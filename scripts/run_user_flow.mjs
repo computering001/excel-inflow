@@ -19,6 +19,8 @@ import {
 import {
   renderDeliveryReport,
   renderFailure,
+  renderStageStatus,
+  WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
 import {
   persistStage,
@@ -50,6 +52,53 @@ import {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 let ACTIVE_RUN_GUARD = null;
+
+const PRESENTATION_SCREENS = Object.freeze({
+  evidence_review: Object.freeze({
+    status: "in progress",
+    summary:
+      "Reading the supplied evidence and reconciling the issuer, periods, statements, debt and broker forecasts.",
+  }),
+  decisions: Object.freeze({
+    status: "complete",
+    summary:
+      "Evidence review is complete and no material unresolved decision requires an answer.",
+  }),
+  build_checks: Object.freeze({
+    status: "in progress",
+    summary:
+      "Solving the economic graph, building the workbook and running the deterministic checks. No response is required.",
+  }),
+  delivery: Object.freeze({
+    status: "in progress",
+    summary:
+      "The workbook cleared its automated build checks and the delivery package is being prepared.",
+  }),
+});
+
+const COMPLETION_SUMMARIES = Object.freeze({
+  evidence_review:
+    "The supplied evidence reconciled and the material decision set has been determined.",
+  build_checks:
+    "The workbook cleared the automated build and validation gates. Delivery can now be prepared.",
+});
+
+function renderPresentationScreen(stageId) {
+  if (stageId === "inputs") return WELCOME_SCREEN;
+  const declaration = PRESENTATION_SCREENS[stageId];
+  if (!declaration) {
+    throw new Error(
+      `--screen must be one of inputs, evidence_review, decisions, build_checks or delivery; got ${stageId}`,
+    );
+  }
+  return renderStageStatus({ stageId, ...declaration });
+}
+
+function renderCompletionScreen(stageId) {
+  const summary = COMPLETION_SUMMARIES[stageId];
+  if (!summary) throw new Error(`No completion screen is declared for ${stageId}`);
+  return renderStageStatus({ stageId, status: "complete", summary });
+}
 
 const STAGE_RUNTIME_MEMBERS = Object.freeze({
   inputs: Object.freeze([
@@ -206,13 +255,22 @@ async function finish({ runDir, result, screen = null, machine = false }) {
 
 async function main() {
   const { positional, options } = parseArgs(process.argv.slice(2));
+  if (options.screen) {
+    if (options.screen === true) {
+      throw new Error("--screen requires a stage id");
+    }
+    const stage = String(options.screen);
+    process.stdout.write(`${renderPresentationScreen(stage)}\n`);
+    return { status: "SCREEN", stage };
+  }
   if ((!positional[0] && !options.carrier) || !options.out) {
     throw new Error(
       "Usage: run_user_flow.mjs <evidence-run.json> --out <run-dir> or " +
         "run_user_flow.mjs --carrier <run-carrier.json> --out <run-dir> " +
         "[--answers <answers.txt|json>] [--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
-        "[--stop-after <stage>] [--json]",
+        "[--stop-after <stage>] [--json], or " +
+        "run_user_flow.mjs --screen <inputs|evidence_review|decisions|build_checks|delivery>",
     );
   }
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });
@@ -359,6 +417,7 @@ async function main() {
   if (options["stop-after"] === "inputs") {
     return finish({
       runDir,
+      screen: renderPresentationScreen("evidence_review"),
       machine: options.json === true,
       result: {
         schema_version: "user-flow-run/1.0",
@@ -512,6 +571,7 @@ async function main() {
   if (options["stop-after"] === "evidence_review") {
     return finish({
       runDir,
+      screen: renderCompletionScreen("evidence_review"),
       machine: options.json === true,
       result: {
         schema_version: "user-flow-run/1.0",
@@ -653,6 +713,7 @@ async function main() {
     const carrier = await persistCurrentCarrier("READY_TO_BUILD", { model_case: answeredCasePath });
     return finish({
       runDir,
+      screen: renderPresentationScreen("build_checks"),
       machine: options.json === true,
       result: {
         schema_version: "user-flow-run/1.0",
@@ -810,6 +871,7 @@ async function main() {
     });
     return finish({
       runDir,
+      screen: renderCompletionScreen("build_checks"),
       machine: options.json === true,
       result: {
         schema_version: "user-flow-run/1.0",
@@ -931,7 +993,7 @@ async function guardedMain() {
 
 guardedMain()
   .then((result) => {
-    process.exitCode = ["PAUSED", "ACTION_REQUIRED", "PASS_PENDING_MANUAL"].includes(result.status)
+    process.exitCode = ["SCREEN", "PAUSED", "ACTION_REQUIRED", "PASS_PENDING_MANUAL"].includes(result.status)
       ? 0
       : 1;
   })

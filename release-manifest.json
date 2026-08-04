@@ -5,12 +5,12 @@
   "skillVersion": "2.0.1",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-04T22:13:08.836Z",
+  "generatedAt": "2026-08-04T22:53:40.476Z",
   "centralInstructionsWords": 3052,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "51ff26a72aa3804ba92363e86e679ff1ef8cef20d40bb8725083bf85f7a2ac3c",
+    "currentClosureSha256": "d8f7ea91ecd9c68cbd01b7e7ee3ff2f4a6401f3997caf630b9e111cafd47b8f7",
     "closureFileCount": 91,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -217,23 +217,39 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python3",
+      "selected": "python",
       "candidates": [
         {
-          "candidate": "python3",
+          "candidate": "python",
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
             "fitz": null,
-            "PIL": "12.2.0",
-            "numpy": "2.4.4",
+            "PIL": null,
+            "numpy": null,
             "jsonschema": null,
-            "pdfplumber": "0.11.9",
-            "pypdf": "6.10.2",
-            "reportlab": "4.4.10"
+            "pdfplumber": null,
+            "pypdf": null,
+            "reportlab": null
           },
           "usable": true,
           "reason": "selected"
+        },
+        {
+          "candidate": "python3",
+          "version": "3.9.6",
+          "packages": {
+            "openpyxl": null,
+            "fitz": null,
+            "PIL": null,
+            "numpy": null,
+            "jsonschema": null,
+            "pdfplumber": null,
+            "pypdf": "6.12.1",
+            "reportlab": null
+          },
+          "usable": false,
+          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
         }
       ]
     },
@@ -631,7 +647,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python3",
+    "pythonExecutable": "python",
     "results": [
       {
         "target": "closure probe",
@@ -755,7 +771,7 @@
         "status": "PASS",
         "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
         "plan_sha256": "963d70e9f5b978ceed398d528297373150a87a12c92fe8c2b383624d981d62de",
-        "workbook_sha256": "a77bdbfe69a68fe4b6f901bdcee9428152a97aa9c5b094d3f9f9ec27e13fac06",
+        "workbook_sha256": "1f207910d6cd7c2856b4518d0eb5e6770d877c6adb786fd70e823bc06f8e3756",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
@@ -764,7 +780,7 @@
       "status": "PASS",
       "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
       "plan_sha256": "963d70e9f5b978ceed398d528297373150a87a12c92fe8c2b383624d981d62de",
-      "workbook_sha256": "a77bdbfe69a68fe4b6f901bdcee9428152a97aa9c5b094d3f9f9ec27e13fac06",
+      "workbook_sha256": "1f207910d6cd7c2856b4518d0eb5e6770d877c6adb786fd70e823bc06f8e3756",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1082,7 +1098,7 @@
     },
     {
       "path": "scripts/lib/flow_runtime.mjs",
-      "sha256": "f3bb660614a636c24444f8fa86b4b70ad39776bbd4d7b689dfc4b151b5e97dcd",
+      "sha256": "cbfee77e2603850fe89bd907de78724dd1168c80e1677467e6416c0305b37fca",
       "bytes": 7394,
       "words": null
     },
@@ -1316,8 +1332,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "bd41015491e625f8c2a619208aad9426efc7c9c5ac97cf65fcf51d2b4741ff55",
-      "bytes": 32208,
+      "sha256": "067703fd5bae784e91c29b3b43a27e207920bce41c099e8184afd989348b51e3",
+      "bytes": 34540,
       "words": null
     },
     {
