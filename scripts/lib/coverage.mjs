@@ -1011,6 +1011,17 @@ function instrumentChecks(modelCase) {
             `${id} needs an explicit commitment-fee convention and value, including an explicit zero.`,
           ),
         );
+      } else if (
+        modelCase.rcf_policy.commitment_fee_convention !== "none" &&
+        !(Number(modelCase.rcf_policy.commitment_fee_value) > 0)
+      ) {
+        checks.push(
+          result(
+            `instrument.${id}.commitment_fee_basis`,
+            "BLOCK",
+            `${id} declares a charged commitment-fee convention but a zero fee. Use convention "none" for a sourced no-fee facility, or supply a positive sourced fee.`,
+          ),
+        );
       }
     }
   }
@@ -1100,6 +1111,18 @@ function fxCoverageChecks(modelCase) {
       } else if (pair[key].some((rate) => !(number(rate) > 0))) {
         problems.push(`${key} must be strictly positive in every period`);
       }
+    }
+    const allDeclaredRates = [
+      ...(pair.average_rates ?? []),
+      ...(pair.period_end_rates ?? []),
+    ].map(number);
+    if (
+      allDeclaredRates.length === 12 &&
+      allDeclaredRates.every((rate) => rate === 1)
+    ) {
+      problems.push(
+        "all twelve rates are the unsourced 1.0 placeholder; supply the actual historical/forecast curve",
+      );
     }
     checks.push(
       result(

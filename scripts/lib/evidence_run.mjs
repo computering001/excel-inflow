@@ -40,6 +40,111 @@ function approximate(left, right, tolerance = 1e-6) {
   return Math.abs(Number(left) - Number(right)) <= tolerance;
 }
 
+function resolveHistoricalStatementSeries(modelCase, section) {
+  const rows = modelCase?.statement_structure?.[section] ?? [];
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const periodCaches = [new Map(), new Map(), new Map()];
+
+  const resolve = (rowId, periodIndex, visiting = new Set()) => {
+    const cache = periodCaches[periodIndex];
+    if (cache.has(rowId)) return cache.get(rowId);
+    const row = byId.get(rowId);
+    if (!row || visiting.has(rowId)) return null;
+
+    const stated = row.values?.[periodIndex];
+    if (finite(stated)) {
+      cache.set(rowId, Number(stated));
+      return Number(stated);
+    }
+
+    const calculation = row.calculation;
+    if (!calculation || !Array.isArray(calculation.refs)) return null;
+    if (calculation.refs.length === 0) return null;
+
+    const nextVisiting = new Set(visiting);
+    nextVisiting.add(rowId);
+    const current = calculation.refs.map((ref) =>
+      resolve(ref, periodIndex, nextVisiting),
+    );
+    if (current.some((value) => value === null)) return null;
+    const previous = (ref) =>
+      periodIndex === 0 ? null : resolve(ref, periodIndex - 1, new Set());
+
+    let value = null;
+    switch (calculation.operator) {
+      case "sum":
+        value = current.reduce((sum, item) => sum + item, 0);
+        break;
+      case "link":
+        value = current[0];
+        break;
+      case "subtract":
+        value = current.slice(1).reduce(
+          (result, item) => result - item,
+          current[0],
+        );
+        break;
+      case "negate":
+        value = -current[0];
+        break;
+      case "negate_sum":
+        value = -current.reduce((sum, item) => sum + item, 0);
+        break;
+      case "ratio":
+        value = current[1] === 0 ? 0 : current[0] / current[1];
+        break;
+      case "negated_ratio":
+        value = current[1] === 0 ? 0 : -current[0] / current[1];
+        break;
+      case "growth": {
+        const prior = previous(calculation.refs[0]);
+        value = prior === null || prior === 0 ? null : current[0] / prior - 1;
+        break;
+      }
+      case "tax":
+        value = current[0] > 0 ? -current[0] * current[1] : 0;
+        break;
+      case "average":
+        value = current.reduce((sum, item) => sum + item, 0) / current.length;
+        break;
+      case "prior_period":
+        value = previous(calculation.refs[0]);
+        break;
+      case "prior_period_scaled_by": {
+        const priorValue = previous(calculation.refs[0]);
+        const priorDriver = previous(calculation.refs[1]);
+        value =
+          priorValue === null || priorDriver === null || priorDriver === 0
+            ? null
+            : (priorValue * current[1]) / priorDriver;
+        break;
+      }
+      default:
+        value = null;
+    }
+    if (finite(value)) cache.set(rowId, Number(value));
+    return finite(value) ? Number(value) : null;
+  };
+
+  return new Map(
+    rows.map((row) => [
+      row.row_id,
+      [0, 1, 2].map((periodIndex) =>
+        resolve(row.row_id, periodIndex, new Set()),
+      ),
+    ]),
+  );
+}
+
+function seriesMatches(left, right, comparable, tolerance = 1e-6) {
+  return comparable.every(
+    (periodIndex) =>
+      finite(left?.[periodIndex]) &&
+      finite(right?.[periodIndex]) &&
+      approximate(left[periodIndex], right[periodIndex], tolerance),
+  );
+}
+
 function bridgeMetricSourceIds(bridge) {
   const ids = new Set();
   for (const metric of bridge?.metrics ?? []) {
@@ -307,7 +412,29 @@ function validateStatementMapping(run, sourceIds, findings) {
     const coverageById = new Map(
       coverage.map((line) => [line.source_line_id, line]),
     );
-    for (const line of run.filings?.[section] ?? []) {
+    const filingLines = run.filings?.[section] ?? [];
+    const filingLineIds = new Set(
+      filingLines.map((line) => line.source_line_id),
+    );
+    // The forward check below proves that every extracted filing line has a
+    // disposition.  The reverse check is equally important: without it an
+    // adapter can keep a large source-coverage graph while presenting only a
+    // short, cherry-picked filings array to the numeric parity gate.
+    for (const disclosure of coverage) {
+      if (
+        sourceIds.has(disclosure.document) &&
+        !filingLineIds.has(disclosure.source_line_id)
+      ) {
+        findings.push(
+          finding(
+            "evidence.statement.coverage_not_extracted",
+            "BLOCK",
+            `${section}.${disclosure.source_line_id} exists in source coverage but is absent from the extracted filing-line ledger.`,
+          ),
+        );
+      }
+    }
+    for (const line of filingLines) {
       if (!sourceIds.has(line.source_id)) {
         findings.push(
           finding(
@@ -366,6 +493,99 @@ function validateStatementMapping(run, sourceIds, findings) {
           );
         }
       }
+    }
+
+    // Mapping existence is not numeric source parity.  A normalized case can
+    // point every filing line at a real row and still carry a different number;
+    // the solver and workbook will then agree perfectly with the wrong case.
+    // Resolve the case's three historical columns independently here and tie
+    // them back to the filing-line values before the case can enter the build.
+    const resolvedSeries = resolveHistoricalStatementSeries(modelCase, section);
+    const rowsById = new Map(
+      (modelCase.statement_structure?.[section] ?? []).map((row) => [
+        row.row_id,
+        row,
+      ]),
+    );
+    const numericGroups = new Map();
+    for (const line of filingLines) {
+      const mapped = coverageById.get(line.source_line_id);
+      if (!mapped || !["mapped", "aggregated"].includes(mapped.disposition)) {
+        continue;
+      }
+      const comparable = [0, 1, 2].filter((index) => finite(line.values?.[index]));
+      if (comparable.length === 0) continue;
+      const mappedRowIds = [...new Set(mapped.mapped_row_ids ?? [])].sort();
+      const key =
+        mapped.disposition === "aggregated"
+          ? `aggregate\u0000${mappedRowIds.join("\u0000")}`
+          : `line\u0000${line.source_line_id}`;
+      if (!numericGroups.has(key)) {
+        numericGroups.set(key, {
+          lines: [],
+          mappedRowIds,
+          mappingMethod: mapped.mapping_method ?? null,
+        });
+      }
+      numericGroups.get(key).lines.push(line);
+    }
+
+    for (const group of numericGroups.values()) {
+      const comparable = [0, 1, 2].filter((periodIndex) =>
+        group.lines.every((line) => finite(line.values?.[periodIndex])),
+      );
+      if (comparable.length === 0) continue;
+      const sourceSeries = [0, 1, 2].map((periodIndex) =>
+        group.lines.every((line) => finite(line.values?.[periodIndex]))
+          ? group.lines.reduce(
+              (sum, line) => sum + Number(line.values[periodIndex]),
+              0,
+            )
+          : null,
+      );
+      const candidates = group.mappedRowIds
+        .map((rowId) => ({ rowId, values: resolvedSeries.get(rowId) }))
+        .filter((candidate) => Array.isArray(candidate.values));
+      const directMatch = candidates.find((candidate) =>
+        seriesMatches(sourceSeries, candidate.values, comparable),
+      );
+      if (directMatch) continue;
+
+      const mappedIds = new Set(group.mappedRowIds);
+      const hasInternalDependency = group.mappedRowIds.some((rowId) =>
+        (rowsById.get(rowId)?.calculation?.refs ?? []).some((ref) =>
+          mappedIds.has(ref),
+        ),
+      );
+      let splitSeries = null;
+      if (!hasInternalDependency && candidates.length > 1) {
+        splitSeries = [0, 1, 2].map((periodIndex) =>
+          candidates.every((candidate) => finite(candidate.values?.[periodIndex]))
+            ? candidates.reduce(
+                (sum, candidate) => sum + Number(candidate.values[periodIndex]),
+                0,
+              )
+            : null,
+        );
+        if (seriesMatches(sourceSeries, splitSeries, comparable)) continue;
+      }
+
+      findings.push(
+        finding(
+          "evidence.statement.numeric_parity",
+          "BLOCK",
+          `${section}.${group.lines.map((line) => line.source_line_id).join("+")} does not numerically reproduce in its mapped normalized row(s).`,
+          {
+            source_values: sourceSeries,
+            mapped_rows: candidates.map((candidate) => ({
+              row_id: candidate.rowId,
+              values: candidate.values,
+            })),
+            split_sum: splitSeries,
+            comparable_periods: comparable,
+          },
+        ),
+      );
     }
   }
 

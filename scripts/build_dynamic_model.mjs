@@ -2766,10 +2766,23 @@ function configureOperatingModel(
   }
 
   function historicalSemanticFormula(definition, column) {
+    const historicalIndex = HISTORICAL_COLUMNS.indexOf(column);
+    const statedHistoricalValue = rowValues(modelCase, definition)?.[
+      historicalIndex
+    ];
+    const hasFiledHistoricalValue = Number.isFinite(
+      Number(statedHistoricalValue),
+    ) && statedHistoricalValue !== null;
     if (definition.semantic_role === "interest_income") {
+      // History is governed by the filed statement row.  The interest schedule
+      // is a reconciliation of that reported amount, not a substitute source.
+      // Forecast columns continue to link to the modelled schedule through
+      // standaloneSemanticFormula().
+      if (hasFiledHistoricalValue) return null;
       return `=${column}${interestRows.interest_income_schedule}`;
     }
     if (definition.semantic_role === "interest_expense") {
+      if (hasFiledHistoricalValue) return null;
       return `=${column}${interestRows.gross_interest_expense}`;
     }
     if (definition.semantic_role === "non_balancing_cash_bucket_movement") {
