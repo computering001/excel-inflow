@@ -1,0 +1,1064 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/model-case-v2.schema.json",
+  "title": "Excel Inflow dynamic production case v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "case_id",
+    "issuer",
+    "periods",
+    "modules",
+    "controls",
+    "operating_metrics",
+    "statement_structure",
+    "source_coverage",
+    "provenance",
+    "broker_pack",
+    "instruments",
+    "debt_reconciliation",
+    "rcf_policy",
+    "cash_policy",
+    "lease_policy"
+  ],
+  "properties": {
+    "contract_version": { "const": 2 },
+    "execution_profile": {
+      "enum": ["production_model", "reference_parity"],
+      "default": "production_model"
+    },
+    "presentation_profile": {
+      "const": "crh_dynamic",
+      "default": "crh_dynamic"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "stage_three_answers": {
+      "type": "object",
+      "description": "Canonical settled stage-3 decisions carried by the case across chats and rebuilds. Keys are stable question IDs and values are stable option IDs.",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "reporting_currency", "units", "fiscal_year_end"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions"] },
+        "fiscal_year_end": {
+          "type": "string",
+          "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+          "description": "The issuer's own year end as MM-DD. Under fiscal_calendar 'fixed_date' this is the exact month and day of every period end. Under '52_53_week' it is the ANCHOR the moving year end sits nearest."
+        },
+        "fiscal_calendar": {
+          "enum": ["fixed_date", "52_53_week"],
+          "default": "fixed_date",
+          "description": "Which fiscal calendar the issuer keeps. 'fixed_date' closes on the same month and day every year. '52_53_week' closes on one weekday near the anchor, so the year end MOVES — 2025-12-27, 2026-01-02, 2027-01-01 — and consecutive ends are 52 or 53 whole weeks apart. Omitting it means fixed_date, which is why every existing case is unaffected. Never asked of the user: the calendar follows from the filings."
+        },
+        "accounting_basis": {
+          "enum": ["IFRS", "US_GAAP", "other_disclosed"],
+          "description": "The issuer's disclosed accounting basis. It informs classification and validation but never replaces issuer-specific statement labels or economics."
+        }
+      }
+    },
+    "periods": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "prefixItems": [
+        { "$ref": "#/$defs/historicalPeriod" },
+        { "$ref": "#/$defs/historicalPeriod" },
+        { "$ref": "#/$defs/historicalPeriod" },
+        { "$ref": "#/$defs/forecastPeriod" },
+        { "$ref": "#/$defs/forecastPeriod" },
+        { "$ref": "#/$defs/forecastPeriod" }
+      ],
+      "items": false
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["multi_currency", "historical_normalisation", "acquisition"],
+      "properties": {
+        "multi_currency": { "type": "boolean" },
+        "historical_normalisation": { "type": "boolean" },
+        "acquisition": { "type": "boolean" }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["broker_case", "circularity", "debt_maturities_roll"],
+      "properties": {
+        "broker_case": { "type": "string", "minLength": 1 },
+        "circularity": { "enum": [0, 1] },
+        "debt_maturities_roll": { "enum": [0, 1] }
+      }
+    },
+    "coverage_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dividends_not_relevant": { "type": "boolean" },
+        "buybacks_not_relevant": { "type": "boolean" }
+      }
+    },
+    "operating_metrics": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/metricSeries" },
+      "required": [
+        "revenue",
+        "adjusted_ebitda",
+        "depreciation_and_amortisation",
+        "change_in_working_capital",
+        "capex",
+        "tax"
+      ]
+    },
+    "forecast_assumptions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": { "type": "number" }
+      }
+    },
+    "statement_structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["income_statement", "cash_flow"],
+      "properties": {
+        "income_statement": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/statementRow" }
+        },
+        "cash_flow": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/statementRow" }
+        }
+      }
+    },
+    "source_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reviewed_at",
+        "review_evidence",
+        "income_statement",
+        "cash_flow"
+      ],
+      "properties": {
+        "status": { "enum": ["incomplete", "complete"] },
+        "classification_contract_version": {
+          "enum": ["legacy", "evidence_v1"],
+          "default": "evidence_v1",
+          "description": "evidence_v1 makes classification evidence a fail-closed production gate; legacy exists only for pre-v1 archived cases."
+        },
+        "reviewed_at": { "type": "string", "format": "date" },
+        "review_evidence": { "type": "string", "minLength": 1 },
+        "income_statement": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceDisclosureLine" }
+        },
+        "cash_flow": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceDisclosureLine" }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/provenanceEntry" }
+      }
+    },
+    "broker_pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_label", "forecast_periods", "metrics"],
+      "properties": {
+        "source_label": { "type": "string", "minLength": 1 },
+        "forecast_periods": { "$ref": "#/$defs/series3Dates" },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/brokerMetric" }
+        },
+        "house_metadata": {
+          "type": "object",
+          "description": "Per-house publication and document metadata retained from the normalized broker input. This makes estimate freshness and selected-house substitution auditable without changing the numeric broker metric shape.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["published_date", "document"],
+            "properties": {
+              "published_date": { "type": "string", "format": "date" },
+              "document": { "type": "string", "minLength": 1 },
+              "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+            }
+          }
+        }
+      }
+    },
+    "instruments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/instrument" }
+    },
+    "debt_reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_opening_gross_debt",
+        "maximum_residual_percentage"
+      ],
+      "properties": {
+        "reported_opening_gross_debt": {
+          "oneOf": [
+            { "type": "number", "minimum": 0 },
+            { "$ref": "#/$defs/series3" }
+          ],
+          "description": "Reported gross debt excluding leases, IN THE REPORTING CURRENCY. As a scalar it is the last historical year end only, and the stack then ties at exactly one date — which is the defect this field's three-series form exists to close. As a three-series, oldest first, it states every historical year end and each is tied and its residual reported. Where the three-series is supplied it must agree with historical_supplement.prior_gross_debt_excluding_leases at the two earlier ends. It is a translated figure: a sum of native USD, EUR and GBP balances is not a currency amount and cannot be reconciled against anything."
+        },
+        "maximum_residual_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.05
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "historical_interest_reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_interest",
+        "identified_interest",
+        "maximum_plug_percentage"
+      ],
+      "properties": {
+        "reported_interest": { "$ref": "#/$defs/series3" },
+        "identified_interest": { "$ref": "#/$defs/series3" },
+        "maximum_plug_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.1
+        }
+      }
+    },
+    "historical_supplement": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Reported history that completes the two earlier balance snapshots and the three-year interest history. DEFECT 0.4: every field below except reported_net_debt_adjustment was read by build_dynamic_model.mjs and declared ONLY in the superseded v1 schema, and this object carried no additionalProperties:false — so prior_gross_debt_excluding_leases was written into columns G and H and styled as an input with nothing in the v2 contract acknowledging its existence, and a misspelt key was silently ignored rather than rejected.",
+      "properties": {
+        "prior_cash_and_cash_equivalents": {
+          "$ref": "#/$defs/series2",
+          "description": "Reported cash at the two EARLIER historical year ends, oldest first. The latest is cash_policy.historical_year_end_cash."
+        },
+        "prior_gross_debt_excluding_leases": {
+          "$ref": "#/$defs/series2",
+          "description": "Reported gross debt excluding leases at the two EARLIER historical year ends, oldest first, in the reporting currency. Written straight into columns G and H of the debt schedule as blue inputs. The latest year end comes from debt_reconciliation.reported_opening_gross_debt and is the only one the instrument register ties to."
+        },
+        "prior_lease_liabilities": {
+          "$ref": "#/$defs/series2",
+          "description": "Reported total lease liability at the two EARLIER historical year ends, oldest first. Superseded by lease_policy.historical_liabilities where that is supplied."
+        },
+        "debt_interest_expense": { "$ref": "#/$defs/series3" },
+        "lease_interest_expense": { "$ref": "#/$defs/series3" },
+        "rcf_commitment_fee": { "$ref": "#/$defs/series3" },
+        "non_cash_interest": { "$ref": "#/$defs/series3" },
+        "interest_income": { "$ref": "#/$defs/series3" },
+        "reported_net_debt_adjustment": {
+          "type": "array",
+          "description": "The bridge from the model's standardised net debt to the figure the issuer itself publishes, stated as a list of NAMED reconciling items. Each item is one thing the company's own definition does that the model's does not — an unamortised fair-value adjustment or issue-cost discount, a debt derivative, a class of lease the issuer leaves out of net debt. Supplying this renders a separate 'company reported' sub-block: the model figure is restated, each named item is a visible row beneath it, and the published number and its leverage multiple follow. Omit it entirely when the model basis IS the company basis — a single anonymous 'reported adjustments' row that sits at zero tells the reader a difference exists and nothing about what it is, and the model-basis header already states that the two bases agree. Items that are zero in every period are dropped.",
+          "items": { "$ref": "#/$defs/reportedNetDebtAdjustmentComponent" }
+        }
+      }
+    },
+    "rcf_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "capacity",
+        "opening_draw",
+        "commitment_fee_convention",
+        "commitment_fee_value"
+      ],
+      "properties": {
+        "instrument_id": { "type": "string" },
+        "capacity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Committed capacity in the matched RCF instrument's native currency. For a reporting-currency facility this is also a reporting-currency amount."
+        },
+        "opening_draw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Opening drawn balance in the matched RCF instrument's native currency. It must equal that instrument's opening_balance before any FX translation."
+        },
+        "commitment_fee_convention": {
+          "enum": ["none", "bps_on_undrawn"]
+        },
+        "commitment_fee_value": { "type": "number", "minimum": 0 }
+      }
+    },
+    "cash_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_cash_override"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "opening_cash",
+            "historical_year_end_cash",
+            "eligible_cash_percentage",
+            "cash_yield"
+          ]
+        },
+        {
+          "required": ["buckets"],
+          "not": {
+            "anyOf": [
+              { "required": ["opening_cash"] },
+              { "required": ["historical_year_end_cash"] },
+              { "required": ["eligible_cash_percentage"] },
+              { "required": ["cash_yield"] }
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "opening_cash": { "type": "number", "minimum": 0 },
+        "historical_year_end_cash": { "$ref": "#/$defs/series3" },
+        "minimum_cash_override": { "type": ["number", "null"], "minimum": 0 },
+        "eligible_cash_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interest_income_cash_flow_classification": {
+          "enum": ["operating", "investing"]
+        },
+        "cash_yield": { "$ref": "#/$defs/series3" },
+        "buckets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/cashBucket" },
+          "description": "Optional explicit cash-bucket authority. Exactly one bucket is balancing. When supplied, legacy opening_cash, historical_year_end_cash, eligible_cash_percentage and cash_yield are omitted rather than restated."
+        }
+      }
+    },
+    "lease_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "principal_repayment",
+        "additions",
+        "effective_rate",
+        "include_in_gross_debt",
+        "include_in_net_debt",
+        "include_in_leverage"
+      ],
+      "anyOf": [
+        { "required": ["historical_liabilities"] },
+        { "required": ["opening_liability"] }
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "exclude",
+            "flat_replacement",
+            "simple_roll_forward",
+            "sourced_balance"
+          ]
+        },
+        "historical_liabilities": {
+          "$ref": "#/$defs/series3",
+          "description": "Reported total lease liability (finance + operating) at each of the three historical period ends, oldest first. This is the preferred input: it states the historical lease balance as a period series, so each actual column carries its own reported figure instead of one column's number being copied across. The last element is the closing balance of the last actual period and therefore the opening balance of the forecast roll-forward, which is why it supersedes opening_liability when both are present."
+        },
+        "opening_liability": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Legacy scalar form of the forecast opening lease liability. Supply historical_liabilities instead where the three reported actuals are known; this field is only consulted when historical_liabilities is absent."
+        },
+        "principal_repayment": { "$ref": "#/$defs/series3" },
+        "additions": { "$ref": "#/$defs/series3" },
+        "effective_rate": { "$ref": "#/$defs/series3" },
+        "forecast_liabilities": {
+          "$ref": "#/$defs/series3",
+          "description": "Explicit total lease-liability forecast used only under sourced_balance. The model retains the sourced closing balances and derives the implied additions bridge from opening + additions - principal = closing."
+        },
+        "interest_basis": {
+          "enum": ["none", "total_liability", "separately_supplied"],
+          "description": "Which liability base earns separately presented lease interest. IFRS cases may use total_liability. US GAAP cases must choose explicitly so operating lease cost already captured above EBIT is not silently duplicated."
+        },
+        "historical_interest_bearing_liabilities": {
+          "$ref": "#/$defs/series3",
+          "description": "Historical finance-lease or otherwise separately interest-bearing balances, required when interest_basis is separately_supplied."
+        },
+        "forecast_interest_bearing_liabilities": {
+          "$ref": "#/$defs/series3",
+          "description": "Forecast finance-lease or otherwise separately interest-bearing balances, required when interest_basis is separately_supplied."
+        },
+        "operating_lease_interest_separately_reclassified": {
+          "type": "boolean",
+          "description": "True only when the issuer or supplied forecast explicitly reclassifies the interest component of US GAAP operating lease cost into interest expense."
+        },
+        "include_in_gross_debt": { "type": "boolean" },
+        "include_in_net_debt": { "type": "boolean" },
+        "include_in_leverage": { "type": "boolean" }
+      }
+    },
+    "other_interest": { "$ref": "#/$defs/series3" },
+    "non_cash_interest": { "$ref": "#/$defs/series3" },
+    "acquisition": { "$ref": "#/$defs/acquisition" },
+    "fx": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/fxPair" }
+    },
+    "historical_entities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/historicalEntity" },
+      "description": "Predecessor or calendarised historical contributors expressed in reporting-currency semantic metrics. The production compiler combines these values, less metric-specific eliminations, into the first three periods of the canonical case."
+    }
+  },
+  "$defs": {
+    "historicalPeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "status"],
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "status": { "const": "historical" }
+      }
+    },
+    "forecastPeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "status"],
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "status": { "const": "forecast" }
+      }
+    },
+    "reportedNetDebtAdjustmentComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "values"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The issuer's own name for this reconciling item, used verbatim as the row label under a '(+/-)' prefix. Name the thing, not the fact that an adjustment exists: 'Unamortized FV adjustments, discounts and issuance costs', not 'Reported adjustments'."
+        },
+        "values": {
+          "$ref": "#/$defs/series6",
+          "description": "The item across all six periods, oldest first: three reported actuals then the three forecast periods. Signed as it moves net debt — negative where the company's definition carries less debt than the model's. Every period is a hardcode because every period is a reported or assumed fact, not something the model derives."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional provenance, attached as a cell comment on the first actual."
+        }
+      }
+    },
+    "series2": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    },
+    "series3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number" }
+    },
+    "series6": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "type": ["number", "null"] }
+    },
+    "series3Dates": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "metricSeries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["values", "forecast_method", "source_kind"],
+      "properties": {
+        "values": { "$ref": "#/$defs/series6" },
+        "forecast_method": {
+          "enum": [
+            "supplied_exact",
+            "derived_compatible",
+            "company_assumption",
+            "not_applicable"
+          ]
+        },
+        "source_kind": {
+          "enum": [
+            "company_reported",
+            "broker",
+            "user_supplied",
+            "inferred",
+            "none"
+          ]
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "historicalEntity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "metrics_basis",
+        "calendarisation_notes",
+        "metrics"
+      ],
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "fiscal_year_end": {
+          "type": "string",
+          "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "metrics_basis": { "const": "reporting_currency_calendarised" },
+        "calendarisation_notes": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/series3" }
+        },
+        "metric_specific_eliminations": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/series3" }
+        },
+        "source_line_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        }
+      }
+    },
+    "formulaRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "refs"],
+      "properties": {
+        "operator": {
+          "enum": ["sum", "link", "subtract", "ratio", "negated_ratio", "growth", "tax", "negate", "negate_sum", "prior_period", "prior_period_scaled_by", "average"]
+        },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "statementRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "label", "row_type"],
+      "properties": {
+        "row_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "row_type": {
+          "enum": ["input", "calculation", "subtotal", "header", "uncalculated"]
+        },
+        "semantic_role": { "type": "string" },
+        "operation_scope": {
+          "enum": ["continuing", "discontinued", "combined", "not_applicable"],
+          "description": "The operating perimeter represented by this row across the three historical years. A combined or mixed-parent presentation requires an explicit reconciliation note."
+        },
+        "scope_reconciliation_note": { "type": "string", "minLength": 1 },
+        "aggregation_authority": {
+          "enum": ["reported_parent", "derived_from_children", "standalone"],
+          "description": "Whether the row is the reported authority, a formula derived from children, or independent of a hierarchy."
+        },
+        "parent_row_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "aggregation_role": {
+          "enum": ["contributing_child", "working_child", "standalone"],
+          "description": "A contributing child feeds a derived parent. A working child is shown beneath a reported parent but must not be counted again."
+        },
+        "economic_class": {
+          "enum": ["working_capital", "provision", "pension", "tax", "restructuring", "deferred_revenue", "other_operating", "investing", "financing", "non_cash_debt"],
+          "description": "Economic classification authority used for aggregation and cash-flow treatment. Wording is never the controlling signal when this field is present."
+        },
+        "classification_status": {
+          "enum": ["accepted", "ambiguous", "unmapped", "manual_reviewed"]
+        },
+        "classification_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "classification_source_line_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "acquisition_driver_role": {
+          "enum": [
+            "revenue",
+            "adjusted_ebitda",
+            "depreciation_and_amortisation",
+            "ebit",
+            "change_in_working_capital",
+            "capex"
+          ]
+        },
+        "movement_type": {
+          "enum": [
+            "operating_cash_flow",
+            "investing_cash_flow",
+            "non_debt_financing",
+            "debt_issuance",
+            "scheduled_amortisation",
+            "maturity_repayment",
+            "debt_issuance_cost",
+            "other_cash_debt_movement",
+            "non_cash_debt_movement",
+            "pik_accretion",
+            "fair_value_debt_movement",
+            "other_non_cash_debt_movement",
+            "lease_principal",
+            "working_capital_movement",
+            "rcf_draw",
+            "rcf_repayment",
+            "fx_on_cash",
+            "cash_balance"
+          ]
+        },
+        "cash_flow_classification": {
+          "enum": [
+            "operating",
+            "investing",
+            "financing",
+            "cash_reconciliation",
+            "none"
+          ]
+        },
+        "movement_note": { "type": "string" },
+        "values": { "$ref": "#/$defs/series6" },
+        "calculation": { "$ref": "#/$defs/formulaRule" },
+        "forecast_calculation": { "$ref": "#/$defs/formulaRule" },
+        "forecast_period_calculations": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "anyOf": [
+              { "$ref": "#/$defs/formulaRule" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "broker_metric_id": { "type": "string" },
+        "forecast_treatment": {
+          "enum": ["broker", "hardcode", "formula", "zero", "uncalculated"]
+        },
+        "indent": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "style_role": {
+          "enum": ["body", "subsection", "total", "header"]
+        },
+        "number_format": {
+          "enum": ["amount", "percentage", "rate", "multiple", "date"]
+        },
+        "source_line_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        }
+      }
+    },
+    "sourceDisclosureLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_line_id",
+        "label",
+        "document",
+        "page_or_note",
+        "face_statement",
+        "material",
+        "disposition",
+        "mapped_row_ids"
+      ],
+      "properties": {
+        "source_line_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "document": { "type": "string", "minLength": 1 },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "face_statement": { "type": "boolean" },
+        "material": { "type": "boolean" },
+        "disposition": {
+          "enum": ["mapped", "aggregated", "not_applicable"]
+        },
+        "mapped_row_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        },
+        "mapping_method": {
+          "enum": [
+            "exact",
+            "renamed",
+            "aggregate",
+            "split",
+            "derived",
+            "not_applicable"
+          ]
+        },
+        "reason": { "type": "string" }
+        ,"source_position": { "type": "integer", "minimum": 0 }
+        ,"parent_label": { "type": "string" }
+        ,"neighbouring_labels": { "type": "array", "items": { "type": "string" } }
+        ,"table_context": { "type": "string" }
+        ,"classification_status": { "enum": ["accepted", "ambiguous", "unmapped", "manual_reviewed"] }
+        ,"classified_role": { "type": ["string", "null"] }
+        ,"classification_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        ,"classification_evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["channel", "detail", "score"],
+            "properties": {
+              "channel": { "enum": ["label", "context", "hierarchy", "numeric", "negative"] },
+              "detail": { "type": "string", "minLength": 1 },
+              "score": { "type": "number", "minimum": -1, "maximum": 1 }
+            }
+          }
+        }
+        ,"classification_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "score"],
+            "properties": {
+              "role": { "type": "string", "minLength": 1 },
+              "score": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        }
+        ,"classification_review_status": { "enum": ["not_required", "auto_accepted", "reviewed", "needs_question", "blocked"] }
+        ,"classifier_version": { "type": "string" }
+      }
+    },
+    "provenanceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "period_index",
+        "document",
+        "publication_date",
+        "page_or_note",
+        "units",
+        "source_label"
+      ],
+      "properties": {
+        "period_index": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "document": { "type": "string", "minLength": 1 },
+        "publication_date": { "type": "string", "minLength": 1 },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "units": { "type": "string", "minLength": 1 },
+        "source_label": { "type": "string", "minLength": 1 },
+        "transformation": { "type": "string" }
+      }
+    },
+    "brokerMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "brokers"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "provider_consensus": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["number", "null"] }
+        },
+        "brokers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+    "cashBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bucket_id",
+        "label",
+        "historical_year_end",
+        "forecast_treatment",
+        "available_for_liquidity",
+        "net_debt_eligible_percentage",
+        "interest_eligible_percentage",
+        "cash_yield"
+      ],
+      "properties": {
+        "bucket_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "historical_year_end": { "$ref": "#/$defs/series3" },
+        "forecast_treatment": {
+          "enum": ["balancing", "hardcode", "flat"]
+        },
+        "forecast_values": {
+          "oneOf": [
+            { "$ref": "#/$defs/series3" },
+            { "type": "null" }
+          ]
+        },
+        "available_for_liquidity": { "type": "boolean" },
+        "net_debt_eligible_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "interest_eligible_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cash_yield": { "$ref": "#/$defs/series3" },
+        "source_line_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "forecast_treatment": { "const": "hardcode" }
+            },
+            "required": ["forecast_treatment"]
+          },
+          "then": {
+            "required": ["forecast_values"],
+            "properties": {
+              "forecast_values": { "$ref": "#/$defs/series3" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "forecast_treatment": { "const": "balancing" }
+            },
+            "required": ["forecast_treatment"]
+          },
+          "then": {
+            "properties": {
+              "available_for_liquidity": { "const": true }
+            }
+          },
+          "else": {
+            "properties": {
+              "available_for_liquidity": { "const": false }
+            }
+          }
+        }
+      ]
+    },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "display_order",
+        "name",
+        "class",
+        "currency",
+        "opening_balance",
+        "rate_type",
+        "include_in_gross_debt",
+        "include_in_net_debt",
+        "cash_interest"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$"
+        },
+        "display_order": { "type": "integer", "minimum": 0 },
+        "name": { "type": "string", "minLength": 1 },
+        "display_group": { "type": "string", "minLength": 1 },
+        "class": {
+          "enum": [
+            "fixed_bond",
+            "floating_loan",
+            "commercial_paper",
+            "securitisation",
+            "rcf",
+            "other_debt"
+          ]
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "opening_balance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Opening balance in the instrument's declared native currency. Reporting-currency presentation is derived through the declared period-end FX pair."
+        },
+        "maturity_date": { "type": ["string", "null"], "format": "date" },
+        "maturity_precision": {
+          "type": ["string", "null"],
+          "enum": ["day", "month", "year", "derived", null],
+          "description": "Precision actually disclosed for maturity_date. The schedule renders only this much: a day where a filing gives one, a month where only a month is disclosed, a year otherwise. Prevents padding a date to a day nobody sourced."
+        },
+        "maturity_treatment": {
+          "enum": ["contractual", "non_maturing_within_forecast"]
+        },
+        "scheduled_amortisation": { "$ref": "#/$defs/series3" },
+        "scheduled_amortisation_dates": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["string", "null"], "format": "date" }
+        },
+        "new_issuance": { "$ref": "#/$defs/series3" },
+        "forecast_ending_balances": {
+          "$ref": "#/$defs/series3",
+          "description": "Optional sourced native-currency period-end balances. These do not replace formulas: each must reconcile to opening + declared issuance + declared non-cash movements + PIK - amortisation - maturity repayment. A mismatch blocks the solve."
+        },
+        "balance_authority_note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required when forecast_ending_balances is supplied; states the source and balance convention used for the tie-out."
+        },
+        "other_non_cash_movement": {
+          "$ref": "#/$defs/series3",
+          "description": "Legacy aggregate instrument-currency fair-value and other non-cash balance movements. It excludes PIK/capitalised interest. Use either this legacy aggregate or non_cash_movement_components, never both. These movements change the debt roll-forward and never enter financing cash flow. FX translation is derived separately from the declared currency curves."
+        },
+        "non_cash_movement_components": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fair_value": { "$ref": "#/$defs/series3" },
+            "other": { "$ref": "#/$defs/series3" }
+          },
+          "minProperties": 1,
+          "description": "Separately visible instrument-currency non-cash principal movements other than PIK and FX. The compiler derives the aggregate; these children never enter financing cash flow."
+        },
+        "new_issuance_dates": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["string", "null"], "format": "date" }
+        },
+        "rate_type": { "enum": ["fixed", "floating", "manual_all_in"] },
+        "coupon_or_all_in_rate": { "$ref": "#/$defs/series3" },
+        "benchmark": { "type": ["string", "null"] },
+        "benchmark_rate": { "$ref": "#/$defs/series3" },
+        "benchmark_floor": {
+          "$ref": "#/$defs/series3",
+          "description": "Contractual reference-rate floor for a floating instrument. Omission preserves the legacy zero floor."
+        },
+        "spread_bps": { "type": ["integer", "null"], "minimum": 0 },
+        "pik_rate": {
+          "$ref": "#/$defs/series3",
+          "description": "Additional non-cash capitalised-interest rate. PIK accrues into principal, is included in interest expense and never enters financing cash flow."
+        },
+        "facility_capacity": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "For an RCF, committed capacity in the instrument's declared native currency; it must equal rcf_policy.capacity on that same native basis."
+        },
+        "include_in_gross_debt": { "type": "boolean" },
+        "include_in_net_debt": { "type": "boolean" },
+        "cash_interest": { "type": "boolean" },
+        "is_residual_pool": { "type": "boolean" },
+        "assumption_note": { "type": "string" },
+        "source_line_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        }
+      }
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "transaction_enterprise_value",
+        "entry_ev_to_ebitda",
+        "acquisition_debt_amount",
+        "incremental_rate",
+        "close_year",
+        "close_month"
+      ],
+      "properties": {
+        "enabled": { "enum": [0, 1] },
+        "transaction_enterprise_value": { "type": "number", "minimum": 0 },
+        "entry_ev_to_ebitda": { "type": "number", "exclusiveMinimum": 0 },
+        "acquisition_debt_amount": { "type": "number", "minimum": 0 },
+        "incremental_rate": { "type": "number", "minimum": 0 },
+        "close_year": { "type": "integer", "minimum": 1900 },
+        "close_month": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "fxPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quote", "average_rates", "period_end_rates"],
+      "properties": {
+        "quote": { "enum": ["reporting_per_native", "native_per_reporting"] },
+        "average_rates": { "$ref": "#/$defs/series6" },
+        "period_end_rates": { "$ref": "#/$defs/series6" }
+      }
+    }
+  }
+}

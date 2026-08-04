@@ -1,0 +1,541 @@
+{
+  "schema_version": 2,
+  "presentation_profile": "crh_consolidated",
+  "font": {
+    "family": "Calibri",
+    "body_size": 8,
+    "section_size": 8,
+    "title_size": 8
+  },
+  "colors": {
+    "_comment": "There is NO input fill. `input_fill` / `input_yellow_fill` (#FFF2CC) were added and then removed: 411 tinted cells on the Smurfit case is a highlighter pass, not a reference model. `total_fill` is gone with them because it was a synonym for `answer_fill` while block subtotals actually carry `subsection_fill`, so the one name covered two different treatments. An editable cell is BLUE FONT and nothing else — see fill_semantics.",
+    "section_fill": "#092064",
+    "section_font": "#FFFFFF",
+    "subsection_fill": "#EFF5F9",
+    "answer_fill": "#D9EAF7",
+    "na_fill": "#EFEFEF",
+    "toggle_on_fill": "#C6EFCE",
+    "toggle_off_fill": "#F2F2F2",
+    "state_amber_fill": "#FFEB9C",
+    "state_red_fill": "#FFC7CE",
+    "white": "#FFFFFF",
+    "formula": "#000000",
+    "input": "#0000FF",
+    "same_workbook_link": "#008000",
+    "external_link": "#FF0000",
+    "border_light": "#BFBFBF",
+    "border_dark": "#7F7F7F"
+  },
+  "provenance": {
+    "section_fill": "directly verified",
+    "font": "directly verified",
+    "other_fill_colors": "screenshot-derived approximation"
+  },
+  "font_role_rules": {
+    "hardcoded_numeric_or_text_input": "input",
+    "historical_source_hardcode": "input",
+    "calculation_formula": "formula",
+    "same_sheet_formula": "formula",
+    "formula_with_other_sheet_reference": "same_workbook_link",
+    "external_workbook_formula": "external_link",
+    "section_or_period_header": "section_font",
+    "hardcoded_input_zero": "input",
+    "formula_returning_zero": "formula"
+  },
+  "conditional_controls": {
+    "allowed_values": [
+      0,
+      1
+    ],
+    "display": {
+      "0": "Off",
+      "1": "On"
+    },
+    "on_font": "#000000",
+    "on_fill": "#C6EFCE",
+    "off_font": "#7F7F7F",
+    "off_fill": "#F2F2F2",
+    "bold": true,
+    "horizontal_alignment": "center",
+    "distinct_from_entry_field": true,
+    "underlying_provenance_role": "hardcoded_input"
+  },
+  "number_formats": {
+    "_comment": "The ladder. One format per class of content, and every format the build emits appears here verbatim — these are the exact formatCode strings in xl/styles.xml, not a description of them. The old single `rate` key had to serve coupons AND spreads at once, which is why the 0.000% coupon format was specified here and absent from every emitted file.",
+    "amount": "#,##0;(#,##0);\"–\"",
+    "adjustment_delta": "\"+\"#,##0;(#,##0);\"–\"",
+    "adjustment_delta_note": "The AMOUNT format for the ADJUSTMENT block N:P only, and the reason it is a separate entry rather than a variant applied ad hoc. N:P is the middle term of A + B = C: it states what the transaction ADDS to the standalone case, not a third level standing beside the other two. Carrying plain `amount` there made a figure in P typographically identical to a figure in L, which is what left the adjustment columns reading as a third complete statement. The explicit leading `+` is what distinguishes a bridge column from a balance column; negatives keep the model's parentheses, so the pair reads +1,100 / (48). It is applied ONLY where the base format is `amount` — a percentage, multiple or rate in N:P restates the pro-forma ratio rather than the change in it, and a `+` there would misstate what the number is. THE ZERO SECTION IS DELIBERATELY STILL AN EN-DASH, NOT BLANK: see zero_and_uncalculated_must_not_converge. An en-dash says the row does not move, an empty cell says there is nothing there, grey says it was never computed; blanking the zero would collapse the first two and destroy the distinction. Resolver: scripts/build_dynamic_model.mjs :: setPeriodNumberFormat.",
+    "percentage": "0.0%;(0.0%);\"–\"",
+    "coupon": "0.000%",
+    "benchmark_or_spread": "0.00%",
+    "multiple": "0.0x;(0.0x);\"–\"",
+    "fx_rate": "0.0000;(0.0000);\"–\"",
+    "year": "0000",
+    "month": "00",
+    "historical_period": "mmm-yy",
+    "forecast_period": "mmm-yy\"E\"",
+    "date": "dd-mmm-yy",
+    "binary_control": "[=1]\"On\";[=0]\"Off\""
+  },
+  "number_format_rules": {
+    "closed_set": true,
+    "closed_set_note": "No numFmt may reach styles.xml that is not listed in number_formats. A raw 0.0000 and a bare 0 were in active use with nothing to say what they meant.",
+    "true_zero_renders_en_dash_on_white": true,
+    "uncalculated_renders_grey_fill": true,
+    "zero_and_uncalculated_must_not_converge": "The en-dash on white says the figure is zero; the grey fill says it was never computed. That distinction is the only thing telling a reader which is which, so grey is always a FILL and never a number format, and every format that can hold a computed zero carries an explicit zero section."
+  },
+  "fill_semantics": {
+    "_comment": [
+      "ONE FILL, ONE MEANING — and THE FILL CHANNEL BELONGS TO TOTALS.",
+      "#D9EAF7 used to be the total fill AND the input fill, so a subtotal row",
+      "and a cell the reader is meant to type over were the same colour: a real",
+      "provenance collision. A yellow input fill broke it, and was too loud —",
+      "411 tinted cells on one case. It is broken instead by giving fill to the",
+      "rank hierarchy ALONE (nothing on a component sum, #EFF5F9 on a block",
+      "subtotal, #D9EAF7 on an answer) and leaving every input unfilled. An",
+      "input has no fill to collide with, so the collision cannot recur by any",
+      "route.",
+      "CONSEQUENCE: blue font is now the ONLY thing marking an input, which",
+      "makes the provenance layer more load-bearing than before, not less.",
+      "`conditional_state.conditional_font_colour_forbidden` and the emitter's",
+      "partial-font-assignment rule are what protect it."
+    ],
+    "white": "ordinary body, formulas, calculated zero, and every COMPONENT SUM",
+    "subsection": "subsection headers AND block subtotals",
+    "answer": "answer rows only — roughly ten rows, never an input",
+    "na_grey": "intentionally not calculated or not applicable only",
+    "input": "NO FILL. An editable input is marked by blue font alone, wherever it sits. An input that is ALSO a total (a subtotal whose history is hardcoded) carries its own rank's fill, which is the row's identity and not an input marking.",
+    "state_amber": "conditional: revolver drawn in that year",
+    "state_red": "conditional: liquidity shortfall in that year",
+    "one_fill_one_meaning": true,
+    "input_carries_no_fill": true,
+    "answer_fill_appears_on_answer_rows_only": true,
+    "ordinary_zero_may_display_dash_without_grey": true,
+    "blank_or_broken_formula_may_not_be_hidden_by_grey": true,
+    "blanket_adjustment_fill_forbidden": true,
+    "blanket_pro_forma_fill_forbidden": true,
+    "blanket_forecast_fill_forbidden": true
+  },
+  "layout": {
+    "_comment": [
+      "These are the values the DYNAMIC build emits, read back out of",
+      "xl/worksheets/sheet1.xml — not the geometry of the static template in",
+      "scripts/build_template.mjs. The whole block used to be a verbatim copy of",
+      "that template (freeze G16, B at 27, C:E at 9.75 and so on), which was",
+      "accurate for build_template.mjs and wrong for every model actually",
+      "shipped: seven of the eight width entries and the freeze row disagreed",
+      "with the emitted package.",
+      "freeze_pane is COMPILED OUTPUT, the same way physical rows are (see",
+      "total_ranks). patchFreezePane() freezes at G{period_row + 1}, so the row",
+      "moves the moment the row plan does; G16 is what period_row 15 compiles",
+      "to across every current case, period_row itself now being DERIVED from",
+      "the last control row plus the two blank rows that separate the control",
+      "block from the period header. It now happens to AGREE with",
+      "template-contract.json's crh_consolidated.freeze_pane, and must still not",
+      "be linted against it: that profile describes the static template, which",
+      "freezes at G16 for reasons of its own, and the agreement is a coincidence",
+      "of row counts, not a shared rule. lint_contracts.mjs asserts",
+      "only the invariant that survives compilation — the split is at column G,",
+      "i.e. xSplit 6, leaving the label and terms block B:E visible."
+    ],
+    "hide_gridlines": true,
+    "freeze_pane": "G16",
+    "blank_rows_between_control_block_and_period_header": 2,
+    "blank_rows_note": "There were eight — a screen of nothing between the block a reader sets and the grid it drives. The gap is DERIVED in row_plan.mjs from the last control row, so it cannot drift when a control is added or removed.",
+    "block_titles": {
+      "_comment": "`Standalone` / `Adjustment` / `Pro Forma` on the period-group row are CENTRED ACROSS their blocks by alignment, never by merging: horizontal=centerContinuous on every cell of G:L, N:P and R:U, with the text in the leftmost cell of each run. patchBlockTitleAlignment() writes it into the package, because format.horizontalAlignment is the fourth formatting call the writer accepts and emits nothing for — it rejects centerContinuous outright and silently drops the values it does accept.",
+      "mechanism": "center_continuous",
+      "merge_forbidden": true,
+      "runs": ["G:L", "N:P", "R:U"],
+      "text_cells": ["G", "N", "R"]
+    },
+    "row_height_body": 12.5,
+    "row_height_section": 15,
+    "column_widths": {
+      "_comment": "Column F is a gutter at width 2 in the dynamic build, so the old `F:L` key could not survive: it grouped a gutter with five period columns. A, F, M and Q are all narrow spacers, but only A, M and Q are BREAKS — see gutter_policy.",
+      "_label_column_comment": "B was 39 (202.83pt usable at Calibri 8). An instrument row is the one label row that cannot overflow — C, D and E carry its currency, nominal and maturity — and the longest instrument name in the certification suite needs 224.36pt, so five labels were cut at the column edge on standard-maximal and Smurfit and two more sat within a point of it on AstraZeneca. Those names are source text and may not be shortened to fit, so the column carries them: 45 characters is 234.33pt usable, 4.4% clear of the widest. The width unit is the MAXIMUM DIGIT WIDTH of the workbook default font, fonts[0], which is why that font must be Calibri and not a substitute Excel does not have.",
+      "A": 1,
+      "B": 45,
+      "C:D": 10,
+      "E": 12,
+      "F": 2,
+      "G:L": 10,
+      "M": 2,
+      "N:P": 10,
+      "Q": 2,
+      "R:U": 10
+    },
+    "gutter_policy": {
+      "_comment": [
+        "A NARROW COLUMN IS NOT AUTOMATICALLY A BREAK. A, F, M and Q are all",
+        "width-1-or-2 spacers and were all treated as breaks, which is what cut",
+        "every band and every rule in two at column F.",
+        "F sits between the instrument TERM columns C:E and the PERIOD GRID from",
+        "G. Both sides of it belong to the SAME line item on the SAME basis — a",
+        "bond's currency and that bond's 2027 balance are two facts about one",
+        "row — so a fill or a rule that stops at F splits one row into two",
+        "halves with no reason to be apart, and leaves a section band reading as",
+        "a labelled block plus a detached rectangle over the period columns.",
+        "M and Q separate STANDALONE from ADJUSTMENT and ADJUSTMENT from PRO",
+        "FORMA: three different BASES of the same figure, which the reader must",
+        "never conflate. The white gap is what makes three column blocks read as",
+        "three column blocks, so it stays.",
+        "A is the sheet's left margin — nothing to its left to carry across to.",
+        "REVERSAL, RECORDED: `gutter_columns_must_remain_white` previously",
+        "included F and the build honoured it. Reviewer round 4, item C2,",
+        "approved carrying the formatting across F. This is a contract change,",
+        "not a tweak, and CARRY_THROUGH_GUTTERS in",
+        "scripts/build_dynamic_model.mjs is the single place it is implemented."
+      ],
+      "must_remain_white": ["A", "M", "Q"],
+      "carry_formatting_through": ["F"],
+      "terms_period_boundary_marked_by": "the terms block's own vertical edges, not by a white gap — a vertical division belongs in a vertical channel"
+    },
+    "gutter_columns_must_remain_white": [
+      "A",
+      "M",
+      "Q"
+    ],
+    "merged_calculation_cells_forbidden": true
+  },
+  "section_bands": {
+    "_comment": [
+      "A BAND SPANS THE COLUMN BLOCKS ITS SECTION ACTUALLY USES.",
+      "The former `ranges` array carried PHYSICAL ROW NUMBERS (B4:L4, B16:L16 …)",
+      "and was stale on every current case — the control band is on row 3, not",
+      "row 4 — for exactly the reason total_ranks stopped listing rows: physical",
+      "rows are compiled output and never canonical. What is canonical is which",
+      "COLUMN BLOCKS a band covers.",
+      "Every statement section spans all three period blocks. The CONTROL",
+      "section does not: it is two panels, the model controls at B:C and the",
+      "acquisition case at N:P, with no period grid at all. Banded across all",
+      "blocks it emitted navy over G:L and again over R:U — ten columns of",
+      "section header over permanently empty sheet, marking nothing (reviewer",
+      "round 4, item B6). Filling a column block a section does not reach is a",
+      "claim the sheet cannot honour."
+    ],
+    "column_blocks": {
+      "control": ["B:E", "N:P"],
+      "default": ["B:L", "N:P", "R:U"]
+    },
+    "resolver": "scripts/build_dynamic_model.mjs :: styleSection",
+    "fill": "section_fill",
+    "font": "section_font",
+    "bold": true,
+    "spans_carry_through_gutters": true,
+    "breaking_gutter_columns_excluded": true
+  },
+  "total_ranks": {
+    "_comment": [
+      "THREE RANKS OF TOTAL, keyed on the row's own SEMANTIC IDENTITY *AND THE",
+      "SECTION IT IS EMITTED INTO*.",
+      "This replaces the former `total_rows` and `subsection_rows` arrays, which",
+      "carried PHYSICAL ROW NUMBERS and so contradicted the architecture rule that",
+      "physical rows are compiled output and never canonical: insert one instrument",
+      "and every number in those arrays was wrong while still reading as",
+      "authoritative. Rank now resolves in scripts/lib/row_plan.mjs (totalRank,",
+      "groupSubtotalRank) from (row_id | semantic_role, section), and the emitter",
+      "looks the physical row up through the compiled plan.",
+      "WHY SECTION. The same line is legitimately an ANSWER where it concludes a",
+      "build-up and a STEP where it feeds one. `net_interest_expense` is the answer",
+      "of the interest schedule and a step on the income statement. Keyed on the id",
+      "alone it could only be one of the two, and the set — written from the debt",
+      "overlay's point of view — declared it an answer everywhere. The income",
+      "statement then gave the reader a double-ruled, answer-filled INTEREST line",
+      "with net income below it in a lighter treatment, while `adjusted_ebitda`,",
+      "`ebit` and `net_income` were not in the answer set at all.",
+      "BOLD IS NOT PART OF RANK ANY MORE — see `headline` below. Rank owns the",
+      "fill and the rules; narrative prominence is its own declared channel.",
+      "Subsection headers are likewise resolved from style_role, not listed here."
+    ],
+    "resolver": "scripts/lib/row_plan.mjs :: totalRank / groupSubtotalRank",
+    "keyed_on": ["row_id | semantic_role", "section"],
+    "sections": [
+      "income_statement",
+      "cash_flow",
+      "debt_schedule",
+      "rcf_waterfall",
+      "interest_schedule"
+    ],
+    "component_sum": {
+      "meaning": "closes a run of like items",
+      "treatment": "thin top rule over the number cells, NO FILL, NOT BOLD",
+      "row_ids": [
+        "total_acquisition_debt",
+        "total_lease_liabilities",
+        "rcf_total_fees"
+      ],
+      "structural": [
+        "every debt-group subtotal (Total Bonds / Bank Debt / Other Debt)",
+        "every per-group interest subtotal"
+      ]
+    },
+    "block_subtotal": {
+      "meaning": "closes a block of the model",
+      "treatment": "thin top rule, subsection_fill, NOT BOLD unless also a headline",
+      "row_ids": [
+        "gross_profit",
+        "operating_profit",
+        "ebit",
+        "adjusted_ebitda",
+        "cash_from_operations",
+        "cash_from_investing",
+        "cash_from_financing",
+        "net_change_in_cash",
+        "gross_debt_excluding_leases",
+        "gross_debt_including_leases",
+        "gross_interest_expense",
+        "cash_before_rcf"
+      ],
+      "default_for_unlisted_totals": true
+    },
+    "answer": {
+      "meaning": "the figure the reader came for, IN THIS SECTION",
+      "treatment": "thin top rule, DOUBLE bottom rule, answer_fill (bold arrives from `headline`)",
+      "_row_ids_comment": [
+        "The flat union across sections, which is what a validator reading the",
+        "emitted file can check a fill against. `by_section` is the authority; this",
+        "list is derived from it and must stay its union.",
+        "`net_interest_expense` appears here because it IS the answer of the",
+        "interest schedule. It is NOT the answer of the income statement, and",
+        "`answer-rank-is-earned-not-asserted` is what holds that line."
+      ],
+      "row_ids": [
+        "net_income",
+        "ending_cash",
+        "net_debt_excluding_leases",
+        "net_debt_including_leases",
+        "net_debt_company_reported",
+        "net_debt_excluding_leases_to_adjusted_ebitda",
+        "net_debt_to_adjusted_ebitda",
+        "net_debt_company_reported_to_adjusted_ebitda",
+        "total_liquidity",
+        "ending_rcf",
+        "net_interest_expense"
+      ],
+      "by_section": {
+        "income_statement": ["net_income"],
+        "cash_flow": ["ending_cash"],
+        "debt_schedule": [
+          "net_debt_excluding_leases",
+          "net_debt_including_leases",
+          "net_debt_company_reported",
+          "net_debt_excluding_leases_to_adjusted_ebitda",
+          "net_debt_to_adjusted_ebitda",
+          "net_debt_company_reported_to_adjusted_ebitda",
+          "total_liquidity"
+        ],
+        "rcf_waterfall": ["ending_rcf"],
+        "interest_schedule": ["net_interest_expense"]
+      },
+      "two_bases_terminate_identically": "net_debt_company_reported and net_debt_company_reported_to_adjusted_ebitda take the SAME rank as their model-basis counterparts. The company-reported figure used to fall through to the block-subtotal default, so the formatting asserted that the model basis is the real number and the published one a footnote. They are two answers to the same question.",
+      "double_rule_is_a_border_not_a_font_underline": true
+    },
+    "rule_spans": ["B:L", "N:P", "R:U"],
+    "rule_spans_note": "B:L is ONE run, not B:E plus G:L: the rule carries straight through gutter F (see layout.gutter_policy). It still breaks at M and Q, so a rank rule is three runs across the sheet and not one band — a rule that closes a run is not a grid. It also INCLUDES the label column B. It used to start at C — the key was `rule_spans_number_cells_only` — so a total's underline began a column and a half to the right of the total's own name and read as a property of the number block rather than of the line. B is a label column, not a gutter; A, M and Q are still white and unbordered.",
+    "rule_breaks_at_gutter_columns": ["A", "M", "Q"],
+    "adjacent_section_boundary": "A block subtotal whose NEXT row opens a sub-section also takes a thin dark grey BOTTOM rule. subsection_fill is deliberately the same colour on both (see fill_semantics.subsection), so `Net Cash from Operations` and `Cash from Investing (CFI)` ran together into one two-line banner belonging to neither section. The closing rule separates them without either fill changing meaning. An answer row keeps its double rule."
+  },
+  "headline": {
+    "_comment": [
+      "NARRATIVE PROMINENCE — THE BOLD CHANNEL, AND NOTHING ELSE IN IT.",
+      "Bold and the rank rules used to track the same fact: both were applied to",
+      "every row that summed something. Anything that added up therefore looked",
+      "important, and when everything is emphasised nothing is — which is why a",
+      "reader could not say why `Change in working capital` was shouting at them.",
+      "One job per channel now:",
+      "  rules (single / double / box)  arithmetic closure — where a sum ends",
+      "  bold                           narrative prominence — this list only",
+      "  fill                           rank hierarchy (total_ranks)",
+      "  font colour                    provenance — never touched by any of this",
+      "Each entry is a LADDER, not a row id: the FIRST id present in the compiled",
+      "section wins and the rest are ignored. That is how the set adapts to what a",
+      "company actually reports — a case stating `operating_profit` bolds that",
+      "line, a case stating only `ebit` bolds that one, and neither is forced onto",
+      "a company presenting neither.",
+      "Chrome is not a headline and is not listed: section bands, the period",
+      "header, the control block and label-only sub-block titles (row_type ===",
+      "'header') are bold because they are chrome, not because they are prominent.",
+      "A NUMBERED row carrying style_role 'subsection' — a consolidated parent",
+      "with its constituents indented beneath it — is NOT chrome and is NOT bold."
+    ],
+    "resolver": "scripts/lib/row_plan.mjs :: headlineIds",
+    "ladders": {
+      "income_statement": [
+        ["revenue"],
+        ["adjusted_ebitda"],
+        ["operating_profit", "ebit"],
+        ["net_income"]
+      ],
+      "cash_flow": [
+        ["cash_from_operations"],
+        ["cash_from_investing"],
+        ["cash_from_financing"],
+        ["net_change_in_cash"],
+        ["ending_cash"]
+      ],
+      "debt_schedule": [
+        ["gross_debt_excluding_leases"],
+        ["gross_debt_including_leases"],
+        ["net_debt_excluding_leases"],
+        ["net_debt_including_leases"],
+        ["net_debt_excluding_leases_to_adjusted_ebitda"],
+        ["net_debt_to_adjusted_ebitda"],
+        ["net_debt_company_reported"],
+        ["net_debt_company_reported_to_adjusted_ebitda"],
+        ["total_liquidity"]
+      ],
+      "rcf_waterfall": [["ending_rcf"]],
+      "interest_schedule": [["net_interest_expense"]]
+    },
+    "chrome_is_bold_and_is_not_a_headline": [
+      "section bands",
+      "the period header and period group header",
+      "the control block and the acquisition case block",
+      "label-only sub-block titles (row_type === 'header')",
+      "the debt schedule's *_header rows, group headers and term headers"
+    ],
+    "independent_validator": {
+      "_comment": [
+        "STANDING PROJECT RULE: the compiler and the validator must not trust the",
+        "same classification blindly. The ladders above are the AUTHORITY. The",
+        "check `answer-rank-is-earned-not-asserted` in validate_style_tokens.mjs",
+        "derives a second, independent signal from the emitted file alone — how",
+        "many other rows' formulas READ this row — and holds the answer rank to",
+        "it. It shares nothing with the declaration.",
+        "It is what catches the original defect: on the income statement,",
+        "`net_interest_expense` is read by NOTHING (reach 0) and has four ranked",
+        "rows below it, yet carried the answer fill. In the interest schedule the",
+        "same id is read by the income statement, and there it is the answer."
+      ],
+      "signal": "reach = distinct rows whose formulas reference this row, ranges expanded",
+      "rule": "a row may carry answer_fill only if reach >= 1, OR it is a ratio row (nothing ever sums a multiple or a margin), OR no other ranked row lies below it in its own section"
+    }
+  },
+  "panels": {
+    "_comment": [
+      "TWO BASES, TWO PANELS, SEPARATED BY A BLANK ROW.",
+      "The model-basis box and the company-reported box used to SHARE AN EDGE, so",
+      "two frames touching read as one region with a line through the middle",
+      "rather than as two statements of the same figure on two bases. A blank row",
+      "sits above the model-basis panel and between the two panels. Positions are",
+      "derived from the compiled row plan (row_plan.mjs :: PANEL_SPACER), never",
+      "hardcoded: the spacer consumes a row number and lands in no index, so no",
+      "emitter can address it and every downstream row still resolves through the",
+      "plan."
+    ],
+    "spacer_rows": [
+      "one blank row above `model_basis_header`",
+      "one blank row above `company_reported_header`, when the company panel exists"
+    ],
+    "company_panel_exists_only_when_the_case_supplies_reconciling_items": true,
+    "a_spacer_carries_no_label_no_formula_no_fill_and_no_rule": true
+  },
+  "conditional_state": {
+    "_comment": [
+      "Fill only, on cells that already exist, driven by the control block.",
+      "A conditional rule may set fill, border, bold/italic and number format. It",
+      "may NEVER set font colour on a body cell: font colour is the provenance",
+      "layer and a rule that overrides it silently destroys it.",
+      "Structure does not depend on state — no rule here sets a border, so every",
+      "rank rule and every double underline stays put when a toggle flips.",
+      "Control addresses resolve from rowPlan.controls and are never hardcoded."
+    ],
+    "conditional_font_colour_forbidden": true,
+    "red_font_on_negatives_forbidden": true,
+    "rules": {
+      "circularity_off": {
+        "when": "circularity control = 0",
+        "effect": "interest schedule FORECAST cells take na_fill + italic; history untouched"
+      },
+      "maturity_roll_off": {
+        "when": "debt maturities roll control = 0",
+        "effect": "maturity column and scheduled repayment rows read as suppressed"
+      },
+      "adjustment_columns_off": {
+        "when": "adjustments control = 0",
+        "effect": "N:P recedes; pro forma S:U stays live because A + B = C means it correctly equals standalone"
+      },
+      "rcf_drawn": {
+        "when": "ending RCF > 0 in that column",
+        "effect": "state_amber on ending_rcf, that year only"
+      },
+      "liquidity_shortfall": {
+        "when": "cash surplus / (deficit) < 0 in that column",
+        "effect": "state_red on cash_surplus_deficit, that year only"
+      },
+      "broker_case_selected": {
+        "_comment": "Replaces `broker_case_not_consensus`, which fired in ONE direction only. The old rule tinted the cell #EFF5F9 when the case was not Consensus and did nothing otherwise, so on the default case — five of the six certification cases — the control naming the entire forecast basis carried no mark at all, and in the other state it carried the same near-white that every subsection header and block subtotal wears. A control that is silent in its default state cannot announce which state it is in.",
+        "when": "always — the broker case control is tested in both directions",
+        "effect": "toggle_off_fill when the control reads \"Consensus\", toggle_on_fill when anything has been selected over it. The underlying question is binary (has the market consensus been overridden), so it is answered in the same on/off vocabulary the two switches beneath it carry. Fill only: the cell is a hardcoded input and its blue font is its provenance, so neither rule sets a font colour even though a single-cell control rule would be permitted one.",
+        "selector_is_not_a_toggle": "The broker case is a NAMED CHOICE out of a list, not a switch and not a magnitude, and it now has its own control treatment — centred and bold like a toggle field, blue like the input it is. See scripts/build_dynamic_model.mjs :: styleSelectorControl. It previously used the plain entry-field treatment, which left the most consequential control in the model as the quietest thing in the panel."
+      },
+      "live_broker_case_row": {
+        "_comment": "On the BROKERS sheet, not the Operating Model. Every candidate — one row per named broker, then Consensus, High and Low — was formatted identically, so nothing said which one the `Selected case` row had actually picked up.",
+        "when": "the candidate's own name in column B equals the live case",
+        "effect": "toggle_on_fill and bold, ACROSS THE WHOLE ROW on a DERIVED candidate (Consensus, High, Low) and on the NAME CELL ONLY on a named house. A derived row is calculated here and already carries subsection_fill end to end, so a conditional fill across the same span changes which rank colour it wears, not whether it wears one — that holds even where a pack supplies its consensus as a hardcode, because the fill is the ROW's identity and the blue font is that CELL's provenance. A named house's C:F cells are its own forecast and nothing else, and input_carries_no_fill means an input is marked by blue font and nothing else, so the mark stops at its name. The unselected alternatives are made subordinate by the live row gaining a mark, never by the others being greyed — na_fill means not calculated, and eight real broker forecasts are not that.",
+        "cross_sheet_reference_spent_once": "The live case is resolved into a single ordinary formula cell (Brokers!E2, green as a cross-sheet link) and every rule tests that same-sheet absolute. A conditional-format formula reaching across sheets is not reliably honoured through the writer and the LibreOffice pass, so it is spent once where it is robust rather than repeated in a rule on every candidate row."
+      }
+    }
+  },
+  "borders": {
+    "body_grid_forbidden": true,
+    "_comment": [
+      "Frames, not a grid. Every rule below either closes a run or draws a box",
+      "round a panel; none rules a body cell on all four sides. Gutter columns A,",
+      "M and Q stay white and unbordered, which is what makes the three period",
+      "blocks read as blocks. F is NOT one of them: it carries fills and rules",
+      "across (see layout.gutter_policy), so B:E and G:L are one run.",
+      "ORDERING, and it is not optional: a PARTIAL border assignment silently",
+      "clears the RIGHT perimeter edge of the range it touches while preserving",
+      "the left. Every box is therefore drawn AFTER every rule that crosses it,",
+      "and a panel's own header rule is drawn BEFORE its box."
+    ],
+    "period_header_row": "thin dark grey bottom rule per column block, breaking at the breaking gutters only",
+    "period_headers_inside_vertical": "thin white",
+    "standalone_forecast_boundary": "thin dark grey left border at J, full model height",
+    "column_block_left_edges": ["J", "N", "S"],
+    "controls": "thin grey box around the control entry fields",
+    "acquisition_controls": "thin grey box around the acquisition entry fields",
+    "instrument_terms": "thin light grey box around C:E on the debt and interest schedules",
+    "interest_assumptions": "thin dark grey outer with thin internal divider",
+    "section_close": "thin dark grey bottom rule on the last row of each section, per column block",
+    "subsection_close": "thin dark grey bottom rule on a block subtotal whose next row opens a sub-section — see total_ranks.adjacent_section_boundary",
+    "totals_hierarchy": "see total_ranks — rank is carried by line weight, not by fill"
+  },
+  "instrument_terms": {
+    "_comment": [
+      "AN ATTRIBUTE IS NOT A STEP IN THE ARITHMETIC, SO IT MUST NOT READ LIKE ONE.",
+      "C:E state what an instrument IS — currency, face value, maturity on the",
+      "debt schedule; rate type, coupon or spread, benchmark on the interest",
+      "schedule. Every column from G rightwards states what HAPPENS to it, period",
+      "by period, and that is the left-to-right flow the reader is meant to trace.",
+      "The terms carried the same upright Calibri 8 as the grid and column D",
+      "carried the same `amount` format as every period column, so a nominal",
+      "amount in D was typographically indistinguishable from a balance in J:",
+      "three columns of static reference data competing with the period grid at",
+      "the head of every row, all the way down both schedules.",
+      "The box round C:E says where the boundary IS. It cannot say which side of",
+      "it matters more, which is why the border alone left the block still reading",
+      "as four more columns of model (reviewer: 'columns C to E look very',",
+      "'boring'). The answer is not more ink on C:E but less weight."
+    ],
+    "treatment": "italic on the term VALUE cells; the header row keeps its upright bold",
+    "why_italic": "It is the vocabulary this sheet already uses for the same idea one axis over: a ratio row is italic because it is a READING of the arithmetic rather than a term in it (see styleStatementRow). A contract term is the same kind of thing. It recedes at a glance, costs no colour, no fill and no palette entry, and stays perfectly legible — an italic date is still a date.",
+    "partial_font_assignment_required": "Every one of these cells is a hardcoded input carrying BLUE and a few are formulas carrying black or green. A full font object would reset them all and destroy the provenance of the entire terms block. `{ italic: true }` merges, exactly as `{ bold: true }` does in applyTotalHierarchy, and assertFormulaProvenance() — which also assigns partially, `{ color }` alone — runs afterwards and reinstates the colours without disturbing the italic.",
+    "header_row_excluded": true,
+    "alignment": "currency, maturity, rate type and benchmark name are CENTRED; the two genuinely numeric terms — nominal amount and coupon — stay RIGHT, for the same reason the period columns do",
+    "resolver": "scripts/build_dynamic_model.mjs :: quietTerms / centreTerms"
+  },
+  "indentation": {
+    "_comment": "Real indentation: `alignment indent` on the label cell. Levels are DERIVED from the ref graph in scripts/lib/row_plan.mjs and never listed as physical rows, and they are written into the package by patchLabelIndents() because the writer accepts format.indentLevel and emits nothing.",
+    "mechanism": "alignment_indent",
+    "applies_to_column": "B",
+    "leading_spaces_in_label_forbidden": true,
+    "leading_spaces_note": "Two literal spaces inside the label string is content pretending to be style: invisible to any restyle, impossible to change globally, and it corrupts column-width measurement. row_plan strips them so the two cannot compound.",
+    "section_subsection_header_total": 0,
+    "ordinary_child": 1,
+    "consolidated_line_constituent": 2,
+    "consolidated_line_constituent_note": "Change in Working Capital and Net Change in Debt are themselves children of a total, so their own constituents land one further in — which is what makes the greyed run beneath Net Change in Debt read as nested rather than as a flat grey list."
+  }
+}

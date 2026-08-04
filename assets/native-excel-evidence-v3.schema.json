@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "native-excel-restoration-evidence/3.1",
+  "title": "Native Excel restoration evidence v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "diagnostic_only",
+    "application",
+    "method",
+    "generated_at",
+    "total_violations",
+    "release_matrix",
+    "candidates",
+    "certified_closure_sha256",
+    "tolerance_policy",
+    "evidence_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "native-excel-restoration-evidence/3.1" },
+    "status": { "const": "PASS" },
+    "diagnostic_only": { "const": false },
+    "application": {
+      "enum": ["Microsoft Excel for Mac", "Microsoft Excel for Windows"]
+    },
+    "method": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "total_violations": { "const": 0 },
+    "certified_closure_sha256": { "$ref": "#/$defs/sha256" },
+    "tolerance_policy": { "$ref": "#/$defs/tolerancePolicy" },
+    "release_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "required_test_ids", "actual_test_ids", "candidate_profiles"],
+      "properties": {
+        "status": { "const": "PASS" },
+        "required_test_ids": { "$ref": "#/$defs/requiredTestIds" },
+        "actual_test_ids": { "$ref": "#/$defs/requiredTestIds" },
+        "candidate_profiles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "acquisition" },
+            { "const": "stressed_liquidity" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/acquisitionCandidate" },
+        { "$ref": "#/$defs/stressedCandidate" }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "evidence_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "requiredTestIds": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "native-excel-circularity-restoration-acquisition-case" },
+        { "const": "native-excel-acquisition-restoration" },
+        { "const": "native-excel-circularity-restoration-stressed-case" },
+        { "const": "native-excel-maturity-restoration" }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "candidateSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sheet_names",
+        "calculation_settings",
+        "formula_signature",
+        "numeric_signature",
+        "structure_signature"
+      ],
+      "properties": {
+        "sheet_names": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "calculation_settings": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "formula_signature": { "$ref": "#/$defs/sha256" },
+        "numeric_signature": { "$ref": "#/$defs/sha256" },
+        "structure_signature": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "stateFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))[^\\\\]+$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "candidateBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "candidate_workbook_sha256",
+        "state_1_sha256",
+        "candidate_formula_signature",
+        "state_1_formula_signature",
+        "candidate_structure_signature",
+        "state_1_structure_signature",
+        "formula_signature_match",
+        "structure_signature_match",
+        "sheet_order_match",
+        "calculation_settings_match",
+        "numeric_difference_count",
+        "max_observed_drift",
+        "candidate_control_value",
+        "state_1_control_value",
+        "failures"
+      ],
+      "properties": {
+        "status": { "const": "PASS" },
+        "candidate_workbook_sha256": { "$ref": "#/$defs/sha256" },
+        "state_1_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_formula_signature": { "$ref": "#/$defs/sha256" },
+        "state_1_formula_signature": { "$ref": "#/$defs/sha256" },
+        "candidate_structure_signature": { "$ref": "#/$defs/sha256" },
+        "state_1_structure_signature": { "$ref": "#/$defs/sha256" },
+        "formula_signature_match": { "const": true },
+        "structure_signature_match": { "const": true },
+        "sheet_order_match": { "const": true },
+        "calculation_settings_match": { "const": true },
+        "numeric_difference_count": { "const": 0 },
+        "max_observed_drift": { "$ref": "#/$defs/drift" },
+        "candidate_control_value": { "const": 1 },
+        "state_1_control_value": { "const": 1 },
+        "failures": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "control_id",
+        "status",
+        "control_cell",
+        "expected_sequence",
+        "actual_sequence",
+        "tolerance_policy",
+        "max_observed_drift",
+        "files",
+        "formula_cells_compared",
+        "numeric_cells_compared",
+        "on_restoration_difference_counts",
+        "off_restoration_difference_counts",
+        "on_off_difference_count_excluding_control",
+        "declared_effect_cells",
+        "declared_effect_cells_present",
+        "declared_effect_cells_changed",
+        "declared_kill_switch_cells",
+        "declared_kill_switch_nonzero_on",
+        "declared_kill_switch_bad_off",
+        "candidate_binding",
+        "failures"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "control_id": { "enum": ["circularity", "acquisition", "debt_maturities_roll"] },
+        "status": { "const": "PASS" },
+        "control_cell": { "type": "string", "pattern": "^Operating Model!" },
+        "expected_sequence": { "$ref": "#/$defs/controlSequence" },
+        "actual_sequence": { "$ref": "#/$defs/controlSequence" },
+        "tolerance_policy": { "$ref": "#/$defs/tolerancePolicy" },
+        "max_observed_drift": { "$ref": "#/$defs/drift" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stateFile" },
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "formula_cells_compared": { "type": "integer", "minimum": 1 },
+        "numeric_cells_compared": { "type": "integer", "minimum": 1 },
+        "on_restoration_difference_counts": {
+          "type": "array",
+          "prefixItems": [{ "const": 0 }, { "const": 0 }],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "off_restoration_difference_counts": {
+          "type": "array",
+          "prefixItems": [{ "const": 0 }],
+          "items": false,
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "on_off_difference_count_excluding_control": { "type": "integer", "minimum": 1 },
+        "declared_effect_cells": { "type": "integer", "minimum": 1 },
+        "declared_effect_cells_present": { "type": "integer", "minimum": 1 },
+        "declared_effect_cells_changed": { "type": "integer", "minimum": 1 },
+        "declared_kill_switch_cells": { "type": "integer", "minimum": 0 },
+        "declared_kill_switch_nonzero_on": { "type": "integer", "minimum": 0 },
+        "declared_kill_switch_bad_off": { "const": 0 },
+        "candidate_binding": { "$ref": "#/$defs/candidateBinding" },
+        "failures": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "tolerancePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency_abs", "ratio_abs", "percentage_abs", "control_abs", "default_abs", "relative"],
+      "properties": {
+        "currency_abs": { "const": 0.000001 },
+        "ratio_abs": { "const": 1e-9 },
+        "percentage_abs": { "const": 1e-10 },
+        "control_abs": { "const": 0 },
+        "default_abs": { "const": 1e-9 },
+        "relative": { "const": 1e-12 }
+      }
+    },
+    "drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_abs_by_class", "max_rel_by_class"],
+      "properties": {
+        "max_abs_by_class": { "$ref": "#/$defs/driftClasses" },
+        "max_rel_by_class": { "$ref": "#/$defs/driftClasses" }
+      }
+    },
+    "driftClasses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "ratio", "percentage", "control", "default"],
+      "properties": {
+        "currency": { "type": "number", "minimum": 0 },
+        "ratio": { "type": "number", "minimum": 0 },
+        "percentage": { "type": "number", "minimum": 0 },
+        "control": { "type": "number", "minimum": 0 },
+        "default": { "type": "number", "minimum": 0 }
+      }
+    },
+    "controlSequence": {
+      "type": "array",
+      "prefixItems": [
+        { "const": 1 }, { "const": 0 }, { "const": 1 }, { "const": 0 }, { "const": 1 }
+      ],
+      "items": false,
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "candidateBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "case_id",
+        "case_sha256",
+        "workbook_sha256",
+        "semantic_manifest_sha256",
+        "row_map_sha256",
+        "candidate_snapshot",
+        "tests"
+      ],
+      "properties": {
+        "profile": { "type": "string" },
+        "case_id": { "type": "string", "minLength": 1 },
+        "case_sha256": { "$ref": "#/$defs/sha256" },
+        "workbook_sha256": { "$ref": "#/$defs/sha256" },
+        "semantic_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "row_map_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_snapshot": { "$ref": "#/$defs/candidateSnapshot" },
+        "tests": { "type": "array" }
+      }
+    },
+    "acquisitionCandidate": {
+      "allOf": [
+        { "$ref": "#/$defs/candidateBase" },
+        {
+          "properties": {
+            "profile": { "const": "acquisition" },
+            "tests": {
+              "prefixItems": [
+                { "allOf": [{ "$ref": "#/$defs/test" }, { "properties": { "id": { "const": "native-excel-circularity-restoration-acquisition-case" }, "control_id": { "const": "circularity" }, "declared_kill_switch_cells": { "minimum": 1 }, "declared_kill_switch_nonzero_on": { "minimum": 1 } } }] },
+                { "allOf": [{ "$ref": "#/$defs/test" }, { "properties": { "id": { "const": "native-excel-acquisition-restoration" }, "control_id": { "const": "acquisition" }, "declared_kill_switch_cells": { "minimum": 1 }, "declared_kill_switch_nonzero_on": { "minimum": 1 } } }] }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      ]
+    },
+    "stressedCandidate": {
+      "allOf": [
+        { "$ref": "#/$defs/candidateBase" },
+        {
+          "properties": {
+            "profile": { "const": "stressed_liquidity" },
+            "tests": {
+              "prefixItems": [
+                { "allOf": [{ "$ref": "#/$defs/test" }, { "properties": { "id": { "const": "native-excel-circularity-restoration-stressed-case" }, "control_id": { "const": "circularity" }, "declared_kill_switch_cells": { "minimum": 1 }, "declared_kill_switch_nonzero_on": { "minimum": 1 } } }] },
+                { "allOf": [{ "$ref": "#/$defs/test" }, { "properties": { "id": { "const": "native-excel-maturity-restoration" }, "control_id": { "const": "debt_maturities_roll" } } }] }
+              ],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      ]
+    }
+  }
+}

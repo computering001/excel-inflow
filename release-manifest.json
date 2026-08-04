@@ -1,0 +1,1436 @@
+{
+  "releaseName": "Excel Inflow v2.0.0",
+  "schemaVersion": 2,
+  "packageMode": "development",
+  "skillVersion": "2.0.0",
+  "templateVersion": "2.0.0-dynamic",
+  "sourceStatus": "v2_development",
+  "generatedAt": "2026-08-04T06:44:26.510Z",
+  "centralInstructionsWords": 2917,
+  "profile": "assets/deployment-profile.json",
+  "certification": {
+    "certifiedClosureSha256": null,
+    "currentClosureSha256": "23769a621faf94b65bca1328aa82fc9b4d79a4af40494caf7a3f991cdd18d3b5",
+    "closureFileCount": 91,
+    "recordedAt": null,
+    "recertifiedByThisRun": false,
+    "evidenceReceipt": null
+  },
+  "closure": {
+    "entryPoints": [
+      "scripts/build_dynamic_model.mjs",
+      "scripts/compile_evidence_run.mjs",
+      "scripts/compile_public_test_run.mjs",
+      "scripts/flow_cli.mjs",
+      "scripts/orchestrate_release.mjs",
+      "scripts/run_user_flow.mjs",
+      "scripts/run_statement_classifier_tests.mjs",
+      "scripts/debt-model-economics.mjs",
+      "scripts/test_release_convergence_seam.mjs",
+      "scripts/validate_cache_parity.mjs",
+      "scripts/validate_source_parity.mjs",
+      "scripts/validate_structure.mjs",
+      "scripts/validate_style_tokens.mjs"
+    ],
+    "scripts": [
+      "scripts/build_dynamic_model.mjs",
+      "scripts/compile_evidence_run.mjs",
+      "scripts/compile_public_test_run.mjs",
+      "scripts/debt-model-economics.mjs",
+      "scripts/flow_cli.mjs",
+      "scripts/lib/attachment_ingress.mjs",
+      "scripts/lib/broker_anchor.mjs",
+      "scripts/lib/coverage.mjs",
+      "scripts/lib/design_contract.mjs",
+      "scripts/lib/evidence_run.mjs",
+      "scripts/lib/flow.mjs",
+      "scripts/lib/flow_entity.mjs",
+      "scripts/lib/flow_impact.mjs",
+      "scripts/lib/flow_questions.mjs",
+      "scripts/lib/flow_read.mjs",
+      "scripts/lib/flow_reconcile.mjs",
+      "scripts/lib/flow_runtime.mjs",
+      "scripts/lib/flow_screens.mjs",
+      "scripts/lib/historical_normalisation.mjs",
+      "scripts/lib/instrument_display.mjs",
+      "scripts/lib/intake.mjs",
+      "scripts/lib/json_schema.mjs",
+      "scripts/lib/lease_policy.mjs",
+      "scripts/lib/plan_builder.mjs",
+      "scripts/lib/plan_values.mjs",
+      "scripts/lib/process_tree.mjs",
+      "scripts/lib/public_test_run.mjs",
+      "scripts/lib/rcf_policy.mjs",
+      "scripts/lib/release_checkpoint_store.mjs",
+      "scripts/lib/release_module_registry.mjs",
+      "scripts/lib/release_nodes.mjs",
+      "scripts/lib/row_plan.mjs",
+      "scripts/lib/run_carrier.mjs",
+      "scripts/lib/run_store.mjs",
+      "scripts/lib/runtime_isolation.mjs",
+      "scripts/lib/semantic_graph.mjs",
+      "scripts/lib/solver.mjs",
+      "scripts/lib/statement_classifier.mjs",
+      "scripts/lib/user_flow_controller.mjs",
+      "scripts/lib/validation_invariants.mjs",
+      "scripts/orchestrate_release.mjs",
+      "scripts/run_statement_classifier_tests.mjs",
+      "scripts/run_user_flow.mjs",
+      "scripts/test_release_convergence_seam.mjs",
+      "scripts/validate_cache_parity.mjs",
+      "scripts/validate_source_parity.mjs",
+      "scripts/validate_structure.mjs",
+      "scripts/validate_style_tokens.mjs"
+    ],
+    "assetsLoadedByScripts": [
+      "assets/deployment-profile.json",
+      "assets/evidence-run-v1.schema.json",
+      "assets/model-case-v2.schema.json",
+      "assets/model-case.schema.json",
+      "assets/plan.schema.json",
+      "assets/production-contract-v2.json",
+      "assets/public-test-run-v1.schema.json",
+      "assets/standardised-design-runtime.v2.json",
+      "assets/statement-semantic-taxonomy.v1.json",
+      "assets/style-tokens.json"
+    ],
+    "assetsDeclaredOnly": [
+      "assets/broker-pack.schema.json",
+      "assets/dcs-export.schema.json",
+      "assets/lineage-exceptions.json",
+      "assets/native-excel-evidence-v3.schema.json",
+      "assets/row-taxonomy-v2.json"
+    ],
+    "resourceRoots": [],
+    "resources": [],
+    "imports": [
+      "scripts/build_dynamic_model.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/coverage.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/design_contract.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/historical_normalisation.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_display.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/lease_policy.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/plan_builder.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/plan_values.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/rcf_policy.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/semantic_graph.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/solver.mjs",
+      "scripts/compile_evidence_run.mjs -> scripts/lib/attachment_ingress.mjs",
+      "scripts/compile_evidence_run.mjs -> scripts/lib/evidence_run.mjs",
+      "scripts/compile_public_test_run.mjs -> scripts/lib/public_test_run.mjs",
+      "scripts/compile_public_test_run.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/debt-model-economics.mjs -> scripts/lib/coverage.mjs",
+      "scripts/debt-model-economics.mjs -> scripts/lib/solver.mjs",
+      "scripts/flow_cli.mjs -> scripts/lib/evidence_run.mjs",
+      "scripts/flow_cli.mjs -> scripts/lib/flow.mjs",
+      "scripts/flow_cli.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/lib/attachment_ingress.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/flow_entity.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/intake.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/flow_entity.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/flow_questions.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/flow_read.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/flow_reconcile.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/intake.mjs",
+      "scripts/lib/flow.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/flow_entity.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow_impact.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/lib/flow_impact.mjs -> scripts/lib/semantic_graph.mjs",
+      "scripts/lib/flow_impact.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/flow_questions.mjs -> scripts/lib/flow_impact.mjs",
+      "scripts/lib/flow_questions.mjs -> scripts/lib/flow_reconcile.mjs",
+      "scripts/lib/flow_questions.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow_read.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/flow_read.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow_read.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/flow_reconcile.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow_runtime.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/flow_screens.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/public_test_run.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/public_test_run.mjs -> scripts/lib/flow_entity.mjs",
+      "scripts/lib/public_test_run.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/public_test_run.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/release_checkpoint_store.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_entity.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_questions.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_read.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_reconcile.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/intake.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/semantic_graph.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/validation_invariants.mjs",
+      "scripts/lib/release_nodes.mjs -> scripts/lib/release_module_registry.mjs",
+      "scripts/lib/release_nodes.mjs -> scripts/lib/statement_classifier.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/design_contract.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/lease_policy.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/rcf_policy.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/semantic_graph.mjs",
+      "scripts/lib/run_carrier.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/lib/semantic_graph.mjs -> scripts/lib/validation_invariants.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/historical_normalisation.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/lease_policy.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/rcf_policy.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/lib/user_flow_controller.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/lib/user_flow_controller.mjs -> scripts/lib/run_store.mjs",
+      "scripts/orchestrate_release.mjs -> scripts/lib/process_tree.mjs",
+      "scripts/orchestrate_release.mjs -> scripts/lib/release_checkpoint_store.mjs",
+      "scripts/orchestrate_release.mjs -> scripts/lib/release_nodes.mjs",
+      "scripts/orchestrate_release.mjs -> scripts/lib/run_store.mjs",
+      "scripts/orchestrate_release.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/run_statement_classifier_tests.mjs -> scripts/lib/coverage.mjs",
+      "scripts/run_statement_classifier_tests.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/run_statement_classifier_tests.mjs -> scripts/lib/semantic_graph.mjs",
+      "scripts/run_statement_classifier_tests.mjs -> scripts/lib/solver.mjs",
+      "scripts/run_statement_classifier_tests.mjs -> scripts/lib/statement_classifier.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/evidence_run.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/flow.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/process_tree.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/run_carrier.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/run_store.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/user_flow_controller.mjs",
+      "scripts/test_release_convergence_seam.mjs -> scripts/lib/release_nodes.mjs"
+    ]
+  },
+  "pythonClosure": {
+    "method": "ast walk of import / from-import, relative levels resolved; never a regex",
+    "interpreter": {
+      "selected": "python3.12",
+      "candidates": [
+        {
+          "candidate": "python3.12",
+          "version": "3.12.13",
+          "packages": {
+            "openpyxl": "3.1.5",
+            "fitz": null,
+            "PIL": "12.2.0",
+            "numpy": "2.3.5",
+            "jsonschema": null,
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
+          },
+          "usable": true,
+          "reason": "selected"
+        },
+        {
+          "candidate": "python3",
+          "version": "3.9.6",
+          "packages": {
+            "openpyxl": null,
+            "fitz": null,
+            "PIL": null,
+            "numpy": null,
+            "jsonschema": null,
+            "pdfplumber": null,
+            "pypdf": "6.12.1",
+            "reportlab": null
+          },
+          "usable": false,
+          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
+        }
+      ]
+    },
+    "entryPoints": [
+      "scripts/emit/__main__.py",
+      "scripts/render/check_render.py",
+      "scripts/render/selftest.py",
+      "scripts/verify/finance_proof.py",
+      "scripts/verify/run_finance_proof_mutations.py",
+      "scripts/verify/run_deterministic_tests.py",
+      "scripts/verify/validate_dynamic_model.py"
+    ],
+    "entryPointsUncommandedByInstructions": [],
+    "modules": [
+      "scripts/emit/__init__.py",
+      "scripts/emit/__main__.py",
+      "scripts/emit/patch.py",
+      "scripts/emit/plan.py",
+      "scripts/emit/render.py",
+      "scripts/emit/styles.py",
+      "scripts/emit/verify.py",
+      "scripts/render/__init__.py",
+      "scripts/render/baseline.py",
+      "scripts/render/calibrate.py",
+      "scripts/render/cfeval.py",
+      "scripts/render/check_render.py",
+      "scripts/render/checks.py",
+      "scripts/render/pdfdoc.py",
+      "scripts/render/rowmap.py",
+      "scripts/render/selftest.py",
+      "scripts/render/soffice.py",
+      "scripts/render/synth.py",
+      "scripts/render/textfit.py",
+      "scripts/render/xlsx_model.py",
+      "scripts/verify/__init__.py",
+      "scripts/verify/finance_proof.py",
+      "scripts/verify/invariants.py",
+      "scripts/verify/run_deterministic_tests.py",
+      "scripts/verify/run_finance_proof_mutations.py",
+      "scripts/verify/tolerances.py",
+      "scripts/verify/validate_dynamic_model.py",
+      "scripts/verify/xlsx.py"
+    ],
+    "packages": [
+      "emit",
+      "render",
+      "verify"
+    ],
+    "imports": [
+      "scripts/emit/__main__.py -> scripts/emit/__init__.py (package-init)",
+      "scripts/emit/__main__.py -> scripts/emit/patch.py (relative)",
+      "scripts/emit/__main__.py -> scripts/emit/plan.py (relative)",
+      "scripts/emit/__main__.py -> scripts/emit/render.py (relative)",
+      "scripts/emit/__main__.py -> scripts/emit/verify.py (relative)",
+      "scripts/emit/patch.py -> scripts/emit/__init__.py (package-init)",
+      "scripts/emit/plan.py -> scripts/emit/__init__.py (package-init)",
+      "scripts/emit/render.py -> scripts/emit/__init__.py (package-init)",
+      "scripts/emit/render.py -> scripts/emit/patch.py (relative)",
+      "scripts/emit/render.py -> scripts/emit/styles.py (relative)",
+      "scripts/emit/styles.py -> scripts/emit/__init__.py (package-init)",
+      "scripts/emit/verify.py -> scripts/emit/__init__.py (package-init)",
+      "scripts/render/baseline.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/baseline.py -> scripts/render/pdfdoc.py (relative)",
+      "scripts/render/baseline.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/calibrate.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/calibrate.py -> scripts/render/pdfdoc.py (relative)",
+      "scripts/render/calibrate.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/cfeval.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/cfeval.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/check_render.py -> scripts/render/baseline.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/calibrate.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/cfeval.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/checks.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/pdfdoc.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/rowmap.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/soffice.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/textfit.py (relative)",
+      "scripts/render/check_render.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/checks.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/checks.py -> scripts/render/calibrate.py (relative)",
+      "scripts/render/checks.py -> scripts/render/cfeval.py (relative)",
+      "scripts/render/checks.py -> scripts/render/pdfdoc.py (relative)",
+      "scripts/render/checks.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/pdfdoc.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/rowmap.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/rowmap.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/selftest.py -> scripts/render/baseline.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/calibrate.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/cfeval.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/checks.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/pdfdoc.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/rowmap.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/synth.py (relative)",
+      "scripts/render/selftest.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/soffice.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/synth.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/synth.py -> scripts/render/cfeval.py (relative)",
+      "scripts/render/synth.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/textfit.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/textfit.py -> scripts/render/xlsx_model.py (relative)",
+      "scripts/render/xlsx_model.py -> scripts/render/__init__.py (package-init)",
+      "scripts/render/xlsx_model.py -> scripts/render/textfit.py (relative)",
+      "scripts/verify/finance_proof.py -> scripts/verify/__init__.py (package-init)",
+      "scripts/verify/finance_proof.py -> scripts/verify/xlsx.py (relative)",
+      "scripts/verify/invariants.py -> scripts/verify/__init__.py (package-init)",
+      "scripts/verify/run_deterministic_tests.py -> scripts/verify/__init__.py (package-init)",
+      "scripts/verify/run_deterministic_tests.py -> scripts/verify/invariants.py (absolute-internal)",
+      "scripts/verify/run_deterministic_tests.py -> scripts/verify/xlsx.py (absolute-internal)",
+      "scripts/verify/run_finance_proof_mutations.py -> scripts/verify/__init__.py (package-init)",
+      "scripts/verify/run_finance_proof_mutations.py -> scripts/verify/xlsx.py (relative)",
+      "scripts/verify/tolerances.py -> scripts/verify/__init__.py (package-init)",
+      "scripts/verify/validate_dynamic_model.py -> scripts/verify/__init__.py (package-init)",
+      "scripts/verify/validate_dynamic_model.py -> scripts/verify/invariants.py (absolute-internal)",
+      "scripts/verify/validate_dynamic_model.py -> scripts/verify/tolerances.py (absolute-internal)",
+      "scripts/verify/validate_dynamic_model.py -> scripts/verify/xlsx.py (absolute-internal)",
+      "scripts/verify/xlsx.py -> scripts/verify/__init__.py (package-init)"
+    ],
+    "assetsLoadedByPythonModules": {
+      "plan.schema.json": [
+        "scripts/emit/plan.py"
+      ],
+      "production-contract-v2.json": [
+        "scripts/verify/tolerances.py"
+      ]
+    },
+    "thirdParty": [
+      {
+        "name": "PIL",
+        "distribution": "Pillow",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "render"
+        ],
+        "sites": [
+          "render/baseline.py:250 (PIL, deferred)",
+          "render/baseline.py:241 (PIL, deferred)",
+          "render/pdfdoc.py:144 (PIL, deferred)",
+          "render/soffice.py:212 (PIL, deferred)"
+        ]
+      },
+      {
+        "name": "fitz",
+        "distribution": "PyMuPDF",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "render"
+        ],
+        "sites": [
+          "render/pdfdoc.py:26 (fitz, deferred)",
+          "render/pdfdoc.py:229 (fitz, deferred)",
+          "render/soffice.py:199 (fitz, deferred)",
+          "render/textfit.py:78 (fitz, deferred)"
+        ]
+      },
+      {
+        "name": "jsonschema",
+        "distribution": "jsonschema",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime_optional",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "emit"
+        ],
+        "sites": [
+          "emit/plan.py:145 (jsonschema, deferred)"
+        ]
+      },
+      {
+        "name": "numpy",
+        "distribution": "numpy",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "render"
+        ],
+        "sites": [
+          "render/baseline.py:238 (numpy, deferred)",
+          "render/baseline.py:325 (numpy, deferred)",
+          "render/checks.py:96 (numpy, deferred)",
+          "render/checks.py:383 (numpy, deferred)",
+          "render/pdfdoc.py:133 (numpy, deferred)",
+          "render/soffice.py:206 (numpy, deferred)"
+        ]
+      },
+      {
+        "name": "openpyxl",
+        "distribution": "openpyxl",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": "3.1.5",
+        "requiredAt": "import",
+        "importedAtModuleTopLevel": true,
+        "usedByPackages": [
+          "emit"
+        ],
+        "sites": [
+          "emit/render.py:26 (openpyxl, top-level)",
+          "emit/render.py:27 (openpyxl.comments, top-level)",
+          "emit/render.py:28 (openpyxl.formatting.rule, top-level)",
+          "emit/render.py:29 (openpyxl.utils, top-level)",
+          "emit/render.py:30 (openpyxl.worksheet.datavalidation, top-level)",
+          "emit/render.py:31 (openpyxl.workbook.properties, top-level)",
+          "emit/styles.py:34 (openpyxl.styles, top-level)",
+          "emit/styles.py:34 (openpyxl.styles, top-level)",
+          "emit/styles.py:34 (openpyxl.styles, top-level)",
+          "emit/styles.py:34 (openpyxl.styles, top-level)",
+          "emit/styles.py:34 (openpyxl.styles, top-level)",
+          "emit/styles.py:35 (openpyxl.styles.differential, top-level)",
+          "emit/styles.py:211 (openpyxl.styles.differential, deferred)",
+          "emit/styles.py:212 (openpyxl.styles.numbers, deferred)"
+        ]
+      },
+      {
+        "name": "pdfplumber",
+        "distribution": "pdfplumber",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime_optional",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "render"
+        ],
+        "sites": [
+          "render/pdfdoc.py:261 (pdfplumber, deferred)"
+        ]
+      },
+      {
+        "name": "pypdf",
+        "distribution": "pypdf",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime_optional",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "render"
+        ],
+        "sites": [
+          "render/pdfdoc.py:262 (pypdf, deferred)"
+        ]
+      },
+      {
+        "name": "reportlab",
+        "distribution": "reportlab",
+        "provision": "native",
+        "vendored": false,
+        "hostVersion": null,
+        "requiredAt": "runtime_optional",
+        "importedAtModuleTopLevel": false,
+        "usedByPackages": [
+          "render"
+        ],
+        "sites": [
+          "render/synth.py:56 (reportlab.pdfbase, deferred)",
+          "render/synth.py:57 (reportlab.pdfgen, deferred)"
+        ]
+      }
+    ],
+    "thirdPartyVendored": [],
+    "externalBinaries": [
+      {
+        "name": "soffice",
+        "used_by_packages": [
+          "render"
+        ],
+        "required_at": "runtime",
+        "provision": "host",
+        "reason": "render/soffice.py resolves soffice/libreoffice from SOFFICE_BIN or a fixed candidate list and returns BLOCKED — never a warning — when it is absent. Not required for import, so its absence does not affect the smoke test; render/selftest.py exists precisely so the checks remain provable without it."
+      }
+    ],
+    "dependencyPolicy": {
+      "emit": {
+        "may_import_third_party": [
+          "openpyxl",
+          "jsonschema"
+        ],
+        "reason": "The renderer's job is to write a workbook. openpyxl expresses most of it; the terminal patch in emit/patch.py handles what openpyxl cannot."
+      },
+      "verify": {
+        "may_import_third_party": [],
+        "must_not_import_third_party": [
+          "openpyxl",
+          "lxml",
+          "numpy",
+          "fitz",
+          "PIL"
+        ],
+        "must_not_import_packages": [
+          "emit",
+          "render"
+        ],
+        "reason": "STDLIB ONLY, and the compiler enforces it rather than trusting the docstring. Two separate claims: (a) a validator with no third-party surface has no version to disagree about, which is the point of the port off private workbook library; (b) the validator is the independent checker of what emit writes, so it must not reach into emit for anything. Both are checked on every compile — an import of openpyxl, or of emit, anywhere under verify/ fails the build."
+      },
+      "render": {
+        "may_import_third_party": [
+          "fitz",
+          "PIL",
+          "numpy",
+          "pdfplumber",
+          "pypdf",
+          "reportlab"
+        ],
+        "must_not_import_third_party": [
+          "openpyxl"
+        ],
+        "must_not_import_packages": [
+          "emit",
+          "verify"
+        ],
+        "reason": "The image-check stage reads the rendered PDF, not the workbook object model, so it has no use for openpyxl and render/xlsx_model.py says so explicitly. Kept out of emit and verify so a render change cannot move either of them."
+      }
+    }
+  },
+  "xlsxReaderConsolidationDecision": {
+    "decision": "keep-separate",
+    "decided_at": "2026-07-26",
+    "readers": {
+      "verify/xlsx.py": "327 lines. Read-only. Extracts cached values, formulas, sheet names and value matches with semantics matched to private workbook library by probe. stdlib zipfile + ElementTree.",
+      "render/xlsx_model.py": "697 lines. Read plus a page-setup patcher that always writes a separate copy. Carries an Excel LAYOUT model — column-width-to-pixel conversion against the default font's max digit width, row heights, print setup, conditional-format geometry. stdlib zipfile + ElementTree.",
+      "emit/patch.py": "456 lines. Not a reader in the same sense: a byte-level rewriter of the .xlsx zip. Uses a hand-written tag scanner rather than ElementTree ON PURPOSE, because ElementTree does not round-trip bytes and this stage must not re-escape a quotation mark that needs no escaping between tags."
+    },
+    "note_on_the_brief": "The brief describes two independent readers. There are three. emit/patch.py is the third and is the one whose consolidation would cost the most.",
+    "reasons_to_keep_separate": [
+      "The validator must not depend on openpyxl OR on emit, so that a bug in a shared reader cannot make the emitter and its own checker agree. verify/ reads back exactly what emit/patch.py writes: a shared misunderstanding of, say, t=\"str\" versus t=\"s\" would be invisible to a comparison performed through the same code. This is now enforced, not merely asserted — python_package_dependency_policy.verify forbids the import and the compiler fails the build on it.",
+      "They read different things. verify/xlsx.py wants values and formulas; render/xlsx_model.py wants geometry. Merging would make the validator carry ~700 lines of layout model it never calls, enlarging the audit surface of the one component whose small surface is the point.",
+      "Certification coupling. The closure hash covers every shipped file. A shared module would put a render-geometry tweak inside the validator's certified closure, so every change to column-width handling would invalidate the validator's certification and force a re-run of solver parity that nothing about the change could have affected.",
+      "emit/patch.py is byte-exact by requirement and the other two are not. Its escaping behaviour is load-bearing for the determinism and golden-file gates, which compare bytes."
+    ],
+    "cost_if_consolidated": "One shared ooxml module of roughly 800-1000 lines plus three adapters, serving three incompatible policies (stdlib-only for verify, openpyxl-permitted for emit, byte-exact round-trip for patch). It would need re-certification of all three packages, and it would permanently couple the validator's certified closure to the renderer's. The saving is real but small: the genuine overlap is address parsing, shared-string resolution and namespace constants, on the order of 120 lines, none of it the part that is hard to get right.",
+    "revisit_if": "verify/ ever needs layout geometry, or a defect is found in the address/shared-string handling of more than one of the three. Either would mean the duplication has started costing correctness rather than lines."
+  },
+  "vendored": [
+    {
+      "name": "jszip",
+      "version": "3.10.1",
+      "license": "(MIT OR GPL-3.0-or-later)",
+      "sha256": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
+      "installPath": "node_modules/jszip/jszip.min.js",
+      "importedBy": [
+        "scripts/build_dynamic_model.mjs",
+        "scripts/validate_cache_parity.mjs",
+        "scripts/validate_source_parity.mjs",
+        "scripts/validate_structure.mjs",
+        "scripts/validate_style_tokens.mjs"
+      ]
+    }
+  ],
+  "instructionRules": [],
+  "instructionAssertions": {
+    "codeFences": 8,
+    "emptyCodeFences": 0,
+    "entryPointsNamedInCommands": 13,
+    "scriptReferencesScanned": 20,
+    "scriptReferences": [
+      "build_dynamic_model.mjs",
+      "compile_evidence_run.mjs",
+      "compile_public_test_run.mjs",
+      "debt-model-economics.mjs",
+      "emit/__main__.py",
+      "flow_cli.mjs",
+      "orchestrate_release.mjs",
+      "render/check_render.py",
+      "render/selftest.py",
+      "run_statement_classifier_tests.mjs",
+      "run_user_flow.mjs",
+      "test_release_convergence_seam.mjs",
+      "validate_cache_parity.mjs",
+      "validate_source_parity.mjs",
+      "validate_structure.mjs",
+      "validate_style_tokens.mjs",
+      "verify/finance_proof.py",
+      "verify/run_deterministic_tests.py",
+      "verify/run_finance_proof_mutations.py",
+      "verify/validate_dynamic_model.py"
+    ],
+    "danglingScriptReferences": 0
+  },
+  "smokeTest": {
+    "isolatedRoot": "(temporary, removed)",
+    "nodeExecutable": "node",
+    "nodeVersion": "v22.23.2",
+    "pythonExecutable": "python3.12",
+    "results": [
+      {
+        "target": "closure probe",
+        "status": 0,
+        "resolved": true
+      },
+      {
+        "target": "scripts/build_dynamic_model.mjs",
+        "status": 1,
+        "resolved": true
+      },
+      {
+        "target": "scripts/compile_evidence_run.mjs",
+        "status": 1,
+        "resolved": true
+      },
+      {
+        "target": "scripts/compile_public_test_run.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "scripts/flow_cli.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "scripts/orchestrate_release.mjs",
+        "status": 1,
+        "resolved": true
+      },
+      {
+        "target": "scripts/run_user_flow.mjs",
+        "status": 1,
+        "resolved": true
+      },
+      {
+        "target": "scripts/run_statement_classifier_tests.mjs",
+        "status": 1,
+        "resolved": true
+      },
+      {
+        "target": "scripts/debt-model-economics.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "scripts/test_release_convergence_seam.mjs",
+        "status": 0,
+        "resolved": true
+      },
+      {
+        "target": "scripts/validate_cache_parity.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "scripts/validate_source_parity.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "scripts/validate_structure.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "scripts/validate_style_tokens.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
+        "target": "python closure import probe",
+        "modules": 28,
+        "allResolvedInsideRelease": true
+      },
+      {
+        "target": "scripts/emit/__main__.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/render/check_render.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/render/selftest.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/verify/finance_proof.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/verify/run_finance_proof_mutations.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/verify/run_deterministic_tests.py",
+        "status": 1,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/verify/validate_dynamic_model.py",
+        "status": 1,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "real clean-root workbook build",
+        "status": "PASS",
+        "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
+        "plan_sha256": "784bc8e6c33d8fab851739eb53f2638a672d34881c5493af46e40f5629e9d63a",
+        "workbook_sha256": "1392752b679ba79ee9c7eec1e918c7e7f0fe07cbec3448c0de84b435cd845c04",
+        "validation_status": "PASS_PENDING_MANUAL",
+        "total_violations": 0
+      }
+    ],
+    "workbookBuild": {
+      "status": "PASS",
+      "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
+      "plan_sha256": "784bc8e6c33d8fab851739eb53f2638a672d34881c5493af46e40f5629e9d63a",
+      "workbook_sha256": "1392752b679ba79ee9c7eec1e918c7e7f0fe07cbec3448c0de84b435cd845c04",
+      "validation_status": "PASS_PENDING_MANUAL",
+      "total_violations": 0
+    }
+  },
+  "deploymentOrder": [
+    "SKILL.md",
+    "scripts/debt-model-economics.mjs and its bundled pure-JavaScript libraries",
+    "scripts/validate_structure.mjs, validate_style_tokens.mjs, validate_cache_parity.mjs, validate_source_parity.mjs",
+    "node_modules/jszip (vendored, pinned)",
+    "scripts/emit (Python renderer; needs openpyxl, native in deployment host, NOT vendored) and assets/plan.schema.json, which it refuses to render without",
+    "scripts/verify (Python validator port; stdlib only, by policy and by check)",
+    "scripts/render (Python image-check stage; needs PyMuPDF, Pillow, numpy — all native, none vendored — and soffice on the host)",
+    "the allowlisted references and runtime contracts"
+  ],
+  "modelRouting": {
+    "routineBuild": "Terra",
+    "mechanicalCheck": "Luna",
+    "materialAmbiguityOrPersistentFailure": "Sol"
+  },
+  "prohibitedLegacyContent": [
+    "certification harnesses",
+    "blind or holdout artifacts",
+    "issuer-specific qualification archives",
+    "ratings scope",
+    "full three-statement requirements"
+  ],
+  "files": [
+    {
+      "path": "central-instructions.md",
+      "sha256": "ae1c8c51a00046e54b250db32aec672ff40a52219aa08c5adf89aa494c71210a",
+      "bytes": 22385,
+      "words": 2917
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "4b540a26c506bce9a2a301ef1787367363b97c637835dced8ff0b57ff5bf7616",
+      "bytes": 22747,
+      "words": 2962
+    },
+    {
+      "path": "references/runtime-core.md",
+      "sha256": "f49d1f00866b25c39b785d35d72b8bd48af88c860432354614d027d16dceaca1",
+      "bytes": 22405,
+      "words": 2919
+    },
+    {
+      "path": "references/model-contract.md",
+      "sha256": "3313f83d8440db0eef3176bd7828d097bf990f01b1aca4fc6c46b3d8cc7679cc",
+      "bytes": 11627,
+      "words": 1766
+    },
+    {
+      "path": "references/calculation-rules.md",
+      "sha256": "f9f76b7d7e08c49e94671438eea7ac10be90ee20acc9f66f8f97580b44583cbd",
+      "bytes": 10282,
+      "words": 1536
+    },
+    {
+      "path": "references/forecast-and-input-policy.md",
+      "sha256": "0e9a7dcce09dde17149bddbb90f22280851e0c9c92438858d202813f9772f6c6",
+      "bytes": 8567,
+      "words": 1327
+    },
+    {
+      "path": "references/acquisition.md",
+      "sha256": "ad96aea955a63015a1caa647930d5859c25d688c0ccbc98dafa022891579b931",
+      "bytes": 4704,
+      "words": 704
+    },
+    {
+      "path": "references/advanced-history-and-fx.md",
+      "sha256": "55ff72743f2e9f8304fb238a4f26c686033f8e6004e7fac3814a0494d297c764",
+      "bytes": 6244,
+      "words": 923
+    },
+    {
+      "path": "references/template-and-formatting.md",
+      "sha256": "9addd1a2aac13e7f57b5ac5b4ba8a26686d07045b09a6348c5d6afee1cb782be",
+      "bytes": 25458,
+      "words": 4186
+    },
+    {
+      "path": "references/validation.md",
+      "sha256": "1098d65ae4b6fff5821741f3194399548053e3d69149c8291d71fdaab0110ecc",
+      "bytes": 45321,
+      "words": 6535
+    },
+    {
+      "path": "assets/broker-pack.schema.json",
+      "sha256": "f92005eb19bac11ff0fa711d4705bc26661415833e646970f033f161a973cd8d",
+      "bytes": 10781,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-export.schema.json",
+      "sha256": "fd101c49b697b16517c929c05997b827ffa064009d256d28342ac85f8b1f9d65",
+      "bytes": 22035,
+      "words": null
+    },
+    {
+      "path": "assets/deployment-profile.json",
+      "sha256": "2bc56c39383f3dd387630044775c2b1694e984a67fa1b3913b937300a67db2bb",
+      "bytes": 34876,
+      "words": null
+    },
+    {
+      "path": "assets/evidence-run-v1.schema.json",
+      "sha256": "839f31873f2392b40ff592aa525e9ccf95d00d6ab6b4fd3d80596897a2d371c8",
+      "bytes": 14478,
+      "words": null
+    },
+    {
+      "path": "assets/lineage-exceptions.json",
+      "sha256": "d7437c05504b35f8d4abcf524c642423cfd127ea8e3b825a5d617063add85d5f",
+      "bytes": 8755,
+      "words": null
+    },
+    {
+      "path": "assets/model-case-v2.schema.json",
+      "sha256": "8f60d7e4cafb660bb388e463578124a63c9eaf0f03f4f92ac856d5c5db561985",
+      "bytes": 41215,
+      "words": null
+    },
+    {
+      "path": "assets/model-case.schema.json",
+      "sha256": "6248bfb8eec8abe2579c7579450d350f3c48c2388c04b3162c9703748cdb0a70",
+      "bytes": 14477,
+      "words": null
+    },
+    {
+      "path": "assets/native-excel-evidence-v3.schema.json",
+      "sha256": "adcf6582bc72d5d51135f6bbc3d8c54bee46d2d535494b4c07a234fb6e47e3f7",
+      "bytes": 12069,
+      "words": null
+    },
+    {
+      "path": "assets/plan.schema.json",
+      "sha256": "2f61463467f308c11a6a24fb71dfb622507ba13880b81de72ba680443d03ed3b",
+      "bytes": 20506,
+      "words": null
+    },
+    {
+      "path": "assets/production-contract-v2.json",
+      "sha256": "591cabc2baaee08cc991da077f906ceb171d5d7a3fdf72111362fa655dbef30f",
+      "bytes": 12867,
+      "words": null
+    },
+    {
+      "path": "assets/public-test-run-v1.schema.json",
+      "sha256": "7ec8694aad54871798b4e83c9750c4c4fe02e8e32356b9e22e4e524595d9fd90",
+      "bytes": 6603,
+      "words": null
+    },
+    {
+      "path": "assets/row-taxonomy-v2.json",
+      "sha256": "5663703b31b1916edf5985fdc5d99bb5c87c5e3e7d72c500ce45a033ef37e4ae",
+      "bytes": 6135,
+      "words": null
+    },
+    {
+      "path": "assets/standardised-design-runtime.v2.json",
+      "sha256": "e0fafa33869934f8fae33ef905be72a59f0902004353d8e6c5673ca1c371bb58",
+      "bytes": 5073,
+      "words": null
+    },
+    {
+      "path": "assets/statement-semantic-taxonomy.v1.json",
+      "sha256": "74424c98ce363084d51beed76623b47a92472b41a126241a19aeb7157810dc8e",
+      "bytes": 3786,
+      "words": null
+    },
+    {
+      "path": "assets/style-tokens.json",
+      "sha256": "76dd1c7e88f91fab7af1e2fd49392aa17a84c7e87945cb611eadf1de05897153",
+      "bytes": 35068,
+      "words": null
+    },
+    {
+      "path": "scripts/build_dynamic_model.mjs",
+      "sha256": "b56f10b00c14253ae9acac634748c3cc3724e5bb48bc64656b838f89776060a5",
+      "bytes": 435464,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_evidence_run.mjs",
+      "sha256": "e1840d0a00f8067dad9bf707d8be626cc2eb9ecf0c88ba4e7cee00e8ff00238f",
+      "bytes": 1936,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_public_test_run.mjs",
+      "sha256": "16fb14b2173a99e6a97e42bf065622b884002b6af92e8ffd365c39eab25d6bfb",
+      "bytes": 11719,
+      "words": null
+    },
+    {
+      "path": "scripts/debt-model-economics.mjs",
+      "sha256": "e7cedaf572b71977d3b8337a8359e3f5384fa4d67a547bf43ac3ff89779360d2",
+      "bytes": 3076,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/__init__.py",
+      "sha256": "40bee299928133b560aaa4b797bb17b29af02377b195384ac364e6b96d3ea6bc",
+      "bytes": 1437,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/__main__.py",
+      "sha256": "da7bdf57a8e19c1d61d67ca37e0fffab3e7f357732fcf5a637495df42cc975de",
+      "bytes": 3589,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/patch.py",
+      "sha256": "f24a3aac0bb64a9c8a10c35924817d33f8f7eaabef6362ed2484e46de52fb841",
+      "bytes": 30302,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/plan.py",
+      "sha256": "b3f8627f6da1b15f96f229c34d6ade465a412f84b37d5fb162c5c9d1736aca8c",
+      "bytes": 8473,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/render.py",
+      "sha256": "13883d573ea895e991c8c4163203510aa2aef3a98e1932c3d050311ae0ed06b4",
+      "bytes": 13151,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/styles.py",
+      "sha256": "1e89a06abdac67a06ce4cd4d4f94bdc1bbcdf4dc9ba4bfbf661bc9a6bec961cc",
+      "bytes": 8270,
+      "words": null
+    },
+    {
+      "path": "scripts/emit/verify.py",
+      "sha256": "11b0d8ee70681fe0f3dee447047c291c09850173e612f4567d8de8a4f9b91350",
+      "bytes": 15690,
+      "words": null
+    },
+    {
+      "path": "scripts/flow_cli.mjs",
+      "sha256": "f15584347ad5b12ba62ee047bc56a02c849313db6b64a13ebef0ad972e37266a",
+      "bytes": 8497,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/attachment_ingress.mjs",
+      "sha256": "9358e2fdf2a1b75b0a78345edaf6adb125e2dafbf839c53cfe081f45ff45f545",
+      "bytes": 10867,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/broker_anchor.mjs",
+      "sha256": "33731a3aa5ffc9ff96ad1aa0350611131fa2ada48d8934aaabe3efa2a7e491ce",
+      "bytes": 15032,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/coverage.mjs",
+      "sha256": "bfadf435c4a43fc6314c993b66dfdbbb31597704a6d46c21f081361905b545e6",
+      "bytes": 58276,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/design_contract.mjs",
+      "sha256": "0150dfc0a2b0e1f4458fb8acc9e997c47b06cb6df3d0568fbf8108eb12c53bc4",
+      "bytes": 3558,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/evidence_run.mjs",
+      "sha256": "3785bb6d71631e9f055427e740512e97a5bd329f9a51ea8b4917e69feb2a8949",
+      "bytes": 34040,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow.mjs",
+      "sha256": "9fe74bd7cab8ebf6776fc51eba43439a84f635ca0bc7aaacf163cc3799ed9687",
+      "bytes": 11918,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_entity.mjs",
+      "sha256": "15514d8527e0806687f47e0bb0779041ed2f509765ad3c7aa495063d13b0cb8c",
+      "bytes": 5082,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_impact.mjs",
+      "sha256": "2b67224cb7aa4174a2582d6d115431d35959c99f239e1db9b3a3e41a1751061d",
+      "bytes": 12329,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_questions.mjs",
+      "sha256": "9f77886fb73a540916b8c86a88ac275069f03e62fd57e136be97de0a3ae71a6d",
+      "bytes": 46404,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_read.mjs",
+      "sha256": "b439a3caf326ba32fbcc92d3df01e9932c037c17b0c624e401838e26f39da6ca",
+      "bytes": 25035,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_reconcile.mjs",
+      "sha256": "71b8a9a28a517bbf213ad2854498cb0b12aec9f743381206781275c6c283d1e0",
+      "bytes": 8216,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_runtime.mjs",
+      "sha256": "f3bb660614a636c24444f8fa86b4b70ad39776bbd4d7b689dfc4b151b5e97dcd",
+      "bytes": 7394,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/flow_screens.mjs",
+      "sha256": "4dd021243c4720506701f1e7b7b4ca15da1b13a0d3c69ef85c6e3c60d8a86f6c",
+      "bytes": 20458,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/historical_normalisation.mjs",
+      "sha256": "a2cf938543ccaf4d66c471ea99d9982955267744ff9e76033b2cf6966b98e06b",
+      "bytes": 4462,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/instrument_display.mjs",
+      "sha256": "a9140238e4aa589532951926255768394281bee5f72c2e6c842b2bb19c42fdca",
+      "bytes": 2006,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/intake.mjs",
+      "sha256": "e928d4588318b510cde8e407ff012729bce7ce9d11f3a8c27c55156bd3bf0d3d",
+      "bytes": 50294,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/json_schema.mjs",
+      "sha256": "eed17badca42854213ce31a571536988b4e4efc6151f33c397e8a977b7b27b63",
+      "bytes": 5446,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/lease_policy.mjs",
+      "sha256": "2c3533f506eb8cd92a0566bce1e0193c43a012f28da5731bc170f5f13c753f3d",
+      "bytes": 5487,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/plan_builder.mjs",
+      "sha256": "24e4293f833c8cc0f391143e569b35fff1c9bc624478bb25814deae82bee0125",
+      "bytes": 33148,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/plan_values.mjs",
+      "sha256": "e332e74c7eb6d461fbb28510714acd8f92c504cd15aa62a32ecc733ce491ec48",
+      "bytes": 21083,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/process_tree.mjs",
+      "sha256": "480b908cddff21a7d8c36db164c3a3af2da39c41fd4057d3bdeabf86bda5ffd6",
+      "bytes": 7600,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/public_test_run.mjs",
+      "sha256": "2de8c05808f8fff6fcf2908bce54d4bc17403117e5a3a388a7d44b286ed81df9",
+      "bytes": 14080,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/rcf_policy.mjs",
+      "sha256": "b0b7a2c39d39b07aff4d245e1a2e327509bef0f980c32ae65a79387e7747e347",
+      "bytes": 1177,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/release_checkpoint_store.mjs",
+      "sha256": "8807a6a0d28aa52a7f1d8931566ef8c6b50f5635761c9ab2a7ab1e9b17a38111",
+      "bytes": 5169,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/release_module_registry.mjs",
+      "sha256": "2d9313a15cb3631a7c63baf25c80328cd46269f8d424549511ffbacd57380cb0",
+      "bytes": 2085,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/release_nodes.mjs",
+      "sha256": "bcd281330d27ecca48177540ad1e866115872ed4379b00fe89f8949ce8b0f4d9",
+      "bytes": 13100,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/row_plan.mjs",
+      "sha256": "a01c263f53371398b941752304be8f89f80c93237ea4a69b8ee830fe8942366f",
+      "bytes": 86380,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/run_carrier.mjs",
+      "sha256": "5ea1cbc1ef71dd9a4e43f2fbceb214df2a50d960906a6e7a04e5169bde3695a4",
+      "bytes": 9881,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/run_store.mjs",
+      "sha256": "65986e06a24f37c36cec3c32c107433a822f0e58851332d3172cf742ed65ee08",
+      "bytes": 8489,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/runtime_isolation.mjs",
+      "sha256": "b1e70576b8a7ec7b3c11714f3449bad4c3a1b9d9d029130ec343765f5e0d9355",
+      "bytes": 21139,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/semantic_graph.mjs",
+      "sha256": "82b33fbc6d176e49848076672072d97007d68c1dd945c13b8bd80c98555a7570",
+      "bytes": 36392,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/solver.mjs",
+      "sha256": "4c23787fca2df89f77a9340a74dea70e3747c79b2b8184e7c5f6582e8ecf8792",
+      "bytes": 99060,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/statement_classifier.mjs",
+      "sha256": "f04fd5f73df89eafcb119eaf0e97ee026624237587e251606f727e92c5a6177f",
+      "bytes": 6218,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/user_flow_controller.mjs",
+      "sha256": "aecb72a1440feb8e00ceb8d16c2ae35d756f9ee623d696267aaea073bd2614c4",
+      "bytes": 3896,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/validation_invariants.mjs",
+      "sha256": "c47ec520c84c2c675e67c46249b8a8935691b16cbec55e8b7630eed801980d8f",
+      "bytes": 33411,
+      "words": null
+    },
+    {
+      "path": "scripts/orchestrate_release.mjs",
+      "sha256": "35a0432963127e56d76e63592adca683cd98f27bbfcaa3395870f4b4858cbb07",
+      "bytes": 28517,
+      "words": null
+    },
+    {
+      "path": "scripts/render/__init__.py",
+      "sha256": "048df9c15c3a64bfe073afdfc3face1a56765d03ae051afcff47658878b77a5b",
+      "bytes": 1435,
+      "words": null
+    },
+    {
+      "path": "scripts/render/baseline.py",
+      "sha256": "a3365a7b066ead0881aa16681e25580654583e7b244ba55201b00affe83667bd",
+      "bytes": 21440,
+      "words": null
+    },
+    {
+      "path": "scripts/render/calibrate.py",
+      "sha256": "07f3599c821ec9270851a3beea981d47df3d72209b5c1b16e0eefcdc3d40ebb2",
+      "bytes": 42289,
+      "words": null
+    },
+    {
+      "path": "scripts/render/cfeval.py",
+      "sha256": "33daff7ea20a56cbb3e7688ef9333ec00e054a2e1ec3e33ab0d265e15003ea9e",
+      "bytes": 13741,
+      "words": null
+    },
+    {
+      "path": "scripts/render/check_render.py",
+      "sha256": "fa3619fb0ca6b6f49dace711d70f7a441c66bba3a3aa0fb4a31411e83b0ca160",
+      "bytes": 60070,
+      "words": null
+    },
+    {
+      "path": "scripts/render/checks.py",
+      "sha256": "c24acb46c0d1326565b1c8d778639ec3e8c9aa022107764e19a347b0a6468143",
+      "bytes": 45975,
+      "words": null
+    },
+    {
+      "path": "scripts/render/pdfdoc.py",
+      "sha256": "f5b85c965eb147f27fd2136001e86b39418a1df3e9ddfb194ae7fdca1302d652",
+      "bytes": 18699,
+      "words": null
+    },
+    {
+      "path": "scripts/render/rowmap.py",
+      "sha256": "3d55f745b7c72170cb6bd01a24ecc9c4207f1782e76839a36315a2b543b8f8a2",
+      "bytes": 5168,
+      "words": null
+    },
+    {
+      "path": "scripts/render/selftest.py",
+      "sha256": "171212df311c0a4bc38361a79f1ddf2a2db6a307d5840b750a6593b3b0365d02",
+      "bytes": 19125,
+      "words": null
+    },
+    {
+      "path": "scripts/render/soffice.py",
+      "sha256": "63f3eb309958755cd6cf9e729b55b8d1edec2540c68cedb07b5a0cf38fb6b5f0",
+      "bytes": 6976,
+      "words": null
+    },
+    {
+      "path": "scripts/render/synth.py",
+      "sha256": "b529674cbaa7bc9d9e02e8ddbd2ffb763deffe2259060dd330676482c5b39164",
+      "bytes": 8199,
+      "words": null
+    },
+    {
+      "path": "scripts/render/textfit.py",
+      "sha256": "614686f8a968d470a6a2637ce03faa12195d131613d2d2bc0e05fc2486158429",
+      "bytes": 9789,
+      "words": null
+    },
+    {
+      "path": "scripts/render/xlsx_model.py",
+      "sha256": "989ab0956d4855b79da3f38177852af0787cd9ac9ed770ee8d5188e37562b760",
+      "bytes": 39799,
+      "words": null
+    },
+    {
+      "path": "scripts/run_statement_classifier_tests.mjs",
+      "sha256": "7a5a1d765253b4e5d64567b587a77bb45c148eeaddcc88f7c64116bcd4877f8e",
+      "bytes": 15427,
+      "words": null
+    },
+    {
+      "path": "scripts/run_user_flow.mjs",
+      "sha256": "98b0b02623c2256fc7a1ee41562773bd20195d760f1e6c397c5a36e1c77d43bf",
+      "bytes": 32314,
+      "words": null
+    },
+    {
+      "path": "scripts/test_release_convergence_seam.mjs",
+      "sha256": "3c4429da187ca66bbcb84ee04c79dc68436c400895e2cdc498b7bbb0ec684509",
+      "bytes": 2183,
+      "words": null
+    },
+    {
+      "path": "scripts/validate_cache_parity.mjs",
+      "sha256": "5a65aac6d504a1c901b0c1930c503c51b96b9636665eb532dc81668ea62afba2",
+      "bytes": 42098,
+      "words": null
+    },
+    {
+      "path": "scripts/validate_source_parity.mjs",
+      "sha256": "7e1d90a21f9b3dbf848fe282d8bea6d5cd34d261e2857c885fb00cf23ad491fa",
+      "bytes": 30143,
+      "words": null
+    },
+    {
+      "path": "scripts/validate_structure.mjs",
+      "sha256": "7bb7d9edd77cbc431c70e4cdf5ae121c44fa18882b3b03149ef1f66d718158b1",
+      "bytes": 12214,
+      "words": null
+    },
+    {
+      "path": "scripts/validate_style_tokens.mjs",
+      "sha256": "3c59f3f0e39c007cd6f0d8ee8ae6f346e12992bb768ae124734dcf0e2a234953",
+      "bytes": 32029,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/finance_proof.py",
+      "sha256": "732eba9bda786430b8017ebdaa6005c0a1b14395a6c5fa862c767a804a5947f2",
+      "bytes": 43168,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/invariants.py",
+      "sha256": "0a94c3f1c657406495cd3fb4124ea72d93d3085903d733188b91281fcc6d2eaf",
+      "bytes": 28861,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/run_deterministic_tests.py",
+      "sha256": "5dbe210f42f19009eb4141a0f88547d7518fee749d55f31cc24ee409e0536386",
+      "bytes": 18531,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/run_finance_proof_mutations.py",
+      "sha256": "1e1128c84c01cce588b40d1e439979caba162649f06d5e4fb73bb41d18f5e649",
+      "bytes": 9580,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/tolerances.py",
+      "sha256": "d153a7972958fb6d24c6cd85b3991250c3a74e429c565f99003ce607460e5f0b",
+      "bytes": 7195,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/validate_dynamic_model.py",
+      "sha256": "d5950cb148fbf1be5ccef11aaafbe98ae118b51e5fe6530ff04d7f2448b4430b",
+      "bytes": 117910,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/xlsx.py",
+      "sha256": "31ce9fa2113f7b02039ce237940515273c3968866323c1691cd7d5ba07b9e812",
+      "bytes": 19493,
+      "words": null
+    },
+    {
+      "path": "node_modules/jszip/jszip.min.js",
+      "sha256": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
+      "bytes": 97630,
+      "words": null
+    },
+    {
+      "path": "node_modules/jszip/package.json",
+      "sha256": "62201617263e6e57862b8b1810c593fab32561e5137d50b2041e0d833e4d64c8",
+      "bytes": 267,
+      "words": null
+    },
+    {
+      "path": "node_modules/jszip/LICENSE.markdown",
+      "sha256": "566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4",
+      "bytes": 33753,
+      "words": null
+    }
+  ]
+}

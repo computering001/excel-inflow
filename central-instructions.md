@@ -1,0 +1,282 @@
+# Excel Inflow
+
+## Outcome
+Build a formula-driven corporate debt-overlay workbook with exactly **three historical and three forecast years**. The output must follow one of two standardised design profiles: maximal for full debt, lease, RCF, interest and optional acquisition topology; net cash only for a simple opening-net-cash issuer with no more than two instruments and acquisition off.
+
+The package contains the design contract, style tokens and renderer, but no workbook or PNG files. Physical reference workbooks are supplied separately after installation. Generate any temporary PNG baselines inside the current run; never write them into the skill or repository.
+
+`assets/standardised-design-runtime.v2.json` carries the portable measured design contract without identifying or embedding a physical workbook. Preserve its A:U geometry, section order, control treatment, named expansion zones and profile identity. Company reporting determines rows inside those zones; it never creates a competing layout.
+
+Deliver a model, not a populated form. Totals, ratios, roll-forwards, pro forma outputs and cross-sheet values are formulas. Hardcode only sourced or expressly supplied inputs. Use blue font for hardcodes, black for same-sheet formulas, green for links to another sheet and white for section titles. Grey fill means intentionally not calculated, never zero and never forecast generally.
+
+## Production architecture
+Run one deterministic graph:
+
+`normalise evidence -> classify issuer rows -> compile semantic graph -> coverage gate -> solve economics -> compile row plan -> emit -> recalculate -> terminal patch -> verify -> render -> deliver`
+
+The semantic graph is canonical; physical row numbers are compiled output. Preserve the issuer label, attach a semantic role and evidence class, and route unmatched material rows to one targeted question or a fail-closed stop. Never solve from workbook coordinates or add a cell-specific exception.
+
+The portable controller owns the stage order and module registry. Each module declares inputs, outputs, invariants and allowed remedies. A stage may not silently skip, widen a tolerance, change a validator or infer a material missing term. Convergence must be declared before solving; non-convergence is a failure.
+
+Read only the reference needed for the current stage:
+
+- `model-contract.md` for horizon, signs, column blocks and statement topology;
+- `calculation-rules.md` for debt, interest, lease, cash, RCF and leverage equations;
+- `forecast-and-input-policy.md` for broker anchors, historical provenance and forecast hierarchy;
+- `acquisition.md` for the lightweight overlay;
+- `advanced-history-and-fx.md` for predecessor, calendarisation, restatement and FX cases;
+- `template-and-formatting.md` for the standardised presentation contract;
+- `validation.md` before interpreting or reporting a validation result.
+
+## Scope
+Always include visible controls, company-specific income-statement and cash-flow rows required by the debt overlay, adjusted EBITDA, free cash flow, instrument-level debt, RCF liquidity, interest, leases when relevant, leverage and an optional lightweight acquisition case.
+
+Use exactly three historical periods and three forecast periods. Do not add ratings analysis, a full balance sheet, a central checks sheet, detailed working-capital schedules, a central source register, debt-issuance-cost roll-forwards or target net debt for acquisitions.
+
+The model is flexible in semantic rows and instrument count, not in presentation grammar. It may handle IFRS or US GAAP labels, net cash or levered issuers, fixed or floating debt, multi-currency instruments, predecessor combinations, calendarisation, restatements, large cash-flow statements, unusual working-capital splits, unusual debt cash-flow splits and RCF capacity stress.
+
+## User flow and evidence
+Begin with one compact request for the company name, the FactSet debt export
+taken at the last fiscal year end, and broker research from 3–10 houses. A prior
+case file and known transaction assumptions are optional. Resolve fiscal year
+end, reporting currency, units and period range from the filings; never ask the
+user to confirm them. For autonomous testing, use only UK- or Irish-listed
+issuers whose public disclosures contain enough debt detail, and use indicative
+broker forecasts rather than presenting them as sourced research.
+
+deployment host reads the supplied files and the required public company documents, then
+creates one `evidence-run/1.0` envelope under
+`assets/evidence-run-v1.schema.json`. Deterministic code validates that envelope
+before the question flow can start. Normalise the broker pack and debt export
+into their schemas before modelling. Reconcile entity, date and gross debt to
+audited filings. Use this evidence waterfall for current facts: latest audited
+filing; later interim or trading update; debt note and maturity table; facility
+or bond documents; company transaction announcement; supplied debt export;
+supplied broker pack; explicit user answer. Preserve source dates for company
+facts. Market curves do not need source dates in the workbook.
+
+Where the runtime can access the attachments, compile that envelope from an
+`attachment-ingress/1.0` spec first:
+
+```text
+node scripts/compile_evidence_run.mjs <attachment-ingress.json> --out <run-folder>
+```
+
+This writes a raw-byte-hash-bound attachment manifest and evidence run. Pass the
+resulting `<run-folder>/evidence-run.json` to the resumable production shell;
+do not handcraft hashes or treat normalized JSON as proof of the original file.
+
+Restated figures replace superseded comparatives only when the filing clearly states the restated basis. Preserve predecessor history and calendarise only with an explicit bridge. Never splice differently scoped periods without a visible reconciliation.
+
+Ask at most once and at most five targeted questions after deterministic pruning. Ask only for material facts that change debt, liquidity, interest, leverage or acquisition outputs and cannot be resolved from supplied evidence. Typical questions cover an unreconciled debt residual, unknown fixed/floating terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease mode, refinancing treatment or transaction timing. If more than five survive, say the inputs appear incomplete and request a corrected pack rather than presenting a questionnaire.
+
+The visible run has exactly five labelled stages:
+
+1. `INPUTS` — receive the company, evidence pack and optional prior case;
+2. `EVIDENCE REVIEW` — validate, read and reconcile without user contact unless the pack is defective;
+3. `DECISIONS` — the only normal stop, containing zero to five questions together;
+4. `BUILD AND CHECKS` — solve, emit and validate without user contact; and
+5. `DELIVERY` — return the workbook, assumptions, findings and gate status.
+
+Use plain ASCII status screens no wider than 61 columns or 70 lines. Every
+screen states `STAGE n OF 5`, status and one unambiguous next action when user
+action is required. Do not expose raw logs, stack traces or internal file
+machinery. Preserve full detail in the stage artifact when the screen is a
+summary.
+
+Every stage writes a small hash-bound receipt containing run ID, controller
+version, stage number and ID, input and output hashes, prior-receipt hash,
+status and next stage. Only a verified `success` receipt is resumable. A stale,
+foreign, failed, blocked or tampered receipt never skips work. State travels in
+the receipts and case files, never in chat history.
+
+Stage 4 has seven silent internal checkpoints: semantic gates, plan, emit,
+recalculate and terminal patch, independent verification, structural render,
+and publication. They do not create additional user messages. Each checkpoint
+stores a separate atomic success receipt and is reusable only when its recipe,
+named input hashes and exact output hashes still agree. A killed invocation
+therefore restarts at the first incomplete or invalid checkpoint in the same
+chat instead of repeating the entire workbook build. No checkpoint is assumed
+to survive across chats.
+
+Invalidate from the earliest affected user stage: a new filing, debt export,
+broker pack or prior case restarts evidence review; a changed answer,
+assumption or transaction input restarts build and checks; a formatting-only
+change restarts rendering and visual checks inside stage 4; delivery wording
+alone restarts stage 5. Internal graph hashes continue to reuse unaffected work
+inside the selected stage.
+
+After answers, rebuild from the normalised case. Do not patch a workbook. Before delivery, give a concise read of the selected profile, broker anchor, opening debt/cash reconciliation, forecast leverage direction, liquidity headroom and any remaining explicit limitation.
+
+### Autonomous public-company test route
+
+This route exists only for local product testing when no supplied FactSet export
+or licensed broker pack is being used. It is not a relaxed production mode.
+
+- Use `assets/public-test-run-v1.schema.json` through the public-test compiler,
+  never `evidence-run/1.0`.
+- Use public issuer filings, debt notes, facility documents and transaction
+  announcements for historical and instrument facts. Every debt instrument and
+  term cites at least one used public-company source.
+- Use 3–10 clearly named indicative houses and retain a source label beginning
+  `SYNTHETIC TEST DATA`. Synthetic forecasts never support a debt fact.
+- Preserve the real issuer name, reporting basis and statement topology, but
+  retain `promotion_status: TEST_ONLY_NOT_PRODUCTION_EVIDENCE` and
+  `production_eligible: false` in the test receipt.
+- If public disclosures do not resolve a material balance, maturity, rate,
+  currency, RCF capacity or drawn amount, the test blocks. It does not create a
+  FactSet-looking fixture, invent a residual term or ask the user to treat test
+  data as production evidence.
+
+Compile the hash-bound TEST_ONLY envelope with:
+
+```text
+node scripts/compile_public_test_run.mjs <source-spec.json> --out <folder>
+```
+
+The public-test validator may hand its case to the same graph, solver and
+renderer so the product is exercised end to end. Its receipt can never be used
+as the production evidence-run receipt required for delivery.
+
+The resumable production shell handles all five user-facing stages. Run the
+same command again after supplying answers or after an interruption; it verifies
+the input and output hashes on each receipt, reuses every unchanged successful
+stage and restarts only at the earliest affected stage:
+
+```text
+node scripts/run_user_flow.mjs <evidence-run.json> --out <run-folder> \
+  [--answers <answers.txt|json>] [--python <python>] [--soffice <path>] \
+  [--baselines <run-folder>/authority-baselines] [--workspace-token <token>] [--json]
+```
+
+The shell writes a compact `run-carrier.json` beside the run evidence at every
+normal pause and delivery boundary. A fresh chat resumes from files, never chat
+memory, by reattaching that carrier and using the same workspace/session token:
+
+```text
+node scripts/run_user_flow.mjs --carrier <run-folder>/run-carrier.json \
+  --out <same-run-folder> --workspace-token <same-token> \
+  [--answers <answers.txt|json>] [--python <python>] [--soffice <path>] \
+  [--baselines <run-folder>/authority-baselines] [--json]
+```
+
+The carrier contains only run-relative paths and exact hashes. It is bound to
+the immutable run identity, issuer, controller and workspace/session token;
+absolute paths, traversal, symlink escapes, changed bytes or a different token
+fail closed. `action_required` is never reusable as success. Receipts bind each
+stage to its own relevant runtime subset, so a delivery-wording change does not
+rebuild a workbook and a formatting change does not repeat evidence review.
+Changed evidence or answers still invalidate the earliest economically affected
+stage and every dependent stage. The lower-level commands remain fixtures and
+diagnostics only:
+
+```text
+node scripts/flow_cli.mjs welcome
+node scripts/flow_cli.mjs start <evidence-run.json> --out <intake-result.json>
+node scripts/flow_cli.mjs answer-run <evidence-run.json> <answers.txt> --case-out <answered-case.json> --out <answer-result.json>
+node scripts/flow_cli.mjs deliver <answered-case.json> --out <delivery-result.json>
+```
+
+## Build rules
+Select the profile from the normalised case. Net cash requires opening debt plus lease liabilities less eligible cash below zero, no more than two instruments and acquisition off; otherwise use maximal. Expand semantic rows only inside the selected profile's zones.
+
+Use issuer-reported rows where material. Preserve unusual impairment, restructuring, pension, working-capital, tax, investing and financing lines rather than forcing generic labels. A cash-flow impairment reversal is distinct from an income-statement impairment charge even when wording overlaps. Aggregate detailed working-capital and debt cash-flow components into visible parent rows only when every child remains represented in the semantic graph and the parent formula closes.
+
+For every debt instrument show opening balance, issuance, scheduled amortisation, maturity repayment, acquisition additions, FX movement, other non-cash movement, RCF signed draw/(repayment) where applicable, and ending balance. Cash repayment and FX translation are separate. A non-amortising instrument remains flat until maturity absent another sourced movement. Optional sourced forecast ending balances corroborate this formula path; they never replace it, and any divergence blocks. Maturity roll and refinancing intent remain economically distinct.
+
+Calculate fixed and floating interest from average balances, with explicit period fractions for material mid-year maturity or closing timing. Floating rates equal the relevant curve plus margin. RCF interest uses average drawn balance. Commitment fee uses average undrawn committed capacity and its own fee rate, not the RCF margin. Other interest must be a visible, documented plug if used. Forecast **interest income** from average eligible cash and a visible yield; never hold it flat by default.
+
+**RCF is the only balancing liquidity source.** Specifically, the balancing facility is the RCF named by `rcf_policy.instrument_id`. Draw only to restore minimum cash, capped by remaining capacity. Repay only from surplus cash, capped by opening drawn balance. Other revolving or bilateral facilities may coexist, but they are ordinary instrument-level debt and never join the balancing waterfall. Keep residual shortfall visible when capacity is exhausted. The circularity control is a kill switch for all forecast interest calculations; it does not switch off the RCF waterfall. Circularity, maturity roll and acquisition controls store numeric 0/1 and display Off/On through formatting.
+
+Keep total lease liability and any separately supplied interest-bearing lease balance visible. Use a sourced closing-balance path, a simple roll-forward or an explicit **Flat replacement** assumption where principal repayments are replenished by replacement additions. For US GAAP, require an explicit interest basis so operating lease cost is not counted again as interest. Apply the selected lease basis consistently to debt, cash flow, interest and leverage.
+
+The acquisition overlay uses enterprise value and entry EV/EBITDA to infer target EBITDA, plus a separately supplied absolute acquisition-debt amount, rate, close year and close month. It has no sources-and-uses, equity funding residual or EV-minus-debt RCF funding. Infer only approved operating metrics from visible ratios. Recompute pro forma amounts and ratios; never add ratios. Each adjustment is `pro forma - standalone`, so unchanged standalone debt, maturity, lease and cash-sweep legs cancel from the adjustment.
+
+For an ordinary production run, invoke only the resumable production shell
+shown under *User flow and evidence*. Its Stage 4 owns the semantic gates,
+solver, plan, renderer, recalculation, terminal patch, independent per-run
+validation and structural render. Do not invoke the lower-level build commands
+or validators separately around it; that repeats work without strengthening the
+company-run evidence.
+
+The following lower-level build commands are diagnostics for a targeted repair
+or an explicitly isolated build-path investigation only:
+
+```text
+node scripts/debt-model-economics.mjs validate-case <case.json>
+node scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>
+python3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json
+python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>
+```
+
+The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
+
+## Validation and certification
+Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing baseline or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass.
+
+An ordinary production company run invokes only `scripts/run_user_flow.mjs`.
+Stage 4 already runs the required per-run gates and returns their hash-bound
+evidence. During an ordinary company run, do **not** run mutation suites, exact
+authority replays, double-build determinism, render self-tests or any package,
+installation or promotion procedure.
+
+The standalone commands below are available only for read-only diagnosis, a
+targeted source repair, frozen-cohort work or explicit release certification.
+Select only the command required by that mode; this is a catalogue, not an
+ordinary-run sequence:
+
+Before the first visual certification in a fresh workspace, create
+`<run-folder>/authority-baseline-attribution.json` with a non-empty `reason`,
+then generate temporary baselines from the separately supplied reference workbook:
+
+```text
+python3 scripts/render/check_render.py <attached-authority.xlsx> --out <run-folder>/authority-baseline-render --baselines <run-folder>/authority-baselines --baseline-case <standard-maximal|standard-net-cash> --update-baseline --attribution <run-folder>/authority-baseline-attribution.json [--soffice <path>]
+```
+
+Keep that directory inside the current run. Never write baseline PNGs to the
+skill or repository.
+
+```text
+node scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-export <json>] [--broker-pack <json>] [--filings <json>] [--soffice <path>] [--baselines <dir>] [--json]
+node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>
+node scripts/test_release_convergence_seam.mjs
+node scripts/validate_source_parity.mjs <workbook.xlsx> <row-map.json> <ledger.json> [--json out.json]
+node scripts/validate_cache_parity.mjs <workbook.xlsx> [--json out.json] [--tol 1e-6] [--rel 1e-9]
+node scripts/validate_style_tokens.mjs <workbook.xlsx> [--json out.json]
+node scripts/validate_structure.mjs <source.xlsx> <built.xlsx>
+python3 scripts/verify/validate_dynamic_model.py <workbook.xlsx> --out <folder> [--tolerance-mode contract|legacy] [--visual-reviewed <file>] [--finance-reviewed <json>]
+python3 scripts/verify/finance_proof.py <case.json> <workbook.xlsx> --out <report.json>
+python3 scripts/verify/run_finance_proof_mutations.py <case.json> <workbook.xlsx> --out <folder>
+python3 scripts/verify/run_deterministic_tests.py --builds <build-a.xlsx> <build-b.xlsx> --out <folder>
+python3 scripts/render/check_render.py <company-workbook.xlsx> --out <folder> --baselines <run-folder>/authority-baselines --baseline-case <standard-maximal|standard-net-cash> --structural-only [--soffice <path>]
+python3 scripts/render/check_render.py <frozen-authority-replay.xlsx> --out <folder> --baselines <run-folder>/authority-baselines --baseline-case <standard-maximal|standard-net-cash> [--soffice <path>]
+python3 scripts/render/selftest.py <reference.xlsx> --fixtures <folder>
+```
+
+Read each report's status and violation count; exit code alone is not the result. `PASS_PENDING_MANUAL` is not `PASS`. The validator requires row-map, solution, coverage, semantic-manifest and source-crosswalk sidecars. Never widen tolerance to clear a finding.
+
+Repair only through a registered deterministic remedy. Re-run the failing node and every downstream node. Stop if a violation appears that was absent in the prior iteration, if severity does not shrink, or after three repair attempts. Validators and authority files are immutable during repair.
+
+Native Microsoft Excel is authoritative for iterative calculation and final analyst appearance. Test circularity, maturity roll and acquisition as 1 -> 0 -> 1 -> 0 -> 1, pressing F9 and saving at each step. Confirm affected outputs suppress and restore identically and leave intended production controls on. Also inspect formulas, provenance colours, freeze panes, outlines, indentation, borders, conditional formats and all visible sheets.
+
+Every company workbook must pass structural render QA against the selected
+maximal or net-cash profile: all visible sheets must render, the declared cells
+must be locatable, and clipping, overlap, fonts, pagination, alignment and
+conditional formatting remain fail-closed. Do not pixel-diff arbitrary company
+labels and values against the example company's pixels.
+
+Exact pixel comparison is a separate release-certification gate. It replays the
+two frozen standardised authority profiles and compares each to its matching,
+attributed baseline without `--structural-only`. The comparison run may never
+create or refresh its own baseline. LibreOffice/Carlito proves regression and
+clipping, not exact Excel/Calibri appearance; native Excel review remains
+separate evidence.
+
+## Completion
+Deliver one workbook, its normalised case, its evidence-run receipt and a concise
+summary naming the selected standardised profile, broker anchor, assumptions,
+unresolved gaps and validation status. The case file is the rebuild carrier;
+never assume it persists across deployment host chats. State status plus total violation
+count and identify any manual gate still open. Never call the model complete
+while coverage, economics, formulas, native Excel restoration or visual review
+is unproven.

@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-export.schema.json",
+  "title": "Debt Overlay — required shape of a debt instrument export (stage 1 input, gated by node N0)",
+  "description": "THIS IS A REQUIREMENT, NOT A DESCRIPTION OF FACTSET'S OUTPUT. No real FactSet DCS debt export was available when this contract was written, and none is expected for some time. Nothing here was reverse-engineered from a vendor file and nothing here should be read as a claim about what FactSet emits. What this document states is the shape the model REQUIRES: the fields it consumes, the units and currency it must be told rather than infer, and the effective date it must be able to assert rather than guess. A real export either conforms, or somebody writes a thin adapter that maps it onto this shape. Do not edit this contract to match a vendor file — write the adapter. If a real export cannot supply a required field at all, that is a finding about the export, not a defect in this schema.",
+  "x_contract_notes": {
+    "authority": "USER-FLOW-20260726.md, 'Source authority': the export is authoritative for instrument-level detail only — amounts, coupons, maturities, currencies. It is NEVER authoritative for reported gross debt, net debt, cash or reported gross interest; those come from the filings and the two must reconcile explicitly at N4.",
+    "derivation": "Every required field below is required because a downstream consumer reads it. The field list was derived from assets/model-case-v2.schema.json ($defs/instrument) and from the eight certified cases, not from a vendor layout.",
+    "declare_rather_than_infer": "units, currency and as_of are declared by the export rather than inferred by the parser. This is deliberate. Each of the three has a silent-failure mode that produces a model that looks complete and is wrong: an export in thousands read as millions, a native-currency column read as reporting currency, and — the commonest production error of all — an export taken at today's date rather than at fiscal year end. Declaring them converts each from an inference into an assertion N0 can check.",
+    "unresolved_is_askable": "Three optional fields — refinancing_intent, is_backstop_for_paper and benchmark_curve — exist solely so that an export which knows the answer can settle it instead of provoking a question. They are OPTIONAL and they must stay optional: absent means unresolved, unresolved is the first half of stage 3's bar for asking, and an export that cannot state them is not defective. Nothing may default them to a value; the flow's own declared defaults apply only after the question has been asked or has been shown to be immaterial. Supplying all three on every row removes at most three of the five stage-3 questions, which is the entire point of carrying them.",
+    "what_this_does_not_cover": "Entity matching. The export names its entity here so that N2 can match it against the filings, but N0 does not check it: filings are not a stage-1 input, so N0 sits upstream of the node that reads them. See ARCHITECTURE-20260726.md §2 and SHIP-PLAN-20260726.md §1a.",
+    "accepted_file_types": "The export must arrive as JSON conforming to this schema, or as CSV/XLSX accompanied by the header block below (an adapter's job is to produce this JSON). Media types an adapter may be handed: text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel.sheet.macroEnabled.12, application/json. An image-only PDF is not an export and is rejected at N0 — there is no text layer to adapt."
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "export_kind",
+    "as_of",
+    "source",
+    "entity",
+    "reporting_currency",
+    "units",
+    "columns",
+    "instruments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "dcs-export/1.0",
+      "description": "Pins the contract an adapter targeted. A future widening gets a new version rather than a silent reinterpretation of an old file."
+    },
+    "export_kind": {
+      "const": "debt_instrument_detail",
+      "description": "Guards against the wrong FactSet report being uploaded. deployment host's native FactSet source is limited and is NOT a substitute for the full DCS debt export (USER-FLOW stage 1)."
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date",
+      "description": "REQUIRED. The effective date of the balances in this export — the date the positions are struck at, not the date the file was produced. N0 gates on this equalling the last historical period end (periods[2].date of the case). The FactSet date toggle must be set to LAST FISCAL YEAR END before exporting; an export at today's date is the commonest production error and produces an unexplained residual at N4 that reads as a data problem of unknown origin. Declaring as_of converts that from an inference into an assertion."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["system", "date_basis"],
+      "description": "Provenance of the file. Feeds the G3 provenance graph's assertion basis ('DCS export row 14').",
+      "properties": {
+        "system": {
+          "type": "string",
+          "minLength": 1,
+          "description": "e.g. 'FactSet DCS', 'adapter:factset-dcs-csv', 'manual'. Free text; recorded, not parsed."
+        },
+        "date_basis": {
+          "enum": ["last_fiscal_year_end", "as_at_export_date", "other"],
+          "description": "What the exporter's date toggle was set to. 'last_fiscal_year_end' is the only value that satisfies N0. The other two are accepted by the schema so that a wrong export is diagnosed specifically rather than rejected as malformed."
+        },
+        "exported_at": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "When the file was produced. Optional, and deliberately NOT the same field as as_of — the gap between them is the evidence that a stale export is stale."
+        },
+        "report_name": { "type": ["string", "null"] }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "The reporting entity the export covers. Carried through N0 untouched and checked against the filings at N2. A Smurfit Kappa Group export against Smurfit WestRock filings produces a gap that looks like a date problem and is not.",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "identifiers": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Any that the export carries. None is individually required — no single identifier survives every merger and holdco/opco split — but each one supplied narrows N2's match.",
+          "properties": {
+            "lei": { "type": ["string", "null"] },
+            "isin": { "type": ["string", "null"] },
+            "cusip": { "type": ["string", "null"] },
+            "ticker": { "type": ["string", "null"] },
+            "factset_entity_id": { "type": ["string", "null"] }
+          }
+        },
+        "consolidation_level": {
+          "enum": ["group", "issuer", "opco", "unknown"],
+          "description": "Optional. Where supplied it lets N2 diagnose a holdco/opco mismatch directly instead of inferring it from a residual."
+        }
+      }
+    },
+    "reporting_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "The currency every amount in this export is stated in. This is the ISSUER's reporting currency, not the instrument's denomination currency — an instrument's own currency is declared per row. A USD reporter's EUR notes appear with currency 'EUR' and an outstanding_amount already translated to USD, because model-case-v2 sums opening_balance across instruments to tie to reported gross debt."
+    },
+    "units": {
+      "enum": ["units", "thousands", "millions"],
+      "description": "The scale of every amount column unless a column overrides it. Must equal the case issuer's units. Required because thousands-vs-millions is invisible in the data for any company whose debt could plausibly be either."
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One declaration per numeric field present in the rows. Must include outstanding_amount. A column that declares a currency other than reporting_currency, or a scale other than the header units, is an error at N0 rather than a silent 1000x or FX error in the model.",
+      "items": { "$ref": "#/$defs/columnDeclaration" }
+    },
+    "instruments": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/exportInstrument" }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional self-declared totals. Where present, N0 checks them against the sum of the rows — a mismatch means the file was truncated or filtered, which is a different failure from a stale export.",
+      "properties": {
+        "total_outstanding": { "type": ["number", "null"] },
+        "instrument_count": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "columnDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "currency", "units"],
+      "properties": {
+        "field": {
+          "enum": [
+            "outstanding_amount",
+            "facility_limit",
+            "drawn_amount",
+            "undrawn_amount",
+            "accrued_interest",
+            "amortisation_amount"
+          ]
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "Must equal the export's reporting_currency. The field exists so that a native-currency column announces itself rather than being summed into a reporting-currency total."
+        },
+        "units": { "enum": ["units", "thousands", "millions"] }
+      }
+    },
+    "exportInstrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "description",
+        "instrument_type",
+        "currency",
+        "outstanding_amount",
+        "rate_type",
+        "maturity_date"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "description": "Stable key, unique within the export. Pattern matches model-case-v2 $defs/instrument.instrument_id so the case can carry it unchanged and the provenance chain survives a rebuild."
+        },
+        "source_row": {
+          "type": ["string", "integer", "null"],
+          "description": "Row locator in the originating file. Becomes the G3 assertion basis 'DCS export row 14'."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Company language, as it will be shown to the user at stage 3 — 'Senior Notes 4.0% 2028', not 'SN_2028'. Maps to model-case-v2 instrument.name."
+        },
+        "display_group": {
+          "type": ["string", "null"],
+          "description": "Optional grouping label ('USD Senior Notes'). Presentation only."
+        },
+        "instrument_type": {
+          "enum": [
+            "fixed_bond",
+            "floating_loan",
+            "commercial_paper",
+            "securitisation",
+            "rcf",
+            "other_debt"
+          ],
+          "description": "Deliberately identical to model-case-v2 instrument.class, with nothing added. A row the model cannot represent as one of these six must be mapped by the adapter and the mapping stated, rather than admitted here and silently dropped later. Finance and operating leases are NOT debt instruments for this purpose — they are handled by the case's lease_policy — so a lease row belongs in the filings path, not in this export."
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "Denomination currency of the instrument itself. May legitimately differ from reporting_currency; the amounts are still stated in reporting_currency. Six of the eight certified cases are single-currency, three are not."
+        },
+        "outstanding_amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Principal outstanding at as_of, in reporting_currency and the declared units. Maps to instrument.opening_balance, which is what N4 foots against reported gross debt."
+        },
+        "maturity_date": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "Required as a KEY. May be null only when maturity_treatment says the instrument does not mature within the forecast (perpetuals, evergreen facilities, non-amortising overdrafts). A null with no maturity_treatment is an incomplete export, reported specifically by N0, because the maturity schedule and the refinancing logic both read it."
+        },
+        "maturity_precision": {
+          "enum": ["day", "month", "year", "derived", null],
+          "description": "How precisely maturity was actually disclosed. The schedule renders only this much, so that a date nobody sourced is never padded to a day. Absent is treated as 'day' when a full date is present, and that treatment is printed as a stated assumption."
+        },
+        "maturity_treatment": {
+          "enum": ["contractual", "non_maturing_within_forecast"],
+          "description": "Required when maturity_date is null."
+        },
+        "next_call_date": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "Optional. Where a call date falls before maturity and inside the forecast window, N0 raises it as a stage-3 question ('The EUR750m notes mature 2029 but are callable 2027. Should I use the 2027 call date?') rather than choosing silently."
+        },
+        "refinancing_intent": {
+          "enum": ["refinanced", "repaid", null],
+          "description": "Optional, and one of the three fields added so that a richer export can settle a question instead of provoking one. States whether an instrument maturing inside the forecast is refinanced or repaid from cash. ABSENT OR NULL IS NOT A DEFECT — it is the unresolved state, and unresolved is the first half of the bar for asking, so the stage-3 question 'The EUR750m notes mature in 2029. Refinanced, or repaid from cash?' is asked. Supplying it silences that question for the row and the value is printed as a stated assumption instead. Nothing may infer it: a refinancing nobody has disclosed is an invention, which is why the default when it is not asked is 'repaid'."
+        },
+        "is_backstop_for_paper": {
+          "type": ["boolean", "null"],
+          "description": "Optional, second of the three. Whether this facility backstops the issuer's commercial paper programme. Only meaningful on a row with a facility_limit, and only consulted when the export also carries commercial paper outstanding. ABSENT OR NULL IS NOT A DEFECT — it becomes the stage-3 question 'Is the EUR250m of commercial paper backstopped by the EUR1,900m facility?', because counting the same capacity twice and not counting it at all differ by the whole of the paper balance. Supplying it silences that question."
+        },
+        "benchmark_curve": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "description": "Optional, third of the three, and the only one that is a block rather than a scalar. reference_rate and margin_bps say WHAT the instrument is priced off and by how much; they do not say what the benchmark is assumed to DO across the forecast. ABSENT OR NULL IS NOT A DEFECT — it becomes the stage-3 question 'Hold EURIBOR at today's 2.4%, or use the forward curve?', which is a real ambiguity because the two answers price the same instrument differently in every forecast year. Supplying `resolved` silences that question; supplying only `spot` and `forward` still asks it, but the question can then state both branches in money instead of guessing them.",
+          "properties": {
+            "resolved": {
+              "type": ["array", "null"],
+              "minItems": 1,
+              "items": { "type": "number" },
+              "description": "The benchmark rate actually to be used, one decimal per forecast period (0.024 for 2.4%). Supplying this settles the basis: the export has stated the curve, so nothing is asked."
+            },
+            "spot": {
+              "type": ["number", "null"],
+              "description": "Today's fixing of reference_rate, decimal. The 'hold it where it is' branch."
+            },
+            "forward": {
+              "type": ["array", "null"],
+              "minItems": 1,
+              "items": { "type": "number" },
+              "description": "The forward curve for reference_rate, one decimal per forecast period. The 'use the curve' branch."
+            }
+          }
+        },
+        "rate_type": {
+          "enum": ["fixed", "floating", "manual_all_in"],
+          "description": "Mirrors model-case-v2 instrument.rate_type. Drives which rate fields are required: fixed needs coupon_rate; floating needs reference_rate and margin_bps; manual_all_in needs all_in_rate."
+        },
+        "coupon_rate": {
+          "type": ["number", "null"],
+          "description": "Decimal, not percent: 0.04 for a 4.0% coupon. Required when rate_type is 'fixed'. Percent-vs-decimal is the second-commonest scale error after thousands-vs-millions, so the unit is fixed by the contract rather than sniffed."
+        },
+        "reference_rate": {
+          "type": ["string", "null"],
+          "description": "Benchmark name for a floating instrument — 'EURIBOR 3M', 'SOFR 3M'. Required when rate_type is 'floating'. Maps to instrument.benchmark; the forward curve itself is not a stage-1 input and is held flat unless supplied elsewhere."
+        },
+        "margin_bps": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Spread over the reference rate, in basis points. Required when rate_type is 'floating'. Integer bps rather than a decimal, again to remove a scale ambiguity."
+        },
+        "all_in_rate": {
+          "type": ["number", "null"],
+          "description": "Decimal. Required when rate_type is 'manual_all_in' — used where the export gives a blended cost rather than a decomposable coupon."
+        },
+        "committed": {
+          "type": ["boolean", "null"],
+          "description": "Whether the facility is committed. NULL AND ABSENT ARE BOTH ACCEPTED, and both become a stage-3 question rather than an N0 failure — this is the schema's one deliberate hole, because 'is the EUR400m facility maturing 2028 committed?' is exactly a question the user can answer in one word and the money consequence is statable (an uncommitted facility drops out of liquidity). Guessing it would be worse than asking."
+        },
+        "facility_limit": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Total facility size. Required for instrument_type 'rcf' — the liquidity block and coverage.mjs both read facility_capacity, and headroom cannot be computed without it."
+        },
+        "drawn_amount": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Amount drawn at as_of. Required for 'rcf'. For a revolver, outstanding_amount and drawn_amount are the same number; both are carried so that a file which populates only one is still usable and a file which populates both inconsistently is caught."
+        },
+        "undrawn_amount": { "type": ["number", "null"], "minimum": 0 },
+        "accrued_interest": {
+          "type": ["number", "null"],
+          "description": "Optional. Where present it explains part of the N4 residual instead of leaving it unattributed."
+        },
+        "interest_settlement": {
+          "enum": ["cash", "non_cash"],
+          "description": "Optional, defaults to 'cash'. Maps to instrument.cash_interest. PIK and accreting instruments cannot be derived from instrument_type, so an export that has the information should say so; where it is absent the cash default is printed as a stated assumption."
+        },
+        "debt_classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional override. instrument.include_in_gross_debt / include_in_net_debt are normally derived from instrument_type; this exists for the rows where the filing's own definition differs, and where it is used the divergence is printed rather than absorbed.",
+          "properties": {
+            "include_in_gross_debt": { "type": "boolean" },
+            "include_in_net_debt": { "type": "boolean" }
+          }
+        },
+        "amortisation_schedule": {
+          "type": "array",
+          "description": "Optional. Contractual repayments after as_of, for amortising term debt. Maps to instrument.scheduled_amortisation once bucketed into forecast periods. Absent means bullet.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "amount"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "amount": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "issuing_entity": {
+          "type": ["string", "null"],
+          "description": "Optional. Where instruments sit at different entities this is the earliest signal of a holdco/opco split, which N2 needs."
+        },
+        "security": { "enum": ["secured", "unsecured", "unknown", null] },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

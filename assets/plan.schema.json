@@ -1,0 +1,445 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://schemas.excel-inflow.local/plan.schema.json",
+  "title": "Workbook render plan (L5 PLAN)",
+  "description": "A fully-resolved, cell-level instruction set for rendering one workbook. Every determinism-bearing decision has already been made by the emitter; a conforming renderer contains no business logic and makes no choice of its own. THE CENTRAL RULE: every style record in `styles` is COMPLETE. A renderer never merges a partial style into an existing one, because no partial style is ever expressed. This is what makes the port to openpyxl safe: openpyxl has no partial-style merge, and the plan removes the need for one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plan_version", "workbook"],
+  "properties": {
+    "plan_version": {
+      "const": "1",
+      "description": "Bumped only by a human. A renderer MUST refuse a version it does not know rather than render a best guess."
+    },
+    "case_id": { "type": "string" },
+    "generator": {
+      "type": "object",
+      "description": "Provenance of the plan itself. Never read by the renderer.",
+      "additionalProperties": true,
+      "properties": {
+        "tool": { "type": "string" },
+        "source": { "type": "string" },
+        "generated_at": { "type": "string" }
+      }
+    },
+    "workbook": { "$ref": "#/definitions/workbook" }
+  },
+  "definitions": {
+    "workbook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sheets", "styles"],
+      "properties": {
+        "default_font": {
+          "$ref": "#/definitions/font",
+          "description": "The stylesheet's font 0 — the workbook default. N14 asserts the rendered font set is exactly {Carlito}; this is where Carlito is declared."
+        },
+        "calc_properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "xl/workbook.xml <calcPr>. `iterate` is not cosmetic: the interest <-> debt balance <-> cash sweep circularity is declared and expected (ARCHITECTURE G2), and a workbook opened without iteration on reports it as an error.",
+          "properties": {
+            "calc_id": { "type": "string" },
+            "calc_mode": { "type": "string", "enum": ["auto", "autoNoTable", "manual"] },
+            "full_calc_on_load": { "type": "boolean" },
+            "force_full_calc": { "type": "boolean" },
+            "iterate": { "type": "boolean" },
+            "iterate_count": { "type": "integer", "minimum": 0 },
+            "iterate_delta": { "type": "number", "minimum": 0 }
+          }
+        },
+        "comment_author": {
+          "type": "string",
+          "description": "Display name for the single person entry backing every threaded comment (workbook.comments.setSelf)."
+        },
+        "styles": {
+          "type": "array",
+          "description": "The style table. Each entry is a COMPLETE cell style; cells reference it by index. Index 0 is the default style and must be present.",
+          "items": { "$ref": "#/definitions/style" },
+          "minItems": 1
+        },
+        "differential_styles": {
+          "type": "array",
+          "description": "dxf records for conditional formatting. Unlike `styles` these ARE partial by nature — a dxf states only the channels the rule overrides — and that is the OOXML contract, not a merge hazard.",
+          "items": { "$ref": "#/definitions/differential_style" },
+          "default": []
+        },
+        "sheets": {
+          "type": "array",
+          "description": "In workbook tab order.",
+          "items": { "$ref": "#/definitions/sheet" },
+          "minItems": 1
+        }
+      }
+    },
+
+    "sheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "cells"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 31 },
+        "show_gridlines": { "type": "boolean", "default": true },
+        "default_row_height": { "type": "number", "exclusiveMinimum": 0 },
+        "freeze_pane": {
+          "description": "null means no frozen pane. LibreOffice preserves a frozen pane, so this may be written natively; it was patched at package level in the Node emitter only because the legacy workbook library writer dropped it.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["top_left_cell"],
+              "properties": {
+                "x_split": { "type": "integer", "minimum": 0, "default": 0 },
+                "y_split": { "type": "integer", "minimum": 0, "default": 0 },
+                "top_left_cell": { "type": "string", "pattern": "^[A-Z]{1,3}[0-9]{1,7}$" },
+                "active_pane": { "type": "string", "enum": ["bottomRight", "bottomLeft", "topRight", "topLeft"] },
+                "state": { "type": "string", "enum": ["frozen", "frozenSplit", "split"], "default": "frozen" }
+              }
+            }
+          ]
+        },
+        "outline": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Sheet-level outline properties. summary_below=false is load-bearing, not cosmetic: a consolidated line sits ABOVE its constituents and Excel puts the collapse control on the wrong side without it.",
+          "properties": {
+            "summary_below": { "type": "boolean", "default": true },
+            "summary_right": { "type": "boolean", "default": true },
+            "outline_level_row": { "type": "integer", "minimum": 0, "maximum": 7 },
+            "outline_level_col": { "type": "integer", "minimum": 0, "maximum": 7 }
+          }
+        },
+        "columns": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/column" },
+          "default": []
+        },
+        "rows": {
+          "type": "array",
+          "description": "Only rows carrying a non-default property. A row with cells but no height and no outline level need not appear.",
+          "items": { "$ref": "#/definitions/row" },
+          "default": []
+        },
+        "cells": {
+          "type": "object",
+          "description": "Address -> cell. A cell may carry a style and nothing else; that is how the sheet's empty-but-styled ground is expressed, and dropping those cells changes the rendered face of the model.",
+          "propertyNames": { "pattern": "^[A-Z]{1,3}[0-9]{1,7}$" },
+          "additionalProperties": { "$ref": "#/definitions/cell" }
+        },
+        "merges": {
+          "type": "array",
+          "description": "Expected empty. `layout.merged_calculation_cells_forbidden` is a standing rule; block titles are centred with horizontal=centerContinuous instead. Present so a renderer can assert the rule rather than silently not implement it.",
+          "items": { "type": "string", "pattern": "^[A-Z]{1,3}[0-9]{1,7}:[A-Z]{1,3}[0-9]{1,7}$" },
+          "default": []
+        },
+        "conditional_formats": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/conditional_format" },
+          "default": []
+        },
+        "data_validations": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/data_validation" },
+          "default": []
+        },
+        "comments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/comment" },
+          "default": []
+        },
+        "page_margins": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "left": { "type": "number" },
+            "right": { "type": "number" },
+            "top": { "type": "number" },
+            "bottom": { "type": "number" },
+            "header": { "type": "number" },
+            "footer": { "type": "number" }
+          }
+        },
+        "page_setup": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "LibreOffice does NOT preserve explicit page scaling. If this is populated it must be applied by the terminal patch stage, after the last LibreOffice pass.",
+          "properties": {
+            "orientation": { "type": "string", "enum": ["portrait", "landscape"] },
+            "scale": { "type": "integer", "minimum": 10, "maximum": 400 },
+            "fit_to_width": { "type": "integer", "minimum": 0 },
+            "fit_to_height": { "type": "integer", "minimum": 0 },
+            "paper_size": { "type": "integer" }
+          }
+        },
+        "defined_names": {
+          "type": "array",
+          "description": "Sheet-scoped defined names. Expected empty for this model.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "refers_to"],
+            "properties": {
+              "name": { "type": "string" },
+              "refers_to": { "type": "string" }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "integer", "minimum": 1 },
+        "max": { "type": "integer", "minimum": 1 },
+        "width": { "type": "number", "minimum": 0 },
+        "hidden": { "type": "boolean", "default": false },
+        "custom_width": { "type": "boolean", "default": true },
+        "outline_level": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "style": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row"],
+      "properties": {
+        "row": { "type": "integer", "minimum": 1 },
+        "height": { "type": "number", "minimum": 0 },
+        "custom_height": { "type": "boolean", "default": true },
+        "hidden": {
+          "type": "boolean",
+          "default": false,
+          "description": "Nothing on the Operating Model is hidden. Present so the renderer can assert that rather than assume it."
+        },
+        "outline_level": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "collapsed": { "type": "boolean", "default": false },
+        "style": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A cell states at most one of `f` (formula) and a literal, plus a complete style. `v` alongside `f` is the CACHED result — the value a reader who does not recalculate sees. It is authoritative output of the recalc/patch stages, never something the renderer computes.",
+      "properties": {
+        "s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Index into workbook.styles. A complete style, never a patch."
+        },
+        "f": {
+          "type": "string",
+          "description": "Formula WITHOUT the leading '='. Modern functions carry the _xlfn. prefix already; a renderer never rewrites formula text."
+        },
+        "v": {
+          "description": "Literal value, or the cached result when `f` is present. Dates are serial numbers with a date number format, never date objects.",
+          "type": ["number", "string", "boolean", "null"]
+        },
+        "t": {
+          "type": "string",
+          "enum": ["n", "s", "b", "e", "d"],
+          "description": "Value type. 'n' numeric, 's' string, 'b' boolean, 'e' error, 'd' ISO date. Absent means inferred from `v`."
+        }
+      }
+    },
+
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A COMPLETE cell style. Every channel the model uses is stated or explicitly absent; a renderer assigns the whole record and never reads the cell's prior state. Two legacy workbook library semantics this design deliberately kills: partial FONT assignment merged (so bold could be added without losing provenance colour), and partial BORDER assignment silently CLEARED the edges it omitted (which is why the Node emitter has a draw-order discipline). Here `border` states the intended edge set outright — omitted edge means no edge, stated edge means that edge — so neither behaviour has to be reproduced.",
+      "properties": {
+        "number_format": {
+          "type": "string",
+          "description": "Excel format code, e.g. '#,##0;(#,##0);\"–\"'. 'General' for none."
+        },
+        "font": { "$ref": "#/definitions/font" },
+        "fill": { "$ref": "#/definitions/fill" },
+        "border": { "$ref": "#/definitions/border" },
+        "alignment": { "$ref": "#/definitions/alignment" }
+      }
+    },
+
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "FONT COLOUR IS THE PROVENANCE LAYER. Input fills were removed, so colour is the whole marking: blue = typed hardcode, black = same-sheet derivation, green = cross-sheet link, white = chrome. Nothing may set it for any other reason, and no renderer may drop it while setting another channel.",
+      "properties": {
+        "name": { "type": "string" },
+        "size": { "type": "number", "exclusiveMinimum": 0 },
+        "color": {
+          "type": "string",
+          "pattern": "^(FF|[0-9A-F]{2})?[0-9A-F]{6}$",
+          "description": "ARGB or RGB hex, upper case. No theme or indexed colours: they resolve against a theme part the renderer must not have to reason about."
+        },
+        "bold": { "type": "boolean", "default": false },
+        "italic": { "type": "boolean", "default": false },
+        "underline": { "type": "string", "enum": ["none", "single", "double", "singleAccounting", "doubleAccounting"] },
+        "strike": { "type": "boolean", "default": false }
+      }
+    },
+
+    "fill": {
+      "description": "null means no fill (patternType none). ONE FILL, ONE MEANING: the fill channel belongs to totals and to the uncalculated marker. An input has no fill at all.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pattern"],
+          "properties": {
+            "pattern": { "type": "string", "enum": ["none", "solid", "gray125"] },
+            "fg_color": { "type": "string", "pattern": "^(FF|[0-9A-F]{2})?[0-9A-F]{6}$" },
+            "bg_color": { "type": "string", "pattern": "^(FF|[0-9A-F]{2})?[0-9A-F]{6}$" }
+          }
+        }
+      ]
+    },
+
+    "border": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The intended edge set, stated outright. An omitted edge is NO edge.",
+      "properties": {
+        "left": { "$ref": "#/definitions/border_edge" },
+        "right": { "$ref": "#/definitions/border_edge" },
+        "top": { "$ref": "#/definitions/border_edge" },
+        "bottom": { "$ref": "#/definitions/border_edge" },
+        "diagonal": { "$ref": "#/definitions/border_edge" }
+      }
+    },
+
+    "border_edge": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["style"],
+          "properties": {
+            "style": {
+              "type": "string",
+              "enum": [
+                "thin", "medium", "thick", "double", "hair", "dotted", "dashed",
+                "dashDot", "dashDotDot", "mediumDashed", "mediumDashDot",
+                "mediumDashDotDot", "slantDashDot"
+              ]
+            },
+            "color": { "type": "string", "pattern": "^(FF|[0-9A-F]{2})?[0-9A-F]{6}$" }
+          }
+        }
+      ]
+    },
+
+    "alignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "`centerContinuous` is how the three block titles centre across their blocks without merging. LibreOffice does NOT preserve it, so a pipeline that recalculates must re-apply this at the terminal patch stage.",
+      "properties": {
+        "horizontal": {
+          "type": "string",
+          "enum": ["general", "left", "center", "right", "fill", "justify", "centerContinuous", "distributed"]
+        },
+        "vertical": { "type": "string", "enum": ["top", "center", "bottom", "justify", "distributed"] },
+        "indent": { "type": "integer", "minimum": 0, "maximum": 250 },
+        "wrap_text": { "type": "boolean", "default": false },
+        "shrink_to_fit": { "type": "boolean", "default": false }
+      }
+    },
+
+    "differential_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A conditional-format override. Partial BY CONTRACT. A dxf may set fill, border, bold/italic and number format. It may NEVER set font colour on a body cell: font colour is the provenance layer and a rule that overrides it silently destroys the one thing the model exists to protect. (The two control-cell toggle rules are the declared exception and are single-cell chrome, not body cells.)",
+      "properties": {
+        "number_format": { "type": "string" },
+        "font": { "$ref": "#/definitions/font" },
+        "fill": { "$ref": "#/definitions/fill" },
+        "border": { "$ref": "#/definitions/border" }
+      }
+    },
+
+    "conditional_format": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sqref", "rules"],
+      "properties": {
+        "sqref": {
+          "type": "string",
+          "description": "One or more space-separated ranges, OOXML sqref syntax."
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "dxf"],
+            "properties": {
+              "type": { "type": "string", "enum": ["expression", "cellIs", "containsText", "top10", "aboveAverage", "duplicateValues", "uniqueValues"] },
+              "operator": {
+                "type": "string",
+                "enum": ["lessThan", "lessThanOrEqual", "equal", "notEqual", "greaterThanOrEqual", "greaterThan", "between", "notBetween", "containsText", "notContains", "beginsWith", "endsWith"]
+              },
+              "formulas": {
+                "type": "array",
+                "description": "Rule formulas WITHOUT a leading '='. Relative/absolute anchoring is significant and is already resolved: `G$185>0` makes each column test its own year.",
+                "items": { "type": "string" }
+              },
+              "priority": { "type": "integer", "minimum": 1 },
+              "stop_if_true": { "type": "boolean", "default": false },
+              "dxf": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Index into workbook.differential_styles."
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "data_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sqref", "type"],
+      "properties": {
+        "sqref": { "type": "string" },
+        "type": { "type": "string", "enum": ["whole", "decimal", "list", "date", "time", "textLength", "custom"] },
+        "operator": {
+          "type": "string",
+          "enum": ["between", "notBetween", "equal", "notEqual", "lessThan", "lessThanOrEqual", "greaterThan", "greaterThanOrEqual"]
+        },
+        "formula1": {
+          "type": "string",
+          "description": "For type=list this is the quoted comma-joined literal set, e.g. '\"Consensus,High,Low\"' — exactly as it lands in the XML, so the renderer never has to decide how to quote."
+        },
+        "formula2": { "type": "string" },
+        "allow_blank": { "type": "boolean", "default": false },
+        "show_error_message": { "type": "boolean" },
+        "show_input_message": { "type": "boolean" },
+        "prompt_title": { "type": "string" },
+        "prompt": { "type": "string" },
+        "error_title": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+
+    "comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell", "text"],
+      "description": "A threaded comment. The Node emitter writes these as modern threaded comments (xl/threadedcomments + a person part) with legacy comment shells for compatibility. A renderer that can only write legacy notes must SAY SO rather than silently degrade the channel.",
+      "properties": {
+        "cell": { "type": "string", "pattern": "^[A-Z]{1,3}[0-9]{1,7}$" },
+        "text": { "type": "string" },
+        "author": { "type": "string" }
+      }
+    }
+  }
+}
