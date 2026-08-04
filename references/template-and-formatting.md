@@ -475,18 +475,26 @@ hierarchy.
 **Nothing in this contract changes a number. If a build's values move because of
 a formatting change, something is wrong.**
 
-Store a rendered PNG per case and diff every build against it. Any pixel change
-must be attributable to an intended change. This is the discipline already
-applied to numbers — zero changed values, zero changed formulas, zero changed
-font colours — extended to appearance, and it converts "I changed the rank system
-and nothing else moved" from an assertion into a proof.
+For ordinary company builds, render every visible sheet and enforce structural
+geometry directly: pagination, presence, clipping, overlap, alignment, fonts,
+section bands, gutters and conditional formatting. Do not compare issuer-
+specific labels and values with an example company's pixels, and do not require
+PNG files in the skill or deployment runtime.
 
-`render/check_render.py` is what performs that diff, and `--update-baseline` is
-what writes the baseline. Populate a baseline only from a real LibreOffice
-conversion; a baseline written from any other renderer makes the regression check
-assert against fiction for the life of the file. Run it on the **patched**
-workbook — the patch stage is terminal, and a render of the pre-patch file
-measures a workbook nobody will open.
+For a frozen local release replay only, diff rendered pages against an external,
+independently approved baseline epoch. Any pixel change must be attributable to
+an intended change. This extends the same discipline applied to numbers — zero
+unexplained changed values, formulas or font colours — to the fixed authority
+replay without turning a production run into its own visual authority.
+
+`render/check_render.py` performs both modes. `--structural-only` needs no
+baseline. Exact release replay omits that flag and uses `--update-baseline` only
+in a separately authorised baseline-adoption transaction. Populate such a
+baseline only from a real LibreOffice conversion of the frozen shipping-path
+replay; a baseline written from another renderer or a raw attached authority
+makes the regression check assert against the wrong producer. Run it on the
+**patched** workbook — the patch stage is terminal, and a render of the pre-
+patch file measures a workbook nobody will open.
 
 **What the render evidence is worth, stated exactly:** it proves LibreOffice
 rendering with Carlito. It is authoritative for visual regression and for

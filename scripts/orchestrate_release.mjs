@@ -248,7 +248,7 @@ async function main() {
     throw new Error(
       "Usage: orchestrate_release.mjs <case.json> --out <run-dir> " +
       "[--dcs-export <json>] [--broker-pack <json>] [--filings <json>] " +
-      "[--case-only] [--python <python>] [--soffice <path>] [--baselines <dir>] " +
+      "[--case-only] [--python <python>] [--soffice <path>] " +
       "[--workspace-token <token>] [--json]",
     );
   }
@@ -293,14 +293,12 @@ async function main() {
   const dcsExport = dcsPath ? await json(dcsPath) : null;
   const brokerPack = brokerPath ? await json(brokerPath) : null;
   const filings = filingsPath ? await json(filingsPath) : null;
-  const baselines = typeof options.baselines === "string" ? path.resolve(options.baselines) : null;
   const caseOnly = options["case-only"] === true;
 
   const python = await resolvePython(typeof options.python === "string" ? options.python : null);
   if (!python) return fail("Python with openpyxl is required for the portable renderer and was not available.");
   const soffice = await resolveSoffice(typeof options.soffice === "string" ? options.soffice : null);
   if (!soffice) return fail("N11 is BLOCKED: LibreOffice is required for recalculation and was not available.");
-  if (!baselines) return fail("N14 is BLOCKED: an approved baseline directory is required for visual certification.");
 
   const evidenceHashes = {
     dcs_export: dcsPath ? await hashFile(dcsPath) : "absent",
@@ -308,7 +306,6 @@ async function main() {
     filings: filingsPath ? await hashFile(filingsPath) : "absent",
   };
   const source = await runtimeSourceDigests();
-  const baselineHash = (await hashDirectory(baselines)).hash;
   const reusedCheckpoints = [];
   const executedCheckpoints = [];
   const checkpointReceipts = {};
@@ -559,7 +556,7 @@ async function main() {
       row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
       verify_receipt: checkpointReceipts.verify,
       code: source.render,
-      baselines: baselineHash,
+      render_mode: hashValue("structural-only-no-pixel-baseline"),
       baseline_case: hashValue(baselineCase),
       python: python.identity,
       soffice: soffice.identity,
@@ -570,7 +567,6 @@ async function main() {
         path.join(HERE, "render", "check_render.py"),
         patchedWorkbook,
         "--out", workDir,
-        "--baselines", baselines,
         "--baseline-case", baselineCase,
         "--structural-only",
         "--soffice", soffice.path,
@@ -580,7 +576,14 @@ async function main() {
       if ((index.cases ?? []).length === 0 || index.cases.some((entry) => entry.verdict !== "PASS")) {
         return fail("N14 render evidence did not return PASS for every visible sheet.", { cases: index.cases ?? [] });
       }
-      return { status: "PASS", detail: { baseline_case: baselineCase, cases: index.cases.length } };
+      return {
+        status: "PASS",
+        detail: {
+          baseline_case: baselineCase,
+          mode: "structural-only-no-pixel-baseline",
+          cases: index.cases.length,
+        },
+      };
     },
   });
   if (!step.ok) return step.result;

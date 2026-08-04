@@ -5,12 +5,12 @@
   "skillVersion": "2.0.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-04T06:44:26.510Z",
-  "centralInstructionsWords": 2917,
+  "generatedAt": "2026-08-04T19:19:59.314Z",
+  "centralInstructionsWords": 3052,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "23769a621faf94b65bca1328aa82fc9b4d79a4af40494caf7a3f991cdd18d3b5",
+    "currentClosureSha256": "d86bb506006908b44c7104c00654053f088dce2dc9fac4bca5e4e9032a17d044",
     "closureFileCount": 91,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -217,10 +217,10 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python3.12",
+      "selected": "python3",
       "candidates": [
         {
-          "candidate": "python3.12",
+          "candidate": "python3",
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
@@ -234,22 +234,6 @@
           },
           "usable": true,
           "reason": "selected"
-        },
-        {
-          "candidate": "python3",
-          "version": "3.9.6",
-          "packages": {
-            "openpyxl": null,
-            "fitz": null,
-            "PIL": null,
-            "numpy": null,
-            "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
-          },
-          "usable": false,
-          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
         }
       ]
     },
@@ -615,7 +599,7 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 8,
+    "codeFences": 7,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 13,
     "scriptReferencesScanned": 20,
@@ -647,7 +631,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python3.12",
+    "pythonExecutable": "python3",
     "results": [
       {
         "target": "closure probe",
@@ -810,21 +794,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "ae1c8c51a00046e54b250db32aec672ff40a52219aa08c5adf89aa494c71210a",
-      "bytes": 22385,
-      "words": 2917
+      "sha256": "dd3ce5d055b5e4d0f0132c568d36b17dd3689228a7d66c3d241540bbdb1236c4",
+      "bytes": 22948,
+      "words": 3052
     },
     {
       "path": "SKILL.md",
-      "sha256": "4b540a26c506bce9a2a301ef1787367363b97c637835dced8ff0b57ff5bf7616",
-      "bytes": 22747,
-      "words": 2962
+      "sha256": "c23211c54f5fa3a73089be60a37c19d86a06ec86f59304c41553dd74e3b7f89a",
+      "bytes": 23310,
+      "words": 3097
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "f49d1f00866b25c39b785d35d72b8bd48af88c860432354614d027d16dceaca1",
-      "bytes": 22405,
-      "words": 2919
+      "sha256": "e5a6b768f9cfdd18a89b4d3eff5388043e7395a125f185f3ddc57aa68619ecb5",
+      "bytes": 22968,
+      "words": 3054
     },
     {
       "path": "references/model-contract.md",
@@ -858,15 +842,15 @@
     },
     {
       "path": "references/template-and-formatting.md",
-      "sha256": "9addd1a2aac13e7f57b5ac5b4ba8a26686d07045b09a6348c5d6afee1cb782be",
-      "bytes": 25458,
-      "words": 4186
+      "sha256": "927d654aac55a2cb7943fd032e98e3fa8d96bd025c3b8699d67c1239bfa32639",
+      "bytes": 25995,
+      "words": 4251
     },
     {
       "path": "references/validation.md",
-      "sha256": "1098d65ae4b6fff5821741f3194399548053e3d69149c8291d71fdaab0110ecc",
-      "bytes": 45321,
-      "words": 6535
+      "sha256": "c5c4c11b06ca8370dcdecc690d0ca2c1210822e873a183b3019db0f0b106f7a7",
+      "bytes": 45685,
+      "words": 6592
     },
     {
       "path": "assets/broker-pack.schema.json",
@@ -1242,8 +1226,8 @@
     },
     {
       "path": "scripts/orchestrate_release.mjs",
-      "sha256": "35a0432963127e56d76e63592adca683cd98f27bbfcaa3395870f4b4858cbb07",
-      "bytes": 28517,
+      "sha256": "30e169385b4cc18de08a9325d41f4b2297748222cf320a4fc7ccd5ce34df15a3",
+      "bytes": 28323,
       "words": null
     },
     {
@@ -1332,8 +1316,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "98b0b02623c2256fc7a1ee41562773bd20195d760f1e6c397c5a36e1c77d43bf",
-      "bytes": 32314,
+      "sha256": "bd41015491e625f8c2a619208aad9426efc7c9c5ac97cf65fcf51d2b4741ff55",
+      "bytes": 32208,
       "words": null
     },
     {

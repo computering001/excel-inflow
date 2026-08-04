@@ -211,7 +211,7 @@ async function main() {
       "Usage: run_user_flow.mjs <evidence-run.json> --out <run-dir> or " +
         "run_user_flow.mjs --carrier <run-carrier.json> --out <run-dir> " +
         "[--answers <answers.txt|json>] [--python <python>] [--soffice <path>] " +
-        "[--baselines <dir>] [--run-id <id>] [--workspace-token <token>] " +
+        "[--run-id <id>] [--workspace-token <token>] " +
         "[--stop-after <stage>] [--json]",
     );
   }
@@ -733,7 +733,6 @@ async function main() {
     ];
     if (options.python) args.push("--python", options.python);
     if (options.soffice) args.push("--soffice", options.soffice);
-    if (options.baselines) args.push("--baselines", path.resolve(options.baselines));
     const runtimeHome = path.join(runDir, ".runtime-home");
     const runtimeTmp = path.join(runDir, ".runtime-tmp");
     await fs.mkdir(runtimeHome, { recursive: true });

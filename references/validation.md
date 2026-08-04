@@ -456,7 +456,7 @@ source reconciliation remain separate gates.
 
 ```text
 python3 scripts/render/check_render.py <workbook.xlsx> [more.xlsx ...] --out <folder>
-        --baselines <run-folder>/authority-baselines
+        [--baselines <external-approved-baselines>]
         [--baseline-case standard-maximal|standard-net-cash]
         [--structural-only] [--baseline-row-model excel-compat|declared]
         [--sheet "Operating Model"] [--soffice <path>] [--expect-pages N]
@@ -473,7 +473,8 @@ and prints one verdict per case, and it needs the workbook's `.row-map.json`
 sidecar beside it. Exit status is 0 only if every case is PASS.
 
 There are two deliberately distinct invocations. A normal company build uses
-`--structural-only` with its selected reusable profile in `--baseline-case`.
+`--structural-only` with its selected reusable profile in `--baseline-case` and
+does not need or consume `--baselines`.
 It renders the actual workbook and enforces every applicable structural and
 geometry check, but does not compare issuer-specific labels and numbers with the
 example authority's pixels. Exact pixel regression omits `--structural-only`
@@ -510,9 +511,13 @@ Baselines are populated only by a real LibreOffice conversion, via
 `--update-baseline`. A baseline written from any other renderer makes the
 regression check assert against fiction for the life of the file.
 
-For a fresh deployment, generate the temporary baseline tree from the
-separately supplied standardised reference workbook and store it under the
-current run folder. Do not read or write baseline PNGs in the repository.
+Do not generate a baseline tree from a separately supplied raw authority
+workbook in a deployment host. It has no semantic row-map sidecar and may use a
+different producer row model. Deployment parity instead binds physical-
+authority structure to a frozen local canary, requires exact installed workbook
+byte identity for that canary, and requires the installed structural render to
+match the expected visible-sheet and pagination contract. Pixel baselines are
+external local release evidence only and are never a production-run dependency.
 
 **A comparison run cannot create or extend a baseline.** Not on the first run,
 not for a page the baseline does not yet have, not for anything. Writing one
@@ -539,7 +544,7 @@ depending on whether `docProps/app.xml`'s `<Application>` string starts with
 "Microsoft": on that path a 12.5pt row renders 12.0pt, off it 12.47pt, which over
 a full sheet is more than a row of drift. The shipping producer declares a
 Microsoft-compatible application string — that is `excel-compat`, the default,
-and the model every PNG under `<run-folder>/authority-baselines/` was produced under.
+and the model every PNG in an external approved release baseline was produced under.
 The local direct-to-workbook certification tool writes no `docProps` at all and
 so falls under `declared`; a no-baseline run may diagnose its geometry but
 remains **BLOCKED**. A passing regression verdict requires a separately approved

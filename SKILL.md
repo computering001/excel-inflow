@@ -8,7 +8,7 @@ description: Build, populate, repair, review, and validate a formula-driven corp
 ## Outcome
 Build a formula-driven corporate debt-overlay workbook with exactly **three historical and three forecast years**. The output must follow one of two standardised design profiles: maximal for full debt, lease, RCF, interest and optional acquisition topology; net cash only for a simple opening-net-cash issuer with no more than two instruments and acquisition off.
 
-The package contains the design contract, style tokens and renderer, but no workbook or PNG files. Physical reference workbooks are supplied separately after installation. Generate any temporary PNG baselines inside the current run; never write them into the skill or repository.
+The package contains the design contract, style tokens and renderer, but no workbook or PNG files. Physical reference workbooks are supplied separately after installation and remain immutable design authorities. An ordinary deployment run never manufactures or depends on a PNG baseline. It proves presentation through authority structure, exact workbook identity where a frozen canary exists, structural rendering of every visible sheet and native Excel review. Pixel baselines remain external local release evidence only; never write them into the skill or repository.
 
 `assets/standardised-design-runtime.v2.json` carries the portable measured design contract without identifying or embedding a physical workbook. Preserve its A:U geometry, section order, control treatment, named expansion zones and profile identity. Company reporting determines rows inside those zones; it never creates a competing layout.
 
@@ -151,7 +151,7 @@ stage and restarts only at the earliest affected stage:
 ```text
 node scripts/run_user_flow.mjs <evidence-run.json> --out <run-folder> \
   [--answers <answers.txt|json>] [--python <python>] [--soffice <path>] \
-  [--baselines <run-folder>/authority-baselines] [--workspace-token <token>] [--json]
+  [--workspace-token <token>] [--json]
 ```
 
 The shell writes a compact `run-carrier.json` beside the run evidence at every
@@ -162,7 +162,7 @@ memory, by reattaching that carrier and using the same workspace/session token:
 node scripts/run_user_flow.mjs --carrier <run-folder>/run-carrier.json \
   --out <same-run-folder> --workspace-token <same-token> \
   [--answers <answers.txt|json>] [--python <python>] [--soffice <path>] \
-  [--baselines <run-folder>/authority-baselines] [--json]
+  [--json]
 ```
 
 The carrier contains only run-relative paths and exact hashes. It is bound to
@@ -217,7 +217,7 @@ python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
 
 ## Validation and certification
-Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing baseline or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass.
+Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.
 
 An ordinary production company run invokes only `scripts/run_user_flow.mjs`.
 Stage 4 already runs the required per-run gates and returns their hash-bound
@@ -230,19 +230,16 @@ targeted source repair, frozen-cohort work or explicit release certification.
 Select only the command required by that mode; this is a catalogue, not an
 ordinary-run sequence:
 
-Before the first visual certification in a fresh workspace, create
-`<run-folder>/authority-baseline-attribution.json` with a non-empty `reason`,
-then generate temporary baselines from the separately supplied reference workbook:
+Do not create a pixel baseline from an attached raw authority workbook in the
+deployment host. The raw workbook has no semantic row-map sidecar and may carry
+a different producer row model; treating its pagination as the shipping
+baseline is invalid. Physical authorities are instead checked against the
+portable design contract and the frozen canary structure. Exact pixel evidence,
+when required for local release certification, comes from the frozen shipping-
+path replay and an independently approved external baseline epoch.
 
 ```text
-python3 scripts/render/check_render.py <attached-authority.xlsx> --out <run-folder>/authority-baseline-render --baselines <run-folder>/authority-baselines --baseline-case <standard-maximal|standard-net-cash> --update-baseline --attribution <run-folder>/authority-baseline-attribution.json [--soffice <path>]
-```
-
-Keep that directory inside the current run. Never write baseline PNGs to the
-skill or repository.
-
-```text
-node scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-export <json>] [--broker-pack <json>] [--filings <json>] [--soffice <path>] [--baselines <dir>] [--json]
+node scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-export <json>] [--broker-pack <json>] [--filings <json>] [--soffice <path>] [--json]
 node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>
 node scripts/test_release_convergence_seam.mjs
 node scripts/validate_source_parity.mjs <workbook.xlsx> <row-map.json> <ledger.json> [--json out.json]
@@ -253,8 +250,8 @@ python3 scripts/verify/validate_dynamic_model.py <workbook.xlsx> --out <folder> 
 python3 scripts/verify/finance_proof.py <case.json> <workbook.xlsx> --out <report.json>
 python3 scripts/verify/run_finance_proof_mutations.py <case.json> <workbook.xlsx> --out <folder>
 python3 scripts/verify/run_deterministic_tests.py --builds <build-a.xlsx> <build-b.xlsx> --out <folder>
-python3 scripts/render/check_render.py <company-workbook.xlsx> --out <folder> --baselines <run-folder>/authority-baselines --baseline-case <standard-maximal|standard-net-cash> --structural-only [--soffice <path>]
-python3 scripts/render/check_render.py <frozen-authority-replay.xlsx> --out <folder> --baselines <run-folder>/authority-baselines --baseline-case <standard-maximal|standard-net-cash> [--soffice <path>]
+python3 scripts/render/check_render.py <company-workbook.xlsx> --out <folder> --baseline-case <standard-maximal|standard-net-cash> --structural-only [--soffice <path>]
+python3 scripts/render/check_render.py <frozen-authority-replay.xlsx> --out <folder> --baselines <external-approved-baselines> --baseline-case <standard-maximal|standard-net-cash> [--soffice <path>]
 python3 scripts/render/selftest.py <reference.xlsx> --fixtures <folder>
 ```
 
@@ -270,11 +267,17 @@ must be locatable, and clipping, overlap, fonts, pagination, alignment and
 conditional formatting remain fail-closed. Do not pixel-diff arbitrary company
 labels and values against the example company's pixels.
 
-Exact pixel comparison is a separate release-certification gate. It replays the
-two frozen standardised authority profiles and compares each to its matching,
-attributed baseline without `--structural-only`. The comparison run may never
-create or refresh its own baseline. LibreOffice/Carlito proves regression and
-clipping, not exact Excel/Calibri appearance; native Excel review remains
+Installed parity is transitive and non-vacuous: first validate each physical
+authority against the portable design contract; then prove the frozen local
+canary against that authority; then require the installed host to produce the
+same workbook bytes and a PASS structural render with the same visible sheets
+and pagination. This is the deployment-host gate and needs no PNG upload.
+
+Exact pixel comparison remains a separate **local** release-certification gate.
+It replays the two frozen shipping-path profiles against a matching independently
+approved external baseline without `--structural-only`. The comparison run may
+never create or refresh its own baseline. LibreOffice/Carlito proves regression
+and clipping, not exact Excel/Calibri appearance; native Excel review remains
 separate evidence.
 
 ## Completion
