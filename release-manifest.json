@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.0.3",
+  "releaseName": "Excel Inflow v2.0.4",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.3",
+  "skillVersion": "2.0.4",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-05T08:14:42.575Z",
+  "generatedAt": "2026-08-05T15:22:58.901Z",
   "centralInstructionsWords": 3170,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "d311beef3e47605641bb421494d16472b79f8b1fdc9d79f222f95a30f0d2053f",
+    "currentClosureSha256": "fdb11a2ea8b210b4dced62632ccaacb05a74f145a957448c016d67f42a067ad9",
     "closureFileCount": 93,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -237,11 +237,11 @@
             "openpyxl": "3.1.5",
             "fitz": null,
             "PIL": "12.2.0",
-            "numpy": "2.4.4",
+            "numpy": "2.3.5",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
-            "pypdf": "6.10.2",
-            "reportlab": "4.4.10"
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
           "usable": true,
           "reason": "selected"
@@ -1195,8 +1195,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "a328bb4a225f96d4b1079a3600a86eaf6efa8925f29236e4f09860661d2f85c5",
-      "bytes": 88617,
+      "sha256": "fa6718162ce1a07095dbedb3e75b1b7b542887a713a5f35b3cae654cc167783b",
+      "bytes": 89824,
       "words": null
     },
     {

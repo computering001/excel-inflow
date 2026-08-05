@@ -749,7 +749,13 @@ function foldRevolverIntoChangeInDebt(rows, consolidated) {
   consolidated.calculation = {
     ...consolidated.calculation,
     operator: "sum",
-    refs: [...refs, ...revolver.map((row) => row.row_id)],
+    // An adopted issuer parent can already contain the RCF legs. Remove every
+    // existing occurrence, then append the physical revolver run once. This
+    // makes the fold idempotent without hiding duplicates in unrelated refs.
+    refs: [
+      ...refs.filter((ref) => !revolverIds.has(ref)),
+      ...revolverIds,
+    ],
   };
   for (const row of revolver) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
@@ -769,6 +775,35 @@ function foldRevolverIntoChangeInDebt(rows, consolidated) {
       if (!rewired.includes(next)) rewired.push(next);
     }
     row.calculation = { ...row.calculation, refs: rewired };
+  }
+}
+
+export function assertUniqueStatementDependencies(rows, section = "statement") {
+  for (const row of rows) {
+    const rules = [
+      ["calculation", row.calculation],
+      ["forecast_calculation", row.forecast_calculation],
+      ...(row.forecast_period_calculations ?? []).map((rule, index) => [
+        `forecast_period_calculations[${index}]`,
+        rule,
+      ]),
+    ];
+    for (const [field, rule] of rules) {
+      if (!Array.isArray(rule?.refs)) continue;
+      const seen = new Set();
+      const duplicates = new Set();
+      for (const ref of rule.refs) {
+        if (seen.has(ref)) duplicates.add(ref);
+        seen.add(ref);
+      }
+      if (duplicates.size > 0) {
+        throw new Error(
+          `${section} row ${row.row_id} ${field} contains duplicate dependency refs: ${[
+            ...duplicates,
+          ].join(", ")}.`,
+        );
+      }
+    }
   }
 }
 
@@ -1397,6 +1432,7 @@ export function normaliseStatementRows(modelCase, section) {
   // as content.
   deriveIndentLevels(rows);
   stripLabelIndentSpaces(rows);
+  assertUniqueStatementDependencies(rows, section);
   return rows;
 }
 
