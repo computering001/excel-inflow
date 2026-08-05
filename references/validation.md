@@ -666,6 +666,15 @@ the certified closure hash. A scalar blanket tolerance is not certification.
 
 Confirm:
 
+- each selected income statement and cash-flow statement has an independent,
+  raw-filing-hash-bound face-statement manifest created before taxonomy;
+- manifest rows are contiguous, unique and source ordered, and their row digest
+  is valid;
+- extracted filing lines and source coverage each match the manifest exactly in
+  membership, order, label, values, source and page;
+- every mapped or aggregated face line has a visible issuer-labelled statement
+  row carrying its source-line lineage; no generic parent silently replaces
+  disclosed children;
 - units, currency, periods and signs are consistent;
 - missing prior-year instrument detail is represented by a visible reported
   aggregate or left unavailable, never silently treated as zero debt;

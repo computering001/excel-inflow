@@ -5,6 +5,10 @@ import path from "node:path";
 
 import { validateJsonSchema } from "./json_schema.mjs";
 import { canonicalJson, hashValue } from "./run_store.mjs";
+import {
+  FACE_STATEMENT_SECTIONS,
+  faceStatementManifestDigest,
+} from "./face_statement_manifest.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const ASSETS = path.resolve(HERE, "..", "..", "assets");
@@ -201,6 +205,61 @@ export async function compileAttachmentIngress({ specPath }) {
     if (!entry) throw new Error(`Inventoried source ${source.source_id} has no raw attachment binding.`);
     source.attachment_id = entry.attachment_id;
     source.content_sha256 = entry.raw_sha256;
+  }
+
+  // The evidence template is intentionally allowed to carry placeholder source
+  // hashes.  Bind every face-statement authority to the raw bytes computed by
+  // this compiler, then recompute its ordered-row digest before validation.
+  for (const section of FACE_STATEMENT_SECTIONS) {
+    for (const statement of evidence.filings?.face_statement_manifests?.[section] ?? []) {
+      const entry = sourceAttachment.get(statement.source_id);
+      if (!entry) {
+        throw new Error(`Face-statement manifest ${section}.${statement.source_id} has no raw attachment binding.`);
+      }
+      statement.document_sha256 = entry.raw_sha256;
+      statement.rows_sha256 = faceStatementManifestDigest(statement);
+    }
+  }
+
+  // A document extraction artifact is not merely proof that some text was
+  // read.  When its source owns a selected face statement, it must contain the
+  // exact manifest that enters evidence-run; otherwise a caller could prepare
+  // a complete extraction artifact but pass a shorter evidence ledger.
+  for (const descriptor of spec.attachments) {
+    if (descriptor.adapter?.domain !== "document_extraction") continue;
+    const sourceIds = new Set((descriptor.source_ids ?? []).map(String));
+    const expected = Object.fromEntries(
+      FACE_STATEMENT_SECTIONS.map((section) => [
+        section,
+        (evidence.filings?.face_statement_manifests?.[section] ?? []).filter(
+          (statement) => sourceIds.has(statement.source_id),
+        ),
+      ]),
+    );
+    const expectedCount = FACE_STATEMENT_SECTIONS.reduce(
+      (count, section) => count + expected[section].length,
+      0,
+    );
+    if (expectedCount === 0) continue;
+    const extractionPath = resolved(
+      specDir,
+      descriptor.adapter.extraction_path,
+      `Attachment ${descriptor.attachment_id}.adapter.extraction_path`,
+    );
+    const extraction = await readJsonFile(
+      extractionPath,
+      `Extraction for attachment ${descriptor.attachment_id}`,
+    );
+    for (const section of FACE_STATEMENT_SECTIONS) {
+      const actual = (extraction.face_statement_manifests?.[section] ?? []).filter(
+        (statement) => sourceIds.has(statement.source_id),
+      );
+      if (canonicalJson(actual) !== canonicalJson(expected[section])) {
+        throw new Error(
+          `Extraction for attachment ${descriptor.attachment_id} does not exactly bind the selected ${section} face-statement manifest.`,
+        );
+      }
+    }
   }
   manifest.sort((left, right) => left.attachment_id.localeCompare(right.attachment_id));
   const manifestHash = hashValue(manifest);

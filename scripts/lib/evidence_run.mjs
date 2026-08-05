@@ -6,6 +6,10 @@ import { runIntake } from "./intake.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { validateCaseShape } from "./solver.mjs";
 import { hashValue } from "./run_store.mjs";
+import {
+  FACE_STATEMENT_SECTIONS,
+  faceStatementManifestDigest,
+} from "./face_statement_manifest.mjs";
 
 const EVIDENCE_SCHEMA = JSON.parse(
   fs.readFileSync(
@@ -401,13 +405,189 @@ function validateAttachmentIngress(run, findings) {
   }
 }
 
+const normalizedStatementLabel = (value) =>
+  String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[\u2010-\u2015]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+function validateFaceStatementManifests(run, findings) {
+  const inventory = new Map(
+    (run.source_inventory ?? []).map((source) => [source.source_id, source]),
+  );
+  const historicalPeriods = run.filings?.historical_periods ?? [];
+  const rowsBySection = Object.fromEntries(
+    FACE_STATEMENT_SECTIONS.map((section) => [section, []]),
+  );
+
+  for (const section of FACE_STATEMENT_SECTIONS) {
+    const manifests = run.filings?.face_statement_manifests?.[section] ?? [];
+    if (manifests.length === 0) {
+      findings.push(
+        finding(
+          "evidence.statement.manifest_missing",
+          "BLOCK",
+          `${section} has no independent face-statement manifest.`,
+        ),
+      );
+      continue;
+    }
+
+    const seenLineIds = new Set();
+    for (const [manifestIndex, manifest] of manifests.entries()) {
+      if (manifest.statement !== section) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_wrong_statement",
+            "BLOCK",
+            `${section} manifest ${manifestIndex + 1} declares ${manifest.statement ?? "no statement"}.`,
+          ),
+        );
+      }
+      if (manifest.statement_order !== manifestIndex + 1) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_order_invalid",
+            "BLOCK",
+            `${section} manifest order must be contiguous from 1; position ${manifestIndex + 1} declares ${manifest.statement_order ?? "missing"}.`,
+          ),
+        );
+      }
+      if (!sameArray(manifest.periods, historicalPeriods)) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_period_mismatch",
+            "BLOCK",
+            `${section} manifest ${manifestIndex + 1} does not use the selected historical periods.`,
+          ),
+        );
+      }
+      if (manifest.complete_face_statement !== true) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_incomplete_attestation",
+            "BLOCK",
+            `${section} manifest ${manifestIndex + 1} does not attest that the complete face statement was extracted.`,
+          ),
+        );
+      }
+      const source = inventory.get(manifest.source_id);
+      if (!source) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_source_absent",
+            "BLOCK",
+            `${section} manifest ${manifestIndex + 1} cites unknown source ${manifest.source_id}.`,
+          ),
+        );
+      } else {
+        if (source.status !== "used") {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_source_not_used",
+              "BLOCK",
+              `${section} manifest ${manifestIndex + 1} cites ${manifest.source_id}, whose status is ${source.status}.`,
+            ),
+          );
+        }
+        if (![
+          "company_annual_report",
+          "company_interim_update",
+        ].includes(source.kind)) {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_source_kind_invalid",
+              "BLOCK",
+              `${section} manifest ${manifestIndex + 1} cites ${source.kind}, not an annual or interim filing.`,
+            ),
+          );
+        }
+        if (manifest.document_sha256 !== source.content_sha256) {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_source_hash_mismatch",
+              "BLOCK",
+              `${section} manifest ${manifestIndex + 1} is not bound to the selected source bytes.`,
+            ),
+          );
+        }
+      }
+      if (manifest.row_count !== (manifest.rows ?? []).length) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_row_count_mismatch",
+            "BLOCK",
+            `${section} manifest ${manifestIndex + 1} declares ${manifest.row_count ?? "missing"} rows but contains ${(manifest.rows ?? []).length}.`,
+          ),
+        );
+      }
+      if (manifest.rows_sha256 !== faceStatementManifestDigest(manifest)) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_hash_mismatch",
+            "BLOCK",
+            `${section} manifest ${manifestIndex + 1} digest does not match its ordered rows and source binding.`,
+          ),
+        );
+      }
+
+      const manifestLineIds = new Set(
+        (manifest.rows ?? []).map((row) => row.source_line_id),
+      );
+      for (const [rowIndex, row] of (manifest.rows ?? []).entries()) {
+        if (row.ordinal !== rowIndex + 1) {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_ordinal_gap",
+              "BLOCK",
+              `${section}.${row.source_line_id ?? `row_${rowIndex + 1}`} must have ordinal ${rowIndex + 1}, not ${row.ordinal ?? "missing"}.`,
+            ),
+          );
+        }
+        if (seenLineIds.has(row.source_line_id)) {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_duplicate_line",
+              "BLOCK",
+              `${section}.${row.source_line_id} appears more than once in the selected face-statement manifests.`,
+            ),
+          );
+        }
+        seenLineIds.add(row.source_line_id);
+        if (
+          row.parent_source_line_id &&
+          (!manifestLineIds.has(row.parent_source_line_id) ||
+            row.parent_source_line_id === row.source_line_id)
+        ) {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_parent_invalid",
+              "BLOCK",
+              `${section}.${row.source_line_id} has an absent or self-referential parent ${row.parent_source_line_id}.`,
+            ),
+          );
+        }
+        rowsBySection[section].push({
+          manifest,
+          row,
+          source_id: manifest.source_id,
+        });
+      }
+    }
+  }
+  return rowsBySection;
+}
+
 function validateStatementMapping(run, sourceIds, findings) {
   const modelCase = run.model_case ?? {};
+  const manifestRows = validateFaceStatementManifests(run, findings);
   const structuralRows = {};
   for (const section of ["income_statement", "cash_flow"]) {
-    structuralRows[section] = new Set(
-      (modelCase.statement_structure?.[section] ?? []).map((row) => row.row_id),
-    );
+    const statementRows = modelCase.statement_structure?.[section] ?? [];
+    structuralRows[section] = new Set(statementRows.map((row) => row.row_id));
+    const rowsById = new Map(statementRows.map((row) => [row.row_id, row]));
     const coverage = modelCase.source_coverage?.[section] ?? [];
     const coverageById = new Map(
       coverage.map((line) => [line.source_line_id, line]),
@@ -416,6 +596,176 @@ function validateStatementMapping(run, sourceIds, findings) {
     const filingLineIds = new Set(
       filingLines.map((line) => line.source_line_id),
     );
+    const manifestEntries = manifestRows[section] ?? [];
+    const manifestById = new Map(
+      manifestEntries.map((entry) => [entry.row.source_line_id, entry]),
+    );
+    const manifestOrder = manifestEntries.map(
+      (entry) => entry.row.source_line_id,
+    );
+    const filingOrder = filingLines.map((line) => line.source_line_id);
+    const coverageOrder = coverage.map((line) => line.source_line_id);
+
+    if (!sameArray(filingOrder, manifestOrder)) {
+      findings.push(
+        finding(
+          "evidence.statement.extraction_order_mismatch",
+          "BLOCK",
+          `${section} extracted filing ledger does not exactly preserve manifest membership and source order.`,
+          { manifest_order: manifestOrder, extraction_order: filingOrder },
+        ),
+      );
+    }
+    if (!sameArray(coverageOrder, manifestOrder)) {
+      findings.push(
+        finding(
+          "evidence.statement.coverage_order_mismatch",
+          "BLOCK",
+          `${section} source coverage does not exactly preserve manifest membership and source order.`,
+          { manifest_order: manifestOrder, coverage_order: coverageOrder },
+        ),
+      );
+    }
+
+    const filingById = new Map();
+    for (const line of filingLines) {
+      if (filingById.has(line.source_line_id)) {
+        findings.push(
+          finding(
+            "evidence.statement.extraction_duplicate_line",
+            "BLOCK",
+            `${section}.${line.source_line_id} appears more than once in the extracted filing ledger.`,
+          ),
+        );
+      }
+      filingById.set(line.source_line_id, line);
+      if (!manifestById.has(line.source_line_id)) {
+        findings.push(
+          finding(
+            "evidence.statement.extraction_not_in_manifest",
+            "BLOCK",
+            `${section}.${line.source_line_id} is extracted but absent from the authoritative face-statement manifest.`,
+          ),
+        );
+      }
+    }
+    const coverageSeen = new Set();
+    for (const line of coverage) {
+      if (coverageSeen.has(line.source_line_id)) {
+        findings.push(
+          finding(
+            "evidence.statement.coverage_duplicate_line",
+            "BLOCK",
+            `${section}.${line.source_line_id} appears more than once in source coverage.`,
+          ),
+        );
+      }
+      coverageSeen.add(line.source_line_id);
+      if (!manifestById.has(line.source_line_id)) {
+        findings.push(
+          finding(
+            "evidence.statement.coverage_not_in_manifest",
+            "BLOCK",
+            `${section}.${line.source_line_id} is covered but absent from the authoritative face-statement manifest.`,
+          ),
+        );
+      }
+    }
+
+    const exactLineageOwners = new Map();
+    for (const entry of manifestEntries) {
+      const manifestRow = entry.row;
+      const filingLine = filingById.get(manifestRow.source_line_id);
+      const disclosure = coverageById.get(manifestRow.source_line_id);
+      if (!filingLine) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_not_extracted",
+            "BLOCK",
+            `${section}.${manifestRow.source_line_id} exists in the face-statement manifest but is absent from the extracted filing ledger.`,
+          ),
+        );
+      } else {
+        const sameLine =
+          filingLine.source_id === entry.source_id &&
+          filingLine.page_or_note === manifestRow.page_or_note &&
+          filingLine.face_statement === true &&
+          filingLine.material === manifestRow.material &&
+          normalizedStatementLabel(filingLine.label) ===
+            normalizedStatementLabel(manifestRow.raw_label) &&
+          JSON.stringify(filingLine.values) === JSON.stringify(manifestRow.values);
+        if (!sameLine) {
+          findings.push(
+            finding(
+              "evidence.statement.manifest_extraction_mismatch",
+              "BLOCK",
+              `${section}.${manifestRow.source_line_id} differs between the manifest and extracted filing ledger.`,
+            ),
+          );
+        }
+      }
+      if (!disclosure) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_not_covered",
+            "BLOCK",
+            `${section}.${manifestRow.source_line_id} exists in the face-statement manifest but has no source-coverage disposition.`,
+          ),
+        );
+        continue;
+      }
+      const sameCoverageIdentity =
+        disclosure.document === entry.source_id &&
+        disclosure.page_or_note === manifestRow.page_or_note &&
+        disclosure.face_statement === true &&
+        disclosure.material === manifestRow.material &&
+        normalizedStatementLabel(disclosure.label) ===
+          normalizedStatementLabel(manifestRow.raw_label);
+      if (!sameCoverageIdentity) {
+        findings.push(
+          finding(
+            "evidence.statement.manifest_coverage_mismatch",
+            "BLOCK",
+            `${section}.${manifestRow.source_line_id} differs between the manifest and source coverage.`,
+          ),
+        );
+      }
+
+      if (["mapped", "aggregated"].includes(disclosure.disposition)) {
+        const exactRows = (disclosure.mapped_row_ids ?? [])
+          .map((rowId) => rowsById.get(rowId))
+          .filter(Boolean)
+          .filter(
+            (row) =>
+              (row.source_line_ids ?? []).includes(manifestRow.source_line_id) &&
+              normalizedStatementLabel(row.label) ===
+                normalizedStatementLabel(manifestRow.raw_label),
+          );
+        if (exactRows.length === 0) {
+          findings.push(
+            finding(
+              "evidence.statement.aggregation_lineage_incomplete",
+              "BLOCK",
+              `${section}.${manifestRow.source_line_id} is mapped without a visible issuer-labelled statement row carrying its source-line lineage.`,
+            ),
+          );
+        }
+        for (const row of exactRows) {
+          const prior = exactLineageOwners.get(row.row_id);
+          if (prior && prior !== manifestRow.source_line_id) {
+            findings.push(
+              finding(
+                "evidence.statement.aggregation_lineage_collision",
+                "BLOCK",
+                `${section}.${row.row_id} is the sole issuer-labelled lineage row for both ${prior} and ${manifestRow.source_line_id}.`,
+              ),
+            );
+          } else {
+            exactLineageOwners.set(row.row_id, manifestRow.source_line_id);
+          }
+        }
+      }
+    }
     // The forward check below proves that every extracted filing line has a
     // disposition.  The reverse check is equally important: without it an
     // adapter can keep a large source-coverage graph while presenting only a
@@ -501,12 +851,6 @@ function validateStatementMapping(run, sourceIds, findings) {
     // Resolve the case's three historical columns independently here and tie
     // them back to the filing-line values before the case can enter the build.
     const resolvedSeries = resolveHistoricalStatementSeries(modelCase, section);
-    const rowsById = new Map(
-      (modelCase.statement_structure?.[section] ?? []).map((row) => [
-        row.row_id,
-        row,
-      ]),
-    );
     const numericGroups = new Map();
     for (const line of filingLines) {
       const mapped = coverageById.get(line.source_line_id);
@@ -602,6 +946,21 @@ function validateStatementMapping(run, sourceIds, findings) {
       }
     }
   }
+}
+
+/**
+ * Reusable statement-evidence gate for production and TEST_ONLY public-company
+ * envelopes.  It validates the raw manifest, extraction, coverage, visible
+ * lineage and historical numeric parity without importing either route's debt
+ * or broker authority rules.
+ */
+export function validateStatementEvidence(run) {
+  const findings = [];
+  const sourceIds = new Set(
+    (run?.source_inventory ?? []).map((source) => source.source_id),
+  );
+  validateStatementMapping(run, sourceIds, findings);
+  return findings;
 }
 
 function validateDebtMapping(run, findings) {

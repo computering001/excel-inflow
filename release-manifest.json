@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v2.0.1",
+  "releaseName": "Excel Inflow v2.0.2",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.1",
+  "skillVersion": "2.0.2",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-04T22:53:40.476Z",
-  "centralInstructionsWords": 3052,
+  "generatedAt": "2026-08-05T06:12:12.606Z",
+  "centralInstructionsWords": 3170,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "d8f7ea91ecd9c68cbd01b7e7ee3ff2f4a6401f3997caf630b9e111cafd47b8f7",
-    "closureFileCount": 91,
+    "currentClosureSha256": "67d6d39dbb52952df305578ff0361a33304467d43fcf000bb06c968cad7d55c9",
+    "closureFileCount": 92,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -43,6 +43,7 @@
       "scripts/lib/coverage.mjs",
       "scripts/lib/design_contract.mjs",
       "scripts/lib/evidence_run.mjs",
+      "scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/flow.mjs",
       "scripts/lib/flow_entity.mjs",
       "scripts/lib/flow_impact.mjs",
@@ -127,16 +128,19 @@
       "scripts/flow_cli.mjs -> scripts/lib/evidence_run.mjs",
       "scripts/flow_cli.mjs -> scripts/lib/flow.mjs",
       "scripts/flow_cli.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/lib/attachment_ingress.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/flow_entity.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/intake.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/face_statement_manifest.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/flow.mjs -> scripts/lib/flow_entity.mjs",
       "scripts/lib/flow.mjs -> scripts/lib/flow_questions.mjs",
       "scripts/lib/flow.mjs -> scripts/lib/flow_read.mjs",
@@ -160,6 +164,7 @@
       "scripts/lib/flow_screens.mjs -> scripts/lib/flow_runtime.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/public_test_run.mjs -> scripts/lib/evidence_run.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/flow_entity.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/solver.mjs",
@@ -217,10 +222,10 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python",
+      "selected": "python3",
       "candidates": [
         {
-          "candidate": "python",
+          "candidate": "python3",
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
@@ -234,22 +239,6 @@
           },
           "usable": true,
           "reason": "selected"
-        },
-        {
-          "candidate": "python3",
-          "version": "3.9.6",
-          "packages": {
-            "openpyxl": null,
-            "fitz": null,
-            "PIL": null,
-            "numpy": null,
-            "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
-          },
-          "usable": false,
-          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
         }
       ]
     },
@@ -647,7 +636,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python",
+    "pythonExecutable": "python3",
     "results": [
       {
         "target": "closure probe",
@@ -769,18 +758,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
-        "plan_sha256": "963d70e9f5b978ceed398d528297373150a87a12c92fe8c2b383624d981d62de",
-        "workbook_sha256": "1f207910d6cd7c2856b4518d0eb5e6770d877c6adb786fd70e823bc06f8e3756",
+        "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
+        "plan_sha256": "784bc8e6c33d8fab851739eb53f2638a672d34881c5493af46e40f5629e9d63a",
+        "workbook_sha256": "521877af1a423aa0e7df72d6f5bbae114820a4b533cf502063217d9b48e866b2",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
-      "plan_sha256": "963d70e9f5b978ceed398d528297373150a87a12c92fe8c2b383624d981d62de",
-      "workbook_sha256": "1f207910d6cd7c2856b4518d0eb5e6770d877c6adb786fd70e823bc06f8e3756",
+      "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
+      "plan_sha256": "784bc8e6c33d8fab851739eb53f2638a672d34881c5493af46e40f5629e9d63a",
+      "workbook_sha256": "521877af1a423aa0e7df72d6f5bbae114820a4b533cf502063217d9b48e866b2",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -810,21 +799,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "dd3ce5d055b5e4d0f0132c568d36b17dd3689228a7d66c3d241540bbdb1236c4",
-      "bytes": 22948,
-      "words": 3052
+      "sha256": "b843c3668ee4f5606181e29ad96f0ee129f79e9ca5614180d988d5c8bdb24cc3",
+      "bytes": 23739,
+      "words": 3170
     },
     {
       "path": "SKILL.md",
-      "sha256": "c23211c54f5fa3a73089be60a37c19d86a06ec86f59304c41553dd74e3b7f89a",
-      "bytes": 23310,
-      "words": 3097
+      "sha256": "3c409f9200718c16fd427cfb6d3e15e6e55b30426cc29ec3b1795785c2abb9f8",
+      "bytes": 24101,
+      "words": 3215
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "e5a6b768f9cfdd18a89b4d3eff5388043e7395a125f185f3ddc57aa68619ecb5",
-      "bytes": 22968,
-      "words": 3054
+      "sha256": "5b6c440e4b323a084f22472a88e05bbdfc3d7bb23a82b22b3be7cf36ac5a7d87",
+      "bytes": 23759,
+      "words": 3172
     },
     {
       "path": "references/model-contract.md",
@@ -864,9 +853,9 @@
     },
     {
       "path": "references/validation.md",
-      "sha256": "c5c4c11b06ca8370dcdecc690d0ca2c1210822e873a183b3019db0f0b106f7a7",
-      "bytes": 45685,
-      "words": 6592
+      "sha256": "7aee90371363c9b25dbf6b31af115485292dd10126bd308d1262f1237f98bf5f",
+      "bytes": 46237,
+      "words": 6668
     },
     {
       "path": "assets/broker-pack.schema.json",
@@ -882,14 +871,14 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "2bc56c39383f3dd387630044775c2b1694e984a67fa1b3913b937300a67db2bb",
-      "bytes": 34876,
+      "sha256": "3bd7bd8f6f9e11dfc065c46f0db2959aa56d36082ed0e193c9015c0c5c9f0dc7",
+      "bytes": 34913,
       "words": null
     },
     {
       "path": "assets/evidence-run-v1.schema.json",
-      "sha256": "839f31873f2392b40ff592aa525e9ccf95d00d6ab6b4fd3d80596897a2d371c8",
-      "bytes": 14478,
+      "sha256": "cf35859278481ae748804dcacac501a524b611eb2d846abddc5dee5d774ef1eb",
+      "bytes": 17255,
       "words": null
     },
     {
@@ -930,8 +919,8 @@
     },
     {
       "path": "assets/public-test-run-v1.schema.json",
-      "sha256": "7ec8694aad54871798b4e83c9750c4c4fe02e8e32356b9e22e4e524595d9fd90",
-      "bytes": 6603,
+      "sha256": "7ecab81423b10c66687c1ad49ac62a088e8dbd0b2ce6834bcf6085bf0619b619",
+      "bytes": 10392,
       "words": null
     },
     {
@@ -1032,8 +1021,8 @@
     },
     {
       "path": "scripts/lib/attachment_ingress.mjs",
-      "sha256": "9358e2fdf2a1b75b0a78345edaf6adb125e2dafbf839c53cfe081f45ff45f545",
-      "bytes": 10867,
+      "sha256": "f9487c0423c5cdd7f76c8778d6c53fa2af4c2a11cf5121585488f17baa58a3ca",
+      "bytes": 13417,
       "words": null
     },
     {
@@ -1056,8 +1045,14 @@
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "e6e4e4063d4e9b4f9338913bba24da37f80eefbc54640466433daeb3cf1197e7",
-      "bytes": 41919,
+      "sha256": "514c2d2b75bce1dfde3e7fcaf2774d7e87d4513eb327d13114a2953b7df854ad",
+      "bytes": 55053,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/face_statement_manifest.mjs",
+      "sha256": "f917d0d93692c574b344e55c85ac9e5669a1161acb82c8f1542e89d4fe9e718f",
+      "bytes": 1693,
       "words": null
     },
     {
@@ -1158,8 +1153,8 @@
     },
     {
       "path": "scripts/lib/public_test_run.mjs",
-      "sha256": "2de8c05808f8fff6fcf2908bce54d4bc17403117e5a3a388a7d44b286ed81df9",
-      "bytes": 14080,
+      "sha256": "b72f589adf0d1087cd2a5073e5d00bd8af9507f1c1555fd5e1b27b0fa11237e1",
+      "bytes": 14196,
       "words": null
     },
     {

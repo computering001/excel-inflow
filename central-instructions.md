@@ -55,6 +55,18 @@ or bond documents; company transaction announcement; supplied debt export;
 supplied broker pack; explicit user answer. Preserve source dates for company
 facts. Market curves do not need source dates in the workbook.
 
+Before taxonomy or normalization, create one independent
+`face-statement-manifest/1.0` for every selected income statement and cash-flow
+statement. Bind it to the raw filing SHA-256, preserve every row in source order
+with its raw label, three historical values, page and hierarchy, and hash the
+ordered rows. The extracted filing ledger and source coverage must each match
+that manifest exactly in both membership and order. Every included line must
+also have a visible issuer-labelled statement row carrying its source-line ID;
+an aggregate may have a visible formula parent, but it may not replace its
+children with a generic row. A missing manifest, omitted line, reordered line,
+cross-statement line or aggregate without child lineage blocks before the case
+enters the semantic graph.
+
 Where the runtime can access the attachments, compile that envelope from an
 `attachment-ingress/1.0` spec first:
 

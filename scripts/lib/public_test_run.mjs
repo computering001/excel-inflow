@@ -4,6 +4,7 @@ import { assessCoverage } from "./coverage.mjs";
 import { matchEntities } from "./flow_entity.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { validateCaseShape } from "./solver.mjs";
+import { validateStatementEvidence } from "./evidence_run.mjs";
 
 const SCHEMA = JSON.parse(
   fs.readFileSync(
@@ -257,6 +258,7 @@ export function validatePublicTestRun(run) {
 
   validateDebtSchedule(run, sourceState, findings);
   validateStatementSources(run, sourceState, findings);
+  findings.push(...validateStatementEvidence(run));
   validateSyntheticBrokers(run, sourceState, findings);
   validateRestatements(run, sourceState, findings);
 

@@ -66,6 +66,7 @@
   "lib/coverage.mjs",
   "lib/design_contract.mjs",
   "lib/evidence_run.mjs",
+  "lib/face_statement_manifest.mjs",
   "lib/flow.mjs",
   "lib/flow_entity.mjs",
   "lib/flow_impact.mjs",

@@ -181,6 +181,85 @@
         "table_context": { "type": "string" }
       }
     },
+    "faceStatementRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_line_id",
+        "ordinal",
+        "raw_label",
+        "values",
+        "page_or_note",
+        "material"
+      ],
+      "properties": {
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "values": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["number", "null"] }
+        },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "material": { "type": "boolean" },
+        "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "hierarchy_level": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "is_subtotal": { "type": "boolean" }
+      }
+    },
+    "faceStatementManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "statement",
+        "statement_order",
+        "source_id",
+        "document_sha256",
+        "page_or_note",
+        "periods",
+        "complete_face_statement",
+        "row_count",
+        "rows_sha256",
+        "rows"
+      ],
+      "properties": {
+        "schema_version": { "const": "face-statement-manifest/1.0" },
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "statement_order": { "type": "integer", "minimum": 1 },
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "periods": { "$ref": "#/$defs/periods3" },
+        "complete_face_statement": { "const": true },
+        "row_count": { "type": "integer", "minimum": 1 },
+        "rows_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/faceStatementRow" }
+        }
+      }
+    },
+    "faceStatementManifests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["income_statement", "cash_flow"],
+      "properties": {
+        "income_statement": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/faceStatementManifest" }
+        },
+        "cash_flow": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/faceStatementManifest" }
+        }
+      }
+    },
     "filings": {
       "type": "object",
       "additionalProperties": false,
@@ -193,6 +272,7 @@
         "forecast_periods",
         "reported_gross_debt",
         "reported_cash",
+        "face_statement_manifests",
         "income_statement",
         "cash_flow"
       ],
@@ -241,6 +321,7 @@
             }
           ]
         },
+        "face_statement_manifests": { "$ref": "#/$defs/faceStatementManifests" },
         "income_statement": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } },
         "cash_flow": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } }
       }
