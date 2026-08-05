@@ -127,7 +127,7 @@ export const WELCOME_SCREEN = finishScreen([
   "",
   "   3   BROKER RESEARCH             minimum 3, maximum 10",
   "       Three is the minimum for a meaningful consensus",
-  "       across EBIT, EBITDA and D&A.",
+  "       for one EBIT/EBITDA anchor plus the D&A bridge.",
   "",
   "   4   CASE FILE FROM LAST TIME                 optional",
   "       Attach it to preserve settled answers on a rebuild.",

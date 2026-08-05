@@ -6,6 +6,7 @@ import { runIntake } from "./intake.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { validateCaseShape } from "./solver.mjs";
 import { hashValue } from "./run_store.mjs";
+import { ensureIllustrativeAcquisitionCase } from "./acquisition_policy.mjs";
 import {
   FACE_STATEMENT_SECTIONS,
   faceStatementManifestDigest,
@@ -582,6 +583,7 @@ function validateFaceStatementManifests(run, findings) {
 
 function validateStatementMapping(run, sourceIds, findings) {
   const modelCase = run.model_case ?? {};
+  ensureIllustrativeAcquisitionCase(modelCase);
   const manifestRows = validateFaceStatementManifests(run, findings);
   const structuralRows = {};
   for (const section of ["income_statement", "cash_flow"]) {

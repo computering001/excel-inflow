@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v2.0.2",
+  "releaseName": "Excel Inflow v2.0.3",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.2",
+  "skillVersion": "2.0.3",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-05T06:12:12.606Z",
+  "generatedAt": "2026-08-05T08:14:42.575Z",
   "centralInstructionsWords": 3170,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "67d6d39dbb52952df305578ff0361a33304467d43fcf000bb06c968cad7d55c9",
-    "closureFileCount": 92,
+    "currentClosureSha256": "d311beef3e47605641bb421494d16472b79f8b1fdc9d79f222f95a30f0d2053f",
+    "closureFileCount": 93,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -38,6 +38,7 @@
       "scripts/compile_public_test_run.mjs",
       "scripts/debt-model-economics.mjs",
       "scripts/flow_cli.mjs",
+      "scripts/lib/acquisition_policy.mjs",
       "scripts/lib/attachment_ingress.mjs",
       "scripts/lib/broker_anchor.mjs",
       "scripts/lib/coverage.mjs",
@@ -105,6 +106,7 @@
     "resourceRoots": [],
     "resources": [],
     "imports": [
+      "scripts/build_dynamic_model.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/coverage.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/design_contract.mjs",
@@ -133,6 +135,7 @@
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/coverage.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/flow_entity.mjs",
@@ -156,6 +159,7 @@
       "scripts/lib/flow_questions.mjs -> scripts/lib/flow_impact.mjs",
       "scripts/lib/flow_questions.mjs -> scripts/lib/flow_reconcile.mjs",
       "scripts/lib/flow_questions.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow_questions.mjs -> scripts/lib/solver.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/flow_screens.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/solver.mjs",
@@ -163,6 +167,7 @@
       "scripts/lib/flow_runtime.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/flow_screens.mjs -> scripts/lib/flow_runtime.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/public_test_run.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/coverage.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/evidence_run.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/flow_entity.mjs",
@@ -180,6 +185,7 @@
       "scripts/lib/release_module_registry.mjs -> scripts/lib/semantic_graph.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/solver.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/validation_invariants.mjs",
+      "scripts/lib/release_nodes.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/release_nodes.mjs -> scripts/lib/release_module_registry.mjs",
       "scripts/lib/release_nodes.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/broker_anchor.mjs",
@@ -230,12 +236,12 @@
           "packages": {
             "openpyxl": "3.1.5",
             "fitz": null,
-            "PIL": null,
-            "numpy": null,
+            "PIL": "12.2.0",
+            "numpy": "2.4.4",
             "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": null,
-            "reportlab": null
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.2",
+            "reportlab": "4.4.10"
           },
           "usable": true,
           "reason": "selected"
@@ -758,18 +764,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
-        "plan_sha256": "784bc8e6c33d8fab851739eb53f2638a672d34881c5493af46e40f5629e9d63a",
-        "workbook_sha256": "521877af1a423aa0e7df72d6f5bbae114820a4b533cf502063217d9b48e866b2",
+        "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
+        "plan_sha256": "f5bf30a8ecdb143096fd1f87fa2cc390a9f72d950d837d642bd714f1535300fd",
+        "workbook_sha256": "db50a518a8c3a8a30e3603884bbe5232c94968c5236ce830d23973294417032b",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
-      "plan_sha256": "784bc8e6c33d8fab851739eb53f2638a672d34881c5493af46e40f5629e9d63a",
-      "workbook_sha256": "521877af1a423aa0e7df72d6f5bbae114820a4b533cf502063217d9b48e866b2",
+      "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
+      "plan_sha256": "f5bf30a8ecdb143096fd1f87fa2cc390a9f72d950d837d642bd714f1535300fd",
+      "workbook_sha256": "db50a518a8c3a8a30e3603884bbe5232c94968c5236ce830d23973294417032b",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -829,9 +835,9 @@
     },
     {
       "path": "references/forecast-and-input-policy.md",
-      "sha256": "0e9a7dcce09dde17149bddbb90f22280851e0c9c92438858d202813f9772f6c6",
-      "bytes": 8567,
-      "words": 1327
+      "sha256": "69635fd2619a40feb7910d63bded289c9dc6ebff905f4873b538899fbd474721",
+      "bytes": 8662,
+      "words": 1343
     },
     {
       "path": "references/acquisition.md",
@@ -859,8 +865,8 @@
     },
     {
       "path": "assets/broker-pack.schema.json",
-      "sha256": "f92005eb19bac11ff0fa711d4705bc26661415833e646970f033f161a973cd8d",
-      "bytes": 10781,
+      "sha256": "1285a50c30f4e6deee1df57298fd9a528ac15e44c2516476be0bbe39db51b587",
+      "bytes": 10830,
       "words": null
     },
     {
@@ -871,8 +877,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "3bd7bd8f6f9e11dfc065c46f0db2959aa56d36082ed0e193c9015c0c5c9f0dc7",
-      "bytes": 34913,
+      "sha256": "af804370a3397fd728fc480b55a4b6a00ede07939b2e2d341bc4f7e0dbd6b422",
+      "bytes": 34949,
       "words": null
     },
     {
@@ -883,8 +889,8 @@
     },
     {
       "path": "assets/lineage-exceptions.json",
-      "sha256": "d7437c05504b35f8d4abcf524c642423cfd127ea8e3b825a5d617063add85d5f",
-      "bytes": 8755,
+      "sha256": "32fcf3c24834392b1977b3be0c299f48eb6edff6b3774c57ff041b82f56ba5da",
+      "bytes": 6972,
       "words": null
     },
     {
@@ -949,8 +955,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "f39fe6298d50c88c38aebd4601df1d8b07563f892b6cc63d0554c1d0d34420d5",
-      "bytes": 436127,
+      "sha256": "3cc12c8149eae3f5b6b10c836e38a4e5aeddc6b9e3e2f614dbcba7dc08115f56",
+      "bytes": 438850,
       "words": null
     },
     {
@@ -1020,6 +1026,12 @@
       "words": null
     },
     {
+      "path": "scripts/lib/acquisition_policy.mjs",
+      "sha256": "6cd0a9dfcec2a70bef2afcc2b11598079a5359b87c88683f71a67cc7a8305f32",
+      "bytes": 3688,
+      "words": null
+    },
+    {
       "path": "scripts/lib/attachment_ingress.mjs",
       "sha256": "f9487c0423c5cdd7f76c8778d6c53fa2af4c2a11cf5121585488f17baa58a3ca",
       "bytes": 13417,
@@ -1027,8 +1039,8 @@
     },
     {
       "path": "scripts/lib/broker_anchor.mjs",
-      "sha256": "33731a3aa5ffc9ff96ad1aa0350611131fa2ada48d8934aaabe3efa2a7e491ce",
-      "bytes": 15032,
+      "sha256": "bee375b6960562d108d4ebeca75e59f5c8890aace27d14863028ed1732f965b6",
+      "bytes": 15193,
       "words": null
     },
     {
@@ -1045,8 +1057,8 @@
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "514c2d2b75bce1dfde3e7fcaf2774d7e87d4513eb327d13114a2953b7df854ad",
-      "bytes": 55053,
+      "sha256": "57ad03515e75a4e107da8e83651501acc3346766d0b4e4f601216e7875b40a38",
+      "bytes": 55179,
       "words": null
     },
     {
@@ -1075,8 +1087,8 @@
     },
     {
       "path": "scripts/lib/flow_questions.mjs",
-      "sha256": "9f77886fb73a540916b8c86a88ac275069f03e62fd57e136be97de0a3ae71a6d",
-      "bytes": 46404,
+      "sha256": "9e03e95e4affefbf40383dc71d0f2e7f0051a16fff657bc754b5682facfe7ed0",
+      "bytes": 47131,
       "words": null
     },
     {
@@ -1099,8 +1111,8 @@
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "4dd021243c4720506701f1e7b7b4ca15da1b13a0d3c69ef85c6e3c60d8a86f6c",
-      "bytes": 20458,
+      "sha256": "d084ac7d12b15d89c05a134af079a705c7136caf2392d75372996bd307190455",
+      "bytes": 20477,
       "words": null
     },
     {
@@ -1117,8 +1129,8 @@
     },
     {
       "path": "scripts/lib/intake.mjs",
-      "sha256": "e928d4588318b510cde8e407ff012729bce7ce9d11f3a8c27c55156bd3bf0d3d",
-      "bytes": 50294,
+      "sha256": "646c7c5185ef514693687bb8db71fd139d45eb48754838574898bcfe1ecd7fea",
+      "bytes": 50427,
       "words": null
     },
     {
@@ -1153,8 +1165,8 @@
     },
     {
       "path": "scripts/lib/public_test_run.mjs",
-      "sha256": "b72f589adf0d1087cd2a5073e5d00bd8af9507f1c1555fd5e1b27b0fa11237e1",
-      "bytes": 14196,
+      "sha256": "88948d466387095cbd478b171079352f4f7ef78c523e9407a77b8b0b056243ae",
+      "bytes": 14322,
       "words": null
     },
     {
@@ -1177,14 +1189,14 @@
     },
     {
       "path": "scripts/lib/release_nodes.mjs",
-      "sha256": "bcd281330d27ecca48177540ad1e866115872ed4379b00fe89f8949ce8b0f4d9",
-      "bytes": 13100,
+      "sha256": "63ad916f12ec378d6530ac6a7972d16771301d22c0fdee05ec023083cb01605c",
+      "bytes": 13226,
       "words": null
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "a01c263f53371398b941752304be8f89f80c93237ea4a69b8ee830fe8942366f",
-      "bytes": 86380,
+      "sha256": "a328bb4a225f96d4b1079a3600a86eaf6efa8925f29236e4f09860661d2f85c5",
+      "bytes": 88617,
       "words": null
     },
     {
@@ -1207,14 +1219,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "82b33fbc6d176e49848076672072d97007d68c1dd945c13b8bd80c98555a7570",
-      "bytes": 36392,
+      "sha256": "78fb5d826611fb7527fb41cb6d800d31f34eb091f5321ca19ce519bfe7bcc881",
+      "bytes": 37304,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "4c23787fca2df89f77a9340a74dea70e3747c79b2b8184e7c5f6582e8ecf8792",
-      "bytes": 99060,
+      "sha256": "1bd63f9d8ce71969bb7dc1b8cf9622b5ec7251c07a3f26e4c9eadcd8de5b85cb",
+      "bytes": 98874,
       "words": null
     },
     {

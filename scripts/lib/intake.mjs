@@ -95,7 +95,7 @@ export const REQUIRED_BROKER_METRICS = Object.freeze([
   "dividends",
 ]);
 
-/** The anchor rule needs the best-supplied two of these three. */
+/** One of EBIT/EBITDA is selected; D&A is always the bridge driver. */
 export const ANCHOR_METRICS = Object.freeze([
   "ebit",
   "adjusted_ebitda",
@@ -1124,16 +1124,19 @@ function checkBrokerMetrics(pack, houses, findings) {
         "incomplete",
         REMEDY.RE_SUPPLY,
         "broker_pack.metrics",
-        "Neither EBIT nor Adj. EBITDA has a single contributing house. The forecast anchor is the best-supplied two of EBIT, Adj. EBITDA and D&A; with no operating profit line at all there is nothing to anchor on.",
+        "Neither EBIT nor Adj. EBITDA has a single contributing house. The forecast needs one broker-supported headline anchor; D&A then bridges to the other headline metric.",
         { anchor_contributors: anchorCounts },
       ),
     );
   }
 
-  const fullPeriodAnchors = ANCHOR_METRICS.filter(
+  const fullPeriodHeadline = ["ebit", "adjusted_ebitda"].some(
     (metricId) => Math.min(...(contributorCountByPeriod[metricId] ?? [0, 0, 0])) > 0,
   );
-  if (fullPeriodAnchors.length < 2) {
+  const fullPeriodDa = Math.min(
+    ...(contributorCountByPeriod.depreciation_and_amortisation ?? [0, 0, 0]),
+  ) > 0;
+  if (!fullPeriodHeadline || !fullPeriodDa) {
     findings.push(
       finding(
         "broker_anchor_periods_unresolvable",
@@ -1141,7 +1144,7 @@ function checkBrokerMetrics(pack, houses, findings) {
         "incomplete",
         REMEDY.RE_SUPPLY,
         "broker_pack.metrics",
-        "The forecast needs one consistent pair from EBIT, Adj. EBITDA and D&A across all three forecast periods. Fewer than two metrics have at least one named contributor in every period.",
+        "The forecast needs one consistent headline anchor (the better-supported of EBIT or Adj. EBITDA) plus D&A across all three forecast periods. EBIT and Adj. EBITDA are never used together as independent inputs.",
         { contributors_by_period: Object.fromEntries(ANCHOR_METRICS.map((metricId) => [metricId, contributorCountByPeriod[metricId] ?? [0, 0, 0]])) },
       ),
     );

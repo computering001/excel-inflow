@@ -1,6 +1,6 @@
 /**
- * BROKER ANCHOR SELECTION — which two of EBIT / Adj. EBITDA / D&A drive the
- * forecast, and which one the model derives.
+ * BROKER ANCHOR SELECTION — which ONE of EBIT / Adj. EBITDA is the headline
+ * forecast authority. D&A is the bridge driver; the other headline is derived.
  *
  * EBITDA = EBIT + D&A is an ARITHMETIC IDENTITY. A forecast that reads all
  * three straight off a broker pack is therefore over-determined, and it never
@@ -11,11 +11,11 @@
  * inside the EBITDA bridge where it read as a company adjustment rather than
  * as a broker disagreement.
  *
- * The rule that replaces it: take TWO broker metrics, DERIVE the third, and
- * choose which two by HOW MANY NAMED BROKERS ACTUALLY SUPPLY EACH ONE. The
- * best-supplied pair anchors; the thinnest metric is the one the model
- * computes. Ties resolve toward EBIT, so a pack that supplies all three
- * equally starts from EBIT.
+ * The rule that replaces it: choose ONE headline metric by HOW MANY NAMED
+ * BROKERS ACTUALLY SUPPLY EBIT versus Adj. EBITDA, use D&A as the separate
+ * bridge driver, and DERIVE the other headline.  EBIT and Adj. EBITDA can
+ * never both be live inputs. Ties resolve toward EBIT, so an evenly supplied
+ * pack works upward from EBIT through D&A to Adj. EBITDA.
  *
  * Where the losing metric DOES have a broker series it is not thrown away —
  * it is restated as a memo line beneath the bridge, with the variance against
@@ -33,6 +33,11 @@ export const ANCHOR_METRIC_IDS = Object.freeze([
   "ebit",
   "adjusted_ebitda",
   "depreciation_and_amortisation",
+]);
+
+export const HEADLINE_ANCHOR_METRIC_IDS = Object.freeze([
+  "ebit",
+  "adjusted_ebitda",
 ]);
 
 const METRIC_SHORT_LABEL = Object.freeze({
@@ -177,25 +182,24 @@ export function selectBrokerAnchor(modelCase) {
       0,
     );
   }
-  const ranked = [...ANCHOR_METRIC_IDS].sort(
+  const rankedHeadlines = [...HEADLINE_ANCHOR_METRIC_IDS].sort(
     (left, right) =>
       counts[right] - counts[left] ||
       totals[right] - totals[left] ||
+      HEADLINE_ANCHOR_METRIC_IDS.indexOf(left) -
+        HEADLINE_ANCHOR_METRIC_IDS.indexOf(right),
+  );
+  const headlineAnchor = rankedHeadlines[0];
+  const derived = rankedHeadlines[1];
+  const da = "depreciation_and_amortisation";
+  const anchors = [headlineAnchor, da].sort(
+    (left, right) =>
       ANCHOR_METRIC_IDS.indexOf(left) - ANCHOR_METRIC_IDS.indexOf(right),
   );
-  const derived = ranked[2];
-  // Presented in statement order rather than in rank order: the reader is
-  // being told which lines are inputs, not which won a count.
-  const anchors = ranked
-    .slice(0, 2)
-    .sort(
-      (left, right) =>
-        ANCHOR_METRIC_IDS.indexOf(left) - ANCHOR_METRIC_IDS.indexOf(right),
-    );
   const label =
-    `Broker anchor: ${METRIC_SHORT_LABEL[anchors[0]]} ` +
-    `(${countsByPeriod[anchors[0]].join("/")} brokers) + ${METRIC_SHORT_LABEL[anchors[1]]} ` +
-    `(${countsByPeriod[anchors[1]].join("/")} brokers) — ${METRIC_SHORT_LABEL[derived]} derived` +
+    `Broker headline anchor: ${METRIC_SHORT_LABEL[headlineAnchor]} ` +
+    `(${countsByPeriod[headlineAnchor].join("/")} brokers); ${METRIC_SHORT_LABEL[da]} bridge driver ` +
+    `(${countsByPeriod[da].join("/")} brokers) — ${METRIC_SHORT_LABEL[derived]} derived` +
     (totals[derived] > 0
       ? `, broker ${METRIC_SHORT_LABEL[derived]} (${countsByPeriod[derived].join("/")} brokers) shown as memo`
       : " (no broker series)");
@@ -204,10 +208,13 @@ export function selectBrokerAnchor(modelCase) {
     counts_by_period: countsByPeriod,
     totals,
     anchors,
+    headline_anchor: headlineAnchor,
+    bridge_driver: da,
     derived,
-    // Two anchors need two supplied metrics. A pack thin enough to fail this
-    // is left exactly as the case authored it rather than half-rewritten.
-    supported: counts[anchors[0]] > 0 && counts[anchors[1]] > 0,
+    // Exactly one headline plus D&A needs full-period support. We never fall
+    // back to using both headline metrics, because doing so merely moves their
+    // consensus mismatch into D&A.
+    supported: counts[headlineAnchor] > 0 && counts[da] > 0,
     label,
   };
 }
@@ -388,9 +395,6 @@ export function resolveAnchorPlan(modelCase, rows) {
   const bridge = resolveEbitdaBridge(rows);
   if (!bridge) return null;
   if (selection.derived === "ebit" && !bridge.ebitSolvable) return null;
-  if (selection.derived === "depreciation_and_amortisation" && !bridge.daSolvable) {
-    return null;
-  }
   const residualPlugRowIds = bridge.addbackTerms.filter((term) => {
     const row = rows.find((item) => item.row_id === term);
     const calculation = row?.forecast_calculation;

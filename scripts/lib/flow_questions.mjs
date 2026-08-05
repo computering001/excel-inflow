@@ -69,6 +69,7 @@ import {
   outstandingAmount,
 } from "./flow_reconcile.mjs";
 import { formatMoney, formatTurns } from "./flow_screens.mjs";
+import { normalisedCashBuckets } from "./solver.mjs";
 
 export const QUESTION_LIMIT = 5;
 
@@ -519,7 +520,14 @@ const KINDS = [
       ) {
         return [];
       }
-      const floor = Number(draftCase.cash_policy?.minimum_cash_override ?? 0);
+      const declaredFloor = draftCase.cash_policy?.minimum_cash_override;
+      const balancingBucket = normalisedCashBuckets(draftCase).find(
+        (bucket) => bucket.forecast_treatment === "balancing",
+      );
+      const floor = Number(
+        declaredFloor ??
+          Math.min(...(balancingBucket?.historical_year_end ?? [0, 0, 0])),
+      );
       if (!(floor > 0)) return [];
       const money = formatMoney(floor, draftCase.issuer?.reporting_currency);
       return [
@@ -532,7 +540,17 @@ const KINDS = [
           other_phrase: "cash can run to zero",
           seeds: ["mechanical.minimum_cash"],
           options: [
-            { id: "floor", word: "floor", apply: (modelCase) => modelCase },
+            {
+              id: "floor",
+              word: "floor",
+              apply: (modelCase) => {
+                // Persist the selected policy as a case fact.  Leaving it as an
+                // implicit compiler fallback made the same run display a floor
+                // without any saved answer proving where it came from.
+                modelCase.cash_policy.minimum_cash_override = floor;
+                return modelCase;
+              },
+            },
             {
               id: "zero",
               word: "zero",

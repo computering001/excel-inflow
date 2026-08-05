@@ -1209,8 +1209,9 @@ export function solveCase(
       maxIterations,
     });
   }
-  // Which two broker metrics anchor the forecast, and what the visible EBITDA
-  // bridge adds between them. Resolved once, from the case's own broker pack
+  // Which single EBIT/EBITDA metric anchors the forecast, with D&A as the
+  // bridge driver, and what the visible EBITDA bridge adds between them.
+  // Resolved once, from the case's own broker pack
   // and semantic roles — never per-issuer, never by row number. Null means the
   // pack is too thin for the rule and the case solves exactly as authored.
   const anchorPlan = resolveAnchorPlan(
@@ -1382,8 +1383,9 @@ export function solveCase(
     //
     // EBITDA = EBIT + D&A is an identity, so reading all three off the pack
     // over-determines the forecast and leaves a residual no one owns. The rule
-    // anchors the two best-supplied metrics and derives the third from the
-    // VISIBLE EBITDA bridge — Adjusted EBITDA less every other term on it —
+    // anchors the better-supplied headline metric, uses D&A as the bridge
+    // driver, and derives the other headline from the VISIBLE EBITDA bridge —
+    // Adjusted EBITDA less every other term on it —
     // which is why `bridgeAddbacks` (share-based compensation, restructuring
     // addbacks, and whatever else the case bridges through) appears here: it
     // is what separates the rearranged bridge from the bare identity. The
@@ -1415,16 +1417,7 @@ export function solveCase(
     let ebitda;
     let da;
     let baseEbit;
-    if (derivedMetric === "depreciation_and_amortisation") {
-      ebitda = brokerEbitda();
-      baseEbit = metricValue(
-        modelCase,
-        "ebit",
-        periodIndex,
-        ebitda - brokerDa() - adjustments,
-      );
-      da = ebitda - baseEbit - bridgeAddbacks;
-    } else if (derivedMetric === "adjusted_ebitda") {
+    if (derivedMetric === "adjusted_ebitda") {
       da = brokerDa();
       baseEbit = metricValue(modelCase, "ebit", periodIndex, 0);
       ebitda = baseEbit + da + bridgeAddbacks;

@@ -50,6 +50,7 @@ import {
 } from "./lib/solver.mjs";
 import { assertWriteTargetOutsideSkill } from "./lib/runtime_isolation.mjs";
 import { applyHistoricalNormalisation } from "./lib/historical_normalisation.mjs";
+import { ensureIllustrativeAcquisitionCase } from "./lib/acquisition_policy.mjs";
 import {
   balancingRcfInstrument,
   isBalancingRcf,
@@ -297,6 +298,11 @@ function blockRanges(row, columns = NUMBER_BLOCKS) {
 // never converge — which is why every format that can hold a computed zero
 // carries an explicit zero section, and why grey is a fill and never a format.
 const AMOUNT = '#,##0;(#,##0);"–"';
+// A policy control must distinguish an intentional zero from an omitted value.
+// Body cells keep the authority's dash-for-zero convention; the minimum-cash
+// entry alone prints 0 so a reader can see that cash is deliberately allowed
+// to run to zero before the RCF draws.
+const CONTROL_AMOUNT = '#,##0;(#,##0);0';
 // THE MIDDLE TERM OF A + B = C STATES A MOVEMENT, NOT A LEVEL.
 //
 // N:P is the ADJUSTMENT block: what the transaction adds to the standalone case,
@@ -2186,34 +2192,35 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
         (statementRow) => statementRow.semantic_role === semanticRole,
       )?.row;
     const preTaxRow = semanticRow("pre_tax_income");
-    const ebitRow = semanticRow("ebit");
     const effectiveTaxRateRow = semanticRow("effective_tax_rate");
-    const taxExpenseRow = semanticRow("tax_expense");
     if (
       !preTaxRow ||
-      !ebitRow ||
-      !effectiveTaxRateRow ||
-      !taxExpenseRow
+      !effectiveTaxRateRow
     ) {
       throw new Error(
-        "Acquisition tax calculation requires pre-tax income, EBIT, effective tax rate and tax-expense semantic roles.",
+        "Acquisition tax calculation requires pre-tax income and effective tax-rate semantic roles.",
       );
     }
-    const forecastIndex = ADJUSTMENT_COLUMNS.indexOf(column);
-    const proFormaColumn = PRO_FORMA_COLUMNS[forecastIndex];
-    const acquisitionInterestRow =
-      rowPlan.interest_summary_rows.acquisition_interest;
-    const targetPreTax =
-      `MAX(0,${column}${ebitRow}+${proFormaColumn}${acquisitionInterestRow})`;
-    // The target is taxed at the standalone effective rate: the rate line
-    // under the tax charge is the assumption, not a control.
-    const totalTax =
-      `-MAX(0,${proFormaColumn}${preTaxRow}-${targetPreTax})*` +
-      `${standaloneColumn}${effectiveTaxRateRow}-` +
-      `${targetPreTax}*${standaloneColumn}${effectiveTaxRateRow}`;
+    // TAX IS THE TERMINAL FLOW OF THE ADJUSTMENT STATEMENT GRAPH.
+    //
+    // The adjustment PBT row already aggregates every declared pre-tax deal
+    // contribution: operating leaves and subtotals, D&A/amortisation,
+    // associates/JVs, acquisition interest and any other finance rows.  Taxing
+    // a separately reconstructed `EBIT + acquisition interest` amount made the
+    // result correct only for the original short-form statement and caused a
+    // newly mapped line item to bypass tax.  Reading the semantic PBT node here
+    // means the tax formula never changes when the issuer's row topology does.
+    //
+    // A normal benefit is not recognised on an acquisition loss by default;
+    // a case that needs a loss benefit must declare that policy explicitly in
+    // the statement graph.  The applicable rate remains the visible
+    // standalone effective-rate assumption.  Pro-forma tax is emitted later
+    // as standalone tax plus this signed adjustment, and the displayed
+    // pro-forma rate is recomputed from the resulting amounts.
     return (
       `=IF($P$${c.adjustments_enabled}=0,0,` +
-      `${totalTax}-${standaloneColumn}${taxExpenseRow})`
+      `-MAX(0,${column}${preTaxRow})*` +
+      `${standaloneColumn}${effectiveTaxRateRow})`
     );
   }
   return null;
@@ -2375,7 +2382,7 @@ function configureOperatingModel(
           ).historical_year_end,
         ),
       "entry",
-      AMOUNT,
+      CONTROL_AMOUNT,
     ],
   ];
   for (const [row, label, value, treatment, numberFormat] of controls) {
@@ -2473,9 +2480,12 @@ function configureOperatingModel(
     `N${c.adjustments_enabled}`,
     "Off: every cell in the adjustment columns (N:P) is exactly zero and " +
       "each pro-forma column returns its standalone column unchanged. " +
-      "On: the acquisition inputs below populate the adjustment columns and " +
+    "On: the acquisition inputs below populate the adjustment columns and " +
       "pro forma becomes standalone + adjustment. Formulas are present in " +
-      "both states — the switch changes the answer, never the workings.",
+      "both states — the switch changes the answer, never the workings." +
+      (Number(acquisition.enabled ?? 0) === 0
+        ? " The populated transaction inputs are illustrative, scale-derived values for testing the module; replace them before using a live transaction case."
+        : ""),
   );
   sheet.getRange(`P${c.close_year}`).dataValidation = {
     rule: {
@@ -4282,6 +4292,7 @@ function configureOperatingModel(
   }
   // I (the last actual) was written above with G and H, from the same series,
   // so the forecast's opening balance is the same cell the reader sees.
+  const statementEndingCashRow = statementByRole.get("ending_cash").row;
   if (explicitCashBuckets) {
     for (const bucket of cashBucketPlans) {
       setRow(
@@ -4334,20 +4345,19 @@ function configureOperatingModel(
       void index;
     }
   } else {
-    const historicalCash = modelCase.cash_policy.historical_year_end_cash;
-    setRow(
-      sheet,
-      `G${debtRows.cash_for_net_debt}:I${debtRows.cash_for_net_debt}`,
-      historicalCash.map(
-        (value) =>
-          -Number(value) *
-          Number(modelCase.cash_policy.eligible_cash_percentage),
-      ),
-    );
-    styleInput(
-      sheet,
-      `G${debtRows.cash_for_net_debt}:I${debtRows.cash_for_net_debt}`,
-    );
+    // Historical cash is stated once, in the company cash-flow statement.
+    // Net debt reads that visible source row and the visible eligibility
+    // assumption exactly as the forecast does.  The old implementation
+    // multiplied both case-file values in JavaScript and wrote the three
+    // derived answers as blue hardcodes, which duplicated the source and hid
+    // the lineage (for AstraZeneca this surfaced as a literal `=-5711`).
+    for (const column of HISTORICAL_COLUMNS) {
+      applyFormula(
+        sheet,
+        `${column}${debtRows.cash_for_net_debt}`,
+        `=-${column}${statementEndingCashRow}*$D$${interestRows.interest_income_schedule}`,
+      );
+    }
   }
   // Net debt is stated on BOTH lease definitions, each off the gross-debt row
   // above that carries the same definition, so the reader can see the two
@@ -4598,7 +4608,7 @@ function configureOperatingModel(
       `${column}${debtRows.gross_debt_including_leases}`,
       `=${column}${debtRows.gross_debt_excluding_leases}+${column}${debtRows.total_lease_liabilities}`,
     );
-    const endingCashRow = statementByRole.get("ending_cash").row;
+    const endingCashRow = statementEndingCashRow;
     if (explicitCashBuckets) {
       for (const bucket of cashBucketPlans) {
         if (bucket.forecast_treatment === "balancing") {
@@ -5834,8 +5844,8 @@ function configureOperatingModel(
         ? "Lease interest — not separately modelled"
         : "Lease interest",
     other_unallocated_interest: "Other / unallocated interest",
-    interest_reported_total: "Reported gross interest (per accounts)",
-    interest_identified_total: "Less: interest identified by instrument",
+    interest_reported_total: "Filed finance expense (statement authority)",
+    interest_identified_total: "Less: finance expense identified",
     non_cash_interest: "Non-cash interest",
     gross_interest_expense: "Gross interest expense",
     interest_income_schedule: "Interest income",
@@ -6039,8 +6049,8 @@ function configureOperatingModel(
   );
   // THE RESIDUAL IS NOW A DIFFERENCE ON THE FACE, NOT A TYPED NUMBER.
   //
-  // `historicalReportedInterest - historicalIdentifiedInterest` used to be
-  // evaluated here and the answer written into the cell. The number was
+  // `reported interest - identified interest` used to be evaluated here and
+  // the answer written into the cell. The number was
   // visible and correctly labelled "Other / unallocated interest", and no
   // reader could check it: both sides of the subtraction lived in the case
   // file and neither reached the sheet. The case has always carried
@@ -6061,11 +6071,44 @@ function configureOperatingModel(
   // blank there because they do not apply, which is itself the useful signal:
   // a reader can now see whether the forward plug is supported by the
   // historical residual or is a judgement standing on its own.
-  setRow(
-    sheet,
-    `G${interestRows.interest_reported_total}:I${interestRows.interest_reported_total}`,
-    historicalReportedInterest.map((value) => -Math.abs(Number(value ?? 0))),
+  const filedFinanceExpenseDefinition = statementByRole.get("interest_expense");
+  const filedFinanceExpenseRow = filedFinanceExpenseDefinition?.row;
+  if (!Number.isInteger(filedFinanceExpenseRow)) {
+    throw new Error(
+      "Historical interest reconciliation requires a semantic interest_expense statement row.",
+    );
+  }
+  // The filed P&L is the one historical authority.  The case's identified-
+  // interest series sizes the named instrument component, but the schedule's
+  // reported total links to the visible finance-expense row rather than
+  // restating a second hardcoded total.  Any interest or non-interest finance
+  // item not separately identified therefore lands transparently in the
+  // formula-derived residual and the schedule always reconciles to the face.
+  const filedFinanceExpenseValues = rowValues(
+    modelCase,
+    filedFinanceExpenseDefinition,
   );
+  for (const [index, column] of HISTORICAL_COLUMNS.entries()) {
+    const filedValue = filedFinanceExpenseValues[index];
+    if (filedValue !== null && Number.isFinite(Number(filedValue))) {
+      applyFormula(
+        sheet,
+        `${column}${interestRows.interest_reported_total}`,
+        `=${column}${filedFinanceExpenseRow}`,
+      );
+    } else {
+      // A compact case may omit the face-statement hardcode and let the
+      // schedule populate that semantic row. In that one direction the
+      // separately sourced reconciliation total is the authority; linking
+      // back to the statement would create a circular reference.
+      setValue(
+        sheet,
+        `${column}${interestRows.interest_reported_total}`,
+        -Math.abs(Number(historicalReportedInterest[index] ?? 0)),
+      );
+      styleInput(sheet, `${column}${interestRows.interest_reported_total}`);
+    }
+  }
   // Everything the schedule can name, in the sign convention of the schedule.
   // `non_cash_interest` sits BELOW the residual and is still part of the
   // identified total: it is a named component inside gross interest, so
@@ -6089,10 +6132,6 @@ function configureOperatingModel(
       `=${column}${interestRows.interest_reported_total}-${column}${interestRows.interest_identified_total}`,
     );
   }
-  styleInput(
-    sheet,
-    `G${interestRows.interest_reported_total}:I${interestRows.interest_reported_total}`,
-  );
   setRow(
     sheet,
     `G${interestRows.rcf_commitment_fee}:I${interestRows.rcf_commitment_fee}`,
@@ -9874,6 +9913,7 @@ async function main(packaging = null) {
     return;
   }
   const rawModelCase = JSON.parse(await fs.readFile(casePath, "utf8"));
+  ensureIllustrativeAcquisitionCase(rawModelCase);
   const validationErrors = validateCaseShape(rawModelCase);
   if (validationErrors.length > 0) {
     throw new Error(`Invalid v2 case:\n- ${validationErrors.join("\n- ")}`);

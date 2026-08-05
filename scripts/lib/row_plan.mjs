@@ -1068,27 +1068,93 @@ function stripAcquisitionOverlayRows(rows) {
 }
 
 /**
- * Everything BELOW net income — net income attributable to NCI, net income to
- * common shareholders — reads n/a on a forecast basis. The model forecasts to
- * net income and stops: an NCI split is an ownership fact the forecast has no
- * driver for, and carrying last year's figure forward dressed as a forecast
- * states a precision the model does not have.
+ * Project the filing's complete income ledger onto the debt-overlay face.
  *
- * The run is bounded STRUCTURALLY — from the net-income row to the next header
- * — rather than "everything after net income", because a layout that puts the
- * Adjusted EBITDA bridge beneath net income (the built-in default does) would
- * otherwise have its whole bridge greyed out.
+ * The evidence graph retains every filed line.  The visible Operating Model is
+ * a different artifact: it needs the issuer's path to consolidated net income
+ * plus any later block the debt model actually consumes (normally the EBITDA
+ * bridge).  OCI, attribution, EPS and dividend-per-share blocks do not become
+ * useful merely because they appeared between those two things in the filing.
+ *
+ * This projection is semantic and dependency based.  It never names an issuer,
+ * caption or physical row.  A post-net-income block survives when it contains a
+ * declared debt-overlay role or an income row referenced by the cash-flow graph;
+ * the calculation closure then preserves every dependency that makes that block
+ * work.  Headers survive only with their surviving block.  The complete source
+ * ledger remains in `modelCase.statement_structure` and the evidence artifacts.
  */
-function greyBelowNetIncome(rows) {
-  const start = rows.findIndex((row) => row.semantic_role === "net_income");
-  if (start < 0) return;
-  for (const row of rows.slice(start + 1)) {
-    if (row.row_type === "header") break;
-    // A row the case genuinely forecasts keeps its forecast, matching the
-    // treatment the change-in-debt constituents get.
-    if (["broker", "formula"].includes(row.forecast_treatment)) continue;
-    row.forecast_treatment = "uncalculated";
+function projectIncomeStatementToDebtOverlay(modelCase, rows) {
+  const netIncomeIndex = rows.findIndex(
+    (row) => row.semantic_role === "net_income",
+  );
+  if (netIncomeIndex < 0 || netIncomeIndex === rows.length - 1) return;
+
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const required = new Set();
+  const requiredPostNetRoles = new Set([
+    "adjusted_ebitda",
+    "depreciation_and_amortisation",
+    "recurring_disclosed_adjustments",
+    "ebit",
+  ]);
+  for (const row of rows.slice(netIncomeIndex + 1)) {
+    if (requiredPostNetRoles.has(row.semantic_role)) required.add(row.row_id);
   }
+  for (const row of modelCase.statement_structure?.cash_flow ?? []) {
+    for (const rule of [
+      row.calculation,
+      row.forecast_calculation,
+      ...(row.forecast_period_calculations ?? []),
+    ]) {
+      for (const ref of rule?.refs ?? []) {
+        if (byId.has(ref)) required.add(ref);
+      }
+    }
+  }
+
+  // Backward dependency closure: if a surviving row is calculated from another
+  // income row, that contributor survives too, however unusual its label.
+  const queue = [...required];
+  while (queue.length > 0) {
+    const row = byId.get(queue.pop());
+    if (!row) continue;
+    for (const rule of [
+      row.calculation,
+      row.forecast_calculation,
+      ...(row.forecast_period_calculations ?? []),
+    ]) {
+      for (const ref of rule?.refs ?? []) {
+        if (!byId.has(ref) || required.has(ref)) continue;
+        required.add(ref);
+        queue.push(ref);
+      }
+    }
+  }
+
+  const beforeAndIncludingNetIncome = rows.slice(0, netIncomeIndex + 1);
+  const tail = rows.slice(netIncomeIndex + 1);
+  const retainedTail = [];
+  for (let index = 0; index < tail.length; ) {
+    const headerIndex = tail[index].row_type === "header" ? index : -1;
+    let end = index + 1;
+    while (end < tail.length && tail[end].row_type !== "header") end += 1;
+    const block = tail.slice(index, end);
+    const keepBlock = block.some((row) => required.has(row.row_id));
+    if (keepBlock) {
+      retainedTail.push(...block);
+    } else if (headerIndex < 0) {
+      // Headerless post-net rows are kept only when the dependency graph named
+      // them; ownership splits and per-share rows therefore disappear cleanly.
+      retainedTail.push(...block.filter((row) => required.has(row.row_id)));
+    }
+    index = end;
+  }
+  rows.splice(
+    0,
+    rows.length,
+    ...beforeAndIncludingNetIncome,
+    ...retainedTail,
+  );
 }
 
 /**
@@ -1108,8 +1174,9 @@ function stripResidualNote(label) {
 /**
  * APPLY THE BROKER ANCHOR RULE TO THE INCOME STATEMENT.
  *
- * Two of EBIT / Adjusted EBITDA / D&A become broker inputs, the third becomes
- * a calculation off the EBITDA bridge, and the row the case was using to
+ * Exactly one of EBIT / Adjusted EBITDA becomes the headline broker input,
+ * D&A is the bridge driver, and the other headline becomes a calculation off
+ * the EBITDA bridge. The row the case was using to
  * absorb the difference between three unreconciled broker series stops being a
  * plug. Where the derived metric HAS a broker series it is restated below the
  * bridge as a memo, with its variance against the derived line on the row
@@ -1131,7 +1198,8 @@ function applyBrokerAnchorRule(modelCase, rows) {
     depreciation_and_amortisation: bridge.daRow,
   };
 
-  // 1. THE ANCHORS ARE BROKER INPUTS, and say so. Setting the metric id here
+  // 1. THE HEADLINE ANCHOR AND D&A DRIVER ARE BROKER INPUTS, and say so.
+  //    EBIT and Adjusted EBITDA are never both inputs. Setting the metric id here
   //    rather than trusting the case is what makes the rule general: a case
   //    that only ever mapped one of the three to its pack still anchors on two.
   for (const metricId of selection.anchors) {
@@ -1142,9 +1210,9 @@ function applyBrokerAnchorRule(modelCase, rows) {
     delete row.forecast_period_calculations;
   }
 
-  // 2. THE THIRD IS DERIVED — a calculation, in black, off the bridge. For
-  //    EBITDA that is the bridge subtotal it already owns; for EBIT or D&A it
-  //    is the bridge rearranged, "Adjusted EBITDA less every other term".
+  // 2. THE OTHER HEADLINE IS DERIVED — a calculation, in black, off the
+  //    bridge. EBITDA is the bridge subtotal; EBIT is the bridge rearranged,
+  //    "Adjusted EBITDA less D&A and every disclosed addback".
   const derivedRow = rowForMetric[selection.derived];
   delete derivedRow.broker_metric_id;
   derivedRow.forecast_treatment = "formula";
@@ -1152,8 +1220,7 @@ function applyBrokerAnchorRule(modelCase, rows) {
     delete derivedRow.forecast_calculation;
     delete derivedRow.forecast_period_calculations;
   } else {
-    const solvedTerm =
-      selection.derived === "ebit" ? bridge.ebitTerm : bridge.daTerm;
+    const solvedTerm = bridge.ebitTerm;
     derivedRow.forecast_calculation = {
       operator: "subtract",
       refs: [
@@ -1208,9 +1275,7 @@ export function normaliseStatementRows(modelCase, section) {
       );
   applyStatementHierarchy(rows);
   if (section === "income_statement") {
-    greyBelowNetIncome(rows);
-    // AFTER the greying pass, so the memo block cannot shorten its run: the
-    // pass stops at the first header, and the anchor note is one.
+    projectIncomeStatementToDebtOverlay(modelCase, rows);
     applyBrokerAnchorRule(modelCase, rows);
   }
   if (section === "cash_flow") {

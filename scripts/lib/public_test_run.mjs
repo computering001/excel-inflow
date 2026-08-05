@@ -5,6 +5,7 @@ import { matchEntities } from "./flow_entity.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { validateCaseShape } from "./solver.mjs";
 import { validateStatementEvidence } from "./evidence_run.mjs";
+import { ensureIllustrativeAcquisitionCase } from "./acquisition_policy.mjs";
 
 const SCHEMA = JSON.parse(
   fs.readFileSync(
@@ -238,6 +239,7 @@ export function validatePublicTestRun(run) {
 
   const sourceState = validateSources(run, findings);
   const modelCase = run.model_case ?? {};
+  ensureIllustrativeAcquisitionCase(modelCase);
   for (const message of validateCaseShape(modelCase)) {
     findings.push(finding("public_test.model_case.schema", message));
   }

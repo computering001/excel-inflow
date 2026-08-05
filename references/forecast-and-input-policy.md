@@ -150,10 +150,11 @@ Include dividends, buybacks, restructuring and other cash items only when suppli
 Broker research covers a **minimum of 3 and up to 10** houses. Three is the
 minimum for meaningful consensus coverage across the selected forecast
 authorities. Count contributors separately in each forecast period; a house supplying
-only FY1 is not an FY2 or FY3 contributor. Select the best-covered anchor pair
-on the minimum period coverage, then total coverage.  When the conventional
-EBIT / Adjusted EBITDA / D&A bridge is the authority, ties fall back toward
-EBIT.  When another broker line is the authority, accept it only if the
+only FY1 is not an FY2 or FY3 contributor. Select exactly one headline anchor
+between EBIT and Adjusted EBITDA, first on minimum period coverage and then on
+total coverage. Use D&A as the separate bridge driver and derive the other
+headline; never take EBIT and Adjusted EBITDA as two independent inputs. Ties
+fall back toward EBIT. When another broker line is the authority, accept it only if the
 declared formula graph resolves both EBIT and Adjusted EBITDA from fully
 covered leaves and solved model quantities.
 

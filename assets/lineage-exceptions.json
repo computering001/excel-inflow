@@ -4,24 +4,7 @@
   "purpose": "Explicitly approved departures from strict source-formula parity. Every entry must state WHY the source formula cannot or should not be reproduced. An entry here converts a cell from same_sheet_formula to a documented hardcode; it does not silence the check, and each still requires a visible provenance comment in the workbook.",
   "review_rule": "An exception is only valid where the source formula encodes an assumption whose inputs are not in the model, or where reproducing it would import a known source defect. 'The number happened to match' is never a reason.",
   "redirect_purpose": "A REDIRECT is not an exception and does not excuse anything. It says that a source cell's lineage survived intact in the built workbook but landed on a DIFFERENT semantic row than the one the row-level crosswalk names, for a stated subset of periods. The check still runs — it runs against the row that actually carries the lineage. A redirect is only valid where the destination row reproduces the source cell's own value from the same upstream data; where it does not, the mapping is wrong and the redirect must not be used to hide that.",
-  "lineage_redirects": [
-    {
-      "target_row_id": "depreciation_and_amortisation",
-      "period_roles": [
-        "forecast_2",
-        "forecast_3"
-      ],
-      "redirect_to_broker_metric_id": "depreciation_and_amortisation",
-      "target_treatment": "same_sheet_formula",
-      "source_cells": [
-        "I32",
-        "J32"
-      ],
-      "reason": "broker_anchor_bridge_split",
-      "rationale": "EBITDA = EBIT + D&A is an arithmetic identity, so a forecast cannot read all three off a broker pack. scripts/lib/broker_anchor.mjs anchors the two best-supplied metrics and DERIVES the third; on this case D&A is supplied by 5 named houses against 7 for EBIT and 7 for Adjusted EBITDA, so D&A is the derived line. The broker D&A series is not discarded — it remains in the visible D&A block on the Brokers sheet, while the Operating Model face carries the derived bridge figure. Source row 32 therefore SPLITS in the forecast: the face line carries the derived bridge figure and the Brokers metric row carries the imported broker series and its live case selector. The split is period-scoped, and the periods are not chosen for convenience — they are the periods the source itself imported. forecast_1 is deliberately NOT redirected: source H32 is the hardcode '=2600', which is not the broker figure for that year (2658.8), so the source's own forecast_1 cell never carried this lineage. That asymmetry is the source's, and the mapping reproduces it rather than smoothing it over.",
-      "verify": "The redirected broker metric row must exist in row-map.json and remain a live same-sheet selector formula on the Brokers sheet. If the broker panel or its metric mapping disappears, the redirect resolves to nothing and the check reports the entry as unmapped rather than passing it."
-    }
-  ],
+  "lineage_redirects": [],
   "exceptions": [
     {
       "target_row_id": "gross_profit",

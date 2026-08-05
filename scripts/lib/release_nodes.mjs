@@ -5,6 +5,7 @@
  */
 import { RELEASE_MODULE_REGISTRY as M, RELEASE_NODE_ORDER } from "./release_module_registry.mjs";
 import { planStatementClassificationQuestions } from "./statement_classifier.mjs";
+import { ensureIllustrativeAcquisitionCase } from "./acquisition_policy.mjs";
 
 const finite = (value) => Number.isFinite(Number(value));
 const passed = (id, message, evidence = {}) => ({ id, status: "PASS", message, evidence });
@@ -93,6 +94,7 @@ export function releaseClassificationReview(modelCase, { caseOnly = false } = {}
 
 /** Executes all portable semantic nodes through N9. */
 export function runReleaseN0N9({ modelCase, dcsExport = null, brokerPack = null, filings = null, caseOnly = false }) {
+  ensureIllustrativeAcquisitionCase(modelCase);
   const gates = [];
   const outputs = {};
   const expected = { last_historical_period_end: historicalPeriodEnd(modelCase) };

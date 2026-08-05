@@ -252,40 +252,58 @@ export function describeStatementRow(definition, section) {
 
 function statementNodes(modelCase, rowPlan) {
   const nodes = [];
+  const emittedRowIds = new Set();
+  const pushStatementNode = (row, section, physicalRow, projectionStatus) => {
+    const description = describeStatementRow(row, section);
+    const movement = movementDefinition(description.movement_type);
+    nodes.push({
+      node_id: `statement.${row.row_id}`,
+      node_kind: "statement_row",
+      semantic_id: description.semantic_id,
+      row_id: row.row_id,
+      label: row.label,
+      section,
+      physical_row: physicalRow,
+      projection_status: projectionStatus,
+      row_type: row.row_type,
+      semantic_role: row.semantic_role ?? null,
+      accounting_basis: modelCase.issuer?.accounting_basis ?? null,
+      operation_scope: row.operation_scope ?? null,
+      aggregation_authority: row.aggregation_authority ?? null,
+      parent_row_id: row.parent_row_id ?? null,
+      aggregation_role: row.aggregation_role ?? null,
+      economic_class: row.economic_class ?? null,
+      acquisition_driver_role: row.acquisition_driver_role ?? null,
+      style_role: row.style_role ?? null,
+      formula_authority: description.formula_authority,
+      dependencies: description.dependency_refs,
+      source_line_ids: uniqueSorted([
+        ...(row.source_line_ids ?? []),
+        ...declaredSources(modelCase, row.row_id),
+      ]),
+      movement_type: description.movement_type,
+      cash_flow_classification: description.cash_flow_classification,
+      waterfall_stage: movement?.waterfall_stage ?? null,
+      cash_effect: movement?.cash_effect ?? null,
+      debt_effect: movement?.debt_effect ?? null,
+    });
+    emittedRowIds.add(row.row_id);
+  };
   for (const section of ["income_statement", "cash_flow"]) {
     for (const row of rowPlan.statement_rows[section] ?? []) {
-      const description = describeStatementRow(row, section);
-      const movement = movementDefinition(description.movement_type);
-      nodes.push({
-        node_id: `statement.${row.row_id}`,
-        node_kind: "statement_row",
-        semantic_id: description.semantic_id,
-        row_id: row.row_id,
-        label: row.label,
-        section,
-        physical_row: row.row,
-        row_type: row.row_type,
-        semantic_role: row.semantic_role ?? null,
-        accounting_basis: modelCase.issuer?.accounting_basis ?? null,
-        operation_scope: row.operation_scope ?? null,
-        aggregation_authority: row.aggregation_authority ?? null,
-        parent_row_id: row.parent_row_id ?? null,
-        aggregation_role: row.aggregation_role ?? null,
-        economic_class: row.economic_class ?? null,
-        acquisition_driver_role: row.acquisition_driver_role ?? null,
-        style_role: row.style_role ?? null,
-        formula_authority: description.formula_authority,
-        dependencies: description.dependency_refs,
-        source_line_ids: uniqueSorted([
-          ...(row.source_line_ids ?? []),
-          ...declaredSources(modelCase, row.row_id),
-        ]),
-        movement_type: description.movement_type,
-        cash_flow_classification: description.cash_flow_classification,
-        waterfall_stage: movement?.waterfall_stage ?? null,
-        cash_effect: movement?.cash_effect ?? null,
-        debt_effect: movement?.debt_effect ?? null,
-      });
+      pushStatementNode(row, section, row.row, "rendered");
+    }
+  }
+  // The visible debt-overlay projection intentionally stops at consolidated
+  // net income and omits irrelevant post-net-income blocks.  Those filed rows
+  // are still evidence and remain first-class graph nodes: they retain source
+  // mappings and dependencies but have no workbook coordinate.  This is what
+  // lets the source crosswalk prove complete coverage without forcing OCI,
+  // attribution or per-share material back onto the Operating Model.
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase.statement_structure?.[section] ?? []) {
+      if (emittedRowIds.has(row.row_id)) continue;
+      pushStatementNode(row, section, null, "evidence_only");
     }
   }
   return nodes;
