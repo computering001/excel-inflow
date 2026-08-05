@@ -170,6 +170,11 @@ separately, declare two cash buckets:
 - a `linked_debt_addback` bucket restores gross cash only for reported cash and
   net debt, with its forecast balance linked to the named debt instrument rows.
 
+Standalone, adjustment and pro-forma opening cash always roll from the prior
+cash-flow-statement ending-cash row. Gross reported cash is a net-debt
+presentation balance and must never become an opening-cash source merely
+because explicit cash buckets are present.
+
 The linked add-back is never independently forecast, never earns interest and
 never funds the RCF sweep. Its latest historical amount must equal the translated
 opening balance of the linked gross/net-debt instruments. This makes the debt

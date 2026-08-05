@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.0.5",
+  "releaseName": "Excel Inflow v2.0.6",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.5",
+  "skillVersion": "2.0.6",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-05T16:36:33.784Z",
+  "generatedAt": "2026-08-05T17:48:35.426Z",
   "centralInstructionsWords": 3261,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "dc840560716a7b6c0baf71ec92844826b064a0d7babe255612f1dd2894ed6103",
+    "currentClosureSha256": "88e39f2da340d6a4c41ff916fa3c6f42c94d12a5c8856aa76d2167e163a8b5b6",
     "closureFileCount": 93,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -765,8 +765,8 @@
         "target": "real clean-root workbook build",
         "status": "PASS",
         "case_sha256": "daae78fa017b3afd3cee240ebeaefb430aca7263684d3055fb32dd17577d2c0e",
-        "plan_sha256": "b1493bd1eed4bccff7ce727f17154d52d59b576134fd0a0254d0b2b04cf1463e",
-        "workbook_sha256": "6f3dc3d791139111dd75a30af753206ac7781812b65b149aafc60876f202a843",
+        "plan_sha256": "712ca92f4e13fc39742326f42192be9c98029184141398509f5e79e4bee5b847",
+        "workbook_sha256": "6a655d079a9183c3b04f911c2a5d0fd6b6010fe36818c31dd46f153a9aa093fa",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
@@ -774,8 +774,8 @@
     "workbookBuild": {
       "status": "PASS",
       "case_sha256": "daae78fa017b3afd3cee240ebeaefb430aca7263684d3055fb32dd17577d2c0e",
-      "plan_sha256": "b1493bd1eed4bccff7ce727f17154d52d59b576134fd0a0254d0b2b04cf1463e",
-      "workbook_sha256": "6f3dc3d791139111dd75a30af753206ac7781812b65b149aafc60876f202a843",
+      "plan_sha256": "712ca92f4e13fc39742326f42192be9c98029184141398509f5e79e4bee5b847",
+      "workbook_sha256": "6a655d079a9183c3b04f911c2a5d0fd6b6010fe36818c31dd46f153a9aa093fa",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -829,9 +829,9 @@
     },
     {
       "path": "references/calculation-rules.md",
-      "sha256": "bdda8f70baa187b481cdedb06c1a1d7222fef7f365b4ac2d67158bf83b7c19cc",
-      "bytes": 11150,
-      "words": 1668
+      "sha256": "548a0a72b4b55892adfb7aceee0c131178b0b77bf28decb77912311da9b6ba1d",
+      "bytes": 11415,
+      "words": 1704
     },
     {
       "path": "references/forecast-and-input-policy.md",
@@ -955,8 +955,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "7e7a0c275af75fa47c03bf216d73008f9f715df2ca6159897ed4208083d8dc62",
-      "bytes": 440610,
+      "sha256": "5f810d5b86d6705e2d373baf93fe27a9f3af02a38a0b4a6c4175b913293cc9ae",
+      "bytes": 440874,
       "words": null
     },
     {

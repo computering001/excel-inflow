@@ -3232,14 +3232,16 @@ function configureOperatingModel(
           ) ?? `=${column}${definition.row}`,
         );
       } else if (definition.semantic_role === "opening_cash") {
+        // Opening cash is a cash-flow-statement concept in every block.  Gross
+        // reported cash may include debt-linked add-backs that are separately
+        // carried in gross debt and therefore must never enter the cash
+        // roll-forward, liquidity waterfall or interest-income basis.  The
+        // pro-forma block consequently opens from the prior pro-forma ending-
+        // cash statement row, exactly as the standalone block does.
         const prior =
           index === 0
-            ? explicitCashBuckets
-              ? `R${debtRows.reported_cash}`
-              : `R${statementByRole.get("ending_cash").row}`
-            : explicitCashBuckets
-              ? `${PRO_FORMA_COLUMNS[index - 1]}${debtRows.reported_cash}`
-              : `${PRO_FORMA_COLUMNS[index - 1]}${statementByRole.get("ending_cash").row}`;
+            ? `R${statementByRole.get("ending_cash").row}`
+            : `${PRO_FORMA_COLUMNS[index - 1]}${statementByRole.get("ending_cash").row}`;
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
