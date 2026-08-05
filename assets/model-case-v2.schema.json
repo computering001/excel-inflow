@@ -28,6 +28,10 @@
       "enum": ["production_model", "reference_parity"],
       "default": "production_model"
     },
+    "forecast_authority_contract_version": {
+      "enum": ["legacy", "waterfall_v1"],
+      "description": "waterfall_v1 requires every independent forecast hardcode to declare its selected authority separately for FY1, FY2 and FY3. Formula, schedule and intentionally uncalculated rows remain graph-derived."
+    },
     "presentation_profile": {
       "const": "crh_dynamic",
       "default": "crh_dynamic"
@@ -523,6 +527,12 @@
             "none"
           ]
         },
+        "forecast_period_authorities": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/forecastAuthority" }
+        },
         "note": { "type": "string" }
       }
     },
@@ -581,6 +591,94 @@
         "refs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "forecastAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "source_kind"],
+      "properties": {
+        "method": {
+          "enum": [
+            "schedule_link",
+            "accounting_identity",
+            "actual_plus_remainder",
+            "contractual_commitment",
+            "company_guidance",
+            "company_indication",
+            "broker_consensus",
+            "user_assumption",
+            "driver_formula",
+            "roll_forward",
+            "seasonal_run_rate",
+            "historical_average",
+            "historical_trend",
+            "carry_forward",
+            "explicit_zero",
+            "not_separately_forecast",
+            "not_applicable",
+            "unresolved"
+          ]
+        },
+        "source_kind": {
+          "enum": [
+            "schedule",
+            "formula",
+            "company_reported",
+            "company_guidance",
+            "company_indication",
+            "broker",
+            "user_supplied",
+            "historical_inference",
+            "none"
+          ]
+        },
+        "value": { "type": ["number", "null"] },
+        "source_id": { "type": "string", "minLength": 1 },
+        "as_of_date": { "type": "string", "format": "date" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "material": { "type": "boolean" },
+        "note": { "type": "string", "minLength": 1 },
+        "guidance_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "high", "selected", "selection_policy"],
+          "properties": {
+            "low": { "type": "number" },
+            "high": { "type": "number" },
+            "selected": { "type": "number" },
+            "selection_policy": {
+              "enum": ["company_point", "low", "midpoint", "high", "user_selected"]
+            }
+          }
+        },
+        "partial_period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reported_to_date",
+            "forecast_remainder",
+            "reported_through",
+            "remainder_method"
+          ],
+          "properties": {
+            "reported_to_date": { "type": "number" },
+            "forecast_remainder": { "type": "number" },
+            "reported_through": { "type": "string", "format": "date" },
+            "remainder_method": {
+              "enum": [
+                "contractual_commitment",
+                "company_guidance",
+                "company_indication",
+                "broker_consensus_less_reported",
+                "broker_quarterly",
+                "historical_seasonality",
+                "straight_line_run_rate",
+                "user_assumption"
+              ]
+            }
+          }
         }
       }
     },
@@ -682,6 +780,12 @@
               { "type": "null" }
             ]
           }
+        },
+        "forecast_period_authorities": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/forecastAuthority" }
         },
         "broker_metric_id": { "type": "string" },
         "forecast_treatment": {

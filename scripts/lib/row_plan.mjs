@@ -12,6 +12,7 @@ import {
 } from "./design_contract.mjs";
 import { isBalancingRcf } from "./rcf_policy.mjs";
 import { resolvedLeaseInterestBasis } from "./lease_policy.mjs";
+import { classifyStatementLine } from "./statement_classifier.mjs";
 
 /**
  * THREE RANKS OF TOTAL — RESOLVED FROM SEMANTIC ROLE *AND SECTION*, NEVER FROM A
@@ -160,15 +161,14 @@ const SECTION_RANKS = {
 };
 
 /**
- * THE HEADLINE SET — NARRATIVE PROMINENCE, DECLARED, AND NOTHING ELSE.
+ * THE HEADLINE SET — EXTRA NARRATIVE PROMINENCE FOR NON-TOTAL ROWS.
  *
- * Bold and the rank rules used to track the same thing: both were applied to
- * every row that summed something. Anything that added up therefore looked
- * important, and when everything is emphasised nothing is. The channels are now
- * one job each:
+ * Semantic totals and subtotals are bold by contract. This smaller ladder is
+ * retained for a prominent issuer row that is not itself classified as a total
+ * (for example an EBIT anchor in a bespoke presentation). The channels remain:
  *
  *   rules (single / double / box)  arithmetic closure — where a sum ends
- *   bold                           narrative prominence — this list, only
+ *   bold                           every semantic total, plus this list
  *   fill                           rank hierarchy
  *   font colour                    provenance (never touched by any of this)
  *
@@ -998,6 +998,31 @@ function consolidateConstituents(rows, spec) {
     rows.splice(rows.indexOf(constituents[0]), 0, consolidated);
   }
 
+  // A consolidated line is the parent of its workings, so present it before
+  // them and keep the entire family contiguous.  This is semantic ordering,
+  // not a label or row-number exception: an issuer may disclose the total
+  // after its constituents, but the standardised model always reads parent
+  // first and lets Excel collapse the children beneath it.  Preserve the
+  // issuer's relative order both within the child run and for every unrelated
+  // row around it.
+  const family = new Set([consolidated, ...constituents]);
+  const familyIndexes = rows
+    .map((row, index) => (family.has(row) ? index : -1))
+    .filter((index) => index >= 0);
+  if (familyIndexes.length > 0) {
+    const insertAt = Math.min(...familyIndexes);
+    const orderedChildren = rows.filter((row) => constituents.includes(row));
+    const withoutFamily = rows.filter((row) => !family.has(row));
+    rows.splice(
+      0,
+      rows.length,
+      ...withoutFamily.slice(0, insertAt),
+      consolidated,
+      ...orderedChildren,
+      ...withoutFamily.slice(insertAt),
+    );
+  }
+
   // Constituents stay on the face, one level in from the consolidated line.
   for (const row of constituents) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
@@ -1019,6 +1044,26 @@ function consolidateConstituents(rows, spec) {
     row.calculation = { ...row.calculation, refs: rewired };
   }
   return consolidated;
+}
+
+/**
+ * Ordinary income-statement components sit one level inside the statement
+ * spine.  The spine itself is semantic: headers, totals and subsection/ratio
+ * readings stay flush left; everything else is a component whether the issuer
+ * calls it distribution expense, impairment, restructuring, or something the
+ * taxonomy has never seen before.  Existing deeper issuer hierarchy remains a
+ * floor, so this normalises presentation without flattening bespoke detail.
+ */
+function normaliseIncomeStatementIndent(rows) {
+  for (const row of rows) {
+    const isSpine =
+      row.row_type === "header" ||
+      row.style_role === "header" ||
+      row.style_role === "total" ||
+      row.style_role === "subsection";
+    if (isSpine) continue;
+    row.indent = Math.max(1, Number(row.indent ?? 0));
+  }
 }
 
 /**
@@ -1309,6 +1354,28 @@ export function normaliseStatementRows(modelCase, section) {
     section === "income_statement" ? DEFAULT_INCOME_ROWS : DEFAULT_CASH_FLOW_ROWS,
       );
   applyStatementHierarchy(rows);
+  // Older mapped cases may preserve a source label but carry no semantic role.
+  // Adopt only the classifier's high-confidence cash-interest roles here; an
+  // ambiguous finance label remains unassigned and is handled by the normal
+  // coverage/question flow.  This is taxonomy-driven and therefore works for
+  // any issuer wording the accepted alias set covers without a case exception.
+  if (section === "cash_flow") {
+    for (const row of rows) {
+      if (row.semantic_role || row.row_type === "header") continue;
+      const classification = classifyStatementLine({
+        label: row.label,
+        section,
+      });
+      if (
+        classification.status === "accepted" &&
+        ["cash_interest_paid", "cash_interest_received"].includes(
+          classification.classified_role,
+        )
+      ) {
+        row.semantic_role = classification.classified_role;
+      }
+    }
+  }
   if (section === "income_statement") {
     projectIncomeStatementToDebtOverlay(modelCase, rows);
     applyBrokerAnchorRule(modelCase, rows);
@@ -1361,30 +1428,11 @@ export function normaliseStatementRows(modelCase, section) {
         );
       }
     }
-    if (
-      !rows.some(
-        (row) => row.semantic_role === "non_cash_interest_addback",
-      )
-    ) {
-      const insertAt = Math.max(
-        0,
-        rows.findIndex((row) => row.row_id === "other_non_cash"),
-      );
-      rows.splice(insertAt, 0, {
-        row_id: "non_cash_interest_addback",
-        label: "Non-cash interest add-back",
-        row_type: "calculation",
-        semantic_role: "non_cash_interest_addback",
-        indent: 1,
-      });
-      const cfo = rows.find((row) => row.row_id === "cash_from_operations");
-      if (cfo?.calculation?.refs) {
-        cfo.calculation.refs = [
-          ...cfo.calculation.refs,
-          "non_cash_interest_addback",
-        ];
-      }
-    }
+    // Never manufacture a non-cash-interest line on the issuer's cash-flow
+    // statement.  P&L interest versus cash interest reconciles inside the
+    // interest schedule.  A cash-flow add-back remains visible only when it is
+    // present in the issuer-supplied statement graph, where its original label,
+    // provenance and position are preserved.
 
     // DYNAMIC 1 — Change in Working Capital. Scoped to the operating section so
     // a label heuristic cannot reach into investing or financing.
@@ -1433,6 +1481,7 @@ export function normaliseStatementRows(modelCase, section) {
   // levelled off the FINAL ref graph, and no label is left carrying its indent
   // as content.
   deriveIndentLevels(rows);
+  if (section === "income_statement") normaliseIncomeStatementIndent(rows);
   stripLabelIndentSpaces(rows);
   assertUniqueStatementDependencies(rows, section);
   return rows;
@@ -2019,6 +2068,7 @@ export function compileRowPlan(modelCase) {
     "net_debt_to_adjusted_ebitda",
     "leverage_net_interest",
     "adjusted_ebitda_to_net_interest",
+    "mandatory_debt_repayments",
     // The line the cash flow reads, closing the model-basis block: the reader
     // still shuts the balance-sheet movement and the cash flow against each
     // other without leaving the block, but it no longer stands between a
@@ -2273,9 +2323,10 @@ export function compileRowPlan(modelCase) {
     "interest_identified_total",
     "non_cash_interest",
     "gross_interest_expense",
+    "cash_interest_paid",
+    "cash_interest_received",
     "interest_income_schedule",
     "net_interest_expense",
-    "cash_interest_paid",
   ]) {
     interestSummaryRows[id] = cursor;
     rowsById[id] = cursor;

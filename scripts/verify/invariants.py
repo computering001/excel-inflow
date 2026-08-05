@@ -184,6 +184,124 @@ def validate_semantic_artifacts(manifest, crosswalk_rows) -> List[Dict[str, Any]
                         "message": "Declared calculation nodes require semantic dependencies.",
                     }
                 )
+            if node.get("row_type") != "header":
+                authorities = node.get("forecast_authorities")
+                if not isinstance(authorities, list) or len(authorities) != 3:
+                    errors.append(
+                        {
+                            "id": "manifest.forecast_authorities",
+                            "node_id": node_id,
+                            "message": "Every non-header statement node requires three period forecast authorities.",
+                        }
+                    )
+                else:
+                    for forecast_index, authority in enumerate(authorities):
+                        mechanism = authority.get("mechanism") if isinstance(authority, dict) else None
+                        method = authority.get("method") if isinstance(authority, dict) else None
+                        expected_mechanism = {
+                            "schedule_link": "formula",
+                            "accounting_identity": "formula",
+                            "driver_formula": "formula",
+                            "roll_forward": "formula",
+                            "broker_consensus": "broker",
+                            "actual_plus_remainder": "hardcode",
+                            "contractual_commitment": "hardcode",
+                            "company_guidance": "hardcode",
+                            "company_indication": "hardcode",
+                            "user_assumption": "hardcode",
+                            "seasonal_run_rate": "hardcode",
+                            "historical_average": "hardcode",
+                            "historical_trend": "hardcode",
+                            "carry_forward": "hardcode",
+                            "explicit_zero": "zero",
+                            "not_separately_forecast": "uncalculated",
+                            "not_applicable": "uncalculated",
+                        }.get(method)
+                        if (
+                            not isinstance(authority, dict)
+                            or authority.get("forecast_index") != forecast_index
+                            or not authority.get("method")
+                            or mechanism not in ("formula", "broker", "hardcode", "zero", "uncalculated")
+                        ):
+                            errors.append(
+                                {
+                                    "id": "manifest.forecast_authority_shape",
+                                    "node_id": node_id,
+                                    "forecast_index": forecast_index,
+                                    "authority": authority,
+                                }
+                            )
+                        if expected_mechanism and mechanism != expected_mechanism:
+                            errors.append(
+                                {
+                                    "id": "manifest.forecast_authority_mechanism",
+                                    "node_id": node_id,
+                                    "forecast_index": forecast_index,
+                                    "method": method,
+                                    "expected_mechanism": expected_mechanism,
+                                    "actual_mechanism": mechanism,
+                                }
+                            )
+                        if isinstance(authority, dict) and method == "unresolved":
+                            errors.append(
+                                {
+                                    "id": "manifest.forecast_authority_unresolved",
+                                    "node_id": node_id,
+                                    "forecast_index": forecast_index,
+                                }
+                            )
+                        if (
+                            isinstance(authority, dict)
+                            and authority.get("inferred") is not True
+                            and method
+                            in (
+                                "actual_plus_remainder",
+                                "contractual_commitment",
+                                "company_guidance",
+                                "company_indication",
+                            )
+                            and (not authority.get("source_id") or not authority.get("as_of_date"))
+                        ):
+                            errors.append(
+                                {
+                                    "id": "manifest.forecast_authority_provenance",
+                                    "node_id": node_id,
+                                    "forecast_index": forecast_index,
+                                }
+                            )
+                        if isinstance(authority, dict) and method == "actual_plus_remainder":
+                            partial = authority.get("partial_period") or {}
+                            try:
+                                reported = float(partial.get("reported_to_date"))
+                                remainder = float(partial.get("forecast_remainder"))
+                                value = float(authority.get("value"))
+                                partial_valid = (
+                                    bool(partial.get("reported_through"))
+                                    and abs(value - (reported + remainder)) <= 1e-9
+                                )
+                            except (TypeError, ValueError):
+                                partial_valid = False
+                            if not partial_valid:
+                                errors.append(
+                                    {
+                                        "id": "manifest.forecast_authority_partial_period",
+                                        "node_id": node_id,
+                                        "forecast_index": forecast_index,
+                                    }
+                                )
+                        if (
+                            isinstance(authority, dict)
+                            and method in ("explicit_zero", "not_separately_forecast", "not_applicable")
+                            and authority.get("inferred") is not True
+                            and not authority.get("note")
+                        ):
+                            errors.append(
+                                {
+                                    "id": "manifest.forecast_authority_rationale",
+                                    "node_id": node_id,
+                                    "forecast_index": forecast_index,
+                                }
+                            )
         if (
             node.get("movement_type") == "non_cash_debt_movement"
             and node.get("waterfall_stage") != "excluded"

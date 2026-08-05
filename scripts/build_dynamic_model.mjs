@@ -59,6 +59,7 @@ import {
   leaseForecast,
   resolvedLeaseInterestBasis,
 } from "./lib/lease_policy.mjs";
+import { resolveForecastAuthority } from "./lib/forecast_authority.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -431,6 +432,67 @@ function columnNumber(name) {
   return value;
 }
 
+// Keep visible aggregation formulas as short as their semantic membership
+// permits. The row plan already decides WHICH cells belong to a total; this
+// helper changes only how that exact ordered set is written. Consecutive A1
+// references in the same column become one range, while gaps and expression
+// terms remain explicit. It therefore never pulls an intervening mechanics row
+// into a subtotal merely because that row sits between two selected balances.
+function compactCellReferences(cells) {
+  const parse = (value) => {
+    const text = String(value);
+    const match = /^(\$?)([A-Z]+)(\$?)(\d+)$/.exec(text);
+    return match
+      ? {
+          text,
+          columnAbsolute: match[1],
+          column: match[2],
+          rowAbsolute: match[3],
+          row: Number(match[4]),
+        }
+      : null;
+  };
+  const terms = [];
+  for (let index = 0; index < cells.length; ) {
+    const first = parse(cells[index]);
+    if (!first) {
+      terms.push(String(cells[index]));
+      index += 1;
+      continue;
+    }
+    let last = first;
+    let next = index + 1;
+    while (next < cells.length) {
+      const candidate = parse(cells[next]);
+      if (
+        !candidate ||
+        candidate.column !== first.column ||
+        candidate.columnAbsolute !== first.columnAbsolute ||
+        candidate.rowAbsolute !== first.rowAbsolute ||
+        candidate.row !== last.row + 1
+      ) {
+        break;
+      }
+      last = candidate;
+      next += 1;
+    }
+    terms.push(last === first ? first.text : `${first.text}:${last.text}`);
+    index = next;
+  }
+  return terms;
+}
+
+function sumCellExpression(cells) {
+  const terms = compactCellReferences(cells);
+  if (terms.length === 0) return "0";
+  if (terms.length === 1 && cells.length === 1) return terms[0];
+  return `SUM(${terms.join(",")})`;
+}
+
+function sumCellFormula(cells) {
+  return `=${sumCellExpression(cells)}`;
+}
+
 // Expand an A1 range into its individual cell addresses. Used by the provenance
 // registry, which is keyed per cell because a range write and a cell write have
 // to be able to contradict each other in either order.
@@ -629,13 +691,12 @@ function setPeriodNumberFormat(sheet, row, format) {
  * reset the colour to black and destroy the provenance of every blue input and
  * every green cross-sheet link sitting on a subtotal row.
  *
- * BOLD IS NO LONGER A PROPERTY OF RANK. It used to be applied to every ranked
- * row, so the rules and the weight tracked the same fact — arithmetic — and
- * anything that summed looked important. `headlineRows` is a separate channel
- * carrying narrative prominence alone (see `row_plan.mjs` → SECTION_HEADLINES),
- * and the two sets deliberately do not coincide: a group subtotal closes a run
- * and takes a rule without claiming the reader's eye, and `Change in working
- * capital` claims neither.
+ * Bold belongs to every semantic total or subtotal.  This is deliberately tied
+ * to the rank map rather than to labels or physical rows: Revenue, Gross Profit,
+ * Operating Profit and an unfamiliar issuer-specific total all receive the
+ * same treatment because they close arithmetic, not because their names were
+ * anticipated. `headlineRows` remains a second route for rare prominent rows
+ * that are not totals in the issuer's own presentation.
  */
 function applyUncalculatedFill(sheet, row) {
   for (const address of [`J${row}:L${row}`, `N${row}:P${row}`, `S${row}:U${row}`]) {
@@ -650,10 +711,8 @@ function applyTotalHierarchy(
   subsectionRows = null,
   headlineRows = null,
 ) {
-  // NARRATIVE PROMINENCE, applied over the same runs the rank rules use and in
-  // the same pass, so the two channels can never drift out of step on ordering.
-  // A headline row need not be a total (Kerry's `ebit` is not) and a total is
-  // usually not a headline, so this loop is over the union, not the ranks.
+  // Narrative headlines can include a non-total (for example an issuer's EBIT
+  // anchor), so apply that small declared set before the rank loop.
   for (const row of [...(headlineRows ?? [])].sort((a, b) => a - b)) {
     for (const address of blockRanges(row, RANK_BLOCKS)) {
       sheet.getRange(address).format.font = { bold: true };
@@ -663,6 +722,8 @@ function applyTotalHierarchy(
     const treatment = RANK_TREATMENT[rank];
     if (!treatment) continue;
     for (const address of blockRanges(row, RANK_BLOCKS)) {
+      // Partial assignment preserves blue/black/green provenance underneath.
+      sheet.getRange(address).format.font = { bold: true };
       // A component sum loses its fill ENTIRELY — white, not "whatever it had".
       sheet.getRange(address).format.fill = treatment.fill ?? COLORS.white;
     }
@@ -989,8 +1050,8 @@ function styleStatementRow(
     : null;
   if (rank) ranks.set(row, rank);
   if (isTotal) {
-    // Fill arrives with the rank pass, bold with the headline pass; nothing to
-    // do here.
+    // Fill, rules and bold arrive together in the final rank pass; nothing to
+    // do here, and provenance colour remains untouched.
   } else if (rank === TOTAL_RANK.ANSWER) {
     // An answer that happens to be a ratio keeps the answer treatment, not the
     // italic commentary treatment.
@@ -1108,9 +1169,9 @@ function genericFormula(rowPlan, definition, column, calculationOverride = null)
     // the cash bridge.  Snap only the displayed net cash movement to a
     // reporting-safe precision so Excel never renders an immaterial "(0)".
     if (definition.semantic_role === "net_change_in_cash") {
-      return `=ROUND(SUM(${refs.join(",")}),6)`;
+      return `=ROUND(${sumCellExpression(refs)},6)`;
     }
-    return `=SUM(${refs.join(",")})`;
+    return `=${sumCellExpression(refs)}`;
   }
   if (calculation.operator === "link") return `=${refs[0]}`;
   if (calculation.operator === "subtract") {
@@ -1118,7 +1179,7 @@ function genericFormula(rowPlan, definition, column, calculationOverride = null)
   }
   if (calculation.operator === "negate") return `=-${refs[0]}`;
   if (calculation.operator === "negate_sum") {
-    return `=-SUM(${refs.join(",")})`;
+    return `=-${sumCellExpression(refs)}`;
   }
   if (calculation.operator === "ratio") {
     return `=IFERROR(${refs[0]}/${refs[1]},0)`;
@@ -2191,36 +2252,27 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
       statementRows.find(
         (statementRow) => statementRow.semantic_role === semanticRole,
       )?.row;
-    const preTaxRow = semanticRow("pre_tax_income");
-    const effectiveTaxRateRow = semanticRow("effective_tax_rate");
+    const taxExpenseRow = semanticRow("tax_expense");
     if (
-      !preTaxRow ||
-      !effectiveTaxRateRow
+      !taxExpenseRow
     ) {
       throw new Error(
-        "Acquisition tax calculation requires pre-tax income and effective tax-rate semantic roles.",
+        "Acquisition tax calculation requires a tax-expense semantic role.",
       );
     }
-    // TAX IS THE TERMINAL FLOW OF THE ADJUSTMENT STATEMENT GRAPH.
+    // TAX IS CALCULATED ON THE PRO-FORMA STATEMENT, THEN RECONCILED BACK.
     //
-    // The adjustment PBT row already aggregates every declared pre-tax deal
-    // contribution: operating leaves and subtotals, D&A/amortisation,
-    // associates/JVs, acquisition interest and any other finance rows.  Taxing
-    // a separately reconstructed `EBIT + acquisition interest` amount made the
-    // result correct only for the original short-form statement and caused a
-    // newly mapped line item to bypass tax.  Reading the semantic PBT node here
-    // means the tax formula never changes when the issuer's row topology does.
-    //
-    // A normal benefit is not recognised on an acquisition loss by default;
-    // a case that needs a loss benefit must declare that policy explicitly in
-    // the statement graph.  The applicable rate remains the visible
-    // standalone effective-rate assumption.  Pro-forma tax is emitted later
-    // as standalone tax plus this signed adjustment, and the displayed
-    // pro-forma rate is recomputed from the resulting amounts.
+    // Every pre-tax line can move in the transaction case, including unusual
+    // issuer-specific finance, associate and non-operating rows.  The pro-forma
+    // tax cell therefore reads the final pro-forma PBT directly.  This column
+    // is only the bridge required to preserve Standalone + Adjustment = Pro
+    // Forma, so it is the difference between that independently calculated tax
+    // and standalone tax.  No statement topology is reconstructed here.
+    const proFormaColumn =
+      PRO_FORMA_COLUMNS[ADJUSTMENT_COLUMNS.indexOf(column)];
     return (
-      `=IF($P$${c.adjustments_enabled}=0,0,` +
-      `-MAX(0,${column}${preTaxRow})*` +
-      `${standaloneColumn}${effectiveTaxRateRow})`
+      `=${proFormaColumn}${taxExpenseRow}-` +
+      `${standaloneColumn}${taxExpenseRow}`
     );
   }
   return null;
@@ -2646,7 +2698,7 @@ function configureOperatingModel(
     const cells = cashBucketPlans
       .filter((bucket) => bucket.included_in_cash_flow_cash !== false)
       .map((bucket) => `${column}${bucket.balance_row}`);
-    return cells.length ? `=SUM(${cells.join(",")})` : "=0";
+    return sumCellFormula(cells);
   };
   const cashReconciliationFormula = (column) => {
     const rows = [
@@ -2655,7 +2707,7 @@ function configureOperatingModel(
       statementByRole.get("cash_from_financing")?.row,
       statementByRole.get("non_balancing_cash_bucket_movement")?.row,
     ].filter(Number.isInteger);
-    return rows.length ? `=SUM(${rows.map((row) => `${column}${row}`).join(",")})` : "=0";
+    return sumCellFormula(rows.map((row) => `${column}${row}`));
   };
   const nonBalancingBucketMovementFormula = (
     column,
@@ -2673,6 +2725,12 @@ function configureOperatingModel(
     }
     if (role === "interest_expense") {
       return `=${column}${interestRows.gross_interest_expense}`;
+    }
+    if (role === "cash_interest_paid") {
+      return `=${column}${interestRows.cash_interest_paid}`;
+    }
+    if (role === "cash_interest_received") {
+      return `=${column}${interestRows.cash_interest_received}`;
     }
     if (role === "non_cash_interest_addback") {
       const nonCashInstrumentRows = rowPlan.instruments
@@ -2784,24 +2842,17 @@ function configureOperatingModel(
   }
 
   function historicalSemanticFormula(definition, column) {
-    const historicalIndex = HISTORICAL_COLUMNS.indexOf(column);
-    const statedHistoricalValue = rowValues(modelCase, definition)?.[
-      historicalIndex
-    ];
-    const hasFiledHistoricalValue = Number.isFinite(
-      Number(statedHistoricalValue),
-    ) && statedHistoricalValue !== null;
     if (definition.semantic_role === "interest_income") {
-      // History is governed by the filed statement row.  The interest schedule
-      // is a reconciliation of that reported amount, not a substitute source.
-      // Forecast columns continue to link to the modelled schedule through
-      // standaloneSemanticFormula().
-      if (hasFiledHistoricalValue) return null;
       return `=${column}${interestRows.interest_income_schedule}`;
     }
     if (definition.semantic_role === "interest_expense") {
-      if (hasFiledHistoricalValue) return null;
       return `=${column}${interestRows.gross_interest_expense}`;
+    }
+    if (definition.semantic_role === "cash_interest_paid") {
+      return `=${column}${interestRows.cash_interest_paid}`;
+    }
+    if (definition.semantic_role === "cash_interest_received") {
+      return `=${column}${interestRows.cash_interest_received}`;
     }
     if (definition.semantic_role === "non_balancing_cash_bucket_movement") {
       const index = HISTORICAL_COLUMNS.indexOf(column);
@@ -2906,6 +2957,16 @@ function configureOperatingModel(
         column,
         index,
       );
+      const forecastAuthority = resolveForecastAuthority(
+        modelCase,
+        definition,
+        index,
+      );
+      if (forecastAuthority.mechanism === "block") {
+        throw new Error(
+          `Unresolved forecast authority for ${definition.row_id} in ${modelCase.periods[index + 3]?.date ?? `forecast period ${index + 1}`}: ${forecastAuthority.reason ?? forecastAuthority.method}.`,
+        );
+      }
       // A row with a supplied forecast (broker/hardcode/zero) or an
       // intentionally blank one must NOT fall back to its historical
       // calculation here. Rows whose dependency direction reverses between
@@ -2916,9 +2977,7 @@ function configureOperatingModel(
       const forecastSupplied =
         !periodForecastCalculation &&
         (periodRulesDeclared ||
-          ["broker", "hardcode", "zero", "uncalculated"].includes(
-            definition.forecast_treatment,
-          ));
+          forecastAuthority.mechanism !== "formula");
       // THE CARRY NEEDS SOMETHING TO CARRY. A hold-flat row's first forecast
       // column is the anchor the chain runs from, and the anchor is an
       // assumption — the source states it as its own figure, not as a repeat of
@@ -2958,26 +3017,26 @@ function configureOperatingModel(
       // reading n/a in the adjustment and pro-forma columns beside them. The
       // pro-forma writer below has always checked n/a first; this matches it.
       if (
-        definition.row_type === "uncalculated" ||
-        definition.forecast_treatment === "uncalculated"
+        forecastAuthority.mechanism === "uncalculated"
       ) {
         setValue(sheet, `${column}${definition.row}`, null);
       } else if (semantic) {
         applyFormula(sheet, `${column}${definition.row}`, semantic);
       } else if (
-        definition.forecast_treatment === "broker" &&
+        forecastAuthority.mechanism === "broker" &&
         brokerFormula
       ) {
         applyFormula(sheet, `${column}${definition.row}`, brokerFormula);
       } else if (generic) {
         applyFormula(sheet, `${column}${definition.row}`, generic);
-      } else if (brokerFormula) {
-        applyFormula(sheet, `${column}${definition.row}`, brokerFormula);
-      } else if (values[index + 3] !== null && values[index + 3] !== undefined) {
+      } else if (
+        forecastAuthority.mechanism === "hardcode" &&
+        forecastAuthority.value !== null
+      ) {
         setValue(
           sheet,
           `${column}${definition.row}`,
-          Number(values[index + 3]),
+          Number(forecastAuthority.value),
         );
         styleInput(sheet, `${column}${definition.row}`);
         // A forecast hardcode is an assumption and must say so on the cell.
@@ -2994,9 +3053,20 @@ function configureOperatingModel(
             `${column}${definition.row}`,
             provenanceComment(provenance),
           );
+        } else if (forecastAuthority.note) {
+          addCommentOnce(
+            workbook,
+            sheet,
+            `${column}${definition.row}`,
+            `Forecast authority: ${forecastAuthority.method}\n${forecastAuthority.note}`,
+          );
         }
-      } else {
+      } else if (forecastAuthority.mechanism === "zero") {
         applyFormula(sheet, `${column}${definition.row}`, "=0");
+      } else {
+        throw new Error(
+          `Forecast authority ${forecastAuthority.method} for ${definition.row_id} did not compile to a formula, broker link, input, zero or intentionally blank cell in forecast period ${index + 1}.`,
+        );
       }
       const acquisitionFormula = acquisitionAdjustmentFormula(
         modelCase,
@@ -3008,8 +3078,7 @@ function configureOperatingModel(
       // adjustment block unless a genuine operating acquisition formula
       // applies through their semantic role.
       const forecastUncalculated =
-        definition.row_type === "uncalculated" ||
-        definition.forecast_treatment === "uncalculated";
+        forecastAuthority.mechanism === "uncalculated";
       // THE ADJUSTMENT IS BUILT, NOT INFERRED.
       //
       // A row whose PRO-FORMA cell links down into a pro-forma schedule (gross
@@ -3031,6 +3100,10 @@ function configureOperatingModel(
             return `=${adjustmentColumn}${interestRows.interest_income_schedule}`;
           case "interest_expense":
             return `=${adjustmentColumn}${interestRows.gross_interest_expense}`;
+          case "cash_interest_paid":
+            return `=${adjustmentColumn}${interestRows.cash_interest_paid}`;
+          case "cash_interest_received":
+            return `=${adjustmentColumn}${interestRows.cash_interest_received}`;
           case "opening_cash":
             // The pro-forma block opens on the SAME last actual the standalone
             // block opens on, so the acquisition adds nothing to FY1 opening
@@ -3153,6 +3226,18 @@ function configureOperatingModel(
           `${proFormaColumn}${definition.row}`,
           `=${proFormaColumn}${interestRows.gross_interest_expense}`,
         );
+      } else if (definition.semantic_role === "cash_interest_paid") {
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${proFormaColumn}${interestRows.cash_interest_paid}`,
+        );
+      } else if (definition.semantic_role === "cash_interest_received") {
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${proFormaColumn}${interestRows.cash_interest_received}`,
+        );
       } else if (
         definition.semantic_role === "non_cash_interest_addback"
       ) {
@@ -3191,10 +3276,31 @@ function configureOperatingModel(
             `${proFormaColumn}${preTaxIncomeRow},${column}${definition.row})`,
         );
       } else if (definition.semantic_role === "tax_expense") {
+        const preTaxIncomeRow = statementByRole.get("pre_tax_income")?.row;
+        const effectiveTaxRateRow = statementByRole.get("effective_tax_rate")?.row;
+        if (!preTaxIncomeRow || !effectiveTaxRateRow) {
+          throw new Error(
+            "Pro-forma tax calculation requires pre-tax-income and effective-tax-rate semantic roles.",
+          );
+        }
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
-          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
+          `=-MAX(0,${proFormaColumn}${preTaxIncomeRow})*` +
+            `${column}${effectiveTaxRateRow}`,
+        );
+      } else if (definition.semantic_role === "opening_cash") {
+        // This semantic roll-forward outranks a source row's generic period
+        // rule.  In every basis, FY1 opens on the shared last actual and later
+        // years open on that same basis's prior closing cash.
+        const prior =
+          index === 0
+            ? `R${statementByRole.get("ending_cash").row}`
+            : `${PRO_FORMA_COLUMNS[index - 1]}${statementByRole.get("ending_cash").row}`;
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${prior}`,
         );
       } else if (
         definition.forecast_treatment === "broker" &&
@@ -3230,22 +3336,6 @@ function configureOperatingModel(
             proFormaColumn,
             periodForecastCalculation,
           ) ?? `=${column}${definition.row}`,
-        );
-      } else if (definition.semantic_role === "opening_cash") {
-        // Opening cash is a cash-flow-statement concept in every block.  Gross
-        // reported cash may include debt-linked add-backs that are separately
-        // carried in gross debt and therefore must never enter the cash
-        // roll-forward, liquidity waterfall or interest-income basis.  The
-        // pro-forma block consequently opens from the prior pro-forma ending-
-        // cash statement row, exactly as the standalone block does.
-        const prior =
-          index === 0
-            ? `R${statementByRole.get("ending_cash").row}`
-            : `${PRO_FORMA_COLUMNS[index - 1]}${statementByRole.get("ending_cash").row}`;
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${definition.row}`,
-          `=${prior}`,
         );
       } else if (definition.semantic_role === "ending_cash") {
         applyFormula(
@@ -3535,7 +3625,7 @@ function configureOperatingModel(
       }
       return `${column}${plan.debt_row}`;
     });
-    return cells.length ? `=SUM(${cells.join(",")})` : "=0";
+    return sumCellFormula(cells);
   };
   // Forecast cash repayments, in reporting currency, compiled from the same
   // per-instrument mechanics that write the visible debt roll-forward. The RCF
@@ -3949,11 +4039,7 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${group.subtotal_row}`,
-        cells.length === 0
-          ? "=0"
-          : cells.length === 1
-            ? `=SUM(${cells[0]}:${cells[0]})`
-            : `=SUM(${cells.join(",")})`,
+        sumCellFormula(cells),
       );
     }
   }
@@ -4071,6 +4157,7 @@ function configureOperatingModel(
     net_debt_to_adjusted_ebitda: `${leverageNetDebtLabel} / Adjusted EBITDA`,
     leverage_net_interest: "Net interest expense",
     adjusted_ebitda_to_net_interest: "Adjusted EBITDA / net interest expense",
+    mandatory_debt_repayments: "Mandatory debt repayments",
     ...Object.fromEntries(
       bridgeComponents.map((component, index) => [
         `reported_net_debt_adjustment_${index}`,
@@ -4100,6 +4187,7 @@ function configureOperatingModel(
     "net_debt_excluding_leases",
     "net_debt_including_leases",
     "net_debt_company_reported",
+    "mandatory_debt_repayments",
     "total_change_in_debt",
     "total_liquidity",
   ]);
@@ -4312,7 +4400,7 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${debtRows.gross_debt_excluding_leases}`,
-      `=SUM(${instrumentCells.join(",")})`,
+      sumCellFormula(instrumentCells),
     );
   }
   // I (the last actual) was written above with G and H, from the same series,
@@ -4346,12 +4434,12 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${debtRows.reported_cash}`,
-        `=SUM(${reportedCells.join(",")})`,
+        sumCellFormula(reportedCells),
       );
       applyFormula(
         sheet,
         `${column}${debtRows.liquidity_cash}`,
-        liquidityCells.length ? `=SUM(${liquidityCells.join(",")})` : "=0",
+        sumCellFormula(liquidityCells),
       );
       applyFormula(
         sheet,
@@ -4410,13 +4498,13 @@ function configureOperatingModel(
       (bucket) => `${col}${bucket.balance_row}`,
     );
     if (id === "reported_cash") {
-      return `=SUM(${bucketCells.join(",")})`;
+      return sumCellFormula(bucketCells);
     }
     if (id === "liquidity_cash") {
       const cells = cashBucketPlans
         .filter((bucket) => bucket.available_for_liquidity)
         .map((bucket) => `${col}${bucket.balance_row}`);
-      return cells.length ? `=SUM(${cells.join(",")})` : "=0";
+      return sumCellFormula(cells);
     }
     if (id === "interest_bearing_cash") {
       const terms = cashBucketPlans.map(
@@ -5029,11 +5117,9 @@ function configureOperatingModel(
     (definition) => inferMovementType(definition) === "lease_principal",
   );
   const sumCells = (blockColumn, definitions) =>
-    definitions.length
-      ? `SUM(${definitions
-          .map((definition) => `${blockColumn}${definition.row}`)
-          .join(",")})`
-      : "0";
+    sumCellExpression(
+      definitions.map((definition) => `${blockColumn}${definition.row}`),
+    );
   const nonRcfIssuanceTerms = (blockColumn, forecastIndex) =>
     rowPlan.instruments
       .filter((plan) => {
@@ -5055,6 +5141,51 @@ function configureOperatingModel(
         );
         return rate === "1" ? cell : `${cell}*${rate}`;
       });
+  // Keep the irreducible instrument-by-instrument maturity mechanics in the
+  // debt schedule.  The liquidity waterfall below consumes one visible link,
+  // rather than repeating the entire maturity expression inside a cash-sweep
+  // formula.  This preserves the economics and makes the summary auditable.
+  const mandatoryDebtRow = debtRows.mandatory_debt_repayments;
+  if (Number.isInteger(mandatoryDebtRow)) {
+    const reportedRepaymentRows = financingRows.filter((definition) => {
+      const role = definition.semantic_role;
+      const movement = inferMovementType(definition);
+      return (
+        role === "debt_repayment" ||
+        movement === "scheduled_amortisation" ||
+        movement === "maturity_repayment"
+      );
+    });
+    for (const historicalColumn of HISTORICAL_COLUMNS) {
+      applyFormula(
+        sheet,
+        `${historicalColumn}${mandatoryDebtRow}`,
+        `=${sumCells(historicalColumn, reportedRepaymentRows)}`,
+      );
+    }
+    applyFormula(sheet, `R${mandatoryDebtRow}`, `=I${mandatoryDebtRow}`);
+    for (let index = 0; index < 3; index += 1) {
+      const column = FORECAST_COLUMNS[index];
+      const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
+      const proFormaColumn = PRO_FORMA_COLUMNS[index];
+      const expressions = mandatoryRepaymentExpressions[index];
+      applyFormula(
+        sheet,
+        `${column}${mandatoryDebtRow}`,
+        expressions.length === 0
+          ? "=0"
+          : expressions.length === 1
+            ? `=${expressions[0]}`
+            : `=SUM(${expressions.join(",")})`,
+      );
+      applyFormula(sheet, `${adjustmentColumn}${mandatoryDebtRow}`, "=0");
+      applyFormula(
+        sheet,
+        `${proFormaColumn}${mandatoryDebtRow}`,
+        `=${column}${mandatoryDebtRow}+${adjustmentColumn}${mandatoryDebtRow}`,
+      );
+    }
+  }
   for (let index = 0; index < 3; index += 1) {
     const column = FORECAST_COLUMNS[index];
     const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
@@ -5110,25 +5241,12 @@ function configureOperatingModel(
             : "=0",
         );
       }
-      // Mandatory repayment is compiled from explicit scheduled amortisation
-      // and maturity mechanics. Never infer it from a change in balances:
-      // acquisition debt, issuance, FX and other non-cash movement would then
-      // be silently netted against cash repayments.
+      // The maturity mechanics live once in the visible debt schedule.  The
+      // waterfall is a consumer, so it carries a single direct link.
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}`,
-        (() => {
-          if (isAdjustment) return "=0";
-          if (blockColumn === proFormaColumn) {
-            return `=${column}${waterfallRows.pre_rcf_debt_cash_flow}+` +
-              `${adjustmentColumn}${waterfallRows.pre_rcf_debt_cash_flow}`;
-          }
-          const expressions = mandatoryRepaymentExpressions[index];
-          if (expressions.length === 0) return "=0";
-          return expressions.length === 1
-            ? `=${expressions[0]}`
-            : `=SUM(${expressions.join(",")})`;
-        })(),
+        `=${blockColumn}${mandatoryDebtRow}`,
       );
       applyFormula(
         sheet,
@@ -5867,11 +5985,7 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${group.interest_subtotal_row}`,
-        cells.length === 0
-          ? "=0"
-          : cells.length === 1
-            ? `=SUM(${cells[0]}:${cells[0]})`
-            : `=SUM(${cells.join(",")})`,
+        sumCellFormula(cells),
       );
     }
   }
@@ -5893,6 +6007,7 @@ function configureOperatingModel(
     interest_income_schedule: "Interest income",
     net_interest_expense: "Net P&L interest",
     cash_interest_paid: "Cash interest paid",
+    cash_interest_received: "Cash interest received",
   };
   for (const [id, row] of Object.entries(interestRows)) {
     setValue(sheet, `B${row}`, interestLabels[id]);
@@ -5910,6 +6025,16 @@ function configureOperatingModel(
     if (rank) totalRanks.set(row, rank);
     setPeriodNumberFormat(sheet, row, AMOUNT);
     applyFormula(sheet, `R${row}`, `=I${row}`);
+  }
+  for (const id of [
+    "rcf_interest",
+    "rcf_commitment_fee",
+    "interest_reported_total",
+    "interest_identified_total",
+  ]) {
+    if (Number.isInteger(interestRows[id])) {
+      setLabelIndent(sheet, rowPlan, interestRows[id], 1);
+    }
   }
   collectHeadlines(RANK_SECTION.INTEREST_SCHEDULE, interestRows);
   // "Total RCF fees" sums its two grouped constituents in EVERY column block.
@@ -6120,35 +6245,35 @@ function configureOperatingModel(
       "Historical interest reconciliation requires a semantic interest_expense statement row.",
     );
   }
-  // The filed P&L is the one historical authority.  The case's identified-
-  // interest series sizes the named instrument component, but the schedule's
-  // reported total links to the visible finance-expense row rather than
-  // restating a second hardcoded total.  Any interest or non-interest finance
-  // item not separately identified therefore lands transparently in the
-  // formula-derived residual and the schedule always reconciles to the face.
+  // The interest schedule is the single workbook location at which filed
+  // finance values are entered.  The statement links DOWN to it in history and
+  // forecast alike.  That preserves the filed statement as source authority
+  // without creating two hardcodes or letting the schedule depend on one of
+  // its consumers.
   const filedFinanceExpenseValues = rowValues(
     modelCase,
     filedFinanceExpenseDefinition,
   );
   for (const [index, column] of HISTORICAL_COLUMNS.entries()) {
     const filedValue = filedFinanceExpenseValues[index];
-    if (filedValue !== null && Number.isFinite(Number(filedValue))) {
-      applyFormula(
+    setValue(
+      sheet,
+      `${column}${interestRows.interest_reported_total}`,
+      filedValue !== null && Number.isFinite(Number(filedValue))
+        ? Number(filedValue)
+        : -Math.abs(Number(historicalReportedInterest[index] ?? 0)),
+    );
+    styleInput(sheet, `${column}${interestRows.interest_reported_total}`);
+    const provenance = (modelCase.provenance?.[
+      filedFinanceExpenseDefinition.row_id
+    ] ?? []).find((entry) => Number(entry.period_index) === index);
+    if (provenance) {
+      addCommentOnce(
+        workbook,
         sheet,
         `${column}${interestRows.interest_reported_total}`,
-        `=${column}${filedFinanceExpenseRow}`,
+        provenanceComment(provenance),
       );
-    } else {
-      // A compact case may omit the face-statement hardcode and let the
-      // schedule populate that semantic row. In that one direction the
-      // separately sourced reconciliation total is the authority; linking
-      // back to the statement would create a circular reference.
-      setValue(
-        sheet,
-        `${column}${interestRows.interest_reported_total}`,
-        -Math.abs(Number(historicalReportedInterest[index] ?? 0)),
-      );
-      styleInput(sheet, `${column}${interestRows.interest_reported_total}`);
     }
   }
   // Everything the schedule can name, in the sign convention of the schedule.
@@ -6196,8 +6321,16 @@ function configureOperatingModel(
     sheet,
     `G${interestRows.non_cash_interest}:I${interestRows.non_cash_interest}`,
   );
-  const historicalInterestIncome =
-    modelCase.historical_supplement?.interest_income ?? [0, 0, 0];
+  const filedInterestIncomeDefinition = statementByRole.get("interest_income");
+  const filedInterestIncomeValues = filedInterestIncomeDefinition
+    ? rowValues(modelCase, filedInterestIncomeDefinition)
+    : [];
+  const historicalInterestIncome = HISTORICAL_COLUMNS.map((_, index) => {
+    const filed = filedInterestIncomeValues[index];
+    return filed !== null && Number.isFinite(Number(filed))
+      ? Number(filed)
+      : Number(modelCase.historical_supplement?.interest_income?.[index] ?? 0);
+  });
   setRow(
     sheet,
     `G${interestRows.interest_income_schedule}:I${interestRows.interest_income_schedule}`,
@@ -6207,6 +6340,21 @@ function configureOperatingModel(
     sheet,
     `G${interestRows.interest_income_schedule}:I${interestRows.interest_income_schedule}`,
   );
+  if (filedInterestIncomeDefinition) {
+    for (const [index, column] of HISTORICAL_COLUMNS.entries()) {
+      const provenance = (modelCase.provenance?.[
+        filedInterestIncomeDefinition.row_id
+      ] ?? []).find((entry) => Number(entry.period_index) === index);
+      if (provenance) {
+        addCommentOnce(
+          workbook,
+          sheet,
+          `${column}${interestRows.interest_income_schedule}`,
+          provenanceComment(provenance),
+        );
+      }
+    }
+  }
   setRow(
     sheet,
     `G${interestRows.lease_interest}:I${interestRows.lease_interest}`,
@@ -6216,7 +6364,17 @@ function configureOperatingModel(
     sheet,
     `G${interestRows.lease_interest}:I${interestRows.lease_interest}`,
   );
-  for (const column of HISTORICAL_COLUMNS) {
+  const filedCashInterestPaidDefinition =
+    statementByRole.get("cash_interest_paid");
+  const filedCashInterestReceivedDefinition =
+    statementByRole.get("cash_interest_received");
+  const filedCashInterestPaidValues = filedCashInterestPaidDefinition
+    ? rowValues(modelCase, filedCashInterestPaidDefinition)
+    : [];
+  const filedCashInterestReceivedValues = filedCashInterestReceivedDefinition
+    ? rowValues(modelCase, filedCashInterestReceivedDefinition)
+    : [];
+  for (const [index, column] of HISTORICAL_COLUMNS.entries()) {
     applyFormula(
       sheet,
       `${column}${interestRows.gross_interest_expense}`,
@@ -6227,11 +6385,58 @@ function configureOperatingModel(
       `${column}${interestRows.net_interest_expense}`,
       `=${column}${interestRows.gross_interest_expense}+${column}${interestRows.interest_income_schedule}`,
     );
-    applyFormula(
-      sheet,
-      `${column}${interestRows.cash_interest_paid}`,
-      `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.non_cash_interest}`,
-    );
+    const filedPaid = filedCashInterestPaidValues[index];
+    if (filedPaid !== null && Number.isFinite(Number(filedPaid))) {
+      setValue(
+        sheet,
+        `${column}${interestRows.cash_interest_paid}`,
+        Number(filedPaid),
+      );
+      styleInput(sheet, `${column}${interestRows.cash_interest_paid}`);
+      const provenance = (modelCase.provenance?.[
+        filedCashInterestPaidDefinition.row_id
+      ] ?? []).find((entry) => Number(entry.period_index) === index);
+      if (provenance) {
+        addCommentOnce(
+          workbook,
+          sheet,
+          `${column}${interestRows.cash_interest_paid}`,
+          provenanceComment(provenance),
+        );
+      }
+    } else {
+      applyFormula(
+        sheet,
+        `${column}${interestRows.cash_interest_paid}`,
+        `=${column}${interestRows.gross_interest_expense}-${column}${interestRows.non_cash_interest}`,
+      );
+    }
+    const filedReceived = filedCashInterestReceivedValues[index];
+    if (filedReceived !== null && Number.isFinite(Number(filedReceived))) {
+      setValue(
+        sheet,
+        `${column}${interestRows.cash_interest_received}`,
+        Number(filedReceived),
+      );
+      styleInput(sheet, `${column}${interestRows.cash_interest_received}`);
+      const provenance = (modelCase.provenance?.[
+        filedCashInterestReceivedDefinition.row_id
+      ] ?? []).find((entry) => Number(entry.period_index) === index);
+      if (provenance) {
+        addCommentOnce(
+          workbook,
+          sheet,
+          `${column}${interestRows.cash_interest_received}`,
+          provenanceComment(provenance),
+        );
+      }
+    } else {
+      applyFormula(
+        sheet,
+        `${column}${interestRows.cash_interest_received}`,
+        `=${column}${interestRows.interest_income_schedule}`,
+      );
+    }
   }
   const leaseInterestBalanceRow =
     leaseInterestBasis === "separately_supplied"
@@ -6272,9 +6477,7 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${interestRows.instrument_interest}`,
-      nonRcfInterestCells.length
-        ? `=SUM(${nonRcfInterestCells.join(",")})`
-        : "=0",
+      sumCellFormula(nonRcfInterestCells),
     );
     applyFormula(sheet, `${column}${interestRows.acquisition_interest}`, "=0");
     const priorRcf =
@@ -6420,6 +6623,11 @@ function configureOperatingModel(
           .map((cell) => `-${cell}`)
           .join(""),
     );
+    applyFormula(
+      sheet,
+      `${column}${interestRows.cash_interest_received}`,
+      `=${column}${interestRows.interest_income_schedule}`,
+    );
 
     // Acquisition debt is a fixed drawing at a stated rate. Both its balance
     // and its coupon are written in the ADJUSTMENT block below, and pro forma
@@ -6465,9 +6673,7 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${proFormaColumn}${interestRows.instrument_interest}`,
-      proFormaInstrumentInterestCells.length
-        ? `=SUM(${proFormaInstrumentInterestCells.join(",")})`
-        : "=0",
+      sumCellFormula(proFormaInstrumentInterestCells),
     );
     const proFormaPriorLease =
       index === 0
@@ -6544,6 +6750,11 @@ function configureOperatingModel(
           .map((cell) => `-${cell}`)
           .join(""),
     );
+    applyFormula(
+      sheet,
+      `${proFormaColumn}${interestRows.cash_interest_received}`,
+      `=${proFormaColumn}${interestRows.interest_income_schedule}`,
+    );
     // THE ADJUSTMENT INTEREST SCHEDULE, WRITTEN OUT.
     //
     // Every line below is the schedule's own arithmetic applied to the
@@ -6570,9 +6781,7 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${adjustmentColumn}${interestRows.instrument_interest}`,
-      adjustmentInstrumentInterestCells.length
-        ? `=SUM(${adjustmentInstrumentInterestCells.join(",")})`
-        : "=0",
+      sumCellFormula(adjustmentInstrumentInterestCells),
     );
     // The acquisition tranche's own coupon, off the acquisition debt row in the
     // adjustment column directly beside it.
@@ -6702,6 +6911,11 @@ function configureOperatingModel(
         nonCashInstrumentCellsFor(adjustmentColumn)
           .map((cell) => `-${cell}`)
           .join(""),
+    );
+    applyFormula(
+      sheet,
+      `${adjustmentColumn}${interestRows.cash_interest_received}`,
+      `=${adjustmentColumn}${interestRows.interest_income_schedule}`,
     );
   }
 
@@ -8220,6 +8434,36 @@ async function patchNumericFormulaCaches(xlsxPath, valuesByAddress) {
 }
 
 function forecastInput(modelCase, definition, forecastIndex) {
+  // Callers use an empty definition only for an optional semantic channel that
+  // does not exist in the compiled statement.  No workbook row is being
+  // forecast in that state, so zero is the neutral internal contribution — it
+  // is not the forbidden fallback that writes `=0` into an unresolved row.
+  if (
+    !definition?.row_id &&
+    !definition?.semantic_role &&
+    !definition?.broker_metric_id
+  ) {
+    return 0;
+  }
+  const authority = resolveForecastAuthority(
+    modelCase,
+    definition,
+    forecastIndex,
+  );
+  if (authority.mechanism === "block") {
+    throw new Error(
+      `Unresolved forecast authority for ${definition.row_id} in forecast period ${forecastIndex + 1}: ${authority.reason ?? authority.method}.`,
+    );
+  }
+  if (authority.mechanism === "uncalculated" || authority.mechanism === "zero") {
+    return 0;
+  }
+  if (authority.mechanism === "broker" && authority.broker_value !== null) {
+    return Number(authority.broker_value);
+  }
+  if (authority.mechanism === "hardcode" && authority.value !== null) {
+    return Number(authority.value);
+  }
   const metric = definition.broker_metric_id
     ? modelCase.broker_pack.metrics?.[definition.broker_metric_id]
     : null;
@@ -8237,7 +8481,12 @@ function forecastInput(modelCase, definition, forecastIndex) {
   if (value === null || value === undefined) {
     value = rowValues(modelCase, definition)[forecastIndex + 3];
   }
-  return value === null || value === undefined ? 0 : Number(value);
+  if (value === null || value === undefined) {
+    throw new Error(
+      `Forecast authority ${authority.method} for ${definition.row_id} did not resolve a value in forecast period ${forecastIndex + 1}.`,
+    );
+  }
+  return Number(value);
 }
 
 function genericNumericValue(
@@ -8918,6 +9167,7 @@ function solverFormulaCaches(
           Number(result.non_rcf_repayment ?? 0) +
           Number(result.rcf_draw ?? 0) -
           Number(result.rcf_repayment ?? 0),
+        mandatory_debt_repayments: -Number(result.non_rcf_repayment ?? 0),
         // The two denominators are cached alongside the ratios that consume
         // them. Without this the visible EBITDA / net interest rows would cache
         // as zero next to a non-zero multiple — precisely the unreconciled
@@ -9056,6 +9306,7 @@ function solverFormulaCaches(
           result.non_cash_interest -
           result.non_cash_instrument_interest
         ),
+      cash_interest_received: result.interest_income,
     });
     const standaloneInterestValues = interestValues(standalone);
     const proFormaInterestValues = interestValues(proForma);

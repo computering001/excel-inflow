@@ -44,16 +44,70 @@ Do not proceed past the coverage gate until a material gap is resolved or
 documented within the residual-debt threshold, with the residual on the face of
 the model.
 
-## Forecast hierarchy
+## Forecast authority waterfall
 
-Apply metric by metric:
+Forecast authority is selected **per semantic row and per forecast period**.
+FY1, FY2 and FY3 may use different paths.  Do not treat `brokers`, `linking`,
+`zero` and `grey` as interchangeable forecast methods: first establish the
+row's role, then select evidence for any independent forecast input.
 
-1. supplied exact metric and period;
-2. compatible supplied metric;
-3. visible company-specific assumption supported by recent history;
-4. user clarification for a material unresolved item.
+### Gate the row role first
 
-Do not prefer an aggregate broker number over a more compatible supplied metric. Do not manufacture consensus from illustrative values. Distinguish supplied values, user inputs and inferred assumptions.
+1. A subtotal or accounting identity is formula-derived from visible rows.
+2. A schedule-owned line links from its sole authority: interest, debt, lease,
+   RCF, acquisition and cash mechanics are never independently forecast on a
+   statement consumer.
+3. Detail that is deliberately not forecast separately is blank and grey while
+   its parent remains forecast.  This is not a zero.
+4. A genuinely non-applicable row is blank and grey.
+5. Only an independent forecast input enters the evidence ladder below.
+
+### Independent-input evidence ladder
+
+Apply in this order, subject to exact metric, scope and period compatibility:
+
+1. reported-to-date actual plus a separately selected forecast remainder;
+2. contractual or committed amount and timing;
+3. formal company guidance;
+4. a clear numeric company indication that is not formally labelled guidance;
+5. compatible broker consensus or the selected broker case;
+6. an explicit user assumption;
+7. a visible company-specific driver or roll-forward;
+8. historical seasonality or run-rate;
+9. recent historical average;
+10. trend or CAGR;
+11. carry-forward of the last supported level;
+12. explicit zero, but only with an economic no-recurrence or inapplicability
+    rationale; and
+13. unresolved.
+
+`Unresolved` never becomes a silent zero.  A material unresolved row triggers
+one targeted question or blocks.  An immaterial detail row may be marked not
+separately forecast only when a forecast parent already captures the amount.
+
+For a partial period:
+
+```text
+full-year forecast = reported YTD / H1 / Q3 amount + forecast remainder
+```
+
+Select the remainder from: committed amounts; remaining company guidance;
+full-year broker forecast less reported-to-date actual; broker quarterly
+estimates; historical seasonality; straight-line run-rate where economically
+sensible; or an explicit user assumption.  Never add a full-year broker number
+on top of reported-to-date actuals.
+
+Every selected authority records method, source kind, period, source/as-of
+information where applicable, confidence, any range-selection policy and the
+reason for zero or non-forecast treatment.  `forecast_authority_contract_version:
+waterfall_v1` carries these decisions as `forecast_period_authorities` on the
+semantic row.  Deterministic code compiles that declaration into exactly one of
+formula, cross-sheet broker link, visible hardcode, formula-driven zero,
+intentional blank or fail-closed unresolved.
+
+Do not prefer an aggregate broker number over a more compatible supplied metric.
+Do not manufacture consensus from illustrative values. Distinguish supplied
+values, user inputs and inferred assumptions.
 
 ## Minimum operating forecast
 

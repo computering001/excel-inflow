@@ -1,6 +1,6 @@
 ---
 name: excel-inflow
-description: Build, populate, repair, review, and validate a formula-driven corporate debt-overlay model in Excel with exactly three historical and three forecast years, company-specific operating and cash-flow rows, instrument-level debt, RCF liquidity, interest, leverage, leases, and an optional lightweight acquisition pro forma.
+description: Build, populate, repair, review, and validate a formula-driven corporate debt-overlay model in Excel with exactly three historical and three forecast years, company-specific operating and cash-flow rows, instrument-level debt, RCF liquidity, interest, leverage, leases, and an optional lightweight acquisition pro forma. Use whenever the user says run excel inflow, asks to build or update a debt model, or supplies a debt export or broker pack.
 ---
 
 # Excel Inflow
@@ -20,6 +20,15 @@ Run one deterministic graph:
 `normalise evidence -> classify issuer rows -> compile semantic graph -> coverage gate -> solve economics -> compile row plan -> emit -> recalculate -> terminal patch -> verify -> render -> deliver`
 
 The semantic graph is canonical; physical row numbers are compiled output. Preserve the issuer label, attach a semantic role and evidence class, and route unmatched material rows to one targeted question or a fail-closed stop. Never solve from workbook coordinates or add a cell-specific exception.
+
+The semantic graph also carries one resolved forecast authority for each row
+and forecast period.  Formula identities and schedule-owned rows resolve before
+the independent-input evidence waterfall.  A first forecast year may be
+reported-to-date actual plus a forecast remainder while later years use broker,
+guidance or visible driver paths.  The compiler must distinguish a formula, a
+cross-sheet broker link, a visible hardcode, a formula-driven zero and an
+intentional grey blank.  An unresolved material forecast path blocks; it never
+falls through to `=0`.
 
 The portable controller owns the stage order and module registry. Each module declares inputs, outputs, invariants and allowed remedies. A stage may not silently skip, widen a tolerance, change a validator or infer a material missing term. Convergence must be declared before solving; non-convergence is a failure.
 
@@ -41,6 +50,22 @@ Use exactly three historical periods and three forecast periods. Do not add rati
 The model is flexible in semantic rows and instrument count, not in presentation grammar. It may handle IFRS or US GAAP labels, net cash or levered issuers, fixed or floating debt, multi-currency instruments, predecessor combinations, calendarisation, restatements, large cash-flow statements, unusual working-capital splits, unusual debt cash-flow splits and RCF capacity stress.
 
 ## User flow and evidence
+### Ordinary chat invocation
+
+On the exact bare request `run excel inflow`, and on any equivalent request to
+start a new model, invoke the canonical production controller before asking a
+question:
+
+```text
+node scripts/run_user_flow.mjs --screen inputs
+```
+
+Return that command's Stage 1 ASCII stdout verbatim as the first visible
+response. Do not replace it with a conversational company/ticker question or a
+Markdown summary. This rule still applies when the user already names the
+company or supplies attachments; consume those inputs only after displaying
+the canonical Stage 1 screen.
+
 Begin with one compact request for the company name, the FactSet debt export
 taken at the last fiscal year end, and broker research from 3–10 houses. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year

@@ -544,6 +544,7 @@ export function renderDeliveryReport(report, { status = "complete" } = {}) {
   };
   section("TIES TO THE FILINGS", report.ties);
   section("BROKER SUBSTITUTIONS", report.broker_substitutions ?? []);
+  section("FORECAST AUTHORITY", report.forecast_authority_summary ?? []);
   section("TYPED, NOT DERIVED", report.typed);
   section("ASSUMED", report.assumed);
   section("PLAUSIBLE, NOT CONFIRMED", report.plausible_only);

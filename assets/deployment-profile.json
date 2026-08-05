@@ -75,8 +75,9 @@
   "lib/flow_read.mjs",
   "lib/flow_reconcile.mjs",
   "lib/flow_runtime.mjs",
-  "lib/flow_screens.mjs",
-  "lib/historical_normalisation.mjs",
+    "lib/flow_screens.mjs",
+    "lib/forecast_authority.mjs",
+    "lib/historical_normalisation.mjs",
   "lib/user_flow_controller.mjs",
   "lib/intake.mjs",
   "lib/instrument_display.mjs",
@@ -493,8 +494,11 @@
  "_removed_strip_rules": {
   "local-plan-extractor-name": "Removed on 2026-07-27, not weakened. It rewrote the single sentence naming `extract_plan.mjs`; that sentence now sits inside the block two-build-paths-subsection removes wholesale, so the rule would match zero times and fail its own exactly_one declaration. The invariant it protected — no bare `extract_plan.mjs` surviving into the compiled instructions — is asserted independently, and more strongly, by the dangling-script-reference check, which resolves bare filenames against the shipped basenames and fails the build on any that do not resolve. Restore this rule if the extractor is ever named outside that block."
  },
- "instruction_required_phrases": [
-  "three historical and three forecast years",
+  "instruction_required_phrases": [
+    "run excel inflow",
+    "node scripts/run_user_flow.mjs --screen inputs",
+    "Do not replace it with a conversational company/ticker question",
+    "three historical and three forecast years",
   "RCF is the only balancing liquidity source",
   "interest income",
   "Flat replacement",

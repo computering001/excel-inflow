@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { compiledCashFlowRoles, normaliseStatementRows } from "./row_plan.mjs";
 import { classifyStatementLine, isHighImpactRole } from "./statement_classifier.mjs";
+import { validateForecastAuthorities } from "./forecast_authority.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -760,6 +761,29 @@ function historicalProvenanceChecks(modelCase) {
     });
   }
   return checks;
+}
+
+function forecastAuthorityChecks(modelCase) {
+  const rows = allStatementRows(modelCase);
+  const errors = validateForecastAuthorities(modelCase, rows);
+  if (errors.length > 0) {
+    return errors.map((message, index) =>
+      result(
+        `forecast_authority.${index + 1}`,
+        "BLOCK",
+        message,
+      ),
+    );
+  }
+  return [
+    result(
+      "forecast_authority.period_waterfall",
+      "PASS",
+      modelCase.forecast_authority_contract_version === "waterfall_v1"
+        ? "Every independent forecast input resolves through the per-row, per-period waterfall; formula, schedule, zero and intentionally uncalculated states remain distinct."
+        : "The legacy forecast declarations resolve without an unresolved path; waterfall-v1 strict hardcode provenance is not asserted for this archived case.",
+    ),
+  ];
 }
 
 function cashBucketStatementChecks(modelCase) {
@@ -1633,6 +1657,7 @@ export function assessCoverage(modelCase) {
   checks.push(...dependencyChecks(modelCase));
   checks.push(...statementHierarchyChecks(modelCase));
   checks.push(...historicalProvenanceChecks(modelCase));
+  checks.push(...forecastAuthorityChecks(modelCase));
   checks.push(...cashBucketStatementChecks(modelCase));
   checks.push(...instrumentChecks(modelCase));
   checks.push(...fxCoverageChecks(modelCase));

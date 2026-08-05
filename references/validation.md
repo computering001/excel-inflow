@@ -250,11 +250,13 @@ agreement carries the information the old arrangement only appeared to.
 validate_style_tokens.mjs <workbook.xlsx> [--json out.json]
 ```
 
-Fifteen checks, including `border-definitions-present`, `double-rule-present`,
+Sixteen checks, including `border-definitions-present`, `double-rule-present`,
 `column-block-left-edges`, `breaking-gutter-columns-white-and-unbordered`,
 `carry-through-gutters-carry-the-formatting`, `answer-fill-reaches-the-file`,
 `no-input-fill-is-declared`, `answer-fill-lands-on-answer-rows-only`,
 `fill-palette-is-closed`, `bold-appears-only-on-declared-headline-rows`,
+`declared-total-rows-are-bold`,
+`ordinary-detail-rows-have-no-horizontal-rules`,
 `net-debt-panels-terminate-identically`, `answer-rank-is-earned-not-asserted`,
 `conditional-format-sets-no-font-colour-on-body-cells`,
 `conditional-state-rules-present`.
@@ -269,9 +271,11 @@ is evidence.
 
 **Cannot see:**
 
-- **Four of the fifteen checks auto-pass when the `.row-map.json` sidecar is
+- **Six of the sixteen checks auto-pass when the `.row-map.json` sidecar is
   missing**, and they are reported as `pass` with a "Not asserted" message:
   `bold-appears-only-on-declared-headline-rows`,
+  `declared-total-rows-are-bold`,
+  `ordinary-detail-rows-have-no-horizontal-rules`,
   `net-debt-panels-terminate-identically`, `answer-rank-is-earned-not-asserted`
   and `answer-fill-lands-on-answer-rows-only`. A sidecar-less run reports PASS on
   four checks it never ran. **Always run it beside the row map.**
@@ -681,6 +685,15 @@ Confirm:
 - mapped operating lines tie to supplied totals;
 - revenue, EBIT, EBITDA, tax, net income and cash-flow subtotals calculate;
 - forecasts reference the selected case or visible assumptions;
+- each semantic row carries one resolved authority for each forecast period,
+  and the solver, semantic manifest and workbook mechanism agree on it;
+- partial-period forecasts equal reported-to-date actual plus the declared
+  remainder without double-counting a full-year broker value;
+- guidance ranges preserve low, high, selected value and selection policy;
+- formula, schedule link, broker link, hardcode, explicit zero, intentionally
+  uncalculated and unresolved states remain mutually distinct;
+- an explicit zero carries a no-recurrence or inapplicability rationale, while
+  a material unresolved path blocks instead of emitting `=0`;
 - **historic figures come from the filings, never from a broker.** Brokers are
   authoritative for the forecast anchor only;
 - capex and aggregate working capital flow into cash with correct signs;
@@ -829,8 +842,8 @@ Check:
 - labels and values are not clipped and nothing overlaps;
 - actual and forecast periods are distinct;
 - input, formula and link colours match the contract;
-- fill marks rank and nothing else; bold marks the declared headline set and
-  nothing else; rules mark arithmetic closure and nothing else;
+- fill marks rank and nothing else; bold marks semantic totals/subtotals plus
+  the declared headline set; rules mark arithmetic closure and nothing else;
 - no conditional rule has set a font colour on a body cell;
 - totals and section hierarchy are consistent;
 - formulas are traceable;

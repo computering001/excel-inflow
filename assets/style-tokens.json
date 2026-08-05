@@ -259,11 +259,12 @@
     ],
     "component_sum": {
       "meaning": "closes a run of like items",
-      "treatment": "thin top rule over the number cells, NO FILL, NOT BOLD",
+      "treatment": "thin top rule over the number cells, NO FILL, BOLD",
       "row_ids": [
         "total_acquisition_debt",
         "total_lease_liabilities",
-        "rcf_total_fees"
+        "rcf_total_fees",
+        "instrument_interest"
       ],
       "structural": [
         "every debt-group subtotal (Total Bonds / Bank Debt / Other Debt)",
@@ -272,7 +273,7 @@
     },
     "block_subtotal": {
       "meaning": "closes a block of the model",
-      "treatment": "thin top rule, subsection_fill, NOT BOLD unless also a headline",
+      "treatment": "thin top rule, subsection_fill, BOLD",
       "row_ids": [
         "gross_profit",
         "operating_profit",
@@ -284,14 +285,19 @@
         "net_change_in_cash",
         "gross_debt_excluding_leases",
         "gross_debt_including_leases",
+        "reported_cash",
+        "mandatory_debt_repayments",
+        "total_change_in_debt",
         "gross_interest_expense",
-        "cash_before_rcf"
+        "cash_interest_paid",
+        "cash_before_rcf",
+        "cash_surplus_deficit"
       ],
       "default_for_unlisted_totals": true
     },
     "answer": {
       "meaning": "the figure the reader came for, IN THIS SECTION",
-      "treatment": "thin top rule, DOUBLE bottom rule, answer_fill (bold arrives from `headline`)",
+      "treatment": "thin top rule, DOUBLE bottom rule, answer_fill, BOLD",
       "_row_ids_comment": [
         "The flat union across sections, which is what a validator reading the",
         "emitted file can check a fill against. `by_section` is the authority; this",
@@ -338,14 +344,15 @@
   },
   "headline": {
     "_comment": [
-      "NARRATIVE PROMINENCE — THE BOLD CHANNEL, AND NOTHING ELSE IN IT.",
-      "Bold and the rank rules used to track the same fact: both were applied to",
-      "every row that summed something. Anything that added up therefore looked",
-      "important, and when everything is emphasised nothing is — which is why a",
-      "reader could not say why `Change in working capital` was shouting at them.",
-      "One job per channel now:",
+      "SEMANTIC TOTALS AND SUBTOTALS ARE BOLD, UNIVERSALLY.",
+      "The trigger is the compiled rank, never a company name, label spelling or",
+      "physical row. This makes Revenue, Gross Profit, Operating Profit, PBT and",
+      "unfamiliar issuer-specific totals consistent without overfitting.",
+      "The ladders below add rare narrative prominence to a row that is not",
+      "otherwise a semantic total; they no longer restrict which totals are bold.",
+      "One job per channel:",
       "  rules (single / double / box)  arithmetic closure — where a sum ends",
-      "  bold                           narrative prominence — this list only",
+      "  bold                           semantic totals plus declared headlines",
       "  fill                           rank hierarchy (total_ranks)",
       "  font colour                    provenance — never touched by any of this",
       "Each entry is a LADDER, not a row id: the FIRST id present in the compiled",

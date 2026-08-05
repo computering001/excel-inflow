@@ -5,13 +5,13 @@
   "skillVersion": "2.0.6",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-05T17:48:35.426Z",
-  "centralInstructionsWords": 3261,
+  "generatedAt": "2026-08-05T21:53:27.934Z",
+  "centralInstructionsWords": 3430,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "88e39f2da340d6a4c41ff916fa3c6f42c94d12a5c8856aa76d2167e163a8b5b6",
-    "closureFileCount": 93,
+    "currentClosureSha256": "fc0c21506ab334fa5b46d533f5f535b4b570493a4557bd810b319d93d6b95985",
+    "closureFileCount": 94,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -53,6 +53,7 @@
       "scripts/lib/flow_reconcile.mjs",
       "scripts/lib/flow_runtime.mjs",
       "scripts/lib/flow_screens.mjs",
+      "scripts/lib/forecast_authority.mjs",
       "scripts/lib/historical_normalisation.mjs",
       "scripts/lib/instrument_display.mjs",
       "scripts/lib/intake.mjs",
@@ -110,6 +111,7 @@
       "scripts/build_dynamic_model.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/coverage.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/design_contract.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_display.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/json_schema.mjs",
@@ -133,6 +135,7 @@
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/coverage.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/acquisition_policy.mjs",
@@ -162,10 +165,12 @@
       "scripts/lib/flow_questions.mjs -> scripts/lib/solver.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/lib/flow_read.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/solver.mjs",
       "scripts/lib/flow_reconcile.mjs -> scripts/lib/flow_screens.mjs",
       "scripts/lib/flow_runtime.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/flow_screens.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/lib/forecast_authority.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/coverage.mjs",
@@ -193,9 +198,12 @@
       "scripts/lib/row_plan.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/rcf_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/semantic_graph.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/run_carrier.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/lib/semantic_graph.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/validation_invariants.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/lease_policy.mjs",
@@ -610,7 +618,7 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 7,
+    "codeFences": 8,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 13,
     "scriptReferencesScanned": 20,
@@ -764,18 +772,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "daae78fa017b3afd3cee240ebeaefb430aca7263684d3055fb32dd17577d2c0e",
-        "plan_sha256": "712ca92f4e13fc39742326f42192be9c98029184141398509f5e79e4bee5b847",
-        "workbook_sha256": "6a655d079a9183c3b04f911c2a5d0fd6b6010fe36818c31dd46f153a9aa093fa",
+        "case_sha256": "e99fb3a5d5c1afe0da0d7453f00a8c3d04a4e5ed09032b52a5e0c4b45806866d",
+        "plan_sha256": "eed950b8fa09beb3aa40e288a5bf7e7976344fcc23ad9c91816fd05f4c3ea481",
+        "workbook_sha256": "8b9ecbd5c152c0536cb0486535737d45f39cfda8a3b4a3c031ca04aadb3d86e4",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "daae78fa017b3afd3cee240ebeaefb430aca7263684d3055fb32dd17577d2c0e",
-      "plan_sha256": "712ca92f4e13fc39742326f42192be9c98029184141398509f5e79e4bee5b847",
-      "workbook_sha256": "6a655d079a9183c3b04f911c2a5d0fd6b6010fe36818c31dd46f153a9aa093fa",
+      "case_sha256": "e99fb3a5d5c1afe0da0d7453f00a8c3d04a4e5ed09032b52a5e0c4b45806866d",
+      "plan_sha256": "eed950b8fa09beb3aa40e288a5bf7e7976344fcc23ad9c91816fd05f4c3ea481",
+      "workbook_sha256": "8b9ecbd5c152c0536cb0486535737d45f39cfda8a3b4a3c031ca04aadb3d86e4",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -805,21 +813,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "46cdd66298b0cc9d802671cc67445bb8eddac931868c314b01a8bd707fc836ab",
-      "bytes": 24396,
-      "words": 3261
+      "sha256": "d26ffc431088c619dc9f6e9c62f3bc7c32afd7fe8ca5ed85cd382cd5f23dfdd2",
+      "bytes": 25551,
+      "words": 3430
     },
     {
       "path": "SKILL.md",
-      "sha256": "7774d19e8ea3ccbe03e21aa1d2ffe637abb962e49d240be7072bf28496eb924b",
-      "bytes": 24758,
-      "words": 3306
+      "sha256": "f3ba7d2ed218d81a204a5f55396584fa1f7aff1a7a7eb1784fb532fbe66d0016",
+      "bytes": 26038,
+      "words": 3499
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "0b8fe0ef5cbb78dfab056c33517f1732385875fe769c23f17cb6423de1b8fec7",
-      "bytes": 24416,
-      "words": 3263
+      "sha256": "6eee5272963eff429645455f975ec4b57d95783da10df2ee388794988fea95a5",
+      "bytes": 25571,
+      "words": 3432
     },
     {
       "path": "references/model-contract.md",
@@ -835,9 +843,9 @@
     },
     {
       "path": "references/forecast-and-input-policy.md",
-      "sha256": "69635fd2619a40feb7910d63bded289c9dc6ebff905f4873b538899fbd474721",
-      "bytes": 8662,
-      "words": 1343
+      "sha256": "9758f660c6ea4525b9d3c8eb47c0238bfc3ef4c23d428967935fb58f6e0ef66e",
+      "bytes": 11229,
+      "words": 1698
     },
     {
       "path": "references/acquisition.md",
@@ -853,15 +861,15 @@
     },
     {
       "path": "references/template-and-formatting.md",
-      "sha256": "927d654aac55a2cb7943fd032e98e3fa8d96bd025c3b8699d67c1239bfa32639",
-      "bytes": 25995,
-      "words": 4251
+      "sha256": "a8f0f280f0b11fb15fd8370ef79dc45866a82ea691b1b9d5fff09834b35446e2",
+      "bytes": 26331,
+      "words": 4294
     },
     {
       "path": "references/validation.md",
-      "sha256": "7aee90371363c9b25dbf6b31af115485292dd10126bd308d1262f1237f98bf5f",
-      "bytes": 46237,
-      "words": 6668
+      "sha256": "e2486464625481e4fa70516fe444d211ef00d3be1611940c1da8eaf25f1eb2df",
+      "bytes": 47059,
+      "words": 6759
     },
     {
       "path": "assets/broker-pack.schema.json",
@@ -877,8 +885,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "af804370a3397fd728fc480b55a4b6a00ede07939b2e2d341bc4f7e0dbd6b422",
-      "bytes": 34949,
+      "sha256": "12368f697d86b04fb04cbab7aa96cd122f1b64ce02ac963e3d00ac6201310784",
+      "bytes": 35139,
       "words": null
     },
     {
@@ -895,8 +903,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "c7278636aa4c1e2825574db1ba84f1658c7d190aa81903babb38d316e63e94f3",
-      "bytes": 42706,
+      "sha256": "62996d4db60fa7675e814487d55c8dd082a37f37249a936d26855fff72d9662a",
+      "bytes": 46247,
       "words": null
     },
     {
@@ -943,20 +951,20 @@
     },
     {
       "path": "assets/statement-semantic-taxonomy.v1.json",
-      "sha256": "74424c98ce363084d51beed76623b47a92472b41a126241a19aeb7157810dc8e",
-      "bytes": 3786,
+      "sha256": "49ab6cee9fd2d179bac161b8a66fcca87839cde4fe24b7b7b64cbed888a79695",
+      "bytes": 4299,
       "words": null
     },
     {
       "path": "assets/style-tokens.json",
-      "sha256": "76dd1c7e88f91fab7af1e2fd49392aa17a84c7e87945cb611eadf1de05897153",
-      "bytes": 35068,
+      "sha256": "d49606cae398ba76777fff1045845ac876e9b4636f487af79d567622e1ba13a6",
+      "bytes": 35251,
       "words": null
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "5f810d5b86d6705e2d373baf93fe27a9f3af02a38a0b4a6c4175b913293cc9ae",
-      "bytes": 440874,
+      "sha256": "77eb49459988fc651871d976f24151b2a31e0dda93880e227c7cf3511d496f47",
+      "bytes": 449275,
       "words": null
     },
     {
@@ -1045,8 +1053,8 @@
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "4664415837984fbb198694ed665710594e7acd9a02a90d9edd0a0bb47228f85d",
-      "bytes": 59382,
+      "sha256": "060265a2bec6ee9d13740ac73f2c82844cb8a8ecc477bbf4f05964f23df07791",
+      "bytes": 60347,
       "words": null
     },
     {
@@ -1093,8 +1101,8 @@
     },
     {
       "path": "scripts/lib/flow_read.mjs",
-      "sha256": "b439a3caf326ba32fbcc92d3df01e9932c037c17b0c624e401838e26f39da6ca",
-      "bytes": 25035,
+      "sha256": "d460996649ae007c0832f606cefdd12d8be46e766dea56307d13b5adb2a6bce7",
+      "bytes": 27092,
       "words": null
     },
     {
@@ -1111,8 +1119,14 @@
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "d084ac7d12b15d89c05a134af079a705c7136caf2392d75372996bd307190455",
-      "bytes": 20477,
+      "sha256": "ed9a172257f52b81638d25cd425952fb4e8f09435266f6eacbdf19b1b8ee708e",
+      "bytes": 20551,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/forecast_authority.mjs",
+      "sha256": "5e0e472490d83e658ecd0661e5624f7b9fa9b673c7d5a570d10e59a3045f3789",
+      "bytes": 18872,
       "words": null
     },
     {
@@ -1195,8 +1209,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "24153136099050578e8efd6dc7eecb2ffbb662636cf87a7a4b85c81ee2521152",
-      "bytes": 90040,
+      "sha256": "30604565be3ee384ad1e38c8477d9c91e7014dc484a1b810453e9cdd8b441eed",
+      "bytes": 92646,
       "words": null
     },
     {
@@ -1219,14 +1233,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "6ed26ef3d9af9b3b9d8f2aef94b0470305b8e628926f8f29653b5baeda27f790",
-      "bytes": 37466,
+      "sha256": "3433f7bcd9a0b524ad1ef6589c8f18a14d507c0eddd8693317bcafafc371c7a9",
+      "bytes": 38880,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "ce2a3d58a95d2d30e21419df2e7e8a20b2370e8003ae9957c080c6c992ecfdde",
-      "bytes": 103594,
+      "sha256": "bbbd3a95e45843d00cb64c9dcb694ca8df54e77933a9d8c4764bb361ef88c0d5",
+      "bytes": 106352,
       "words": null
     },
     {
@@ -1243,8 +1257,8 @@
     },
     {
       "path": "scripts/lib/validation_invariants.mjs",
-      "sha256": "c47ec520c84c2c675e67c46249b8a8935691b16cbec55e8b7630eed801980d8f",
-      "bytes": 33411,
+      "sha256": "cd5d96a1d527f1be1bb21dcfe577132f4048958d23fbe7108928519c0b93ffd0",
+      "bytes": 37808,
       "words": null
     },
     {
@@ -1333,8 +1347,8 @@
     },
     {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "7a5a1d765253b4e5d64567b587a77bb45c148eeaddcc88f7c64116bcd4877f8e",
-      "bytes": 15427,
+      "sha256": "b8bf9ecea5cf03db5534d82438ecc4b012c8290df9fc3971adc991bc96eeaa67",
+      "bytes": 15519,
       "words": null
     },
     {
@@ -1369,8 +1383,8 @@
     },
     {
       "path": "scripts/validate_style_tokens.mjs",
-      "sha256": "3c59f3f0e39c007cd6f0d8ee8ae6f346e12992bb768ae124734dcf0e2a234953",
-      "bytes": 32029,
+      "sha256": "422e1562ec849a58e3cb88cb7e5cea39e1ba2daa6c8bbd668a727940c6137393",
+      "bytes": 35706,
       "words": null
     },
     {
@@ -1387,8 +1401,8 @@
     },
     {
       "path": "scripts/verify/invariants.py",
-      "sha256": "0a94c3f1c657406495cd3fb4124ea72d93d3085903d733188b91281fcc6d2eaf",
-      "bytes": 28861,
+      "sha256": "6291e006dc82cbfde484caa8a8b8435e046479b6b8ded312965f93ce32c907ec",
+      "bytes": 35520,
       "words": null
     },
     {

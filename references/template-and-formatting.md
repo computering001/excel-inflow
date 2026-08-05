@@ -32,12 +32,13 @@ job, and they are independent.
 | **font colour** | provenance | anything else, ever |
 | **fill** | the rank hierarchy | inputs, blocks, forecast shading |
 | **rules** (single, double, box) | arithmetic closure — where a sum ends | emphasis |
-| **bold** | narrative prominence — the declared headline set | "this row adds up" |
+| **bold** | every semantic total/subtotal, plus a small declared headline set | provenance or rank fill |
 
-Bold and the rank rules used to track the same fact: both were applied to every
-row that summed something. Anything that added up therefore looked important, and
-when everything is emphasised nothing is — which is why a reader could not say
-why `Change in working capital` was shouting at them.
+Bold follows the semantic total contract, not label spelling or row number.
+An unfamiliar issuer-specific total therefore receives the same weight as
+Revenue, Gross Profit, Operating Profit, PBT or Net Income. A numbered
+subsection parent such as Change in Working Capital is not a total and remains
+unbold unless the source statement itself declares it as one.
 
 ### Font colour is the provenance layer
 
@@ -113,9 +114,9 @@ net income below it in a lighter treatment.
 
 | rank | means | treatment |
 |---|---|---|
-| **component sum** | closes a run of like items | thin top rule over the number cells · **no fill** · not bold |
-| **block subtotal** | closes a block of the model | thin top rule · `#EFF5F9` · not bold unless also a headline |
-| **answer** | the figure the reader came for, **in this section** | thin top rule · **double bottom rule** · `#D9EAF7` |
+| **component sum** | closes a run of like items | thin top rule over the number cells · **no fill** · bold |
+| **block subtotal** | closes a block of the model | thin top rule · `#EFF5F9` · bold |
+| **answer** | the figure the reader came for, **in this section** | thin top rule · **double bottom rule** · `#D9EAF7` · bold |
 
 Block subtotal is the default for any total not otherwise classified — an
 unclassified total keeps a fill and can never silently lose its weight.
@@ -134,9 +135,13 @@ company-reported figure used to fall through to the block-subtotal default, so
 the formatting asserted that one basis is the real number and the other a
 footnote. They are two answers to the same question.
 
-### Bold — the headline set
+### Bold — totals plus the headline set
 
-Bold is declared per section as a **ladder**, not as a row-id list: the first id
+Every compiled semantic total or subtotal is bold. The decision is structural:
+`style_role: total`, `row_type: subtotal`, or a declared mechanical total. It is
+never inferred from a familiar label and never attached to a physical row.
+
+Additional headline prominence is declared per section as a **ladder**, not as a row-id list: the first id
 present in the compiled section wins and the rest are ignored. That is how the
 set adapts to what a company actually reports — a case stating `operating_profit`
 bolds that line, a case stating only `ebit` bolds that one, and neither is forced

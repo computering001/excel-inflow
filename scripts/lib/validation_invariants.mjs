@@ -390,6 +390,116 @@ export function validateSemanticArtifacts(manifest, crosswalkRows) {
           message: "Declared calculation nodes require semantic dependencies.",
         });
       }
+      if (node.row_type !== "header") {
+        const authorities = node.forecast_authorities;
+        if (!Array.isArray(authorities) || authorities.length !== 3) {
+          errors.push({
+            id: "manifest.forecast_authorities",
+            node_id: node.node_id,
+            message: "Every non-header statement node requires three period forecast authorities.",
+          });
+        } else {
+          for (const [forecastIndex, authority] of authorities.entries()) {
+            const expectedMechanism = {
+              schedule_link: "formula",
+              accounting_identity: "formula",
+              driver_formula: "formula",
+              roll_forward: "formula",
+              broker_consensus: "broker",
+              actual_plus_remainder: "hardcode",
+              contractual_commitment: "hardcode",
+              company_guidance: "hardcode",
+              company_indication: "hardcode",
+              user_assumption: "hardcode",
+              seasonal_run_rate: "hardcode",
+              historical_average: "hardcode",
+              historical_trend: "hardcode",
+              carry_forward: "hardcode",
+              explicit_zero: "zero",
+              not_separately_forecast: "uncalculated",
+              not_applicable: "uncalculated",
+            }[authority?.method];
+            if (
+              Number(authority.forecast_index) !== forecastIndex ||
+              !authority.method ||
+              !["formula", "broker", "hardcode", "zero", "uncalculated"].includes(
+                authority.mechanism,
+              )
+            ) {
+              errors.push({
+                id: "manifest.forecast_authority_shape",
+                node_id: node.node_id,
+                forecast_index: forecastIndex,
+                authority,
+              });
+            }
+            if (expectedMechanism && authority.mechanism !== expectedMechanism) {
+              errors.push({
+                id: "manifest.forecast_authority_mechanism",
+                node_id: node.node_id,
+                forecast_index: forecastIndex,
+                method: authority.method,
+                expected_mechanism: expectedMechanism,
+                actual_mechanism: authority.mechanism ?? null,
+              });
+            }
+            if (authority.method === "unresolved") {
+              errors.push({
+                id: "manifest.forecast_authority_unresolved",
+                node_id: node.node_id,
+                forecast_index: forecastIndex,
+              });
+            }
+            if (
+              authority.inferred !== true &&
+              [
+                "actual_plus_remainder",
+                "contractual_commitment",
+                "company_guidance",
+                "company_indication",
+              ].includes(authority.method) &&
+              (!authority.source_id || !authority.as_of_date)
+            ) {
+              errors.push({
+                id: "manifest.forecast_authority_provenance",
+                node_id: node.node_id,
+                forecast_index: forecastIndex,
+              });
+            }
+            if (authority.method === "actual_plus_remainder") {
+              const reported = Number(authority.partial_period?.reported_to_date);
+              const remainder = Number(authority.partial_period?.forecast_remainder);
+              const value = Number(authority.value);
+              if (
+                !Number.isFinite(reported) ||
+                !Number.isFinite(remainder) ||
+                !authority.partial_period?.reported_through ||
+                !Number.isFinite(value) ||
+                Math.abs(value - (reported + remainder)) > 1e-9
+              ) {
+                errors.push({
+                  id: "manifest.forecast_authority_partial_period",
+                  node_id: node.node_id,
+                  forecast_index: forecastIndex,
+                });
+              }
+            }
+            if (
+              ["explicit_zero", "not_separately_forecast", "not_applicable"].includes(
+                authority.method,
+              ) &&
+              authority.inferred !== true &&
+              !authority.note
+            ) {
+              errors.push({
+                id: "manifest.forecast_authority_rationale",
+                node_id: node.node_id,
+                forecast_index: forecastIndex,
+              });
+            }
+          }
+        }
+      }
     }
     if (
       node.movement_type === "non_cash_debt_movement" &&

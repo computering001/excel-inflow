@@ -38,6 +38,8 @@ const positive = [
   ["Cost of revenue", "income_statement", "cost_of_sales"],
   ["Exceptional impairment of goodwill", "income_statement", "impairment_loss"],
   ["Finance costs", "income_statement", "interest_expense"],
+  ["Interest paid", "cash_flow", "cash_interest_paid"],
+  ["Finance income received", "cash_flow", "cash_interest_received"],
   ["Income taxes paid", "cash_flow", "cash_taxes"],
   ["Repayments of borrowings", "cash_flow", "debt_repayment"],
   ["Effect of exchange rate changes on cash", "cash_flow", "fx_effect_on_cash"],
@@ -48,7 +50,6 @@ for (const [label, section, role] of positive) {
     `Positive classification failed for ${label}: ${JSON.stringify(result)}`);
 }
 for (const [label, section, forbiddenRole] of [
-  ["Interest paid", "cash_flow"],
   ["Deferred tax", "cash_flow"],
   ["Impairment charge", "cash_flow", "capex"],
   ["Impairment charge", "income_statement", "other_non_cash"],

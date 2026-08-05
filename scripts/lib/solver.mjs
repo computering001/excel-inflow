@@ -8,6 +8,11 @@ import {
   validateBalancingRcf,
 } from "./rcf_policy.mjs";
 import { leaseForecast, validateLeasePolicy } from "./lease_policy.mjs";
+import {
+  resolveForecastAuthority,
+  resolveMetricForecastAuthority,
+  validateForecastAuthorities,
+} from "./forecast_authority.mjs";
 
 const NORMALISED_STATEMENT_CACHE = new WeakMap();
 
@@ -87,6 +92,28 @@ function brokerForecastValue(modelCase, metricId, forecastIndex) {
 
 function metricValue(modelCase, metricId, periodIndex, fallback) {
   if (periodIndex >= 3) {
+    const metric = modelCase.operating_metrics?.[metricId];
+    if (Array.isArray(metric?.forecast_period_authorities)) {
+      const authority = resolveMetricForecastAuthority(
+        modelCase,
+        metricId,
+        periodIndex - 3,
+      );
+      if (authority.mechanism === "block") {
+        throw new Error(
+          `Unresolved forecast authority for operating metric ${metricId} in forecast period ${periodIndex - 2}: ${authority.reason ?? authority.method}.`,
+        );
+      }
+      if (authority.mechanism === "uncalculated" || authority.mechanism === "zero") {
+        return 0;
+      }
+      if (authority.mechanism === "broker" && authority.broker_value !== null) {
+        return Number(authority.broker_value);
+      }
+      if (authority.mechanism === "hardcode" && authority.value !== null) {
+        return Number(authority.value);
+      }
+    }
     const brokerValue = brokerForecastValue(
       modelCase,
       metricId,
@@ -167,6 +194,21 @@ function statementRoleIsCalculated(modelCase, semanticRole, forecastIndex) {
 // in build_dynamic_model.mjs.
 function statementRowForecastValue(modelCase, row, periodIndex) {
   const forecastIndex = periodIndex - 3;
+  const authority = resolveForecastAuthority(modelCase, row, forecastIndex);
+  if (authority.mechanism === "block") {
+    throw new Error(
+      `Unresolved forecast authority for ${row.row_id} in forecast period ${forecastIndex + 1}: ${authority.reason ?? authority.method}.`,
+    );
+  }
+  if (authority.mechanism === "uncalculated" || authority.mechanism === "zero") {
+    return 0;
+  }
+  if (authority.mechanism === "broker" && authority.broker_value !== null) {
+    return Number(authority.broker_value);
+  }
+  if (authority.mechanism === "hardcode" && authority.value !== null) {
+    return Number(authority.value);
+  }
   const rule = forecastRule(row, forecastIndex);
   const selfCarry =
     !Array.isArray(row.forecast_period_calculations) &&
@@ -184,7 +226,12 @@ function statementRowForecastValue(modelCase, row, periodIndex) {
     if (broker !== null && broker !== undefined) return Number(broker);
   }
   const value = row.values?.[index];
-  return value === null || value === undefined ? 0 : Number(value);
+  if (value === null || value === undefined) {
+    throw new Error(
+      `Forecast authority ${authority.method} for ${row.row_id} did not resolve a value in forecast period ${forecastIndex + 1}.`,
+    );
+  }
+  return Number(value);
 }
 
 // The roles the solver already prices into pre-tax income by its own route:
@@ -1236,6 +1283,18 @@ export function validateCaseShape(modelCase) {
   if (dates.some((date, index) => index > 0 && date <= dates[index - 1])) {
     errors.push("Period dates must be strictly increasing.");
   }
+  if (Number(modelCase.contract_version) === 2) {
+    try {
+      errors.push(
+        ...validateForecastAuthorities(modelCase, [
+          ...(modelCase.statement_structure?.income_statement ?? []),
+          ...(modelCase.statement_structure?.cash_flow ?? []),
+        ]).map((message) => `forecast_authority.${message}`),
+      );
+    } catch (error) {
+      errors.push(`forecast_authority validation failed: ${error.message}`);
+    }
+  }
   return errors;
 }
 
@@ -1376,6 +1435,19 @@ export function solveCase(
           : opening,
       );
     }
+    const nonBalancingCashBucketMovement = cashBuckets
+      .filter(
+        (bucket) =>
+          bucket.bucket_id !== balancingBucket.bucket_id &&
+          bucket.included_in_cash_flow_cash !== false,
+      )
+      .reduce(
+        (total, bucket) =>
+          total +
+          Number(fixedEndingBucketBalances.get(bucket.bucket_id) ?? 0) -
+          Number(openingBucketBalances.get(bucket.bucket_id) ?? 0),
+        0,
+      );
     const cashBucketSnapshot = (balancingEndingCash) => {
       const balances = new Map(fixedEndingBucketBalances);
       balances.set(balancingBucket.bucket_id, Number(balancingEndingCash));
@@ -2132,6 +2204,7 @@ export function solveCase(
         ["change_in_working_capital", totalWorkingCapital],
         ["capex", totalCapex],
         ["other_investing", otherInvesting],
+        ["non_balancing_cash_bucket_movement", nonBalancingCashBucketMovement],
         ["acquisition_consideration", 0],
       ]);
       const cashFlowGraph = declaredStatementPeriod(

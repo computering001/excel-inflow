@@ -1,4 +1,5 @@
 import { deterministicCaseHash } from "./validation_invariants.mjs";
+import { resolveForecastAuthority } from "./forecast_authority.mjs";
 
 const MOVEMENT_DEFINITIONS = {
   operating_cash_flow: {
@@ -154,6 +155,8 @@ const MECHANICAL_MOVEMENT_TYPES = {
 const COMPILER_CALCULATED_ROLES = new Set([
   "interest_income",
   "interest_expense",
+  "cash_interest_paid",
+  "cash_interest_received",
   "debt_issuance",
   "debt_repayment",
   "non_balancing_cash_bucket_movement",
@@ -250,6 +253,31 @@ export function describeStatementRow(definition, section) {
   };
 }
 
+function semanticForecastAuthorities(modelCase, row) {
+  if (row.row_type === "header") return [];
+  return [0, 1, 2].map((forecastIndex) => {
+    const authority = resolveForecastAuthority(modelCase, row, forecastIndex);
+    return {
+      forecast_index: forecastIndex,
+      method: authority.method,
+      mechanism: authority.mechanism,
+      source_kind: authority.source_kind ?? null,
+      source_id: authority.source_id ?? null,
+      as_of_date: authority.as_of_date ?? null,
+      confidence: authority.confidence ?? null,
+      value: authority.mechanism === "hardcode" ? authority.value : null,
+      partial_period: authority.partial_period ?? null,
+      guidance_range: authority.guidance_range ?? null,
+      note: authority.note ?? authority.reason ?? null,
+      broker_metric_id:
+        authority.mechanism === "broker"
+          ? row.broker_metric_id ?? row.semantic_role ?? null
+          : null,
+      inferred: authority.inferred === true,
+    };
+  });
+}
+
 function statementNodes(modelCase, rowPlan) {
   const nodes = [];
   const emittedRowIds = new Set();
@@ -277,6 +305,7 @@ function statementNodes(modelCase, rowPlan) {
       style_role: row.style_role ?? null,
       formula_authority: description.formula_authority,
       dependencies: description.dependency_refs,
+      forecast_authorities: semanticForecastAuthorities(modelCase, row),
       source_line_ids: uniqueSorted([
         ...(row.source_line_ids ?? []),
         ...declaredSources(modelCase, row.row_id),
@@ -835,6 +864,7 @@ function graphEdges(nodes, rowPlan) {
     ["mechanical.net_interest_expense", "mechanical.gross_interest_expense"],
     ["mechanical.net_interest_expense", "mechanical.interest_income_schedule"],
     ["mechanical.cash_interest_paid", "mechanical.gross_interest_expense"],
+    ["mechanical.cash_interest_received", "mechanical.interest_income_schedule"],
     ["mechanical.cash_before_debt", "mechanical.net_interest_expense"],
     ["mechanical.cash_before_debt", "mechanical.interest_identified_total"],
   ]) {
@@ -843,6 +873,8 @@ function graphEdges(nodes, rowPlan) {
   link("mechanical.leverage_adjusted_ebitda", statement("adjusted_ebitda"));
   link(statement("interest_expense"), "mechanical.gross_interest_expense");
   link(statement("interest_income"), "mechanical.interest_income_schedule");
+  link(statement("cash_interest_paid"), "mechanical.cash_interest_paid");
+  link(statement("cash_interest_received"), "mechanical.cash_interest_received");
   link("mechanical.cash_before_debt", statement("cash_from_operations"));
   link("mechanical.cash_before_debt", statement("cash_from_investing"));
   link("mechanical.cash_before_debt", statement("fx_effect_on_cash"));

@@ -344,6 +344,8 @@ try {
 if (!plan) {
   for (const id of [
     "bold-appears-only-on-declared-headline-rows",
+    "declared-total-rows-are-bold",
+    "ordinary-detail-rows-have-no-horizontal-rules",
     "net-debt-panels-terminate-identically",
     "answer-rank-is-earned-not-asserted",
   ]) {
@@ -390,6 +392,41 @@ if (!plan) {
     }
   }
 
+  // Semantic totals are a structural declaration in the row map and token
+  // contract.  Resolve them independently of the emitter's in-memory rank map:
+  // statement totals/subtotals, dynamic instrument-group subtotals, and named
+  // schedule totals declared by the style authority.
+  const totalRows = new Set();
+  const statementPhysicalRows = new Set();
+  for (const definitions of Object.values(plan.statement_rows ?? {})) {
+    for (const definition of definitions ?? []) {
+      statementPhysicalRows.add(Number(definition.row));
+      if (
+        definition.style_role === "total" ||
+        definition.row_type === "subtotal"
+      ) {
+        totalRows.add(Number(definition.row));
+      }
+    }
+  }
+  for (const group of plan.debt_groups ?? []) {
+    totalRows.add(Number(group.subtotal_row));
+    totalRows.add(Number(group.interest_subtotal_row));
+  }
+  const declaredTotalIds = new Set([
+    ...(TOKENS.total_ranks?.component_sum?.row_ids ?? []),
+    ...(TOKENS.total_ranks?.block_subtotal?.row_ids ?? []),
+    ...(TOKENS.total_ranks?.answer?.row_ids ?? []),
+  ]);
+  for (const [id, row] of Object.entries(plan.rows_by_id ?? {})) {
+    // Statement totals are case-resolved by style_role/row_type above.  A name
+    // such as `ebit` may be a subtotal in one issuer and a non-total bridge in
+    // another; the flat token union must not promote it by spelling alone.
+    if (declaredTotalIds.has(id) && !statementPhysicalRows.has(Number(row))) {
+      totalRows.add(Number(row));
+    }
+  }
+
   // --- chrome, which is bold because it is chrome and not because it is loud -
   const chromeRows = new Set();
   for (const entry of sectionHeaderRows) chromeRows.add(entry.row);
@@ -433,17 +470,71 @@ if (!plan) {
     // Everything above the first section band is the title, the control block
     // and the period header: chrome by position, not by declaration.
     if (row < firstSectionRow) continue;
-    if (chromeRows.has(row) || headlineRows.has(row)) continue;
+    if (chromeRows.has(row) || headlineRows.has(row) || totalRows.has(row)) continue;
     strayBold.push(ref);
   }
   const strayBoldRows = [...new Set(strayBold.map(rowOf))].sort((a, b) => a - b);
   check(
     "bold-appears-only-on-declared-headline-rows",
     strayBold.length === 0,
-    `Bold appears on the ${headlineRows.size} declared headline rows and on chrome, and nowhere else. Bold used to ride every ranked row, so anything that summed looked important.`,
+    `Bold appears only on ${totalRows.size} semantic total/subtotal rows, ${headlineRows.size} declared headline rows and chrome.`,
     strayBold.length
       ? { rows: strayBoldRows.slice(0, 20), cells: strayBold.slice(0, 20) }
       : { headline_rows: headlineNames },
+  );
+
+  const nonBoldTotals = [...totalRows]
+    .filter((row) => Number.isFinite(row))
+    .filter((row) =>
+      [...BODY_COLUMNS].some(
+        (column) => cellStyle.has(`${column}${row}`) && !styleOf(`${column}${row}`).bold,
+      ),
+    )
+    .sort((a, b) => a - b);
+  check(
+    "declared-total-rows-are-bold",
+    nonBoldTotals.length === 0,
+    `Every semantic total/subtotal row is bold across its populated body cells.`,
+    nonBoldTotals.length ? { rows: nonBoldTotals.slice(0, 20) } : { rows: [...totalRows].sort((a, b) => a - b) },
+  );
+
+  // A closed border vocabulary prevents a fragment inherited from an input
+  // style or template cell from appearing as a random line in the statement
+  // body. Horizontal rules in the numeric/label grid may originate only on
+  // chrome, semantic totals/subtotals, or the declared row that closes a
+  // section. Contract-term boxes in C:E are intentionally outside this scan.
+  const sectionCloseRows = new Set();
+  sectionHeaderRows.forEach((entry, index) => {
+    const next = sectionHeaderRows[index + 1]?.row;
+    const last = next ? next - 2 : Number(plan.visible_end_row);
+    if (Number.isFinite(last) && last > entry.row) sectionCloseRows.add(last);
+  });
+  const horizontalRuleCells = [];
+  for (const ref of cellStyle.keys()) {
+    if (!BODY_COLUMNS.has(columnOf(ref))) continue;
+    const row = rowOf(ref);
+    if (!statementPhysicalRows.has(row)) continue;
+    if (
+      chromeRows.has(row) ||
+      totalRows.has(row) ||
+      headlineRows.has(row) ||
+      sectionCloseRows.has(row)
+    ) {
+      continue;
+    }
+    const edges = edgesOf(ref);
+    if (edges.top || edges.bottom) horizontalRuleCells.push(ref);
+  }
+  check(
+    "ordinary-detail-rows-have-no-horizontal-rules",
+    horizontalRuleCells.length === 0,
+    "Ordinary detail rows carry no stray top or bottom border fragments; rules originate only from declared structural roles.",
+    horizontalRuleCells.length
+      ? {
+          rows: [...new Set(horizontalRuleCells.map(rowOf))].slice(0, 20),
+          cells: horizontalRuleCells.slice(0, 30),
+        }
+      : null,
   );
 
   // --- the two net-debt panels terminate identically ------------------------

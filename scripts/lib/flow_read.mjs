@@ -18,6 +18,7 @@
 import { leaseOpeningLiability } from "./solver.mjs";
 import { formatMoney, formatTurns } from "./flow_screens.mjs";
 import { resolveBrokerForecastSelection } from "./broker_anchor.mjs";
+import { resolveForecastAuthority } from "./forecast_authority.mjs";
 
 function pct(value, { decimals = 0 } = {}) {
   return `${(Number(value) * 100).toFixed(decimals)}%`;
@@ -421,16 +422,18 @@ function brokerSubstitutions(modelCase) {
  * What the model carries because it was TYPED, with nothing behind it to derive
  * it from.
  *
- * WHAT THIS FUNCTION USED TO SAY, AND WHY IT NO LONGER SAYS IT.
+ * WHY THIS FUNCTION DOES NOT USE THE LEGACY METRIC-LEVEL FORECAST LABEL.
  *
  * It opened with one claim per operating metric whose `forecast_method` read
  * `supplied_exact`: "X is typed for every year rather than derived. A forecast
  * method that derived it would overwrite the consensus the broker set
  * supplies." Three things were wrong with it, and none is repairable in place.
  *
- *   1. `forecast_method` DRIVES NOTHING. Outside `validateCaseShape`, which
- *      only asserts the field is present, no module in the skill reads it. It
- *      cannot make a value typed and it cannot report that one is.
+ *   1. The legacy metric-level `forecast_method` label is not an executable
+ *      authority. The executable contract is now the resolved per-row,
+ *      per-period waterfall carried by the semantic graph. This function has a
+ *      narrower purpose: disclose unscheduled typed finance plugs and residual
+ *      debt pools, not restate the forecast authority report below.
  *
  *   2. THE CLAIM WAS FALSE ON EVERY CERTIFICATION CASE. Every one of the eight
  *      marks Revenue and Adjusted EBITDA `supplied_exact`, and every one of the
@@ -483,6 +486,48 @@ function typedNotDerived(modelCase) {
     );
   }
   return typed;
+}
+
+function forecastAuthorityPath(modelCase) {
+  const rows = [
+    ...(modelCase.statement_structure?.income_statement ?? []),
+    ...(modelCase.statement_structure?.cash_flow ?? []),
+  ].filter((row) => row.row_type !== "header");
+  const details = [];
+  const summary = [];
+  for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+    const counts = new Map();
+    for (const row of rows) {
+      const authority = resolveForecastAuthority(modelCase, row, forecastIndex);
+      counts.set(authority.method, (counts.get(authority.method) ?? 0) + 1);
+      details.push({
+        row_id: row.row_id,
+        label: row.label,
+        semantic_role: row.semantic_role ?? null,
+        forecast_index: forecastIndex,
+        period: modelCase.periods?.[forecastIndex + 3]?.date ?? null,
+        method: authority.method,
+        mechanism: authority.mechanism,
+        source_kind: authority.source_kind ?? null,
+        source_id: authority.source_id ?? null,
+        as_of_date: authority.as_of_date ?? null,
+        broker_metric_id:
+          authority.mechanism === "broker"
+            ? row.broker_metric_id ?? row.semantic_role ?? null
+            : null,
+        inferred: authority.inferred === true,
+      });
+    }
+    const period = String(
+      modelCase.periods?.[forecastIndex + 3]?.date ?? `forecast ${forecastIndex + 1}`,
+    ).slice(0, 4);
+    const path = [...counts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([method, count]) => `${count} ${method.replaceAll("_", " ")}`)
+      .join(", ");
+    summary.push(`${period}: ${path}.`);
+  }
+  return { summary, details };
 }
 
 /**
@@ -598,11 +643,14 @@ export function buildDeliveryReport({
   assumptions = [],
 }) {
   const read = plainEnglishRead(modelCase, solved);
+  const forecastAuthorities = forecastAuthorityPath(modelCase);
   return {
     read: read.text,
     read_detail: read,
     ties: tiesToFilings(modelCase, reconciliation),
     broker_substitutions: brokerSubstitutions(modelCase),
+    forecast_authority_summary: forecastAuthorities.summary,
+    forecast_authority_path: forecastAuthorities.details,
     typed: typedNotDerived(modelCase),
     assumed: assumptions.map((assumption) => assumption.text),
     plausible_only: plausibilityChecks(modelCase, solved, read),
