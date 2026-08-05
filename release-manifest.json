@@ -5,8 +5,8 @@
   "skillVersion": "2.0.6",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-05T21:53:27.934Z",
-  "centralInstructionsWords": 3430,
+  "generatedAt": "2026-08-05T22:46:51.361Z",
+  "centralInstructionsWords": 3496,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
@@ -772,18 +772,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "e99fb3a5d5c1afe0da0d7453f00a8c3d04a4e5ed09032b52a5e0c4b45806866d",
-        "plan_sha256": "eed950b8fa09beb3aa40e288a5bf7e7976344fcc23ad9c91816fd05f4c3ea481",
-        "workbook_sha256": "8b9ecbd5c152c0536cb0486535737d45f39cfda8a3b4a3c031ca04aadb3d86e4",
+        "case_sha256": "350b9a36e73d96a3b5f2895586acdc6ba7dcf2d762be85552742f62db5b20058",
+        "plan_sha256": "c09117432777523bd8cd69cf95d2202432552087f21294712eab430ebc54edbe",
+        "workbook_sha256": "00c84a2c4bda257b08d1d5b6013c5422267163df95f630380bcf0abfab291d98",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "e99fb3a5d5c1afe0da0d7453f00a8c3d04a4e5ed09032b52a5e0c4b45806866d",
-      "plan_sha256": "eed950b8fa09beb3aa40e288a5bf7e7976344fcc23ad9c91816fd05f4c3ea481",
-      "workbook_sha256": "8b9ecbd5c152c0536cb0486535737d45f39cfda8a3b4a3c031ca04aadb3d86e4",
+      "case_sha256": "350b9a36e73d96a3b5f2895586acdc6ba7dcf2d762be85552742f62db5b20058",
+      "plan_sha256": "c09117432777523bd8cd69cf95d2202432552087f21294712eab430ebc54edbe",
+      "workbook_sha256": "00c84a2c4bda257b08d1d5b6013c5422267163df95f630380bcf0abfab291d98",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -813,21 +813,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "d26ffc431088c619dc9f6e9c62f3bc7c32afd7fe8ca5ed85cd382cd5f23dfdd2",
-      "bytes": 25551,
-      "words": 3430
+      "sha256": "84ad88f8f7f77e642c778546b6fadf101da74b99504669a998bf90c941d9fa8a",
+      "bytes": 26005,
+      "words": 3496
     },
     {
       "path": "SKILL.md",
-      "sha256": "f3ba7d2ed218d81a204a5f55396584fa1f7aff1a7a7eb1784fb532fbe66d0016",
-      "bytes": 26038,
-      "words": 3499
+      "sha256": "3a880bf766b3de338140cc5180d9e37301aad319713d6efd70016f9a75d37a26",
+      "bytes": 26492,
+      "words": 3565
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "6eee5272963eff429645455f975ec4b57d95783da10df2ee388794988fea95a5",
-      "bytes": 25571,
-      "words": 3432
+      "sha256": "552c4a169a2ea850ca5f367ab8a5ad29f1193b4b6db0179380b3fd73f143491b",
+      "bytes": 26025,
+      "words": 3498
     },
     {
       "path": "references/model-contract.md",

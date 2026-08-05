@@ -61,6 +61,13 @@ Markdown summary. This rule still applies when the user already names the
 company or supplies attachments; consume those inputs only after displaying
 the canonical Stage 1 screen.
 
+The bare trigger is presentation-only. Do not certify the installed release,
+inspect package bytes, emit progress prose, search for tools, read evidence or
+perform any other work before returning the Stage 1 screen. Deployment
+certification belongs to the versioned installation transaction, never to an
+ordinary end-user invocation. After Stage 1 is visible, intake and later stages
+may perform their declared checks and persist their normal receipts.
+
 Begin with one compact request for the company name, the FactSet debt export
 taken at the last fiscal year end, and broker research from 3–10 houses. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year
