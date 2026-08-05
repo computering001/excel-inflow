@@ -160,6 +160,21 @@ assumptions unchanged.
 
 Use total cash as eligible unless restricted, trapped or non-interest-bearing cash is separately available and material. Keep any eligible-cash percentage and yield visible.
 
+Do not assume that cash-flow-statement cash, liquidity cash and cash used in net
+debt are always the same balance. If the cash-flow statement nets a debt item
+(for example an on-demand overdraft) while gross debt presents that item
+separately, declare two cash buckets:
+
+- the balancing bucket holds cash-flow-statement cash and drives opening cash,
+  ending cash, liquidity and interest income; and
+- a `linked_debt_addback` bucket restores gross cash only for reported cash and
+  net debt, with its forecast balance linked to the named debt instrument rows.
+
+The linked add-back is never independently forecast, never earns interest and
+never funds the RCF sweep. Its latest historical amount must equal the translated
+opening balance of the linked gross/net-debt instruments. This makes the debt
+and cash add-back neutral in net debt and prevents double counting.
+
 ## Circularity
 
 When cash, net income, RCF and interest depend on one another, use a visible

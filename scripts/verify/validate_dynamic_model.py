@@ -2483,9 +2483,12 @@ def main(argv: List[str]) -> int:
             column = columns[index]
             comparisons = [
                 (
-                    "reported_cash",
+                    "cash_flow_cash",
                     value("%s%s" % (column, statement_ending_cash_row)),
-                    result.get("reported_cash", result.get("ending_cash")),
+                    result.get(
+                        "cash_flow_cash",
+                        result.get("reported_cash", result.get("ending_cash")),
+                    ),
                     "currency",
                 ),
                 (

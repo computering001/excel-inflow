@@ -203,6 +203,16 @@ For every debt instrument show opening balance, issuance, scheduled amortisation
 
 Calculate fixed and floating interest from average balances, with explicit period fractions for material mid-year maturity or closing timing. Floating rates equal the relevant curve plus margin. RCF interest uses average drawn balance. Commitment fee uses average undrawn committed capacity and its own fee rate, not the RCF margin. Other interest must be a visible, documented plug if used. Forecast **interest income** from average eligible cash and a visible yield; never hold it flat by default.
 
+Resolve cash by semantic basis, not by one overloaded number. Cash-flow rows use
+the buckets marked as cash-flow cash, the RCF waterfall uses only the balancing
+liquidity bucket, interest uses interest-eligible cash, and net debt uses
+net-debt-eligible cash. When a debt balance is netted from cash-flow-statement
+cash but shown separately in gross debt, use `linked_debt_addback` with explicit
+instrument IDs. The runtime must derive that bucket from those instruments in
+every forecast and reject missing, duplicated, RCF, non-gross-debt or
+non-net-debt links, non-zero yield, liquidity inclusion, stale opening balances
+and independent forecast values.
+
 **RCF is the only balancing liquidity source.** Specifically, the balancing facility is the RCF named by `rcf_policy.instrument_id`. Draw only to restore minimum cash, capped by remaining capacity. Repay only from surplus cash, capped by opening drawn balance. Other revolving or bilateral facilities may coexist, but they are ordinary instrument-level debt and never join the balancing waterfall. Keep residual shortfall visible when capacity is exhausted. The circularity control is a kill switch for all forecast interest calculations; it does not switch off the RCF waterfall. Circularity, maturity roll and acquisition controls store numeric 0/1 and display Off/On through formatting.
 
 Keep total lease liability and any separately supplied interest-bearing lease balance visible. Use a sourced closing-balance path, a simple roll-forward or an explicit **Flat replacement** assumption where principal repayments are replenished by replacement additions. For US GAAP, require an explicit interest basis so operating lease cost is not counted again as interest. Apply the selected lease basis consistently to debt, cash flow, interest and leverage.

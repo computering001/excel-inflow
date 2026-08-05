@@ -536,6 +536,9 @@ function cashBucketNodes(rowPlan) {
       formula_authority:
         plan.forecast_treatment === "hardcode" ? "case_input" : "compiler",
       forecast_treatment: plan.forecast_treatment,
+      included_in_cash_flow_cash:
+        plan.included_in_cash_flow_cash !== false,
+      linked_instrument_ids: uniqueSorted(plan.linked_instrument_ids ?? []),
       available_for_liquidity: Boolean(plan.available_for_liquidity),
       net_debt_eligible_percentage: plan.net_debt_eligible_percentage,
       interest_eligible_percentage: plan.interest_eligible_percentage,

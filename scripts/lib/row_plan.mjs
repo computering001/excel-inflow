@@ -1322,7 +1322,9 @@ export function normaliseStatementRows(modelCase, section) {
     // the non-balancing buckets increased; negative means they decreased.
     // It is deliberately a cash-reconciliation movement, not a sweep input.
     const nonBalancingBuckets = (modelCase.cash_policy?.buckets ?? []).filter(
-      (bucket) => bucket.forecast_treatment !== "balancing",
+      (bucket) =>
+        bucket.forecast_treatment !== "balancing" &&
+        bucket.included_in_cash_flow_cash !== false,
     );
     if (
       nonBalancingBuckets.length > 0 &&
@@ -2071,6 +2073,9 @@ export function compileRowPlan(modelCase) {
     bucket_id: bucket.bucket_id,
     label: bucket.label,
     forecast_treatment: bucket.forecast_treatment,
+    included_in_cash_flow_cash:
+      bucket.included_in_cash_flow_cash !== false,
+    linked_instrument_ids: [...(bucket.linked_instrument_ids ?? [])],
     available_for_liquidity: bucket.available_for_liquidity,
     net_debt_eligible_percentage: Number(
       bucket.net_debt_eligible_percentage,

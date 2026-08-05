@@ -770,6 +770,11 @@ function cashBucketStatementChecks(modelCase) {
   );
   if (!endingCash) return [];
   const declared = [0, 1, 2].map((index) =>
+    buckets
+      .filter((bucket) => bucket.included_in_cash_flow_cash !== false)
+      .reduce((sum, bucket) => sum + Number(bucket.historical_year_end?.[index] ?? 0), 0),
+  );
+  const reported = [0, 1, 2].map((index) =>
     buckets.reduce((sum, bucket) => sum + Number(bucket.historical_year_end?.[index] ?? 0), 0),
   );
   const visible = endingCash.values?.slice(0, 3) ?? [];
@@ -777,12 +782,12 @@ function cashBucketStatementChecks(modelCase) {
     (value, index) => Math.abs(Number(value) - Number(visible[index])) <= 1e-8,
   );
   return [result(
-    "cash_buckets.reported_history_statement_tie",
+    "cash_buckets.cash_flow_history_statement_tie",
     agrees ? "PASS" : "BLOCK",
     agrees
-      ? "The historical cash-flow ending-cash row matches reported cash across all explicit buckets."
-      : "The historical cash-flow ending-cash row must equal reported cash (the sum of all explicit buckets); the RCF waterfall separately uses the balancing/liquidity bucket.",
-    { reported_cash_history: declared, ending_cash_history: visible },
+      ? "The historical cash-flow ending-cash row matches the explicit buckets included in cash-flow cash."
+      : "The historical cash-flow ending-cash row must equal the sum of explicit buckets included in cash-flow cash; reported cash and liquidity remain separately defined.",
+    { cash_flow_cash_history: declared, reported_cash_history: reported, ending_cash_history: visible },
   )];
 }
 

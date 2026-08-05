@@ -2638,8 +2638,16 @@ function configureOperatingModel(
       .map((row) => [row.semantic_role, row]),
   );
   const nonBalancingCashBuckets = cashBucketPlans.filter(
-    (bucket) => bucket.forecast_treatment !== "balancing",
+    (bucket) =>
+      bucket.forecast_treatment !== "balancing" &&
+      bucket.included_in_cash_flow_cash !== false,
   );
+  const cashFlowCashFormula = (column) => {
+    const cells = cashBucketPlans
+      .filter((bucket) => bucket.included_in_cash_flow_cash !== false)
+      .map((bucket) => `${column}${bucket.balance_row}`);
+    return cells.length ? `=SUM(${cells.join(",")})` : "=0";
+  };
   const cashReconciliationFormula = (column) => {
     const rows = [
       statementByRole.get("cash_from_operations")?.row,
@@ -2752,13 +2760,13 @@ function configureOperatingModel(
     if (role === "opening_cash") {
       const prior = forecastIndex === 0 ? "I" : FORECAST_COLUMNS[forecastIndex - 1];
       if (explicitCashBuckets) {
-        return `=${prior}${debtRows.reported_cash}`;
+        return cashFlowCashFormula(prior);
       }
       return `=${prior}${statementByRole.get("ending_cash").row}`;
     }
     if (role === "ending_cash") {
       if (explicitCashBuckets) {
-        return `=${column}${debtRows.reported_cash}`;
+        return cashFlowCashFormula(column);
       }
       // The sweep no longer restates ending cash on a row of its own, so the
       // cash flow closes on the sweep's own arithmetic: cash before the
@@ -3029,14 +3037,14 @@ function configureOperatingModel(
             // cash. Thereafter it inherits the prior year's closing adjustment.
             return explicitCashBuckets
               ? priorAdjustmentColumn
-                ? `=${priorAdjustmentColumn}${debtRows.reported_cash}`
+                ? cashFlowCashFormula(priorAdjustmentColumn)
                 : "=0"
               : priorAdjustmentColumn
                 ? `=${priorAdjustmentColumn}${statementByRole.get("ending_cash").row}`
                 : "=0";
           case "ending_cash":
             if (explicitCashBuckets) {
-              return `=${adjustmentColumn}${debtRows.reported_cash}`;
+              return cashFlowCashFormula(adjustmentColumn);
             }
             return (
               `=${adjustmentColumn}${waterfallRows.cash_before_rcf}` +
@@ -3242,7 +3250,7 @@ function configureOperatingModel(
           sheet,
           `${proFormaColumn}${definition.row}`,
           explicitCashBuckets
-            ? `=${proFormaColumn}${debtRows.reported_cash}`
+            ? cashFlowCashFormula(proFormaColumn)
             : `=${proFormaColumn}${waterfallRows.cash_before_rcf}` +
                 `+${proFormaColumn}${waterfallRows.rcf_draw_waterfall}` +
                 `-${proFormaColumn}${waterfallRows.rcf_repayment_waterfall}`,
@@ -3512,6 +3520,21 @@ function configureOperatingModel(
   const instrumentById = new Map(
     modelCase.instruments.map((item) => [item.instrument_id, item]),
   );
+  const instrumentPlanById = new Map(
+    rowPlan.instruments.map((plan) => [plan.instrument_id, plan]),
+  );
+  const linkedDebtCashFormula = (bucket, column) => {
+    const cells = (bucket.linked_instrument_ids ?? []).map((instrumentId) => {
+      const plan = instrumentPlanById.get(instrumentId);
+      if (!plan) {
+        throw new Error(
+          `Cash bucket ${bucket.bucket_id} links instrument ${instrumentId}, but the row plan has no matching debt row.`,
+        );
+      }
+      return `${column}${plan.debt_row}`;
+    });
+    return cells.length ? `=SUM(${cells.join(",")})` : "=0";
+  };
   // Forecast cash repayments, in reporting currency, compiled from the same
   // per-instrument mechanics that write the visible debt roll-forward. The RCF
   // waterfall consumes these expressions directly. A balance delta is not a
@@ -4626,6 +4649,12 @@ function configureOperatingModel(
             Number(bucket.forecast_values?.[index] ?? 0),
           );
           styleInput(sheet, `${column}${bucket.balance_row}`);
+        } else if (bucket.forecast_treatment === "linked_debt_addback") {
+          applyFormula(
+            sheet,
+            `${column}${bucket.balance_row}`,
+            linkedDebtCashFormula(bucket, column),
+          );
         } else {
           const priorColumn = index === 0 ? "I" : FORECAST_COLUMNS[index - 1];
           applyFormula(
@@ -4883,6 +4912,17 @@ function configureOperatingModel(
             `=${proFormaColumn}${waterfallRows.cash_before_rcf}` +
               `+${proFormaColumn}${waterfallRows.rcf_draw_waterfall}` +
               `-${proFormaColumn}${waterfallRows.rcf_repayment_waterfall}`,
+          );
+        } else if (bucket.forecast_treatment === "linked_debt_addback") {
+          applyFormula(
+            sheet,
+            `${adjustmentColumn}${row}`,
+            linkedDebtCashFormula(bucket, adjustmentColumn),
+          );
+          applyFormula(
+            sheet,
+            `${proFormaColumn}${row}`,
+            linkedDebtCashFormula(bucket, proFormaColumn),
           );
         } else {
           applyFormula(sheet, `${adjustmentColumn}${row}`, "=0");
@@ -8279,16 +8319,20 @@ function statementSolverValues(
             ).historical_year_end[2],
         )
       : Number(solution.forecast[forecastIndex - 1].ending_cash);
-  const reportedOpeningCash = explicitCashBuckets
+  const cashFlowOpeningCash = explicitCashBuckets
     ? forecastIndex === 0
       ? cashBuckets.reduce(
-          (sum, bucket) => sum + Number(bucket.historical_year_end[2] ?? 0),
+          (sum, bucket) =>
+            sum +
+            (bucket.included_in_cash_flow_cash !== false
+              ? Number(bucket.historical_year_end[2] ?? 0)
+              : 0),
           0,
         )
-      : Number(solution.forecast[forecastIndex - 1].reported_cash)
+      : Number(solution.forecast[forecastIndex - 1].cash_flow_cash)
     : balancingOpeningCash;
-  const reportedEndingCash = explicitCashBuckets
-    ? Number(result.reported_cash)
+  const cashFlowEndingCash = explicitCashBuckets
+    ? Number(result.cash_flow_cash)
     : Number(result.ending_cash);
   const nonBalancingCashBucketMovement = explicitCashBuckets
     ? (result.cash_bucket_balances ?? [])
@@ -8296,7 +8340,10 @@ function statementSolverValues(
           (bucket) =>
             cashBuckets.find(
               (definition) => definition.bucket_id === bucket.bucket_id,
-            )?.forecast_treatment !== "balancing",
+            )?.forecast_treatment !== "balancing" &&
+            cashBuckets.find(
+              (definition) => definition.bucket_id === bucket.bucket_id,
+            )?.included_in_cash_flow_cash !== false,
         )
         .reduce(
           (sum, bucket) =>
@@ -8420,10 +8467,10 @@ function statementSolverValues(
     ["fx_effect_on_cash", result.fx_effect_on_cash],
     [
       "net_change_in_cash",
-      reportedEndingCash - reportedOpeningCash - result.fx_effect_on_cash,
+      cashFlowEndingCash - cashFlowOpeningCash - result.fx_effect_on_cash,
     ],
-    ["opening_cash", reportedOpeningCash],
-    ["ending_cash", reportedEndingCash],
+    ["opening_cash", cashFlowOpeningCash],
+    ["ending_cash", cashFlowEndingCash],
   ]);
   const definitions = [
     ...rowPlan.statement_rows.income_statement,

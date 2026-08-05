@@ -848,7 +848,20 @@
         "label": { "type": "string", "minLength": 1 },
         "historical_year_end": { "$ref": "#/$defs/series3" },
         "forecast_treatment": {
-          "enum": ["balancing", "hardcode", "flat"]
+          "enum": ["balancing", "hardcode", "flat", "linked_debt_addback"]
+        },
+        "included_in_cash_flow_cash": {
+          "type": "boolean",
+          "description": "Whether the bucket is part of the issuer's cash-flow-statement opening and ending cash. Omission preserves the legacy true convention. A debt-linked add-back is false because it converts cash net of the linked debt item to gross cash solely for net-debt presentation."
+        },
+        "linked_instrument_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          }
         },
         "forecast_values": {
           "oneOf": [
@@ -907,6 +920,30 @@
             "properties": {
               "available_for_liquidity": { "const": false }
             }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "forecast_treatment": { "const": "linked_debt_addback" }
+            },
+            "required": ["forecast_treatment"]
+          },
+          "then": {
+            "required": ["included_in_cash_flow_cash", "linked_instrument_ids"],
+            "properties": {
+              "included_in_cash_flow_cash": { "const": false },
+              "available_for_liquidity": { "const": false },
+              "net_debt_eligible_percentage": { "const": 1 },
+              "interest_eligible_percentage": { "const": 0 },
+              "cash_yield": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": { "const": 0 }
+              }
+            },
+            "not": { "required": ["forecast_values"] }
           }
         }
       ]

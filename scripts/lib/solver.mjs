@@ -579,6 +579,9 @@ export function normalisedCashBuckets(modelCase) {
   if (Array.isArray(declared)) {
     return declared.map((bucket) => ({
       ...bucket,
+      included_in_cash_flow_cash:
+        bucket.included_in_cash_flow_cash !== false,
+      linked_instrument_ids: [...(bucket.linked_instrument_ids ?? [])],
       historical_year_end: asSeries3(bucket.historical_year_end, 0),
       forecast_values:
         bucket.forecast_values === null ||
@@ -598,6 +601,8 @@ export function normalisedCashBuckets(modelCase) {
       forecast_treatment: "balancing",
       forecast_values: null,
       available_for_liquidity: true,
+      included_in_cash_flow_cash: true,
+      linked_instrument_ids: [],
       net_debt_eligible_percentage: Number(
         cash.eligible_cash_percentage ?? 1,
       ),
@@ -820,6 +825,13 @@ export function validateCaseShape(modelCase) {
   } else {
     const ids = new Set();
     let balancingCount = 0;
+    const linkedInstrumentOwners = new Map();
+    const instrumentsById = new Map(
+      (modelCase.instruments ?? []).map((instrument) => [
+        instrument.instrument_id,
+        instrument,
+      ]),
+    );
     for (const bucket of cash.buckets) {
       const id = bucket.bucket_id ?? "unknown";
       if (!bucket.bucket_id || ids.has(bucket.bucket_id)) {
@@ -834,7 +846,7 @@ export function validateCaseShape(modelCase) {
       } else if (bucket.historical_year_end.some((value) => Number(value) < 0)) {
         errors.push(`cash_policy.buckets.${id}.historical_year_end cannot be negative.`);
       }
-      if (!["balancing", "hardcode", "flat"].includes(bucket.forecast_treatment)) {
+      if (!["balancing", "hardcode", "flat", "linked_debt_addback"].includes(bucket.forecast_treatment)) {
         errors.push(`cash_policy.buckets.${id}.forecast_treatment is invalid.`);
       }
       if (bucket.forecast_treatment === "balancing") balancingCount += 1;
@@ -850,6 +862,56 @@ export function validateCaseShape(modelCase) {
         !isSeries3(bucket.forecast_values)
       ) {
         errors.push(`cash_policy.buckets.${id}.forecast_values must contain three balances for hardcode treatment.`);
+      }
+      if (bucket.forecast_treatment === "linked_debt_addback") {
+        if (bucket.included_in_cash_flow_cash !== false) {
+          errors.push(`cash_policy.buckets.${id}.included_in_cash_flow_cash must be false for linked_debt_addback treatment.`);
+        }
+        if (bucket.net_debt_eligible_percentage !== 1) {
+          errors.push(`cash_policy.buckets.${id}.net_debt_eligible_percentage must be 1 for linked_debt_addback treatment.`);
+        }
+        if (bucket.interest_eligible_percentage !== 0 ||
+            !isSeries3(bucket.cash_yield) ||
+            bucket.cash_yield.some((value) => Number(value) !== 0)) {
+          errors.push(`cash_policy.buckets.${id} must have zero interest eligibility and zero cash yield for linked_debt_addback treatment.`);
+        }
+        if (bucket.forecast_values !== undefined && bucket.forecast_values !== null) {
+          errors.push(`cash_policy.buckets.${id}.forecast_values must be omitted for linked_debt_addback treatment.`);
+        }
+        if (!Array.isArray(bucket.linked_instrument_ids) || bucket.linked_instrument_ids.length === 0) {
+          errors.push(`cash_policy.buckets.${id}.linked_instrument_ids must name at least one debt instrument.`);
+        } else {
+          let linkedOpeningReporting = 0;
+          for (const instrumentId of bucket.linked_instrument_ids) {
+            const instrument = instrumentsById.get(instrumentId);
+            if (!instrument) {
+              errors.push(`cash_policy.buckets.${id} links unknown instrument ${instrumentId}.`);
+              continue;
+            }
+            if (instrument.class === "rcf") {
+              errors.push(`cash_policy.buckets.${id} cannot link balancing RCF instrument ${instrumentId}.`);
+            }
+            if (instrument.include_in_gross_debt !== true || instrument.include_in_net_debt !== true) {
+              errors.push(`cash_policy.buckets.${id} linked instrument ${instrumentId} must be included in both gross debt and net debt.`);
+            }
+            if (linkedInstrumentOwners.has(instrumentId)) {
+              errors.push(`cash_policy.buckets.${id} duplicates linked instrument ${instrumentId} already owned by ${linkedInstrumentOwners.get(instrumentId)}.`);
+            } else {
+              linkedInstrumentOwners.set(instrumentId, id);
+            }
+            linkedOpeningReporting +=
+              Number(instrument.opening_balance ?? 0) *
+              fxRate(modelCase, instrument.currency, 2, "period_end");
+          }
+          const latestHistorical = Number(bucket.historical_year_end?.[2] ?? 0);
+          if (Math.abs(latestHistorical - linkedOpeningReporting) > 1e-8) {
+            errors.push(
+              `cash_policy.buckets.${id} latest historical balance ${latestHistorical} must equal the reporting-currency opening balance ${linkedOpeningReporting} of its linked debt instruments.`,
+            );
+          }
+        }
+      } else if (Array.isArray(bucket.linked_instrument_ids) && bucket.linked_instrument_ids.length > 0) {
+        errors.push(`cash_policy.buckets.${id}.linked_instrument_ids is only valid for linked_debt_addback treatment.`);
       }
       if (
         bucket.forecast_values !== undefined &&
@@ -1318,6 +1380,7 @@ export function solveCase(
       const balances = new Map(fixedEndingBucketBalances);
       balances.set(balancingBucket.bucket_id, Number(balancingEndingCash));
       let reportedCash = 0;
+      let cashFlowCash = 0;
       let liquidityCash = 0;
       let netDebtEligibleCash = 0;
       let interestEligibleCash = 0;
@@ -1334,6 +1397,7 @@ export function solveCase(
         );
         const yieldRate = Number(bucket.cash_yield?.[forecastIndex] ?? 0);
         reportedCash += ending;
+        if (bucket.included_in_cash_flow_cash !== false) cashFlowCash += ending;
         if (bucket.available_for_liquidity) liquidityCash += ending;
         netDebtEligibleCash += ending * netDebtPercentage;
         interestEligibleCash += ending * interestPercentage;
@@ -1346,6 +1410,8 @@ export function solveCase(
           opening_balance: opening,
           ending_balance: ending,
           available_for_liquidity: bucket.available_for_liquidity,
+          included_in_cash_flow_cash:
+            bucket.included_in_cash_flow_cash !== false,
           net_debt_eligible_percentage: netDebtPercentage,
           interest_eligible_percentage: interestPercentage,
           cash_yield: yieldRate,
@@ -1356,6 +1422,7 @@ export function solveCase(
         balances,
         detail,
         reported_cash: reportedCash,
+        cash_flow_cash: cashFlowCash,
         liquidity_cash: liquidityCash,
         net_debt_eligible_cash: netDebtEligibleCash,
         interest_eligible_cash: interestEligibleCash,
@@ -1711,6 +1778,20 @@ export function solveCase(
         raw_interest_reporting: rawInterestReporting,
         cash_interest: instrument.cash_interest !== false,
       });
+    }
+    const instrumentResultById = new Map(
+      instrumentResults.map((item) => [item.instrument_id, item]),
+    );
+    for (const bucket of cashBuckets) {
+      if (bucket.forecast_treatment !== "linked_debt_addback") continue;
+      fixedEndingBucketBalances.set(
+        bucket.bucket_id,
+        bucket.linked_instrument_ids.reduce(
+          (sum, instrumentId) =>
+            sum + Number(instrumentResultById.get(instrumentId)?.ending_reporting ?? 0),
+          0,
+        ),
+      );
     }
 
     const leasePeriod = leaseProjection[forecastIndex];
@@ -2157,8 +2238,18 @@ export function solveCase(
         ["acquisition_debt_proceeds", 0],
         ["acquisition_debt_repayment", 0],
         ["fx_effect_on_cash", fxOnCash],
-        ["opening_cash", openingCash],
-        ["ending_cash", nextEndingCash],
+        [
+          "opening_cash",
+          cashBuckets.reduce(
+            (sum, bucket) =>
+              sum +
+              (bucket.included_in_cash_flow_cash !== false
+                ? Number(openingBucketBalances.get(bucket.bucket_id) ?? 0)
+                : 0),
+            0,
+          ),
+        ],
+        ["ending_cash", nextCashBucketSnapshot.cash_flow_cash],
       ]) {
         finalStatementOverrides.set(role, value);
       }
@@ -2323,6 +2414,7 @@ export function solveCase(
       ...(Array.isArray(modelCase.cash_policy?.buckets)
         ? {
             reported_cash: finalCashBucketSnapshot.reported_cash,
+            cash_flow_cash: finalCashBucketSnapshot.cash_flow_cash,
             liquidity_cash: finalCashBucketSnapshot.liquidity_cash,
             interest_eligible_cash:
               finalCashBucketSnapshot.interest_eligible_cash,
