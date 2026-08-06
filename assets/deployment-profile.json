@@ -98,6 +98,7 @@
   "lib/semantic_graph.mjs",
   "lib/solver.mjs",
   "lib/statement_classifier.mjs",
+  "lib/statement_topology.mjs",
   "lib/validation_invariants.mjs",
   "orchestrate_release.mjs",
   "run_user_flow.mjs",

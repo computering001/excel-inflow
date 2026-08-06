@@ -8723,6 +8723,29 @@ function statementSolverValues(
     ["opening_cash", cashFlowOpeningCash],
     ["ending_cash", cashFlowEndingCash],
   ]);
+  for (const [role, value] of [
+    [
+      "cash_interest_paid",
+      -(
+        result.gross_interest -
+        result.non_cash_interest -
+        result.non_cash_instrument_interest
+      ),
+    ],
+    ["cash_interest_received", result.interest_income],
+  ]) {
+    const definition = rowPlan.statement_rows.cash_flow.find(
+      (row) => row.semantic_role === role,
+    );
+    if (
+      definition &&
+      (forecastCalculationForIndex(definition, forecastIndex) ||
+        (definition.forecast_treatment === "formula" &&
+          definition.calculation))
+    ) {
+      semantic.set(role, value);
+    }
+  }
   const definitions = [
     ...rowPlan.statement_rows.income_statement,
     ...rowPlan.statement_rows.cash_flow,

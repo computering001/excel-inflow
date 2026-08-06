@@ -679,6 +679,12 @@ Confirm:
 - every mapped or aggregated face line has a visible issuer-labelled statement
   row carrying its source-line lineage; no generic parent silently replaces
   disclosed children;
+- the compiled statement-topology graph preserves source order after declared
+  consolidation groups, carries one visible successor for each adjacent row,
+  and contains no source-order inversion, duplicate visible authority, orphan
+  numeric prefix, child-before-parent edge or non-contiguous family;
+- no residual issuer-row list is appended after net income, free cash flow or
+  another overlay-only terminal row;
 - units, currency, periods and signs are consistent;
 - missing prior-year instrument detail is represented by a visible reported
   aggregate or left unavailable, never silently treated as zero debt;

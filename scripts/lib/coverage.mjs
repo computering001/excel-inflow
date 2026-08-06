@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { compiledCashFlowRoles, normaliseStatementRows } from "./row_plan.mjs";
 import { classifyStatementLine, isHighImpactRole } from "./statement_classifier.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
+import { compileStatementTopology } from "./statement_topology.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -28,6 +29,25 @@ function series(value, length) {
 
 function result(id, status, message, detail = null) {
   return { id, status, message, detail };
+}
+
+function statementTopologyChecks(modelCase) {
+  const checks = [];
+  for (const section of ["income_statement", "cash_flow"]) {
+    const rows = normaliseStatementRows(modelCase, section);
+    const topology = compileStatementTopology(modelCase, section, rows);
+    checks.push(
+      result(
+        `statement_topology.${section}`,
+        topology.errors.length === 0 ? "PASS" : "BLOCK",
+        topology.errors.length === 0
+          ? `${section} visible rows preserve the compiled source and hierarchy graph.`
+          : `${section} has ${topology.errors.length} visible ordering, ownership or hierarchy violation(s).`,
+        topology,
+      ),
+    );
+  }
+  return checks;
 }
 
 function allStatementRows(modelCase) {
@@ -1656,6 +1676,7 @@ export function assessCoverage(modelCase) {
   checks.push(...requiredRoleChecks(modelCase));
   checks.push(...dependencyChecks(modelCase));
   checks.push(...statementHierarchyChecks(modelCase));
+  checks.push(...statementTopologyChecks(modelCase));
   checks.push(...historicalProvenanceChecks(modelCase));
   checks.push(...forecastAuthorityChecks(modelCase));
   checks.push(...cashBucketStatementChecks(modelCase));

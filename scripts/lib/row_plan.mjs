@@ -13,6 +13,10 @@ import {
 import { isBalancingRcf } from "./rcf_policy.mjs";
 import { resolvedLeaseInterestBasis } from "./lease_policy.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
+import {
+  assertStatementTopology,
+  repairStatementSourceOrder,
+} from "./statement_topology.mjs";
 
 /**
  * THREE RANKS OF TOTAL — RESOLVED FROM SEMANTIC ROLE *AND SECTION*, NEVER FROM A
@@ -937,7 +941,9 @@ function deriveIndentLevels(rows) {
 function stripLabelIndentSpaces(rows) {
   for (const row of rows) {
     if (typeof row.label !== "string") continue;
-    row.label = row.label.replace(/^\s+/, "");
+    row.label = row.label
+      .replace(/^\s+/, "")
+      .replace(/^(?:[\u2022\u00b7\u25aa\u25e6]|[\u2013\u2014-])\s+/u, "");
   }
 }
 
@@ -1353,6 +1359,7 @@ export function normaliseStatementRows(modelCase, section) {
       : cloneRows(
     section === "income_statement" ? DEFAULT_INCOME_ROWS : DEFAULT_CASH_FLOW_ROWS,
       );
+  repairStatementSourceOrder(modelCase, section, rows);
   applyStatementHierarchy(rows);
   // Older mapped cases may preserve a source label but carry no semantic role.
   // Adopt only the classifier's high-confidence cash-interest roles here; an
@@ -1825,8 +1832,13 @@ export function compileRowPlan(modelCase) {
 
   sectionHeaders.income_statement = cursor;
   cursor += 1;
+  const incomeDefinitions = normaliseStatementRows(
+    modelCase,
+    "income_statement",
+  );
+  assertStatementTopology(modelCase, "income_statement", incomeDefinitions);
   const income = allocateRows(
-    normaliseStatementRows(modelCase, "income_statement"),
+    incomeDefinitions,
     cursor,
     rowsById,
     "income_statement",
@@ -1835,8 +1847,10 @@ export function compileRowPlan(modelCase) {
 
   sectionHeaders.cash_flow = cursor;
   cursor += 1;
+  const cashFlowDefinitions = normaliseStatementRows(modelCase, "cash_flow");
+  assertStatementTopology(modelCase, "cash_flow", cashFlowDefinitions);
   const cashFlow = allocateRows(
-    normaliseStatementRows(modelCase, "cash_flow"),
+    cashFlowDefinitions,
     cursor,
     rowsById,
     "cash_flow",

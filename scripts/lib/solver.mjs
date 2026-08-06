@@ -2207,6 +2207,27 @@ export function solveCase(
         ["non_balancing_cash_bucket_movement", nonBalancingCashBucketMovement],
         ["acquisition_consideration", 0],
       ]);
+      if (
+        statementRoleIsCalculated(
+          modelCase,
+          "cash_interest_paid",
+          forecastIndex,
+        )
+      ) {
+        statementOverrides.set(
+          "cash_interest_paid",
+          -(grossInterest - nonCashInterest - nonCashInstrumentInterest),
+        );
+      }
+      if (
+        statementRoleIsCalculated(
+          modelCase,
+          "cash_interest_received",
+          forecastIndex,
+        )
+      ) {
+        statementOverrides.set("cash_interest_received", interestIncome);
+      }
       const cashFlowGraph = declaredStatementPeriod(
         modelCase,
         periodIndex,

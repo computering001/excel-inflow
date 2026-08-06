@@ -8,8 +8,9 @@ import {
 } from "./lib/statement_classifier.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { validateCaseShape } from "./lib/solver.mjs";
-import { compileRowPlan } from "./lib/row_plan.mjs";
+import { compileRowPlan, normaliseStatementRows } from "./lib/row_plan.mjs";
 import { compileSemanticManifest } from "./lib/semantic_graph.mjs";
+import { compileStatementTopology } from "./lib/statement_topology.mjs";
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function clone(value) { return structuredClone(value); }
@@ -100,6 +101,97 @@ Object.assign(interestSource, { label: "Finance costs", ...accepted({ label: "Fi
 
 assert(validateCaseShape(fixture).length === 0, "Evidence fixture failed schema validation.");
 assert(assessCoverage(fixture).ready_to_build, "Evidence fixture did not pass baseline coverage.");
+
+const orderInversion = clone(fixture);
+const orderedIncomeIds = orderInversion.source_coverage.income_statement
+  .flatMap((source) => source.mapped_row_ids ?? [])
+  .filter((rowId, index, ids) => ids.indexOf(rowId) === index);
+const firstOrderedIndex = orderInversion.statement_structure.income_statement
+  .findIndex((row) => row.row_id === orderedIncomeIds[0]);
+const lastOrderedIndex = orderInversion.statement_structure.income_statement
+  .findIndex((row) => row.row_id === orderedIncomeIds.at(-1));
+assert(firstOrderedIndex >= 0 && lastOrderedIndex > firstOrderedIndex,
+  "Representative fixture needs at least two ordered income-statement rows.");
+[
+  orderInversion.statement_structure.income_statement[firstOrderedIndex],
+  orderInversion.statement_structure.income_statement[lastOrderedIndex],
+] = [
+  orderInversion.statement_structure.income_statement[lastOrderedIndex],
+  orderInversion.statement_structure.income_statement[firstOrderedIndex],
+];
+const repairedIncome = normaliseStatementRows(
+  orderInversion,
+  "income_statement",
+);
+const repairedTopology = compileStatementTopology(
+  orderInversion,
+  "income_statement",
+  repairedIncome,
+);
+assert(
+  !repairedTopology.errors.some(
+    (error) => error.code === "SOURCE_ORDER_INVERSION",
+  ),
+  "The deterministic statement compiler did not restore a face-statement source-order inversion.",
+);
+assert(
+  assessCoverage(orderInversion).ready_to_build,
+  "A repairable source-order inversion remained blocked after deterministic normalization.",
+);
+
+for (const section of ["income_statement", "cash_flow"]) {
+  const reversedCase = clone(fixture);
+  const rank = new Map();
+  reversedCase.source_coverage[section].forEach((source, index) => {
+    for (const rowId of source.mapped_row_ids ?? []) {
+      if (!rank.has(rowId)) rank.set(rowId, index);
+    }
+  });
+  const rows = reversedCase.statement_structure[section];
+  const slots = rows
+    .map((row, index) => (rank.has(row.row_id) ? index : -1))
+    .filter((index) => index >= 0);
+  const reversed = slots.map((index) => rows[index]).reverse();
+  slots.forEach((slot, index) => {
+    rows[slot] = reversed[index];
+  });
+  const compiled = normaliseStatementRows(reversedCase, section);
+  const topology = compileStatementTopology(reversedCase, section, compiled);
+  assert(
+    topology.errors.length === 0,
+    `${section} full source-sequence reversal was not repaired: ${JSON.stringify(topology.errors)}`,
+  );
+}
+
+const duplicateAuthority = clone(fixture);
+const duplicateRevenue = duplicateAuthority.statement_structure.income_statement
+  .find((row) => row.semantic_role !== "revenue" && row.row_type !== "header");
+duplicateRevenue.semantic_role = "revenue";
+assert(
+  hasBlock(assessCoverage(duplicateAuthority), "statement_topology.income_statement"),
+  "Two visible revenue authorities were allowed through the topology gate.",
+);
+
+const orphanPrefix = clone(fixture);
+orphanPrefix.statement_structure.cash_flow.unshift({
+  row_id: "orphan_numeric_prefix",
+  label: "Unowned cash-flow basis",
+  row_type: "input",
+  values: [1, 1, 1, null, null, null],
+  forecast_treatment: "uncalculated",
+});
+assert(
+  hasBlock(assessCoverage(orphanPrefix), "statement_topology.cash_flow"),
+  "An unowned historical row before the cash-flow source tree was allowed through the topology gate.",
+);
+
+const bulletLabel = clone(fixture);
+bulletLabel.statement_structure.income_statement[0].label =
+  `— ${bulletLabel.statement_structure.income_statement[0].label}`;
+assert(
+  !normaliseStatementRows(bulletLabel, "income_statement")[0].label.startsWith("—"),
+  "A source-layout dash survived as literal model label content.",
+);
 
 const ambiguous = clone(fixture);
 Object.assign(ambiguous.source_coverage.income_statement.find((source) => source.source_line_id === interestSource.source_line_id), {
@@ -323,4 +415,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 2 hierarchy authorities, 6 hierarchy mutations).");
+console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 6 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");

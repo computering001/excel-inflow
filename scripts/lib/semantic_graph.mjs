@@ -1,5 +1,6 @@
 import { deterministicCaseHash } from "./validation_invariants.mjs";
 import { resolveForecastAuthority } from "./forecast_authority.mjs";
+import { compileStatementTopology } from "./statement_topology.mjs";
 
 const MOVEMENT_DEFINITIONS = {
   operating_cash_flow: {
@@ -973,6 +974,16 @@ export function compileSemanticManifest(modelCase, rowPlan) {
       status: period.status,
     })),
     movement_contract: MOVEMENT_DEFINITIONS,
+    statement_topology: Object.fromEntries(
+      ["income_statement", "cash_flow"].map((section) => [
+        section,
+        compileStatementTopology(
+          modelCase,
+          section,
+          rowPlan.statement_rows?.[section] ?? [],
+        ),
+      ]),
+    ),
     source_inventory: sourceInventory(modelCase),
     nodes,
     edges: graphEdges(nodes, rowPlan),

@@ -16,6 +16,13 @@ Run one deterministic graph:
 
 The semantic graph is canonical; physical row numbers are compiled output. Preserve the issuer label, attach a semantic role and evidence class, and route unmatched material rows to one targeted question or a fail-closed stop. Never solve from workbook coordinates or add a cell-specific exception.
 
+Compile the statement-topology subgraph before allocating physical rows. Its
+visible-successor edges preserve face-statement order and its parent edges own
+contiguous collapsible families. Never build a generic short statement and
+append remaining issuer rows afterwards. A source-order inversion, duplicate
+visible authority, orphan numeric row, child before its parent or
+non-contiguous family blocks before emission.
+
 The semantic graph also carries one resolved forecast authority for each row
 and forecast period.  Formula identities and schedule-owned rows resolve before
 the independent-input evidence waterfall.  A first forecast year may be
