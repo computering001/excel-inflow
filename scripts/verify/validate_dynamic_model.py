@@ -520,6 +520,35 @@ def main(argv: List[str]) -> int:
         )
     )
 
+    formula_lengths = sorted(
+        len(text)
+        for text in operating_model.formula_cells.values()
+        if isinstance(text, str) and text.startswith("=")
+    )
+    formula_maximum = formula_lengths[-1] if formula_lengths else 0
+    formula_p95 = (
+        formula_lengths[
+            min(len(formula_lengths) - 1, int(len(formula_lengths) * 0.95))
+        ]
+        if formula_lengths
+        else 0
+    )
+    checks.append(
+        record(
+            "formula-complexity-contract",
+            formula_maximum <= 1600 and formula_p95 <= 750,
+            "Visible formulas remain auditable: no formula exceeds 1,600 "
+            "characters and the 95th percentile does not exceed 750 characters.",
+            {
+                "formula_count": len(formula_lengths),
+                "maximum_characters": formula_maximum,
+                "p95_characters": formula_p95,
+                "maximum_allowed": 1600,
+                "p95_allowed": 750,
+            },
+        )
+    )
+
     # ------------------------------------------ semantic-artifact-completeness
     semantic_artifact_errors = validate_semantic_artifacts(
         semantic_manifest, source_crosswalk

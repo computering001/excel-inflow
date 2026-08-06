@@ -32,6 +32,10 @@
       "enum": ["legacy", "waterfall_v1"],
       "description": "waterfall_v1 requires every independent forecast hardcode to declare its selected authority separately for FY1, FY2 and FY3. Formula, schedule and intentionally uncalculated rows remain graph-derived."
     },
+    "statement_authority_contract_version": {
+      "enum": ["legacy", "authority_v1"],
+      "description": "authority_v1 requires every visible non-header statement row to declare whether its historical cells are sourced inputs, derived formulas, reported totals reconciled to visible components, or links to a schedule authority."
+    },
     "presentation_profile": {
       "const": "crh_dynamic",
       "default": "crh_dynamic"
@@ -695,6 +699,14 @@
         "row_type": {
           "enum": ["input", "calculation", "subtotal", "header", "uncalculated"]
         },
+        "historical_authority": {
+          "enum": ["source_input", "derived_formula", "reported_total_reconciled", "schedule_link", "not_applicable"],
+          "description": "The sole authority for the three historical cells. reported_total_reconciled emits a formula from visible components and retains the filed total separately as reconciliation evidence."
+        },
+        "reported_historical_values": {
+          "$ref": "#/$defs/series3",
+          "description": "Filed historical total retained only for a reported_total_reconciled row. The workbook emits the declared formula, and validation proves that formula against these three source totals."
+        },
         "semantic_role": { "type": "string" },
         "operation_scope": {
           "enum": ["continuing", "discontinued", "combined", "not_applicable"],
@@ -1086,10 +1098,14 @@
           ]
         },
         "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "balance_basis": {
+          "enum": ["native_principal", "reporting_currency_carrying_value"],
+          "description": "Basis of opening_balance and supplied principal movements. Denomination never implies basis. Native principal is translated through FX; a reporting-currency carrying value must never be translated again."
+        },
         "opening_balance": {
           "type": "number",
           "minimum": 0,
-          "description": "Opening balance in the instrument's declared native currency. Reporting-currency presentation is derived through the declared period-end FX pair."
+          "description": "Opening balance on balance_basis. The instrument currency remains the legal denomination even when this value is a reporting-currency carrying amount."
         },
         "maturity_date": { "type": ["string", "null"], "format": "date" },
         "maturity_precision": {
@@ -1110,7 +1126,7 @@
         "new_issuance": { "$ref": "#/$defs/series3" },
         "forecast_ending_balances": {
           "$ref": "#/$defs/series3",
-          "description": "Optional sourced native-currency period-end balances. These do not replace formulas: each must reconcile to opening + declared issuance + declared non-cash movements + PIK - amortisation - maturity repayment. A mismatch blocks the solve."
+          "description": "Optional sourced period-end balances on balance_basis. These do not replace formulas: each must reconcile to opening + declared issuance + declared non-cash movements + PIK - amortisation - maturity repayment. A mismatch blocks the solve."
         },
         "balance_authority_note": {
           "type": "string",

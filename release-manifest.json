@@ -5,12 +5,12 @@
   "skillVersion": "2.0.6",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-06T07:17:45.964Z",
-  "centralInstructionsWords": 3549,
+  "generatedAt": "2026-08-06T20:09:48.916Z",
+  "centralInstructionsWords": 3716,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "4bc5ed4fd82235818a0ac31b396d2c52ce151450a33a79397fb6d0aef1b3c943",
+    "currentClosureSha256": "97f9efbfdf742d3331e90e9941b300126450c997bdd36d671dfce3c875a5f4e5",
     "closureFileCount": 95,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -241,20 +241,20 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python",
+      "selected": "python3.12",
       "candidates": [
         {
-          "candidate": "python",
-          "version": "3.11.15",
+          "candidate": "python3.12",
+          "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
             "fitz": null,
-            "PIL": null,
-            "numpy": null,
+            "PIL": "12.2.0",
+            "numpy": "2.3.5",
             "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": null,
-            "reportlab": null
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
           "usable": true,
           "reason": "selected"
@@ -671,7 +671,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python",
+    "pythonExecutable": "python3.12",
     "results": [
       {
         "target": "closure probe",
@@ -793,18 +793,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
-        "plan_sha256": "a6e1c8e5c664af66f829427c8b7c5047065d5a849a79ac9c6f707788f9165071",
-        "workbook_sha256": "336191a83b6bb81befac268dd3e022a9e340c304e26e34b9d1e5f657de2ebcca",
+        "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
+        "plan_sha256": "f82ea79cb761d629ad504ab8f5514d5175052e591921fca15925f0c8da500882",
+        "workbook_sha256": "d158ff8218e6459c6508593539b22ceef51b4f3d767358e688029bf5447e1923",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
-      "plan_sha256": "a6e1c8e5c664af66f829427c8b7c5047065d5a849a79ac9c6f707788f9165071",
-      "workbook_sha256": "336191a83b6bb81befac268dd3e022a9e340c304e26e34b9d1e5f657de2ebcca",
+      "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
+      "plan_sha256": "f82ea79cb761d629ad504ab8f5514d5175052e591921fca15925f0c8da500882",
+      "workbook_sha256": "d158ff8218e6459c6508593539b22ceef51b4f3d767358e688029bf5447e1923",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -834,21 +834,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "d4f21b5d98af99015491119572b5f35b54a150412d373de8ce2f3ddbd9e6841a",
-      "bytes": 26426,
-      "words": 3549
+      "sha256": "62d5c167710c806c7f5b0c48d72371a95a37c092655543b3c771ef57190d09b0",
+      "bytes": 27732,
+      "words": 3716
     },
     {
       "path": "SKILL.md",
-      "sha256": "11e87d5a14e906fe3bd70f69ca464015aee6a79c1762eb20f7a70671e7e055ea",
-      "bytes": 26913,
-      "words": 3618
+      "sha256": "3c6d3c3907189164dd34bcd96c8565094677655d32d8f937b284d51790a4c38e",
+      "bytes": 28219,
+      "words": 3785
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "e63c3a852a2eccc2f41bb0dec01348568c7293eaf6e9aff939fe22bca6c53112",
-      "bytes": 26446,
-      "words": 3551
+      "sha256": "f98149cde29f88bd97a447353fb1c607b6aec38339c6ebbc459ae81871977502",
+      "bytes": 27752,
+      "words": 3718
     },
     {
       "path": "references/model-contract.md",
@@ -924,8 +924,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "62996d4db60fa7675e814487d55c8dd082a37f37249a936d26855fff72d9662a",
-      "bytes": 46247,
+      "sha256": "1de413101d705d1a4bf6f5e5707c91da67140294f2d89860bad0fc7a1ad967aa",
+      "bytes": 47615,
       "words": null
     },
     {
@@ -984,8 +984,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "57c471eb379ac739c9e18a0cde05b4b58a397f13ae05452a48acece425b64667",
-      "bytes": 449888,
+      "sha256": "df619cfdf5992f17afafaa86aca830d76891830859e4c81ab85da61aa30f96bd",
+      "bytes": 450963,
       "words": null
     },
     {
@@ -1074,8 +1074,8 @@
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "c1d873ff830f1c6ba99c150e76ac30b95b4ee614a2951a1955e3607d48cbfdad",
-      "bytes": 61155,
+      "sha256": "dd539b56d3f5a9f47f7a5978bd64e36f21053bf23037cb15ad4b9bf845c9fd55",
+      "bytes": 66868,
       "words": null
     },
     {
@@ -1230,8 +1230,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "0333efe7298ad6a8f68bbee34d9b2676585ff3c951393929f490e629fd9faa71",
-      "bytes": 93144,
+      "sha256": "bcd57576fcc6d9ceb9bf8d177763e255fdd232a0ed0877165a982e562369ef00",
+      "bytes": 94232,
       "words": null
     },
     {
@@ -1260,8 +1260,8 @@
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "3ff2116aa2bfbd35f23580a2638061b65d7e1f7f4acd1e05b798ea439e57514e",
-      "bytes": 106883,
+      "sha256": "95021b26cf4910a4cd6dca097db271b1cbe20269a936cfc84c59a54c2825eabe",
+      "bytes": 107265,
       "words": null
     },
     {
@@ -1374,8 +1374,8 @@
     },
     {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "c3edcab2391e00a680747a2f0ddf082a8769eb44e9e5ed032c76445053561fad",
-      "bytes": 19293,
+      "sha256": "6b3e4037c549ff6b061642fede9119a01fafec48d44fa7ea96e63805c1d87cdd",
+      "bytes": 19341,
       "words": null
     },
     {
@@ -1452,8 +1452,8 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "aa7f460e886cac75543ba15586add82f56af727337ad8e1224ae71969181b47d",
-      "bytes": 118012,
+      "sha256": "5319af0150a3f21dcf0d111622df7142f6bdd3ba17165418d08260244e50fc9d",
+      "bytes": 119005,
       "words": null
     },
     {

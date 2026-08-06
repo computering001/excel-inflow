@@ -531,6 +531,12 @@ function fxRate(modelCase, currency, periodIndex, kind) {
   return fx.quote === "reporting_per_native" ? raw : 1 / raw;
 }
 
+function instrumentBalanceCurrency(modelCase, instrument) {
+  return instrument?.balance_basis === "reporting_currency_carrying_value"
+    ? modelCase.issuer.reporting_currency
+    : instrument?.currency;
+}
+
 function allInRate(instrument, forecastIndex) {
   const manual = asSeries3(instrument.coupon_or_all_in_rate, 0)[forecastIndex];
   if (instrument.rate_type !== "floating") return manual;
@@ -948,7 +954,12 @@ export function validateCaseShape(modelCase) {
             }
             linkedOpeningReporting +=
               Number(instrument.opening_balance ?? 0) *
-              fxRate(modelCase, instrument.currency, 2, "period_end");
+              fxRate(
+                modelCase,
+                instrumentBalanceCurrency(modelCase, instrument),
+                2,
+                "period_end",
+              );
           }
           const latestHistorical = Number(bucket.historical_year_end?.[2] ?? 0);
           if (Math.abs(latestHistorical - linkedOpeningReporting) > 1e-8) {
@@ -1742,15 +1753,16 @@ export function solveCase(
             `declared ${Number(sourcedEndingNative)}, formula roll-forward ${endingNative}.`,
         );
       }
+      const balanceCurrency = instrumentBalanceCurrency(modelCase, instrument);
       const averageFx = fxRate(
         modelCase,
-        instrument.currency,
+        balanceCurrency,
         periodIndex,
         "average",
       );
       const endingFx = fxRate(
         modelCase,
-        instrument.currency,
+        balanceCurrency,
         periodIndex,
         "period_end",
       );
@@ -1771,7 +1783,7 @@ export function solveCase(
         openingNative *
         fxRate(
           modelCase,
-          instrument.currency,
+          balanceCurrency,
           Math.max(0, periodIndex - 1),
           "period_end",
         );
@@ -1835,7 +1847,7 @@ export function solveCase(
           openingNative *
             fxRate(
               modelCase,
-              instrument.currency,
+              balanceCurrency,
               Math.max(0, periodIndex - 1),
               "period_end",
             ) -

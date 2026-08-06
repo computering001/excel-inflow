@@ -32,6 +32,27 @@ cross-sheet broker link, a visible hardcode, a formula-driven zero and an
 intentional grey blank.  An unresolved material forecast path blocks; it never
 falls through to `=0`.
 
+For a production evidence run, set
+`statement_authority_contract_version=authority_v1`. Every visible non-header
+statement row must declare one historical authority: `source_input`,
+`derived_formula`, `reported_total_reconciled`, `schedule_link` or
+`not_applicable`. When a filed subtotal and its visible components are both
+shown, emit the subtotal as a formula, retain the filed value in
+`reported_historical_values`, and prove the reconciliation. Never turn a
+derived total into a blue hardcode merely because the filing printed it.
+The same production run must set
+`forecast_authority_contract_version=waterfall_v1`; legacy implicit zeros or
+unexplained grey forecast cells are forbidden. Every material historical line
+must either have its own executable forecast path or be a declared child of a
+visible parent whose forecast captures it in the same period.
+
+Every instrument also declares `balance_basis`. Keep legal denomination in
+`currency`, but set `native_principal` only when the supplied balance and
+principal movements are genuinely native-currency amounts. Use
+`reporting_currency_carrying_value` for a debt-export carrying value already
+translated into the issuer's reporting currency. The latter must never pass
+through FX again; a placeholder 1.0 curve is not an acceptable workaround.
+
 The portable controller owns the stage order and module registry. Each module declares inputs, outputs, invariants and allowed remedies. A stage may not silently skip, widen a tolerance, change a validator or infer a material missing term. Convergence must be declared before solving; non-convergence is a failure.
 
 Read only the reference needed for the current stage:

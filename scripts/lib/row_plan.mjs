@@ -1879,6 +1879,10 @@ export function compileRowPlan(modelCase) {
   for (const currency of [
     ...new Set(
       sorted
+        .filter(
+          (instrument) =>
+            instrument.balance_basis !== "reporting_currency_carrying_value",
+        )
         .map((instrument) => instrument.currency)
         .filter(
           (currency) =>
@@ -1940,6 +1944,7 @@ export function compileRowPlan(modelCase) {
       undrawn_row: null,
       issuance_row: null,
       amortisation_row: null,
+      repayment_row: null,
       pik_row: null,
       fair_value_row: null,
       other_non_cash_row: null,
@@ -1966,6 +1971,26 @@ export function compileRowPlan(modelCase) {
     ) {
       plan.amortisation_row = cursor;
       rowsById[`debt.${instrument.instrument_id}.amortisation`] = cursor;
+      cursor += 1;
+    }
+    const lastHistoricalEnd = new Date(modelCase.periods?.[2]?.date ?? 0);
+    const lastForecastEnd = new Date(modelCase.periods?.[5]?.date ?? 0);
+    const maturity = instrument.maturity_date
+      ? new Date(instrument.maturity_date)
+      : null;
+    const forecastMaturity =
+      instrument.class !== "rcf" &&
+      instrument.maturity_treatment !== "non_maturing_within_forecast" &&
+      maturity &&
+      !Number.isNaN(maturity.getTime()) &&
+      maturity > lastHistoricalEnd &&
+      maturity <= lastForecastEnd;
+    if (
+      instrument.class !== "rcf" &&
+      (forecastMaturity || Number.isInteger(plan.amortisation_row))
+    ) {
+      plan.repayment_row = cursor;
+      rowsById[`debt.${instrument.instrument_id}.repayment`] = cursor;
       cursor += 1;
     }
     if (
@@ -2427,6 +2452,9 @@ export function compileRowPlan(modelCase) {
     // silently dropped. Appended to, never replaced, so other sections can add
     // their own groups without fighting over the key.
     outline_rows: [
+      ...instrumentPlans
+        .filter((plan) => Number.isInteger(plan.repayment_row))
+        .map((plan) => ({ row: plan.repayment_row, level: 1 })),
       { row: interestSummaryRows.rcf_interest, level: 1 },
       { row: interestSummaryRows.rcf_commitment_fee, level: 1 },
       // The two rows that derive the unallocated-interest residual, grouped

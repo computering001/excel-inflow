@@ -831,13 +831,12 @@ function applyConditionalState(sheet, rowPlan, context) {
     );
   }
   for (const plan of rowPlan.instruments) {
-    if (!plan.amortisation_row) continue;
+    if (!plan.amortisation_row && !plan.repayment_row) continue;
     for (const pair of ["J:L", "N:P", "S:U"]) {
       const [first, last] = pair.split(":");
-      recede(
-        `${first}${plan.amortisation_row}:${last}${plan.amortisation_row}`,
-        maturityRollOff,
-      );
+      for (const row of [plan.amortisation_row, plan.repayment_row].filter(Boolean)) {
+        recede(`${first}${row}:${last}${row}`, maturityRollOff);
+      }
     }
   }
 
@@ -2416,7 +2415,7 @@ function configureOperatingModel(
     ],
     [
       c.debt_maturities_roll,
-      "Debt maturities roll",
+      "Debt maturity repayments",
       Number(modelCase.controls.debt_maturities_roll),
       "toggle",
     ],
@@ -2709,6 +2708,19 @@ function configureOperatingModel(
     ].filter(Number.isInteger);
     return sumCellFormula(rows.map((row) => `${column}${row}`));
   };
+  const endingCashStatementFormula = (column) => {
+    const rows = [
+      statementByRole.get("opening_cash")?.row,
+      statementByRole.get("net_change_in_cash")?.row,
+      statementByRole.get("fx_effect_on_cash")?.row,
+    ].filter(Number.isInteger);
+    if (rows.length < 2) {
+      throw new Error(
+        "Ending cash requires opening cash and net change in cash statement roles.",
+      );
+    }
+    return sumCellFormula(rows.map((row) => `${column}${row}`));
+  };
   const nonBalancingBucketMovementFormula = (
     column,
     priorColumn,
@@ -2817,23 +2829,14 @@ function configureOperatingModel(
     }
     if (role === "opening_cash") {
       const prior = forecastIndex === 0 ? "I" : FORECAST_COLUMNS[forecastIndex - 1];
-      if (explicitCashBuckets) {
-        return cashFlowCashFormula(prior);
-      }
       return `=${prior}${statementByRole.get("ending_cash").row}`;
     }
     if (role === "ending_cash") {
-      if (explicitCashBuckets) {
-        return cashFlowCashFormula(column);
-      }
-      // The sweep no longer restates ending cash on a row of its own, so the
-      // cash flow closes on the sweep's own arithmetic: cash before the
-      // revolver, plus the draw, less the repayment.
-      return (
-        `=${column}${waterfallRows.cash_before_rcf}` +
-        `+${column}${waterfallRows.rcf_draw_waterfall}` +
-        `-${column}${waterfallRows.rcf_repayment_waterfall}`
-      );
+      // The cash-flow statement owns its own closing cash through the declared
+      // opening + movement + FX identity. Cash buckets, liquidity and interest
+      // are consumers of that answer; they never push a same-period balance
+      // back up into the statement.
+      return endingCashStatementFormula(column);
     }
     // The acquisition overlays used to own three rows here and pinned them to
     // zero in the standalone columns. They now ride on company-reported lines,
@@ -3108,22 +3111,11 @@ function configureOperatingModel(
             // The pro-forma block opens on the SAME last actual the standalone
             // block opens on, so the acquisition adds nothing to FY1 opening
             // cash. Thereafter it inherits the prior year's closing adjustment.
-            return explicitCashBuckets
-              ? priorAdjustmentColumn
-                ? cashFlowCashFormula(priorAdjustmentColumn)
-                : "=0"
-              : priorAdjustmentColumn
-                ? `=${priorAdjustmentColumn}${statementByRole.get("ending_cash").row}`
-                : "=0";
+            return priorAdjustmentColumn
+              ? `=${priorAdjustmentColumn}${statementByRole.get("ending_cash").row}`
+              : "=0";
           case "ending_cash":
-            if (explicitCashBuckets) {
-              return cashFlowCashFormula(adjustmentColumn);
-            }
-            return (
-              `=${adjustmentColumn}${waterfallRows.cash_before_rcf}` +
-              `+${adjustmentColumn}${waterfallRows.rcf_draw_waterfall}` +
-              `-${adjustmentColumn}${waterfallRows.rcf_repayment_waterfall}`
-            );
+            return endingCashStatementFormula(adjustmentColumn);
           case "change_in_debt":
             return Number.isInteger(debtRows.total_change_in_debt)
               ? `=${adjustmentColumn}${debtRows.total_change_in_debt}`
@@ -3341,11 +3333,7 @@ function configureOperatingModel(
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
-          explicitCashBuckets
-            ? cashFlowCashFormula(proFormaColumn)
-            : `=${proFormaColumn}${waterfallRows.cash_before_rcf}` +
-                `+${proFormaColumn}${waterfallRows.rcf_draw_waterfall}` +
-                `-${proFormaColumn}${waterfallRows.rcf_repayment_waterfall}`,
+          endingCashStatementFormula(proFormaColumn),
         );
       } else if (
         definition.semantic_role === "non_balancing_cash_bucket_movement"
@@ -3501,6 +3489,10 @@ function configureOperatingModel(
   // carrying its own 'Forward Curves' round trip and, where the case quotes the
   // pair the other way round, an invisible 1/x.
   const reportingCurrency = modelCase.issuer.reporting_currency;
+  const instrumentBalanceCurrency = (instrument) =>
+    instrument?.balance_basis === "reporting_currency_carrying_value"
+      ? reportingCurrency
+      : instrument?.currency;
   const debtFxRows = rowPlan.debt_fx_rows ?? {};
   // No visible row means the row plan found the forecast rate FLAT. The rate is
   // then a single constant and the balances point straight at the one curve cell
@@ -3646,8 +3638,8 @@ function configureOperatingModel(
     const periodDays = `(${periodEnd}-${periodStart}+1)`;
     const maturityCell = `$E${plan.debt_row}`;
     const maturityActive =
-      `AND($C$${c.debt_maturities_roll}=1,ISNUMBER(${maturityCell}),` +
-      `${maturityCell}<=${periodEnd})`;
+      `IF($C$${c.debt_maturities_roll}=1,` +
+      `IF(ISNUMBER(${maturityCell}),IF(${maturityCell}<=${periodEnd},1,0),0),0)`;
     const activeEnd = `IF(${maturityActive},MIN(${maturityCell},${periodEnd}),${periodEnd})`;
     const activeFraction = `MAX(0,${activeEnd}-${periodStart}+1)/${periodDays}`;
     const fallbackMovementFraction = `((${activeFraction})/2)`;
@@ -3728,7 +3720,7 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `I${plan.debt_row}`,
-      `=$D${plan.debt_row}*${fxCell(instrument.currency, "I")}`,
+      `=$D${plan.debt_row}*${fxCell(instrumentBalanceCurrency(instrument), "I")}`,
     );
     // R IS THE PRO-FORMA BLOCK'S LAST ACTUAL — IT MUST NOT BE BLANK.
     //
@@ -3816,6 +3808,13 @@ function configureOperatingModel(
       );
       styleInput(sheet, `J${plan.amortisation_row}:L${plan.amortisation_row}`);
     }
+    if (plan.repayment_row) {
+      setValue(sheet, `B${plan.repayment_row}`, "Mandatory repayment");
+      setLabelIndent(sheet, rowPlan, plan.repayment_row, 1);
+      setPeriodNumberFormat(sheet, plan.repayment_row, AMOUNT);
+      sheet.getRange(`G${plan.repayment_row}:I${plan.repayment_row}`).format.fill =
+        COLORS.grey;
+    }
     if (plan.pik_row) {
       setValue(sheet, `B${plan.pik_row}`, "PIK / capitalised interest");
       setLabelIndent(sheet, rowPlan, plan.pik_row, 1);
@@ -3849,7 +3848,7 @@ function configureOperatingModel(
 
     if (isBalancingRcf(modelCase, instrument)) {
       const foreignRcf =
-        instrument.currency && instrument.currency !== reportingCurrency;
+        instrumentBalanceCurrency(instrument) !== reportingCurrency;
       setValue(
         sheet,
         `I${plan.debt_row}`,
@@ -3912,11 +3911,12 @@ function configureOperatingModel(
       // of this one — exactly how a reader would find it. Where the forecast
       // rate never moves there is no row, and both rates resolve to the same
       // curve cell.
-      const endFx = fxCell(instrument.currency, column);
+      const balanceCurrency = instrumentBalanceCurrency(instrument);
+      const endFx = fxCell(balanceCurrency, column);
       const averageFx = fxFormula(
         modelCase,
         curveRows,
-        instrument.currency,
+        balanceCurrency,
         index + 3,
         "average",
       );
@@ -3925,11 +3925,11 @@ function configureOperatingModel(
           ? fxFormula(
               modelCase,
               curveRows,
-              instrument.currency,
+              balanceCurrency,
               2,
               "period_end",
             )
-          : fxCell(instrument.currency, FORECAST_COLUMNS[index - 1]);
+          : fxCell(balanceCurrency, FORECAST_COLUMNS[index - 1]);
       const priorClosing = `$${FORECAST_COLUMNS[index - 1] ?? "I"}${plan.debt_row}`;
       const opening =
         index === 0
@@ -3951,9 +3951,10 @@ function configureOperatingModel(
         `MIN(${availableBeforeAmortisation},${amortisation})`;
       const baseEndingBeforePik =
         `MAX(0,${opening}+${issuance}+${fairValue}+${otherNonCash}-${cappedAmortisation})`;
-      const matures =
-        `AND($C$${c.debt_maturities_roll}=1,ISNUMBER($E${plan.debt_row}),` +
-        `$E${plan.debt_row}<=${column}$${rowPlan.period_row})`;
+      const matures = instrument.maturity_date
+        ? `IF($C$${c.debt_maturities_roll}=1,` +
+          `IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},1,0),0)`
+        : "0";
       const pikRateRow = rowPlan.pik_rate_rows?.[instrument.instrument_id];
       const pikRate = pikRateRow ? `$${column}$${pikRateRow}` : "0";
       const timing = instrumentTimingExpressions(
@@ -3978,18 +3979,33 @@ function configureOperatingModel(
       }
       const preMaturity =
         `MAX(0,${baseEndingBeforePik}+${plan.pik_row ? `$${column}${plan.pik_row}` : "0"})`;
-      mandatoryRepaymentExpressions[index].push(
+      const mandatoryRepaymentExpression =
         `-(${cappedAmortisation}+IF(${matures},${preMaturity},0))` +
-          `*${averageFx}`,
-      );
+        `*${averageFx}`;
+      if (plan.repayment_row) {
+        applyFormula(
+          sheet,
+          `${column}${plan.repayment_row}`,
+          `=${mandatoryRepaymentExpression}`,
+        );
+        applyFormula(sheet, `${adjustmentColumn}${plan.repayment_row}`, "=0");
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${plan.repayment_row}`,
+          `=${column}${plan.repayment_row}`,
+        );
+        mandatoryRepaymentExpressions[index].push(
+          `${column}${plan.repayment_row}`,
+        );
+      }
       applyFormula(
         sheet,
         `${column}${plan.debt_row}`,
         `=${preMaturity}*IF(${matures},0,1)*${endFx}`,
       );
       if (
-        instrument.currency &&
-        instrument.currency !== reportingCurrency
+        balanceCurrency &&
+        balanceCurrency !== reportingCurrency
       ) {
         const openingReporting = priorClosing;
         const nonCashReporting =
@@ -4331,7 +4347,7 @@ function configureOperatingModel(
   );
   const rcfInstrument = balancingRcfInstrument(modelCase);
   const foreignRcf = Boolean(
-    rcfInstrument?.currency && rcfInstrument.currency !== reportingCurrency,
+    instrumentBalanceCurrency(rcfInstrument) !== reportingCurrency,
   );
   const rcfAverageFx = (index) =>
     foreignRcf
@@ -4725,12 +4741,20 @@ function configureOperatingModel(
     if (explicitCashBuckets) {
       for (const bucket of cashBucketPlans) {
         if (bucket.forecast_treatment === "balancing") {
+          const otherCashFlowBuckets = cashBucketPlans
+            .filter(
+              (candidate) =>
+                candidate !== bucket &&
+                candidate.included_in_cash_flow_cash !== false,
+            )
+            .map((candidate) => `${column}${candidate.balance_row}`);
           applyFormula(
             sheet,
             `${column}${bucket.balance_row}`,
-            `=${column}${waterfallRows.cash_before_rcf}` +
-              `+${column}${waterfallRows.rcf_draw_waterfall}` +
-              `-${column}${waterfallRows.rcf_repayment_waterfall}`,
+            `=${column}${statementEndingCashRow}` +
+              (otherCashFlowBuckets.length
+                ? `-SUM(${otherCashFlowBuckets.join(",")})`
+                : ""),
           );
         } else if (bucket.forecast_treatment === "hardcode") {
           setValue(
@@ -5135,7 +5159,7 @@ function configureOperatingModel(
         const rate = fxFormula(
           modelCase,
           curveRows,
-          instrument.currency,
+          instrumentBalanceCurrency(instrument),
           forecastIndex + 3,
           "average",
         );
@@ -5805,16 +5829,17 @@ function configureOperatingModel(
           `=${proFormaColumn}${interestRows.rcf_interest}`,
         );
       } else {
+        const balanceCurrency = instrumentBalanceCurrency(instrument);
         const standalonePriorFx =
           index === 0
             ? fxFormula(
                 modelCase,
                 curveRows,
-                instrument.currency,
+                balanceCurrency,
                 2,
                 "period_end",
               )
-            : fxCell(instrument.currency, FORECAST_COLUMNS[index - 1]);
+            : fxCell(balanceCurrency, FORECAST_COLUMNS[index - 1]);
         const standaloneOpening =
           index === 0
             ? `$D${plan.debt_row}`
@@ -5834,7 +5859,7 @@ function configureOperatingModel(
         const averageFx = fxFormula(
           modelCase,
           curveRows,
-          instrument.currency,
+          balanceCurrency,
           index + 3,
           "average",
         );
@@ -5927,7 +5952,7 @@ function configureOperatingModel(
         const standalonePikFx = fxFormula(
           modelCase,
           curveRows,
-          instrument.currency,
+          instrumentBalanceCurrency(instrument),
           index + 3,
           "average",
         );
@@ -7070,6 +7095,7 @@ function configureOperatingModel(
       plan.debt_row,
       plan.issuance_row,
       plan.amortisation_row,
+      plan.repayment_row,
       plan.other_non_cash_row,
     ]),
   ]);

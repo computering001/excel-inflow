@@ -69,6 +69,7 @@ const inputPath = process.argv[2];
 if (!inputPath) throw new Error("Usage: run_statement_classifier_tests.mjs <representative-v2-case.json>");
 const base = JSON.parse(await fs.readFile(inputPath, "utf8"));
 const fixture = clone(base);
+fixture.execution_profile = "reference_parity";
 fixture.source_coverage.classification_contract_version = "evidence_v1";
 for (const section of ["income_statement", "cash_flow"]) {
   for (const source of fixture.source_coverage[section]) {

@@ -737,6 +737,127 @@ function statementHierarchyChecks(modelCase) {
   return checks;
 }
 
+export function statementAuthorityChecks(modelCase) {
+  const checks = [];
+  const productionEvidence =
+    modelCase.execution_profile !== "reference_parity" &&
+    modelCase.source_coverage?.classification_contract_version === "evidence_v1";
+  if (!productionEvidence) return checks;
+  if (modelCase.statement_authority_contract_version !== "authority_v1") {
+    return [
+      result(
+        "statement_authority.contract_version",
+        "BLOCK",
+        "Production evidence requires statement_authority_contract_version=authority_v1.",
+      ),
+    ];
+  }
+  const scheduleRoles = new Set([
+    "interest_income",
+    "interest_expense",
+    "cash_interest_paid",
+    "cash_interest_received",
+    "debt_issuance",
+    "debt_repayment",
+    "rcf_draw",
+    "rcf_repayment",
+    "lease_principal",
+  ]);
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase.statement_structure?.[section] ?? []) {
+      if (row.row_type === "header") continue;
+      const id = `statement_authority.${section}.${row.row_id}`;
+      const authority = row.historical_authority;
+      if (!authority) {
+        checks.push(
+          result(
+            `${id}.missing`,
+            "BLOCK",
+            `${row.label} has no declared historical authority.`,
+          ),
+        );
+        continue;
+      }
+      const historicalValues = (row.values ?? []).slice(0, 3);
+      const hasThreeValues =
+        historicalValues.length === 3 &&
+        historicalValues.every(
+          (value) => value !== null && value !== undefined && finite(value),
+        );
+      const refs = row.calculation?.refs ?? [];
+      if (authority === "source_input" && !hasThreeValues) {
+        checks.push(
+          result(
+            `${id}.source_input`,
+            "BLOCK",
+            `${row.label} declares source_input but does not carry three filed historical values.`,
+          ),
+        );
+      }
+      if (authority === "derived_formula" && refs.length === 0) {
+        checks.push(
+          result(
+            `${id}.derived_formula`,
+            "BLOCK",
+            `${row.label} declares derived_formula without visible dependencies.`,
+          ),
+        );
+      }
+      if (authority === "reported_total_reconciled") {
+        if (refs.length === 0) {
+          checks.push(
+            result(
+              `${id}.reported_formula`,
+              "BLOCK",
+              `${row.label} is a reported total but has no visible reconciliation formula.`,
+            ),
+          );
+        }
+        if (
+          !series(row.reported_historical_values, 3) ||
+          row.reported_historical_values.some((value) => value === null)
+        ) {
+          checks.push(
+            result(
+              `${id}.reported_values`,
+              "BLOCK",
+              `${row.label} does not retain all three filed totals for reconciliation.`,
+            ),
+          );
+        }
+        if (hasThreeValues) {
+          checks.push(
+            result(
+              `${id}.duplicate_input`,
+              "BLOCK",
+              `${row.label} duplicates a derived total in values; emitted historical cells must remain formulas.`,
+            ),
+          );
+        }
+      }
+      if (authority === "schedule_link" && !scheduleRoles.has(row.semantic_role)) {
+        checks.push(
+          result(
+            `${id}.schedule_role`,
+            "BLOCK",
+            `${row.label} declares schedule_link without a schedule-owned semantic role.`,
+          ),
+        );
+      }
+      if (authority === "not_applicable" && row.row_type !== "uncalculated") {
+        checks.push(
+          result(
+            `${id}.not_applicable`,
+            "BLOCK",
+            `${row.label} declares no historical authority but is not intentionally uncalculated.`,
+          ),
+        );
+      }
+    }
+  }
+  return checks;
+}
+
 function historicalProvenanceChecks(modelCase) {
   const checks = [];
   const rows = [
@@ -784,6 +905,19 @@ function historicalProvenanceChecks(modelCase) {
 }
 
 function forecastAuthorityChecks(modelCase) {
+  if (
+    modelCase.source_coverage?.classification_contract_version === "evidence_v1" &&
+    modelCase.execution_profile !== "reference_parity" &&
+    modelCase.forecast_authority_contract_version !== "waterfall_v1"
+  ) {
+    return [
+      result(
+        "forecast_authority.contract_version",
+        "BLOCK",
+        "Production evidence requires forecast_authority_contract_version=waterfall_v1; legacy implicit zeros and undeclared grey rows are not permitted.",
+      ),
+    ];
+  }
   const rows = allStatementRows(modelCase);
   const errors = validateForecastAuthorities(modelCase, rows);
   if (errors.length > 0) {
@@ -850,6 +984,7 @@ function instrumentChecks(modelCase) {
     ];
   }
   const ids = new Set();
+  const displayNames = new Set();
   for (const instrument of instruments) {
     const id = instrument.instrument_id ?? "unknown";
     if (!id || ids.has(id)) {
@@ -866,6 +1001,18 @@ function instrumentChecks(modelCase) {
       checks.push(
         result(`instrument.${id}.name`, "BLOCK", `${id} has no name.`),
       );
+    } else {
+      const normalisedName = String(instrument.name).trim().toLowerCase();
+      if (displayNames.has(normalisedName)) {
+        checks.push(
+          result(
+            `instrument.${id}.duplicate_display_name`,
+            "BLOCK",
+            `${instrument.name} is not a unique audit label; each instrument must retain enough coupon, maturity or facility identity to be distinguished on both debt and interest schedules.`,
+          ),
+        );
+      }
+      displayNames.add(normalisedName);
     }
     if (!/^[A-Z]{3}$/.test(instrument.currency ?? "")) {
       checks.push(
@@ -873,6 +1020,21 @@ function instrumentChecks(modelCase) {
           `instrument.${id}.currency`,
           "BLOCK",
           `${id} has no valid three-letter currency.`,
+        ),
+      );
+    }
+    if (
+      modelCase.execution_profile !== "reference_parity" &&
+      modelCase.source_coverage?.classification_contract_version === "evidence_v1" &&
+      !["native_principal", "reporting_currency_carrying_value"].includes(
+        instrument.balance_basis,
+      )
+    ) {
+      checks.push(
+        result(
+          `instrument.${id}.balance_basis`,
+          "BLOCK",
+          `${id} must declare whether supplied debt values are native principal or reporting-currency carrying values.`,
         ),
       );
     }
@@ -1130,6 +1292,7 @@ function fxCoverageChecks(modelCase) {
   const reporting = modelCase.issuer?.reporting_currency ?? null;
   const required = new Map();
   for (const instrument of modelCase.instruments ?? []) {
+    if (instrument.balance_basis === "reporting_currency_carrying_value") continue;
     const currency = instrument.currency;
     if (!currency || currency === reporting) continue;
     if (!required.has(currency)) required.set(currency, []);
@@ -1275,15 +1438,19 @@ function debtReconciliationChecks(modelCase) {
   const untranslatable = [];
   const rateStatements = new Map();
   const translate = (instrument) => {
-    const { rate, statement } = openingFxRate(modelCase, instrument.currency);
+    const balanceCurrency =
+      instrument.balance_basis === "reporting_currency_carrying_value"
+        ? modelCase.issuer.reporting_currency
+        : instrument.currency;
+    const { rate, statement } = openingFxRate(modelCase, balanceCurrency);
     if (rate === null) {
       untranslatable.push({
         instrument_id: instrument.instrument_id ?? "unknown",
-        currency: instrument.currency ?? null,
+        currency: balanceCurrency ?? null,
       });
       return 0;
     }
-    if (statement) rateStatements.set(instrument.currency, statement);
+    if (statement) rateStatements.set(balanceCurrency, statement);
     return number(instrument.opening_balance || 0) * rate;
   };
   const included = instruments
@@ -1675,6 +1842,7 @@ export function assessCoverage(modelCase) {
   checks.push(...statementCoverageChecks(modelCase));
   checks.push(...requiredRoleChecks(modelCase));
   checks.push(...dependencyChecks(modelCase));
+  checks.push(...statementAuthorityChecks(modelCase));
   checks.push(...statementHierarchyChecks(modelCase));
   checks.push(...statementTopologyChecks(modelCase));
   checks.push(...historicalProvenanceChecks(modelCase));
