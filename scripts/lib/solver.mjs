@@ -1404,6 +1404,7 @@ export function solveCase(
   let openingLease = leaseOpeningLiability(modelCase);
   const leaseProjection = leaseForecast(modelCase);
   let openingAcquisitionDebt = 0;
+  let priorTargetEbitda = null;
   const closeIndex = acquisitionCloseIndex(modelCase);
   const acquisitionDebtAmount = acquisitionDebt(modelCase.acquisition);
   const results = [];
@@ -1938,10 +1939,17 @@ export function solveCase(
         ? 0
         : ebitda / previousEbitda - 1;
     const targetEbitdaGrowth = isV2 ? standaloneEbitdaGrowth : 0;
-    const targetEbitda = acquisitionActive
-      ? baseTargetEbitda *
-        (1 + targetEbitdaGrowth) ** Math.max(0, forecastIndex - closeIndex)
-      : 0;
+    // Entry EBITDA is the close-period base.  Thereafter the target compounds
+    // each successive standalone EBITDA growth rate exactly once.  This is the
+    // numeric twin of acquisitionFullEbitdaFormula; it intentionally avoids
+    // the old `current growth ^ elapsed years` shortcut, which drifted whenever
+    // the forecast growth rates differed by year.
+    const targetEbitda = !acquisitionActive
+      ? 0
+      : acquisitionCloses
+        ? baseTargetEbitda
+        : Number(priorTargetEbitda ?? baseTargetEbitda) *
+          (1 + targetEbitdaGrowth);
     if (acquisitionActive && Math.abs(revenue) <= ACQUISITION_NEAR_ZERO) {
       throw new Error(
         `Acquisition target ratios cannot be inferred in ${period.date}: standalone revenue is zero or unavailable.`,
@@ -2595,6 +2603,7 @@ export function solveCase(
     openingRcfNative = result.rcf_ending_native;
     openingLease = endingLease;
     openingAcquisitionDebt = endingAcquisitionDebt;
+    if (acquisitionActive) priorTargetEbitda = targetEbitda;
   }
 
   return {

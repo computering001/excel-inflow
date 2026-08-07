@@ -5,12 +5,12 @@
   "skillVersion": "2.0.6",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T07:33:15.469Z",
+  "generatedAt": "2026-08-07T11:52:55.816Z",
   "centralInstructionsWords": 3797,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "09544614e12dbb4779591319a46c3dc97be3c5cd05b4169755fd35abf56ca63e",
+    "currentClosureSha256": "8245c68325e223b370c08bb5fdfb7f357d2784990ffc857565eb83d5e7821b3d",
     "closureFileCount": 95,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -250,11 +250,11 @@
             "openpyxl": "3.1.5",
             "fitz": null,
             "PIL": "12.2.0",
-            "numpy": "2.3.5",
+            "numpy": "2.4.4",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
-            "reportlab": "4.4.9"
+            "pypdf": "6.10.2",
+            "reportlab": "4.4.10"
           },
           "usable": true,
           "reason": "selected"
@@ -778,8 +778,8 @@
         "target": "real clean-root workbook build",
         "status": "PASS",
         "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
-        "plan_sha256": "81d97d0a006c97ad213f9b1a31bcc1e5e64aba54c9aefdc20a8e8c56baf21803",
-        "workbook_sha256": "644c70333e58defbd36cb209668fae918a16cc21d8d8bb1d6485010ccc3e4196",
+        "plan_sha256": "8d844dbf276f7415d36473e24983e982d018dd85ffa6b0c4bb1f74b3c4803356",
+        "workbook_sha256": "72feac8710935d12721e399b624807d609c8a058ebbe79c6dca7fe0c870737f3",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
@@ -787,8 +787,8 @@
     "workbookBuild": {
       "status": "PASS",
       "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
-      "plan_sha256": "81d97d0a006c97ad213f9b1a31bcc1e5e64aba54c9aefdc20a8e8c56baf21803",
-      "workbook_sha256": "644c70333e58defbd36cb209668fae918a16cc21d8d8bb1d6485010ccc3e4196",
+      "plan_sha256": "8d844dbf276f7415d36473e24983e982d018dd85ffa6b0c4bb1f74b3c4803356",
+      "workbook_sha256": "72feac8710935d12721e399b624807d609c8a058ebbe79c6dca7fe0c870737f3",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -968,8 +968,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "a686bdb9602a91596171a55124d42d51028d2a9d6bffc422fbef65651eee2dd9",
-      "bytes": 457236,
+      "sha256": "6f40e528c7b8479025e9b8d333a5eca4da0b720f2453a44a2d21d581137db0d2",
+      "bytes": 457175,
       "words": null
     },
     {
@@ -1058,8 +1058,8 @@
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "423a04a9dc5ed76a33f30a85eacfb6ca05aa5301c9b2ed58183d292b1e89618a",
-      "bytes": 69555,
+      "sha256": "947fac412c106a49c15859b1eee8a2de4fcac3b14b60e866f1cee5a660e63bba",
+      "bytes": 70191,
       "words": null
     },
     {
@@ -1136,14 +1136,14 @@
     },
     {
       "path": "scripts/lib/historical_normalisation.mjs",
-      "sha256": "700dabeb6dafac8e440e4591f62c898d94090e805db8bd0926a76319705234a0",
-      "bytes": 8872,
+      "sha256": "b93f6b5e1960dc71eae76b249be178de158385ad735cb2737af4a27d651f0861",
+      "bytes": 12312,
       "words": null
     },
     {
       "path": "scripts/lib/instrument_display.mjs",
-      "sha256": "a9140238e4aa589532951926255768394281bee5f72c2e6c842b2bb19c42fdca",
-      "bytes": 2006,
+      "sha256": "d5ab69aa4e67f015e8877a2b782c45583edac1c34fd1b38d7528fcf677b1beb6",
+      "bytes": 2278,
       "words": null
     },
     {
@@ -1214,8 +1214,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "d84f073974ff344e94e24a138f0b44a0a67a1afddaccfee995df382af2031a30",
-      "bytes": 101018,
+      "sha256": "eea19f1f34747bb56ad449d21ee288256597bd813ba0561a5ee033ae0e4f6d90",
+      "bytes": 101602,
       "words": null
     },
     {
@@ -1244,8 +1244,8 @@
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "95021b26cf4910a4cd6dca097db271b1cbe20269a936cfc84c59a54c2825eabe",
-      "bytes": 107265,
+      "sha256": "cf1674dfe73efb90f642be3ed392d57811e974c150c7936dbe58311213f4ca86",
+      "bytes": 107770,
       "words": null
     },
     {
@@ -1394,8 +1394,8 @@
     },
     {
       "path": "scripts/validate_style_tokens.mjs",
-      "sha256": "422e1562ec849a58e3cb88cb7e5cea39e1ba2daa6c8bbd668a727940c6137393",
-      "bytes": 35706,
+      "sha256": "a6d9a01e352dd511b99d177871fbe86fec17c46e399651eb014940f128e660b8",
+      "bytes": 36261,
       "words": null
     },
     {

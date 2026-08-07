@@ -2028,6 +2028,17 @@ function acquisitionDerivedDrivers(modelCase, rowPlan) {
     if (!driver?.row_id) return null;
     return (
       definitions.find((definition) => {
+        // A displayed ratio is only an acquisition driver when it is actually
+        // live in the standalone forecast.  The streamlined operating face
+        // deliberately leaves many pre-EBIT detail rows blank; selecting one
+        // of those rows here makes the acquisition formula divide by an empty
+        // cell even though the underlying EBITDA and revenue are available.
+        if (
+          definition.forecast_treatment === "uncalculated" ||
+          definition.formula_authority === "intentionally_blank"
+        ) {
+          return false;
+        }
         const operator = definition.calculation?.operator;
         const matches =
           kind === "growth"
@@ -2217,7 +2228,19 @@ function acquisitionFactorFormula(column, rowPlan) {
   const c = rowPlan.controls;
   const closeDate = `DATE($P$${c.close_year},$P$${c.close_month},1)`;
   const periodEnd = `${column}$${rowPlan.period_row}`;
-  const periodStart = `EDATE(${periodEnd},-12)+1`;
+  const index = ADJUSTMENT_COLUMNS.indexOf(column);
+  if (index < 0) {
+    throw new Error(`Unknown acquisition adjustment column ${column}.`);
+  }
+  // Use the actual model period boundary, not EDATE(period-end,-12).  A 52/53
+  // week filer can be several days away from a calendar-year approximation;
+  // the solver already uses prior period-end + one day, so the visible formula
+  // must use that identical authority.
+  const priorPeriodColumn =
+    index === 0
+      ? HISTORICAL_COLUMNS[HISTORICAL_COLUMNS.length - 1]
+      : ADJUSTMENT_COLUMNS[index - 1];
+  const periodStart = `${priorPeriodColumn}$${rowPlan.period_row}+1`;
   return (
     `IF($P$${c.adjustments_enabled}=0,0,IF(${closeDate}>${periodEnd},0,` +
     `IF(${closeDate}>=${periodStart},MAX(0,(${periodEnd}-${closeDate}+1)/` +
@@ -2238,8 +2261,17 @@ function acquisitionDrawFormula(column, rowPlan) {
   const c = rowPlan.controls;
   const periodEnd = `${column}$${rowPlan.period_row}`;
   const closeDate = `DATE($P$${c.close_year},$P$${c.close_month},1)`;
+  const index = ADJUSTMENT_COLUMNS.indexOf(column);
+  if (index < 0) {
+    throw new Error(`Unknown acquisition adjustment column ${column}.`);
+  }
+  const priorPeriodColumn =
+    index === 0
+      ? HISTORICAL_COLUMNS[HISTORICAL_COLUMNS.length - 1]
+      : ADJUSTMENT_COLUMNS[index - 1];
+  const periodStart = `${priorPeriodColumn}$${rowPlan.period_row}+1`;
   return (
-    `IF(AND(${closeDate}<=${periodEnd},${closeDate}>EDATE(${periodEnd},-12)),` +
+    `IF(AND(${closeDate}<=${periodEnd},${closeDate}>=${periodStart}),` +
     `$P$${c.acquisition_debt_amount},0)`
   );
 }
@@ -2247,20 +2279,46 @@ function acquisitionDrawFormula(column, rowPlan) {
 function acquisitionFullEbitdaFormula(modelCase, column, rowPlan) {
   const c = rowPlan.controls;
   const drivers = acquisitionDerivedDrivers(modelCase, rowPlan);
-  // Growth is the target's, resolved through the ladder above. `(1+0)^` — a
-  // target that never grows because no line happened to sit under EBITDA — is
-  // not one of the outcomes.
-  const growth = acquisitionGrowthExpression(drivers, rowPlan, column);
-  if (!growth && Number(modelCase.acquisition?.enabled ?? 0) === 1) {
+  const currentIndex = ADJUSTMENT_COLUMNS.indexOf(column);
+  if (currentIndex < 0) {
+    throw new Error(`Unknown acquisition adjustment column ${column}.`);
+  }
+  // The close-year EBITDA is the entry EBITDA.  Every full year after close
+  // compounds the corresponding standalone EBITDA growth once.  Raising the
+  // current year's growth to an elapsed-year exponent was only correct when
+  // every forecast growth rate happened to be identical.
+  const closeDate = `DATE($P$${c.close_year},$P$${c.close_month},1)`;
+  const growthFactors = [];
+  for (let index = 1; index <= currentIndex; index += 1) {
+    const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
+    const growth = acquisitionGrowthExpression(
+      drivers,
+      rowPlan,
+      adjustmentColumn,
+    );
+    if (!growth && Number(modelCase.acquisition?.enabled ?? 0) === 1) {
+      throw new Error(
+        "Acquisition target growth requires a standalone adjusted-EBITDA semantic row.",
+      );
+    }
+    const priorPeriodEnd =
+      `${ADJUSTMENT_COLUMNS[index - 1]}$${rowPlan.period_row}`;
+    growthFactors.push(
+      `IF(${closeDate}<=${priorPeriodEnd},1+${growth ?? "0"},1)`,
+    );
+  }
+  if (
+    currentIndex === 0 &&
+    !drivers.ebitda &&
+    Number(modelCase.acquisition?.enabled ?? 0) === 1
+  ) {
     throw new Error(
       "Acquisition target growth requires a standalone adjusted-EBITDA semantic row.",
     );
   }
-  return (
-    `$P$${c.target_ebitda}*(1+${growth ?? "0"})^` +
-    `MAX(0,YEAR(${column}$${rowPlan.period_row})-$P$${c.close_year}-` +
-    `IF(MONTH(${column}$${rowPlan.period_row})<$P$${c.close_month},1,0))`
-  );
+  return `$P$${c.target_ebitda}${growthFactors
+    .map((factor) => `*(${factor})`)
+    .join("")}`;
 }
 
 function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
@@ -3604,35 +3662,12 @@ function configureOperatingModel(
     if (!currency || currency === reportingCurrency) return "1";
     return curveFxReference(currency, fxPeriodColumn(column));
   };
-  // TRANSLATION IS NOT A CASH FLOW.
-  //
-  // A native-currency balance is carried on the face at its period-end rate.
-  // When that rate moves, the translated balance moves with it and NO cash has
-  // changed hands. Differencing the translated balances therefore reports a
-  // draw or a repayment that never happened — which is exactly what put a
-  // USD75.4m "repayment" in Smurfit's FY1 financing cash flow off a EUR book
-  // whose native balance did not move at all.
-  //
-  // references/advanced-history-and-fx.md, "Separate cash movement from
-  // translation", fixes the split:
-  //
-  //   cash movement (reporting) = native cash movement x applicable FX
-  //   FX / non-cash movement    = closing - opening - translated cash movement
-  //
-  // Each foreign non-RCF instrument contributes an explicit residual after
-  // its visible roll-forward has been emitted:
-  //   closing - opening - issuance@average + repayment@average
-  //           - non-cash movements@period-end
-  // The maps are populated by the instrument loop below, then consumed by the
-  // debt summary. This remains correct when average and closing FX differ and
-  // when an instrument has dated issuance, amortisation, PIK or maturity.
-  const instrumentFxResidualExpressions = [new Map(), new Map(), new Map()];
-  const fxTranslationExpression = (plans, periodIndex) => {
-    const terms = plans
-      .map((plan) => instrumentFxResidualExpressions[periodIndex].get(plan.instrument_id))
-      .filter(Boolean);
-    return terms.length ? terms.map((term) => `(${term})`).join("+") : null;
-  };
+  // TRANSLATION IS NOT A CASH FLOW. Cash movement is compiled later from the
+  // visible issuance, repayment and RCF event rows. FX is then the residual
+  // needed to reconcile opening and closing gross debt after those cash events
+  // and every separately declared non-cash movement. This direction keeps one
+  // cash authority and avoids restating the instrument maturity machinery in a
+  // second, much longer formula family.
   // Non-cash balance movements are stated on their own instrument rows. They
   // move debt but are never permitted to leak into the financing cash flow.
   // Translate each native-currency input at the period-end rate, exactly as the
@@ -4075,29 +4110,31 @@ function configureOperatingModel(
       const preMaturity = plan.pik_row
         ? `MAX(0,${baseEndingBeforePik}+$${column}${plan.pik_row})`
         : baseEndingBeforePik;
+      // Repayment is read back from the complete visible roll-forward identity
+      // rather than rebuilding the maturity test a second time.  This is not a
+      // naked balance-delta proxy: issuance, fair-value movement, other
+      // non-cash movement, PIK and FX are all explicitly restored before the
+      // closing balance is deducted.  Debt balance, financing cash flow and
+      // the repayment comment therefore consume one economic mechanism.
+      const closingNative =
+        endFx === "1"
+          ? `$${column}${plan.debt_row}`
+          : `($${column}${plan.debt_row}/${endFx})`;
+      const preRepaymentNative = plan.pik_row
+        ? `(${availableBeforeAmortisation}+$${column}${plan.pik_row})`
+        : availableBeforeAmortisation;
+      const reconciledRepaymentNative =
+        `MAX(0,${preRepaymentNative}-${closingNative})`;
       const simpleBullet =
         !plan.issuance_row &&
         !plan.amortisation_row &&
         !plan.pik_row &&
         !plan.fair_value_row &&
         !plan.other_non_cash_row;
-      const simpleMaturityRepayment = instrument.maturity_date
-        ? `IF($C$${c.debt_maturities_roll}=1,` +
-          `IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},` +
-          `${availableBeforeAmortisation},0),0)`
-        : "0";
-      const detailedMaturityRepayment = `IF(${matures},${preMaturity},0)`;
-      const repaymentAmount = simpleBullet
-        ? simpleMaturityRepayment
-        : cappedAmortisation === "0"
-          ? detailedMaturityRepayment
-          : detailedMaturityRepayment === "0"
-            ? cappedAmortisation
-            : `${cappedAmortisation}+${detailedMaturityRepayment}`;
       const mandatoryRepaymentExpression =
         averageFx === "1"
-          ? `-(${repaymentAmount})`
-          : `-(${repaymentAmount})*${averageFx}`;
+          ? `-(${reconciledRepaymentNative})`
+          : `-(${reconciledRepaymentNative})*${averageFx}`;
       if (plan.has_mandatory_repayment) {
         mandatoryRepaymentExpressions[index].push(
           mandatoryRepaymentExpression,
@@ -4112,20 +4149,6 @@ function configureOperatingModel(
           : `=${preMaturity}*IF(${matures},0,1)` +
             (endFx === "1" ? "" : `*${endFx}`),
       );
-      if (
-        balanceCurrency &&
-        balanceCurrency !== reportingCurrency
-      ) {
-        const openingReporting = priorClosing;
-        const nonCashReporting =
-          `(${fairValue}+${otherNonCash}+${plan.pik_row ? `$${column}${plan.pik_row}` : "0"})*${endFx}`;
-        instrumentFxResidualExpressions[index].set(
-          instrument.instrument_id,
-          `${column}${plan.debt_row}-${openingReporting}-${issuance}*${averageFx}+` +
-            `(${cappedAmortisation}+IF(${matures},${preMaturity},0))*${averageFx}-` +
-            `${nonCashReporting}`,
-        );
-      }
       // AN INSTRUMENT THE TRANSACTION DOES NOT TOUCH IS ZERO IN THE ADJUSTMENT
       // COLUMN, AND SAYS SO. The acquisition draws its own tranche, which has
       // its own row in the acquisition block below; it does not add to, repay
@@ -5543,11 +5566,10 @@ function configureOperatingModel(
 
   // TOTAL CHANGE IN DEBT — the CASH movement, one line, in the debt schedule.
   //
-  // On a FORECAST basis it is the movement in gross debt excluding leases,
-  // read straight off the schedule above — closing less opening — LESS the
-  // part of that movement that is translation rather than cash. The cash flow
-  // links down to this row, so it has to be the cash measure: a translated
-  // balance that falls because the rate moved has not repaid anything.
+  // On a FORECAST basis it is compiled directly from cash events: non-RCF
+  // issuance plus mandatory repayment plus RCF draw less RCF repayment. The
+  // cash flow links down to this row, so it must never be inferred from a
+  // translated balance delta.
   //
   // The translation it strips out is stated on its own line directly beneath,
   // so the reader can still close the roll-forward by eye:
@@ -5588,27 +5610,12 @@ function configureOperatingModel(
       );
     }
     applyFormula(sheet, `R${changeRow}`, `=I${changeRow}`);
-    // The instruments the gross-debt subtotal actually adds up. The revolver
-    // drops out inside the helper and the acquisition tranche is drawn in the
-    // reporting currency, so neither carries translation.
+    // The instruments the gross-debt subtotal actually adds up. Non-cash
+    // movements from these rows are removed from the FX residual below.
     const grossDebtPlans = nonRcfPlans.filter(
       (plan) =>
         instrumentById.get(plan.instrument_id).include_in_gross_debt !== false,
     );
-    const foreignRcfFxResidual = (blockColumn) =>
-      foreignRcf
-        ? `${blockColumn}${waterfallRows.ending_rcf}-` +
-          `${blockColumn}${waterfallRows.opening_rcf}-` +
-          `${blockColumn}${waterfallRows.rcf_draw_waterfall}+` +
-          `${blockColumn}${waterfallRows.rcf_repayment_waterfall}`
-        : null;
-    const combineFxTerms = (...terms) => {
-      const present = terms.filter(Boolean);
-      if (present.length === 0) return null;
-      return present.length === 1
-        ? present[0]
-        : present.map((term) => `(${term})`).join("+");
-    };
     for (let index = 0; index < 3; index += 1) {
       const column = FORECAST_COLUMNS[index];
       const proFormaColumn = PRO_FORMA_COLUMNS[index];
@@ -5620,20 +5627,6 @@ function configureOperatingModel(
       // subtotals but is blank on the individual instrument rows, so the
       // translation reads its opening balances from column I — the same
       // figures, and the only ones on the face.
-      const priorProFormaBalanceColumn =
-        index === 0 ? "I" : PRO_FORMA_COLUMNS[index - 1];
-      const standaloneFx = Number.isInteger(fxRow)
-        ? combineFxTerms(
-            fxTranslationExpression(grossDebtPlans, index),
-            foreignRcfFxResidual(column),
-          )
-        : null;
-      const proFormaFx = Number.isInteger(fxRow)
-        ? combineFxTerms(
-            fxTranslationExpression(grossDebtPlans, index),
-            foreignRcfFxResidual(proFormaColumn),
-          )
-        : null;
       const standaloneOtherNonCash = otherNonCashExpression(
         grossDebtPlans,
         column,
@@ -5644,59 +5637,53 @@ function configureOperatingModel(
       const acquisitionDebtDelta =
         `${proFormaColumn}${debtRows.acquisition_debt}-` +
         `${index === 0 ? "R" : PRO_FORMA_COLUMNS[index - 1]}${debtRows.acquisition_debt}`;
-      if (Number.isInteger(fxRow)) {
-        applyFormula(
-          sheet,
-          `${column}${fxRow}`,
-          `=${standaloneFx ?? "0"}`,
-        );
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${fxRow}`,
-          `=${proFormaFx ?? "0"}`,
-        );
-        // The acquisition tranche is drawn in the reporting currency. Existing
-        // non-RCF translation therefore cancels between standalone and pro
-        // forma, but a foreign RCF can carry an incremental translation
-        // residual when the acquisition changes its native closing draw.
-        applyFormula(
-          sheet,
-          `${adjustmentColumn}${fxRow}`,
-          foreignRcf
-            ? `=${proFormaColumn}${fxRow}-${column}${fxRow}`
-            : "=0",
-        );
-      }
+      const cashMovementFormula = (blockColumn) => {
+        const issuance = nonRcfIssuanceTerms(blockColumn, index);
+        const terms = [
+          ...issuance,
+          `${blockColumn}${mandatoryDebtRow}`,
+          `${blockColumn}${waterfallRows.rcf_draw_waterfall}`,
+          `-${blockColumn}${waterfallRows.rcf_repayment_waterfall}`,
+        ];
+        return `=SUM(${terms.join(",")})`;
+      };
       applyFormula(
         sheet,
         `${column}${changeRow}`,
-        `=${column}${grossDebtRow}-${priorColumn}${grossDebtRow}` +
-          `${Number.isInteger(fxRow) ? `-${column}${fxRow}` : ""}` +
-          `${standaloneOtherNonCash ? `-(${standaloneOtherNonCash})` : ""}`,
+        cashMovementFormula(column),
       );
       applyFormula(
         sheet,
         `${proFormaColumn}${changeRow}`,
-        `=${proFormaColumn}${grossDebtRow}-${priorProFormaColumn}${grossDebtRow}` +
-          `${Number.isInteger(fxRow) ? `-${proFormaColumn}${fxRow}` : ""}` +
-          `${proFormaOtherNonCash ? `-(${proFormaOtherNonCash})` : ""}` +
-          `-(${acquisitionDebtDelta})`,
+        cashMovementFormula(proFormaColumn),
       );
-      // Same movement, read off the ADJUSTMENT block's own gross-debt line,
-      // less the acquisition balance-sheet overlay. The overlay is explicitly
-      // non-cash in this lightweight case; only the changed RCF balance may
-      // remain as a financing cash movement.
-      const priorAdjustmentColumn =
-        index === 0 ? null : ADJUSTMENT_COLUMNS[index - 1];
       applyFormula(
         sheet,
         `${adjustmentColumn}${changeRow}`,
-        `=${adjustmentColumn}${grossDebtRow}` +
-          `${priorAdjustmentColumn ? `-${priorAdjustmentColumn}${grossDebtRow}` : ""}` +
-          `${Number.isInteger(fxRow) ? `-${adjustmentColumn}${fxRow}` : ""}` +
-          `-(${adjustmentColumn}${debtRows.acquisition_debt}` +
-          `${priorAdjustmentColumn ? `-${priorAdjustmentColumn}${debtRows.acquisition_debt}` : ""})`,
+        `=${proFormaColumn}${changeRow}-${column}${changeRow}`,
       );
+      if (Number.isInteger(fxRow)) {
+        applyFormula(
+          sheet,
+          `${column}${fxRow}`,
+          `=${column}${grossDebtRow}-${priorColumn}${grossDebtRow}` +
+            `-${column}${changeRow}` +
+            `${standaloneOtherNonCash ? `-(${standaloneOtherNonCash})` : ""}`,
+        );
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${fxRow}`,
+          `=${proFormaColumn}${grossDebtRow}-${priorProFormaColumn}${grossDebtRow}` +
+            `-${proFormaColumn}${changeRow}` +
+            `${proFormaOtherNonCash ? `-(${proFormaOtherNonCash})` : ""}` +
+            `-(${acquisitionDebtDelta})`,
+        );
+        applyFormula(
+          sheet,
+          `${adjustmentColumn}${fxRow}`,
+          `=${proFormaColumn}${fxRow}-${column}${fxRow}`,
+        );
+      }
     }
   }
 
@@ -5975,16 +5962,34 @@ function configureOperatingModel(
             : standalonePriorFx === "1"
               ? `${FORECAST_COLUMNS[index - 1]}${plan.debt_row}`
               : `(${FORECAST_COLUMNS[index - 1]}${plan.debt_row}/${standalonePriorFx})`;
-        const standaloneTiming = instrumentTimingExpressions(
-          plan,
-          instrument,
-          index,
-          column,
-          standaloneOpening,
-        );
-        const standaloneWeighted =
-          `(${standaloneTiming.weightedBase}+` +
-          `${plan.pik_row ? `${column}${plan.pik_row}` : "0"}*(${standaloneTiming.activeFraction})/2)`;
+        const simpleBullet =
+          !plan.issuance_row &&
+          !plan.amortisation_row &&
+          !plan.pik_row &&
+          !plan.fair_value_row &&
+          !plan.other_non_cash_row;
+        const periodStart = `(${index === 0 ? "I" : FORECAST_COLUMNS[index - 1]}$${rowPlan.period_row}+1)`;
+        const periodEnd = `${column}$${rowPlan.period_row}`;
+        const periodDays = `(${periodEnd}-${periodStart}+1)`;
+        const simpleActiveFraction =
+          instrument.maturity_date &&
+          instrument.maturity_treatment !== "non_maturing_within_forecast"
+            ? `IF($C$${c.debt_maturities_roll}=0,1,` +
+              `MAX(0,MIN($E${plan.debt_row},${periodEnd})-${periodStart}+1)/${periodDays})`
+            : "1";
+        const standaloneTiming = simpleBullet
+          ? null
+          : instrumentTimingExpressions(
+              plan,
+              instrument,
+              index,
+              column,
+              standaloneOpening,
+            );
+        const standaloneWeighted = simpleBullet
+          ? `MAX(0,${standaloneOpening})*(${simpleActiveFraction})`
+          : `(${standaloneTiming.weightedBase}+` +
+            `${plan.pik_row ? `${column}${plan.pik_row}` : "0"}*(${standaloneTiming.activeFraction})/2)`;
         const averageFx = fxFormula(
           modelCase,
           curveRows,
@@ -6019,16 +6024,19 @@ function configureOperatingModel(
             : standalonePriorFx === "1"
               ? `${PRO_FORMA_COLUMNS[index - 1]}${plan.debt_row}`
               : `(${PRO_FORMA_COLUMNS[index - 1]}${plan.debt_row}/${standalonePriorFx})`;
-        const proFormaTiming = instrumentTimingExpressions(
-          plan,
-          instrument,
-          index,
-          column,
-          proFormaOpening,
-        );
-        const proFormaWeighted =
-          `(${proFormaTiming.weightedBase}+` +
-          `${plan.pik_row ? `${proFormaColumn}${plan.pik_row}` : "0"}*(${proFormaTiming.activeFraction})/2)`;
+        const proFormaTiming = simpleBullet
+          ? null
+          : instrumentTimingExpressions(
+              plan,
+              instrument,
+              index,
+              column,
+              proFormaOpening,
+            );
+        const proFormaWeighted = simpleBullet
+          ? `MAX(0,${proFormaOpening})*(${simpleActiveFraction})`
+          : `(${proFormaTiming.weightedBase}+` +
+            `${plan.pik_row ? `${proFormaColumn}${plan.pik_row}` : "0"}*(${proFormaTiming.activeFraction})/2)`;
         applyFormula(
           sheet,
           `${proFormaColumn}${plan.interest_row}`,

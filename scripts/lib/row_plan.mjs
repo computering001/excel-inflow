@@ -978,6 +978,15 @@ function consolidateConstituents(rows, spec) {
     rows.splice(rows.indexOf(constituents[0]), 0, consolidated);
   }
 
+  // Presentation rank is a compiler decision, not a property inherited from
+  // whichever issuer row happened to be adopted. This keeps an adopted Change
+  // in Debt visually equivalent to an inserted one and prevents a reported
+  // parent from acquiring answer-row fill merely because its source called it
+  // a total.
+  if (spec.presentation_style_role) {
+    consolidated.style_role = spec.presentation_style_role;
+  }
+
   // A consolidated line is the parent of its workings, so present it before
   // them and keep the entire family contiguous.  This is semantic ordering,
   // not a label or row-number exception: an issuer may disclose the total
@@ -1367,16 +1376,12 @@ function applyBrokerAnchorRule(modelCase, rows) {
     delete derivedMetricRow.forecast_calculation;
     delete derivedMetricRow.forecast_period_calculations;
   } else {
-    // Solve the term that actually sits inside the EBITDA identity. If that is
-    // a pass-through bridge row, the statement EBIT row links to it; if the
-    // bridge references statement EBIT directly, that row remains canonical.
-    // In either shape the economic fact is calculated once and displayed
-    // elsewhere by a direct link — never sent through a row that depends back
-    // on it.
-    const solvedTerm = byId.get(bridge.ebitTerm) ?? derivedMetricRow;
-    delete solvedTerm.broker_metric_id;
-    solvedTerm.forecast_treatment = "formula";
-    solvedTerm.forecast_calculation = {
+    // The statement EBIT row is the canonical economic authority. Solve it
+    // directly from the selected broker EBITDA anchor and D&A; any repeated
+    // bridge presentation links back to that statement answer. The reverse
+    // path (statement -> bridge -> EBITDA) was arithmetically sound but made a
+    // reader follow the model in a circle to understand one number.
+    derivedMetricRow.forecast_calculation = {
       operator: "subtract",
       refs: [
         bridge.ebitdaRow.row_id,
@@ -1385,13 +1390,16 @@ function applyBrokerAnchorRule(modelCase, rows) {
         ),
       ],
     };
-    delete solvedTerm.forecast_period_calculations;
-    if (solvedTerm.row_id !== derivedMetricRow.row_id) {
-      derivedMetricRow.forecast_calculation = {
+    delete derivedMetricRow.forecast_period_calculations;
+    const bridgeTerm = byId.get(bridge.ebitTerm);
+    if (bridgeTerm && bridgeTerm.row_id !== derivedMetricRow.row_id) {
+      delete bridgeTerm.broker_metric_id;
+      bridgeTerm.forecast_treatment = "formula";
+      bridgeTerm.forecast_calculation = {
         operator: "link",
-        refs: [solvedTerm.row_id],
+        refs: [derivedMetricRow.row_id],
       };
-      delete derivedMetricRow.forecast_period_calculations;
+      delete bridgeTerm.forecast_period_calculations;
     }
   }
 
@@ -1605,6 +1613,7 @@ export function normaliseStatementRows(modelCase, section) {
         broker_metric_id: "change_in_working_capital",
         forecast_treatment: "broker",
       },
+      presentation_style_role: "subsection",
     });
 
     // DYNAMIC 2 — Change in Debt. Same shape: additions, repayments, issuance
@@ -1615,6 +1624,7 @@ export function normaliseStatementRows(modelCase, section) {
       label: "Change in Debt",
       semantic_role: "change_in_debt",
       isConstituent: isDebtMovementConstituent,
+      presentation_style_role: "subsection",
     });
     if (changeInDebt) {
       ensureDebtScheduleLinkage(rows, changeInDebt);
@@ -2141,16 +2151,19 @@ export function compileRowPlan(modelCase) {
     plan.repayment_state_by_period = [0, 1, 2].map((index) => {
       if (instrument.class === "rcf") return "discretionary_rcf";
       const periodEnd = new Date(modelCase.periods?.[index + 3]?.date ?? 0);
+      const priorPeriodEnd = new Date(
+        modelCase.periods?.[index + 2]?.date ?? 0,
+      );
       const maturityDue =
         instrument.maturity_treatment !== "non_maturing_within_forecast" &&
         maturity &&
         !Number.isNaN(maturity.getTime()) &&
-        maturity > lastHistoricalEnd &&
+        maturity > priorPeriodEnd &&
         maturity <= periodEnd;
       const scheduled =
         Math.abs(Number(instrument.scheduled_amortisation?.[index] ?? 0)) > 0;
       if (maturityDue && scheduled) return "scheduled_and_maturity";
-      if (maturityDue) return "maturity_due_or_past";
+      if (maturityDue) return "maturity_due";
       if (scheduled) return "scheduled_amortisation";
       return "zero";
     });

@@ -30,6 +30,101 @@ function closeSeries(left, right) {
   });
 }
 
+const INFERABLE_TOTAL_ROLES = new Set([
+  "revenue",
+  "ebit",
+  "adjusted_ebitda",
+  "pre_tax_income",
+  "net_income",
+  "cash_from_operations",
+  "cash_from_investing",
+  "cash_from_financing",
+  "net_change_in_cash",
+  "ending_cash",
+]);
+
+function isInferableReportedTotal(row) {
+  return (
+    row?.historical_authority === "source_input" &&
+    finiteHistorical(row.values) &&
+    !(row.calculation?.refs?.length > 0) &&
+    (row.style_role === "total" ||
+      row.row_type === "subtotal" ||
+      INFERABLE_TOTAL_ROLES.has(row.semantic_role))
+  );
+}
+
+/**
+ * Discover a filed total's visible dependency run when the source supplied the
+ * answer but omitted the arithmetic metadata.
+ *
+ * The search is deliberately narrow: it walks the contiguous numeric run
+ * immediately above a declared total, accepts the shortest suffix that
+ * reconciles in all three historical periods, and stops after crossing the
+ * first earlier total. This captures issuer-specific shapes without guessing
+ * from labels or reaching across an unrelated statement family.
+ */
+function inferExactContiguousTotalDependencies(modelCase) {
+  const inferred = [];
+  for (const section of ["income_statement", "cash_flow"]) {
+    const rows = modelCase.statement_structure?.[section] ?? [];
+    const byId = new Map(rows.map((row) => [row.row_id, row]));
+    const memo = new Map();
+    const resolve = (rowId, visiting = new Set()) => {
+      if (memo.has(rowId)) return memo.get(rowId);
+      if (visiting.has(rowId)) return null;
+      const row = byId.get(rowId);
+      if (!row) return null;
+      const values = declaredHistoricalSeries(
+        row,
+        resolve,
+        new Set(visiting).add(rowId),
+      );
+      memo.set(rowId, values);
+      return values;
+    };
+
+    for (let index = 0; index < rows.length; index += 1) {
+      const total = rows[index];
+      if (!isInferableReportedTotal(total)) continue;
+      const filed = total.values.slice(0, 3).map(Number);
+      const refs = [];
+      const running = [0, 0, 0];
+      for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+        const candidate = rows[cursor];
+        if (candidate.row_type === "header") break;
+        const values = resolve(candidate.row_id);
+        if (!values || candidate.number_format === "percentage") continue;
+        refs.unshift(candidate.row_id);
+        for (let period = 0; period < 3; period += 1) {
+          running[period] += Number(values[period]);
+        }
+        if (refs.length >= 2 && closeSeries(running, filed)) {
+          total.calculation = { operator: "sum", refs: [...refs] };
+          total.calculation_inference = {
+            policy: "exact_contiguous_historical_total_v1",
+            dependency_row_ids: [...refs],
+          };
+          inferred.push({
+            section,
+            row_id: total.row_id,
+            dependency_row_ids: [...refs],
+          });
+          break;
+        }
+        if (
+          candidate.style_role === "total" ||
+          candidate.row_type === "subtotal" ||
+          INFERABLE_TOTAL_ROLES.has(candidate.semantic_role)
+        ) {
+          break;
+        }
+      }
+    }
+  }
+  return inferred;
+}
+
 function declaredHistoricalSeries(row, resolve, visiting) {
   if (finiteHistorical(row.reported_historical_values)) {
     return row.reported_historical_values.slice(0, 3).map(Number);
@@ -75,6 +170,11 @@ function promoteExactReportedTotals(modelCase) {
     modelCase.statement_authority_contract_version === "authority_v1";
   if (!productionAuthority) return [];
 
+  const inferredDependencies =
+    inferExactContiguousTotalDependencies(modelCase);
+  const inferredByRow = new Map(
+    inferredDependencies.map((item) => [`${item.section}.${item.row_id}`, item]),
+  );
   const rows = [
     ...(modelCase.statement_structure?.income_statement ?? []),
     ...(modelCase.statement_structure?.cash_flow ?? []),
@@ -119,6 +219,7 @@ function promoteExactReportedTotals(modelCase) {
         filed_values: filed,
         calculated_values: calculated,
         dependency_row_ids: [...row.calculation.refs],
+        dependency_inferred: inferredByRow.has(`${section}.${row.row_id}`),
       });
     }
   }

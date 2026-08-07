@@ -718,6 +718,16 @@ if (!plan) {
         stoppedAt = `sub-block header at row ${below}`;
         break;
       }
+      // A ratio terminates the amount ladder it reads.  Anything beneath that
+      // ratio belongs to the next analytical question even when the layout
+      // deliberately keeps both questions inside one bordered panel (net debt
+      // and leverage followed by mandatory repayments is the canonical
+      // example).  Continuing past the ratio compares unrelated outputs and
+      // turns formula fan-out into a false style hierarchy.
+      if (isRatioFormat(below)) {
+        stoppedAt = `ratio terminus at row ${below}`;
+        break;
+      }
       if (answerRowSet.has(below)) continue;
       if (!carriesARankRule(below)) continue;
       const theirs = readersOf(below);

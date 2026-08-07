@@ -49,6 +49,15 @@ export function instrumentDisplayLabel(instrument) {
   const maturityYear = instrument?.maturity_date
     ? String(instrument.maturity_date).slice(0, 4)
     : null;
-  if (maturityYear && !name.includes(maturityYear)) parts.push(maturityYear);
+  const maturityYearShort = maturityYear?.slice(-2);
+  const hasMaturity =
+    Boolean(maturityYear && name.includes(maturityYear)) ||
+    Boolean(
+      maturityYearShort &&
+        new RegExp(`(?:^|\\D)\\d{1,2}[/-]${maturityYearShort}(?:\\D|$)`).test(
+          name,
+        ),
+    );
+  if (maturityYear && !hasMaturity) parts.push(maturityYear);
   return parts.join(" ");
 }

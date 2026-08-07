@@ -1852,21 +1852,39 @@ function acquisitionChecks(modelCase) {
       );
     }
   }
-  const forecastYears = new Set(
-    (modelCase.periods ?? [])
-      .slice(3)
-      .map((period) => new Date(period.date).getUTCFullYear()),
+  const closeDate = new Date(
+    Date.UTC(
+      Number(acquisition.close_year),
+      Number(acquisition.close_month) - 1,
+      1,
+    ),
   );
+  const periods = modelCase.periods ?? [];
+  const closeFallsInForecast = periods.slice(3).some((period, offset) => {
+    const periodIndex = offset + 3;
+    const periodEnd = new Date(period.date);
+    const priorEnd = new Date(periods[periodIndex - 1]?.date);
+    const periodStart = new Date(priorEnd.getTime() + 86400000);
+    return closeDate >= periodStart && closeDate <= periodEnd;
+  });
   if (
     PRODUCTION_CONTRACT.acquisition.close_year_must_be_forecast &&
-    !forecastYears.has(Number(acquisition.close_year))
+    !closeFallsInForecast
   ) {
     checks.push(
       result(
         "acquisition.close_year.forecast",
         "BLOCK",
-        "The illustrative acquisition close year must be one of the three forecast years.",
-        { close_year: acquisition.close_year, forecast_years: [...forecastYears] },
+        "The acquisition close date must fall inside one of the three actual forecast-period boundaries.",
+        {
+          close_date: closeDate.toISOString().slice(0, 10),
+          forecast_periods: periods.slice(3).map((period, offset) => ({
+            start: new Date(
+              new Date(periods[offset + 2].date).getTime() + 86400000,
+            ).toISOString().slice(0, 10),
+            end: period.date,
+          })),
+        },
       ),
     );
   }
