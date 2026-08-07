@@ -8,6 +8,10 @@
 // a solver.
 //
 import { SCREEN_CONTRACT, stageById } from "./flow_runtime.mjs";
+import {
+  forecastRowMateriality,
+  resolveForecastAuthority,
+} from "./forecast_authority.mjs";
 
 const RULE_WIDTH = SCREEN_CONTRACT.width;
 const RULE = `  ${"-".repeat(RULE_WIDTH - 2)}`;
@@ -390,6 +394,95 @@ export function parseAnswers(input, questions) {
     }
   }
   return { answers, errors, complete: errors.length === 0 };
+}
+
+function forecastMethodLabel(authority) {
+  if (authority.method === "not_separately_forecast") return "captured by parent";
+  if (authority.method === "actual_plus_remainder") return "actual + remainder";
+  return String(authority.method ?? "unresolved").replaceAll("_", " ");
+}
+
+function forecastAuthorityValue(authority) {
+  const value = Number.isFinite(Number(authority.broker_value))
+    ? Number(authority.broker_value)
+    : Number.isFinite(Number(authority.value))
+      ? Number(authority.value)
+      : null;
+  return value === null ? "" : ` = ${formatNumber(value, { decimals: 1 })}`;
+}
+
+/**
+ * Stage 3 always exposes the economic forecast decisions before a workbook is
+ * built.  Formula totals and schedule links are deliberately omitted from the
+ * list: they calculate.  The screen is about the independent assumptions a
+ * reader needs to challenge -- guidance, brokers, run-rate, trend, flatline,
+ * explicit zero and parent-captured detail.
+ */
+export function renderForecastPlanScreen(modelCase) {
+  const rows = [
+    ...(modelCase?.statement_structure?.income_statement ?? []),
+    ...(modelCase?.statement_structure?.cash_flow ?? []),
+  ];
+  const selected = rows.filter((row) => {
+    if (row.row_type === "header") return false;
+    const authorities = [0, 1, 2].map((index) =>
+      resolveForecastAuthority(modelCase, row, index),
+    );
+    const independent = authorities.some((authority) =>
+      ["broker", "hardcode", "zero", "uncalculated", "block"].includes(
+        authority.mechanism,
+      ),
+    );
+    const material = authorities.some((authority) => authority.material === true) ||
+      forecastRowMateriality(modelCase, row) === true;
+    return independent && material;
+  });
+
+  const lines = [
+    ...renderStageHeader("decisions", "complete - review before build"),
+    "",
+    "   MATERIAL FORECAST PLAN",
+    "",
+  ];
+  for (const row of selected) {
+    const rowLabel = wrap(String(row.label), RULE_WIDTH - 3);
+    lines.push(`   ${rowLabel[0]}`);
+    for (const continuation of rowLabel.slice(1)) {
+      lines.push(`   ${continuation}`);
+    }
+    [0, 1, 2].forEach((index) => {
+      const authority = resolveForecastAuthority(modelCase, row, index);
+      const period = String(
+        modelCase.periods?.[index + 3]?.date ?? `FY${index + 1}`,
+      ).slice(0, 4);
+      const source = authority.source_id
+        ? ` [${authority.source_id}]`
+        : authority.method === "broker_consensus"
+          ? " [broker pack]"
+          : row.parent_row_id && authority.method === "not_separately_forecast"
+            ? ` [${row.parent_row_id}]`
+            : "";
+      const detail =
+        `${period}: ${forecastMethodLabel(authority)}` +
+        `${forecastAuthorityValue(authority)}${source}`;
+      const wrapped = wrap(detail, RULE_WIDTH - 6);
+      lines.push(`      ${wrapped[0]}`);
+      for (const continuation of wrapped.slice(1)) {
+        lines.push(`      ${continuation}`);
+      }
+    });
+  }
+  if (selected.length === 0) {
+    lines.push("   No material independent forecast assumptions resolved.");
+  }
+  lines.push(
+    "",
+    `   ${selected.length} material independent row(s); totals and links calculate.`,
+    "   Reply continue to build, or amend an assumption first.",
+    "",
+    RULE,
+  );
+  return finishScreen(lines, { summariseOverflow: true });
 }
 
 // The cap of five is reached by pruning, never by truncation. When more than

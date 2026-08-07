@@ -1295,6 +1295,32 @@ export function validateCaseShape(modelCase) {
     errors.push("Period dates must be strictly increasing.");
   }
   if (Number(modelCase.contract_version) === 2) {
+    const referenceParity = modelCase.execution_profile === "reference_parity";
+    if (!referenceParity) {
+      if (modelCase.execution_profile !== "production_model") {
+        errors.push(
+          "execution_profile must be production_model for an end-user build; archived and synthetic regression cases must declare reference_parity explicitly.",
+        );
+      }
+      if (
+        modelCase.source_coverage?.classification_contract_version !==
+        "evidence_v1"
+      ) {
+        errors.push(
+          "production_model requires source_coverage.classification_contract_version=evidence_v1; an absent or legacy evidence contract cannot enter the builder.",
+        );
+      }
+      if (modelCase.statement_authority_contract_version !== "authority_v1") {
+        errors.push(
+          "production_model requires statement_authority_contract_version=authority_v1.",
+        );
+      }
+      if (modelCase.forecast_authority_contract_version !== "waterfall_v1") {
+        errors.push(
+          "production_model requires forecast_authority_contract_version=waterfall_v1; legacy blank and implicit-zero forecasts cannot enter the builder.",
+        );
+      }
+    }
     try {
       errors.push(
         ...validateForecastAuthorities(modelCase, [

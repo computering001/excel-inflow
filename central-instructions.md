@@ -46,6 +46,14 @@ unexplained grey forecast cells are forbidden. Every material historical line
 must either have its own executable forecast path or be a declared child of a
 visible parent whose forecast captures it in the same period.
 
+Stage 3 always emits the material forecast plan before build. For each
+independent row and forecast period it states the method, selected value and
+source or parent capture. Totals, ratios and schedule links are not forecast
+judgements and remain formula driven. A production build may not enter the
+renderer as a legacy case merely because a caller bypassed the user-flow
+screen; the solver independently requires `production_model`, `evidence_v1`,
+`authority_v1` and `waterfall_v1`.
+
 Every instrument also declares `balance_basis`. Keep legal denomination in
 `currency`, but set `native_principal` only when the supplied balance and
 principal movements are genuinely native-currency amounts. Use

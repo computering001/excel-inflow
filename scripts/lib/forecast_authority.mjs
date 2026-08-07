@@ -58,6 +58,22 @@ const UNCALCULATED_METHODS = new Set([
   "not_applicable",
 ]);
 
+const MATERIALITY_REQUIRED_METHODS = new Set([
+  "actual_plus_remainder",
+  "contractual_commitment",
+  "company_guidance",
+  "company_indication",
+  "broker_consensus",
+  "user_assumption",
+  "seasonal_run_rate",
+  "historical_average",
+  "historical_trend",
+  "carry_forward",
+  "explicit_zero",
+  "not_separately_forecast",
+  "not_applicable",
+]);
+
 const SCHEDULE_OWNED_ROLES = new Set([
   "interest_income",
   "interest_expense",
@@ -105,6 +121,40 @@ function metricDefinition(modelCase, semanticRole) {
   return semanticRole ? modelCase?.operating_metrics?.[semanticRole] ?? null : null;
 }
 
+function mappedCoverageRows(modelCase, row) {
+  const sourceLineIds = new Set([
+    ...(row?.source_line_ids ?? []),
+    ...(row?.classification_source_line_ids ?? []),
+  ]);
+  const matches = [];
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const disclosure of modelCase?.source_coverage?.[section] ?? []) {
+      if (
+        (disclosure.mapped_row_ids ?? []).includes(row?.row_id) ||
+        sourceLineIds.has(disclosure.source_line_id)
+      ) {
+        matches.push(disclosure);
+      }
+    }
+  }
+  return matches;
+}
+
+/**
+ * Materiality belongs to the evidence mapping, not to a label or a workbook
+ * row number.  A visible parent may aggregate several material filing rows;
+ * those children remain material even when their forecast is captured by the
+ * parent rather than forecast separately.
+ */
+export function forecastRowMateriality(modelCase, row) {
+  const mapped = mappedCoverageRows(modelCase, row);
+  if (mapped.some((entry) => entry.material === true)) return true;
+  if (mapped.length > 0 && mapped.every((entry) => entry.material === false)) {
+    return false;
+  }
+  return null;
+}
+
 function explicitAuthority(modelCase, row, forecastIndex) {
   if (Array.isArray(row?.forecast_period_authorities)) {
     return row.forecast_period_authorities[forecastIndex] ?? null;
@@ -144,6 +194,7 @@ function inferredAuthority(modelCase, row, forecastIndex) {
   const legacy = modelCase?.forecast_authority_contract_version !== "waterfall_v1";
   const treatment = row?.forecast_treatment;
   const value = rowSeriesValue(modelCase, row, forecastIndex);
+  const material = forecastRowMateriality(modelCase, row);
 
   if (row?.row_type === "header") {
     return {
@@ -165,6 +216,7 @@ function inferredAuthority(modelCase, row, forecastIndex) {
       method: "not_separately_forecast",
       source_kind: "none",
       inferred: true,
+      material,
     };
   }
   if (SCHEDULE_OWNED_ROLES.has(row?.semantic_role)) {
@@ -202,10 +254,21 @@ function inferredAuthority(modelCase, row, forecastIndex) {
     return { method, source_kind: "formula", inferred: true };
   }
   if (treatment === "broker" || row?.broker_metric_id) {
-    return { method: "broker_consensus", source_kind: "broker", inferred: true };
+    return {
+      method: "broker_consensus",
+      source_kind: "broker",
+      inferred: true,
+      material,
+    };
   }
   if (treatment === "zero") {
-    return { method: "explicit_zero", source_kind: "none", value: 0, inferred: true };
+    return {
+      method: "explicit_zero",
+      source_kind: "none",
+      value: 0,
+      inferred: true,
+      material,
+    };
   }
   if (treatment === "hardcode" && finite(value)) {
     return {
@@ -348,7 +411,12 @@ export function validateForecastAuthorities(modelCase, rows = []) {
     historical_average: new Set(["historical_inference"]),
     historical_trend: new Set(["historical_inference"]),
     carry_forward: new Set(["historical_inference"]),
-    explicit_zero: new Set(["none", "company_reported", "user_supplied"]),
+    explicit_zero: new Set([
+      "none",
+      "company_reported",
+      "user_supplied",
+      "historical_inference",
+    ]),
     not_separately_forecast: new Set(["none"]),
     not_applicable: new Set(["none"]),
     unresolved: new Set(["none"]),
@@ -401,6 +469,12 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         if (!partial?.reported_through) {
           errors.push(`${label} requires reported_through.`);
         }
+        if (strict && !partial?.reported_source_id) {
+          errors.push(`${label} requires reported_source_id for the actual-to-date amount.`);
+        }
+        if (strict && !partial?.remainder_source_id) {
+          errors.push(`${label} requires remainder_source_id for the selected forecast remainder.`);
+        }
         if (
           finite(authority.declared_value) &&
           finite(partial?.reported_to_date) &&
@@ -415,6 +489,26 @@ export function validateForecastAuthorities(modelCase, rows = []) {
       }
       if (authority.method === "explicit_zero" && finite(authority.value) && Number(authority.value) !== 0) {
         errors.push(`${label} is explicit_zero but carries ${authority.value}.`);
+      }
+      const evidenceMaterial = forecastRowMateriality(modelCase, row);
+      if (
+        strict &&
+        MATERIALITY_REQUIRED_METHODS.has(authority.method) &&
+        typeof authority.material !== "boolean"
+      ) {
+        errors.push(
+          `${label} must declare material=true or material=false before selecting ${authority.method}.`,
+        );
+      }
+      if (
+        strict &&
+        typeof evidenceMaterial === "boolean" &&
+        typeof authority.material === "boolean" &&
+        evidenceMaterial !== authority.material
+      ) {
+        errors.push(
+          `${label} declares material=${authority.material}, but the mapped source evidence declares material=${evidenceMaterial}.`,
+        );
       }
       if (authority.guidance_range) {
         const low = Number(authority.guidance_range.low);
@@ -459,6 +553,15 @@ export function validateForecastAuthorities(modelCase, rows = []) {
       }
       if (
         strict &&
+        authority.method === "user_assumption" &&
+        (!authority.source_id || !authority.as_of_date)
+      ) {
+        errors.push(
+          `${label} requires source_id and as_of_date for the explicit user assumption.`,
+        );
+      }
+      if (
+        strict &&
         [
           "user_assumption",
           "seasonal_run_rate",
@@ -487,6 +590,29 @@ export function validateForecastAuthorities(modelCase, rows = []) {
             );
           }
         }
+      }
+      if (strict && authority.method === "not_applicable") {
+        if (authority.material !== false) {
+          errors.push(
+            `${label} may be not_applicable only when the mapped row is explicitly immaterial.`,
+          );
+        }
+        const historical = (row?.values ?? []).slice(0, 3);
+        if (historical.some((value) => finite(value) && Math.abs(Number(value)) > 1e-9)) {
+          errors.push(
+            `${label} is not_applicable but the row has non-zero historical activity; choose a supported forecast method, capture it in a parent, or document a sourced zero.`,
+          );
+        }
+      }
+      if (
+        strict &&
+        authority.method === "explicit_zero" &&
+        authority.material === true &&
+        authority.source_kind === "none"
+      ) {
+        errors.push(
+          `${label} is a material explicit zero without a company, user or historical-inference basis.`,
+        );
       }
     }
   }

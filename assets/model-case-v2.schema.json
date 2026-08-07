@@ -670,6 +670,8 @@
             "reported_to_date": { "type": "number" },
             "forecast_remainder": { "type": "number" },
             "reported_through": { "type": "string", "format": "date" },
+            "reported_source_id": { "type": "string", "minLength": 1 },
+            "remainder_source_id": { "type": "string", "minLength": 1 },
             "remainder_method": {
               "enum": [
                 "contractual_commitment",
@@ -678,6 +680,8 @@
                 "broker_consensus_less_reported",
                 "broker_quarterly",
                 "historical_seasonality",
+                "historical_average",
+                "historical_trend",
                 "straight_line_run_rate",
                 "user_assumption"
               ]

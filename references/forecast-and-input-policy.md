@@ -105,6 +105,14 @@ semantic row.  Deterministic code compiles that declaration into exactly one of
 formula, cross-sheet broker link, visible hardcode, formula-driven zero,
 intentional blank or fail-closed unresolved.
 
+Before selecting those authorities, record `forecast_context` in the evidence
+run: every annual/interim result reviewed, the latest publication-dated result,
+and whether guidance was used or reviewed and absent. Bind company methods to
+those inventoried source IDs. An actual-plus-remainder method binds the reported
+actual and the remainder separately. A material line cannot be called
+`not_applicable`; parent capture, a sourced forecast, a stated historical
+inference or a targeted unresolved question is required.
+
 Do not prefer an aggregate broker number over a more compatible supplied metric.
 Do not manufacture consensus from illustrative values. Distinguish supplied
 values, user inputs and inferred assumptions.

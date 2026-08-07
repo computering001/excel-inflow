@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.0.6",
+  "releaseName": "Excel Inflow v2.0.7",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.6",
+  "skillVersion": "2.0.7",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T11:52:55.816Z",
-  "centralInstructionsWords": 3797,
+  "generatedAt": "2026-08-07T12:31:43.118Z",
+  "centralInstructionsWords": 3867,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "8245c68325e223b370c08bb5fdfb7f357d2784990ffc857565eb83d5e7821b3d",
+    "currentClosureSha256": "8ae27339934df03af43ce4b385c6561ac1e7c249dc6f932f4b5f4fb903221dea",
     "closureFileCount": 95,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -172,6 +172,7 @@
       "scripts/lib/flow_reconcile.mjs -> scripts/lib/flow_screens.mjs",
       "scripts/lib/flow_runtime.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/flow_screens.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/lib/flow_screens.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/forecast_authority.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/acquisition_policy.mjs",
@@ -241,10 +242,10 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python3",
+      "selected": "python",
       "candidates": [
         {
-          "candidate": "python3",
+          "candidate": "python",
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
@@ -258,6 +259,22 @@
           },
           "usable": true,
           "reason": "selected"
+        },
+        {
+          "candidate": "python3",
+          "version": "3.9.6",
+          "packages": {
+            "openpyxl": null,
+            "fitz": null,
+            "PIL": null,
+            "numpy": null,
+            "jsonschema": null,
+            "pdfplumber": null,
+            "pypdf": "6.12.1",
+            "reportlab": null
+          },
+          "usable": false,
+          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
         }
       ]
     },
@@ -655,7 +672,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python3",
+    "pythonExecutable": "python",
     "results": [
       {
         "target": "closure probe",
@@ -777,18 +794,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
-        "plan_sha256": "8d844dbf276f7415d36473e24983e982d018dd85ffa6b0c4bb1f74b3c4803356",
-        "workbook_sha256": "72feac8710935d12721e399b624807d609c8a058ebbe79c6dca7fe0c870737f3",
+        "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
+        "plan_sha256": "ff8c3797d918cc1e113c14ea07f3fdf9c4e5c822a4e1cddb7954679babe6f6c1",
+        "workbook_sha256": "e80468b8740b6658b050a8459ec6c4a58a30f32cb5a00554d92ec7a9d762590f",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
-      "plan_sha256": "8d844dbf276f7415d36473e24983e982d018dd85ffa6b0c4bb1f74b3c4803356",
-      "workbook_sha256": "72feac8710935d12721e399b624807d609c8a058ebbe79c6dca7fe0c870737f3",
+      "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
+      "plan_sha256": "ff8c3797d918cc1e113c14ea07f3fdf9c4e5c822a4e1cddb7954679babe6f6c1",
+      "workbook_sha256": "e80468b8740b6658b050a8459ec6c4a58a30f32cb5a00554d92ec7a9d762590f",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -818,21 +835,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "c8147325d256e1a6454d796e7e6e17626c1c93eca8127206c76423c75ba3e51b",
-      "bytes": 28304,
-      "words": 3797
+      "sha256": "e0ff13fcd9176f892649a1ec6078015cca267585c7a30a7f64c02686b1c37eb8",
+      "bytes": 28790,
+      "words": 3867
     },
     {
       "path": "SKILL.md",
-      "sha256": "4318540af889340a120229f8dc04543078b718e118282451b5d5358cd6345f95",
-      "bytes": 28791,
-      "words": 3866
+      "sha256": "e9b2ccb688795b79f70ab7d797b293789c0144885506155d65a193f0d5dc0f54",
+      "bytes": 29277,
+      "words": 3936
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "2d172299ad967a0b0ff82801fae020429c6ff5314986c38dbbfb37b14e1e6480",
-      "bytes": 28324,
-      "words": 3799
+      "sha256": "92c4a2bbeafc8e336bb49b2f1ba06d9d82e90dfdb99e0a13765c9ab337941307",
+      "bytes": 28810,
+      "words": 3869
     },
     {
       "path": "references/model-contract.md",
@@ -848,9 +865,9 @@
     },
     {
       "path": "references/forecast-and-input-policy.md",
-      "sha256": "9758f660c6ea4525b9d3c8eb47c0238bfc3ef4c23d428967935fb58f6e0ef66e",
-      "bytes": 11229,
-      "words": 1698
+      "sha256": "0f71bb2d2f5c59d6cc2350dc7331a68a67134bffff7f6ad34eb532e61b799ecf",
+      "bytes": 11748,
+      "words": 1767
     },
     {
       "path": "references/acquisition.md",
@@ -896,8 +913,8 @@
     },
     {
       "path": "assets/evidence-run-v1.schema.json",
-      "sha256": "cf35859278481ae748804dcacac501a524b611eb2d846abddc5dee5d774ef1eb",
-      "bytes": 17255,
+      "sha256": "7f30fb683defe32a46c0f93646d2df374a5df8357d5b0c91ae45ad62898fe06a",
+      "bytes": 18994,
       "words": null
     },
     {
@@ -908,8 +925,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "1de413101d705d1a4bf6f5e5707c91da67140294f2d89860bad0fc7a1ad967aa",
-      "bytes": 47615,
+      "sha256": "2e49ba7bca837077b8b6d49785ddcc8164b2ba1871472cf1761d0a3b4a02a717",
+      "bytes": 47834,
       "words": null
     },
     {
@@ -1070,8 +1087,8 @@
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "57ad03515e75a4e107da8e83651501acc3346766d0b4e4f601216e7875b40a38",
-      "bytes": 55179,
+      "sha256": "207c28664937c96f7822c64f63912e6d43b97188195cac72a7c66e4fe1de2c93",
+      "bytes": 62894,
       "words": null
     },
     {
@@ -1124,14 +1141,14 @@
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "ed9a172257f52b81638d25cd425952fb4e8f09435266f6eacbdf19b1b8ee708e",
-      "bytes": 20551,
+      "sha256": "197d22fe3864e9304881772573e2bc895d22badc6c98d7f51a2a3fe694d7d7e9",
+      "bytes": 23981,
       "words": null
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "5e0e472490d83e658ecd0661e5624f7b9fa9b673c7d5a570d10e59a3045f3789",
-      "bytes": 18872,
+      "sha256": "8f80f7ccca09b10a5d5c521b5be200b806da46e16bb68d1e0e4ce84782d0b433",
+      "bytes": 22832,
       "words": null
     },
     {
@@ -1244,8 +1261,8 @@
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "cf1674dfe73efb90f642be3ed392d57811e974c150c7936dbe58311213f4ca86",
-      "bytes": 107770,
+      "sha256": "4e87725faa6a1ae8bac2445da43606a0a8cb6dc7ecdd183956121fb005ed65aa",
+      "bytes": 108950,
       "words": null
     },
     {
@@ -1364,8 +1381,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "067703fd5bae784e91c29b3b43a27e207920bce41c099e8184afd989348b51e3",
-      "bytes": 34540,
+      "sha256": "d5cefda19cd8e19df925f1648d261d0161a5950a37a321f7cc8b70bcc0462b61",
+      "bytes": 34791,
       "words": null
     },
     {

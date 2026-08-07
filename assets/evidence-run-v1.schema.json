@@ -16,6 +16,7 @@
     "filings",
     "dcs_export",
     "broker_pack",
+    "forecast_context",
     "model_case",
     "decisions"
   ],
@@ -38,6 +39,7 @@
     "filings": { "$ref": "#/$defs/filings" },
     "dcs_export": { "type": "object" },
     "broker_pack": { "type": "object" },
+    "forecast_context": { "$ref": "#/$defs/forecastContext" },
     "model_case": { "type": "object" },
     "attachment_manifest": {
       "type": "array",
@@ -83,6 +85,56 @@
     }
   },
   "$defs": {
+    "forecastContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "reviewed_at",
+        "public_results_source_ids",
+        "latest_public_results_source_id",
+        "guidance_status",
+        "guidance_source_ids",
+        "guidance_review_note"
+      ],
+      "properties": {
+        "contract_version": { "const": "forecast-evidence/1.0" },
+        "reviewed_at": { "type": "string", "format": "date" },
+        "public_results_source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "latest_public_results_source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "guidance_status": {
+          "enum": ["used", "reviewed_none", "not_applicable"]
+        },
+        "guidance_source_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "guidance_review_note": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "guidance_status": { "const": "used" } } },
+          "then": { "properties": { "guidance_source_ids": { "minItems": 1 } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "guidance_status": { "enum": ["reviewed_none", "not_applicable"] }
+            }
+          },
+          "then": { "properties": { "guidance_source_ids": { "maxItems": 0 } } }
+        }
+      ]
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,

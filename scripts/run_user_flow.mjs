@@ -19,6 +19,7 @@ import {
 import {
   renderDeliveryReport,
   renderFailure,
+  renderForecastPlanScreen,
   renderStageStatus,
   WELCOME_SCREEN,
 } from "./lib/flow_screens.mjs";
@@ -589,6 +590,7 @@ async function main() {
   // the complete question set. No default may answer a question that was shown.
   const stage3Dir = path.join(runDir, "stages", "decisions");
   const answeredCasePath = path.join(stage3Dir, "model-case.json");
+  const forecastPlanPath = path.join(stage3Dir, "forecast-plan.txt");
   let answeredCase;
   let answerHash;
   if (intakeResult.outcome === "questions") {
@@ -680,7 +682,10 @@ async function main() {
     answers: answerHash,
     runtime: runtimeDigests.decisions,
   };
-  const stage3Outputs = { model_case: answeredCasePath };
+  const stage3Outputs = {
+    model_case: answeredCasePath,
+    forecast_plan: forecastPlanPath,
+  };
   const cached3 = await readUsableStage({
     runDir,
     runId,
@@ -696,6 +701,10 @@ async function main() {
     reusedStages.push("decisions");
   } else {
     await writeJsonAtomic(answeredCasePath, answeredCase);
+    await writeTextAtomic(
+      forecastPlanPath,
+      `${renderForecastPlanScreen(answeredCase)}\n`,
+    );
     receipt3 = await persistStage({
       runDir,
       runId,
@@ -713,7 +722,7 @@ async function main() {
     const carrier = await persistCurrentCarrier("READY_TO_BUILD", { model_case: answeredCasePath });
     return finish({
       runDir,
-      screen: renderPresentationScreen("build_checks"),
+      screen: renderForecastPlanScreen(answeredCase),
       machine: options.json === true,
       result: {
         schema_version: "user-flow-run/1.0",

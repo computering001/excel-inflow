@@ -1446,6 +1446,234 @@ function validateDecisionSources(run, sourceIds, findings) {
   }
 }
 
+function validateForecastEvidence(run, findings) {
+  const inventory = new Map(
+    (run.source_inventory ?? []).map((source) => [source.source_id, source]),
+  );
+  const context = run.forecast_context ?? {};
+  const publicKinds = new Set([
+    "company_annual_report",
+    "company_interim_update",
+  ]);
+  const publicResultIds = new Set(context.public_results_source_ids ?? []);
+
+  for (const sourceId of publicResultIds) {
+    const source = inventory.get(sourceId);
+    if (!source) {
+      findings.push(
+        finding(
+          "evidence.forecast_context.source_absent",
+          "BLOCK",
+          `Forecast context cites unknown public-results source ${sourceId}.`,
+        ),
+      );
+      continue;
+    }
+    if (source.status !== "used" || !publicKinds.has(source.kind)) {
+      findings.push(
+        finding(
+          "evidence.forecast_context.source_invalid",
+          "BLOCK",
+          `Forecast context source ${sourceId} must be a used annual report or interim update, not ${source.kind}/${source.status}.`,
+        ),
+      );
+    }
+  }
+
+  const latestId = context.latest_public_results_source_id;
+  if (latestId && !publicResultIds.has(latestId)) {
+    findings.push(
+      finding(
+        "evidence.forecast_context.latest_not_reviewed",
+        "BLOCK",
+        `Latest public-results source ${latestId} is not included in public_results_source_ids.`,
+      ),
+    );
+  }
+  const usedPublicSources = [...inventory.values()].filter(
+    (source) => source.status === "used" && publicKinds.has(source.kind),
+  );
+  const datedPublicSources = usedPublicSources.filter((source) =>
+    Boolean(source.publication_date),
+  );
+  if (datedPublicSources.length === 0) {
+    findings.push(
+      finding(
+        "evidence.forecast_context.no_dated_results",
+        "BLOCK",
+        "Forecasting requires at least one used, publication-dated annual report or interim update.",
+      ),
+    );
+  } else {
+    const latest = [...datedPublicSources].sort(
+      (left, right) =>
+        String(right.publication_date).localeCompare(String(left.publication_date)) ||
+        String(left.source_id).localeCompare(String(right.source_id)),
+    )[0];
+    if (latestId !== latest.source_id) {
+      findings.push(
+        finding(
+          "evidence.forecast_context.latest_mismatch",
+          "BLOCK",
+          `Forecast context selects ${latestId ?? "no source"}, but the latest used public result is ${latest.source_id} dated ${latest.publication_date}.`,
+        ),
+      );
+    }
+  }
+
+  const guidanceIds = new Set(context.guidance_source_ids ?? []);
+  for (const sourceId of guidanceIds) {
+    const source = inventory.get(sourceId);
+    if (!source) {
+      findings.push(
+        finding(
+          "evidence.forecast_context.guidance_source_absent",
+          "BLOCK",
+          `Guidance review cites unknown source ${sourceId}.`,
+        ),
+      );
+    } else if (
+      source.status !== "used" ||
+      ![
+        "company_annual_report",
+        "company_interim_update",
+        "company_transaction_announcement",
+      ].includes(source.kind)
+    ) {
+      findings.push(
+        finding(
+          "evidence.forecast_context.guidance_source_invalid",
+          "BLOCK",
+          `Guidance source ${sourceId} must be a used company result or transaction announcement.`,
+        ),
+      );
+    }
+  }
+
+  const rows = [
+    ...(run.model_case?.statement_structure?.income_statement ?? []),
+    ...(run.model_case?.statement_structure?.cash_flow ?? []),
+  ];
+  const authorityGroups = [
+    ...rows.map((row) => ({
+      owner: row.row_id,
+      authorities: row.forecast_period_authorities,
+    })),
+    ...Object.entries(run.model_case?.operating_metrics ?? {}).map(
+      ([metricId, metric]) => ({
+        owner: `operating_metrics.${metricId}`,
+        authorities: metric.forecast_period_authorities,
+      }),
+    ),
+  ];
+  const compatibleKinds = {
+    company_reported: new Set([
+      "company_annual_report",
+      "company_interim_update",
+      "company_debt_document",
+      "company_transaction_announcement",
+    ]),
+    company_guidance: new Set([
+      "company_annual_report",
+      "company_interim_update",
+      "company_transaction_announcement",
+    ]),
+    company_indication: new Set([
+      "company_annual_report",
+      "company_interim_update",
+      "company_transaction_announcement",
+    ]),
+    broker: new Set(["user_broker_research"]),
+    user_supplied: new Set(["user_answer"]),
+  };
+
+  for (const group of authorityGroups) {
+    if (!Array.isArray(group.authorities)) continue;
+    group.authorities.forEach((authority, forecastIndex) => {
+      const bindings = [
+        ["source_id", authority?.source_id, authority?.source_kind],
+        [
+          "partial_period.reported_source_id",
+          authority?.partial_period?.reported_source_id,
+          "company_reported",
+        ],
+        [
+          "partial_period.remainder_source_id",
+          authority?.partial_period?.remainder_source_id,
+          authority?.partial_period?.remainder_method?.startsWith("broker_")
+            ? "broker"
+            : authority?.partial_period?.remainder_method === "user_assumption"
+              ? "user_supplied"
+              : ["company_guidance", "company_indication"].includes(
+                    authority?.partial_period?.remainder_method,
+                  )
+                ? authority.partial_period.remainder_method
+                : null,
+        ],
+      ];
+      for (const [field, sourceId, sourceKind] of bindings) {
+        if (!sourceId) continue;
+        const source = inventory.get(sourceId);
+        const label = `${group.owner}.forecast_period_authorities[${forecastIndex}].${field}`;
+        if (!source) {
+          findings.push(
+            finding(
+              "evidence.forecast_authority.source_absent",
+              "BLOCK",
+              `${label} cites unknown source ${sourceId}.`,
+            ),
+          );
+          continue;
+        }
+        if (source.status !== "used") {
+          findings.push(
+            finding(
+              "evidence.forecast_authority.source_not_used",
+              "BLOCK",
+              `${label} cites ${sourceId}, whose status is ${source.status}.`,
+            ),
+          );
+        }
+        if (sourceKind && !compatibleKinds[sourceKind]?.has(source.kind)) {
+          findings.push(
+            finding(
+              "evidence.forecast_authority.source_kind_mismatch",
+              "BLOCK",
+              `${label} declares ${sourceKind}, but ${sourceId} is ${source.kind}.`,
+            ),
+          );
+        }
+      }
+      if (
+        ["company_guidance", "company_indication"].includes(authority?.method) &&
+        authority?.source_id &&
+        !guidanceIds.has(authority.source_id)
+      ) {
+        findings.push(
+          finding(
+            "evidence.forecast_authority.guidance_not_reviewed",
+            "BLOCK",
+            `${group.owner} forecast period ${forecastIndex + 1} cites ${authority.source_id}, but that source is absent from the forecast-context guidance review.`,
+          ),
+        );
+      }
+      if (
+        authority?.method === "actual_plus_remainder" &&
+        authority?.partial_period?.reported_source_id &&
+        !publicResultIds.has(authority.partial_period.reported_source_id)
+      ) {
+        findings.push(
+          finding(
+            "evidence.forecast_authority.actual_not_in_results_review",
+            "BLOCK",
+            `${group.owner} forecast period ${forecastIndex + 1} uses actual-to-date source ${authority.partial_period.reported_source_id}, which is absent from the public-results review.`,
+          ),
+        );
+      }
+    });
+  }
+}
+
 /**
  * Validate the complete deployment host evidence-to-case handoff. No workbook or solver
  * result is trusted here; this gate only decides whether the deterministic
@@ -1522,6 +1750,7 @@ export function validateEvidenceRun(run) {
   validateBrokerMapping(run, findings);
   validateRestatements(run, sourceIds, findings);
   validateDecisionSources(run, sourceIds, findings);
+  validateForecastEvidence(run, findings);
 
   const coverage = caseErrors.length === 0 ? assessCoverage(modelCase) : null;
   if (coverage && !coverage.ready_to_build) {
