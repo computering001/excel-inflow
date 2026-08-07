@@ -1338,6 +1338,7 @@ function applyBrokerAnchorRule(modelCase, rows) {
   const plan = resolveAnchorPlan(modelCase, rows);
   if (!plan) return null;
   const { selection, bridge, residualPlugRowIds } = plan;
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
   const rowForMetric = {
     ebit: bridge.ebitRow,
     adjusted_ebitda: bridge.ebitdaRow,
@@ -1359,23 +1360,39 @@ function applyBrokerAnchorRule(modelCase, rows) {
   // 2. THE OTHER HEADLINE IS DERIVED — a calculation, in black, off the
   //    bridge. EBITDA is the bridge subtotal; EBIT is the bridge rearranged,
   //    "Adjusted EBITDA less D&A and every disclosed addback".
-  const derivedRow = rowForMetric[selection.derived];
-  delete derivedRow.broker_metric_id;
-  derivedRow.forecast_treatment = "formula";
+  const derivedMetricRow = rowForMetric[selection.derived];
+  delete derivedMetricRow.broker_metric_id;
+  derivedMetricRow.forecast_treatment = "formula";
   if (selection.derived === "adjusted_ebitda") {
-    delete derivedRow.forecast_calculation;
-    delete derivedRow.forecast_period_calculations;
+    delete derivedMetricRow.forecast_calculation;
+    delete derivedMetricRow.forecast_period_calculations;
   } else {
-    const solvedTerm = bridge.ebitTerm;
-    derivedRow.forecast_calculation = {
+    // Solve the term that actually sits inside the EBITDA identity. If that is
+    // a pass-through bridge row, the statement EBIT row links to it; if the
+    // bridge references statement EBIT directly, that row remains canonical.
+    // In either shape the economic fact is calculated once and displayed
+    // elsewhere by a direct link — never sent through a row that depends back
+    // on it.
+    const solvedTerm = byId.get(bridge.ebitTerm) ?? derivedMetricRow;
+    delete solvedTerm.broker_metric_id;
+    solvedTerm.forecast_treatment = "formula";
+    solvedTerm.forecast_calculation = {
       operator: "subtract",
       refs: [
         bridge.ebitdaRow.row_id,
         ...bridge.ebitdaRow.calculation.refs.filter(
-          (ref) => ref !== solvedTerm,
+          (ref) => ref !== bridge.ebitTerm,
         ),
       ],
     };
+    delete solvedTerm.forecast_period_calculations;
+    if (solvedTerm.row_id !== derivedMetricRow.row_id) {
+      derivedMetricRow.forecast_calculation = {
+        operator: "link",
+        refs: [solvedTerm.row_id],
+      };
+      delete derivedMetricRow.forecast_period_calculations;
+    }
   }
 
   // 3. THE PLUG GOES BACK TO BEING AN INPUT. The row keeps its history and its
@@ -1411,6 +1428,68 @@ function applyBrokerAnchorRule(modelCase, rows) {
   return selection;
 }
 
+/**
+ * Keep the issuer's full filed P&L in history, but do not manufacture forecast
+ * detail between the key Revenue and EBIT answers when a supported headline
+ * anchor already supplies the operating result. Revenue components and
+ * intermediate operating lines become intentionally blank forecast workings;
+ * the total Revenue line, its growth calculation and the EBIT/EBITDA identity
+ * remain live. Cases without a resolvable anchor retain their authored detail.
+ */
+function applyAnchoredSlimForecast(rows, anchorSelection) {
+  if (!anchorSelection) return;
+  const revenueIndex = rows.findIndex((row) => row.semantic_role === "revenue");
+  const ebitIndex = rows.findIndex((row) => row.semantic_role === "ebit");
+  if (revenueIndex < 0 || ebitIndex < 0 || revenueIndex >= ebitIndex) return;
+  const revenueId = rows[revenueIndex].row_id;
+  const keepLive = new Set([revenueId, rows[ebitIndex].row_id]);
+  for (const row of rows) {
+    if (
+      [
+        "ebit",
+        "adjusted_ebitda",
+        "depreciation_and_amortisation",
+        "recurring_disclosed_adjustments",
+      ].includes(row.semantic_role)
+    ) {
+      keepLive.add(row.row_id);
+    }
+  }
+  // Preserve the complete dependency closure of the selected headline
+  // identity even when an issuer lays its EBITDA bridge above statement EBIT.
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const queue = [...keepLive];
+  while (queue.length > 0) {
+    const row = byId.get(queue.pop());
+    for (const ref of [
+      ...(row?.calculation?.refs ?? []),
+      ...(row?.forecast_calculation?.refs ?? []),
+    ]) {
+      if (!byId.has(ref) || keepLive.has(ref)) continue;
+      keepLive.add(ref);
+      queue.push(ref);
+    }
+  }
+  for (const row of rows) {
+    if (
+      row.semantic_role === "revenue_growth" ||
+      (row.calculation?.operator === "growth" &&
+        row.calculation.refs?.includes(revenueId))
+    ) {
+      keepLive.add(row.row_id);
+    }
+  }
+  for (let index = 0; index < ebitIndex; index += 1) {
+    const row = rows[index];
+    if (row.row_type === "header" || keepLive.has(row.row_id)) continue;
+    row.forecast_treatment = "uncalculated";
+    row.formula_authority = "intentionally_blank";
+    delete row.broker_metric_id;
+    delete row.forecast_calculation;
+    delete row.forecast_period_calculations;
+  }
+}
+
 export function normaliseStatementRows(modelCase, section) {
   const supplied = modelCase.statement_structure?.[section];
   const rows =
@@ -1436,7 +1515,11 @@ export function normaliseStatementRows(modelCase, section) {
       });
       if (
         classification.status === "accepted" &&
-        ["cash_interest_paid", "cash_interest_received"].includes(
+        [
+          "cash_interest_paid",
+          "cash_interest_received",
+          "net_finance_addback",
+        ].includes(
           classification.classified_role,
         )
       ) {
@@ -1446,7 +1529,8 @@ export function normaliseStatementRows(modelCase, section) {
   }
   if (section === "income_statement") {
     projectIncomeStatementToDebtOverlay(modelCase, rows);
-    applyBrokerAnchorRule(modelCase, rows);
+    const anchorSelection = applyBrokerAnchorRule(modelCase, rows);
+    applyAnchoredSlimForecast(rows, anchorSelection);
   }
   if (section === "cash_flow") {
     selectSingleCashFlowRoot(modelCase, rows);
@@ -2013,6 +2097,7 @@ export function compileRowPlan(modelCase) {
       amortisation_row: null,
       repayment_row: null,
       has_mandatory_repayment: false,
+      repayment_state_by_period: ["zero", "zero", "zero"],
       pik_row: null,
       fair_value_row: null,
       other_non_cash_row: null,
@@ -2053,6 +2138,22 @@ export function compileRowPlan(modelCase) {
       !Number.isNaN(maturity.getTime()) &&
       maturity > lastHistoricalEnd &&
       maturity <= lastForecastEnd;
+    plan.repayment_state_by_period = [0, 1, 2].map((index) => {
+      if (instrument.class === "rcf") return "discretionary_rcf";
+      const periodEnd = new Date(modelCase.periods?.[index + 3]?.date ?? 0);
+      const maturityDue =
+        instrument.maturity_treatment !== "non_maturing_within_forecast" &&
+        maturity &&
+        !Number.isNaN(maturity.getTime()) &&
+        maturity > lastHistoricalEnd &&
+        maturity <= periodEnd;
+      const scheduled =
+        Math.abs(Number(instrument.scheduled_amortisation?.[index] ?? 0)) > 0;
+      if (maturityDue && scheduled) return "scheduled_and_maturity";
+      if (maturityDue) return "maturity_due_or_past";
+      if (scheduled) return "scheduled_amortisation";
+      return "zero";
+    });
     if (
       instrument.class !== "rcf" &&
       (forecastMaturity || Number.isInteger(plan.amortisation_row))

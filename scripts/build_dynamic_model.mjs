@@ -1284,6 +1284,26 @@ function provenanceComment(entry) {
   return parts.join("\n");
 }
 
+function forecastAuthorityComment(modelCase, definition, forecastIndex, authority) {
+  const provenance = (modelCase.provenance?.[definition.row_id] ?? []).find(
+    (entry) => Number(entry.period_index) === forecastIndex + 3,
+  );
+  if (provenance) return provenanceComment(provenance);
+  const parts = [
+    `Forecast authority: ${authority.method}`,
+    `Source kind: ${authority.source_kind ?? "not declared"}`,
+  ];
+  if (authority.source_id) parts.push(`Source: ${authority.source_id}`);
+  if (authority.as_of_date) parts.push(`As of: ${authority.as_of_date}`);
+  if (authority.note) parts.push(authority.note);
+  if (authority.inferred && !authority.note) {
+    parts.push(
+      "Legacy/reference forecast value retained from the case input; no additional source was declared.",
+    );
+  }
+  return parts.join("\n");
+}
+
 function brokerNames(modelCase) {
   const names = new Set();
   for (const metric of Object.values(modelCase.broker_pack?.metrics ?? {})) {
@@ -1499,6 +1519,7 @@ function buildBrokersSheet(workbook, modelCase, rowPlan) {
 
   const names = brokerNames(modelCase);
   const selectedRows = {};
+  const assumptionRows = {};
   const declaredMetricRows = rowPlan.broker_metric_rows?.rows ?? {};
   // Every broker row on the sheet, for the outline pass that collapses the
   // contributors and leaves the metric standing over its three summaries.
@@ -1692,12 +1713,70 @@ function buildBrokersSheet(workbook, modelCase, rowPlan) {
     row += 1;
   }
 
+  // INDEPENDENT FORECAST ASSUMPTIONS LIVE HERE, NOT ON THE MODEL FACE.
+  //
+  // Guidance, commitments, historical run-rates and user assumptions are
+  // genuine inputs, but putting their literal values in the Operating Model
+  // makes a forecast indistinguishable from an unexplained hardcode.  This
+  // block is the single blue-input authority; the model face links here in
+  // green. A row is emitted only when at least one of its three periods is an
+  // independent-input authority. Formula, broker, schedule, explicit-zero and
+  // intentionally blank paths never appear in this block.
+  const statementRows = [
+    ...(rowPlan.statement_rows?.income_statement ?? []),
+    ...(rowPlan.statement_rows?.cash_flow ?? []),
+  ];
+  const assumptionDefinitions = statementRows
+    .filter((definition) => definition.row_type !== "header")
+    .map((definition) => ({
+      definition,
+      authorities: [0, 1, 2].map((index) =>
+        resolveForecastAuthority(modelCase, definition, index),
+      ),
+    }))
+    .filter(({ authorities }) =>
+      authorities.some((authority) => authority.mechanism === "hardcode"),
+    );
+  if (assumptionDefinitions.length > 0) {
+    setValue(sheet, `B${row}`, "Forecast assumptions");
+    sheet.getRange(`B${row}:${LAST_COLUMN}${row}`).format.fill = COLORS.navy;
+    styleFont(sheet, `B${row}:${LAST_COLUMN}${row}`, COLORS.white, { bold: true });
+    row += 1;
+    for (const { definition, authorities } of assumptionDefinitions) {
+      assumptionRows[definition.row_id] = row;
+      setValue(sheet, `B${row}`, definition.label);
+      applyFormula(
+        sheet,
+        `${ACTUAL_COLUMN}${row}`,
+        `='Operating Model'!I${definition.row}`,
+      );
+      for (let index = 0; index < 3; index += 1) {
+        const authority = authorities[index];
+        const address = `${FORECAST_COLUMNS_BROKERS[index]}${row}`;
+        if (authority.mechanism !== "hardcode") continue;
+        setValue(sheet, address, Number(authority.value));
+        styleInput(sheet, address);
+        addCommentOnce(
+          workbook,
+          sheet,
+          address,
+          forecastAuthorityComment(modelCase, definition, index, authority),
+        );
+      }
+      sheet.getRange(`${ACTUAL_COLUMN}${row}:${LAST_COLUMN}${row}`).format.numberFormat =
+        definition.number_format === "percentage" ? PERCENT : AMOUNT;
+      row += 1;
+    }
+    row += 1;
+  }
+
   sheet.getRange(`A1:A${row}`).format.columnWidth = 1;
   sheet.getRange(`B1:B${row}`).format.columnWidth = 27;
   sheet.getRange(`${ACTUAL_COLUMN}1:${LAST_COLUMN}${row}`).format.columnWidth = 10;
   return {
     sheet,
     selectedRows,
+    assumptionRows,
     names,
     forecastColumns: FORECAST_COLUMNS_BROKERS,
     headerRow: HEADER_ROW,
@@ -2243,27 +2322,21 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
       statementRows.find(
         (statementRow) => statementRow.semantic_role === semanticRole,
       )?.row;
-    const taxExpenseRow = semanticRow("tax_expense");
-    if (
-      !taxExpenseRow
-    ) {
+    const preTaxIncomeRow = semanticRow("pre_tax_income");
+    const effectiveTaxRateRow = semanticRow("effective_tax_rate");
+    if (!preTaxIncomeRow || !effectiveTaxRateRow) {
       throw new Error(
-        "Acquisition tax calculation requires a tax-expense semantic role.",
+        "Acquisition tax calculation requires pre-tax-income and effective-tax-rate semantic roles.",
       );
     }
-    // TAX IS CALCULATED ON THE PRO-FORMA STATEMENT, THEN RECONCILED BACK.
-    //
-    // Every pre-tax line can move in the transaction case, including unusual
-    // issuer-specific finance, associate and non-operating rows.  The pro-forma
-    // tax cell therefore reads the final pro-forma PBT directly.  This column
-    // is only the bridge required to preserve Standalone + Adjustment = Pro
-    // Forma, so it is the difference between that independently calculated tax
-    // and standalone tax.  No statement topology is reconstructed here.
-    const proFormaColumn =
-      PRO_FORMA_COLUMNS[ADJUSTMENT_COLUMNS.indexOf(column)];
+    // The adjustment column owns the incremental tax effect. The pro-forma
+    // statement then remains the transparent identity Standalone + Adjustment,
+    // rather than independently recalculating its whole tax charge from the
+    // standalone tax-rate cell. This is acyclic and lets every transaction
+    // change above PBT flow through exactly once.
     return (
-      `=${proFormaColumn}${taxExpenseRow}-` +
-      `${standaloneColumn}${taxExpenseRow}`
+      `=-MAX(0,${column}${preTaxIncomeRow})*` +
+      `${standaloneColumn}${effectiveTaxRateRow}`
     );
   }
   return null;
@@ -2435,6 +2508,15 @@ function configureOperatingModel(
     else if (treatment === "selector") styleSelectorControl(`C${row}`);
     else styleEntryControl(`C${row}`, numberFormat ?? null);
   }
+  addCommentOnce(
+    workbook,
+    sheet,
+    `C${c.effective_minimum_cash}`,
+    modelCase.cash_policy.minimum_cash_override !== null &&
+      modelCase.cash_policy.minimum_cash_override !== undefined
+      ? "Minimum-cash authority: explicit user override."
+      : "Minimum-cash authority: lowest reported year-end balance of the balancing cash bucket across the three historical periods. This is an editable operating-liquidity assumption, not a forecast output.",
+  );
   sheet.getRange(`C${c.broker_case}`).dataValidation = {
     rule: {
       type: "list",
@@ -2736,6 +2818,9 @@ function configureOperatingModel(
     if (role === "cash_interest_received") {
       return `=${column}${interestRows.cash_interest_received}`;
     }
+    if (role === "net_finance_addback") {
+      return `=-${column}${interestRows.net_interest_expense}`;
+    }
     if (role === "non_cash_interest_addback") {
       const nonCashInstrumentRows = rowPlan.instruments
         .flatMap((plan) => {
@@ -2848,6 +2933,18 @@ function configureOperatingModel(
     }
     if (definition.semantic_role === "cash_interest_received") {
       return `=${column}${interestRows.cash_interest_received}`;
+    }
+    if (definition.semantic_role === "net_finance_addback") {
+      return `=-${column}${interestRows.net_interest_expense}`;
+    }
+    if (definition.semantic_role === "opening_cash") {
+      const index = HISTORICAL_COLUMNS.indexOf(column);
+      return index > 0
+        ? `=${HISTORICAL_COLUMNS[index - 1]}${statementByRole.get("ending_cash").row}`
+        : null;
+    }
+    if (definition.semantic_role === "ending_cash") {
+      return endingCashStatementFormula(column);
     }
     if (definition.semantic_role === "non_balancing_cash_bucket_movement") {
       const index = HISTORICAL_COLUMNS.indexOf(column);
@@ -3030,53 +3127,17 @@ function configureOperatingModel(
         forecastAuthority.mechanism === "hardcode" &&
         forecastAuthority.value !== null
       ) {
-        setValue(
-          sheet,
-          `${column}${definition.row}`,
-          Number(forecastAuthority.value),
-        );
-        styleInput(sheet, `${column}${definition.row}`);
-        // A forecast hardcode is an assumption and must say so on the cell.
-        // Historical inputs already carried provenance; forecast inputs did
-        // not, which left assumptions in the workbook with nothing explaining
-        // where the number came from.
-        const provenance = (modelCase.provenance?.[definition.row_id] ?? []).find(
-          (entry) => Number(entry.period_index) === index + 3,
-        );
-        if (provenance) {
-          addCommentOnce(
-            workbook,
-            sheet,
-            `${column}${definition.row}`,
-            provenanceComment(provenance),
-          );
-        } else if (forecastAuthority.note) {
-          addCommentOnce(
-            workbook,
-            sheet,
-            `${column}${definition.row}`,
-            `Forecast authority: ${forecastAuthority.method}\n${forecastAuthority.note}`,
-          );
-        } else {
-          // A forecast hardcode may never ship anonymously. Production
-          // waterfall-v1 cases are already blocked upstream unless the
-          // relevant authority carries its required source or rationale; this
-          // fallback is for archived/reference-parity inputs whose legacy
-          // declaration predates that contract. It describes exactly what the
-          // compiler knows and does not invent a source.
-          addCommentOnce(
-            workbook,
-            sheet,
-            `${column}${definition.row}`,
-            [
-              `Forecast authority: ${forecastAuthority.method}`,
-              `Source kind: ${forecastAuthority.source_kind ?? "not declared"}`,
-              forecastAuthority.inferred
-                ? "Legacy/reference forecast value retained from the case input; no additional source was declared."
-                : "Forecast value supplied by the declared authority path.",
-            ].join("\n"),
+        const assumptionRow = brokerRows.assumptionRows?.[definition.row_id];
+        if (!Number.isInteger(assumptionRow)) {
+          throw new Error(
+            `Forecast assumption row missing for ${definition.row_id}.`,
           );
         }
+        applyFormula(
+          sheet,
+          `${column}${definition.row}`,
+          `='Brokers'!${brokerRows.forecastColumns[index]}${assumptionRow}`,
+        );
       } else if (forecastAuthority.mechanism === "zero") {
         applyFormula(sheet, `${column}${definition.row}`, "=0");
       } else {
@@ -3120,6 +3181,8 @@ function configureOperatingModel(
             return `=${adjustmentColumn}${interestRows.cash_interest_paid}`;
           case "cash_interest_received":
             return `=${adjustmentColumn}${interestRows.cash_interest_received}`;
+          case "net_finance_addback":
+            return `=-${adjustmentColumn}${interestRows.net_interest_expense}`;
           case "opening_cash":
             // The pro-forma block opens on the SAME last actual the standalone
             // block opens on, so the acquisition adds nothing to FY1 opening
@@ -3243,6 +3306,12 @@ function configureOperatingModel(
           `${proFormaColumn}${definition.row}`,
           `=${proFormaColumn}${interestRows.cash_interest_received}`,
         );
+      } else if (definition.semantic_role === "net_finance_addback") {
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=-${proFormaColumn}${interestRows.net_interest_expense}`,
+        );
       } else if (
         definition.semantic_role === "non_cash_interest_addback"
       ) {
@@ -3281,18 +3350,13 @@ function configureOperatingModel(
             `${proFormaColumn}${preTaxIncomeRow},${column}${definition.row})`,
         );
       } else if (definition.semantic_role === "tax_expense") {
-        const preTaxIncomeRow = statementByRole.get("pre_tax_income")?.row;
-        const effectiveTaxRateRow = statementByRole.get("effective_tax_rate")?.row;
-        if (!preTaxIncomeRow || !effectiveTaxRateRow) {
-          throw new Error(
-            "Pro-forma tax calculation requires pre-tax-income and effective-tax-rate semantic roles.",
-          );
-        }
+        // Pro forma is a presentation identity, not a second tax engine. The
+        // incremental tax is calculated once in the adjustment column from
+        // incremental PBT; this cell simply carries Standalone + Adjustment.
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
-          `=-MAX(0,${proFormaColumn}${preTaxIncomeRow})*` +
-            `${column}${effectiveTaxRateRow}`,
+          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
         );
       } else if (definition.semantic_role === "opening_cash") {
         // This semantic roll-forward outranks a source row's generic period
@@ -5246,6 +5310,26 @@ function configureOperatingModel(
           : expressions.length === 1
             ? `=${expressions[0]}`
             : `=SUM(${expressions.join(",")})`,
+      );
+      const repaymentStates = rowPlan.instruments
+        .map((plan) => ({
+          plan,
+          state: plan.repayment_state_by_period?.[index] ?? "zero",
+        }))
+        .filter(({ state }) => !["zero", "discretionary_rcf"].includes(state));
+      addCommentOnce(
+        workbook,
+        sheet,
+        `${column}${mandatoryDebtRow}`,
+        repaymentStates.length
+          ? [
+              "Mandatory repayment state is declared once per instrument and is shared with the debt roll-forward.",
+              ...repaymentStates.map(({ plan, state }) => {
+                const instrument = instrumentById.get(plan.instrument_id);
+                return `${instrument?.name ?? plan.instrument_id}: ${state.replaceAll("_", " ")}`;
+              }),
+            ].join("\n")
+          : "No instrument has a scheduled or maturity repayment state in this period; the consolidated repayment is zero.",
       );
       applyFormula(sheet, `${adjustmentColumn}${mandatoryDebtRow}`, "=0");
       applyFormula(
@@ -10252,6 +10336,12 @@ async function writeModelSidecars(
 function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
   FORMULA_PROVENANCE.clear();
   const workbook = makeWorkbook();
+  const commentAuthor = { displayName: "Excel Inflow", initials: "EI" };
+  if (typeof workbook.comments?.self?.set === "function") {
+    workbook.comments.self.set(commentAuthor);
+  } else if (typeof workbook.comments?.setSelf === "function") {
+    workbook.comments.setSelf(commentAuthor);
+  }
   const operatingModel = workbook.worksheets.add("Operating Model");
   const brokerRows = buildBrokersSheet(workbook, modelCase, rowPlan);
   const curveSheet = buildForwardCurvesSheet(workbook, modelCase);

@@ -41,6 +41,7 @@ const positive = [
   ["Finance costs", "income_statement", "interest_expense"],
   ["Interest paid", "cash_flow", "cash_interest_paid"],
   ["Finance income received", "cash_flow", "cash_interest_received"],
+  ["Finance income and expense", "cash_flow", "net_finance_addback"],
   ["Income taxes paid", "cash_flow", "cash_taxes"],
   ["Repayments of borrowings", "cash_flow", "debt_repayment"],
   ["Effect of exchange rate changes on cash", "cash_flow", "fx_effect_on_cash"],
@@ -396,7 +397,6 @@ function hierarchyFixture(authority) {
     parent.values = [...historical, 5, 10, 15];
     parent.forecast_treatment = "hardcode";
     delete parent.calculation;
-    delete parent.broker_metric_id;
     candidate.provenance[parent.row_id] = historical.map((_, period_index) => ({
       period_index,
       document: "Synthetic hierarchy fixture",
@@ -478,7 +478,6 @@ function hierarchyFixture(authority) {
     parent.values = [null, null, null, null, null, null];
     parent.calculation = { operator: "sum", refs: children.map((row) => row.row_id) };
     parent.forecast_treatment = "formula";
-    delete parent.broker_metric_id;
     delete candidate.provenance[parent.row_id];
     const parentSource = candidate.source_coverage.cash_flow.find(
       (source) => source.mapped_row_ids.includes(parent.row_id),

@@ -5,12 +5,12 @@
   "skillVersion": "2.0.6",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T05:46:58.167Z",
+  "generatedAt": "2026-08-07T07:33:15.469Z",
   "centralInstructionsWords": 3797,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "d52f3276ecf265b777a867b80ca8ca9a95751894169259f02b1b5e78c1c57108",
+    "currentClosureSha256": "09544614e12dbb4779591319a46c3dc97be3c5cd05b4169755fd35abf56ca63e",
     "closureFileCount": 95,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -241,39 +241,23 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python",
+      "selected": "python3",
       "candidates": [
         {
-          "candidate": "python",
+          "candidate": "python3",
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
             "fitz": null,
-            "PIL": null,
-            "numpy": null,
+            "PIL": "12.2.0",
+            "numpy": "2.3.5",
             "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": null,
-            "reportlab": null
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
           "usable": true,
           "reason": "selected"
-        },
-        {
-          "candidate": "python3",
-          "version": "3.9.6",
-          "packages": {
-            "openpyxl": null,
-            "fitz": null,
-            "PIL": null,
-            "numpy": null,
-            "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
-          },
-          "usable": false,
-          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
         }
       ]
     },
@@ -671,7 +655,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python",
+    "pythonExecutable": "python3",
     "results": [
       {
         "target": "closure probe",
@@ -793,18 +777,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
-        "plan_sha256": "01e25d40ea0e97cddf619fc3725b5380cb5facbb39cf16abde2c4621becd9346",
-        "workbook_sha256": "6bc9f311dcd05f34e3f0a615e41264449140154d2b7a975d148e49a566bcc6a2",
+        "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
+        "plan_sha256": "81d97d0a006c97ad213f9b1a31bcc1e5e64aba54c9aefdc20a8e8c56baf21803",
+        "workbook_sha256": "644c70333e58defbd36cb209668fae918a16cc21d8d8bb1d6485010ccc3e4196",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "cdba764337aab07a009b2231c48e110149e9a8f4466d52620e569a7b0d5c8116",
-      "plan_sha256": "01e25d40ea0e97cddf619fc3725b5380cb5facbb39cf16abde2c4621becd9346",
-      "workbook_sha256": "6bc9f311dcd05f34e3f0a615e41264449140154d2b7a975d148e49a566bcc6a2",
+      "case_sha256": "50da4c91a3e832db4817e6d13742fa342a51d0c74de6d89d15661b6dae2b15fe",
+      "plan_sha256": "81d97d0a006c97ad213f9b1a31bcc1e5e64aba54c9aefdc20a8e8c56baf21803",
+      "workbook_sha256": "644c70333e58defbd36cb209668fae918a16cc21d8d8bb1d6485010ccc3e4196",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -972,8 +956,8 @@
     },
     {
       "path": "assets/statement-semantic-taxonomy.v1.json",
-      "sha256": "49ab6cee9fd2d179bac161b8a66fcca87839cde4fe24b7b7b64cbed888a79695",
-      "bytes": 4299,
+      "sha256": "74b431d0854aea04934fcde3090612a64f6f669e63494b2f5d4bf77028a966b6",
+      "bytes": 4699,
       "words": null
     },
     {
@@ -984,8 +968,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "4e9e27f4bac74fa2dd7c15112fca5213b4749752dd1688b7377673fed38b78b1",
-      "bytes": 453300,
+      "sha256": "a686bdb9602a91596171a55124d42d51028d2a9d6bffc422fbef65651eee2dd9",
+      "bytes": 457236,
       "words": null
     },
     {
@@ -1230,8 +1214,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "e0fb21e3110fca8124a7fb87f28eaecd1bb7888050fe092f4bdd3b199929ef11",
-      "bytes": 96822,
+      "sha256": "d84f073974ff344e94e24a138f0b44a0a67a1afddaccfee995df382af2031a30",
+      "bytes": 101018,
       "words": null
     },
     {
@@ -1254,8 +1238,8 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "e75ba5581d1dcd34a0c2621802a9e8d0f4a72efa17baa2f96aa27926c48303cc",
-      "bytes": 39222,
+      "sha256": "82f328e0e74090030fb29c128796e59928ff42e1d8961d12046f3acd7da71c89",
+      "bytes": 39339,
       "words": null
     },
     {
@@ -1374,8 +1358,8 @@
     },
     {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "464e33b928cc319d8174f979cd39cce6b23d011419175c5775fa2971a940d454",
-      "bytes": 23862,
+      "sha256": "f04473870b09c507f1d375980a4f0a25158664f58a780d87521046be12dd69aa",
+      "bytes": 23860,
       "words": null
     },
     {

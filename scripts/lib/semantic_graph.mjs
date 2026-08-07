@@ -457,6 +457,9 @@ function instrumentNodes(modelCase, rowPlan) {
       instrument_class: instrument.class ?? null,
       display_group: plan.display_group ?? null,
       maturity_treatment: instrument.maturity_treatment ?? "contractual",
+      repayment_state_by_period: [
+        ...(plan.repayment_state_by_period ?? ["zero", "zero", "zero"]),
+      ],
       section: "debt_schedule",
       physical_row: plan.debt_row,
       formula_authority: "compiler",
