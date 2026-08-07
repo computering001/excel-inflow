@@ -5,12 +5,12 @@
   "skillVersion": "2.0.7",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T21:01:40.895Z",
+  "generatedAt": "2026-08-07T21:59:01.159Z",
   "centralInstructionsWords": 3867,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "797b0b306380725579ddcb091b8df5b4c3f4e163f881ca651a41747481ae4632",
+    "currentClosureSha256": "e4823c61d045b97dd06aa2a7eef396e7dd8fa07a3d0829467091485a203e3463",
     "closureFileCount": 95,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -262,19 +262,19 @@
         },
         {
           "candidate": "python3",
-          "version": "3.9.6",
+          "version": "3.12.13",
           "packages": {
-            "openpyxl": null,
+            "openpyxl": "3.1.5",
             "fitz": null,
-            "PIL": null,
-            "numpy": null,
+            "PIL": "12.2.0",
+            "numpy": "2.3.5",
             "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
-          "usable": false,
-          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports; cannot import required_at=import package(s): openpyxl"
+          "usable": true,
+          "reason": "selected"
         }
       ]
     },
@@ -794,18 +794,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "cbd6b72a0ab4f896d6ad4ee22b63158fd0e14c1ac15c30ce8738d7b510ff14d1",
-        "plan_sha256": "a769b710b747c76ce6dc84ca7e43150f8ca1ddbe7aef06151652229e3da3f55a",
-        "workbook_sha256": "3b1128ac28b759afafe895febeedd6071bc7d6f15083e68cab13867e34644ce3",
+        "case_sha256": "b94ed0c055ef176968dfa533a35a0d9b5b53f007db98b554189efcadce904bc9",
+        "plan_sha256": "d522d6f4979b6868a6891357adbe0b5b58f28aa1272e59f2d97ef09dda459abc",
+        "workbook_sha256": "c2831157e566aac3caa30aee4e8e89a44588c515e7e5537028664c5a2a788c45",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "cbd6b72a0ab4f896d6ad4ee22b63158fd0e14c1ac15c30ce8738d7b510ff14d1",
-      "plan_sha256": "a769b710b747c76ce6dc84ca7e43150f8ca1ddbe7aef06151652229e3da3f55a",
-      "workbook_sha256": "3b1128ac28b759afafe895febeedd6071bc7d6f15083e68cab13867e34644ce3",
+      "case_sha256": "b94ed0c055ef176968dfa533a35a0d9b5b53f007db98b554189efcadce904bc9",
+      "plan_sha256": "d522d6f4979b6868a6891357adbe0b5b58f28aa1272e59f2d97ef09dda459abc",
+      "workbook_sha256": "c2831157e566aac3caa30aee4e8e89a44588c515e7e5537028664c5a2a788c45",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1423,8 +1423,8 @@
     },
     {
       "path": "scripts/verify/finance_proof.py",
-      "sha256": "732eba9bda786430b8017ebdaa6005c0a1b14395a6c5fa862c767a804a5947f2",
-      "bytes": 43168,
+      "sha256": "41d6dc20db2f0134ea22407e5c259aee7f1e40cafcaa7d9a00a7ff5949dbb8cd",
+      "bytes": 44183,
       "words": null
     },
     {

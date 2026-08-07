@@ -118,6 +118,21 @@ def fx_rate(case: dict, currency: str, period_index: int, kind: str) -> float:
     return raw if fx.get("quote") == "reporting_per_native" else 1.0 / raw
 
 
+def instrument_balance_currency(case: dict, instrument: dict) -> str:
+    """Return the currency basis of the instrument amounts in the case.
+
+    ``currency`` is always the instrument's legal denomination.  It is not
+    necessarily the currency of ``opening_balance`` or the forecast principal
+    movements: a debt export can supply a foreign-denominated instrument's
+    carrying value already translated into the issuer's reporting currency.
+    The independent proof must therefore resolve amount basis independently of
+    legal denomination, just as the production solver and renderer do.
+    """
+    if instrument.get("balance_basis") == "reporting_currency_carrying_value":
+        return case["issuer"]["reporting_currency"]
+    return instrument["currency"]
+
+
 def all_in_rate(instrument: dict, forecast_index: int) -> float:
     if instrument.get("rate_type") != "floating":
         return series3(instrument.get("coupon_or_all_in_rate"))[forecast_index]
@@ -327,8 +342,10 @@ class Proof:
         self.compare("controls", "shared", 0, "debt_maturities_roll", self.value("C", controls["debt_maturities_roll"]), maturity_roll)
         self.compare("controls", "shared", 0, "acquisition_enabled", self.value("P", controls["adjustments_enabled"]), number(acquisition.get("enabled")))
 
-        # Instrument mechanics are independent of the acquisition overlay.  One
-        # native roll-forward is therefore proved against both visible blocks.
+        # Instrument mechanics are independent of the acquisition overlay. One
+        # basis-currency roll-forward is therefore proved against both visible
+        # blocks. Legal denomination is presentation metadata and must not force
+        # a second FX translation of a reporting-currency carrying value.
         period_instruments: List[dict] = []
         for index in range(3):
             period_index = index + 3
@@ -342,6 +359,7 @@ class Proof:
             entries = []
             for instrument in non_rcf:
                 instrument_id = instrument["instrument_id"]
+                balance_currency = instrument_balance_currency(case, instrument)
                 opening_native = native_balances[instrument_id]
                 issuance = series3(instrument.get("new_issuance"))[index]
                 fair_value, other_non_cash = non_cash_components(instrument, index)
@@ -375,12 +393,14 @@ class Proof:
                 pre_maturity = max(0.0, base_ending + pik)
                 maturity_repayment = pre_maturity if matures else 0.0
                 ending_native = pre_maturity - maturity_repayment
-                ending_fx = fx_rate(case, instrument["currency"], period_index, "period_end")
-                average_fx = fx_rate(case, instrument["currency"], period_index, "average")
+                ending_fx = fx_rate(case, balance_currency, period_index, "period_end")
+                average_fx = fx_rate(case, balance_currency, period_index, "average")
                 ending_reporting = ending_native * ending_fx
-                opening_reporting = opening_native * fx_rate(case, instrument["currency"], period_index - 1, "period_end")
+                opening_reporting = opening_native * fx_rate(
+                    case, balance_currency, period_index - 1, "period_end"
+                )
                 opening_fx = fx_rate(
-                    case, instrument["currency"], period_index - 1, "period_end"
+                    case, balance_currency, period_index - 1, "period_end"
                 )
                 weighted_principal = (
                     timing["weighted_base"]
@@ -423,7 +443,7 @@ class Proof:
                     leverage_debt += ending_reporting
                 if instrument.get("class") == "commercial_paper":
                     commercial_paper += ending_reporting
-                if instrument["currency"] != case["issuer"]["reporting_currency"]:
+                if balance_currency != case["issuer"]["reporting_currency"]:
                     issuance_reporting = issuance * average_fx
                     repayment_reporting = (
                         amortisation + maturity_repayment
