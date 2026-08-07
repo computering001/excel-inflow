@@ -4,7 +4,7 @@ import fs from "node:fs";
 export const STANDARDISED_DESIGN_CONTRACT_SHA256 =
   "aea5808b7914cd699cdda42c5d3e09091634fbca5934ccd4141b5a3ffa4e84be";
 export const STANDARDISED_DESIGN_RUNTIME_SHA256 =
-  "e0fafa33869934f8fae33ef905be72a59f0902004353d8e6c5673ca1c371bb58";
+  "6bba4cb7a5348d8a16d0759596bf56c05ca8db695b334b5b315db00d292c6343";
 
 const CONTRACT_URL = new URL(
   "../../assets/standardised-design-runtime.v2.json",
@@ -32,8 +32,12 @@ export function standardisedDesignContract() {
   }
   for (const profile of ["maximal", "net_cash"]) {
     const fingerprint = contract.profiles?.[profile]?.exact_replay_fingerprint_sha256;
+    const authoritySha256 = contract.profiles?.[profile]?.immutable_authority_sha256;
     if (!/^[0-9a-f]{64}$/.test(fingerprint ?? "")) {
       throw new Error(`Standardised design profile ${profile} has no design fingerprint.`);
+    }
+    if (!/^[0-9a-f]{64}$/.test(authoritySha256 ?? "")) {
+      throw new Error(`Standardised design profile ${profile} has no immutable authority hash.`);
     }
   }
   cachedContract = Object.freeze(contract);

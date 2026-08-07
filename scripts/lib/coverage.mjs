@@ -794,6 +794,19 @@ export function statementAuthorityChecks(modelCase) {
           ),
         );
       }
+      if (
+        authority === "source_input" &&
+        refs.length > 0 &&
+        row.aggregation_authority !== "reported_parent"
+      ) {
+        checks.push(
+          result(
+            `${id}.unresolved_arithmetic_parent`,
+            "BLOCK",
+            `${row.label} is a sourced total with visible arithmetic dependencies but is neither an exact reconciled formula nor a declared reported parent.`,
+          ),
+        );
+      }
       if (authority === "derived_formula" && refs.length === 0) {
         checks.push(
           result(
@@ -1753,6 +1766,52 @@ function brokerChecks(modelCase) {
       },
     ),
   );
+
+  const compiledBrokerRows = [
+    ...rows,
+    ...normaliseStatementRows(modelCase, "cash_flow"),
+  ];
+  const consumedMetricIds = new Set(
+    compiledBrokerRows
+      .map((row) => row.broker_metric_id)
+      .filter(Boolean),
+  );
+  for (const [metricId, metric] of Object.entries(pack.metrics ?? {})) {
+    if (consumedMetricIds.has(metricId)) continue;
+    const disposition = metric.model_disposition;
+    const reason = metric.model_disposition_reason;
+    const explicitlyExcluded =
+      ["reference_only", "rejected", "not_applicable"].includes(disposition) &&
+      typeof reason === "string" &&
+      reason.trim().length > 0;
+    // A disclosed broker subtotal may deliberately remain a counter-headline
+    // rather than drive the model when the compiled statement calculates the
+    // same semantic concept from visible constituents.  This is generic: it
+    // covers revenue, working capital, capex, EBIT/EBITDA and any future
+    // issuer-specific subtotal without teaching the renderer issuer labels or
+    // row numbers.  It is not an orphan exemption—the semantic row must exist
+    // and must carry a declared calculation graph.
+    const derivedSemanticReference = compiledBrokerRows.some((row) => {
+      if (row.semantic_role !== metricId) return false;
+      const rule = row.forecast_calculation ?? row.calculation;
+      return (
+        row.forecast_treatment === "formula" ||
+        row.historical_authority === "derived_formula" ||
+        Boolean(rule && Array.isArray(rule.refs) && rule.refs.length > 0)
+      );
+    });
+    checks.push(
+      result(
+        `broker_pack.${metricId}.consumption`,
+        explicitlyExcluded || derivedSemanticReference ? "PASS" : "BLOCK",
+        explicitlyExcluded
+          ? `${metricId} is explicitly ${disposition}: ${reason.trim()}`
+          : derivedSemanticReference
+            ? `${metricId} is retained on Brokers as a disclosed counter-headline while the visible model derives the same semantic concept through its declared calculation graph.`
+          : `${metricId} is present in the accepted broker pack but maps to no visible statement or schedule node. Map it exactly once or reject it with a model disposition and reason.`,
+      ),
+    );
+  }
   return checks;
 }
 

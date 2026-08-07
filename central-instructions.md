@@ -52,6 +52,12 @@ principal movements are genuinely native-currency amounts. Use
 `reporting_currency_carrying_value` for a debt-export carrying value already
 translated into the issuer's reporting currency. The latter must never pass
 through FX again; a placeholder 1.0 curve is not an acceptable workaround.
+On the workbook face, preserve legal denomination separately from the amount
+basis and label the amount column generically. Every instrument amount must
+state whether it is native principal, reporting-currency carrying value or
+facility capacity; never describe a reporting-currency carrying value as
+foreign-currency nominal merely because the instrument is legally denominated
+in that foreign currency.
 
 The portable controller owns the stage order and module registry. Each module declares inputs, outputs, invariants and allowed remedies. A stage may not silently skip, widen a tolerance, change a validator or infer a material missing term. Convergence must be declared before solving; non-convergence is a failure.
 
@@ -254,7 +260,16 @@ Select the profile from the normalised case. Net cash requires opening debt plus
 
 Use issuer-reported rows where material. Preserve unusual impairment, restructuring, pension, working-capital, tax, investing and financing lines rather than forcing generic labels. A cash-flow impairment reversal is distinct from an income-statement impairment charge even when wording overlaps. Aggregate detailed working-capital and debt cash-flow components into visible parent rows only when every child remains represented in the semantic graph and the parent formula closes.
 
-For every debt instrument show opening balance, issuance, scheduled amortisation, maturity repayment, acquisition additions, FX movement, other non-cash movement, RCF signed draw/(repayment) where applicable, and ending balance. Cash repayment and FX translation are separate. A non-amortising instrument remains flat until maturity absent another sourced movement. Optional sourced forecast ending balances corroborate this formula path; they never replace it, and any divergence blocks. Maturity roll and refinancing intent remain economically distinct.
+For every debt instrument show the opening and ending balance and every sourced
+issuance, scheduled-amortisation, acquisition, FX or other non-cash movement
+needed to explain that path. Automatic contractual maturity repayment is
+calculated inside the visible balance formula and summed into one visible
+mandatory-repayment answer; do not repeat a technical helper line beneath every
+instrument. Cash repayment and FX translation are separate. A non-amortising
+instrument remains flat until maturity absent another sourced movement.
+Optional sourced forecast ending balances corroborate this formula path; they
+never replace it, and any divergence blocks. Maturity roll and refinancing
+intent remain economically distinct.
 
 Calculate fixed and floating interest from average balances, with explicit period fractions for material mid-year maturity or closing timing. Floating rates equal the relevant curve plus margin. RCF interest uses average drawn balance. Commitment fee uses average undrawn committed capacity and its own fee rate, not the RCF margin. Other interest must be a visible, documented plug if used. Forecast **interest income** from average eligible cash and a visible yield; never hold it flat by default.
 

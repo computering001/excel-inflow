@@ -282,7 +282,10 @@ const KINDS = [
             maturityYear <= lastYear &&
             maturityYear >= years[0] &&
             (row.refinancing_intent === null ||
-              row.refinancing_intent === undefined) &&
+              row.refinancing_intent === undefined ||
+              ["ask", "unclear", "unknown"].includes(
+                String(row.refinancing_intent).toLowerCase(),
+              )) &&
             outstandingAmount(row) > 0
           );
         })

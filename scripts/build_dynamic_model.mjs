@@ -819,8 +819,9 @@ function applyConditionalState(sheet, rowPlan, context) {
   }
 
   // --- maturity roll off -------------------------------------------------
-  // The maturity column stops binding, and the scheduled repayment rows stop
-  // being repayments. Both should read as suppressed rather than as zero.
+  // The maturity column stops binding. Explicit scheduled amortisation remains
+  // live because the maturity switch governs automatic contractual roll-off,
+  // not a separately supplied amortisation path.
   const debtRows = rowPlan.instruments
     .map((plan) => Number(plan.debt_row))
     .filter(Number.isFinite);
@@ -829,15 +830,6 @@ function applyConditionalState(sheet, rowPlan, context) {
       `E${Math.min(...debtRows)}:E${Math.max(...debtRows)}`,
       maturityRollOff,
     );
-  }
-  for (const plan of rowPlan.instruments) {
-    if (!plan.amortisation_row && !plan.repayment_row) continue;
-    for (const pair of ["J:L", "N:P", "S:U"]) {
-      const [first, last] = pair.split(":");
-      for (const row of [plan.amortisation_row, plan.repayment_row].filter(Boolean)) {
-        recede(`${first}${row}:${last}${row}`, maturityRollOff);
-      }
-    }
   }
 
   // --- adjustment columns off -------------------------------------------
@@ -2901,7 +2893,9 @@ function configureOperatingModel(
         values[index] !== undefined;
       const generic =
         !historicalSelfCarry &&
-        (definition.row_type === "calculation" ||
+        (definition.historical_authority === "derived_formula" ||
+          definition.historical_authority === "reported_total_reconciled" ||
+          definition.row_type === "calculation" ||
           definition.row_type === "subtotal")
           ? genericFormula(rowPlan, definition, column)
           : null;
@@ -3062,6 +3056,25 @@ function configureOperatingModel(
             sheet,
             `${column}${definition.row}`,
             `Forecast authority: ${forecastAuthority.method}\n${forecastAuthority.note}`,
+          );
+        } else {
+          // A forecast hardcode may never ship anonymously. Production
+          // waterfall-v1 cases are already blocked upstream unless the
+          // relevant authority carries its required source or rationale; this
+          // fallback is for archived/reference-parity inputs whose legacy
+          // declaration predates that contract. It describes exactly what the
+          // compiler knows and does not invent a source.
+          addCommentOnce(
+            workbook,
+            sheet,
+            `${column}${definition.row}`,
+            [
+              `Forecast authority: ${forecastAuthority.method}`,
+              `Source kind: ${forecastAuthority.source_kind ?? "not declared"}`,
+              forecastAuthority.inferred
+                ? "Legacy/reference forecast value retained from the case input; no additional source was declared."
+                : "Forecast value supplied by the declared authority path.",
+            ].join("\n"),
           );
         }
       } else if (forecastAuthority.mechanism === "zero") {
@@ -3471,8 +3484,8 @@ function configureOperatingModel(
   // room by abbreviating where a whole word is available.
   setValue(sheet, `B${rowPlan.debt_term_header_row}`, "Instrument / facility");
   setRow(sheet, `C${rowPlan.debt_term_header_row}:E${rowPlan.debt_term_header_row}`, [
-    "Currency",
-    "Nominal",
+    "Denom.",
+    "Amount",
     "Maturity",
   ]);
   applyRowFill(sheet, rowPlan.debt_term_header_row, COLORS.subsection);
@@ -3692,8 +3705,11 @@ function configureOperatingModel(
     const instrument = instrumentById.get(plan.instrument_id);
     setValue(sheet, `B${plan.debt_row}`, instrumentDisplayLabel(instrument));
     setValue(sheet, `C${plan.debt_row}`, instrument.currency);
-    // Column D is the NOMINAL AMOUNT of the instrument: the drawable
-    // commitment for a committed facility, the notional outstanding otherwise.
+    // Column C is always legal denomination.  Column D is deliberately called
+    // Amount rather than Nominal: it may be native principal, a reporting-
+    // currency carrying value, or committed facility capacity.  The cell note
+    // states which basis applies so a foreign legal denomination can never make
+    // a reporting-currency carrying value look like native principal.
     setValue(
       sheet,
       `D${plan.debt_row}`,
@@ -3702,6 +3718,17 @@ function configureOperatingModel(
             modelCase.rcf_policy?.capacity ?? instrument.facility_capacity ?? 0,
           )
         : Number(instrument.opening_balance),
+    );
+    const amountBasisNote = isBalancingRcf(modelCase, instrument)
+      ? `Debt amount basis: committed facility capacity in ${instrument.currency}. Legal denomination: ${instrument.currency}.`
+      : instrument.balance_basis === "reporting_currency_carrying_value"
+        ? `Debt amount basis: opening carrying value in ${reportingCurrency}. Legal denomination: ${instrument.currency}. This amount is already translated and must not pass through FX again.`
+        : `Debt amount basis: opening native principal in ${instrument.currency}. Legal denomination: ${instrument.currency}.`;
+    addCommentOnce(
+      workbook,
+      sheet,
+      `D${plan.debt_row}`,
+      amountBasisNote,
     );
     setValue(
       sheet,
@@ -3807,13 +3834,6 @@ function configureOperatingModel(
         `C${plan.amortisation_row}:E${plan.amortisation_row}`,
       );
       styleInput(sheet, `J${plan.amortisation_row}:L${plan.amortisation_row}`);
-    }
-    if (plan.repayment_row) {
-      setValue(sheet, `B${plan.repayment_row}`, "Mandatory repayment");
-      setLabelIndent(sheet, rowPlan, plan.repayment_row, 1);
-      setPeriodNumberFormat(sheet, plan.repayment_row, AMOUNT);
-      sheet.getRange(`G${plan.repayment_row}:I${plan.repayment_row}`).format.fill =
-        COLORS.grey;
     }
     if (plan.pik_row) {
       setValue(sheet, `B${plan.pik_row}`, "PIK / capitalised interest");
@@ -3945,12 +3965,23 @@ function configureOperatingModel(
       const amortisation = plan.amortisation_row
         ? `$${column}${plan.amortisation_row}`
         : "0";
-      const availableBeforeAmortisation =
-        `MAX(0,${opening}+${issuance}+${fairValue}+${otherNonCash})`;
-      const cappedAmortisation =
-        `MIN(${availableBeforeAmortisation},${amortisation})`;
-      const baseEndingBeforePik =
-        `MAX(0,${opening}+${issuance}+${fairValue}+${otherNonCash}-${cappedAmortisation})`;
+      const openingMovementTerms = [
+        opening,
+        issuance,
+        fairValue,
+        otherNonCash,
+      ].filter((term) => term !== "0");
+      const openingWithMovements =
+        openingMovementTerms.length === 1
+          ? openingMovementTerms[0]
+          : openingMovementTerms.join("+");
+      const availableBeforeAmortisation = `MAX(0,${openingWithMovements})`;
+      const cappedAmortisation = plan.amortisation_row
+        ? `MIN(${availableBeforeAmortisation},${amortisation})`
+        : "0";
+      const baseEndingBeforePik = plan.amortisation_row
+        ? `MAX(0,${openingWithMovements}-${cappedAmortisation})`
+        : availableBeforeAmortisation;
       const matures = instrument.maturity_date
         ? `IF($C$${c.debt_maturities_roll}=1,` +
           `IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},1,0),0)`
@@ -3977,31 +4008,45 @@ function configureOperatingModel(
           `=${column}${plan.pik_row}+${adjustmentColumn}${plan.pik_row}`,
         );
       }
-      const preMaturity =
-        `MAX(0,${baseEndingBeforePik}+${plan.pik_row ? `$${column}${plan.pik_row}` : "0"})`;
+      const preMaturity = plan.pik_row
+        ? `MAX(0,${baseEndingBeforePik}+$${column}${plan.pik_row})`
+        : baseEndingBeforePik;
+      const simpleBullet =
+        !plan.issuance_row &&
+        !plan.amortisation_row &&
+        !plan.pik_row &&
+        !plan.fair_value_row &&
+        !plan.other_non_cash_row;
+      const simpleMaturityRepayment = instrument.maturity_date
+        ? `IF($C$${c.debt_maturities_roll}=1,` +
+          `IF($E${plan.debt_row}<=${column}$${rowPlan.period_row},` +
+          `${availableBeforeAmortisation},0),0)`
+        : "0";
+      const detailedMaturityRepayment = `IF(${matures},${preMaturity},0)`;
+      const repaymentAmount = simpleBullet
+        ? simpleMaturityRepayment
+        : cappedAmortisation === "0"
+          ? detailedMaturityRepayment
+          : detailedMaturityRepayment === "0"
+            ? cappedAmortisation
+            : `${cappedAmortisation}+${detailedMaturityRepayment}`;
       const mandatoryRepaymentExpression =
-        `-(${cappedAmortisation}+IF(${matures},${preMaturity},0))` +
-        `*${averageFx}`;
-      if (plan.repayment_row) {
-        applyFormula(
-          sheet,
-          `${column}${plan.repayment_row}`,
-          `=${mandatoryRepaymentExpression}`,
-        );
-        applyFormula(sheet, `${adjustmentColumn}${plan.repayment_row}`, "=0");
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${plan.repayment_row}`,
-          `=${column}${plan.repayment_row}`,
-        );
+        averageFx === "1"
+          ? `-(${repaymentAmount})`
+          : `-(${repaymentAmount})*${averageFx}`;
+      if (plan.has_mandatory_repayment) {
         mandatoryRepaymentExpressions[index].push(
-          `${column}${plan.repayment_row}`,
+          mandatoryRepaymentExpression,
         );
       }
       applyFormula(
         sheet,
         `${column}${plan.debt_row}`,
-        `=${preMaturity}*IF(${matures},0,1)*${endFx}`,
+        simpleBullet
+          ? `=${availableBeforeAmortisation}*IF(${matures},0,1)` +
+            (endFx === "1" ? "" : `*${endFx}`)
+          : `=${preMaturity}*IF(${matures},0,1)` +
+            (endFx === "1" ? "" : `*${endFx}`),
       );
       if (
         balanceCurrency &&
@@ -5165,10 +5210,10 @@ function configureOperatingModel(
         );
         return rate === "1" ? cell : `${cell}*${rate}`;
       });
-  // Keep the irreducible instrument-by-instrument maturity mechanics in the
-  // debt schedule.  The liquidity waterfall below consumes one visible link,
-  // rather than repeating the entire maturity expression inside a cash-sweep
-  // formula.  This preserves the economics and makes the summary auditable.
+  // Instrument maturity mechanics remain inside each visible balance formula.
+  // The schedule exposes one aggregate cash requirement, not a repeated
+  // technical helper row beneath every instrument.  The waterfall consumes
+  // this one visible answer.
   const mandatoryDebtRow = debtRows.mandatory_debt_repayments;
   if (Number.isInteger(mandatoryDebtRow)) {
     const reportedRepaymentRows = financingRows.filter((definition) => {
@@ -7095,7 +7140,6 @@ function configureOperatingModel(
       plan.debt_row,
       plan.issuance_row,
       plan.amortisation_row,
-      plan.repayment_row,
       plan.other_non_cash_row,
     ]),
   ]);

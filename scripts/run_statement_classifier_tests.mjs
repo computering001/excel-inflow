@@ -194,6 +194,110 @@ assert(
   "A source-layout dash survived as literal model label content.",
 );
 
+const arbitraryIndent = clone(fixture);
+const arbitraryCashRows = arbitraryIndent.statement_structure.cash_flow;
+const cashGenerated = arbitraryCashRows.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+const cashGeneratedChildren = cashGenerated.calculation.refs
+  .map((rowId) => arbitraryCashRows.find((row) => row.row_id === rowId))
+  .filter((row) => row && row.style_role !== "total");
+assert(
+  cashGeneratedChildren.length >= 2,
+  "Representative fixture needs two ordinary cash-generation children.",
+);
+cashGeneratedChildren[0].indent = 7;
+cashGeneratedChildren[1].indent = 0;
+const normalisedArbitraryIndent = normaliseStatementRows(
+  arbitraryIndent,
+  "cash_flow",
+);
+const normalisedChildIndents = cashGeneratedChildren.slice(0, 2).map(
+  (sourceRow) =>
+    normalisedArbitraryIndent.find((row) => row.row_id === sourceRow.row_id)
+      .indent,
+);
+assert(
+  normalisedChildIndents[0] === normalisedChildIndents[1] &&
+    normalisedChildIndents[0] === 1,
+  `Source indent metadata overrode the graph: ${normalisedChildIndents.join(", ")}.`,
+);
+const mutatedCompiledIndent = clone(normalisedArbitraryIndent);
+mutatedCompiledIndent.find(
+  (row) => row.row_id === cashGeneratedChildren[0].row_id,
+).indent += 1;
+assert(
+  compileStatementTopology(
+    arbitraryIndent,
+    "cash_flow",
+    mutatedCompiledIndent,
+  ).errors.some((error) => error.code === "INDENT_NOT_GRAPH_DERIVED"),
+  "A post-compile indentation mutation was not rejected by the topology gate.",
+);
+
+const duplicateCashRoot = clone(fixture);
+const duplicateRootRows = duplicateCashRoot.statement_structure.cash_flow;
+const duplicateRootParent = duplicateRootRows.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+duplicateRootRows.unshift({
+  row_id: "generic_unsourced_cash_flow_root",
+  label: "Profit for the period",
+  row_type: "calculation",
+  calculation: { operator: "link", refs: ["pre_tax_income"] },
+  indent: 0,
+});
+duplicateRootParent.calculation.refs.unshift(
+  "generic_unsourced_cash_flow_root",
+);
+const normalisedSingleRoot = normaliseStatementRows(
+  duplicateCashRoot,
+  "cash_flow",
+);
+assert(
+  !normalisedSingleRoot.some(
+    (row) => row.row_id === "generic_unsourced_cash_flow_root",
+  ),
+  "An unsourced generic P&L root survived beside the sourced cash-flow root.",
+);
+const singleRootById = new Map(
+  normalisedSingleRoot.map((row) => [row.row_id, row]),
+);
+const singleRootClosure = new Set();
+const visitSingleRoot = (rowId) => {
+  if (singleRootClosure.has(rowId)) return;
+  singleRootClosure.add(rowId);
+  for (const ref of singleRootById.get(rowId)?.calculation?.refs ?? []) {
+    if (singleRootById.has(ref)) visitSingleRoot(ref);
+  }
+};
+visitSingleRoot("cash_from_operations");
+assert(
+  normalisedSingleRoot.filter(
+    (row) =>
+      singleRootClosure.has(row.row_id) &&
+      row.calculation?.operator === "link" &&
+      row.calculation.refs.some((ref) =>
+        ["pre_tax_income", "net_income"].includes(ref),
+      ),
+  ).length === 1,
+  "Cash generation retained more than one visible P&L starting point.",
+);
+
+const parentFirstCash = normaliseStatementRows(fixture, "cash_flow");
+const capex = parentFirstCash.find((row) => row.semantic_role === "capex");
+for (const childId of capex.calculation?.refs ?? []) {
+  const child = parentFirstCash.find((row) => row.row_id === childId);
+  assert(
+    parentFirstCash.indexOf(capex) < parentFirstCash.indexOf(child),
+    `Consolidated capex parent did not precede ${childId}.`,
+  );
+  assert(
+    child.indent === capex.indent + 1,
+    `Capex child ${childId} did not inherit graph depth.`,
+  );
+}
+
 const ambiguous = clone(fixture);
 Object.assign(ambiguous.source_coverage.income_statement.find((source) => source.source_line_id === interestSource.source_line_id), {
   label: "Interest paid",
@@ -213,6 +317,31 @@ assert(hasBlock(assessCoverage(stale), "classification."), "Stale declared role 
 const noEvidence = clone(fixture);
 delete noEvidence.source_coverage.income_statement.find((source) => source.source_line_id === interestSource.source_line_id).classification_evidence;
 assert(hasBlock(assessCoverage(noEvidence), "classification."), "Material line without evidence was allowed to build.");
+
+const unusedBrokerMetric = clone(fixture);
+unusedBrokerMetric.broker_pack.metrics.unmapped_investing_cash_flow = {
+  ...clone(unusedBrokerMetric.broker_pack.metrics.capex),
+  label: "Unmapped investing cash flow",
+};
+assert(
+  hasBlock(
+    assessCoverage(unusedBrokerMetric),
+    "broker_pack.unmapped_investing_cash_flow.consumption",
+  ),
+  "An accepted broker metric with no model consumer was silently ignored.",
+);
+unusedBrokerMetric.broker_pack.metrics.unmapped_investing_cash_flow
+  .model_disposition = "reference_only";
+unusedBrokerMetric.broker_pack.metrics.unmapped_investing_cash_flow
+  .model_disposition_reason =
+    "Retained for research context and deliberately excluded from the debt-overlay forecast.";
+assert(
+  !hasBlock(
+    assessCoverage(unusedBrokerMetric),
+    "broker_pack.unmapped_investing_cash_flow.consumption",
+  ),
+  "An explicitly rejected broker metric remained blocked.",
+);
 
 const questionFixture = clone(fixture);
 questionFixture.source_coverage.cash_flow.push({
@@ -416,4 +545,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 6 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");
+console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 10 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");

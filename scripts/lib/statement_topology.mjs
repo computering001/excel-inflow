@@ -43,6 +43,74 @@ const DERIVED_PRESENTATION_OPERATORS = new Set([
   "negated_ratio",
 ]);
 
+function isIndentAnchor(row) {
+  return (
+    row.row_type === "header" ||
+    row.style_role === "header" ||
+    row.style_role === "total"
+  );
+}
+
+/**
+ * Compile the one presentation hierarchy used by the renderer.
+ *
+ * Explicit filing hierarchy wins.  Where the filing supplies no parent edge,
+ * a visible SUM parent owns its contributing rows.  Physical indentation from
+ * an input case is deliberately ignored: indentation is compiled output, not a
+ * second source of semantic truth.
+ */
+export function deriveStatementIndentMap(rows, section) {
+  assertSection(section);
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const parentOf = new Map();
+
+  for (const row of rows) {
+    if (!row.parent_row_id || !byId.has(row.parent_row_id)) continue;
+    parentOf.set(row.row_id, row.parent_row_id);
+  }
+  for (const parent of rows) {
+    if (parent.calculation?.operator !== "sum") continue;
+    for (const ref of parent.calculation.refs ?? []) {
+      const child = byId.get(ref);
+      if (
+        !child ||
+        ref === parent.row_id ||
+        parentOf.has(ref) ||
+        isIndentAnchor(child)
+      ) {
+        continue;
+      }
+      parentOf.set(ref, parent.row_id);
+    }
+  }
+
+  const depth = new Map();
+  const resolve = (rowId, visiting = new Set()) => {
+    if (depth.has(rowId)) return depth.get(rowId);
+    if (visiting.has(rowId)) {
+      // Topology validation reports the malformed parent cycle.  Indentation
+      // remains a pure compiler projection and must not pre-empt the coverage
+      // gate with an uncaught exception.
+      return 0;
+    }
+    const row = byId.get(rowId);
+    if (!row || isIndentAnchor(row)) {
+      depth.set(rowId, 0);
+      return 0;
+    }
+    const next = new Set(visiting).add(rowId);
+    const parentId = parentOf.get(rowId);
+    const graphDepth = parentId ? resolve(parentId, next) + 1 : 0;
+    const incomeComponentDepth =
+      section === "income_statement" && row.style_role !== "subsection" ? 1 : 0;
+    const value = Math.max(graphDepth, incomeComponentDepth);
+    depth.set(rowId, value);
+    return value;
+  };
+
+  return new Map(rows.map((row) => [row.row_id, resolve(row.row_id)]));
+}
+
 function ownsSourceOrder(row) {
   return !DERIVED_PRESENTATION_OPERATORS.has(row.calculation?.operator);
 }
@@ -165,7 +233,7 @@ export function repairStatementSourceOrder(modelCase, section, rows) {
 
   if (section === "cash_flow") {
     const capex = rows.find((row) => row.semantic_role === "capex");
-    if (capex) placeCalculationFamily(rows, capex, false);
+    if (capex) placeCalculationFamily(rows, capex, true);
 
     const endingCash = rows.find((row) => row.semantic_role === "ending_cash");
     const freeCashFlowRows = rows.filter(
@@ -241,6 +309,21 @@ export function compileStatementTopology(modelCase, section, rows) {
     row_type: row.row_type ?? null,
   }));
   const errors = [];
+
+  const expectedIndents = deriveStatementIndentMap(rows, section);
+  for (const row of rows) {
+    const expected = expectedIndents.get(row.row_id) ?? 0;
+    const actual = Number(row.indent ?? 0);
+    if (actual !== expected) {
+      errors.push({
+        code: "INDENT_NOT_GRAPH_DERIVED",
+        row_id: row.row_id,
+        label: row.label,
+        expected_indent: expected,
+        actual_indent: actual,
+      });
+    }
+  }
 
   const sourceOrderExemptRows = new Set();
   for (const row of rows) {
@@ -392,4 +475,5 @@ export default {
   compileStatementTopology,
   assertStatementTopology,
   repairStatementSourceOrder,
+  deriveStatementIndentMap,
 };

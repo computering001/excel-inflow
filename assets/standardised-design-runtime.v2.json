@@ -84,6 +84,7 @@
   "profiles": {
     "maximal": {
       "profile": "maximal",
+      "immutable_authority_sha256": "80cf0df3769ceb0958fddde613ee61a0e37e958cb555b824eeb79e76f7513d9c",
       "exact_replay_fingerprint_sha256": "64ed3007b54f5e4af7e0bd69184d1899c17ef87c27ce03193d5696beb3ce41cb",
       "selection": {"fallback_profile": true, "max_instruments": null},
       "authority_rows": {"period_group": 14, "period": 15, "visible_end": 180},
@@ -103,6 +104,7 @@
     },
     "net_cash": {
       "profile": "net_cash",
+      "immutable_authority_sha256": "38e719c636cec03d7d2e6381bc14d565a67fcb36f78bb910096fd45996d1939b",
       "exact_replay_fingerprint_sha256": "e487a9524a0d2304922bf1442e927e669c928b13e20d2a88d5526f665e098a09",
       "selection": {"opening_net_cash_required": true, "max_instruments": 2, "acquisition_must_be_off": true},
       "authority_rows": {"period_group": 14, "period": 15, "visible_end": 140},

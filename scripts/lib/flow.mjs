@@ -220,11 +220,37 @@ export function runIntake({
     };
   }
 
-  const workingCase = draftCase;
+  // Contractual repayment is the production default.  A refinancing that is
+  // disclosed or expressly supplied is represented on the instrument itself;
+  // absence of such evidence is not a reason to interrupt the user or ship the
+  // workbook with the maturity switch off.
+  const workingCase = structuredClone(draftCase);
+  if (workingCase.controls) {
+    workingCase.controls.debt_maturities_roll = 1;
+  }
+  for (const instrument of workingCase.instruments ?? []) {
+    if (
+      instrument.class !== "rcf" &&
+      instrument.maturity_date &&
+      !instrument.maturity_treatment
+    ) {
+      instrument.maturity_treatment = "contractual";
+    }
+  }
 
   const resolved = priorAnswers instanceof Map
     ? priorAnswers
     : new Map(Object.entries(draftCase?.stage_three_answers ?? {}));
+  // No announced refinancing means contractual repayment.  Seed that
+  // deterministic answer before pruning so the ordinary production journey
+  // does not ask the user to choose whether a dated maturity exists.  An
+  // explicitly ambiguous export value (ask/unclear/unknown) remains a real
+  // question.
+  for (const instrument of intake?.export?.instruments ?? []) {
+    const intent = instrument.refinancing_intent;
+    if (intent !== null && intent !== undefined) continue;
+    resolved.set(`refinance_at_maturity:${instrument.instrument_id}`, "repaid");
+  }
   const plan = planQuestions({
     draftCase: workingCase,
     intake,

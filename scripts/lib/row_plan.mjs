@@ -15,6 +15,7 @@ import { resolvedLeaseInterestBasis } from "./lease_policy.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import {
   assertStatementTopology,
+  deriveStatementIndentMap,
   repairStatementSourceOrder,
 } from "./statement_topology.mjs";
 
@@ -611,6 +612,13 @@ function cloneRows(rows) {
   return rows.map((row) => structuredClone(row));
 }
 
+function resetCompiledPresentationMetadata(rows) {
+  for (const row of rows) {
+    row.indent = 0;
+    row.outline_level = 0;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // CONSOLIDATION DYNAMICS
 //
@@ -893,43 +901,9 @@ function groupSubtotalRuns(rows) {
  * label: spaces are invisible to the style layer, impossible to restyle
  * globally, and they corrupt column-width measurement.
  */
-function deriveIndentLevels(rows) {
-  const byId = new Map(rows.map((row) => [row.row_id, row]));
-  const isAnchor = (row) =>
-    row.row_type === "header" ||
-    row.style_role === "header" ||
-    row.style_role === "total";
-  const parentOf = new Map();
-  for (const row of rows) {
-    if (row.calculation?.operator !== "sum") continue;
-    for (const ref of row.calculation.refs ?? []) {
-      if (ref === row.row_id || parentOf.has(ref)) continue;
-      const child = byId.get(ref);
-      if (!child || isAnchor(child)) continue;
-      parentOf.set(ref, row.row_id);
-    }
-  }
-  const depth = new Map();
-  const resolve = (id, seen) => {
-    if (depth.has(id)) return depth.get(id);
-    if (seen.has(id)) return 0; // a ref cycle is a bug elsewhere, not a level
-    seen.add(id);
-    const row = byId.get(id);
-    if (!row || isAnchor(row)) {
-      depth.set(id, 0);
-      return 0;
-    }
-    const parent = parentOf.get(id);
-    const level = parent ? resolve(parent, seen) + 1 : 0;
-    depth.set(id, level);
-    return level;
-  };
-  for (const row of rows) {
-    row.indent = Math.max(
-      Number(row.indent ?? 0),
-      resolve(row.row_id, new Set()),
-    );
-  }
+function deriveIndentLevels(rows, section) {
+  const levels = deriveStatementIndentMap(rows, section);
+  for (const row of rows) row.indent = levels.get(row.row_id) ?? 0;
 }
 
 /**
@@ -1070,6 +1044,92 @@ function normaliseIncomeStatementIndent(rows) {
     if (isSpine) continue;
     row.indent = Math.max(1, Number(row.indent ?? 0));
   }
+}
+
+function sourceOwnedRowIds(modelCase, section) {
+  return new Set(
+    (modelCase.source_coverage?.[section] ?? []).flatMap(
+      (source) => source.mapped_row_ids ?? [],
+    ),
+  );
+}
+
+function cashFlowIncomeRootKind(row) {
+  const refs = row.calculation?.operator === "link"
+    ? row.calculation.refs ?? []
+    : [];
+  if (refs.includes("pre_tax_income")) return "pre_tax_income";
+  if (refs.includes("net_income")) return "net_income";
+  return null;
+}
+
+function dependencyClosure(rows, rootId) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const closure = new Set();
+  const visit = (rowId) => {
+    if (closure.has(rowId)) return;
+    closure.add(rowId);
+    const row = byId.get(rowId);
+    for (const ref of row?.calculation?.refs ?? []) {
+      if (byId.has(ref)) visit(ref);
+    }
+  };
+  visit(rootId);
+  return closure;
+}
+
+/**
+ * An indirect cash-flow bridge has exactly one visible P&L starting point.
+ * A generic scaffold row may coexist with the issuer's sourced PBT or net-
+ * income row during evidence mapping; keep the source-owned authority and
+ * remove only the unsourced scaffold.  Two source-owned roots are ambiguous
+ * and block rather than being guessed.
+ */
+function selectSingleCashFlowRoot(modelCase, rows) {
+  const cfo = rows.find(
+    (row) =>
+      row.semantic_role === "cash_from_operations" ||
+      row.row_id === "cash_from_operations",
+  );
+  if (!cfo) return;
+  const closure = dependencyClosure(rows, cfo.row_id);
+  const candidates = rows.filter(
+    (row) => closure.has(row.row_id) && cashFlowIncomeRootKind(row),
+  );
+  if (candidates.length <= 1) return;
+
+  const sourceOwned = sourceOwnedRowIds(modelCase, "cash_flow");
+  const sourced = candidates.filter(
+    (row) =>
+      sourceOwned.has(row.row_id) ||
+      (Array.isArray(row.source_line_ids) && row.source_line_ids.length > 0),
+  );
+  if (sourced.length !== 1) {
+    throw new Error(
+      `cash_flow has ${candidates.length} visible income roots (${candidates
+        .map((row) => `${row.row_id}:${cashFlowIncomeRootKind(row)}`)
+        .join(", ")}); declare exactly one source-owned PBT or net-income root.`,
+    );
+  }
+
+  const selected = sourced[0];
+  const rejected = new Set(
+    candidates.filter((row) => row !== selected).map((row) => row.row_id),
+  );
+  for (const row of rows) {
+    for (const rule of [
+      row.calculation,
+      row.forecast_calculation,
+      ...(row.forecast_period_calculations ?? []),
+    ]) {
+      if (!Array.isArray(rule?.refs)) continue;
+      rule.refs = rule.refs.filter((ref) => !rejected.has(ref));
+    }
+  }
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    if (rejected.has(rows[index].row_id)) rows.splice(index, 1);
+  }
+  selected.cash_flow_root_kind = cashFlowIncomeRootKind(selected);
 }
 
 /**
@@ -1359,6 +1419,7 @@ export function normaliseStatementRows(modelCase, section) {
       : cloneRows(
     section === "income_statement" ? DEFAULT_INCOME_ROWS : DEFAULT_CASH_FLOW_ROWS,
       );
+  resetCompiledPresentationMetadata(rows);
   repairStatementSourceOrder(modelCase, section, rows);
   applyStatementHierarchy(rows);
   // Older mapped cases may preserve a source label but carry no semantic role.
@@ -1388,6 +1449,7 @@ export function normaliseStatementRows(modelCase, section) {
     applyBrokerAnchorRule(modelCase, rows);
   }
   if (section === "cash_flow") {
+    selectSingleCashFlowRoot(modelCase, rows);
     stripAcquisitionOverlayRows(rows);
     // Explicit cash-bucket cases distinguish the one balancing liquidity
     // bucket from reported cash that is not available to the sweep.  The
@@ -1487,7 +1549,7 @@ export function normaliseStatementRows(modelCase, section) {
   // Later still, so every row the consolidation dynamics added or re-pointed is
   // levelled off the FINAL ref graph, and no label is left carrying its indent
   // as content.
-  deriveIndentLevels(rows);
+  deriveIndentLevels(rows, section);
   if (section === "income_statement") normaliseIncomeStatementIndent(rows);
   stripLabelIndentSpaces(rows);
   assertUniqueStatementDependencies(rows, section);
@@ -1940,11 +2002,17 @@ export function compileRowPlan(modelCase) {
     const plan = {
       instrument_id: instrument.instrument_id,
       display_group: displayGroup,
+      // The validator needs the same semantic distinction as the emitter:
+      // a contractual term maturity is governed by the roll switch, whereas a
+      // documented non-maturing/evergreen balance is deliberately not. Carry
+      // the treatment, never infer it later from a row number or label.
+      maturity_treatment: instrument.maturity_treatment ?? null,
       debt_row: cursor,
       undrawn_row: null,
       issuance_row: null,
       amortisation_row: null,
       repayment_row: null,
+      has_mandatory_repayment: false,
       pik_row: null,
       fair_value_row: null,
       other_non_cash_row: null,
@@ -1989,9 +2057,7 @@ export function compileRowPlan(modelCase) {
       instrument.class !== "rcf" &&
       (forecastMaturity || Number.isInteger(plan.amortisation_row))
     ) {
-      plan.repayment_row = cursor;
-      rowsById[`debt.${instrument.instrument_id}.repayment`] = cursor;
-      cursor += 1;
+      plan.has_mandatory_repayment = true;
     }
     if (
       (instrument.pik_rate ?? []).some(
@@ -2385,6 +2451,11 @@ export function compileRowPlan(modelCase) {
     authority_profile: authorityProfile,
     authority_contract_sha256: STANDARDISED_DESIGN_CONTRACT_SHA256,
     authority_runtime_contract_sha256: STANDARDISED_DESIGN_RUNTIME_SHA256,
+    // Bind every generated row map to the exact immutable workbook authority
+    // selected for this profile.  The projection validator must be able to
+    // prove that a maximal plan was measured against maximal (and net-cash
+    // against net-cash), not merely that both used the same abstract contract.
+    authority_source_sha256: authority.immutable_authority_sha256,
     authority_profile_fingerprint_sha256:
       authority.exact_replay_fingerprint_sha256,
     // Carried so the validators can size a MONEY tolerance without re-reading
@@ -2452,9 +2523,6 @@ export function compileRowPlan(modelCase) {
     // silently dropped. Appended to, never replaced, so other sections can add
     // their own groups without fighting over the key.
     outline_rows: [
-      ...instrumentPlans
-        .filter((plan) => Number.isInteger(plan.repayment_row))
-        .map((plan) => ({ row: plan.repayment_row, level: 1 })),
       { row: interestSummaryRows.rcf_interest, level: 1 },
       { row: interestSummaryRows.rcf_commitment_fee, level: 1 },
       // The two rows that derive the unallocated-interest residual, grouped

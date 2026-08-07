@@ -2343,11 +2343,34 @@ def main(argv: List[str]) -> int:
                 }
             )
         balance_formula = cell_formula("J%s" % plan["debt_row"])
-        if balance_formula and roll_token not in balance_formula:
+        # Use the same semantic maturity distinction as the emitter and the
+        # independent JavaScript validator.  A contractual term maturity is
+        # governed by the roll switch; a documented evergreen/non-maturing
+        # balance deliberately is not.  Never infer this from its label or row.
+        governed_by_maturity_roll = (
+            plan.get("maturity_treatment") != "non_maturing_within_forecast"
+        )
+        if (
+            governed_by_maturity_roll
+            and balance_formula
+            and roll_token not in balance_formula
+        ):
             gate_errors.append(
                 {
                     "address": "J%s" % plan["debt_row"],
                     "issue": "debt_balance_not_gated_by_maturity_roll",
+                    "formula": balance_formula,
+                }
+            )
+        if (
+            not governed_by_maturity_roll
+            and balance_formula
+            and roll_token in balance_formula
+        ):
+            gate_errors.append(
+                {
+                    "address": "J%s" % plan["debt_row"],
+                    "issue": "non_maturing_balance_incorrectly_gated_by_maturity_roll",
                     "formula": balance_formula,
                 }
             )

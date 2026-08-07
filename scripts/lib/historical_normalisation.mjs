@@ -13,6 +13,118 @@ function cloneCase(modelCase) {
   return JSON.parse(JSON.stringify(modelCase));
 }
 
+function finiteHistorical(values) {
+  return (
+    Array.isArray(values) &&
+    values.length >= 3 &&
+    values.slice(0, 3).every((value) => Number.isFinite(Number(value)))
+  );
+}
+
+function closeSeries(left, right) {
+  return left.every((value, index) => {
+    const expected = Number(right[index]);
+    const actual = Number(value);
+    return Math.abs(actual - expected) <=
+      Math.max(1e-7, Math.abs(expected) * 1e-10);
+  });
+}
+
+function declaredHistoricalSeries(row, resolve, visiting) {
+  if (finiteHistorical(row.reported_historical_values)) {
+    return row.reported_historical_values.slice(0, 3).map(Number);
+  }
+  if (finiteHistorical(row.values)) {
+    return row.values.slice(0, 3).map(Number);
+  }
+  return calculatedHistoricalSeries(row, resolve, visiting);
+}
+
+function calculatedHistoricalSeries(row, resolve, visiting = new Set()) {
+  const rule = row.calculation;
+  const refs = rule?.refs ?? [];
+  if (!rule?.operator || refs.length === 0) return null;
+  const operands = refs.map((ref) => resolve(ref, visiting));
+  if (operands.some((values) => !values)) return null;
+  const sum = (series) =>
+    series.reduce(
+      (total, values) => total.map((value, index) => value + values[index]),
+      [0, 0, 0],
+    );
+  if (rule.operator === "sum") return sum(operands);
+  if (rule.operator === "link" && operands.length === 1) return operands[0];
+  if (rule.operator === "subtract") {
+    return operands.slice(1).reduce(
+      (total, values) => total.map((value, index) => value - values[index]),
+      [...operands[0]],
+    );
+  }
+  if (rule.operator === "negate" && operands.length === 1) {
+    return operands[0].map((value) => -value);
+  }
+  if (rule.operator === "negate_sum") {
+    return sum(operands).map((value) => -value);
+  }
+  return null;
+}
+
+function promoteExactReportedTotals(modelCase) {
+  const productionAuthority =
+    modelCase.execution_profile !== "reference_parity" &&
+    modelCase.source_coverage?.classification_contract_version === "evidence_v1" &&
+    modelCase.statement_authority_contract_version === "authority_v1";
+  if (!productionAuthority) return [];
+
+  const rows = [
+    ...(modelCase.statement_structure?.income_statement ?? []),
+    ...(modelCase.statement_structure?.cash_flow ?? []),
+  ];
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const memo = new Map();
+  const resolve = (rowId, visiting = new Set()) => {
+    if (memo.has(rowId)) return memo.get(rowId);
+    if (visiting.has(rowId)) return null;
+    const row = byId.get(rowId);
+    if (!row) return null;
+    const next = new Set(visiting).add(rowId);
+    const values = declaredHistoricalSeries(row, resolve, next);
+    memo.set(rowId, values);
+    return values;
+  };
+
+  const promotions = [];
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase.statement_structure?.[section] ?? []) {
+      if (
+        row.historical_authority !== "source_input" ||
+        !finiteHistorical(row.values) ||
+        (row.calculation?.refs?.length ?? 0) === 0
+      ) {
+        continue;
+      }
+      const calculated = calculatedHistoricalSeries(
+        row,
+        resolve,
+        new Set([row.row_id]),
+      );
+      const filed = row.values.slice(0, 3).map(Number);
+      if (!calculated || !closeSeries(calculated, filed)) continue;
+      row.reported_historical_values = filed;
+      row.values = [null, null, null, ...row.values.slice(3)];
+      row.historical_authority = "reported_total_reconciled";
+      memo.set(row.row_id, calculated);
+      promotions.push({
+        section,
+        row_id: row.row_id,
+        filed_values: filed,
+        calculated_values: calculated,
+        dependency_row_ids: [...row.calculation.refs],
+      });
+    }
+  }
+  return promotions;
+}
+
 export function combineHistoricalEntities(entities) {
   if (!Array.isArray(entities) || entities.length === 0) {
     throw new Error(
@@ -74,27 +186,36 @@ function replaceHistoricalValues(target, values, label) {
  * an operating metric or a visible statement row, otherwise production blocks.
  */
 export function applyHistoricalNormalisation(modelCase) {
-  if (!modelCase?.modules?.historical_normalisation) {
+  const productionAuthority =
+    modelCase?.execution_profile !== "reference_parity" &&
+    modelCase?.source_coverage?.classification_contract_version === "evidence_v1" &&
+    modelCase?.statement_authority_contract_version === "authority_v1";
+  if (!modelCase?.modules?.historical_normalisation && !productionAuthority) {
     return {
       model_case: modelCase,
       receipt: {
         applied: false,
         entity_ids: [],
         metrics: [],
+        exact_reported_total_promotions: [],
       },
     };
   }
 
   const normalizedCase = cloneCase(modelCase);
-  const combined = combineHistoricalEntities(
-    normalizedCase.historical_entities,
+  const historicalEntityNormalisation = Boolean(
+    normalizedCase.modules?.historical_normalisation,
   );
+  const combined = historicalEntityNormalisation
+    ? combineHistoricalEntities(normalizedCase.historical_entities)
+    : {};
   const receipt = {
-    applied: true,
-    entity_ids: normalizedCase.historical_entities.map(
-      (entity) => entity.entity_id,
-    ),
+    applied: historicalEntityNormalisation,
+    entity_ids: historicalEntityNormalisation
+      ? normalizedCase.historical_entities.map((entity) => entity.entity_id)
+      : [],
     metrics: [],
+    exact_reported_total_promotions: [],
   };
 
   for (const [metricId, values] of Object.entries(combined)) {
@@ -140,6 +261,9 @@ export function applyHistoricalNormalisation(modelCase) {
       destinations: [...new Set(destinations)].sort(),
     });
   }
+
+  receipt.exact_reported_total_promotions =
+    promoteExactReportedTotals(normalizedCase);
 
   return { model_case: normalizedCase, receipt };
 }
