@@ -40,6 +40,16 @@ export const HEADLINE_ANCHOR_METRIC_IDS = Object.freeze([
   "adjusted_ebitda",
 ]);
 
+const DEFINITION_DIMENSIONS = Object.freeze([
+  "metric_id",
+  "accounting_basis",
+  "operation_scope",
+  "adjustment_basis",
+  "currency",
+  "units",
+  "fiscal_calendar",
+]);
+
 const METRIC_SHORT_LABEL = Object.freeze({
   ebit: "EBIT",
   adjusted_ebitda: "Adj. EBITDA",
@@ -61,6 +71,53 @@ function contributes(series) {
         value !== null && value !== undefined && Number.isFinite(Number(value)),
     )
   );
+}
+
+export function brokerMetricDefinitionSignature(modelCase, metricId) {
+  const declared =
+    modelCase?.broker_pack?.metrics?.[metricId]?.definition_signature ?? {};
+  return {
+    metric_id: declared.metric_id ?? metricId,
+    accounting_basis:
+      declared.accounting_basis ?? modelCase?.issuer?.accounting_basis ?? null,
+    operation_scope: declared.operation_scope ?? "continuing",
+    adjustment_basis:
+      declared.adjustment_basis ??
+      (metricId.startsWith("adjusted_") ? "adjusted" : "statutory"),
+    currency:
+      declared.currency ?? modelCase?.issuer?.reporting_currency ?? null,
+    units: declared.units ?? modelCase?.issuer?.units ?? null,
+    fiscal_calendar:
+      declared.fiscal_calendar ?? modelCase?.issuer?.fiscal_calendar ?? "fixed_date",
+    declaration_status:
+      Object.keys(declared).length > 0 ? "declared" : "inferred_from_case_contract",
+  };
+}
+
+export function statementMetricDefinitionSignature(modelCase, rows, metricId) {
+  const row = (rows ?? []).find((candidate) => candidate.semantic_role === metricId);
+  return {
+    metric_id: metricId,
+    accounting_basis: modelCase?.issuer?.accounting_basis ?? null,
+    operation_scope: row?.operation_scope ?? "continuing",
+    adjustment_basis: metricId.startsWith("adjusted_") ? "adjusted" : "statutory",
+    currency: modelCase?.issuer?.reporting_currency ?? null,
+    units: modelCase?.issuer?.units ?? null,
+    fiscal_calendar: modelCase?.issuer?.fiscal_calendar ?? "fixed_date",
+    declaration_status: row ? "statement_row" : "missing_statement_row",
+  };
+}
+
+export function compareDefinitionSignatures(left, right) {
+  const mismatches = [];
+  for (const dimension of DEFINITION_DIMENSIONS) {
+    const a = left?.[dimension];
+    const b = right?.[dimension];
+    if (a !== null && a !== undefined && b !== null && b !== undefined && a !== b) {
+      mismatches.push({ dimension, left: a, right: b });
+    }
+  }
+  return { compatible: mismatches.length === 0, mismatches };
 }
 
 export function brokerContributorCount(modelCase, metricId) {
@@ -170,7 +227,7 @@ export function resolveBrokerForecastSelection(
   };
 }
 
-export function selectBrokerAnchor(modelCase) {
+export function selectBrokerAnchor(modelCase, rows = []) {
   const counts = {};
   const countsByPeriod = {};
   const totals = {};
@@ -203,6 +260,21 @@ export function selectBrokerAnchor(modelCase) {
     (totals[derived] > 0
       ? `, broker ${METRIC_SHORT_LABEL[derived]} (${countsByPeriod[derived].join("/")} brokers) shown as memo`
       : " (no broker series)");
+  const definitionSignatures = Object.fromEntries(
+    ANCHOR_METRIC_IDS.map((metricId) => [
+      metricId,
+      {
+        broker: brokerMetricDefinitionSignature(modelCase, metricId),
+        statement: statementMetricDefinitionSignature(modelCase, rows, metricId),
+      },
+    ]),
+  );
+  const definitionCompatibility = Object.fromEntries(
+    Object.entries(definitionSignatures).map(([metricId, signatures]) => [
+      metricId,
+      compareDefinitionSignatures(signatures.broker, signatures.statement),
+    ]),
+  );
   return {
     counts,
     counts_by_period: countsByPeriod,
@@ -215,6 +287,8 @@ export function selectBrokerAnchor(modelCase) {
     // back to using both headline metrics, because doing so merely moves their
     // consensus mismatch into D&A.
     supported: counts[headlineAnchor] > 0 && counts[da] > 0,
+    definition_signatures: definitionSignatures,
+    definition_compatibility: definitionCompatibility,
     label,
   };
 }
@@ -267,10 +341,15 @@ export function resolveEbitdaBridge(rows) {
   // straight link to it. Anything else (a term that folds a second line in
   // alongside the metric) would make the rearranged formula wrong by that
   // second line, so the rule declines rather than guesses.
-  const solvableFor = (term, row) =>
-    term === row.row_id ||
-    (byId.get(term)?.calculation?.operator === "link" &&
-      byId.get(term)?.calculation?.refs?.[0] === row.row_id);
+  const solvableFor = (term, row) => {
+    if (term === row.row_id) return true;
+    const bridgeTerm = byId.get(term);
+    return [bridgeTerm?.forecast_calculation, bridgeTerm?.calculation].some(
+      (calculation) =>
+        calculation?.operator === "link" &&
+        calculation.refs?.[0] === row.row_id,
+    );
+  };
   return {
     ebitdaRow,
     ebitRow,
@@ -389,12 +468,70 @@ export function bridgeAddbackTotal(
  * a row whose forecast is "Adjusted EBITDA less everything else in the
  * bridge". Those stop being formulas once the bridge is determined.
  */
-export function resolveAnchorPlan(modelCase, rows) {
-  const selection = selectBrokerAnchor(modelCase);
-  if (!selection.supported) return null;
+export function resolveAnchorPlanDecision(modelCase, rows) {
+  const selection = selectBrokerAnchor(modelCase, rows);
+  const roles = new Set((rows ?? []).map((row) => row.semantic_role).filter(Boolean));
+  const hasBridgeRoles = ANCHOR_METRIC_IDS.every((metricId) => roles.has(metricId));
+  const authoredForBrokerAnchor = (rows ?? []).some(
+    (row) =>
+      HEADLINE_ANCHOR_METRIC_IDS.includes(row.semantic_role) &&
+      (row.forecast_treatment === "broker" || row.broker_metric_id),
+  );
+  // Applicability belongs to the statement authority graph, not merely to the
+  // contents of an attached broker pack. A pack may retain EBIT/EBITDA as
+  // counter-headlines while a PBT-led or net-income-led model deliberately
+  // uses a different authority path. Treating any residual broker series as
+  // applicability made diagnostic and alternative-authority cases fail before
+  // their declared graph could even be inspected.
+  const applicable = authoredForBrokerAnchor;
+  if (!applicable) {
+    return {
+      status: "not_applicable",
+      reason: "No EBIT/Adjusted EBITDA/D&A broker authority is declared.",
+      selection,
+    };
+  }
+  if (!hasBridgeRoles) {
+    return {
+      status: "unresolved",
+      reason: "Broker anchor evidence exists but the statement does not declare the complete EBIT/Adjusted EBITDA/D&A identity.",
+      selection,
+    };
+  }
+  if (!selection.supported) {
+    return {
+      status: "unresolved",
+      reason: "No single headline metric plus D&A has usable coverage in all three forecast periods.",
+      selection,
+    };
+  }
+  const incompatible = selection.anchors.filter(
+    (metricId) => !selection.definition_compatibility[metricId]?.compatible,
+  );
+  if (incompatible.length > 0) {
+    return {
+      status: "unresolved",
+      reason: `Broker and statement definitions are incompatible for ${incompatible.join(", ")}.`,
+      selection,
+      incompatible_metrics: incompatible,
+    };
+  }
   const bridge = resolveEbitdaBridge(rows);
-  if (!bridge) return null;
-  if (selection.derived === "ebit" && !bridge.ebitSolvable) return null;
+  if (!bridge) {
+    return {
+      status: "unresolved",
+      reason: "The declared Adjusted EBITDA calculation is not a resolvable EBIT/D&A bridge.",
+      selection,
+    };
+  }
+  if (selection.derived === "ebit" && !bridge.ebitSolvable) {
+    return {
+      status: "unresolved",
+      reason: "EBIT is the derived headline but its bridge term is not uniquely solvable.",
+      selection,
+      bridge,
+    };
+  }
   const residualPlugRowIds = bridge.addbackTerms.filter((term) => {
     const row = rows.find((item) => item.row_id === term);
     const calculation = row?.forecast_calculation;
@@ -412,6 +549,33 @@ export function resolveAnchorPlan(modelCase, rows) {
       plugRowIds,
     ),
   );
-  if (addbackTotals.some((total) => total === null)) return null;
-  return { selection, bridge, residualPlugRowIds, addbackTotals };
+  if (addbackTotals.some((total) => total === null)) {
+    return {
+      status: "unresolved",
+      reason: "At least one Adjusted EBITDA bridge addback has no resolvable forecast authority.",
+      selection,
+      bridge,
+      residualPlugRowIds,
+    };
+  }
+  return {
+    status: "applied",
+    selection,
+    bridge,
+    residualPlugRowIds,
+    addbackTotals,
+  };
+}
+
+export function resolveAnchorPlan(modelCase, rows) {
+  const decision = resolveAnchorPlanDecision(modelCase, rows);
+  return decision.status === "applied" ? decision : null;
+}
+
+export function requireResolvedAnchorPlan(modelCase, rows) {
+  const decision = resolveAnchorPlanDecision(modelCase, rows);
+  if (decision.status === "unresolved") {
+    throw new Error(`Broker anchor is unresolved: ${decision.reason}`);
+  }
+  return decision.status === "applied" ? decision : null;
 }

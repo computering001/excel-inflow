@@ -42,6 +42,15 @@ import {
   sourceCrosswalkCsv,
 } from "./lib/semantic_graph.mjs";
 import {
+  assertModelIrV3Pass,
+  compileModelIrV3,
+  forecastDecisionReceipt,
+  forecastDecisionReceiptCsv,
+  shadowSemanticComparison,
+  transformationReceipt,
+  workbookSemanticProofContract,
+} from "./lib/model_ir_v3.mjs";
+import {
   leaseHistoricalLiabilities,
   leaseOpeningLiability,
   normalisedCashBuckets,
@@ -60,6 +69,7 @@ import {
   resolvedLeaseInterestBasis,
 } from "./lib/lease_policy.mjs";
 import { resolveForecastAuthority } from "./lib/forecast_authority.mjs";
+import { compileStatementFormula } from "./lib/formula_dsl.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -1149,83 +1159,16 @@ function isSelfCarry(definition, calculation) {
 function genericFormula(rowPlan, definition, column, calculationOverride = null) {
   const calculation = calculationOverride ?? definition.calculation;
   if (!calculation) return null;
-  const refs = calculation.refs.map((id) => {
-    const row = rowPlan.rows_by_id[id];
-    if (!row) throw new Error(`Formula reference ${id} does not resolve.`);
-    return `${column}${row}`;
-  });
-  if (calculation.operator === "sum") {
-    if (refs.length === 0) return "=0";
+  return compileStatementFormula({
+    rule: calculation,
+    definition,
+    column,
+    rowForId: (id) => rowPlan.rows_by_id[id] ?? null,
+    previousColumn,
     // Native iterative calculation can leave sub-cent circularity residue in
-    // the cash bridge.  Snap only the displayed net cash movement to a
-    // reporting-safe precision so Excel never renders an immaterial "(0)".
-    if (definition.semantic_role === "net_change_in_cash") {
-      return `=ROUND(${sumCellExpression(refs)},6)`;
-    }
-    return `=${sumCellExpression(refs)}`;
-  }
-  if (calculation.operator === "link") return `=${refs[0]}`;
-  if (calculation.operator === "subtract") {
-    return `=${refs.slice(1).reduce((value, ref) => `${value}-${ref}`, refs[0])}`;
-  }
-  if (calculation.operator === "negate") return `=-${refs[0]}`;
-  if (calculation.operator === "negate_sum") {
-    return `=-${sumCellExpression(refs)}`;
-  }
-  if (calculation.operator === "ratio") {
-    return `=IFERROR(${refs[0]}/${refs[1]},0)`;
-  }
-  if (calculation.operator === "negated_ratio") {
-    return `=IFERROR(-${refs[0]}/${refs[1]},0)`;
-  }
-  if (calculation.operator === "growth") {
-    const prior = previousColumn(column);
-    if (!prior) return '=""';
-    const sourceRow = rowPlan.rows_by_id[calculation.refs[0]];
-    return `=IFERROR(${column}${sourceRow}/${prior}${sourceRow}-1,0)`;
-  }
-  if (calculation.operator === "tax") {
-    return `=IF(${refs[0]}>0,-${refs[0]}*${refs[1]},0)`;
-  }
-  // Prior-period reference. Covers both a flat carry-forward (refs[0] is this
-  // row) and a roll-forward across rows (opening cash = prior ending cash).
-  // The source expressed these as formulas; reproducing them as repeated
-  // constants would break the roll-forward under any driver change.
-  if (calculation.operator === "prior_period") {
-    const prior = previousColumn(column);
-    // No prior column exists for the first historical period. Returning null
-    // here left the cell EMPTY, and because later periods carry forward from
-    // it (H66 = G66, I66 = H66 ...) a single blank anchor zeroed the entire
-    // row across all six periods — and blanked opening cash, throwing every
-    // historical ending-cash figure out by hundreds of millions. The caller
-    // falls back to the row's seed value, so the row must carry one.
-    if (!prior) return null;
-    const sourceRow = rowPlan.rows_by_id[calculation.refs[0]];
-    if (!sourceRow) {
-      throw new Error(`prior_period reference ${calculation.refs[0]} does not resolve.`);
-    }
-    return `=${prior}${sourceRow}`;
-  }
-  if (calculation.operator === "prior_period_scaled_by") {
-    const prior = previousColumn(column);
-    if (!prior) return null;
-    const sourceRow = rowPlan.rows_by_id[calculation.refs[0]];
-    const driverRow = rowPlan.rows_by_id[calculation.refs[1]];
-    if (!sourceRow || !driverRow) {
-      throw new Error(
-        "prior_period_scaled_by requires a source row and a driver row.",
-      );
-    }
-    return (
-      `=IFERROR(${prior}${sourceRow}*${column}${driverRow}/` +
-      `${prior}${driverRow},0)`
-    );
-  }
-  if (calculation.operator === "average") {
-    if (refs.length === 0) return "=0";
-    return `=AVERAGE(${refs.join(",")})`;
-  }
-  throw new Error(`Unsupported formula operator ${calculation.operator}.`);
+    // the cash bridge. Snap only the displayed net cash movement.
+    roundSumDigits: definition.semantic_role === "net_change_in_cash" ? 6 : null,
+  }).formula;
 }
 
 function hasForecastPeriodCalculations(definition) {
@@ -2090,13 +2033,19 @@ function acquisitionDerivedDrivers(modelCase, rowPlan) {
 // column, so the reader can follow the reference to the number it states — then
 // the same quotient inline for companies that print no such line.
 function acquisitionMarginExpression(drivers, column) {
-  if (drivers.margin_ratio) return `${column}${drivers.margin_ratio.row}`;
   const standaloneColumn = standaloneColumnFor(column);
   if (drivers.ebitda && drivers.revenue) {
     return (
       `IFERROR(${standaloneColumn}${drivers.ebitda.row}/` +
       `${standaloneColumn}${drivers.revenue.row},0)`
     );
+  }
+  // A printed standalone margin is an acceptable fallback, but the adjustment
+  // column must never divide by or depend on its own as-yet-unpopulated ratio
+  // row. Acquisition operating assumptions always read from standalone
+  // authority and then flow through the adjustment case.
+  if (drivers.margin_ratio) {
+    return `${standaloneColumn}${drivers.margin_ratio.row}`;
   }
   return null;
 }
@@ -10485,6 +10434,11 @@ async function writeModelSidecars(
     rowPlan,
     semanticManifest,
     sourceCrosswalk,
+    modelIrV3,
+    modelIrReceipt,
+    forecastReceipt,
+    shadowComparison,
+    workbookProofContract,
     modelCase,
     standaloneSolution,
     proFormaSolution,
@@ -10497,6 +10451,21 @@ async function writeModelSidecars(
     "utf8",
   );
   await fs.writeFile(
+    `${outputPath}.forecast-receipt.json`,
+    `${JSON.stringify(forecastReceipt, null, 2)}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    `${outputPath}.forecast-receipt.csv`,
+    forecastDecisionReceiptCsv(forecastReceipt),
+    "utf8",
+  );
+  await fs.writeFile(
+    `${outputPath}.shadow-comparison.json`,
+    `${JSON.stringify(shadowComparison, null, 2)}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
     `${outputPath}.semantic-manifest.json`,
     `${JSON.stringify(semanticManifest, null, 2)}\n`,
     "utf8",
@@ -10504,6 +10473,21 @@ async function writeModelSidecars(
   await fs.writeFile(
     `${outputPath}.source-crosswalk.csv`,
     sourceCrosswalkCsv(sourceCrosswalk),
+    "utf8",
+  );
+  await fs.writeFile(
+    `${outputPath}.model-ir-v3.json`,
+    `${JSON.stringify(modelIrV3, null, 2)}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    `${outputPath}.transformation-receipt.json`,
+    `${JSON.stringify(modelIrReceipt, null, 2)}\n`,
+    "utf8",
+  );
+  await fs.writeFile(
+    `${outputPath}.workbook-proof-contract.json`,
+    `${JSON.stringify(workbookProofContract, null, 2)}\n`,
     "utf8",
   );
   await fs.writeFile(
@@ -10646,6 +10630,25 @@ async function main(packaging = null) {
     rowPlan,
     semanticManifest,
   );
+  const modelIrV3 = compileModelIrV3({
+    modelCase,
+    rowPlan,
+    semanticManifest,
+    sourceCrosswalk,
+  });
+  assertModelIrV3Pass(modelIrV3);
+  const modelIrReceipt = transformationReceipt(modelIrV3);
+  const forecastReceipt = forecastDecisionReceipt(modelIrV3);
+  const shadowComparison = shadowSemanticComparison(
+    semanticManifest,
+    modelIrV3,
+  );
+  const workbookProofContract = workbookSemanticProofContract(modelIrV3, rowPlan);
+  if (shadowComparison.status !== "PASS") {
+    throw new Error(
+      `Candidate semantic shadow comparison blocked: ${JSON.stringify(shadowComparison)}`,
+    );
+  }
   // ---- PLAN ONLY ----------------------------------------------------------
   // The whole point of Phase 2.6. This branch produces a certified render plan
   // for a case the model has never seen, reads no file, runs no converter and
@@ -10685,6 +10688,11 @@ async function main(packaging = null) {
       rowPlan,
       semanticManifest,
       sourceCrosswalk,
+      modelIrV3,
+      modelIrReceipt,
+      forecastReceipt,
+      shadowComparison,
+      workbookProofContract,
       modelCase,
       standaloneSolution,
       proFormaSolution,
@@ -10863,6 +10871,11 @@ async function main(packaging = null) {
     rowPlan,
     semanticManifest,
     sourceCrosswalk,
+    modelIrV3,
+    modelIrReceipt,
+    forecastReceipt,
+    shadowComparison,
+    workbookProofContract,
     modelCase,
     standaloneSolution,
     proFormaSolution,

@@ -1372,7 +1372,7 @@ export function solveCase(
   // Resolved once, from the case's own broker pack
   // and semantic roles — never per-issuer, never by row number. Null means the
   // pack is too thin for the rule and the case solves exactly as authored.
-  const anchorPlan = resolveAnchorPlan(
+  const anchorPlan = requireResolvedAnchorPlan(
     modelCase,
     modelCase.statement_structure?.income_statement ?? [],
   );
@@ -2636,7 +2636,7 @@ export function solveCase(
 import fs from "node:fs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import {
-  resolveAnchorPlan,
+  requireResolvedAnchorPlan,
   resolveBrokerForecastSelection,
 } from "./broker_anchor.mjs";
 

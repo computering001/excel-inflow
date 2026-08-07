@@ -354,6 +354,7 @@ node scripts/validate_structure.mjs <source.xlsx> <built.xlsx>
 python3 scripts/verify/validate_dynamic_model.py <workbook.xlsx> --out <folder> [--tolerance-mode contract|legacy] [--visual-reviewed <file>] [--finance-reviewed <json>]
 python3 scripts/verify/finance_proof.py <case.json> <workbook.xlsx> --out <report.json>
 python3 scripts/verify/run_finance_proof_mutations.py <case.json> <workbook.xlsx> --out <folder>
+python3 scripts/verify/workbook_semantic_oracle.py --xlsx <workbook.xlsx> --contract <workbook.xlsx.workbook-proof-contract.json> --out <report.json>
 python3 scripts/verify/run_deterministic_tests.py --builds <build-a.xlsx> <build-b.xlsx> --out <folder>
 python3 scripts/render/check_render.py <company-workbook.xlsx> --out <folder> --baseline-case <standard-maximal|standard-net-cash> --structural-only [--soffice <path>]
 python3 scripts/render/check_render.py <frozen-authority-replay.xlsx> --out <folder> --baselines <external-approved-baselines> --baseline-case <standard-maximal|standard-net-cash> [--soffice <path>]

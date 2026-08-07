@@ -3,7 +3,7 @@ import {
   inferMovementType,
 } from "./semantic_graph.mjs";
 export { inferMovementType } from "./semantic_graph.mjs";
-import { resolveAnchorPlan } from "./broker_anchor.mjs";
+import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
 import {
   selectStandardisedProfile,
   STANDARDISED_DESIGN_CONTRACT_SHA256,
@@ -16,6 +16,7 @@ import { classifyStatementLine } from "./statement_classifier.mjs";
 import {
   assertStatementTopology,
   deriveStatementIndentMap,
+  materializeStatementPresentationTree,
   repairStatementSourceOrder,
 } from "./statement_topology.mjs";
 
@@ -618,6 +619,9 @@ function resetCompiledPresentationMetadata(rows) {
     row.outline_level = 0;
     delete row.projection_origin;
     delete row.projection_required_by;
+    delete row.presentation_parent_id;
+    delete row.presentation_depth;
+    delete row.presentation_role;
   }
 }
 
@@ -661,10 +665,16 @@ function isWorkingCapitalConstituent(row) {
  * an uncalculated row while the formula pass saw an explicit zero.  Centralise
  * the transition so no pass can create that split-brain state again.
  */
-function markForecastCapturedBy(row, parentRowId, note) {
+function markForecastCapturedBy(
+  row,
+  parentRowId,
+  note,
+  mode = "formula_membership",
+) {
   row.forecast_treatment = "uncalculated";
   row.formula_authority = "intentionally_blank";
   row.forecast_capture_parent_id = parentRowId;
+  row.forecast_capture_mode = mode;
   row.forecast_capture_note = note;
   delete row.broker_metric_id;
   delete row.forecast_calculation;
@@ -675,6 +685,7 @@ function markForecastCapturedBy(row, parentRowId, note) {
 function clearCompiledForecastOverride(row) {
   delete row.forecast_period_authorities;
   delete row.forecast_capture_parent_id;
+  delete row.forecast_capture_mode;
   delete row.forecast_capture_note;
   if (row.formula_authority === "intentionally_blank") {
     delete row.formula_authority;
@@ -895,6 +906,7 @@ function greyDebtChangeConstituents(rows, consolidated) {
       row,
       consolidated.row_id,
       `Forecast debt movement is captured by ${consolidated.label} and the debt schedule.`,
+      "semantic_scope",
     );
   }
 }
@@ -1560,8 +1572,12 @@ function stripResidualNote(label) {
  * model metadata on the face of the operating model.
  */
 function applyBrokerAnchorRule(modelCase, rows) {
-  const plan = resolveAnchorPlan(modelCase, rows);
-  if (!plan) return null;
+  // Row planning is also used by intake diagnostics and question planning.
+  // It must therefore be inspectable even when the declared broker authority
+  // is incomplete. The production coverage gate below is what fails closed;
+  // this compiler pass applies only a fully resolved decision.
+  const plan = resolveAnchorPlanDecision(modelCase, rows);
+  if (plan.status !== "applied") return null;
   const { selection, bridge, residualPlugRowIds } = plan;
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const canonicalEbitRow =
@@ -1734,6 +1750,32 @@ function applyAnchoredSlimForecast(rows, anchorSelection) {
       keepLive.add(row.row_id);
     }
   }
+  // Keep every pure derived output whose complete dependency set is already
+  // live.  This is a graph-closure rule, not a caption list: margins, growth
+  // rates and other ratios remain calculated when their inputs survive the
+  // slim forecast, while detailed operating workings whose inputs were
+  // intentionally suppressed remain blank.  It also prevents a ratio from
+  // being nonsensically described as "captured by EBIT".
+  let addedDerivedRow = true;
+  while (addedDerivedRow) {
+    addedDerivedRow = false;
+    for (const row of rows) {
+      if (keepLive.has(row.row_id) || row.row_type === "header") continue;
+      const rules = (row.forecast_period_calculations ?? []).filter(Boolean);
+      const rule = rules.length > 0
+        ? rules[0]
+        : row.forecast_calculation ?? row.calculation;
+      const refs = rule?.refs ?? [];
+      if (
+        row.row_type === "calculation" &&
+        refs.length > 0 &&
+        refs.every((ref) => keepLive.has(ref))
+      ) {
+        keepLive.add(row.row_id);
+        addedDerivedRow = true;
+      }
+    }
+  }
   for (let index = 0; index < ebitIndex; index += 1) {
     const row = rows[index];
     if (row.row_type === "header" || keepLive.has(row.row_id)) continue;
@@ -1743,6 +1785,7 @@ function applyAnchoredSlimForecast(rows, anchorSelection) {
       row,
       parentId,
       `Forecast detail is captured by ${parent?.label ?? parentId}.`,
+      "semantic_scope",
     );
   }
 }
@@ -1914,6 +1957,7 @@ export function normaliseStatementRows(modelCase, section) {
   // beneath it indents and groups that run.
   removeRedundantDuplicateHeaders(rows);
   if (section === "cash_flow") groupSubtotalRuns(rows);
+  materializeStatementPresentationTree(rows, section);
   // Later still, so every row the consolidation dynamics added or re-pointed is
   // levelled off the FINAL ref graph, and no label is left carrying its indent
   // as content.

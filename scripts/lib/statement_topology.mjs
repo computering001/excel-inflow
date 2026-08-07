@@ -51,6 +51,131 @@ function isIndentAnchor(row) {
   );
 }
 
+function inferPresentationParents(rows) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const parentOf = new Map();
+  for (const row of rows) {
+    if (row.parent_row_id && byId.has(row.parent_row_id)) {
+      parentOf.set(row.row_id, row.parent_row_id);
+    }
+  }
+  // Arithmetic may nominate a presentation family only once, during this
+  // dedicated compilation pass.  Renderers and later indent logic consume the
+  // materialised edge and never infer hierarchy from formulas themselves. A
+  // sum qualifies only when its complete member set is already a contiguous
+  // parent-first run. A PBT, PAT or cash-flow total that appears *after* its
+  // inputs is an answer, not a presentation parent, and must never indent or
+  // reorder the lines above it.
+  for (const parent of rows) {
+    if (parent.calculation?.operator !== "sum") continue;
+    const parentIndex = rows.indexOf(parent);
+    const eligibleRefs = (parent.calculation.refs ?? []).filter((ref) => {
+      const child = byId.get(ref);
+      return (
+        child &&
+        ref !== parent.row_id &&
+        !parentOf.has(ref) &&
+        !isIndentAnchor(child)
+      );
+    });
+    const indexes = eligibleRefs.map((ref) => rows.indexOf(byId.get(ref))).sort((a, b) => a - b);
+    const contiguousParentFirst =
+      eligibleRefs.length > 0 &&
+      eligibleRefs.length === (parent.calculation.refs ?? []).length &&
+      indexes.every((index, offset) => index === parentIndex + offset + 1);
+    if (!contiguousParentFirst) continue;
+    for (const ref of eligibleRefs) {
+      parentOf.set(ref, parent.row_id);
+    }
+  }
+  return parentOf;
+}
+
+function presentationDepth(rowId, parentOf, byId, visiting = new Set()) {
+  if (visiting.has(rowId)) return null;
+  const row = byId.get(rowId);
+  if (!row || isIndentAnchor(row)) return 0;
+  const parentId = parentOf.get(rowId);
+  if (!parentId || !byId.has(parentId)) return 0;
+  const parentDepth = presentationDepth(
+    parentId,
+    parentOf,
+    byId,
+    new Set(visiting).add(rowId),
+  );
+  return parentDepth === null ? null : 1 + parentDepth;
+}
+
+/**
+ * Materialise the presentation tree as its own compiler product.
+ *
+ * Once this runs, indentation, outline grouping and row order are projections
+ * of `presentation_parent_id`; changing a formula cannot silently re-indent a
+ * workbook.  A stable parent-first repair is applied only where the declared
+ * tree would otherwise put a child before its parent.
+ */
+export function materializeStatementPresentationTree(rows, section) {
+  assertSection(section);
+  const parentOf = inferPresentationParents(rows);
+  const initialById = new Map(rows.map((row) => [row.row_id, row]));
+  const depths = new Map(
+    rows.map((row) => [
+      row.row_id,
+      presentationDepth(row.row_id, parentOf, initialById),
+    ]),
+  );
+  // A malformed cycle belongs to coverage validation, where it can produce a
+  // precise BLOCK result. The presentation compiler must remain bounded and
+  // preserve source order so diagnostic and question-flow code can inspect
+  // the case instead of spinning while alternately moving two parents.
+  const hasCycle = [...depths.values()].some((depth) => depth === null);
+  let reordered = false;
+  let changed = !hasCycle;
+  while (changed) {
+    changed = false;
+    for (const [childId, parentId] of parentOf) {
+      const childIndex = rows.findIndex((row) => row.row_id === childId);
+      const parentIndex = rows.findIndex((row) => row.row_id === parentId);
+      if (childIndex < 0 || parentIndex < 0 || parentIndex < childIndex) continue;
+      const [parent] = rows.splice(parentIndex, 1);
+      const nextChildIndex = rows.findIndex((row) => row.row_id === childId);
+      rows.splice(nextChildIndex, 0, parent);
+      reordered = true;
+      changed = true;
+      break;
+    }
+  }
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  for (const row of rows) {
+    const parentId = parentOf.get(row.row_id) ?? null;
+    row.presentation_parent_id = parentId;
+    row.presentation_depth = isIndentAnchor(row)
+      ? 0
+      : (depths.get(row.row_id) ?? 0);
+    row.presentation_role =
+      row.row_type === "header"
+        ? "header"
+        : row.style_role === "total" || row.row_type === "subtotal"
+          ? "answer"
+          : parentId
+            ? "component"
+            : row.formula_authority === "compiler"
+              ? "consumer"
+              : "standalone";
+  }
+  return {
+    section,
+    reordered,
+    nodes: rows.map((row, order) => ({
+      display_id: row.row_id,
+      parent_display_id: row.presentation_parent_id,
+      depth: row.presentation_depth,
+      display_role: row.presentation_role,
+      order,
+    })),
+  };
+}
+
 /**
  * Compile the one presentation hierarchy used by the renderer.
  *
@@ -62,27 +187,14 @@ function isIndentAnchor(row) {
 export function deriveStatementIndentMap(rows, section) {
   assertSection(section);
   const byId = new Map(rows.map((row) => [row.row_id, row]));
-  const parentOf = new Map();
-
-  for (const row of rows) {
-    if (!row.parent_row_id || !byId.has(row.parent_row_id)) continue;
-    parentOf.set(row.row_id, row.parent_row_id);
-  }
-  for (const parent of rows) {
-    if (parent.calculation?.operator !== "sum") continue;
-    for (const ref of parent.calculation.refs ?? []) {
-      const child = byId.get(ref);
-      if (
-        !child ||
-        ref === parent.row_id ||
-        parentOf.has(ref) ||
-        isIndentAnchor(child)
-      ) {
-        continue;
-      }
-      parentOf.set(ref, parent.row_id);
-    }
-  }
+  const parentOf = new Map(
+    rows
+      .filter(
+        (row) =>
+          row.presentation_parent_id && byId.has(row.presentation_parent_id),
+      )
+      .map((row) => [row.row_id, row.presentation_parent_id]),
+  );
 
   const depth = new Map();
   const resolve = (rowId, visiting = new Set()) => {
@@ -105,7 +217,11 @@ export function deriveStatementIndentMap(rows, section) {
     // parent owned it, while debt instruments stayed flat under a separate
     // renderer. That made indentation describe the section a row happened to
     // be in rather than its economic depth.
-    const value = parentId ? resolve(parentId, next) + 1 : 0;
+    const value = Number.isInteger(row.presentation_depth)
+      ? row.presentation_depth
+      : parentId
+        ? resolve(parentId, next) + 1
+        : 0;
     depth.set(rowId, value);
     return value;
   };

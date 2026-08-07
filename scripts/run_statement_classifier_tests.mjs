@@ -220,7 +220,7 @@ const normalisedChildIndents = cashGeneratedChildren.slice(0, 2).map(
 );
 assert(
   normalisedChildIndents[0] === normalisedChildIndents[1] &&
-    normalisedChildIndents[0] === 1,
+    normalisedChildIndents[0] === 0,
   `Source indent metadata overrode the graph: ${normalisedChildIndents.join(", ")}.`,
 );
 const mutatedCompiledIndent = clone(normalisedArbitraryIndent);

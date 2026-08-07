@@ -22,6 +22,7 @@
   "lineage-exceptions.json",
   "model-case-v2.schema.json",
   "model-case.schema.json",
+  "model-ir-v3.schema.json",
   "native-excel-evidence-v3.schema.json",
   "plan.schema.json",
   "production-contract-v2.json",
@@ -37,6 +38,7 @@
     "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
     "lineage-exceptions.json": "L0 immutable exception registry. Named as immutable-at-runtime; must be present so a runtime exception claim can be checked against it.",
     "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
+    "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
   "deployment-profile.json": "Package provenance and exact allowlists. It is compiler input rather than runtime-loaded content, but ships so release-manifest.json never points to an absent profile.",
     "row-taxonomy-v2.json": "Row taxonomy the agent reads while mapping company rows. Referenced from the instructions, not imported by a shipped script."
   },
@@ -77,12 +79,14 @@
   "lib/flow_runtime.mjs",
     "lib/flow_screens.mjs",
     "lib/forecast_authority.mjs",
+    "lib/formula_dsl.mjs",
     "lib/historical_normalisation.mjs",
   "lib/user_flow_controller.mjs",
   "lib/intake.mjs",
   "lib/instrument_display.mjs",
   "lib/json_schema.mjs",
   "lib/lease_policy.mjs",
+  "lib/model_ir_v3.mjs",
   "lib/plan_builder.mjs",
   "lib/plan_values.mjs",
   "lib/process_tree.mjs",
@@ -139,10 +143,11 @@
   "verify/finance_proof.py",
   "verify/run_finance_proof_mutations.py",
   "verify/run_deterministic_tests.py",
-  "verify/validate_dynamic_model.py"
+  "verify/validate_dynamic_model.py",
+  "verify/workbook_semantic_oracle.py"
  ],
  "_python_entry_point_note": "Why each entry is distinct from a module the closure happens to reach. emit/__main__.py is the Phase 2 renderer CLI. render/check_render.py and render/selftest.py prove image checks and their injected-defect behavior. verify/finance_proof.py is the independent finance oracle and verify/run_finance_proof_mutations.py proves that oracle detects targeted corruption. verify/run_deterministic_tests.py is the stdlib-only determinism harness. verify/validate_dynamic_model.py is the portable Python model validator.",
- "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship WITHOUT a runnable command naming them. It is empty because none do: the instructions now carry a python3 command for all five, and the compiler reports entryPointsUncommandedByInstructions as empty. It previously held five notes all saying 'ships uncommanded', which had become false for every one of them; a note that outlives its condition silently satisfies the assertion for the wrong entry point, so they were deleted rather than kept as description. Add an entry here only when an entry point actually loses its command.",
+ "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship WITHOUT a runnable command naming them. It is empty because none do: the instructions now carry a python3 command for all eight, and the compiler reports entryPointsUncommandedByInstructions as empty. The former blanket exemptions were deleted rather than kept as description; a note that outlives its condition silently satisfies the assertion for the wrong entry point. Add an entry here only when an entry point actually loses its command.",
  "python_entry_point_notes": {},
  "python_entry_point_smoke": {
   "_note": "What running each entry point from the clean release root must produce. Exit status alone is not the contract: two of these treat --help as an unrecognised argument and exit 1 with a usage line, and an entry point that had lost its imports would also exit non-zero. The required substring is what separates the two.",
@@ -208,6 +213,15 @@
     1
    ],
    "expect_output_contains": "Usage: validate_dynamic_model.py"
+  },
+  "verify/workbook_semantic_oracle.py": {
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
+   "expect_output_contains": "usage: workbook_semantic_oracle.py"
   }
  },
  "python_module_allowlist": [
@@ -238,6 +252,7 @@
   "verify/run_deterministic_tests.py",
   "verify/tolerances.py",
   "verify/validate_dynamic_model.py",
+  "verify/workbook_semantic_oracle.py",
   "verify/xlsx.py"
  ],
  "_python_module_allowlist_omissions": {

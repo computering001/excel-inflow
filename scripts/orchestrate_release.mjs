@@ -60,6 +60,12 @@ const SIDECAR_SUFFIXES = Object.freeze([
   ".coverage.json",
   ".semantic-manifest.json",
   ".source-crosswalk.csv",
+  ".forecast-receipt.json",
+  ".forecast-receipt.csv",
+  ".shadow-comparison.json",
+  ".model-ir-v3.json",
+  ".transformation-receipt.json",
+  ".workbook-proof-contract.json",
 ]);
 
 const fail = (message, detail = {}) => ({ status: "BLOCKED", message, ...detail });
@@ -467,6 +473,7 @@ async function main() {
   const styleReport = path.join(verifyDir, "style-tokens.json");
   const cacheReport = path.join(verifyDir, "cache-parity.json");
   const financeReport = path.join(verifyDir, "finance-proof.json");
+  const semanticOracleReport = path.join(verifyDir, "workbook-semantic-oracle.json");
   step = await checkpoint({
     id: "verify",
     recipe: "release-independent-verify/1.0",
@@ -482,23 +489,32 @@ async function main() {
       style_report: styleReport,
       cache_report: cacheReport,
       finance_report: financeReport,
+      semantic_oracle_report: semanticOracleReport,
     },
     action: async (workDir) => {
-      const [verified, styled, cached, financed] = await Promise.all([
+      const [verified, styled, cached, financed, semanticOracle] = await Promise.all([
         command(python.path, [path.join(HERE, "verify", "validate_dynamic_model.py"), patchedWorkbook, "--out", workDir]),
         command(process.execPath, [path.join(HERE, "validate_style_tokens.mjs"), patchedWorkbook, "--json", styleReport]),
         command(process.execPath, [path.join(HERE, "validate_cache_parity.mjs"), patchedWorkbook, "--json", cacheReport]),
         command(python.path, [path.join(HERE, "verify", "finance_proof.py"), casePath, patchedWorkbook, "--out", financeReport]),
+        command(python.path, [
+          path.join(HERE, "verify", "workbook_semantic_oracle.py"),
+          "--xlsx", patchedWorkbook,
+          "--contract", `${patchedWorkbook}.workbook-proof-contract.json`,
+          "--out", semanticOracleReport,
+        ]),
       ]);
       if (!verified.ok) return fail("N13 portable independent validation failed.", { stdout: verified.stdout.slice(-4000), stderr: verified.stderr.slice(-4000) });
       if (!styled.ok) return fail("N13 style-token validation failed.", { stdout: styled.stdout.slice(-4000), stderr: styled.stderr.slice(-4000) });
       if (!cached.ok) return fail("N13 cache parity failed.", { stdout: cached.stdout.slice(-4000), stderr: cached.stderr.slice(-4000) });
       if (!financed.ok) return fail("N13 independent finance proof failed.", { stdout: financed.stdout.slice(-4000), stderr: financed.stderr.slice(-4000) });
-      const [validation, style, cache, finance] = await Promise.all([
+      if (!semanticOracle.ok) return fail("N13 independent workbook-semantic oracle failed.", { stdout: semanticOracle.stdout.slice(-4000), stderr: semanticOracle.stderr.slice(-4000) });
+      const [validation, style, cache, finance, semanticOracleResult] = await Promise.all([
         json(validationReport),
         json(styleReport),
         json(cacheReport),
         json(financeReport),
+        json(semanticOracleReport),
       ]);
       if (!["PASS", "PASS_PENDING_MANUAL"].includes(validation.status) || Number(validation.total_violations ?? validation.summary?.total_violations ?? 0) !== 0) {
         return fail("N13 independent validation report did not clear with zero violations.", { report_status: validation.status, total_violations: validation.total_violations ?? validation.summary?.total_violations ?? null });
@@ -514,7 +530,7 @@ async function main() {
         Object.values(cacheBlindBuckets).every((count) => count === 0);
       const financeViolations = Number(finance.summary?.violations ?? finance.total_violations ?? 0);
       const financeComparisons = Number(finance.summary?.comparisons ?? finance.comparisons ?? 0);
-      if (style.status !== "PASS" || !cacheStrict || finance.status !== "PASS" || financeViolations !== 0 || financeComparisons <= 0) {
+      if (style.status !== "PASS" || !cacheStrict || finance.status !== "PASS" || financeViolations !== 0 || financeComparisons <= 0 || semanticOracleResult.status !== "PASS") {
         return fail("N13 style, strict cache coverage or independent finance proof did not clear.", {
           style_status: style.status,
           cache_status: cache.status,
@@ -525,6 +541,7 @@ async function main() {
           finance_status: finance.status,
           finance_violations: financeViolations,
           finance_comparisons: financeComparisons,
+          semantic_oracle_status: semanticOracleResult.status,
         });
       }
       return {
@@ -537,6 +554,7 @@ async function main() {
           cache_blind_buckets: cacheBlindBuckets,
           finance_status: finance.status,
           finance_comparisons: financeComparisons,
+          semantic_oracle_status: semanticOracleResult.status,
         },
       };
     },

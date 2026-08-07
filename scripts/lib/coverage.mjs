@@ -3,6 +3,7 @@ import { compiledCashFlowRoles, normaliseStatementRows } from "./row_plan.mjs";
 import { classifyStatementLine, isHighImpactRole } from "./statement_classifier.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { compileStatementTopology } from "./statement_topology.mjs";
+import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -1815,6 +1816,31 @@ function brokerChecks(modelCase) {
   return checks;
 }
 
+function brokerAnchorResolutionChecks(modelCase) {
+  const decision = resolveAnchorPlanDecision(
+    modelCase,
+    modelCase.statement_structure?.income_statement ?? [],
+  );
+  return [
+    result(
+      "broker_pack.anchor_resolution",
+      decision.status === "unresolved" ? "BLOCK" : "PASS",
+      decision.status === "applied"
+        ? `Broker anchor resolves through ${decision.selection.headline_anchor} plus D&A.`
+        : decision.status === "not_applicable"
+          ? "The statement declares an alternative forecast authority; the EBIT/EBITDA broker-anchor rule is not applicable."
+          : `Broker anchor is unresolved: ${decision.reason}`,
+      {
+        status: decision.status,
+        reason: decision.reason ?? null,
+        headline_anchor: decision.selection?.headline_anchor ?? null,
+        definition_compatibility:
+          decision.selection?.definition_compatibility ?? null,
+      },
+    ),
+  ];
+}
+
 function acquisitionChecks(modelCase) {
   if (!modelCase.modules?.acquisition) return [];
   const acquisition = modelCase.acquisition;
@@ -1930,6 +1956,7 @@ export function assessCoverage(modelCase) {
   checks.push(...debtReconciliationChecks(modelCase));
   checks.push(...historicalInterestChecks(modelCase));
   checks.push(...brokerChecks(modelCase));
+  checks.push(...brokerAnchorResolutionChecks(modelCase));
   checks.push(...acquisitionChecks(modelCase));
   const blockers = checks.filter((item) => item.status === "BLOCK");
   return {

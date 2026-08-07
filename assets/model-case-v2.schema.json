@@ -730,6 +730,10 @@
           "pattern": "^[a-z0-9][a-z0-9_.-]*$",
           "description": "Economic parent whose live forecast captures this row when the detail is intentionally not forecast separately. This is distinct from presentation hierarchy."
         },
+        "forecast_capture_mode": {
+          "enum": ["formula_membership", "semantic_scope"],
+          "description": "How a deliberately unforecast child is proved captured: exact parent-formula membership, or explicit inclusion within a resolved parent economic scope."
+        },
         "forecast_capture_note": {
           "type": "string",
           "minLength": 1,
@@ -940,6 +944,19 @@
       "required": ["label", "brokers"],
       "properties": {
         "label": { "type": "string", "minLength": 1 },
+        "definition_signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "metric_id": { "type": "string", "minLength": 1 },
+            "accounting_basis": { "type": ["string", "null"] },
+            "operation_scope": { "type": ["string", "null"] },
+            "adjustment_basis": { "type": ["string", "null"] },
+            "currency": { "type": ["string", "null"] },
+            "units": { "type": ["string", "null"] },
+            "fiscal_calendar": { "type": ["string", "null"] }
+          }
+        },
         "provider_consensus": {
           "type": "array",
           "minItems": 3,

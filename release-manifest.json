@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v2.0.7",
+  "releaseName": "Excel Inflow v2.0.8",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.7",
+  "skillVersion": "2.0.8",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T21:59:01.159Z",
-  "centralInstructionsWords": 3867,
+  "generatedAt": "2026-08-07T23:56:41.988Z",
+  "centralInstructionsWords": 3875,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "e4823c61d045b97dd06aa2a7eef396e7dd8fa07a3d0829467091485a203e3463",
-    "closureFileCount": 95,
+    "currentClosureSha256": "9903306e143650b242856f9fe0b123d22d9b7e954874cfdb494b23f1ffb6cd90",
+    "closureFileCount": 99,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -54,11 +54,13 @@
       "scripts/lib/flow_runtime.mjs",
       "scripts/lib/flow_screens.mjs",
       "scripts/lib/forecast_authority.mjs",
+      "scripts/lib/formula_dsl.mjs",
       "scripts/lib/historical_normalisation.mjs",
       "scripts/lib/instrument_display.mjs",
       "scripts/lib/intake.mjs",
       "scripts/lib/json_schema.mjs",
       "scripts/lib/lease_policy.mjs",
+      "scripts/lib/model_ir_v3.mjs",
       "scripts/lib/plan_builder.mjs",
       "scripts/lib/plan_values.mjs",
       "scripts/lib/process_tree.mjs",
@@ -102,6 +104,7 @@
       "assets/broker-pack.schema.json",
       "assets/dcs-export.schema.json",
       "assets/lineage-exceptions.json",
+      "assets/model-ir-v3.schema.json",
       "assets/native-excel-evidence-v3.schema.json",
       "assets/row-taxonomy-v2.json"
     ],
@@ -113,10 +116,12 @@
       "scripts/build_dynamic_model.mjs -> scripts/lib/coverage.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/design_contract.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/formula_dsl.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_display.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/json_schema.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/lease_policy.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/model_ir_v3.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/plan_builder.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/plan_values.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/rcf_policy.mjs",
@@ -136,6 +141,7 @@
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/coverage.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
@@ -242,24 +248,8 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python3.12",
+      "selected": "python3",
       "candidates": [
-        {
-          "candidate": "python3.12",
-          "version": "3.12.13",
-          "packages": {
-            "openpyxl": "3.1.5",
-            "fitz": null,
-            "PIL": "12.2.0",
-            "numpy": "2.3.5",
-            "jsonschema": null,
-            "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
-            "reportlab": "4.4.9"
-          },
-          "usable": true,
-          "reason": "selected"
-        },
         {
           "candidate": "python3",
           "version": "3.12.13",
@@ -267,11 +257,11 @@
             "openpyxl": "3.1.5",
             "fitz": null,
             "PIL": "12.2.0",
-            "numpy": "2.3.5",
+            "numpy": "2.4.4",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
-            "reportlab": "4.4.9"
+            "pypdf": "6.10.2",
+            "reportlab": "4.4.10"
           },
           "usable": true,
           "reason": "selected"
@@ -285,7 +275,8 @@
       "scripts/verify/finance_proof.py",
       "scripts/verify/run_finance_proof_mutations.py",
       "scripts/verify/run_deterministic_tests.py",
-      "scripts/verify/validate_dynamic_model.py"
+      "scripts/verify/validate_dynamic_model.py",
+      "scripts/verify/workbook_semantic_oracle.py"
     ],
     "entryPointsUncommandedByInstructions": [],
     "modules": [
@@ -316,6 +307,7 @@
       "scripts/verify/run_finance_proof_mutations.py",
       "scripts/verify/tolerances.py",
       "scripts/verify/validate_dynamic_model.py",
+      "scripts/verify/workbook_semantic_oracle.py",
       "scripts/verify/xlsx.py"
     ],
     "packages": [
@@ -392,6 +384,7 @@
       "scripts/verify/validate_dynamic_model.py -> scripts/verify/invariants.py (absolute-internal)",
       "scripts/verify/validate_dynamic_model.py -> scripts/verify/tolerances.py (absolute-internal)",
       "scripts/verify/validate_dynamic_model.py -> scripts/verify/xlsx.py (absolute-internal)",
+      "scripts/verify/workbook_semantic_oracle.py -> scripts/verify/__init__.py (package-init)",
       "scripts/verify/xlsx.py -> scripts/verify/__init__.py (package-init)"
     ],
     "assetsLoadedByPythonModules": {
@@ -643,7 +636,7 @@
     "codeFences": 8,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 13,
-    "scriptReferencesScanned": 20,
+    "scriptReferencesScanned": 21,
     "scriptReferences": [
       "build_dynamic_model.mjs",
       "compile_evidence_run.mjs",
@@ -664,7 +657,8 @@
       "verify/finance_proof.py",
       "verify/run_deterministic_tests.py",
       "verify/run_finance_proof_mutations.py",
-      "verify/validate_dynamic_model.py"
+      "verify/validate_dynamic_model.py",
+      "verify/workbook_semantic_oracle.py"
     ],
     "danglingScriptReferences": 0
   },
@@ -672,7 +666,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python3.12",
+    "pythonExecutable": "python3",
     "results": [
       {
         "target": "closure probe",
@@ -746,7 +740,7 @@
       },
       {
         "target": "python closure import probe",
-        "modules": 28,
+        "modules": 29,
         "allResolvedInsideRelease": true
       },
       {
@@ -792,20 +786,26 @@
         "resolved": true
       },
       {
+        "target": "scripts/verify/workbook_semantic_oracle.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "b94ed0c055ef176968dfa533a35a0d9b5b53f007db98b554189efcadce904bc9",
-        "plan_sha256": "d522d6f4979b6868a6891357adbe0b5b58f28aa1272e59f2d97ef09dda459abc",
-        "workbook_sha256": "c2831157e566aac3caa30aee4e8e89a44588c515e7e5537028664c5a2a788c45",
+        "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
+        "plan_sha256": "6afa6011246822ba08e6752a911e35a0a7ca3e154750190a9393050059fdd32f",
+        "workbook_sha256": "196bf135d1a81fd346680b07c4f5f79d413da4afe24a1df9ebbff2f6bd171bf8",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "b94ed0c055ef176968dfa533a35a0d9b5b53f007db98b554189efcadce904bc9",
-      "plan_sha256": "d522d6f4979b6868a6891357adbe0b5b58f28aa1272e59f2d97ef09dda459abc",
-      "workbook_sha256": "c2831157e566aac3caa30aee4e8e89a44588c515e7e5537028664c5a2a788c45",
+      "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
+      "plan_sha256": "6afa6011246822ba08e6752a911e35a0a7ca3e154750190a9393050059fdd32f",
+      "workbook_sha256": "196bf135d1a81fd346680b07c4f5f79d413da4afe24a1df9ebbff2f6bd171bf8",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -835,21 +835,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "e0ff13fcd9176f892649a1ec6078015cca267585c7a30a7f64c02686b1c37eb8",
-      "bytes": 28790,
-      "words": 3867
+      "sha256": "0e227a408f874025b0fc49cc53de4a0bed8419fdcaed978462c25d8e9841d9fb",
+      "bytes": 28940,
+      "words": 3875
     },
     {
       "path": "SKILL.md",
-      "sha256": "e9b2ccb688795b79f70ab7d797b293789c0144885506155d65a193f0d5dc0f54",
-      "bytes": 29277,
-      "words": 3936
+      "sha256": "e80db4f6d461e5fee1a2cdacfc5e563cb74bedd5781a8a352ff7ed91712e5d75",
+      "bytes": 29427,
+      "words": 3944
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "92c4a2bbeafc8e336bb49b2f1ba06d9d82e90dfdb99e0a13765c9ab337941307",
-      "bytes": 28810,
-      "words": 3869
+      "sha256": "6b23b6ac9e6e6b9497d27b0d46c7b468aa5e588bc42293fe0759580255e2487d",
+      "bytes": 28960,
+      "words": 3877
     },
     {
       "path": "references/model-contract.md",
@@ -889,9 +889,9 @@
     },
     {
       "path": "references/validation.md",
-      "sha256": "ccd249add486914b76f120946a5262bff603adce49906615b8edb127c5df7d4e",
-      "bytes": 47476,
-      "words": 6813
+      "sha256": "5d7149e58711dca655c9c9386b2eee844c9008d2b3ee3fbce270cb7820be2f72",
+      "bytes": 48183,
+      "words": 6889
     },
     {
       "path": "assets/broker-pack.schema.json",
@@ -907,8 +907,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "ce265cbe6688dd13cc035dd018c0c2f13e4b0c791eac40ff9555bf3e165afe28",
-      "bytes": 35171,
+      "sha256": "f032739f1be3e172bfbbdd0723874aaf4b875eca2f636a67abbf3455da7851a2",
+      "bytes": 35645,
       "words": null
     },
     {
@@ -925,14 +925,20 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "76939435745c30c409c6ea446f678ab0cf35457c50f7e23b8b0a1d8ed202e4e9",
-      "bytes": 48363,
+      "sha256": "27360adfa748d51e5f20bdb14f67d6604e1b968ad4abfa096345cb512522fdb6",
+      "bytes": 49225,
       "words": null
     },
     {
       "path": "assets/model-case.schema.json",
       "sha256": "6248bfb8eec8abe2579c7579450d350f3c48c2388c04b3162c9703748cdb0a70",
       "bytes": 14477,
+      "words": null
+    },
+    {
+      "path": "assets/model-ir-v3.schema.json",
+      "sha256": "eaf7dba8f91bc0df9b9a274fb8556b503a228c92554d2c4ac7362861689b9f50",
+      "bytes": 6176,
       "words": null
     },
     {
@@ -985,8 +991,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "04e0b23164733d8420ec018e552c2e32e242f35812deec780912861c0738f414",
-      "bytes": 464426,
+      "sha256": "71f4a5d4ca198cb0d6767a2421438f0c875849d7e663e203e9a25c1774bd1455",
+      "bytes": 463782,
       "words": null
     },
     {
@@ -1069,14 +1075,14 @@
     },
     {
       "path": "scripts/lib/broker_anchor.mjs",
-      "sha256": "bee375b6960562d108d4ebeca75e59f5c8890aace27d14863028ed1732f965b6",
-      "bytes": 15193,
+      "sha256": "7e95d9f6fff5917dfb8db3c24c659b1c6be188dfdd318048c8fbb9cead42d7f6",
+      "bytes": 20967,
       "words": null
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "947fac412c106a49c15859b1eee8a2de4fcac3b14b60e866f1cee5a660e63bba",
-      "bytes": 70191,
+      "sha256": "62259f26299520f73974b027c77db1bfcf8f2583f39325a586a006fcc7d41bf5",
+      "bytes": 71249,
       "words": null
     },
     {
@@ -1152,6 +1158,12 @@
       "words": null
     },
     {
+      "path": "scripts/lib/formula_dsl.mjs",
+      "sha256": "6c9630232283693b54036f563a3d5cfed5779b8c8b9f2985771864efe3036b6e",
+      "bytes": 7872,
+      "words": null
+    },
+    {
       "path": "scripts/lib/historical_normalisation.mjs",
       "sha256": "b93f6b5e1960dc71eae76b249be178de158385ad735cb2737af4a27d651f0861",
       "bytes": 12312,
@@ -1179,6 +1191,12 @@
       "path": "scripts/lib/lease_policy.mjs",
       "sha256": "2c3533f506eb8cd92a0566bce1e0193c43a012f28da5731bc170f5f13c753f3d",
       "bytes": 5487,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/model_ir_v3.mjs",
+      "sha256": "2f6d97b7e26a4dfcda7e7467d58f6ca964b43412c662a8907ea091b2594b99bd",
+      "bytes": 24539,
       "words": null
     },
     {
@@ -1231,8 +1249,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "aff953d5dd992e95fbe7e6ec40903a06548fe1c99b38fdf673cdbeac7614874e",
-      "bytes": 112362,
+      "sha256": "e22465d38471dae6a9fa602f3c4fda0146ab5a4b341a5317837e15f365b61700",
+      "bytes": 114130,
       "words": null
     },
     {
@@ -1255,14 +1273,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "01dcd3f913d1cc0ac211a55b0e03f2c9043eaafab20416ae749287afbbbb9c40",
-      "bytes": 40415,
+      "sha256": "d5c5593e6c1c585a3a05f2d947e07ffb20adc9458140132784d0a982cb559f42",
+      "bytes": 40656,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "5ca40c7bd0d62c94cb112aed20322eedc78749844afd1d8fccb4baf96fdae63f",
-      "bytes": 108111,
+      "sha256": "0fc14c3bf576a8ff32c5614269d6840f5cdb5c6848ac9e348707b81254923745",
+      "bytes": 108127,
       "words": null
     },
     {
@@ -1273,8 +1291,8 @@
     },
     {
       "path": "scripts/lib/statement_topology.mjs",
-      "sha256": "842a78b39507d0eb62456cb64e3f4905840555fba8de7974ad798d92a5b9099d",
-      "bytes": 16285,
+      "sha256": "1460c43fed0694a9da7339996bdc90f6819610e85d27a6bb6a2299ff1c66f715",
+      "bytes": 20731,
       "words": null
     },
     {
@@ -1291,8 +1309,8 @@
     },
     {
       "path": "scripts/orchestrate_release.mjs",
-      "sha256": "30e169385b4cc18de08a9325d41f4b2297748222cf320a4fc7ccd5ce34df15a3",
-      "bytes": 28323,
+      "sha256": "e0cd06f1d39fecb5bd65237ce895a1ac1ccbea6b88f8ceb7f898c002a253816f",
+      "bytes": 29330,
       "words": null
     },
     {
@@ -1375,7 +1393,7 @@
     },
     {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "c15ac358584ca1d42b1be3363218e636ccc1773f2e0e04b7ad0efe8fc15aab90",
+      "sha256": "9c5a6e9c3459ed10eafaba4c754e8d21fb41c908bc9a49ea4ac999ca38f2cf0c",
       "bytes": 27216,
       "words": null
     },
@@ -1455,6 +1473,12 @@
       "path": "scripts/verify/validate_dynamic_model.py",
       "sha256": "394126a658fbf3d950fbd7c3b52882371f3a1293ea7d462923129506b063d24c",
       "bytes": 125875,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/workbook_semantic_oracle.py",
+      "sha256": "5c578a70d940ca2662ce65b50adfa11dfff6cf2a4aa05d7789d6bcab29ca5d9d",
+      "bytes": 16940,
       "words": null
     },
     {

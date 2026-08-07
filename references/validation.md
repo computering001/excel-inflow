@@ -456,6 +456,19 @@ families, native Excel iterative restoration, or rendered presentation. It also
 cannot prove that a wrong case input is economically true; evidence intake and
 source reconciliation remain separate gates.
 
+### `verify/workbook_semantic_oracle.py` — independent physical semantic proof
+
+```text
+python3 scripts/verify/workbook_semantic_oracle.py --xlsx <workbook.xlsx> --contract <workbook.xlsx.workbook-proof-contract.json> --out <report.json>
+```
+
+This standard-library-only verifier reads raw OOXML rather than compiler or
+renderer objects. It proves unique answer ownership, independent-writer limits,
+forecast capture membership, parent-before-child hierarchy and statement-to-
+schedule authority direction against the hash-bound proof contract emitted from
+the sealed model IR. A physical mutation to any of those relationships blocks
+publication even when formula caches and headline values still agree.
+
 ### The Python render stage — `render/check_render.py` and `render/selftest.py`
 
 ```text
