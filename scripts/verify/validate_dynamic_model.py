@@ -77,6 +77,10 @@ real time.
     asserts that the emitter chose the RIGHT row to link to; that binding is a
     build-time contract, checked by the row plan and the semantic manifest, not
     by this validator.
+13. `forecast-structural-state` DIRECTLY COMPARES the manifest's declared
+    mechanism with the emitted workbook formula and cache.  It therefore sees
+    the former grey-`=0` defect, but it still depends on the build's manifest to
+    say which rows were intended to be absent.
 """
 
 from __future__ import annotations
@@ -174,6 +178,8 @@ MECHANICAL_ROLES = {
 # 27  independent-solver-parity                same id                 ported
 # 28  native-excel-toggle-restoration          same id                 ported (manual)
 # 29  visual-review                            same id                 ported (manual)
+# 30  formula-complexity-contract              same id                 ported
+# 31  forecast-structural-state                Python independent      added
 #
 # * Re-implemented rather than transliterated, because these two were the paths
 #   an earlier survey of the legacy workbook library surface MISSED.  The survey listed
@@ -195,7 +201,7 @@ MECHANICAL_ROLES = {
 #      font-colour violations across the 6 failing certification cases are this
 #      artefact; every reported address is an empty self-closing cell.  This
 #      port parses the XML properly and reports no violation.
-CHECK_COUNT = 29
+CHECK_COUNT = 31
 
 
 # --------------------------------------------------------------------------
@@ -520,11 +526,12 @@ def main(argv: List[str]) -> int:
         )
     )
 
-    formula_lengths = sorted(
-        len(text)
-        for text in operating_model.formula_cells.values()
+    formula_items = [
+        (address, text)
+        for address, text in operating_model.formula_cells.items()
         if isinstance(text, str) and text.startswith("=")
-    )
+    ]
+    formula_lengths = sorted(len(text) for _, text in formula_items)
     formula_maximum = formula_lengths[-1] if formula_lengths else 0
     formula_p95 = (
         formula_lengths[
@@ -561,6 +568,100 @@ def main(argv: List[str]) -> int:
             "dependencies or orphan material source rows.",
             semantic_artifact_errors[:100],
             violations=len(semantic_artifact_errors),
+        )
+    )
+
+    # --------------------------------------------- forecast-structural-state
+    # This check crosses the sidecar/workbook boundary.  A same-build manifest
+    # can be internally consistent while the emitter writes a different cell;
+    # inspect both formula text and cached value so an intentionally blank grey
+    # row can never silently contain =0 again.
+    structural_state_errors: List[Dict[str, Any]] = []
+    rendered_statement_nodes = [
+        node
+        for node in semantic_manifest.get("nodes") or []
+        if node.get("node_kind") == "statement_row"
+        and node.get("projection_status") == "rendered"
+        and isinstance(node.get("physical_row"), int)
+    ]
+    for node in rendered_statement_nodes:
+        authorities = node.get("forecast_authorities") or []
+        for forecast_index, column in enumerate(FORECAST_COLUMNS):
+            if forecast_index >= len(authorities):
+                continue
+            authority = authorities[forecast_index] or {}
+            mechanism = authority.get("mechanism")
+            address = "%s%s" % (column, node["physical_row"])
+            formula = cell_formula(address)
+            cached = value(address)
+            if mechanism == "uncalculated":
+                if formula not in (None, "") or cached not in (None, ""):
+                    structural_state_errors.append(
+                        {
+                            "id": "uncalculated_cell_not_blank",
+                            "node_id": node.get("node_id"),
+                            "address": address,
+                            "formula": formula,
+                            "cached_value": cached,
+                        }
+                    )
+            elif mechanism == "zero":
+                normalised_formula = re.sub(r"\s+", "", str(formula or ""))
+                if normalised_formula not in ("=0", "=+0", "=0.0") or not equal(
+                    cached, 0, policy.class_for("structural-zero", "currency")
+                ):
+                    structural_state_errors.append(
+                        {
+                            "id": "explicit_zero_cell_mismatch",
+                            "node_id": node.get("node_id"),
+                            "address": address,
+                            "formula": formula,
+                            "cached_value": cached,
+                        }
+                    )
+            if (
+                node.get("formula_authority") == "intentionally_blank"
+                and mechanism != "uncalculated"
+            ):
+                structural_state_errors.append(
+                    {
+                        "id": "intentionally_blank_live_authority",
+                        "node_id": node.get("node_id"),
+                        "address": address,
+                        "mechanism": mechanism,
+                    }
+                )
+
+    def normalised_label(value_to_normalise: Any) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", str(value_to_normalise or "").lower()).strip()
+
+    for section in ("income_statement", "cash_flow"):
+        section_nodes = sorted(
+            [node for node in rendered_statement_nodes if node.get("section") == section],
+            key=lambda node: node["physical_row"],
+        )
+        for current, following in zip(section_nodes, section_nodes[1:]):
+            if (
+                current.get("row_type") == "header"
+                and following.get("row_type") != "header"
+                and normalised_label(current.get("label"))
+                == normalised_label(following.get("label"))
+            ):
+                structural_state_errors.append(
+                    {
+                        "id": "duplicate_header_and_result_label",
+                        "section": section,
+                        "header_node_id": current.get("node_id"),
+                        "result_node_id": following.get("node_id"),
+                    }
+                )
+    checks.append(
+        record(
+            "forecast-structural-state",
+            len(structural_state_errors) == 0,
+            "Forecast absence, explicit zero and duplicate-header declarations match the emitted workbook cells.",
+            structural_state_errors[:100],
+            violations=len(structural_state_errors),
         )
     )
 
@@ -1440,8 +1541,6 @@ def main(argv: List[str]) -> int:
         node
         for node in semantic_manifest["nodes"]
         if node.get("node_kind") == "statement_row"
-        and node.get("row_type") != "uncalculated"
-        and node.get("formula_authority") != "intentionally_blank"
         and node.get("waterfall_stage") in ("pre_debt", "non_rcf_debt")
         and node.get("cash_effect") not in ("none", "balance", None)
     ]
@@ -1451,6 +1550,14 @@ def main(argv: List[str]) -> int:
             item["row"]
             for item in all_statement_rows
             if item.get("semantic_role") == "cash_from_financing"
+        ),
+        None,
+    )
+    cash_operating_subtotal_row = next(
+        (
+            item["row"]
+            for item in all_statement_rows
+            if item.get("semantic_role") == "cash_from_operations"
         ),
         None,
     )
@@ -1466,8 +1573,6 @@ def main(argv: List[str]) -> int:
         node
         for node in semantic_manifest["nodes"]
         if node.get("node_kind") == "statement_row"
-        and node.get("row_type") != "uncalculated"
-        and node.get("formula_authority") != "intentionally_blank"
         and node.get("movement_type") in ("rcf_draw", "rcf_repayment")
     ]
     debt_component_types = {
@@ -1586,11 +1691,6 @@ def main(argv: List[str]) -> int:
 
         for row_id in constituent_row_ids:
             manifest_node = manifest_row_node_by_id.get(row_id) or {}
-            if (
-                manifest_node.get("row_type") == "uncalculated"
-                or manifest_node.get("formula_authority") == "intentionally_blank"
-            ):
-                continue
             movement_type = manifest_node.get("movement_type")
             if movement_type == "rcf_draw":
                 push(row_id, "rcf_draw_waterfall", 1)
@@ -1825,6 +1925,18 @@ def main(argv: List[str]) -> int:
                 path_count = reference_path_count(
                     "%s%s" % (column, cash_investing_subtotal_row), target_address
                 )
+            elif (
+                node.get("cash_flow_classification") == "operating"
+                and cash_operating_subtotal_row
+            ):
+                # Stop at the filed operating-cash subtotal. Traversing beyond
+                # it enters the declared cash/interest circularity and can find
+                # the same financing or FX row again through interest income,
+                # which is not a second cash-flow contribution.
+                path_count = reference_path_count(
+                    "%s%s" % (column, cash_operating_subtotal_row),
+                    target_address,
+                )
             else:
                 bridge_references = same_sheet_references(cell_formula(bridge_address))
                 path_count = sum(
@@ -2054,6 +2166,24 @@ def main(argv: List[str]) -> int:
             - numeric(value("%s%s" % (column, balancing_cash_row))),
         )
         liquidity_class = policy.class_for("liquidity-certification", "currency")
+        shortfall_address = "%s%s" % (
+            column,
+            waterfall_rows.get("liquidity_shortfall"),
+        )
+        visible_shortfall = numeric(value(shortfall_address))
+        if not cell_formula(shortfall_address) or not policy.equal(
+            visible_shortfall, shortfall, liquidity_class
+        ):
+            liquidity_mechanic_errors.append(
+                {
+                    "column": column,
+                    "id": "residual_liquidity_shortfall_not_visible",
+                    "address": shortfall_address,
+                    "visible": visible_shortfall,
+                    "expected": shortfall,
+                    "formula": cell_formula(shortfall_address),
+                }
+            )
         if policy.exceeds(draw, liquidity_class) and policy.exceeds(
             repayment, liquidity_class
         ):

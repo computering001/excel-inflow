@@ -497,8 +497,33 @@ export function validateSemanticArtifacts(manifest, crosswalkRows) {
                 forecast_index: forecastIndex,
               });
             }
+            if (
+              (node.row_type === "uncalculated" ||
+                node.formula_authority === "intentionally_blank") &&
+              authority.mechanism !== "uncalculated"
+            ) {
+              errors.push({
+                id: "manifest.structural_absence_conflict",
+                node_id: node.node_id,
+                forecast_index: forecastIndex,
+                formula_authority: node.formula_authority ?? null,
+                row_type: node.row_type ?? null,
+                actual_mechanism: authority.mechanism ?? null,
+                message:
+                  "A structurally absent forecast row cannot retain a live or zero period authority.",
+              });
+            }
           }
         }
+      }
+      if (
+        node.forecast_capture_parent_id &&
+        node.forecast_capture_parent_id === node.row_id
+      ) {
+        errors.push({
+          id: "manifest.forecast_capture_self_reference",
+          node_id: node.node_id,
+        });
       }
     }
     if (

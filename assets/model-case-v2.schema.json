@@ -725,6 +725,16 @@
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_.-]*$"
         },
+        "forecast_capture_parent_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+          "description": "Economic parent whose live forecast captures this row when the detail is intentionally not forecast separately. This is distinct from presentation hierarchy."
+        },
+        "forecast_capture_note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reviewer-facing rationale for capturing this forecast row in its declared economic parent."
+        },
         "aggregation_role": {
           "enum": ["contributing_child", "working_child", "standalone"],
           "description": "A contributing child feeds a derived parent. A working child is shown beneath a reported parent but must not be counted again."

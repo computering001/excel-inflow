@@ -5,12 +5,12 @@
   "skillVersion": "2.0.7",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T12:31:43.118Z",
+  "generatedAt": "2026-08-07T21:01:40.895Z",
   "centralInstructionsWords": 3867,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "8ae27339934df03af43ce4b385c6561ac1e7c249dc6f932f4b5f4fb903221dea",
+    "currentClosureSha256": "797b0b306380725579ddcb091b8df5b4c3f4e163f881ca651a41747481ae4632",
     "closureFileCount": 95,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -242,20 +242,20 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python",
+      "selected": "python3.12",
       "candidates": [
         {
-          "candidate": "python",
+          "candidate": "python3.12",
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
             "fitz": null,
             "PIL": "12.2.0",
-            "numpy": "2.4.4",
+            "numpy": "2.3.5",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
-            "pypdf": "6.10.2",
-            "reportlab": "4.4.10"
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
           "usable": true,
           "reason": "selected"
@@ -672,7 +672,7 @@
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
     "nodeVersion": "v22.23.2",
-    "pythonExecutable": "python",
+    "pythonExecutable": "python3.12",
     "results": [
       {
         "target": "closure probe",
@@ -794,18 +794,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
-        "plan_sha256": "ff8c3797d918cc1e113c14ea07f3fdf9c4e5c822a4e1cddb7954679babe6f6c1",
-        "workbook_sha256": "e80468b8740b6658b050a8459ec6c4a58a30f32cb5a00554d92ec7a9d762590f",
+        "case_sha256": "cbd6b72a0ab4f896d6ad4ee22b63158fd0e14c1ac15c30ce8738d7b510ff14d1",
+        "plan_sha256": "a769b710b747c76ce6dc84ca7e43150f8ca1ddbe7aef06151652229e3da3f55a",
+        "workbook_sha256": "3b1128ac28b759afafe895febeedd6071bc7d6f15083e68cab13867e34644ce3",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
-      "plan_sha256": "ff8c3797d918cc1e113c14ea07f3fdf9c4e5c822a4e1cddb7954679babe6f6c1",
-      "workbook_sha256": "e80468b8740b6658b050a8459ec6c4a58a30f32cb5a00554d92ec7a9d762590f",
+      "case_sha256": "cbd6b72a0ab4f896d6ad4ee22b63158fd0e14c1ac15c30ce8738d7b510ff14d1",
+      "plan_sha256": "a769b710b747c76ce6dc84ca7e43150f8ca1ddbe7aef06151652229e3da3f55a",
+      "workbook_sha256": "3b1128ac28b759afafe895febeedd6071bc7d6f15083e68cab13867e34644ce3",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -925,8 +925,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "2e49ba7bca837077b8b6d49785ddcc8164b2ba1871472cf1761d0a3b4a02a717",
-      "bytes": 47834,
+      "sha256": "76939435745c30c409c6ea446f678ab0cf35457c50f7e23b8b0a1d8ed202e4e9",
+      "bytes": 48363,
       "words": null
     },
     {
@@ -979,14 +979,14 @@
     },
     {
       "path": "assets/style-tokens.json",
-      "sha256": "d49606cae398ba76777fff1045845ac876e9b4636f487af79d567622e1ba13a6",
-      "bytes": 35251,
+      "sha256": "54f50a8c1ea89ff8de450946f3646d3e0eff48a076e63fec125390d2f1d55c9b",
+      "bytes": 35221,
       "words": null
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "6f40e528c7b8479025e9b8d333a5eca4da0b720f2453a44a2d21d581137db0d2",
-      "bytes": 457175,
+      "sha256": "04e0b23164733d8420ec018e552c2e32e242f35812deec780912861c0738f414",
+      "bytes": 464426,
       "words": null
     },
     {
@@ -1147,8 +1147,8 @@
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "8f80f7ccca09b10a5d5c521b5be200b806da46e16bb68d1e0e4ce84782d0b433",
-      "bytes": 22832,
+      "sha256": "11fb51290f2b73f23acd24eebebf5e0ee409331390551aa97108e617e55710b7",
+      "bytes": 25564,
       "words": null
     },
     {
@@ -1189,8 +1189,8 @@
     },
     {
       "path": "scripts/lib/plan_values.mjs",
-      "sha256": "e332e74c7eb6d461fbb28510714acd8f92c504cd15aa62a32ecc733ce491ec48",
-      "bytes": 21083,
+      "sha256": "9169870517441ab1d56129df5b42e75d355560ae04884bda4a3c6cd5881d19ef",
+      "bytes": 21922,
       "words": null
     },
     {
@@ -1231,8 +1231,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "eea19f1f34747bb56ad449d21ee288256597bd813ba0561a5ee033ae0e4f6d90",
-      "bytes": 101602,
+      "sha256": "aff953d5dd992e95fbe7e6ec40903a06548fe1c99b38fdf673cdbeac7614874e",
+      "bytes": 112362,
       "words": null
     },
     {
@@ -1255,14 +1255,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "82f328e0e74090030fb29c128796e59928ff42e1d8961d12046f3acd7da71c89",
-      "bytes": 39339,
+      "sha256": "01dcd3f913d1cc0ac211a55b0e03f2c9043eaafab20416ae749287afbbbb9c40",
+      "bytes": 40415,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "4e87725faa6a1ae8bac2445da43606a0a8cb6dc7ecdd183956121fb005ed65aa",
-      "bytes": 108950,
+      "sha256": "5ca40c7bd0d62c94cb112aed20322eedc78749844afd1d8fccb4baf96fdae63f",
+      "bytes": 108111,
       "words": null
     },
     {
@@ -1273,8 +1273,8 @@
     },
     {
       "path": "scripts/lib/statement_topology.mjs",
-      "sha256": "51ef62cfb92bc84e64b8359c4af056c12fa59b14129789177740129a4409d546",
-      "bytes": 15426,
+      "sha256": "842a78b39507d0eb62456cb64e3f4905840555fba8de7974ad798d92a5b9099d",
+      "bytes": 16285,
       "words": null
     },
     {
@@ -1285,8 +1285,8 @@
     },
     {
       "path": "scripts/lib/validation_invariants.mjs",
-      "sha256": "cd5d96a1d527f1be1bb21dcfe577132f4048958d23fbe7108928519c0b93ffd0",
-      "bytes": 37808,
+      "sha256": "eea3df79aca4c609ab0667300137d6d51784bb4f12cb5d8334376fa42e3da7d9",
+      "bytes": 38780,
       "words": null
     },
     {
@@ -1375,8 +1375,8 @@
     },
     {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "f04473870b09c507f1d375980a4f0a25158664f58a780d87521046be12dd69aa",
-      "bytes": 23860,
+      "sha256": "c15ac358584ca1d42b1be3363218e636ccc1773f2e0e04b7ad0efe8fc15aab90",
+      "bytes": 27216,
       "words": null
     },
     {
@@ -1429,8 +1429,8 @@
     },
     {
       "path": "scripts/verify/invariants.py",
-      "sha256": "6291e006dc82cbfde484caa8a8b8435e046479b6b8ded312965f93ce32c907ec",
-      "bytes": 35520,
+      "sha256": "46af8015d451e251afc05afc2dbf210a32f9382e05119d7f57b2fe13eae0d4da",
+      "bytes": 37010,
       "words": null
     },
     {
@@ -1453,14 +1453,14 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "f14ae74b675deaf581ed4755d8213b5622d1a26ee01e3a2054e4fe8643251864",
-      "bytes": 119934,
+      "sha256": "394126a658fbf3d950fbd7c3b52882371f3a1293ea7d462923129506b063d24c",
+      "bytes": 125875,
       "words": null
     },
     {
       "path": "scripts/verify/xlsx.py",
-      "sha256": "31ce9fa2113f7b02039ce237940515273c3968866323c1691cd7d5ba07b9e812",
-      "bytes": 19493,
+      "sha256": "5ac640ea60b8b93432f6f4702f82ca844130a555c6db4078ab915ab0df9d4fad",
+      "bytes": 20330,
       "words": null
     },
     {

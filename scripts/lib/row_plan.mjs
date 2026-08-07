@@ -616,6 +616,8 @@ function resetCompiledPresentationMetadata(rows) {
   for (const row of rows) {
     row.indent = 0;
     row.outline_level = 0;
+    delete row.projection_origin;
+    delete row.projection_required_by;
   }
 }
 
@@ -636,26 +638,11 @@ function resetCompiledPresentationMetadata(rows) {
 //                 commercial paper and other debt movements.
 // ---------------------------------------------------------------------------
 
-const WORKING_CAPITAL_LABEL_PATTERNS = [
-  /receivab/i,
-  /inventor/i,
-  /\bpayab/i,
-  /accrued/i,
-  // "Income Taxes" as a movement line — deliberately anchored so it cannot
-  // swallow "Deferred Income Tax Benefit", which is a non-cash add-back.
-  /^\(?\s*(net\s+)?(changes?\s+in\s+)?income\s+taxe?s?\s*\)?$/i,
-  /\btaxes?\s+(payable|receivable)\b/i,
-  /working[ -]capital/i,
-  /\bother\s+(current\s+)?(assets|liabilities)\b/i,
-  /\bprepaid\b/i,
-  /\bcontract\s+(assets|liabilities)\b/i,
-];
-
 /**
  * A working-capital constituent is an operating-section input the company
  * reported as one of the movements a broker would net into one line. Detection
- * is structural first (row_id namespace, declared movement type) and falls back
- * to the reported label, so a case does not have to hand-tag every row.
+ * is semantic only: high-impact cash-flow classification must be declared by
+ * the evidence adapter and must never be inferred from a convenient caption.
  */
 function isWorkingCapitalConstituent(row) {
   if (row.economic_class !== undefined) {
@@ -663,11 +650,75 @@ function isWorkingCapitalConstituent(row) {
   }
   if (row.movement_type === "working_capital_movement") return true;
   if (/^working_capital[_.]/.test(String(row.row_id ?? ""))) return true;
-  if (row.row_type !== "input") return false;
-  if (row.semantic_role) return false;
-  return WORKING_CAPITAL_LABEL_PATTERNS.some((pattern) =>
-    pattern.test(String(row.label ?? "")),
-  );
+  return false;
+}
+
+/**
+ * Move a row into the one legal "captured by parent" forecast state.
+ *
+ * Several compiler passes used to set only `forecast_treatment`, leaving an
+ * earlier `forecast_period_authorities` array behind.  The style pass then saw
+ * an uncalculated row while the formula pass saw an explicit zero.  Centralise
+ * the transition so no pass can create that split-brain state again.
+ */
+function markForecastCapturedBy(row, parentRowId, note) {
+  row.forecast_treatment = "uncalculated";
+  row.formula_authority = "intentionally_blank";
+  row.forecast_capture_parent_id = parentRowId;
+  row.forecast_capture_note = note;
+  delete row.broker_metric_id;
+  delete row.forecast_calculation;
+  delete row.forecast_period_calculations;
+  delete row.forecast_period_authorities;
+}
+
+function clearCompiledForecastOverride(row) {
+  delete row.forecast_period_authorities;
+  delete row.forecast_capture_parent_id;
+  delete row.forecast_capture_note;
+  if (row.formula_authority === "intentionally_blank") {
+    delete row.formula_authority;
+  }
+}
+
+/**
+ * A reported parent can legitimately combine working capital with unrelated
+ * non-cash operating adjustments.  It cannot then be re-labelled and forecast
+ * from the narrower broker "change in working capital" metric.  Split the
+ * economic scopes before hierarchy suppression runs: the reported broad total
+ * becomes a derived total, and the working-capital subset receives its own
+ * homogeneous compiler parent later in `consolidateConstituents`.
+ */
+function splitHeterogeneousWorkingCapitalParents(rows) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  for (const parent of rows) {
+    if (parent.semantic_role !== "change_in_working_capital") continue;
+    const declaredIds = rows
+      .filter((row) => row.parent_row_id === parent.row_id)
+      .map((row) => row.row_id);
+    const childIds = declaredIds.length > 0
+      ? declaredIds
+      : [...(parent.calculation?.refs ?? [])];
+    const children = childIds.map((id) => byId.get(id)).filter(Boolean);
+    const workingCapital = children.filter(isWorkingCapitalConstituent);
+    const other = children.filter((row) => !isWorkingCapitalConstituent(row));
+    if (workingCapital.length === 0 || other.length === 0) continue;
+
+    parent.semantic_role = "operating_adjustments_total";
+    parent.row_type = "subtotal";
+    parent.historical_authority = "reported_total_reconciled";
+    parent.aggregation_authority = "derived_from_children";
+    parent.forecast_treatment = "formula";
+    parent.style_role = "subsection";
+    parent.calculation = { operator: "sum", refs: [...childIds] };
+    delete parent.broker_metric_id;
+    delete parent.forecast_calculation;
+    delete parent.forecast_period_calculations;
+    clearCompiledForecastOverride(parent);
+    for (const child of children) {
+      child.aggregation_role = "contributing_child";
+    }
+  }
 }
 
 /**
@@ -690,9 +741,11 @@ function applyStatementHierarchy(rows) {
       parent.aggregation_authority === "reported_parent" &&
       row.aggregation_role === "working_child"
     ) {
-      row.forecast_treatment = "uncalculated";
-      delete row.forecast_calculation;
-      delete row.forecast_period_calculations;
+      markForecastCapturedBy(
+        row,
+        parent.row_id,
+        `Forecast detail is captured by reported parent ${parent.label}.`,
+      );
     }
   }
 }
@@ -838,11 +891,11 @@ function greyDebtChangeConstituents(rows, consolidated) {
   const refs = new Set(consolidated.calculation?.refs ?? []);
   for (const row of rows) {
     if (!refs.has(row.row_id)) continue;
-    row.forecast_treatment = "uncalculated";
-    // A forecast calculation left on the row would out-rank the n/a treatment
-    // in the emitter and put a live formula back on a greyed line.
-    delete row.forecast_calculation;
-    delete row.forecast_period_calculations;
+    markForecastCapturedBy(
+      row,
+      consolidated.row_id,
+      `Forecast debt movement is captured by ${consolidated.label} and the debt schedule.`,
+    );
   }
 }
 
@@ -947,6 +1000,7 @@ function consolidateConstituents(rows, spec) {
       );
     }) ??
     null;
+  const adoptedIssuerParent = consolidated !== null;
 
   if (consolidated) {
     consolidated.semantic_role = spec.semantic_role;
@@ -966,8 +1020,15 @@ function consolidateConstituents(rows, spec) {
     }
   } else {
     const constituentIds = constituents.map((row) => row.row_id);
+    const occupiedIds = new Set(rows.map((row) => row.row_id));
+    let compiledRowId = spec.row_id;
+    let suffix = 1;
+    while (occupiedIds.has(compiledRowId)) {
+      compiledRowId = `${spec.row_id}_compiled${suffix === 1 ? "" : `_${suffix}`}`;
+      suffix += 1;
+    }
     consolidated = {
-      row_id: spec.row_id,
+      row_id: compiledRowId,
       label: spec.label,
       row_type: "subtotal",
       calculation: { operator: "sum", refs: [...constituentIds] },
@@ -978,6 +1039,11 @@ function consolidateConstituents(rows, spec) {
     rows.splice(rows.indexOf(constituents[0]), 0, consolidated);
   }
 
+  // Whether adopted from the filing or inserted by the compiler, a
+  // consolidated parent is a subtotal because its declared child graph—not a
+  // caption-specific headline list—owns its prominence and indentation.
+  consolidated.row_type = "subtotal";
+
   // Presentation rank is a compiler decision, not a property inherited from
   // whichever issuer row happened to be adopted. This keeps an adopted Change
   // in Debt visually equivalent to an inserted one and prevents a reported
@@ -985,6 +1051,12 @@ function consolidateConstituents(rows, spec) {
   // a total.
   if (spec.presentation_style_role) {
     consolidated.style_role = spec.presentation_style_role;
+  }
+  if (
+    spec.aggregation_authority &&
+    (!adoptedIssuerParent || !consolidated.aggregation_authority)
+  ) {
+    consolidated.aggregation_authority = spec.aggregation_authority;
   }
 
   // A consolidated line is the parent of its workings, so present it before
@@ -1015,6 +1087,18 @@ function consolidateConstituents(rows, spec) {
   // Constituents stay on the face, one level in from the consolidated line.
   for (const row of constituents) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
+    if (spec.captureForecastInParent) {
+      row.parent_row_id = consolidated.row_id;
+      row.aggregation_role =
+        consolidated.aggregation_authority === "reported_parent"
+          ? "working_child"
+          : "contributing_child";
+      markForecastCapturedBy(
+        row,
+        consolidated.row_id,
+        `Forecast detail is captured by ${consolidated.label}.`,
+      );
+    }
   }
 
   // Any other total that summed the constituents directly now sums the
@@ -1035,32 +1119,108 @@ function consolidateConstituents(rows, spec) {
   return consolidated;
 }
 
-/**
- * Ordinary income-statement components sit one level inside the statement
- * spine.  The spine itself is semantic: headers, totals and subsection/ratio
- * readings stay flush left; everything else is a component whether the issuer
- * calls it distribution expense, impairment, restructuring, or something the
- * taxonomy has never seen before.  Existing deeper issuer hierarchy remains a
- * floor, so this normalises presentation without flattening bespoke detail.
- */
-function normaliseIncomeStatementIndent(rows) {
-  for (const row of rows) {
-    const isSpine =
-      row.row_type === "header" ||
-      row.style_role === "header" ||
-      row.style_role === "total" ||
-      row.style_role === "subsection";
-    if (isSpine) continue;
-    row.indent = Math.max(1, Number(row.indent ?? 0));
-  }
-}
-
 function sourceOwnedRowIds(modelCase, section) {
   return new Set(
     (modelCase.source_coverage?.[section] ?? []).flatMap(
       (source) => source.mapped_row_ids ?? [],
     ),
   );
+}
+
+function statementRules(row) {
+  return [
+    row.calculation,
+    row.forecast_calculation,
+    ...(row.forecast_period_calculations ?? []),
+  ].filter(Boolean);
+}
+
+/**
+ * Remove a compiler-only pass-through row when it carries no economic fact of
+ * its own. Two source-owned rows remain evidence and therefore block as an
+ * ambiguity; an unsourced one-reference alias can be substituted by its target
+ * without changing history, forecast mechanics or meaning.
+ *
+ * This closes the generic failure that left a second EBIT, PBT or cash-flow
+ * root on the face merely because a reconciliation block happened to contain
+ * it. The rule has no metric names, issuer captions or physical row numbers.
+ */
+function collapseRedundantStatementAliases(modelCase, section, rows) {
+  const sourceOwned = sourceOwnedRowIds(modelCase, section);
+  const isSourceOwned = (row) =>
+    sourceOwned.has(row.row_id) ||
+    (Array.isArray(row.source_line_ids) && row.source_line_ids.length > 0);
+  const history = (row) => (row.values ?? []).slice(0, 3);
+  const sameHistory = (left, right) => {
+    const leftHistory = history(left);
+    if (!leftHistory.some((value) => Number.isFinite(Number(value)))) return true;
+    const rightHistory = history(right);
+    return leftHistory.every((value, index) => {
+      if (!Number.isFinite(Number(value))) return true;
+      return (
+        Number.isFinite(Number(rightHistory[index])) &&
+        Math.abs(Number(value) - Number(rightHistory[index])) <= 1e-9
+      );
+    });
+  };
+  const replaceReference = (fromId, toId) => {
+    for (const row of rows) {
+      for (const rule of statementRules(row)) {
+        if (!Array.isArray(rule.refs)) continue;
+        rule.refs = rule.refs.map((ref) => (ref === fromId ? toId : ref));
+      }
+      if (row.parent_row_id === fromId) row.parent_row_id = toId;
+      if (row.forecast_capture_parent_id === fromId) {
+        row.forecast_capture_parent_id = toId;
+      }
+    }
+  };
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const byId = new Map(rows.map((row) => [row.row_id, row]));
+    for (const row of rows) {
+      if (
+        row.row_type === "header" ||
+        isSourceOwned(row) ||
+        rows.some((candidate) => candidate.parent_row_id === row.row_id)
+      ) {
+        continue;
+      }
+      const link = row.calculation;
+      if (link?.operator !== "link" || link.refs?.length !== 1) continue;
+      const target = byId.get(link.refs[0]);
+      if (!target || target === row || !sameHistory(row, target)) continue;
+      if (
+        row.semantic_role &&
+        target.semantic_role &&
+        row.semantic_role !== target.semantic_role
+      ) {
+        continue;
+      }
+      const forecastRules = [
+        row.forecast_calculation,
+        ...(row.forecast_period_calculations ?? []),
+      ].filter(Boolean);
+      if (
+        forecastRules.some(
+          (rule) =>
+            rule.operator !== "link" ||
+            rule.refs?.length !== 1 ||
+            rule.refs[0] !== target.row_id,
+        ) ||
+        row.broker_metric_id ||
+        ["broker", "hardcode", "zero"].includes(row.forecast_treatment)
+      ) {
+        continue;
+      }
+      replaceReference(row.row_id, target.row_id);
+      rows.splice(rows.indexOf(row), 1);
+      changed = true;
+      break;
+    }
+  }
 }
 
 function cashFlowIncomeRootKind(row) {
@@ -1246,14 +1406,29 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
 
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const required = new Set();
-  const requiredPostNetRoles = new Set([
+  const representedBeforeNet = new Set(
+    rows
+      .slice(0, netIncomeIndex + 1)
+      .map((row) => row.semantic_role)
+      .filter(Boolean),
+  );
+  // Economic outputs are retained only when the issuer's main statement path
+  // has not already supplied them. Contributors and aliases are then pulled in
+  // strictly through dependency closure; resembling a familiar bridge line is
+  // not, by itself, a reason to render a row.
+  const requiredOutputRoles = new Set([
     "adjusted_ebitda",
     "depreciation_and_amortisation",
-    "recurring_disclosed_adjustments",
-    "ebit",
   ]);
   for (const row of rows.slice(netIncomeIndex + 1)) {
-    if (requiredPostNetRoles.has(row.semantic_role)) required.add(row.row_id);
+    if (
+      requiredOutputRoles.has(row.semantic_role) &&
+      !representedBeforeNet.has(row.semantic_role)
+    ) {
+      required.add(row.row_id);
+      row.projection_origin = "required_economic_output";
+      row.projection_required_by = "debt_overlay_contract";
+    }
   }
   for (const row of modelCase.statement_structure?.cash_flow ?? []) {
     for (const rule of [
@@ -1262,7 +1437,12 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
       ...(row.forecast_period_calculations ?? []),
     ]) {
       for (const ref of rule?.refs ?? []) {
-        if (byId.has(ref)) required.add(ref);
+        if (byId.has(ref)) {
+          required.add(ref);
+          const dependency = byId.get(ref);
+          dependency.projection_origin ??= "downstream_dependency";
+          dependency.projection_required_by ??= row.row_id;
+        }
       }
     }
   }
@@ -1281,8 +1461,40 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
       for (const ref of rule?.refs ?? []) {
         if (!byId.has(ref) || required.has(ref)) continue;
         required.add(ref);
+        const dependency = byId.get(ref);
+        dependency.projection_origin ??= "dependency_closure";
+        dependency.projection_required_by ??= row.row_id;
         queue.push(ref);
       }
+    }
+  }
+
+  // Keep reviewer-facing ratios or growth rows that are pure dependants of a
+  // required post-net bridge answer.  This is a forward display closure, not a
+  // license to retain the source block: every reference must already survive,
+  // and at least one must be a required post-net node.
+  const preNetIds = new Set(
+    rows.slice(0, netIncomeIndex + 1).map((row) => row.row_id),
+  );
+  let addedDisplayDependent = true;
+  while (addedDisplayDependent) {
+    addedDisplayDependent = false;
+    for (const row of rows.slice(netIncomeIndex + 1)) {
+      if (required.has(row.row_id)) continue;
+      const calculation = row.calculation;
+      const refs = calculation?.refs ?? [];
+      if (
+        !["ratio", "negated_ratio", "growth"].includes(calculation?.operator) ||
+        refs.length === 0 ||
+        !refs.some((ref) => required.has(ref)) ||
+        !refs.every((ref) => required.has(ref) || preNetIds.has(ref))
+      ) {
+        continue;
+      }
+      required.add(row.row_id);
+      row.projection_origin = "derived_display";
+      row.projection_required_by = refs.find((ref) => required.has(ref)) ?? null;
+      addedDisplayDependent = true;
     }
   }
 
@@ -1290,17 +1502,21 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
   const tail = rows.slice(netIncomeIndex + 1);
   const retainedTail = [];
   for (let index = 0; index < tail.length; ) {
-    const headerIndex = tail[index].row_type === "header" ? index : -1;
+    const hasHeader = tail[index].row_type === "header";
     let end = index + 1;
     while (end < tail.length && tail[end].row_type !== "header") end += 1;
     const block = tail.slice(index, end);
-    const keepBlock = block.some((row) => required.has(row.row_id));
-    if (keepBlock) {
-      retainedTail.push(...block);
-    } else if (headerIndex < 0) {
-      // Headerless post-net rows are kept only when the dependency graph named
-      // them; ownership splits and per-share rows therefore disappear cleanly.
-      retainedTail.push(...block.filter((row) => required.has(row.row_id)));
+    const requiredRows = block.filter((row) => required.has(row.row_id));
+    if (requiredRows.length > 0) {
+      // A header owns presentation only.  Retaining one required bridge row
+      // must not drag every unrelated row in the same source block (OCI,
+      // attribution, EPS, dividends) back onto the debt-overlay face.
+      if (hasHeader) {
+        block[0].projection_origin = "required_block_header";
+        block[0].projection_required_by = requiredRows[0].row_id;
+        retainedTail.push(block[0]);
+      }
+      retainedTail.push(...requiredRows);
     }
     index = end;
   }
@@ -1348,8 +1564,10 @@ function applyBrokerAnchorRule(modelCase, rows) {
   if (!plan) return null;
   const { selection, bridge, residualPlugRowIds } = plan;
   const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const canonicalEbitRow =
+    rows.find((row) => row.semantic_role === "ebit") ?? bridge.ebitRow;
   const rowForMetric = {
-    ebit: bridge.ebitRow,
+    ebit: canonicalEbitRow,
     adjusted_ebitda: bridge.ebitdaRow,
     depreciation_and_amortisation: bridge.daRow,
   };
@@ -1360,6 +1578,7 @@ function applyBrokerAnchorRule(modelCase, rows) {
   //    that only ever mapped one of the three to its pack still anchors on two.
   for (const metricId of selection.anchors) {
     const row = rowForMetric[metricId];
+    clearCompiledForecastOverride(row);
     row.forecast_treatment = "broker";
     row.broker_metric_id = metricId;
     delete row.forecast_calculation;
@@ -1370,6 +1589,7 @@ function applyBrokerAnchorRule(modelCase, rows) {
   //    bridge. EBITDA is the bridge subtotal; EBIT is the bridge rearranged,
   //    "Adjusted EBITDA less D&A and every disclosed addback".
   const derivedMetricRow = rowForMetric[selection.derived];
+  clearCompiledForecastOverride(derivedMetricRow);
   delete derivedMetricRow.broker_metric_id;
   derivedMetricRow.forecast_treatment = "formula";
   if (selection.derived === "adjusted_ebitda") {
@@ -1393,6 +1613,7 @@ function applyBrokerAnchorRule(modelCase, rows) {
     delete derivedMetricRow.forecast_period_calculations;
     const bridgeTerm = byId.get(bridge.ebitTerm);
     if (bridgeTerm && bridgeTerm.row_id !== derivedMetricRow.row_id) {
+      clearCompiledForecastOverride(bridgeTerm);
       delete bridgeTerm.broker_metric_id;
       bridgeTerm.forecast_treatment = "formula";
       bridgeTerm.forecast_calculation = {
@@ -1401,6 +1622,23 @@ function applyBrokerAnchorRule(modelCase, rows) {
       };
       delete bridgeTerm.forecast_period_calculations;
     }
+  }
+
+  // A filing can repeat EBIT in the statement and again in the EBITDA bridge.
+  // There is one economic answer: the earliest visible EBIT row. Every later
+  // presentation links to it, regardless of which headline broker series won.
+  for (const repeatedEbit of rows.filter(
+    (row) =>
+      row.semantic_role === "ebit" && row.row_id !== canonicalEbitRow.row_id,
+  )) {
+    clearCompiledForecastOverride(repeatedEbit);
+    delete repeatedEbit.broker_metric_id;
+    repeatedEbit.forecast_treatment = "formula";
+    repeatedEbit.forecast_calculation = {
+      operator: "link",
+      refs: [canonicalEbitRow.row_id],
+    };
+    delete repeatedEbit.forecast_period_calculations;
   }
 
   // 3. THE PLUG GOES BACK TO BEING AN INPUT. The row keeps its history and its
@@ -1450,7 +1688,8 @@ function applyAnchoredSlimForecast(rows, anchorSelection) {
   const ebitIndex = rows.findIndex((row) => row.semantic_role === "ebit");
   if (revenueIndex < 0 || ebitIndex < 0 || revenueIndex >= ebitIndex) return;
   const revenueId = rows[revenueIndex].row_id;
-  const keepLive = new Set([revenueId, rows[ebitIndex].row_id]);
+  const ebitId = rows[ebitIndex].row_id;
+  const keepLive = new Set([revenueId, ebitId]);
   for (const row of rows) {
     if (
       [
@@ -1466,13 +1705,21 @@ function applyAnchoredSlimForecast(rows, anchorSelection) {
   // Preserve the complete dependency closure of the selected headline
   // identity even when an issuer lays its EBITDA bridge above statement EBIT.
   const byId = new Map(rows.map((row) => [row.row_id, row]));
-  const queue = [...keepLive];
+  // Walk the FORECAST graph, not the historical calculation graph. Revenue's
+  // filed component sum is historical evidence; traversing it here kept every
+  // product/geography line live in forecast and defeated the slim overlay.
+  const queue = [...keepLive].filter((rowId) => rowId !== revenueId);
   while (queue.length > 0) {
     const row = byId.get(queue.pop());
-    for (const ref of [
-      ...(row?.calculation?.refs ?? []),
-      ...(row?.forecast_calculation?.refs ?? []),
-    ]) {
+    const periodRules = (row?.forecast_period_calculations ?? []).filter(Boolean);
+    const forecastRules = periodRules.length > 0
+      ? periodRules
+      : row?.forecast_calculation
+        ? [row.forecast_calculation]
+        : row?.forecast_treatment === "formula"
+          ? [row.calculation]
+          : [];
+    for (const ref of forecastRules.flatMap((rule) => rule?.refs ?? [])) {
       if (!byId.has(ref) || keepLive.has(ref)) continue;
       keepLive.add(ref);
       queue.push(ref);
@@ -1490,11 +1737,31 @@ function applyAnchoredSlimForecast(rows, anchorSelection) {
   for (let index = 0; index < ebitIndex; index += 1) {
     const row = rows[index];
     if (row.row_type === "header" || keepLive.has(row.row_id)) continue;
-    row.forecast_treatment = "uncalculated";
-    row.formula_authority = "intentionally_blank";
-    delete row.broker_metric_id;
-    delete row.forecast_calculation;
-    delete row.forecast_period_calculations;
+    const parentId = index < revenueIndex ? revenueId : ebitId;
+    const parent = byId.get(parentId);
+    markForecastCapturedBy(
+      row,
+      parentId,
+      `Forecast detail is captured by ${parent?.label ?? parentId}.`,
+    );
+  }
+}
+
+function removeRedundantDuplicateHeaders(rows) {
+  const normalise = (value) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  for (let index = rows.length - 2; index >= 0; index -= 1) {
+    const header = rows[index];
+    if (header.row_type !== "header") continue;
+    const next = rows[index + 1];
+    if (next?.row_type === "header") continue;
+    if (normalise(header.label) === normalise(next?.label)) {
+      rows.splice(index, 1);
+    }
   }
 }
 
@@ -1508,6 +1775,7 @@ export function normaliseStatementRows(modelCase, section) {
       );
   resetCompiledPresentationMetadata(rows);
   repairStatementSourceOrder(modelCase, section, rows);
+  splitHeterogeneousWorkingCapitalParents(rows);
   applyStatementHierarchy(rows);
   // Older mapped cases may preserve a source label but carry no semantic role.
   // Adopt only the classifier's high-confidence cash-interest roles here; an
@@ -1527,6 +1795,7 @@ export function normaliseStatementRows(modelCase, section) {
           "cash_interest_paid",
           "cash_interest_received",
           "net_finance_addback",
+          "cash_taxes",
         ].includes(
           classification.classified_role,
         )
@@ -1536,6 +1805,7 @@ export function normaliseStatementRows(modelCase, section) {
     }
   }
   if (section === "income_statement") {
+    collapseRedundantStatementAliases(modelCase, section, rows);
     projectIncomeStatementToDebtOverlay(modelCase, rows);
     const anchorSelection = applyBrokerAnchorRule(modelCase, rows);
     applyAnchoredSlimForecast(rows, anchorSelection);
@@ -1612,8 +1882,11 @@ export function normaliseStatementRows(modelCase, section) {
       extra: {
         broker_metric_id: "change_in_working_capital",
         forecast_treatment: "broker",
+        aggregation_authority: "derived_from_children",
       },
       presentation_style_role: "subsection",
+      aggregation_authority: "derived_from_children",
+      captureForecastInParent: true,
     });
 
     // DYNAMIC 2 — Change in Debt. Same shape: additions, repayments, issuance
@@ -1639,12 +1912,12 @@ export function normaliseStatementRows(modelCase, section) {
   // lines remain only when the issuer's own statement contains them.
   // Last, so it sees the final row order: every parent that sums the run
   // beneath it indents and groups that run.
+  removeRedundantDuplicateHeaders(rows);
   if (section === "cash_flow") groupSubtotalRuns(rows);
   // Later still, so every row the consolidation dynamics added or re-pointed is
   // levelled off the FINAL ref graph, and no label is left carrying its indent
   // as content.
   deriveIndentLevels(rows, section);
-  if (section === "income_statement") normaliseIncomeStatementIndent(rows);
   stripLabelIndentSpaces(rows);
   assertUniqueStatementDependencies(rows, section);
   return rows;
@@ -1967,20 +2240,24 @@ export function compileRowPlan(modelCase) {
     incremental_rate: 9,
     close_year: 10,
     close_month: 11,
+    // Two visible, period-specific helper rows replace repeated close-date and
+    // target-growth expressions in every acquisition formula. They occupy the
+    // former blank rows above the period header, so statement geometry does not
+    // move and no hidden calculation block is introduced.
+    acquisition_operating_fraction: 12,
+    acquisition_full_year_ebitda: 13,
     // Growth, margin, D&A, tax, capex and working-capital ratios are DERIVED
     // from the standalone case in the adjustment columns — a ratio line
     // beneath the row it drives — so declaring them again as transaction
     // inputs would duplicate the model against itself.
   };
-  // The control block ends on `close_month`, the last acquisition input. The
-  // gap to the period header is DERIVED from that row rather than typed, so it
-  // cannot drift the moment a control is added or removed. It used to be eight
-  // blank rows — a screen of nothing between the block a reader sets and the
-  // grid it drives. Two is the separation used everywhere else in the sheet.
+  // Rows 12-13 are now visible acquisition helpers, using the former two-row
+  // gap. The period header therefore follows immediately after the helper
+  // block and remains on the same physical row as the frozen authorities.
   const controlBlockEndRow = Math.max(
     ...Object.values(controls).map(Number).filter(Number.isFinite),
   );
-  const BLANK_ROWS_BEFORE_PERIOD_HEADER = 2;
+  const BLANK_ROWS_BEFORE_PERIOD_HEADER = 0;
   const periodGroupRow = controlBlockEndRow + BLANK_ROWS_BEFORE_PERIOD_HEADER + 1;
   const periodRow = periodGroupRow + 1;
   // One blank row separates the period header from the first section band.
@@ -2268,6 +2545,9 @@ export function compileRowPlan(modelCase) {
     "gross_debt_excluding_leases",
     "lease_header",
     "lease_liability",
+    ...(leasesPresent
+      ? ["lease_principal_assumption", "lease_additions_assumption"]
+      : []),
     ...(leaseInterestBasis === "separately_supplied"
       ? ["lease_interest_bearing_liability"]
       : []),
@@ -2393,6 +2673,7 @@ export function compileRowPlan(modelCase) {
     "rcf_draw_waterfall",
     "rcf_repayment_waterfall",
     "ending_rcf",
+    "liquidity_shortfall",
   ]) {
     waterfallRows[id] = cursor;
     rowsById[id] = cursor;

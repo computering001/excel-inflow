@@ -21,7 +21,7 @@
  *
  * THE SCOPE IS DELIBERATELY CLOSED. This is not a spreadsheet engine and must
  * never grow into one. It evaluates the vocabulary this emitter actually
- * writes — IF, IFERROR, SUM, MIN, MAX, ROUND, arithmetic, comparison,
+ * writes — IF, IFERROR, SUM, MIN, MAX, ROUND, ABS, DATE, arithmetic, comparison,
  * concatenation, cell and range references including cross-sheet ones — and
  * REFUSES anything else by name. A formula it does not understand is reported,
  * not guessed at: a wrong cached value is worse than an absent one, because a
@@ -74,7 +74,7 @@ function columnNameOf(number) {
 // Tokeniser
 // ---------------------------------------------------------------------------
 
-const FUNCTIONS = new Set(["IF", "IFERROR", "SUM", "MIN", "MAX", "ROUND"]);
+const FUNCTIONS = new Set(["IF", "IFERROR", "SUM", "MIN", "MAX", "ROUND", "ABS", "DATE"]);
 
 // A reference, with an optional quoted sheet name and an optional second
 // corner. `$` is anchoring and carries no meaning once the formula is written.
@@ -485,6 +485,21 @@ class Evaluator {
     if (name === "IFERROR") {
       const value = this.evaluate(args[0], sheetName);
       return isError(value) ? this.evaluate(args[1], sheetName) : value;
+    }
+    if (name === "DATE") {
+      const evaluated = args.map((argument) => toNumber(this.evaluate(argument, sheetName)));
+      const error = evaluated.find((value) => isError(value));
+      if (error) return error;
+      const [year, month, day] = evaluated.map((value) => Math.trunc(value));
+      if (![year, month, day].every(Number.isFinite)) return VALUE;
+      // Excel's 1900 date system uses 1899-12-30 as its serial epoch. Date.UTC
+      // deliberately supplies Excel's month/day rollover behaviour as well, so
+      // DATE(2026,13,1) and DATE(2026,1,32) remain deterministic.
+      return Date.UTC(year, month - 1, day) / 86_400_000 + 25_569;
+    }
+    if (name === "ABS") {
+      const value = toNumber(this.evaluate(args[0], sheetName));
+      return isError(value) ? value : Math.abs(value);
     }
     // SUM, MIN and MAX take ranges and ignore text, blanks and booleans inside
     // them — Excel's own rule, and the one that keeps a label in a summed

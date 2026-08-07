@@ -146,10 +146,35 @@ function mappedCoverageRows(modelCase, row) {
  * those children remain material even when their forecast is captured by the
  * parent rather than forecast separately.
  */
-export function forecastRowMateriality(modelCase, row) {
+export function forecastRowMateriality(modelCase, row, seen = new Set()) {
   const mapped = mappedCoverageRows(modelCase, row);
   if (mapped.some((entry) => entry.material === true)) return true;
   if (mapped.length > 0 && mapped.every((entry) => entry.material === false)) {
+    return false;
+  }
+  if (!row?.row_id || seen.has(row.row_id)) return null;
+  const nextSeen = new Set(seen).add(row.row_id);
+  const rowsById = new Map(
+    [
+      ...(modelCase?.statement_structure?.income_statement ?? []),
+      ...(modelCase?.statement_structure?.cash_flow ?? []),
+    ].map((candidate) => [candidate.row_id, candidate]),
+  );
+  const references = [
+    ...(row.calculation?.refs ?? []),
+    ...(row.forecast_calculation?.refs ?? []),
+    ...(row.forecast_period_calculations ?? []).flatMap(
+      (calculation) => calculation?.refs ?? [],
+    ),
+  ].filter((reference) => reference !== row.row_id && rowsById.has(reference));
+  const childMateriality = references.map((reference) =>
+    forecastRowMateriality(modelCase, rowsById.get(reference), nextSeen),
+  );
+  if (childMateriality.some((value) => value === true)) return true;
+  if (
+    childMateriality.length > 0 &&
+    childMateriality.every((value) => value === false)
+  ) {
     return false;
   }
   return null;
@@ -212,11 +237,20 @@ function inferredAuthority(modelCase, row, forecastIndex) {
     treatment === "uncalculated" ||
     row?.formula_authority === "intentionally_blank"
   ) {
+    const declaredMaterial = row?.forecast_period_authorities?.[forecastIndex]?.material;
     return {
       method: "not_separately_forecast",
       source_kind: "none",
       inferred: true,
-      material,
+      material:
+        typeof material === "boolean"
+          ? material
+          : typeof declaredMaterial === "boolean"
+            ? declaredMaterial
+            : false,
+      note:
+        row?.forecast_capture_note ??
+        `Forecast detail is captured by ${row?.forecast_capture_parent_id ?? row?.parent_row_id ?? "its declared parent"}.`,
     };
   }
   if (SCHEDULE_OWNED_ROLES.has(row?.semantic_role)) {
@@ -258,7 +292,11 @@ function inferredAuthority(modelCase, row, forecastIndex) {
       method: "broker_consensus",
       source_kind: "broker",
       inferred: true,
-      material,
+      // Selecting a broker series as the live forecast is itself a materiality
+      // decision.  Aggregate or schedule-adjacent rows may not map one-for-one
+      // to a filing source line, so absence of direct source materiality cannot
+      // turn a live broker answer into an undeclared state.
+      material: typeof material === "boolean" ? material : true,
     };
   }
   if (treatment === "zero") {
@@ -315,8 +353,23 @@ export function resolveForecastAuthority(modelCase, row, forecastIndex) {
   if (!Number.isInteger(forecastIndex) || forecastIndex < 0 || forecastIndex > 2) {
     throw new Error(`forecastIndex must be 0, 1 or 2; received ${forecastIndex}.`);
   }
-  const selected = explicitAuthority(modelCase, row, forecastIndex) ??
-    inferredAuthority(modelCase, row, forecastIndex);
+  // Structural absence outranks every previously-authored period authority.
+  // Compiler passes are allowed to project a source row out of the forecast
+  // after the case has been authored (for example granular P&L detail captured
+  // by Revenue or EBIT).  Letting a stale `explicit_zero` survive that pass
+  // produced the impossible state "grey, intentionally blank, but formula
+  // =0".  A structural state is therefore resolved first; evidence authorities
+  // compete only for rows the compiled graph still calculates.
+  const structurallyAbsent =
+    row?.row_type === "header" ||
+    row?.operation_scope === "not_applicable" ||
+    row?.row_type === "uncalculated" ||
+    row?.formula_authority === "intentionally_blank" ||
+    Boolean(row?.forecast_capture_parent_id);
+  const selected = structurallyAbsent
+    ? inferredAuthority(modelCase, row, forecastIndex)
+    : explicitAuthority(modelCase, row, forecastIndex) ??
+      inferredAuthority(modelCase, row, forecastIndex);
   const method = selected.method;
   const value = authorityValue(modelCase, row, forecastIndex, selected);
   let broker = null;
@@ -577,10 +630,11 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         errors.push(`${label} requires a rationale note for ${authority.method}.`);
       }
       if (strict && authority.method === "not_separately_forecast") {
-        const parent = row.parent_row_id ? rowsById.get(row.parent_row_id) : null;
+        const captureParentId = row.forecast_capture_parent_id ?? row.parent_row_id;
+        const parent = captureParentId ? rowsById.get(captureParentId) : null;
         if (!parent || parent.row_id === row.row_id) {
           errors.push(
-            `${label} requires a valid parent_row_id whose forecast captures the unforecast detail.`,
+            `${label} requires a valid parent_row_id or forecast_capture_parent_id whose forecast captures the unforecast detail.`,
           );
         } else {
           const parentAuthority = resolveForecastAuthority(modelCase, parent, index);

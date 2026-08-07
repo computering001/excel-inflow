@@ -896,13 +896,13 @@ function applyConditionalState(sheet, rowPlan, context) {
       );
     }
   }
-  const surplus = Number(waterfallRows?.cash_surplus_deficit);
-  if (Number.isFinite(surplus)) {
+  const shortfall = Number(waterfallRows?.liquidity_shortfall);
+  if (Number.isFinite(shortfall)) {
     for (const pair of ["G:L", "N:P", "S:U"]) {
       const [first, last] = pair.split(":");
       tint(
-        `${first}${surplus}:${last}${surplus}`,
-        `=${first}$${surplus}<0`,
+        `${first}${shortfall}:${last}${shortfall}`,
+        `=${first}$${shortfall}>0`,
         COLORS.stateRed,
       );
     }
@@ -2224,7 +2224,7 @@ function acquisitionAdjustmentRatioCaches(
   return values;
 }
 
-function acquisitionFactorFormula(column, rowPlan) {
+function acquisitionFactorInlineFormula(column, rowPlan) {
   const c = rowPlan.controls;
   const closeDate = `DATE($P$${c.close_year},$P$${c.close_month},1)`;
   const periodEnd = `${column}$${rowPlan.period_row}`;
@@ -2246,6 +2246,13 @@ function acquisitionFactorFormula(column, rowPlan) {
     `IF(${closeDate}>=${periodStart},MAX(0,(${periodEnd}-${closeDate}+1)/` +
     `(${periodEnd}-(${periodStart})+1)),1)))`
   );
+}
+
+function acquisitionFactorFormula(column, rowPlan) {
+  const row = rowPlan.controls.acquisition_operating_fraction;
+  return Number.isInteger(row)
+    ? `${column}$${row}`
+    : acquisitionFactorInlineFormula(column, rowPlan);
 }
 
 /**
@@ -2276,7 +2283,7 @@ function acquisitionDrawFormula(column, rowPlan) {
   );
 }
 
-function acquisitionFullEbitdaFormula(modelCase, column, rowPlan) {
+function acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan) {
   const c = rowPlan.controls;
   const drivers = acquisitionDerivedDrivers(modelCase, rowPlan);
   const currentIndex = ADJUSTMENT_COLUMNS.indexOf(column);
@@ -2319,6 +2326,13 @@ function acquisitionFullEbitdaFormula(modelCase, column, rowPlan) {
   return `$P$${c.target_ebitda}${growthFactors
     .map((factor) => `*(${factor})`)
     .join("")}`;
+}
+
+function acquisitionFullEbitdaFormula(modelCase, column, rowPlan) {
+  const row = rowPlan.controls.acquisition_full_year_ebitda;
+  return Number.isInteger(row)
+    ? `${column}$${row}`
+    : acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan);
 }
 
 function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
@@ -2657,6 +2671,47 @@ function configureOperatingModel(
       styleEntryControl(`P${row}`, format);
     }
   }
+  // PERIOD-SPECIFIC ACQUISITION HELPERS — visible and stated once.
+  //
+  // These two rows use the former blank space above the period header. Every
+  // operating adjustment and the acquisition-interest row now reads the same
+  // close-date fraction and full-year EBITDA instead of repeating nested DATE,
+  // IF and growth expressions. They are workings, not user inputs: black
+  // formulas, no hidden names, and no duplicated judgement.
+  const acquisitionFractionRow = c.acquisition_operating_fraction;
+  const acquisitionFullEbitdaRow = c.acquisition_full_year_ebitda;
+  setValue(sheet, `B${acquisitionFractionRow}`, "Acquisition operating fraction");
+  setValue(sheet, `B${acquisitionFullEbitdaRow}`, "Acquisition full-year EBITDA");
+  for (const column of ADJUSTMENT_COLUMNS) {
+    applyFormula(
+      sheet,
+      `${column}${acquisitionFractionRow}`,
+      `=${acquisitionFactorInlineFormula(column, rowPlan)}`,
+    );
+    applyFormula(
+      sheet,
+      `${column}${acquisitionFullEbitdaRow}`,
+      `=${acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan)}`,
+    );
+  }
+  sheet.getRange(
+    `N${acquisitionFractionRow}:P${acquisitionFractionRow}`,
+  ).format.numberFormat = PERCENT;
+  sheet.getRange(
+    `N${acquisitionFullEbitdaRow}:P${acquisitionFullEbitdaRow}`,
+  ).format.numberFormat = AMOUNT;
+  addCommentOnce(
+    workbook,
+    sheet,
+    `B${acquisitionFractionRow}`,
+    "One shared close-date fraction for each forecast period. Every acquisition operating and interest formula consumes this visible row.",
+  );
+  addCommentOnce(
+    workbook,
+    sheet,
+    `B${acquisitionFullEbitdaRow}`,
+    "Target EBITDA at entry, compounded only by the standalone EBITDA growth rates applicable after the close date.",
+  );
   addCommentOnce(
     workbook,
     sheet,
@@ -2953,7 +3008,13 @@ function configureOperatingModel(
     }
     if (role === "lease_principal") {
       if (modelCase.lease_policy?.mode === "exclude") return "=0";
-      return `=-${Number(modelCase.lease_policy.principal_repayment?.[forecastIndex] ?? 0)}`;
+      const assumptionRow = debtRows.lease_principal_assumption;
+      if (!Number.isInteger(assumptionRow)) {
+        throw new Error(
+          "Lease principal requires a visible lease-principal assumption row.",
+        );
+      }
+      return `=-${column}${assumptionRow}`;
     }
     if (role === "non_balancing_cash_bucket_movement") {
       const prior = forecastIndex === 0 ? "I" : FORECAST_COLUMNS[forecastIndex - 1];
@@ -2980,6 +3041,16 @@ function configureOperatingModel(
   }
 
   function historicalSemanticFormula(definition, column) {
+    if (definition.semantic_role === "cash_tax_rate") {
+      const cashTaxes = statementByRole.get("cash_taxes")?.row;
+      const preTaxIncome = statementByRole.get("pre_tax_income")?.row;
+      if (!cashTaxes || !preTaxIncome) {
+        throw new Error(
+          "Cash-tax-rate history requires cash-taxes and pre-tax-income semantic rows.",
+        );
+      }
+      return `=IFERROR(-${column}${cashTaxes}/${column}${preTaxIncome},0)`;
+    }
     if (definition.semantic_role === "interest_income") {
       return `=${column}${interestRows.interest_income_schedule}`;
     }
@@ -3736,7 +3807,12 @@ function configureOperatingModel(
   // waterfall consumes these expressions directly. A balance delta is not a
   // cash-flow proxy: issuance, acquisition additions, FX and other non-cash
   // movements can all change the balance without being a mandatory repayment.
-  const mandatoryRepaymentExpressions = [[], [], []];
+  // Mandatory repayment is a semantic REDUCER, not a hand-written list of
+  // bonds. Each period collects the complete eligible opening/movement/closing
+  // state by balance currency; the visible answer aggregates those pools once.
+  // Adding, removing or reordering instruments therefore changes the reducer's
+  // membership, never a manually maintained formula.
+  const mandatoryRepaymentPools = Array.from({ length: 3 }, () => new Map());
   const instrumentTimingExpressions = (
     plan,
     instrument,
@@ -4120,25 +4196,29 @@ function configureOperatingModel(
         endFx === "1"
           ? `$${column}${plan.debt_row}`
           : `($${column}${plan.debt_row}/${endFx})`;
-      const preRepaymentNative = plan.pik_row
-        ? `(${availableBeforeAmortisation}+$${column}${plan.pik_row})`
-        : availableBeforeAmortisation;
-      const reconciledRepaymentNative =
-        `MAX(0,${preRepaymentNative}-${closingNative})`;
       const simpleBullet =
         !plan.issuance_row &&
         !plan.amortisation_row &&
         !plan.pik_row &&
         !plan.fair_value_row &&
         !plan.other_non_cash_row;
-      const mandatoryRepaymentExpression =
-        averageFx === "1"
-          ? `-(${reconciledRepaymentNative})`
-          : `-(${reconciledRepaymentNative})*${averageFx}`;
       if (plan.has_mandatory_repayment) {
-        mandatoryRepaymentExpressions[index].push(
-          mandatoryRepaymentExpression,
+        const poolKey = balanceCurrency;
+        const pool = mandatoryRepaymentPools[index].get(poolKey) ?? {
+          currency: poolKey,
+          averageFx,
+          openingAndMovementTerms: [],
+          closingTerms: [],
+        };
+        pool.openingAndMovementTerms.push(
+          opening,
+          ...(issuance !== "0" ? [issuance] : []),
+          ...(fairValue !== "0" ? [fairValue] : []),
+          ...(otherNonCash !== "0" ? [otherNonCash] : []),
+          ...(plan.pik_row ? [`$${column}${plan.pik_row}`] : []),
         );
+        pool.closingTerms.push(closingNative);
+        mandatoryRepaymentPools[index].set(poolKey, pool);
       }
       applyFormula(
         sheet,
@@ -4262,6 +4342,8 @@ function configureOperatingModel(
     gross_debt_excluding_leases: "Gross debt (excl. leases)",
     lease_header: "Leases",
     lease_liability: leaseLiabilityLabel,
+    lease_principal_assumption: "Lease principal repayment assumption",
+    lease_additions_assumption: "New lease additions assumption",
     lease_interest_bearing_liability:
       "Interest-bearing lease liabilities",
     total_lease_liabilities: "Total lease liabilities",
@@ -4342,6 +4424,8 @@ function configureOperatingModel(
   const debtIndentedIds = new Set([
     "acquisition_debt",
     "lease_liability",
+    "lease_principal_assumption",
+    "lease_additions_assumption",
     // The translation line is a memo beneath the cash movement it explains,
     // not a second subtotal competing with it.
     "debt_fx_translation",
@@ -4808,30 +4892,90 @@ function configureOperatingModel(
     if (!component.note) return;
     addCommentOnce(workbook, sheet, `G${row}`, component.note);
   });
+  const leasePrincipalAssumptionRow = debtRows.lease_principal_assumption;
+  const leaseAdditionsAssumptionRow = debtRows.lease_additions_assumption;
+  if (
+    Number.isInteger(leasePrincipalAssumptionRow) &&
+    Number.isInteger(leaseAdditionsAssumptionRow)
+  ) {
+    for (const row of [leasePrincipalAssumptionRow, leaseAdditionsAssumptionRow]) {
+      setPeriodNumberFormat(sheet, row, AMOUNT);
+      for (const column of HISTORICAL_COLUMNS) {
+        setValue(sheet, `${column}${row}`, null);
+        sheet.getRange(`${column}${row}`).format.fill = COLORS.grey;
+      }
+      applyFormula(sheet, `R${row}`, `=I${row}`);
+    }
+    setRow(
+      sheet,
+      `J${leasePrincipalAssumptionRow}:L${leasePrincipalAssumptionRow}`,
+      asSeries3(modelCase.lease_policy.principal_repayment, 0),
+    );
+    styleInput(
+      sheet,
+      `J${leasePrincipalAssumptionRow}:L${leasePrincipalAssumptionRow}`,
+    );
+    for (let index = 0; index < 3; index += 1) {
+      const standaloneColumn = FORECAST_COLUMNS[index];
+      const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
+      const proFormaColumn = PRO_FORMA_COLUMNS[index];
+      if (modelCase.lease_policy.mode === "flat_replacement") {
+        applyFormula(
+          sheet,
+          `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
+          `=${standaloneColumn}${leasePrincipalAssumptionRow}`,
+        );
+      } else if (modelCase.lease_policy.mode === "simple_roll_forward") {
+        setValue(
+          sheet,
+          `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
+          Number(modelCase.lease_policy.additions?.[index] ?? 0),
+        );
+        styleInput(
+          sheet,
+          `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
+        );
+      } else {
+        setValue(sheet, `${standaloneColumn}${leaseAdditionsAssumptionRow}`, null);
+        sheet.getRange(
+          `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
+        ).format.fill = COLORS.grey;
+      }
+      for (const row of [
+        leasePrincipalAssumptionRow,
+        leaseAdditionsAssumptionRow,
+      ]) {
+        applyFormula(sheet, `${adjustmentColumn}${row}`, "=0");
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${row}`,
+          `=${standaloneColumn}${row}+${adjustmentColumn}${row}`,
+        );
+      }
+    }
+    addCommentOnce(
+      workbook,
+      sheet,
+      `B${leasePrincipalAssumptionRow}`,
+      "Visible forecast assumption consumed by the cash-flow statement and lease-liability roll-forward; no formula may embed this amount as a numeric literal.",
+    );
+  }
   for (let index = 0; index < 3; index += 1) {
     const column = FORECAST_COLUMNS[index];
     const prior =
       index === 0
         ? `I${debtRows.lease_liability}`
         : `${FORECAST_COLUMNS[index - 1]}${debtRows.lease_liability}`;
-    const principal = Number(
-      modelCase.lease_policy.principal_repayment?.[index] ?? 0,
-    );
-    const additions =
-      modelCase.lease_policy.mode === "flat_replacement"
-        ? principal
-        : Number(modelCase.lease_policy.additions?.[index] ?? 0);
-    // A "+0" additions term is not neutral punctuation: written next to an
-    // equal repayment it produces "+56-56", which reads as a roll-forward but
-    // is an identity, and the balance never moves. Emit the additions term
-    // ONLY when there is an additions assumption to state; where there is one,
-    // the row label below says so on the face of the model.
+    const principalCell = Number.isInteger(leasePrincipalAssumptionRow)
+      ? `${column}${leasePrincipalAssumptionRow}`
+      : "0";
+    const additionsCell = Number.isInteger(leaseAdditionsAssumptionRow)
+      ? `${column}${leaseAdditionsAssumptionRow}`
+      : "0";
     const formula =
       modelCase.lease_policy.mode === "exclude"
         ? "=0"
-        : additions === 0
-          ? `=MAX(0,${prior}-${principal})`
-          : `=MAX(0,${prior}+${additions}-${principal})`;
+        : `=MAX(0,${prior}+${additionsCell}-${principalCell})`;
     if (modelCase.lease_policy.mode === "sourced_balance") {
       setValue(
         sheet,
@@ -5204,6 +5348,7 @@ function configureOperatingModel(
     rcf_draw_waterfall: "RCF — drawdown",
     rcf_repayment_waterfall: "RCF — repayment",
     ending_rcf: "RCF — closing",
+    liquidity_shortfall: "Residual liquidity shortfall",
   };
   for (const [id, row] of Object.entries(waterfallRows)) {
     setValue(sheet, `B${row}`, waterfallLabels[id]);
@@ -5301,6 +5446,54 @@ function configureOperatingModel(
   // The schedule exposes one aggregate cash requirement, not a repeated
   // technical helper row beneath every instrument.  The waterfall consumes
   // this one visible answer.
+  const compactFormulaTerms = (terms) => {
+    const byColumn = new Map();
+    const expressions = [];
+    for (const term of terms.filter((item) => item && item !== "0")) {
+      const match = String(term).match(/^\$?([A-Z]{1,3})\$?(\d+)$/);
+      if (!match) {
+        expressions.push(term);
+        continue;
+      }
+      const [, column, rowText] = match;
+      const rows = byColumn.get(column) ?? [];
+      rows.push(Number(rowText));
+      byColumn.set(column, rows);
+    }
+    for (const [column, rawRows] of [...byColumn.entries()].sort()) {
+      const rows = [...new Set(rawRows)].sort((left, right) => left - right);
+      let start = null;
+      let prior = null;
+      const flush = () => {
+        if (start === null) return;
+        expressions.push(
+          start === prior
+            ? `$${column}${start}`
+            : `SUM($${column}${start}:$${column}${prior})`,
+        );
+      };
+      for (const row of rows) {
+        if (start === null) {
+          start = row;
+          prior = row;
+        } else if (row === prior + 1) {
+          prior = row;
+        } else {
+          flush();
+          start = row;
+          prior = row;
+        }
+      }
+      flush();
+    }
+    return expressions;
+  };
+  const aggregateTerms = (terms) => {
+    const compacted = compactFormulaTerms(terms);
+    if (compacted.length === 0) return "0";
+    if (compacted.length === 1) return compacted[0];
+    return `SUM(${compacted.join(",")})`;
+  };
   const mandatoryDebtRow = debtRows.mandatory_debt_repayments;
   if (Number.isInteger(mandatoryDebtRow)) {
     const reportedRepaymentRows = financingRows.filter((definition) => {
@@ -5316,7 +5509,7 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${historicalColumn}${mandatoryDebtRow}`,
-        `=${sumCells(historicalColumn, reportedRepaymentRows)}`,
+        `=-(${sumCells(historicalColumn, reportedRepaymentRows)})`,
       );
     }
     applyFormula(sheet, `R${mandatoryDebtRow}`, `=I${mandatoryDebtRow}`);
@@ -5324,7 +5517,17 @@ function configureOperatingModel(
       const column = FORECAST_COLUMNS[index];
       const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
       const proFormaColumn = PRO_FORMA_COLUMNS[index];
-      const expressions = mandatoryRepaymentExpressions[index];
+      const pools = [...mandatoryRepaymentPools[index].values()];
+      const expressions = pools.map((pool) => {
+        const openingAndMovements = aggregateTerms(
+          pool.openingAndMovementTerms,
+        );
+        const closing = aggregateTerms(pool.closingTerms);
+        const nativeRepayment = `MAX(0,${openingAndMovements}-${closing})`;
+        return pool.averageFx === "1"
+          ? nativeRepayment
+          : `${nativeRepayment}*${pool.averageFx}`;
+      });
       applyFormula(
         sheet,
         `${column}${mandatoryDebtRow}`,
@@ -5422,7 +5625,7 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}`,
-        `=${blockColumn}${mandatoryDebtRow}`,
+        `=-${blockColumn}${mandatoryDebtRow}`,
       );
       applyFormula(
         sheet,
@@ -5555,12 +5758,26 @@ function configureOperatingModel(
           `=${blockColumn}${waterfallRows.opening_rcf}+${blockColumn}${waterfallRows.rcf_draw_waterfall}-${blockColumn}${waterfallRows.rcf_repayment_waterfall}`,
         );
       }
+      if (isAdjustment) {
+        applyFormula(
+          sheet,
+          `${blockColumn}${waterfallRows.liquidity_shortfall}`,
+          `=${proFormaColumn}${waterfallRows.liquidity_shortfall}-` +
+            `${column}${waterfallRows.liquidity_shortfall}`,
+        );
+      } else {
+        applyFormula(
+          sheet,
+          `${blockColumn}${waterfallRows.liquidity_shortfall}`,
+          `=MAX(0,${blockColumn}${waterfallRows.minimum_cash}-(` +
+            `${blockColumn}${waterfallRows.cash_before_rcf}+` +
+            `${blockColumn}${waterfallRows.rcf_draw_waterfall}-` +
+            `${blockColumn}${waterfallRows.rcf_repayment_waterfall}))`,
+        );
+      }
       // The sweep stops at the revolver. Ending cash is a CASH FLOW line and
-      // is stated once, on the cash flow statement, which reads the sweep's
-      // cash before RCF plus the draw less the repayment. The shortfall row
-      // that used to close this block was MAX(0, minimum cash - ending cash)
-      // and is zero by construction wherever the sweep solves, so it said
-      // nothing the four revolver lines above had not already said.
+      // is stated once on that statement; the shortfall remains visible here
+      // when committed capacity cannot restore the minimum-cash control.
     }
   }
 
@@ -5641,7 +5858,7 @@ function configureOperatingModel(
         const issuance = nonRcfIssuanceTerms(blockColumn, index);
         const terms = [
           ...issuance,
-          `${blockColumn}${mandatoryDebtRow}`,
+          `-${blockColumn}${mandatoryDebtRow}`,
           `${blockColumn}${waterfallRows.rcf_draw_waterfall}`,
           `-${blockColumn}${waterfallRows.rcf_repayment_waterfall}`,
         ];
@@ -6948,35 +7165,21 @@ function configureOperatingModel(
     // The acquisition tranche's own coupon, off the acquisition debt row in the
     // adjustment column directly beside it.
     //
-    // DEFECT 0.7 — THE ACQUISITION LEG WAS THE ONE LEG NOT ON AN AVERAGE.
-    //
-    // Every instrument leg on this schedule charges
-    // `-AVERAGE(opening, closing) x rate`. This cell used to charge the CLOSING
-    // balance alone, while `solver.mjs` charged the balance BEFORE amortisation.
-    // Opening equals closing whenever the tranche never amortises, which was
-    // true of every case in the suite, so the two conventions had never been
-    // distinguishable — and the moment a real amortisation schedule existed the
-    // workbook and the solver priced the same debt differently.
-    //
-    // The window the tranche is alive for opens at `prior + draw` — the balance
-    // the moment it comes into existence, which in the close year is the drawn
-    // amount and in every later year is simply the prior year's closing balance
-    // — and shuts at this column's own closing balance. The part-year factor
-    // then prorates the close year's stub. That is the same average convention
-    // every other leg uses, applied to the window this tranche actually exists
-    // over, and it now matches `solver.mjs` line for line.
+    // Existing acquisition debt earns a full year's coupon; a new draw earns
+    // only the visible operating fraction for the close-year stub. Multiplying
+    // an average balance by that fraction double-prorated the first year
+    // (half-balance times half-year). State the two pieces directly instead.
     const priorAcquisitionDebtCell =
       index === 0
         ? "0"
         : `${ADJUSTMENT_COLUMNS[index - 1]}${debtRows.acquisition_debt}`;
-    const acquisitionInterestOpening =
-      `MAX(0,${priorAcquisitionDebtCell}+${acquisitionDrawFormula(adjustmentColumn, rowPlan)})`;
+    const acquisitionDraw = acquisitionDrawFormula(adjustmentColumn, rowPlan);
     applyFormula(
       sheet,
       `${adjustmentColumn}${interestRows.acquisition_interest}`,
-      `=IF($C$${c.circularity}=0,0,-AVERAGE(${acquisitionInterestOpening},` +
-        `${adjustmentColumn}${debtRows.acquisition_debt})*$P$${c.incremental_rate}*` +
-        `${acquisitionFactorFormula(adjustmentColumn, rowPlan)})`,
+      `=IF($C$${c.circularity}=0,0,-(${priorAcquisitionDebtCell}+` +
+        `${acquisitionDraw}*${acquisitionFactorFormula(adjustmentColumn, rowPlan)})*` +
+        `$P$${c.incremental_rate})`,
     );
     applyFormula(
       sheet,
@@ -9352,7 +9555,7 @@ function solverFormulaCaches(
           Number(result.non_rcf_repayment ?? 0) +
           Number(result.rcf_draw ?? 0) -
           Number(result.rcf_repayment ?? 0),
-        mandatory_debt_repayments: -Number(result.non_rcf_repayment ?? 0),
+        mandatory_debt_repayments: Number(result.non_rcf_repayment ?? 0),
         // The two denominators are cached alongside the ratios that consume
         // them. Without this the visible EBITDA / net interest rows would cache
         // as zero next to a non-zero multiple — precisely the unreconciled
@@ -9454,6 +9657,7 @@ function solverFormulaCaches(
       rcf_draw_waterfall: result.rcf_draw,
       rcf_repayment_waterfall: result.rcf_repayment,
       ending_rcf: result.ending_rcf,
+      liquidity_shortfall: result.liquidity_shortfall,
     });
     const standaloneWaterfall = waterfallValues(standalone);
     const proFormaWaterfall = waterfallValues(proForma);

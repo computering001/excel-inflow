@@ -100,10 +100,12 @@ export function deriveStatementIndentMap(rows, section) {
     }
     const next = new Set(visiting).add(rowId);
     const parentId = parentOf.get(rowId);
-    const graphDepth = parentId ? resolve(parentId, next) + 1 : 0;
-    const incomeComponentDepth =
-      section === "income_statement" && row.style_role !== "subsection" ? 1 : 0;
-    const value = Math.max(graphDepth, incomeComponentDepth);
+    // Indentation is a projection of the declared hierarchy only. The former
+    // income-statement fallback shifted every ordinary line right even when no
+    // parent owned it, while debt instruments stayed flat under a separate
+    // renderer. That made indentation describe the section a row happened to
+    // be in rather than its economic depth.
+    const value = parentId ? resolve(parentId, next) + 1 : 0;
     depth.set(rowId, value);
     return value;
   };
@@ -307,6 +309,8 @@ export function compileStatementTopology(modelCase, section, rows) {
     parent_row_id: row.parent_row_id ?? null,
     semantic_role: row.semantic_role ?? null,
     row_type: row.row_type ?? null,
+    projection_origin: row.projection_origin ?? null,
+    projection_required_by: row.projection_required_by ?? null,
   }));
   const errors = [];
 
@@ -389,6 +393,22 @@ export function compileStatementTopology(modelCase, section, rows) {
       semantic_role: role,
       row_ids: rowIds,
     });
+  }
+
+  if (section === "income_statement") {
+    const netIncomeIndex = nodes.findIndex(
+      (node) => node.semantic_role === "net_income",
+    );
+    for (const node of nodes.slice(netIncomeIndex + 1)) {
+      if (netIncomeIndex < 0 || node.projection_origin) continue;
+      errors.push({
+        code: "PROJECTION_NECESSITY_UNDECLARED",
+        row_id: node.row_id,
+        label: node.label,
+        message:
+          "A post-net-income row is visible without a required economic output, dependency, derived-display or block-header reason.",
+      });
+    }
   }
 
   const indexById = new Map(rows.map((row, index) => [row.row_id, index]));

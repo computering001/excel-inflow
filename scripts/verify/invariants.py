@@ -300,8 +300,37 @@ def validate_semantic_artifacts(manifest, crosswalk_rows) -> List[Dict[str, Any]
                                     "id": "manifest.forecast_authority_rationale",
                                     "node_id": node_id,
                                     "forecast_index": forecast_index,
+                                    }
+                                )
+                        if (
+                            isinstance(authority, dict)
+                            and (
+                                node.get("row_type") == "uncalculated"
+                                or node.get("formula_authority") == "intentionally_blank"
+                            )
+                            and mechanism != "uncalculated"
+                        ):
+                            errors.append(
+                                {
+                                    "id": "manifest.structural_absence_conflict",
+                                    "node_id": node_id,
+                                    "forecast_index": forecast_index,
+                                    "formula_authority": node.get("formula_authority"),
+                                    "row_type": node.get("row_type"),
+                                    "actual_mechanism": mechanism,
+                                    "message": "A structurally absent forecast row cannot retain a live or zero period authority.",
                                 }
                             )
+            if (
+                node.get("forecast_capture_parent_id")
+                and node.get("forecast_capture_parent_id") == node.get("row_id")
+            ):
+                errors.append(
+                    {
+                        "id": "manifest.forecast_capture_self_reference",
+                        "node_id": node_id,
+                    }
+                )
         if (
             node.get("movement_type") == "non_cash_debt_movement"
             and node.get("waterfall_stage") != "excluded"

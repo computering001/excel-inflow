@@ -448,9 +448,13 @@ class Workbook:
 _QUOTED_SEGMENT = re.compile(r'("(?:[^"]|"")*")')
 _A1 = re.compile(r"(?<![A-Za-z0-9_.])(\$?)([A-Z]{1,3})(\$?)(\d+)")
 _SHEET_QUALIFIED = re.compile(
-    r"'(?:[^']|'')+'![A-Z]+\d+|[A-Za-z_][A-Za-z0-9_.]*![A-Z]+\d+"
+    r"'(?:[^']|'')+'!\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?|"
+    r"[A-Za-z_][A-Za-z0-9_.]*!\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?"
 )
 _SAME_SHEET = re.compile(r"(?<![A-Za-z0-9_.])\$?([A-Z]{1,3})\$?(\d+)")
+_SAME_SHEET_RANGE = re.compile(
+    r"(?<![A-Za-z0-9_.])\$?([A-Z]{1,3})\$?(\d+):\$?([A-Z]{1,3})\$?(\d+)"
+)
 
 
 def shift_shared_formula(formula_text: str, base_address: str, target_address: str) -> str:
@@ -480,4 +484,21 @@ def shift_shared_formula(formula_text: str, base_address: str, target_address: s
 
 def same_sheet_references(formula_text) -> List[str]:
     text = _SHEET_QUALIFIED.sub("", str(formula_text or ""))
-    return ["%s%s" % (m.group(1), m.group(2)) for m in _SAME_SHEET.finditer(text)]
+    references: List[str] = []
+
+    def expand(match: "re.Match") -> str:
+        first_column = column_number(match.group(1))
+        first_row = int(match.group(2))
+        last_column = column_number(match.group(3))
+        last_row = int(match.group(4))
+        for column in range(min(first_column, last_column), max(first_column, last_column) + 1):
+            for row in range(min(first_row, last_row), max(first_row, last_row) + 1):
+                references.append("%s%s" % (column_letters(column), row))
+        return " "
+
+    without_ranges = _SAME_SHEET_RANGE.sub(expand, text)
+    references.extend(
+        "%s%s" % (match.group(1), match.group(2))
+        for match in _SAME_SHEET.finditer(without_ranges)
+    )
+    return references

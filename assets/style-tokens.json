@@ -129,8 +129,8 @@
       "total_ranks). patchFreezePane() freezes at G{period_row + 1}, so the row",
       "moves the moment the row plan does; G16 is what period_row 15 compiles",
       "to across every current case, period_row itself now being DERIVED from",
-      "the last control row plus the two blank rows that separate the control",
-      "block from the period header. It now happens to AGREE with",
+      "the last visible acquisition-helper row immediately above the period",
+      "header. It now happens to AGREE with",
       "template-contract.json's crh_consolidated.freeze_pane, and must still not",
       "be linted against it: that profile describes the static template, which",
       "freezes at G16 for reasons of its own, and the agreement is a coincidence",
@@ -140,8 +140,8 @@
     ],
     "hide_gridlines": true,
     "freeze_pane": "G16",
-    "blank_rows_between_control_block_and_period_header": 2,
-    "blank_rows_note": "There were eight — a screen of nothing between the block a reader sets and the grid it drives. The gap is DERIVED in row_plan.mjs from the last control row, so it cannot drift when a control is added or removed.",
+    "blank_rows_between_control_block_and_period_header": 0,
+    "blank_rows_note": "The former two-row gap now carries the visible acquisition operating-fraction and full-year EBITDA helpers. The period header remains on its frozen-authority row and no hidden support block is introduced.",
     "block_titles": {
       "_comment": "`Standalone` / `Adjustment` / `Pro Forma` on the period-group row are CENTRED ACROSS their blocks by alignment, never by merging: horizontal=centerContinuous on every cell of G:L, N:P and R:U, with the text in the leftmost cell of each run. patchBlockTitleAlignment() writes it into the package, because format.horizontalAlignment is the fourth formatting call the writer accepts and emits nothing for — it rejects centerContinuous outright and silently drops the values it does accept.",
       "mechanism": "center_continuous",
@@ -468,8 +468,8 @@
         "effect": "state_amber on ending_rcf, that year only"
       },
       "liquidity_shortfall": {
-        "when": "cash surplus / (deficit) < 0 in that column",
-        "effect": "state_red on cash_surplus_deficit, that year only"
+        "when": "residual liquidity shortfall > 0 in that column",
+        "effect": "state_red on liquidity_shortfall, that year only"
       },
       "broker_case_selected": {
         "_comment": "Replaces `broker_case_not_consensus`, which fired in ONE direction only. The old rule tinted the cell #EFF5F9 when the case was not Consensus and did nothing otherwise, so on the default case — five of the six certification cases — the control naming the entire forecast basis carried no mark at all, and in the other state it carried the same near-white that every subsection header and block subtotal wears. A control that is silent in its default state cannot announce which state it is in.",

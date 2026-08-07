@@ -121,6 +121,7 @@ const MOVEMENT_DEFINITIONS = {
 
 const ROLE_MOVEMENT_TYPES = {
   cash_from_operations: "operating_cash_flow",
+  cash_taxes: "operating_cash_flow",
   cash_from_investing: "investing_cash_flow",
   dividends: "non_debt_financing",
   share_buybacks: "non_debt_financing",
@@ -204,6 +205,7 @@ function declaredSources(modelCase, rowId) {
 }
 
 function formulaAuthority(definition) {
+  if (definition.formula_authority) return definition.formula_authority;
   if (definition.row_type === "input") return "case_input";
   if (COMPILER_CALCULATED_ROLES.has(definition.semantic_role)) {
     return "compiler";
@@ -294,12 +296,16 @@ function statementNodes(modelCase, rowPlan) {
       section,
       physical_row: physicalRow,
       projection_status: projectionStatus,
+      projection_origin: row.projection_origin ?? null,
+      projection_required_by: row.projection_required_by ?? null,
       row_type: row.row_type,
       semantic_role: row.semantic_role ?? null,
       accounting_basis: modelCase.issuer?.accounting_basis ?? null,
       operation_scope: row.operation_scope ?? null,
       aggregation_authority: row.aggregation_authority ?? null,
       parent_row_id: row.parent_row_id ?? null,
+      forecast_capture_parent_id: row.forecast_capture_parent_id ?? null,
+      forecast_capture_note: row.forecast_capture_note ?? null,
       aggregation_role: row.aggregation_role ?? null,
       economic_class: row.economic_class ?? null,
       acquisition_driver_role: row.acquisition_driver_role ?? null,
@@ -631,6 +637,22 @@ function graphEdges(nodes, rowPlan) {
         });
       }
     }
+    if (
+      node.node_kind === "statement_row" &&
+      node.forecast_capture_parent_id
+    ) {
+      const parentNodeId = statementNodeByRowId.get(
+        node.forecast_capture_parent_id,
+      );
+      if (parentNodeId) {
+        edges.push({
+          edge_type: "forecast_captured_by",
+          from: node.node_id,
+          to: parentNodeId,
+          origin: "forecast_authority",
+        });
+      }
+    }
   }
   for (const plan of rowPlan.instruments ?? []) {
     edges.push({
@@ -842,6 +864,10 @@ function graphEdges(nodes, rowPlan) {
     ["mechanical.rcf_repayment_waterfall", "mechanical.cash_surplus_deficit"],
     ["mechanical.cash_surplus_deficit", "mechanical.cash_before_rcf"],
     ["mechanical.cash_surplus_deficit", "mechanical.minimum_cash"],
+    ["mechanical.liquidity_shortfall", "mechanical.minimum_cash"],
+    ["mechanical.liquidity_shortfall", "mechanical.cash_before_rcf"],
+    ["mechanical.liquidity_shortfall", "mechanical.rcf_draw_waterfall"],
+    ["mechanical.liquidity_shortfall", "mechanical.rcf_repayment_waterfall"],
     ["mechanical.cash_before_rcf", "mechanical.pre_rcf_debt_cash_flow"],
     ["mechanical.cash_before_rcf", "mechanical.non_rcf_debt_proceeds"],
     ["mechanical.cash_before_rcf", "mechanical.lease_principal_waterfall"],

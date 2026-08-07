@@ -2020,26 +2020,13 @@ export function solveCase(
     const endingAcquisitionDebt = acquisitionActive
       ? acquisitionPreMaturityDebt
       : 0;
-    // DEFECT 0.7 — ONE BASIS FOR THE ACQUISITION LEG, THE SAME AS EVERY OTHER.
-    //
-    // This used to branch: the pre-amortisation balance in the close year, the
-    // average of opening and closing after it. The workbook meanwhile charged
-    // the CLOSING balance in every year. Opening equals closing whenever the
-    // tranche never amortises — true of every case in the suite until the
-    // maximal bracket case — so the three conventions were indistinguishable
-    // and nothing tested them apart.
-    //
-    // The single rule is the instrument rule: the average of the balance at the
-    // start of the window the debt is alive over and the balance at the end.
-    // In the close year the window opens at the drawn amount, which is exactly
-    // `acquisitionPreMaturityDebt`; in every later year it opens at the prior
-    // closing balance, which `acquisitionPreMaturityDebt` also equals because
-    // there are no further proceeds. So one expression covers both, and
-    // `build_dynamic_model.mjs` writes the same average into the cell.
+    // Existing acquisition debt earns a full period; only the new close-year
+    // draw is prorated. Averaging a zero opening with the closing draw and then
+    // multiplying by the close-year fraction double-prorates the first year.
     const rawAcquisitionInterest =
-      ((acquisitionPreMaturityDebt + endingAcquisitionDebt) / 2) *
-      Number(modelCase.acquisition?.incremental_rate ?? 0) *
-      acquisitionInterestTiming;
+      (openingAcquisitionDebt +
+        acquisitionDebtAddition * acquisitionInterestTiming) *
+      Number(modelCase.acquisition?.incremental_rate ?? 0);
     // Acquisition debt is a fixed drawing at a stated rate, but it is still
     // forecast interest expense, so the breaker zeroes it — matching the gate
     // on the pro-forma acquisition interest formula.

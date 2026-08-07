@@ -236,6 +236,85 @@ assert(
   "A post-compile indentation mutation was not rejected by the topology gate.",
 );
 
+const arbitraryIncomeIndent = clone(fixture);
+const topLevelIncomeSourceRow = arbitraryIncomeIndent.statement_structure.income_statement
+  .find((row) => row.row_type !== "header" && !row.parent_row_id);
+assert(
+  topLevelIncomeSourceRow,
+  "Representative fixture needs an ordinary top-level income-statement row.",
+);
+topLevelIncomeSourceRow.indent = 6;
+const normalisedIncomeIndent = normaliseStatementRows(
+  arbitraryIncomeIndent,
+  "income_statement",
+);
+assert(
+  normalisedIncomeIndent.find(
+    (row) => row.row_id === topLevelIncomeSourceRow.row_id,
+  ).indent === 0,
+  "An unparented income-statement row retained a section-wide or source-layout indent.",
+);
+
+const unsourcedIncomeAlias = clone(fixture);
+const canonicalIncomeAuthority = unsourcedIncomeAlias.statement_structure.income_statement
+  .find((row) => row.semantic_role === "ebit");
+assert(
+  canonicalIncomeAuthority,
+  "Representative fixture needs an EBIT authority for the generic alias regression.",
+);
+const canonicalIncomeIndex = unsourcedIncomeAlias.statement_structure.income_statement
+  .indexOf(canonicalIncomeAuthority);
+unsourcedIncomeAlias.statement_structure.income_statement.splice(
+  canonicalIncomeIndex + 1,
+  0,
+  {
+    row_id: "compiler_only_repeated_authority",
+    label: "Repeated operating answer",
+    row_type: "calculation",
+    semantic_role: canonicalIncomeAuthority.semantic_role,
+    calculation: { operator: "link", refs: [canonicalIncomeAuthority.row_id] },
+    values: [...(canonicalIncomeAuthority.values ?? [])],
+    forecast_treatment: "formula",
+    forecast_calculation: {
+      operator: "link",
+      refs: [canonicalIncomeAuthority.row_id],
+    },
+  },
+);
+assert(
+  !normaliseStatementRows(unsourcedIncomeAlias, "income_statement").some(
+    (row) => row.row_id === "compiler_only_repeated_authority",
+  ),
+  "An unsourced one-reference income-statement alias survived as a second visible authority.",
+);
+
+const unexplainedPostNetRows = normaliseStatementRows(
+  fixture,
+  "income_statement",
+);
+const netIncomePosition = unexplainedPostNetRows.findIndex(
+  (row) => row.semantic_role === "net_income",
+);
+assert(netIncomePosition >= 0, "Representative fixture needs a net-income row.");
+unexplainedPostNetRows.splice(netIncomePosition + 1, 0, {
+  row_id: "unexplained_post_net_row",
+  label: "Unexplained post-net calculation",
+  row_type: "calculation",
+  calculation: {
+    operator: "link",
+    refs: [unexplainedPostNetRows[netIncomePosition].row_id],
+  },
+  indent: 0,
+});
+assert(
+  compileStatementTopology(
+    fixture,
+    "income_statement",
+    unexplainedPostNetRows,
+  ).errors.some((error) => error.code === "PROJECTION_NECESSITY_UNDECLARED"),
+  "A visible post-net-income row without a declared projection reason was not rejected.",
+);
+
 const duplicateCashRoot = clone(fixture);
 const duplicateRootRows = duplicateCashRoot.statement_structure.cash_flow;
 const duplicateRootParent = duplicateRootRows.find(
@@ -423,6 +502,22 @@ function hierarchyFixture(authority) {
     ],
     forecast_treatment:
       authority === "derived_from_children" ? "hardcode" : "uncalculated",
+    ...(authority === "derived_from_children"
+      ? {
+          forecast_period_authorities: [0, 1, 2].map((forecastIndex) => ({
+            method: "user_assumption",
+            source_kind: "user_supplied",
+            source_id: `statement-hierarchy-fixture-${forecastIndex + 1}`,
+            as_of_date: "2026-01-01",
+            material: true,
+            value:
+              index === 0
+                ? [10, 20, 30][forecastIndex]
+                : [-5, -10, -15][forecastIndex],
+            note: "Synthetic hierarchy mutation input.",
+          })),
+        }
+      : {}),
     parent_row_id: parent.row_id,
     aggregation_role:
       authority === "reported_parent" ? "working_child" : "contributing_child",
@@ -544,4 +639,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 10 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");
+console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 13 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");
