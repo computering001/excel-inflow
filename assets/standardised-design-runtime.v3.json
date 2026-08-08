@@ -192,8 +192,8 @@
   "profiles": {
     "maximal": {
       "profile": "maximal",
-      "immutable_authority_sha256": "6cfe0cf67dd522496d25659bed4bbc1825a477204a71c4b81c9ac559d6ef5f60",
-      "exact_replay_fingerprint_sha256": "f9dce5c3f5e071a6f2e5e2fe2dbf2cea018e75eb79d250f2379904152b73fa17",
+      "immutable_authority_sha256": "877f7c2a9d5feebe3ee45798643d73adac2b3bea22e91e1287189a518a90894f",
+      "exact_replay_fingerprint_sha256": "978c6b7820a468fe22c8fb35b0aa5c37294c484a0fdd5da885be3a02a71fb5ef",
       "selection": {
         "fallback_profile": true,
         "max_instruments": null
@@ -228,14 +228,14 @@
       "style_identity": {
         "cell_styles": 289,
         "differential_styles": 93,
-        "cell_style_sha256": "fe161f42c8f67d87675c287a4a512dd3108931fc4e9dcde0e1ee34f906729cb6",
-        "differential_style_sha256": "6856eca306a1a1c9810dfdc352d689a2cfcea4935df7a7c5ed686a7ddf9c0814"
+        "cell_style_sha256": "98de4cc0d82c3246eba1c294293470f38acb02cd5b2fd762f1c2b9e3950c80c7",
+        "differential_style_sha256": "45983d35adad0d58e6115a89ba1a9d5a33ce230b36c28fe428e76aae4d47e71e"
       }
     },
     "net_cash": {
       "profile": "net_cash",
-      "immutable_authority_sha256": "66a0e911b02922ba9ba3f55c0ae0f0478744f32432f0e30a800a2ec3e9e5b2b5",
-      "exact_replay_fingerprint_sha256": "fd057c01e93649b123490fbbd04fd2f8c02876dead432027117ba04d296c84c8",
+      "immutable_authority_sha256": "0db8b4ede5ca47c218e28321fd2aa1ac6b8e88ba17f91b758f2e8cbe5731bb76",
+      "exact_replay_fingerprint_sha256": "84600546250738012fd9f66e1a0bf3091a20f4ec6824dee8717dc8217cdeab2a",
       "selection": {
         "opening_net_cash_required": true,
         "max_instruments": 2,
@@ -271,7 +271,7 @@
       "style_identity": {
         "cell_styles": 272,
         "differential_styles": 71,
-        "cell_style_sha256": "cd0556e56c5525302d99017e7b0d4e6f74b889f9e6ef8cbf887c33ded7963f48",
+        "cell_style_sha256": "ecf15e0f035d728f0e258998c21bf92aa208f7d46ae4ca71a00ef4f0a0ae6f18",
         "differential_style_sha256": "d0484fe69940794eb3117e9a1c895af4dfed8d6f6933ef82b70caaa068611a9b"
       }
     }

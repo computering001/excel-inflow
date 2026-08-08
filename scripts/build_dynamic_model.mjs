@@ -1041,15 +1041,25 @@ function styleStatementRow(
   // already on the row plan — patchLabelIndents() writes it into the package
   // after the last LibreOffice pass, because the writer drops indentLevel.
   sheet.getRange(`B${row}`).format.indentLevel = Number(definition.indent ?? 0);
+  // Epoch 3: a NUMBERED GROUP PARENT is not a ranked total. The consolidation
+  // pass types these rows `subtotal` for the formula and outline layers, but
+  // marks them `style_role: "subsection"` precisely so the costume decision
+  // stays separate — a bold label over indented children is the whole
+  // treatment, and the band stays reserved for rows that close a section.
+  const numberedParentEpoch3 =
+    presentationEpoch() >= 3 &&
+    definition.style_role === "subsection" &&
+    definition.row_type !== "header";
   const isTotal =
-    definition.display_role === "answer" ||
-    definition.style_role === "total" ||
-    definition.row_type === "subtotal" ||
-    // Epoch 3: a key subtotal is a total by identity, whatever row_type its
-    // arithmetic was authored with — gross profit typed as a plain
-    // calculation must not dress like the expense lines around it.
-    (presentationEpoch() >= 3 &&
-      isRankedTotalIdentity([definition.row_id, definition.semantic_role]));
+    !numberedParentEpoch3 &&
+    (definition.display_role === "answer" ||
+      definition.style_role === "total" ||
+      definition.row_type === "subtotal" ||
+      // Epoch 3: a key subtotal is a total by identity, whatever row_type its
+      // arithmetic was authored with — gross profit typed as a plain
+      // calculation must not dress like the expense lines around it.
+      (presentationEpoch() >= 3 &&
+        isRankedTotalIdentity([definition.row_id, definition.semantic_role])));
   // Rank is resolved from the row's OWN identity AND ITS SECTION, never from a
   // row number, and the treatment is applied once at the end of the build by
   // applyTotalHierarchy(). A ratio row can still be an ANSWER — the leverage
@@ -7500,7 +7510,17 @@ function configureOperatingModel(
     // column-block left edge spans, so the edge is only re-stated where it
     // already exists. Restating a perimeter is safe; extending one is not.
     const withinLeftEdge = lastRow <= rowPlan.visible_end_row;
-    for (const address of blockRanges(lastRow)) {
+    // A CLOSING RULE RUNS UNDER THE LABEL IT CLOSES.
+    //
+    // This used the default C-anchored number blocks, so a section closed with
+    // a rule that began a column and a half to the right of its own last
+    // label — under three empty term columns — and read as a line belonging to
+    // the number block rather than to the section. It is the same defect
+    // RANK_BLOCKS was introduced to fix, which was fixed for rank rows and
+    // never for section closes. Epoch 3 anchors both at column B, so every
+    // horizontal rule in the model starts in the same place.
+    const closeBlocks = presentationEpoch() >= 3 ? RANK_BLOCKS : NUMBER_BLOCKS;
+    for (const address of blockRanges(lastRow, closeBlocks)) {
       sheet.getRange(address).format.borders = {
         ...(withinLeftEdge ? blockLeftEdge(address) : {}),
         bottom: { style: "thin", color: COLORS.darkBorder },

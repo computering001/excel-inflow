@@ -10,9 +10,9 @@ export const STANDARDISED_DESIGN_RUNTIME_SHA256 =
 // successor. It activates only through the explicit epoch switch below —
 // never as a side effect of being present on disk.
 export const STANDARDISED_DESIGN_RUNTIME_V3_SHA256 =
-  "ef791b83a5dd753270e7a4e32d48e2ceac2a5a8f7c71e835d313a029ef0b167c";
+  "f0392d0a7e6e9fe86b98075fdafc3831e438569cd975733243c79c43df2b99b1";
 export const STANDARDISED_DESIGN_CONTRACT_V3_SHA256 =
-  "bdc58eecda36ca8774a2fa498f1400c3992528ab2c366af79287d2058748cd47";
+  "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3";
 
 // Epoch-aware identities for artifacts that stamp themselves with the
 // active design lattice. Shipped default remains the v2 pair.

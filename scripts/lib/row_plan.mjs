@@ -131,11 +131,19 @@ const SECTION_RANKS = {
     // NOT an answer here. It is a step between operating profit and profit
     // before tax; the interest schedule below is where it concludes something.
     blocks: new Set(["net_interest_expense", "pre_tax_income"]),
+    // NOTHING on the income statement closes a block. Revenue, gross profit,
+    // Adjusted EBITDA, EBIT and profit before taxation are all steps down one
+    // continuous ladder to the bottom line, and the bottom line is the answer.
+    bands: new Set(),
     ratio_answers: new Set(),
   },
   [RANK_SECTION.CASH_FLOW]: {
     answers: new Set(["ending_cash"]),
     blocks: new Set(["free_cash_flow"]),
+    // The waterfall's own close, and the memo conclusion beneath it. The three
+    // activity subtotals are deliberately NOT here: they are steps, and giving
+    // them the band made the statement read as four conclusions.
+    bands: new Set(["net_change_in_cash", "free_cash_flow"]),
     ratio_answers: new Set(),
   },
   [RANK_SECTION.DEBT_SCHEDULE]: {
@@ -151,6 +159,9 @@ const SECTION_RANKS = {
       "total_liquidity",
     ]),
     blocks: new Set(),
+    // Gross debt and cash-before-RCF are steps toward net debt; net debt and
+    // liquidity are already answers.
+    bands: new Set(),
     ratio_answers: new Set([
       "net_debt_excluding_leases_to_adjusted_ebitda",
       "net_debt_to_adjusted_ebitda",
@@ -163,12 +174,14 @@ const SECTION_RANKS = {
   [RANK_SECTION.RCF_WATERFALL]: {
     answers: new Set(["ending_rcf"]),
     blocks: new Set(),
+    bands: new Set(),
     ratio_answers: new Set(),
   },
   [RANK_SECTION.INTEREST_SCHEDULE]: {
     // Here it IS the answer: the entire schedule builds to it.
     answers: new Set(["net_interest_expense"]),
     blocks: new Set(),
+    bands: new Set(),
     ratio_answers: new Set(),
   },
 };
@@ -267,6 +280,31 @@ export function totalRank(identity, isTotal = true, section = undefined) {
   }
   for (const key of keys) {
     if (table.answers.has(key)) return TOTAL_RANK.ANSWER;
+  }
+  // EPOCH 3 INVERTS THE DEFAULT, AND THAT IS THE WHOLE DESIGN CHANGE.
+  //
+  // Epoch 2 banded every total it could not otherwise classify, on the theory
+  // that a band is the safe outcome because an unfamiliar total can never
+  // silently lose its weight. In practice the unclassified case is the COMMON
+  // case — an issuer's own `Cash generated from operations` carries no semantic
+  // role at all — so the safe default became the universal one, and a real
+  // filing rendered as a wall of identical bands. Three declared ranks came out
+  // as two, and the row each section exists to produce sat one shade away from
+  // four rows that merely pass through it. Filling everything is the same as
+  // filling nothing.
+  //
+  // So under epoch 3 the band is DECLARED, never inherited: `bands` names the
+  // rows that close a block, `answers` names the one row the section produces,
+  // and everything else that closes arithmetic is a STEP — bold, with a thin
+  // rule under its own label, and no fill. An unfamiliar issuer total is still
+  // unmistakably a total; it simply is not also a conclusion. That makes the
+  // default degrade toward quiet rather than toward noise, which is the only
+  // direction that survives contact with an arbitrary filing.
+  if (presentationEpoch() >= 3) {
+    for (const key of keys) {
+      if (table.bands.has(key)) return TOTAL_RANK.BLOCK;
+    }
+    return TOTAL_RANK.COMPONENT;
   }
   for (const key of keys) {
     if (table.blocks.has(key)) return TOTAL_RANK.BLOCK;
@@ -1480,9 +1518,15 @@ function badgeAdjustedEbitdaBridge(rows) {
   if (presentationEpoch() < 3) return;
   const ebitda = rows.find((row) => row.semantic_role === "adjusted_ebitda");
   if (!ebitda) return;
-  if (rows.some((row) => row.row_id === "adjusted_ebitda_bridge_header")) {
-    return;
-  }
+  // A bridge title anywhere in the section — the issuer's own or a prior
+  // compile's — means the block is already badged; matching by label, not
+  // row id, because the existing header may be case-authored.
+  const alreadyBadged = rows.some(
+    (row) =>
+      row.row_type === "header" &&
+      /ebitda\s+bridge/i.test(String(row.label ?? "")),
+  );
+  if (alreadyBadged) return;
   const index = rows.indexOf(ebitda);
   const previous = rows[index - 1];
   if (previous?.row_type === "header") return;
