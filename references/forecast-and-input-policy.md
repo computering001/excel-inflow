@@ -85,6 +85,12 @@ Apply in this order, subject to exact metric, scope and period compatibility:
 one targeted question or blocks.  An immaterial detail row may be marked not
 separately forecast only when a forecast parent already captures the amount.
 
+After every sourced, linked, schedule-owned and captured path has been tested,
+a non-schedule historical input may use a visible last-supported-level carry or
+an explicit zero as the final deterministic fallback. The selection and reason
+remain in the forecast receipt; grey is a presentation state, not a forecast
+method.
+
 For a partial period:
 
 ```text
@@ -104,6 +110,15 @@ waterfall_v1` carries these decisions as `forecast_period_authorities` on the
 semantic row.  Deterministic code compiles that declaration into exactly one of
 formula, cross-sheet broker link, visible hardcode, formula-driven zero,
 intentional blank or fail-closed unresolved.
+
+Authority is immutable once declared for a period. A presentation capture or
+compiler fallback may never erase a direct broker link, sourced formula, user
+assumption or supplied value. The compiler records every eligible candidate,
+the selected candidate and any parent-capture certificate. A capture is valid
+only when the parent is a genuine disclosed or semantic aggregation, the child
+has no stronger direct authority, and the parent includes that child exactly
+once. Accounting identities such as EBIT, EBITDA, PBT, tax, net income and cash
+totals are never used as generic capture buckets.
 
 Before selecting those authorities, record `forecast_context` in the evidence
 run: every annual/interim result reviewed, the latest publication-dated result,

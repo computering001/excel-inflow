@@ -1041,7 +1041,9 @@ function styleStatementRow(
   // after the last LibreOffice pass, because the writer drops indentLevel.
   sheet.getRange(`B${row}`).format.indentLevel = Number(definition.indent ?? 0);
   const isTotal =
-    definition.style_role === "total" || definition.row_type === "subtotal";
+    definition.display_role === "answer" ||
+    definition.style_role === "total" ||
+    definition.row_type === "subtotal";
   // Rank is resolved from the row's OWN identity AND ITS SECTION, never from a
   // row number, and the treatment is applied once at the end of the build by
   // applyTotalHierarchy(). A ratio row can still be an ANSWER — the leverage
@@ -2546,6 +2548,18 @@ function configureOperatingModel(
   };
 
   const acquisition = modelCase.acquisition ?? {};
+  const fy1AdjustedEbitda = Number(
+    modelCase.operating_metrics?.adjusted_ebitda?.values?.[3] ??
+      modelCase.operating_metrics?.ebitda?.values?.[3] ??
+      0,
+  );
+  const illustrativeTargetEbitda = Math.max(1, Math.abs(fy1AdjustedEbitda) * 0.01);
+  const illustrativeMultiple = 10;
+  const illustrativeEnterpriseValue = illustrativeTargetEbitda * illustrativeMultiple;
+  const illustrativeDebt = illustrativeEnterpriseValue * 0.5;
+  const illustrativeCloseYear = new Date(
+    modelCase.periods?.[3]?.date ?? Date.UTC(new Date().getUTCFullYear(), 11, 31),
+  ).getUTCFullYear();
   // The acquisition case is now only the transaction itself: what is bought,
   // at what price, how much of it is debt-funded, at what rate and when. Its
   // operating profile is inherited from the standalone case in the adjustment
@@ -2564,14 +2578,14 @@ function configureOperatingModel(
     [
       c.transaction_enterprise_value,
       "Enterprise value",
-      acquisition.transaction_enterprise_value ?? null,
+      acquisition.transaction_enterprise_value ?? illustrativeEnterpriseValue,
       AMOUNT,
       "entry",
     ],
     [
       c.entry_ev_to_ebitda,
       "Entry EV / EBITDA",
-      acquisition.entry_ev_to_ebitda ?? null,
+      acquisition.entry_ev_to_ebitda ?? illustrativeMultiple,
       MULTIPLE,
       "entry",
     ],
@@ -2581,24 +2595,30 @@ function configureOperatingModel(
       // controls inferred EBITDA; this amount alone controls debt economics.
       c.acquisition_debt_amount,
       "Acquisition debt",
-      acquisition.acquisition_debt_amount ?? null,
+      acquisition.acquisition_debt_amount ?? illustrativeDebt,
       AMOUNT,
       "entry",
     ],
     [
       c.incremental_rate,
       "Debt rate",
-      acquisition.incremental_rate ?? null,
+      acquisition.incremental_rate ?? 0.05,
       // The rate the acquisition debt is struck at is an all-in coupon, not a
       // spread over anything, so it reads to the basis point.
       COUPON,
       "entry",
     ],
-    [c.close_year, "Close year", acquisition.close_year ?? null, YEAR, "entry"],
+    [
+      c.close_year,
+      "Close year",
+      acquisition.close_year ?? illustrativeCloseYear,
+      YEAR,
+      "entry",
+    ],
     [
       c.close_month,
       "Close month",
-      acquisition.close_month ?? null,
+      acquisition.close_month ?? 6,
       MONTH,
       "entry",
     ],
@@ -2620,47 +2640,6 @@ function configureOperatingModel(
       styleEntryControl(`P${row}`, format);
     }
   }
-  // PERIOD-SPECIFIC ACQUISITION HELPERS — visible and stated once.
-  //
-  // These two rows use the former blank space above the period header. Every
-  // operating adjustment and the acquisition-interest row now reads the same
-  // close-date fraction and full-year EBITDA instead of repeating nested DATE,
-  // IF and growth expressions. They are workings, not user inputs: black
-  // formulas, no hidden names, and no duplicated judgement.
-  const acquisitionFractionRow = c.acquisition_operating_fraction;
-  const acquisitionFullEbitdaRow = c.acquisition_full_year_ebitda;
-  setValue(sheet, `B${acquisitionFractionRow}`, "Acquisition operating fraction");
-  setValue(sheet, `B${acquisitionFullEbitdaRow}`, "Acquisition full-year EBITDA");
-  for (const column of ADJUSTMENT_COLUMNS) {
-    applyFormula(
-      sheet,
-      `${column}${acquisitionFractionRow}`,
-      `=${acquisitionFactorInlineFormula(column, rowPlan)}`,
-    );
-    applyFormula(
-      sheet,
-      `${column}${acquisitionFullEbitdaRow}`,
-      `=${acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan)}`,
-    );
-  }
-  sheet.getRange(
-    `N${acquisitionFractionRow}:P${acquisitionFractionRow}`,
-  ).format.numberFormat = PERCENT;
-  sheet.getRange(
-    `N${acquisitionFullEbitdaRow}:P${acquisitionFullEbitdaRow}`,
-  ).format.numberFormat = AMOUNT;
-  addCommentOnce(
-    workbook,
-    sheet,
-    `B${acquisitionFractionRow}`,
-    "One shared close-date fraction for each forecast period. Every acquisition operating and interest formula consumes this visible row.",
-  );
-  addCommentOnce(
-    workbook,
-    sheet,
-    `B${acquisitionFullEbitdaRow}`,
-    "Target EBITDA at entry, compounded only by the standalone EBITDA growth rates applicable after the close date.",
-  );
   addCommentOnce(
     workbook,
     sheet,
@@ -2904,52 +2883,13 @@ function configureOperatingModel(
       );
     }
     if (role === "debt_issuance") {
-      const rows = rowPlan.instruments
-        .filter((plan) => plan.issuance_row)
-        .map((plan) => `${column}${plan.issuance_row}`);
-      return rows.length ? `=SUM(${rows.join(",")})` : "=0";
+      return Number.isInteger(waterfallRows.non_rcf_debt_proceeds)
+        ? `=${column}${waterfallRows.non_rcf_debt_proceeds}`
+        : "=0";
     }
     if (role === "debt_repayment") {
-      // Read straight off the VISIBLE debt schedule: scheduled repayment is
-      // last year's closing balance less this year's, plus anything newly
-      // issued. The hidden per-instrument repayment scratch row is gone.
-      const priorColumn =
-        forecastIndex === 0 ? "I" : FORECAST_COLUMNS[forecastIndex - 1];
-      const plans = rowPlan.instruments.filter(
-        (plan) =>
-          modelCase.instruments.find(
-            (instrument) => instrument.instrument_id === plan.instrument_id,
-          )?.instrument_id !== modelCase.rcf_policy.instrument_id,
-      );
-      if (plans.length === 0) return "=0";
-      const opening = plans.map((plan) => `${priorColumn}${plan.debt_row}`);
-      const closing = plans.map((plan) => `${column}${plan.debt_row}`);
-      const issued = plans
-        .filter((plan) => plan.issuance_row)
-        .map((plan) => `${column}${plan.issuance_row}`);
-      const otherNonCash = plans
-        .filter((plan) => plan.other_non_cash_row)
-        .map((plan) => `${column}${plan.other_non_cash_row}`);
-      return (
-        `=-(SUM(${opening.join(",")})-SUM(${closing.join(",")})` +
-        `${issued.length ? `+SUM(${issued.join(",")})` : ""}` +
-        `${otherNonCash.length ? `+SUM(${otherNonCash.join(",")})` : ""})`
-      );
-    }
-    if (role === "change_in_debt") {
-      // The consolidated line IS the link down to the debt schedule. Every
-      // constituent beneath it reads n/a on a forecast basis, so there is
-      // nothing here to sum. Where the schedule states a "Total change in
-      // debt" line, this is a single LINK to it — one number, stated once,
-      // read where it is derived. Only if the schedule has no such line does
-      // this fall back to differencing gross debt itself.
-      if (Number.isInteger(debtRows.total_change_in_debt)) {
-        return `=${column}${debtRows.total_change_in_debt}`;
-      }
-      const prior =
-        forecastIndex === 0 ? "I" : FORECAST_COLUMNS[forecastIndex - 1];
-      const grossDebt = debtRows.gross_debt_excluding_leases;
-      return `=${column}${grossDebt}-${prior}${grossDebt}`;
+      const mandatory = debtRows.mandatory_debt_repayments;
+      return Number.isInteger(mandatory) ? `=-${column}${mandatory}` : "=0";
     }
     if (role === "rcf_draw") return `=${column}${waterfallRows.rcf_draw_waterfall}`;
     if (role === "rcf_repayment") {
@@ -3270,11 +3210,6 @@ function configureOperatingModel(
               : "=0";
           case "ending_cash":
             return endingCashStatementFormula(adjustmentColumn);
-          case "change_in_debt":
-            return Number.isInteger(debtRows.total_change_in_debt)
-              ? `=${adjustmentColumn}${debtRows.total_change_in_debt}`
-              : `=${adjustmentColumn}${debtRows.gross_debt_excluding_leases}` +
-                `${priorAdjustmentColumn ? `-${priorAdjustmentColumn}${debtRows.gross_debt_excluding_leases}` : ""}`;
           case "rcf_draw":
             return `=${adjustmentColumn}${waterfallRows.rcf_draw_waterfall}`;
           case "rcf_repayment":
@@ -3507,19 +3442,6 @@ function configureOperatingModel(
           sheet,
           `${proFormaColumn}${definition.row}`,
           cashReconciliationFormula(proFormaColumn),
-        );
-      } else if (definition.semantic_role === "change_in_debt") {
-        // Same link-down as the standalone column, read off the PRO-FORMA debt
-        // schedule. R mirrors the last actual, so the fallback still has a
-        // prior to difference against in FY1.
-        const grossDebt = debtRows.gross_debt_excluding_leases;
-        const prior = index === 0 ? "R" : PRO_FORMA_COLUMNS[index - 1];
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${definition.row}`,
-          Number.isInteger(debtRows.total_change_in_debt)
-            ? `=${proFormaColumn}${debtRows.total_change_in_debt}`
-            : `=${proFormaColumn}${grossDebt}-${prior}${grossDebt}`,
         );
       } else if (definition.semantic_role === "rcf_draw") {
         applyFormula(
@@ -4234,7 +4156,11 @@ function configureOperatingModel(
   // block's own multiple silently switched to the company numerator — putting
   // it out of step with the solver, which only ever measures the model basis.
   const bridgeComponents = rowPlan.reported_net_debt_bridge ?? [];
-  const reportedBridgeVisible = bridgeComponents.length > 0;
+  const reportedNetDebtStatus =
+    rowPlan.reported_net_debt_basis_status ?? "not_disclosed";
+  const reportedBridgeVisible =
+    reportedNetDebtStatus === "reconciled_difference" &&
+    bridgeComponents.length > 0;
   const bridgeComponentRows = bridgeComponents.map(
     (_, index) => debtRows[`reported_net_debt_adjustment_${index}`],
   );
@@ -4310,9 +4236,14 @@ function configureOperatingModel(
     // bridge to draw, it also carries the answer to "so what does the company
     // report, then?" — one row, instead of a company block whose every line
     // would be a zero or a copy.
-    model_basis_header: reportedBridgeVisible
-      ? "Net debt and leverage — model basis (standardised)"
-      : "Net debt and leverage — model basis (company reported basis is the same)",
+    model_basis_header:
+      reportedNetDebtStatus === "proven_same"
+        ? "Net debt and leverage — model basis (proven equal to company basis)"
+        : reportedBridgeVisible
+          ? "Net debt and leverage — model basis (standardised)"
+          : reportedNetDebtStatus === "reported_unreconciled"
+            ? "Net debt and leverage — model basis (company basis not reconciled)"
+            : "Net debt and leverage — model basis (company basis not disclosed)",
     total_change_in_debt: "Total change in debt — cash movement",
     debt_fx_translation: "(+/-) FX translation on debt (non-cash)",
     // NAMED AS A RECONCILIATION, not as a second model. The company block does
@@ -5363,6 +5294,15 @@ function configureOperatingModel(
   const debtMovementRows = financingRows.filter((definition) =>
     debtMovementTypes.has(inferMovementType(definition)),
   );
+  const mandatoryRepaymentStatementRows = financingRows.filter((definition) => {
+    const role = definition.semantic_role;
+    const movementType = inferMovementType(definition);
+    return (
+      role === "debt_repayment" ||
+      movementType === "scheduled_amortisation" ||
+      movementType === "maturity_repayment"
+    );
+  });
   const leasePrincipalRows = financingRows.filter(
     (definition) => inferMovementType(definition) === "lease_principal",
   );
@@ -5569,12 +5509,18 @@ function configureOperatingModel(
             : "=0",
         );
       }
-      // The maturity mechanics live once in the visible debt schedule.  The
-      // waterfall is a consumer, so it carries a single direct link.
+      // The maturity mechanics live once in the visible debt schedule, then
+      // flow through the visible financing-statement repayment line(s).  The
+      // sweep consumes those statement lines rather than bypassing them and
+      // reading the schedule a second time.  This preserves one economic
+      // writer while keeping the face of the cash-flow statement fully
+      // traceable into ending cash.
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}`,
-        `=-${blockColumn}${mandatoryDebtRow}`,
+        mandatoryRepaymentStatementRows.length
+          ? `=${sumCells(blockColumn, mandatoryRepaymentStatementRows)}`
+          : `=-${blockColumn}${mandatoryDebtRow}`,
       );
       applyFormula(
         sheet,
@@ -6508,22 +6454,21 @@ function configureOperatingModel(
     modelCase.historical_interest_reconciliation?.identified_interest ?? [0, 0, 0];
   // THE HISTORICAL COLUMNS BUILD UP THE SAME WAY THE FORECAST DOES.
   //
-  // `identified_interest` is the portion of reported gross interest that has
+  // `identified_interest` is the portion of filed finance expense that has
   // been attributed to a named component row; the residual goes to the visible
   // "Other / unallocated interest" plug. The named components that carry their
-  // own historical input rows — lease interest, the RCF commitment fee and
-  // non-cash issuance-cost amortisation — are part of that identified total and
-  // are already inside the gross-interest SUM. "Instrument-modelled interest"
-  // is therefore identified interest LESS those three, not the whole reported
-  // total: writing the reported total here and then letting the lease row add
-  // finance-lease interest a second time double-counted it (worth 31 / 31 / 32
-  // of pre-tax income a year on the Smurfit reference case).
+  // own historical input rows — the RCF commitment fee and non-cash
+  // issuance-cost amortisation — and separately disclosed lease interest are
+  // all part of that identified finance-expense total and are already inside
+  // the gross-interest SUM. "Instrument-modelled interest" is therefore the
+  // identified total LESS RCF, non-cash and lease interest.
   //
-  // By construction the historical column now foots to reported gross interest:
+  // By construction the historical column now foots exactly to the filed
+  // finance-expense authority while still displaying lease interest once:
   //   instrument + lease + RCF + non-cash + plug
   //   = (identified - lease - RCF - non-cash) + lease + RCF + non-cash
   //     + (reported - identified)
-  //   = reported.
+  //   = filed finance expense.
   const historicalLeaseInterest =
     modelCase.historical_supplement?.lease_interest_expense ?? [0, 0, 0];
   const historicalRcfCommitmentFee =
@@ -9071,7 +9016,28 @@ function statementSolverValues(
   for (const definition of definitions) {
     const solverRole =
       definition.acquisition_driver_role ?? definition.semantic_role;
-    let value = solverRole
+    const periodRulesDeclared = hasForecastPeriodCalculations(definition);
+    const activeCalculation =
+      forecastCalculationForIndex(definition, forecastIndex) ??
+      (periodRulesDeclared ||
+      ["broker", "hardcode", "zero", "uncalculated"].includes(
+        definition.forecast_treatment,
+      )
+        ? null
+        : definition.calculation);
+    // A visible aggregate formula is the one authoritative writer for its
+    // cached subtotal. Solver summaries may seed schedule-owned links and
+    // independent inputs, but they must not supply a second answer for a SUM.
+    // Otherwise an issuer-specific component can be present in the cell
+    // formula yet absent from the solver summary, so the displayed value
+    // changes on the first native recalculation. Leave aggregate rows
+    // unresolved here; resolve() below evaluates the same dependency graph
+    // that emitted the workbook formula. Link, schedule, circular and other
+    // specialised formulas retain their explicit semantic cache authority.
+    const visibleAggregateOwnsCache =
+      solverRole === "cash_from_financing" &&
+      activeCalculation?.operator === "sum";
+    let value = solverRole && !visibleAggregateOwnsCache
       ? semantic.get(solverRole)
       : undefined;
     if (value !== undefined && value !== null) {
@@ -10592,6 +10558,20 @@ async function main(packaging = null) {
     return;
   }
   const rawModelCase = JSON.parse(await fs.readFile(casePath, "utf8"));
+  const assertThreePlusThree = (candidate, stage) => {
+    const periods = candidate?.periods ?? [];
+    const statuses = periods.map((period) => period.status);
+    const valid =
+      periods.length === 6 &&
+      statuses.slice(0, 3).every((status) => status === "historical") &&
+      statuses.slice(3).every((status) => status === "forecast");
+    if (!valid) {
+      throw new Error(
+        `${stage}: the workbook contract is exactly three historical and three forecast periods; received ${statuses.join(", ") || "no periods"}.`,
+      );
+    }
+  };
+  assertThreePlusThree(rawModelCase, "Pre-compile period gate");
   ensureIllustrativeAcquisitionCase(rawModelCase);
   const validationErrors = validateCaseShape(rawModelCase);
   if (validationErrors.length > 0) {
@@ -10601,6 +10581,7 @@ async function main(packaging = null) {
     model_case: modelCase,
     receipt: historicalNormalisationReceipt,
   } = applyHistoricalNormalisation(rawModelCase);
+  assertThreePlusThree(modelCase, "Post-normalisation period gate");
   const coverage = assessCoverage(modelCase);
   const coveragePath = `${outputPath}.coverage.json`;
   await fs.mkdir(path.dirname(outputPath), { recursive: true });

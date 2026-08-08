@@ -36,9 +36,13 @@ export function asciiText(value) {
 }
 
 export function inspectScreen(screen) {
-  const lines = String(screen ?? "").split("\n");
+  const rendered = String(screen ?? "");
+  const body = rendered.startsWith("```text\n") && rendered.endsWith("\n```")
+    ? rendered.slice(8, -4)
+    : rendered;
+  const lines = body.split("\n");
   const violations = [];
-  if (SCREEN_CONTRACT.ascii_only && /[^\x00-\x7F]/.test(String(screen ?? ""))) {
+  if (SCREEN_CONTRACT.ascii_only && /[^\x00-\x7F]/.test(body)) {
     violations.push("screen contains non-ASCII characters");
   }
   lines.forEach((line, index) => {
@@ -71,7 +75,10 @@ function finishScreen(lines, { summariseOverflow = false } = {}) {
   if (!inspected.ok) {
     throw new Error(`Screen contract violation: ${inspected.violations.join("; ")}`);
   }
-  return screen;
+  // One fenced text block is the user-interface boundary. It preserves
+  // monospacing in every host and prevents a stage screen from being rendered
+  // as proportional prose or a markdown list.
+  return `\`\`\`text\n${screen}\n\`\`\``;
 }
 
 export function renderStageHeader(stageId, status) {

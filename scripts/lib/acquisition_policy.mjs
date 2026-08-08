@@ -8,10 +8,10 @@
  * must remain explicit and will still fail the ordinary shape/coverage gates if
  * an input is absent.
  *
- * Values are scale-derived, not issuer-specific: target EBITDA is ten per cent
+ * Values are scale-derived, not issuer-specific: target EBITDA is one per cent
  * of the first usable forecast EBITDA, rounded to two significant figures; EV
  * is 10.0x that amount and acquisition debt is 50% of EV.  The illustrative
- * close is the middle forecast year at mid-year and the debt rate is 5.0%.
+ * close is the first forecast year at mid-year and the debt rate is 5.0%.
  */
 
 function positive(value) {
@@ -70,7 +70,7 @@ export function ensureIllustrativeAcquisitionCase(modelCase) {
   }
 
   const targetEbitda = twoSignificantFigures(
-    (forecastEbitda(modelCase) ?? 100) * 0.1,
+    (forecastEbitda(modelCase) ?? 100) * 0.01,
   );
   const entryMultiple = positive(acquisition.entry_ev_to_ebitda) ?? 10;
   const enterpriseValue =
@@ -90,7 +90,7 @@ export function ensureIllustrativeAcquisitionCase(modelCase) {
     close_year:
       Number.isInteger(closeYear) && years.includes(closeYear)
         ? closeYear
-        : years[Math.min(1, Math.max(0, years.length - 1))] ??
+        : years[0] ??
           new Date().getUTCFullYear() + 1,
     close_month:
       Number.isInteger(Number(acquisition.close_month)) &&
@@ -101,4 +101,3 @@ export function ensureIllustrativeAcquisitionCase(modelCase) {
   };
   return modelCase;
 }
-

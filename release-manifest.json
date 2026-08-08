@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.0.8",
+  "releaseName": "Excel Inflow v2.0.9",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.8",
+  "skillVersion": "2.0.9",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-07T23:56:41.988Z",
-  "centralInstructionsWords": 3875,
+  "generatedAt": "2026-08-08T10:23:13.832Z",
+  "centralInstructionsWords": 3890,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "9903306e143650b242856f9fe0b123d22d9b7e954874cfdb494b23f1ffb6cd90",
+    "currentClosureSha256": "e7d6d4ccb013fa2c4938e14ab98383236a6a097dd585745a795242eaf045dcac",
     "closureFileCount": 99,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -204,6 +204,7 @@
       "scripts/lib/release_nodes.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/design_contract.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/rcf_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/semantic_graph.mjs",
@@ -794,18 +795,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
-        "plan_sha256": "6afa6011246822ba08e6752a911e35a0a7ca3e154750190a9393050059fdd32f",
-        "workbook_sha256": "196bf135d1a81fd346680b07c4f5f79d413da4afe24a1df9ebbff2f6bd171bf8",
+        "case_sha256": "9dfbc07f44168131cc663d1e44d2e3c9a16dd5ad0bd6bdd69274a84e45edbb25",
+        "plan_sha256": "ccc859fd9debf82ba366950a65ec38345f14627aa4abe3ceeaeac89d78f6c401",
+        "workbook_sha256": "16a4f7c86a31f5b3ed1586e847ab2972d273aa550c76131b592d203e9351e419",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
-      "plan_sha256": "6afa6011246822ba08e6752a911e35a0a7ca3e154750190a9393050059fdd32f",
-      "workbook_sha256": "196bf135d1a81fd346680b07c4f5f79d413da4afe24a1df9ebbff2f6bd171bf8",
+      "case_sha256": "9dfbc07f44168131cc663d1e44d2e3c9a16dd5ad0bd6bdd69274a84e45edbb25",
+      "plan_sha256": "ccc859fd9debf82ba366950a65ec38345f14627aa4abe3ceeaeac89d78f6c401",
+      "workbook_sha256": "16a4f7c86a31f5b3ed1586e847ab2972d273aa550c76131b592d203e9351e419",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -835,45 +836,45 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "0e227a408f874025b0fc49cc53de4a0bed8419fdcaed978462c25d8e9841d9fb",
-      "bytes": 28940,
-      "words": 3875
+      "sha256": "1ca69a58670972b1938aa252c1f8cc927f5ff58f49badb7cc15604fd23427b64",
+      "bytes": 29033,
+      "words": 3890
     },
     {
       "path": "SKILL.md",
-      "sha256": "e80db4f6d461e5fee1a2cdacfc5e563cb74bedd5781a8a352ff7ed91712e5d75",
-      "bytes": 29427,
-      "words": 3944
+      "sha256": "6c395bab9383d01a89aeb6994d47408910114d429013a6313aa2f84dcf5071d2",
+      "bytes": 29520,
+      "words": 3959
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "6b23b6ac9e6e6b9497d27b0d46c7b468aa5e588bc42293fe0759580255e2487d",
-      "bytes": 28960,
-      "words": 3877
+      "sha256": "4768dd751214788358f6420fb83a25ae8e341379a341a73076cde56892176858",
+      "bytes": 29053,
+      "words": 3892
     },
     {
       "path": "references/model-contract.md",
-      "sha256": "3313f83d8440db0eef3176bd7828d097bf990f01b1aca4fc6c46b3d8cc7679cc",
-      "bytes": 11627,
-      "words": 1766
+      "sha256": "c83b6bc3e355b16212ee512c20e5ab1fe76f8954ce314baab3e379f90bcafb3c",
+      "bytes": 12686,
+      "words": 1921
     },
     {
       "path": "references/calculation-rules.md",
-      "sha256": "548a0a72b4b55892adfb7aceee0c131178b0b77bf28decb77912311da9b6ba1d",
-      "bytes": 11415,
-      "words": 1704
+      "sha256": "60831ad60166949d1a7208bdd1724178b601cffffad1f09c43dfbff0fbf5e9dc",
+      "bytes": 12582,
+      "words": 1876
     },
     {
       "path": "references/forecast-and-input-policy.md",
-      "sha256": "0f71bb2d2f5c59d6cc2350dc7331a68a67134bffff7f6ad34eb532e61b799ecf",
-      "bytes": 11748,
-      "words": 1767
+      "sha256": "88d1984c1389cdefb23ce9ba862df3f3801d4c2db908589f185db8f9409d251d",
+      "bytes": 12669,
+      "words": 1906
     },
     {
       "path": "references/acquisition.md",
-      "sha256": "ad96aea955a63015a1caa647930d5859c25d688c0ccbc98dafa022891579b931",
-      "bytes": 4704,
-      "words": 704
+      "sha256": "e51780cc4585a02426f07878334fbbcd1eded7e90aa7c9907c713f253dbf81c9",
+      "bytes": 5284,
+      "words": 795
     },
     {
       "path": "references/advanced-history-and-fx.md",
@@ -883,15 +884,15 @@
     },
     {
       "path": "references/template-and-formatting.md",
-      "sha256": "a8f0f280f0b11fb15fd8370ef79dc45866a82ea691b1b9d5fff09834b35446e2",
-      "bytes": 26331,
-      "words": 4294
+      "sha256": "e3a255a917e1a1b7a2300cc267e41ae2249bbd5c9d137749eb08bb4471d8333e",
+      "bytes": 26577,
+      "words": 4323
     },
     {
       "path": "references/validation.md",
-      "sha256": "5d7149e58711dca655c9c9386b2eee844c9008d2b3ee3fbce270cb7820be2f72",
-      "bytes": 48183,
-      "words": 6889
+      "sha256": "ba4ba93a5d6578ff1bec5187c7b50088a78c1be58e5e754f03c2582cb59e6c98",
+      "bytes": 48900,
+      "words": 6980
     },
     {
       "path": "assets/broker-pack.schema.json",
@@ -925,8 +926,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "27360adfa748d51e5f20bdb14f67d6604e1b968ad4abfa096345cb512522fdb6",
-      "bytes": 49225,
+      "sha256": "68be4b1047527d91a4ee122265b127d668c2ba07a7a5414475280d7ed0f16aeb",
+      "bytes": 51289,
       "words": null
     },
     {
@@ -937,8 +938,8 @@
     },
     {
       "path": "assets/model-ir-v3.schema.json",
-      "sha256": "eaf7dba8f91bc0df9b9a274fb8556b503a228c92554d2c4ac7362861689b9f50",
-      "bytes": 6176,
+      "sha256": "1bf3679960c4a2e6bdb2701b1c695b3d875e725bfc246a44f642ba75dd8ac749",
+      "bytes": 6412,
       "words": null
     },
     {
@@ -985,14 +986,14 @@
     },
     {
       "path": "assets/style-tokens.json",
-      "sha256": "54f50a8c1ea89ff8de450946f3646d3e0eff48a076e63fec125390d2f1d55c9b",
-      "bytes": 35221,
+      "sha256": "ade2c22344cae06978c17c77f45f1227a2299b52d531b3684bc4e8825c752f6f",
+      "bytes": 35287,
       "words": null
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "71f4a5d4ca198cb0d6767a2421438f0c875849d7e663e203e9a25c1774bd1455",
-      "bytes": 463782,
+      "sha256": "bc6ddd8238f5257d67e6c26a8fa1e19bf249d4c7903c084973801fb268e7acda",
+      "bytes": 462635,
       "words": null
     },
     {
@@ -1063,8 +1064,8 @@
     },
     {
       "path": "scripts/lib/acquisition_policy.mjs",
-      "sha256": "6cd0a9dfcec2a70bef2afcc2b11598079a5359b87c88683f71a67cc7a8305f32",
-      "bytes": 3688,
+      "sha256": "4cc8a21bea79c71a75ba946c45fa1216b5b7b6c3daa4832c2d5c576d1ca4dd33",
+      "bytes": 3646,
       "words": null
     },
     {
@@ -1147,14 +1148,14 @@
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "197d22fe3864e9304881772573e2bc895d22badc6c98d7f51a2a3fe694d7d7e9",
-      "bytes": 23981,
+      "sha256": "16e97263acad57016df5f7792d61b9b91f6d0eac31057a1097c061c87bc6e22a",
+      "bytes": 24335,
       "words": null
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "11fb51290f2b73f23acd24eebebf5e0ee409331390551aa97108e617e55710b7",
-      "bytes": 25564,
+      "sha256": "b8ce877f15ad8e889c4fb6ffac6c5fa72b35b89fc9e5f259c04654df1f95cd83",
+      "bytes": 26333,
       "words": null
     },
     {
@@ -1195,8 +1196,8 @@
     },
     {
       "path": "scripts/lib/model_ir_v3.mjs",
-      "sha256": "2f6d97b7e26a4dfcda7e7467d58f6ca964b43412c662a8907ea091b2594b99bd",
-      "bytes": 24539,
+      "sha256": "0c3859669a7346cab5f190fc2211fbba85a2c56cd1e1d007deab6457eba0d4c9",
+      "bytes": 24825,
       "words": null
     },
     {
@@ -1249,8 +1250,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "e22465d38471dae6a9fa602f3c4fda0146ab5a4b341a5317837e15f365b61700",
-      "bytes": 114130,
+      "sha256": "a0f3d0beca64ad5c62514714dfeda32fdf49e49792128a42458566f1d2def02b",
+      "bytes": 120968,
       "words": null
     },
     {
@@ -1273,14 +1274,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "d5c5593e6c1c585a3a05f2d947e07ffb20adc9458140132784d0a982cb559f42",
-      "bytes": 40656,
+      "sha256": "4f828adcf3bb4edc1c82b855679ea2af9f7a1251ae8fb770c6aed22e9971e596",
+      "bytes": 41117,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "0fc14c3bf576a8ff32c5614269d6840f5cdb5c6848ac9e348707b81254923745",
-      "bytes": 108127,
+      "sha256": "c1f415177e2f3a487fbddec7eed4012e2bf235dbe2f0c2f48a5aea3190a167cd",
+      "bytes": 109880,
       "words": null
     },
     {
@@ -1291,8 +1292,8 @@
     },
     {
       "path": "scripts/lib/statement_topology.mjs",
-      "sha256": "1460c43fed0694a9da7339996bdc90f6819610e85d27a6bb6a2299ff1c66f715",
-      "bytes": 20731,
+      "sha256": "d4e50be4939542f1c5ae709804d3840f22d809fcc20ed336b5953551615da664",
+      "bytes": 22389,
       "words": null
     },
     {
@@ -1393,8 +1394,8 @@
     },
     {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "9c5a6e9c3459ed10eafaba4c754e8d21fb41c908bc9a49ea4ac999ca38f2cf0c",
-      "bytes": 27216,
+      "sha256": "97dc0f2ff589da8a67b3e44f57573e26f95c7bf3d52f6f8c389ecde73f73bcd4",
+      "bytes": 27386,
       "words": null
     },
     {
@@ -1471,8 +1472,8 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "394126a658fbf3d950fbd7c3b52882371f3a1293ea7d462923129506b063d24c",
-      "bytes": 125875,
+      "sha256": "d1aeab927a8bb5542f65199b1011a19d08b79fd8979e9b51bac5a2003b1ca937",
+      "bytes": 126691,
       "words": null
     },
     {

@@ -114,7 +114,19 @@ Keep material reported-to-adjusted add-backs visible.
 - FX effect on cash when relevant
 - Ending cash
 
-Link mandatory debt repayments and RCF movements from the waterfall exactly once.
+The debt schedule owns mandatory repayment; the financing-statement repayment
+line consumes it; the pre-RCF sweep consumes that visible statement line. The
+waterfall owns RCF draw and repayment and the corresponding financing children
+consume them. `Change in Debt` is a compact parent that sums the visible debt
+children. Each movement reaches ending cash exactly once.
+
+Presentation hierarchy is separate from calculation authority. A genuine group
+parent is bold without an answer band or subtotal rule, appears immediately
+above its contiguous indented children and sums only those children. A normal
+issuer detail or linked schedule line sits at body level one but does not become
+a deeper grouped child without an explicit semantic parent. Do not invent
+`Other investing` or `Other financing` parents merely to shorten a formula;
+direct issuer lines may flow straight into the disclosed subtotal.
 
 #### Free Cash Flow Metrics
 
@@ -201,9 +213,12 @@ reported net debt". Never emit a single anonymous "(+/-) reported adjustments"
 row: it tells the reader that a difference exists and nothing about what it is,
 and where no item exists it is a line of zeros between two identical subtotals.
 
-Where the model basis IS the company basis, suppress the company block entirely
-and say so in the model-basis header. One row answers the question; five rows of
-zeros do not.
+Where the model basis is independently proven to be the company basis, suppress
+the company block and say so in the model-basis header. Where no company basis
+is disclosed, use neutral standardised-basis wording; absence of reconciling
+items is not proof of equality. A named bridge may be shown only when the case
+declares `reconciled_difference`; an unresolved company figure must remain
+labelled unreconciled.
 
 The model-basis multiples always divide MODEL-basis numerators. The independent
 solver measures leverage on the model basis and knows nothing about reported

@@ -97,12 +97,14 @@ Do not reinterpret a percentage-of-margin convention as basis points.
 Keep historical reconciliation and the forecast plug economically distinct.
 
 For historical periods, calculate `Other / unallocated interest` as the visible
-residual between reported gross interest and the interest identified from the
-available instrument, RCF, commitment-fee and lease detail:
+residual between filed total finance expense and the interest identified from
+the available instrument, RCF, commitment-fee, lease and other named detail.
+Separately disclosed lease interest is a component of filed finance expense
+when the issuer includes it there; display it once and never add it again on top:
 
 ```text
 other interest
-= reported gross interest per the filing
+= filed total finance expense
 - identified instrument interest
 - RCF interest
 - commitment fee
@@ -281,7 +283,23 @@ RCF draw and RCF repayment are mutually exclusive. A period with a cash deficit
 may draw; a period with a cash surplus may repay opening drawn RCF only. A draw
 made in the current period is never immediately repaid in that same period.
 
-Calculate mandatory repayment, RCF draw and RCF repayment once in the waterfall. Link them into Cash from Financing with cash-flow signs. Do not subtract them twice.
+Calculate mandatory repayment once from the instrument repayment states in the
+visible debt schedule. Its membership is semantic: every eligible non-RCF
+instrument with scheduled amortisation or a maturity inside the period is
+included, regardless of its physical row; RCF is excluded because it is the
+balancing source. Link the positive schedule requirement into the visible
+negative financing-statement repayment line. The pre-RCF sweep then consumes
+that visible statement line. Calculate RCF draw and repayment once in the
+waterfall and link them back into their visible financing-statement children.
+The visible Change in Debt parent sums those children. No schedule or sweep may
+bypass the statement and no movement may enter ending cash twice.
+
+Historical reported debt interest and separately reported lease interest are
+distinct authorities. Reconcile named debt-interest components and any residual
+to reported debt interest; add lease interest once when calculating gross
+finance expense. Do not absorb lease interest into the debt-interest residual
+and do not subtract it from the instrument total merely because both appear in
+the same interest schedule.
 
 ## Credit outputs
 

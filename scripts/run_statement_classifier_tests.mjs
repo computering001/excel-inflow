@@ -220,7 +220,7 @@ const normalisedChildIndents = cashGeneratedChildren.slice(0, 2).map(
 );
 assert(
   normalisedChildIndents[0] === normalisedChildIndents[1] &&
-    normalisedChildIndents[0] === 0,
+    normalisedChildIndents[0] === 1,
   `Source indent metadata overrode the graph: ${normalisedChildIndents.join(", ")}.`,
 );
 const mutatedCompiledIndent = clone(normalisedArbitraryIndent);
@@ -248,10 +248,14 @@ const normalisedIncomeIndent = normaliseStatementRows(
   arbitraryIncomeIndent,
   "income_statement",
 );
+const cleanIncomeIndent = normaliseStatementRows(
+  fixture,
+  "income_statement",
+).find((row) => row.row_id === topLevelIncomeSourceRow.row_id).indent;
 assert(
   normalisedIncomeIndent.find(
     (row) => row.row_id === topLevelIncomeSourceRow.row_id,
-  ).indent === 0,
+  ).indent === cleanIncomeIndent,
   "An unparented income-statement row retained a section-wide or source-layout indent.",
 );
 

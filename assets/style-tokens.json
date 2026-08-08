@@ -540,9 +540,9 @@
     "applies_to_column": "B",
     "leading_spaces_in_label_forbidden": true,
     "leading_spaces_note": "Two literal spaces inside the label string is content pretending to be style: invisible to any restyle, impossible to change globally, and it corrupts column-width measurement. row_plan strips them so the two cannot compound.",
-    "section_subsection_header_total": 0,
-    "ordinary_child": 1,
+    "section_label_only_subsection_total_and_ratio": 0,
+    "ordinary_statement_component_or_numbered_parent": 1,
     "consolidated_line_constituent": 2,
-    "consolidated_line_constituent_note": "Change in Working Capital and Net Change in Debt are themselves children of a total, so their own constituents land one further in — which is what makes the greyed run beneath Net Change in Debt read as nested rather than as a flat grey list."
+    "consolidated_line_constituent_note": "A compiler-declared group parent sits at body level one and its explicit constituents sit at level two. Working-capital children may be blank and grey only when their forecast parent captures them; Change in Debt children remain live formula links on white cells."
   }
 }

@@ -14,6 +14,10 @@ import { isBalancingRcf } from "./rcf_policy.mjs";
 import { resolvedLeaseInterestBasis } from "./lease_policy.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import {
+  forecastRowMateriality,
+  isScheduleOwnedForecastRole,
+} from "./forecast_authority.mjs";
+import {
   assertStatementTopology,
   deriveStatementIndentMap,
   materializeStatementPresentationTree,
@@ -649,11 +653,28 @@ function resetCompiledPresentationMetadata(rows) {
  * the evidence adapter and must never be inferred from a convenient caption.
  */
 function isWorkingCapitalConstituent(row) {
+  if (
+    row.semantic_role &&
+    row.semantic_role !== "change_in_working_capital"
+  ) return false;
+  if (row.semantic_role === "change_in_working_capital") return false;
   if (row.economic_class !== undefined) {
     return row.economic_class === "working_capital";
   }
   if (row.movement_type === "working_capital_movement") return true;
   if (/^working_capital[_.]/.test(String(row.row_id ?? ""))) return true;
+  const classification = classifyStatementLine({
+    label: row.label,
+    section: "cash_flow",
+  });
+  // A declared WC parent supplies the missing context for a caption-level
+  // candidate.  Use the taxonomy's strongest candidate only when it is WC;
+  // unrelated operating adjustments whose strongest candidate is another
+  // class remain outside the narrower group.
+  if (
+    classification.candidates?.[0]?.role === "change_in_working_capital" &&
+    Number(classification.candidates[0].score) >= 0.34
+  ) return true;
   return false;
 }
 
@@ -670,16 +691,45 @@ function markForecastCapturedBy(
   parentRowId,
   note,
   mode = "formula_membership",
+  modelCase = null,
 ) {
+  const explicit = row.forecast_period_authorities;
+  const hasDirectAuthority =
+    row.broker_metric_id ||
+    row.forecast_calculation ||
+    (row.forecast_period_calculations ?? []).some(Boolean) ||
+    (row.values ?? []).slice(3, 6).some(
+      (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+    ) ||
+    (Array.isArray(explicit) &&
+      explicit.some(
+        (authority) =>
+          authority &&
+          !["not_separately_forecast", "not_applicable", "unresolved"].includes(
+            authority.method,
+          ),
+      ));
+  if (hasDirectAuthority) return false;
+  const material = modelCase ? forecastRowMateriality(modelCase, row) : null;
   row.forecast_treatment = "uncalculated";
   row.formula_authority = "intentionally_blank";
   row.forecast_capture_parent_id = parentRowId;
   row.forecast_capture_mode = mode;
   row.forecast_capture_note = note;
-  delete row.broker_metric_id;
-  delete row.forecast_calculation;
-  delete row.forecast_period_calculations;
+  // Remove only stale absence declarations. Genuine direct authorities have
+  // already returned above and are never deleted.
   delete row.forecast_period_authorities;
+  row.forecast_capture_certificates = [0, 1, 2].map((forecastIndex) => ({
+    forecast_index: forecastIndex,
+    parent_row_id: parentRowId,
+    mode,
+    material,
+    proof:
+      mode === "formula_membership"
+        ? "Parent formula contains this row exactly once."
+        : "Immaterial detail is represented by the declared semantic parent.",
+  }));
+  return true;
 }
 
 function clearCompiledForecastOverride(row) {
@@ -687,6 +737,7 @@ function clearCompiledForecastOverride(row) {
   delete row.forecast_capture_parent_id;
   delete row.forecast_capture_mode;
   delete row.forecast_capture_note;
+  delete row.forecast_capture_certificates;
   if (row.formula_authority === "intentionally_blank") {
     delete row.formula_authority;
   }
@@ -884,64 +935,6 @@ export function assertUniqueStatementDependencies(rows, section = "statement") {
 }
 
 /**
- * EVERY constituent beneath Net Change in Debt reads n/a on a forecast basis —
- * additions, repayments, issuance costs, commercial paper, other movements and
- * both revolver legs. None of them is a number the reader should be reading:
- * the movement is a CONSEQUENCE of the debt schedule and the cash sweep, and
- * restating it here split five ways invites the reader to check a sum that the
- * schedule below already reconciles.
- *
- * An earlier pass kept additions and repayments live on the grounds that they
- * carried the link down to the debt schedule. The reviewer overruled that: the
- * CONSOLIDATED line now carries the link-down itself, reading the change in
- * gross debt straight off the schedule, so the constituents are free to go n/a
- * without severing anything. Historic columns are untouched — a company that
- * reported these movements still shows them as reported.
- */
-function greyDebtChangeConstituents(rows, consolidated) {
-  const refs = new Set(consolidated.calculation?.refs ?? []);
-  for (const row of rows) {
-    if (!refs.has(row.row_id)) continue;
-    markForecastCapturedBy(
-      row,
-      consolidated.row_id,
-      `Forecast debt movement is captured by ${consolidated.label} and the debt schedule.`,
-      "semantic_scope",
-    );
-  }
-}
-
-/**
- * A row that SUMS the rows DIRECTLY BENEATH it is a parent, and the reviewer
- * wants it to read as one: the run indents a level in and becomes an Excel
- * outline group so the whole thing collapses to the single line. Detected
- * structurally — refs exactly equal to the contiguous run below — so Change in
- * Working Capital, Change in Debt and any consolidation added later all get the
- * treatment without being named here.
- */
-function groupSubtotalRuns(rows) {
-  for (let index = 0; index < rows.length; index += 1) {
-    const parent = rows[index];
-    if (parent.calculation?.operator !== "sum") continue;
-    const refs = parent.calculation.refs;
-    if (!Array.isArray(refs) || refs.length === 0) continue;
-    const run = rows.slice(index + 1, index + 1 + refs.length);
-    if (run.length !== refs.length) continue;
-    const runIds = new Set(run.map((row) => row.row_id));
-    if (runIds.size !== refs.length) continue;
-    if (!refs.every((ref) => runIds.has(ref))) continue;
-    const level = Number(parent.outline_level ?? 0) + 1;
-    for (const child of run) {
-      child.indent = Math.max(
-        Number(parent.indent ?? 0) + 1,
-        Number(child.indent ?? 0),
-      );
-      child.outline_level = Math.max(level, Number(child.outline_level ?? 0));
-    }
-  }
-}
-
-/**
  * INDENT EVERY CHILD, not just the ones a case author happened to space in.
  *
  * The level a row reads at is a fact about the arithmetic, so it is derived
@@ -951,11 +944,12 @@ function groupSubtotalRuns(rows) {
  *            adds up TO (`style_role: "total"`). Anchors are the spine; they
  *            never move right no matter how deep the sum that names them.
  *   level 1  an ordinary child: a row named in the refs of an anchor.
- *   level 2  a constituent beneath a CONSOLIDATED line — Change in Working
- *            Capital, Net Change in Debt. Those lines are themselves children
- *            of a total (level 1), so their own refs land one further in and
- *            the greyed run beneath them reads as nested rather than as a flat
- *            list that happens to be grey.
+ *   level 2  a constituent beneath a DECLARED consolidated line — Change in
+ *            Working Capital or Change in Debt. Those lines are themselves
+ *            ordinary body parents (level 1), so their explicit children land
+ *            one further in. Forecast debt children remain live schedule links;
+ *            WC children may be blank and grey only when the forecast parent
+ *            carries their full economic scope.
  *
  * A ref that is itself an anchor is skipped, so `Adjusted EBITDA = Operating
  * Profit + ...` does not push Operating Profit — a total in its own right —
@@ -993,15 +987,43 @@ function stripLabelIndentSpaces(rows) {
  */
 function consolidateConstituents(rows, spec) {
   const scoped = spec.scope ? rows.filter((row) => spec.scope(row)) : rows;
-  let constituents = scoped.filter((row) => spec.isConstituent(row));
-  if (constituents.length === 0) return null;
+  // Adopt an explicitly declared parent BEFORE classifier discovery. This is
+  // critical for unusual issuer wording: the filing's own parent/refs are
+  // stronger evidence than whether every child caption matched a taxonomy.
+  let consolidated = rows.find(
+    (row) => row.semantic_role === spec.semantic_role,
+  ) ?? null;
+  const explicitChildIds = consolidated
+    ? [
+        ...rows
+          .filter((row) => row.parent_row_id === consolidated.row_id)
+          .map((row) => row.row_id),
+        ...(consolidated.calculation?.refs ?? []),
+      ]
+    : [];
+  const explicitChildSet = new Set(explicitChildIds);
+  let constituents = explicitChildSet.size > 0
+    ? scoped.filter((row) => explicitChildSet.has(row.row_id))
+    : scoped.filter((row) => spec.isConstituent(row));
+  if (constituents.length === 0) {
+    if (consolidated) {
+      // Preserve the semantic identity of an issuer-reported aggregate even
+      // where its detail is not separately disclosed.  It remains a numbered
+      // body line, not a label-only header and not an invented answer.
+      consolidated.display_role = "group_parent";
+      consolidated.formula_role = consolidated.calculation
+        ? "derived_total"
+        : "input";
+    }
+    return consolidated;
+  }
   let constituentIdSet = new Set(constituents.map((row) => row.row_id));
 
   // The company already reports the consolidated line: adopt it rather than
   // adding a second one. Either it declares the role, or it is a sum whose
   // refs are exactly this run of constituents.
-  let consolidated =
-    rows.find((row) => row.semantic_role === spec.semantic_role) ??
+  consolidated =
+    consolidated ??
     rows.find((row) => {
       const refs = row.calculation?.refs ?? [];
       return (
@@ -1055,6 +1077,8 @@ function consolidateConstituents(rows, spec) {
   // consolidated parent is a subtotal because its declared child graph—not a
   // caption-specific headline list—owns its prominence and indentation.
   consolidated.row_type = "subtotal";
+  consolidated.display_role = "group_parent";
+  consolidated.formula_role = "derived_total";
 
   // Presentation rank is a compiler decision, not a property inherited from
   // whichever issuer row happened to be adopted. This keeps an adopted Change
@@ -1099,6 +1123,7 @@ function consolidateConstituents(rows, spec) {
   // Constituents stay on the face, one level in from the consolidated line.
   for (const row of constituents) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
+    row.display_role = "component";
     if (spec.captureForecastInParent) {
       row.parent_row_id = consolidated.row_id;
       row.aggregation_role =
@@ -1698,7 +1723,7 @@ function applyBrokerAnchorRule(modelCase, rows) {
  * the total Revenue line, its growth calculation and the EBIT/EBITDA identity
  * remain live. Cases without a resolvable anchor retain their authored detail.
  */
-function applyAnchoredSlimForecast(rows, anchorSelection) {
+function applyAnchoredSlimForecast(modelCase, rows, anchorSelection) {
   if (!anchorSelection) return;
   const revenueIndex = rows.findIndex((row) => row.semantic_role === "revenue");
   const ebitIndex = rows.findIndex((row) => row.semantic_role === "ebit");
@@ -1786,6 +1811,7 @@ function applyAnchoredSlimForecast(rows, anchorSelection) {
       parentId,
       `Forecast detail is captured by ${parent?.label ?? parentId}.`,
       "semantic_scope",
+      modelCase,
     );
   }
 }
@@ -1804,6 +1830,168 @@ function removeRedundantDuplicateHeaders(rows) {
     if (next?.row_type === "header") continue;
     if (normalise(header.label) === normalise(next?.label)) {
       rows.splice(index, 1);
+    }
+  }
+}
+
+/**
+ * Final non-destructive forecast fallback.  It runs only after broker,
+ * schedule, accounting-identity and declared capture decisions have been made.
+ * A reported line with no stronger path remains visible and formula-driven:
+ * zero stays zero; otherwise the last reported value carries forward.  This is
+ * the last rung of the waterfall, never a replacement for guidance or broker
+ * evidence, and it avoids both unexplained blue hardcodes and grey material
+ * rows.
+ */
+function applyDefaultForecastWaterfall(modelCase, rows) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  for (const row of rows) {
+    if (
+      row.row_type === "header" ||
+      row.operation_scope === "not_applicable" ||
+      isScheduleOwnedForecastRole(row.semantic_role) ||
+      row.forecast_capture_parent_id ||
+      row.broker_metric_id ||
+      row.forecast_calculation ||
+      (row.forecast_period_calculations ?? []).some(Boolean) ||
+      (row.forecast_period_authorities ?? []).some(
+        (authority) =>
+          authority &&
+          !["not_separately_forecast", "not_applicable", "unresolved"].includes(
+            authority.method,
+          ),
+      ) ||
+      (row.values ?? []).slice(3, 6).some(
+        (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+      )
+    ) continue;
+    const parent = row.parent_row_id ? byId.get(row.parent_row_id) : null;
+    if (parent?.broker_metric_id || parent?.forecast_calculation) continue;
+    const history = (row.values ?? []).slice(0, 3).map((value) =>
+      value === null || value === undefined || !Number.isFinite(Number(value))
+        ? null
+        : Number(value),
+    );
+    if (!history.some((value) => value !== null)) continue;
+    const last = history[2] ?? history[1] ?? history[0];
+    clearCompiledForecastOverride(row);
+    if (Math.abs(Number(last ?? 0)) <= 1e-12) {
+      row.forecast_treatment = "zero";
+      row.values = [...history, 0, 0, 0];
+      row.forecast_decision = {
+        method: "explicit_zero",
+        reason: "Latest reported value is zero and no stronger forecast evidence exists.",
+      };
+    } else {
+      row.forecast_treatment = "formula";
+      row.forecast_calculation = {
+        operator: "prior_period",
+        refs: [row.row_id],
+      };
+      row.forecast_decision = {
+        method: "carry_forward",
+        reason: "Last-resort formula carry from the latest reported value.",
+      };
+    }
+  }
+}
+
+function captureChildrenOfDirectForecastParents(modelCase, rows) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const accountingIdentityParents = new Set([
+    "gross_profit",
+    "operating_profit",
+    "ebit",
+    "adjusted_ebitda",
+    "pre_tax_income",
+    "tax_expense",
+    "net_income",
+    "cash_from_operations",
+    "cash_from_investing",
+    "cash_from_financing",
+    "net_change_in_cash",
+    "ending_cash",
+  ]);
+  for (const parent of rows) {
+    // Change in Debt is the visible sum of four live schedule producers:
+    // issuance, mandatory repayment, RCF draw and RCF repayment.  Capturing
+    // those children in the parent would grey the very audit trail the row is
+    // meant to expose and would make the financing statement bypass its own
+    // components.
+    if (parent.semantic_role === "change_in_debt") continue;
+    const refs = parent.calculation?.refs ?? [];
+    const hasDirectForecast =
+      parent.broker_metric_id ||
+      parent.forecast_calculation ||
+      (parent.forecast_period_calculations ?? []).some(Boolean) ||
+      (parent.forecast_period_authorities ?? []).some(
+        (authority) =>
+          authority &&
+          !["not_separately_forecast", "not_applicable", "unresolved"].includes(
+            authority.method,
+          ),
+      );
+    const aggregationParent =
+      !accountingIdentityParents.has(parent.semantic_role) &&
+      (hasDirectForecast ||
+        parent.forecast_capture_mode === "formula_membership");
+    if (
+      parent.calculation?.operator !== "sum" ||
+      refs.length === 0 ||
+      !aggregationParent
+    ) continue;
+    for (const childId of refs) {
+      const child = byId.get(childId);
+      if (!child || child === parent) continue;
+      const presentAsGroup =
+        parent.style_role === "subsection" ||
+        ["change_in_working_capital", "capex", "change_in_debt"].includes(
+          parent.semantic_role,
+        );
+      if (presentAsGroup) {
+        child.parent_row_id ??= parent.row_id;
+        child.aggregation_role ??= "contributing_child";
+      }
+      markForecastCapturedBy(
+        child,
+        parent.row_id,
+        `Forecast detail is captured by directly forecast parent ${parent.label}.`,
+        "formula_membership",
+        modelCase,
+      );
+    }
+  }
+}
+
+function assignDisplayAndFormulaRoles(rows) {
+  const referencedAsChild = new Set(
+    rows.flatMap((row) => row.calculation?.refs ?? []),
+  );
+  for (const row of rows) {
+    if (row.row_type === "header") {
+      row.display_role = "header";
+      row.formula_role = "presentation";
+      continue;
+    }
+    const hasDeclaredChildren = rows.some(
+      (candidate) =>
+        candidate.parent_row_id === row.row_id ||
+        candidate.presentation_parent_id === row.row_id,
+    );
+    row.formula_role = row.formula_authority === "intentionally_blank"
+      ? "uncalculated"
+      : row.calculation || row.forecast_calculation
+        ? "derived"
+        : "input";
+    if (row.display_role === "group_parent" || hasDeclaredChildren) {
+      row.display_role =
+        row.style_role === "total" && !referencedAsChild.has(row.row_id)
+          ? "answer"
+          : "group_parent";
+    } else if (row.style_role === "total") {
+      row.display_role = "answer";
+    } else {
+      row.display_role = "component";
     }
   }
 }
@@ -1851,7 +2039,7 @@ export function normaliseStatementRows(modelCase, section) {
     collapseRedundantStatementAliases(modelCase, section, rows);
     projectIncomeStatementToDebtOverlay(modelCase, rows);
     const anchorSelection = applyBrokerAnchorRule(modelCase, rows);
-    applyAnchoredSlimForecast(rows, anchorSelection);
+    applyAnchoredSlimForecast(modelCase, rows, anchorSelection);
   }
   if (section === "cash_flow") {
     selectSingleCashFlowRoot(modelCase, rows);
@@ -1944,20 +2132,22 @@ export function normaliseStatementRows(modelCase, section) {
     });
     if (changeInDebt) {
       ensureDebtScheduleLinkage(rows, changeInDebt);
-      // The revolver legs join the run, then the whole run goes n/a — both
-      // before the grouping pass reads the run.
+      // The revolver legs join the run.  Every child remains a visible
+      // schedule-linked producer and the parent sums the children; the old
+      // parent-bypass made the forecast impossible to audit line by line.
       foldRevolverIntoChangeInDebt(rows, changeInDebt);
-      greyDebtChangeConstituents(rows, changeInDebt);
     }
   }
   // The acquisition case is a debt-overlay balance-sheet module. It never
   // injects, stamps or fabricates cash-flow rows; issuer-reported acquisition
   // lines remain only when the issuer's own statement contains them.
-  // Last, so it sees the final row order: every parent that sums the run
-  // beneath it indents and groups that run.
+  // Last, so it sees the final row order. The presentation-tree compiler is
+  // the single writer for parentage, indentation and outline levels.
   removeRedundantDuplicateHeaders(rows);
-  if (section === "cash_flow") groupSubtotalRuns(rows);
+  captureChildrenOfDirectForecastParents(modelCase, rows);
+  applyDefaultForecastWaterfall(modelCase, rows);
   materializeStatementPresentationTree(rows, section);
+  assignDisplayAndFormulaRoles(rows);
   // Later still, so every row the consolidation dynamics added or re-pointed is
   // levelled off the FINAL ref graph, and no label is left carrying its indent
   // as content.
@@ -2161,6 +2351,19 @@ export function reportedNetDebtBridgeComponents(modelCase) {
     }));
 }
 
+export function reportedNetDebtBasisStatus(modelCase) {
+  const declared =
+    modelCase?.historical_supplement?.reported_net_debt_basis_status;
+  const bridge = reportedNetDebtBridgeComponents(modelCase);
+  if (bridge.length > 0) return "reconciled_difference";
+  if (
+    ["proven_same", "reported_unreconciled", "not_disclosed"].includes(
+      declared,
+    )
+  ) return declared;
+  return "not_disclosed";
+}
+
 /**
  * THE REFERENCE RATES THE FORECAST ACTUALLY PRICES OFF.
  *
@@ -2284,24 +2487,18 @@ export function compileRowPlan(modelCase) {
     incremental_rate: 9,
     close_year: 10,
     close_month: 11,
-    // Two visible, period-specific helper rows replace repeated close-date and
-    // target-growth expressions in every acquisition formula. They occupy the
-    // former blank rows above the period header, so statement geometry does not
-    // move and no hidden calculation block is introduced.
-    acquisition_operating_fraction: 12,
-    acquisition_full_year_ebitda: 13,
     // Growth, margin, D&A, tax, capex and working-capital ratios are DERIVED
     // from the standalone case in the adjustment columns — a ratio line
     // beneath the row it drives — so declaring them again as transaction
     // inputs would duplicate the model against itself.
   };
-  // Rows 12-13 are now visible acquisition helpers, using the former two-row
-  // gap. The period header therefore follows immediately after the helper
-  // block and remains on the same physical row as the frozen authorities.
+  // Rows 12-13 remain blank. Acquisition timing and target growth are compiled
+  // inline from the visible controls, so helper workings never intrude between
+  // the control block and the period header.
   const controlBlockEndRow = Math.max(
     ...Object.values(controls).map(Number).filter(Number.isFinite),
   );
-  const BLANK_ROWS_BEFORE_PERIOD_HEADER = 0;
+  const BLANK_ROWS_BEFORE_PERIOD_HEADER = 2;
   const periodGroupRow = controlBlockEndRow + BLANK_ROWS_BEFORE_PERIOD_HEADER + 1;
   const periodRow = periodGroupRow + 1;
   // One blank row separates the period header from the first section band.
@@ -2552,7 +2749,8 @@ export function compileRowPlan(modelCase) {
   // and FX translation) now close the block rather than interrupting the run
   // from a balance to the ratio that reads it.
   const bridgeComponents = reportedNetDebtBridgeComponents(modelCase);
-  const reportedBridge = bridgeComponents.length > 0;
+  const reportedNetDebtStatus = reportedNetDebtBasisStatus(modelCase);
+  const reportedBridge = reportedNetDebtStatus === "reconciled_difference";
   const declaredCashBuckets = Array.isArray(modelCase.cash_policy?.buckets)
     ? modelCase.cash_policy.buckets
     : [];
@@ -2930,6 +3128,7 @@ export function compileRowPlan(modelCase) {
     // allocated, so the emitters and the cache writer walk the same list the
     // row plan walked.
     reported_net_debt_bridge: bridgeComponents,
+    reported_net_debt_basis_status: reportedNetDebtStatus,
     cash_buckets: cashBucketPlans,
     waterfall_rows: waterfallRows,
     benchmark_row: benchmarkRow,

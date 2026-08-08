@@ -43,7 +43,10 @@ function definitionSignature(manifest, node) {
 }
 
 function producerType(authority, node) {
-  if (node.forecast_capture_parent_id) return "CapturedBy";
+  if (
+    node.forecast_capture_parent_id &&
+    ["not_separately_forecast", "not_applicable"].includes(authority.method)
+  ) return "CapturedBy";
   switch (authority.method) {
     case "broker_consensus":
       return "BrokerInput";
@@ -75,6 +78,7 @@ function producerType(authority, node) {
 }
 
 function displayRole(node) {
+  if (node.display_role) return node.display_role;
   if (node.row_type === "header") return "header";
   if (node.projection_status !== "rendered") return "memo";
   if (node.formula_authority === "compiler") return "consumer";
@@ -217,6 +221,9 @@ export function compileModelIrV3({
         source_id: item.source_id ?? null,
         capture_parent_display_id: node.forecast_capture_parent_id ?? null,
         reason: item.note ?? null,
+        material: item.material ?? null,
+        candidates: item.candidates ?? [],
+        capture_certificate: item.capture_certificate ?? null,
       };
     }),
   );

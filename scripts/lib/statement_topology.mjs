@@ -43,12 +43,41 @@ const DERIVED_PRESENTATION_OPERATORS = new Set([
   "negated_ratio",
 ]);
 
+// Stable headline economic identities remain level-zero even when an imported
+// authority described their visual style as a subsection rather than a total.
+// This is semantic, not issuer- or row-specific: EBIT / operating profit is a
+// statement result, never an indented component of itself.
+const HEADLINE_TOTAL_ROLES = new Set([
+  "revenue",
+  "gross_profit",
+  "operating_profit",
+  "ebit",
+  "adjusted_ebitda",
+  "pre_tax_income",
+  "net_income",
+  "cash_from_operations",
+  "cash_from_investing",
+  "cash_from_financing",
+  "net_change_in_cash",
+  "ending_cash",
+]);
+
 function isIndentAnchor(row) {
   return (
     row.row_type === "header" ||
     row.style_role === "header" ||
-    row.style_role === "total"
+    row.style_role === "total" ||
+    HEADLINE_TOTAL_ROLES.has(row.semantic_role) ||
+    DERIVED_PRESENTATION_OPERATORS.has(row.calculation?.operator)
   );
+}
+
+function rootIndentDepth(row) {
+  // The standardised statement grammar has one visible body level beneath
+  // its level-zero headers, totals and ratio readings.  A declared parent at
+  // that body level owns level-two constituents.  This is still a projection
+  // of semantic role and hierarchy; no physical row or issuer caption is used.
+  return isIndentAnchor(row) ? 0 : 1;
 }
 
 function inferPresentationParents(rows) {
@@ -62,12 +91,14 @@ function inferPresentationParents(rows) {
   // Arithmetic may nominate a presentation family only once, during this
   // dedicated compilation pass.  Renderers and later indent logic consume the
   // materialised edge and never infer hierarchy from formulas themselves. A
-  // sum qualifies only when its complete member set is already a contiguous
-  // parent-first run. A PBT, PAT or cash-flow total that appears *after* its
-  // inputs is an answer, not a presentation parent, and must never indent or
-  // reorder the lines above it.
+  // sum qualifies only when another semantic pass explicitly declared it a
+  // display parent and its complete member set is already a contiguous
+  // parent-first run.  A convenient parent-first SUM such as "Other investing
+  // cash flow" remains an arithmetic subtotal; it cannot invent a collapsible
+  // visual family merely because two referenced rows happen to follow it.
   for (const parent of rows) {
     if (parent.calculation?.operator !== "sum") continue;
+    if (parent.display_role !== "group_parent") continue;
     const parentIndex = rows.indexOf(parent);
     const eligibleRefs = (parent.calculation.refs ?? []).filter((ref) => {
       const child = byId.get(ref);
@@ -96,7 +127,7 @@ function presentationDepth(rowId, parentOf, byId, visiting = new Set()) {
   const row = byId.get(rowId);
   if (!row || isIndentAnchor(row)) return 0;
   const parentId = parentOf.get(rowId);
-  if (!parentId || !byId.has(parentId)) return 0;
+  if (!parentId || !byId.has(parentId)) return rootIndentDepth(row);
   const parentDepth = presentationDepth(
     parentId,
     parentOf,
@@ -152,6 +183,12 @@ export function materializeStatementPresentationTree(rows, section) {
     row.presentation_depth = isIndentAnchor(row)
       ? 0
       : (depths.get(row.row_id) ?? 0);
+    // The same materialised edge owns the Excel outline.  No downstream pass
+    // may infer grouping from a SUM formula, so arithmetic and presentation
+    // cannot drift into competing hierarchies.
+    row.outline_level = parentId
+      ? Math.max(1, Number(row.presentation_depth ?? 1) - 1)
+      : 0;
     row.presentation_role =
       row.row_type === "header"
         ? "header"
@@ -212,16 +249,15 @@ export function deriveStatementIndentMap(rows, section) {
     }
     const next = new Set(visiting).add(rowId);
     const parentId = parentOf.get(rowId);
-    // Indentation is a projection of the declared hierarchy only. The former
-    // income-statement fallback shifted every ordinary line right even when no
-    // parent owned it, while debt instruments stayed flat under a separate
-    // renderer. That made indentation describe the section a row happened to
-    // be in rather than its economic depth.
+    // Indentation is a projection of the declared hierarchy and the
+    // standardised statement grammar.  Level-zero rows are headers, totals and
+    // ratio readings; ordinary statement components sit at level one; an
+    // explicit parent's children sit one level beneath that parent.
     const value = Number.isInteger(row.presentation_depth)
       ? row.presentation_depth
       : parentId
         ? resolve(parentId, next) + 1
-        : 0;
+        : rootIndentDepth(row);
     depth.set(rowId, value);
     return value;
   };
@@ -455,6 +491,9 @@ export function compileStatementTopology(modelCase, section, rows) {
       if (child.parent_row_id === row.row_id) {
         sourceOrderExemptRows.add(child.row_id);
       }
+    }
+    for (const index of descendantIndexes(rows, row.row_id)) {
+      sourceOrderExemptRows.add(rows[index].row_id);
     }
   }
 

@@ -91,6 +91,10 @@ const SCHEDULE_OWNED_ROLES = new Set([
   "non_balancing_cash_bucket_movement",
 ]);
 
+export function isScheduleOwnedForecastRole(role) {
+  return SCHEDULE_OWNED_ROLES.has(role);
+}
+
 function finite(value) {
   return value !== null && value !== undefined && Number.isFinite(Number(value));
 }
@@ -353,19 +357,14 @@ export function resolveForecastAuthority(modelCase, row, forecastIndex) {
   if (!Number.isInteger(forecastIndex) || forecastIndex < 0 || forecastIndex > 2) {
     throw new Error(`forecastIndex must be 0, 1 or 2; received ${forecastIndex}.`);
   }
-  // Structural absence outranks every previously-authored period authority.
-  // Compiler passes are allowed to project a source row out of the forecast
-  // after the case has been authored (for example granular P&L detail captured
-  // by Revenue or EBIT).  Letting a stale `explicit_zero` survive that pass
-  // produced the impossible state "grey, intentionally blank, but formula
-  // =0".  A structural state is therefore resolved first; evidence authorities
-  // compete only for rows the compiled graph still calculates.
+  // Headers and genuinely out-of-scope rows are absent by definition.  A
+  // compiler-authored capture, however, is only a CANDIDATE authority: it may
+  // never erase stronger period evidence already carried by the case.  The old
+  // ordering let a presentation pass delete guidance, broker links and derived
+  // forecasts simply by marking a row grey.
   const structurallyAbsent =
     row?.row_type === "header" ||
-    row?.operation_scope === "not_applicable" ||
-    row?.row_type === "uncalculated" ||
-    row?.formula_authority === "intentionally_blank" ||
-    Boolean(row?.forecast_capture_parent_id);
+    row?.operation_scope === "not_applicable";
   const selected = structurallyAbsent
     ? inferredAuthority(modelCase, row, forecastIndex)
     : explicitAuthority(modelCase, row, forecastIndex) ??
@@ -390,6 +389,37 @@ export function resolveForecastAuthority(modelCase, row, forecastIndex) {
     broker_selection: broker,
     forecast_index: forecastIndex,
   };
+}
+
+/**
+ * Preserve the complete per-period decision surface for audit.  The renderer
+ * consumes only `selected`; rejected candidates remain proof of why a source
+ * was not used.  This is deliberately row-number-free and therefore survives
+ * issuer-specific statement layouts.
+ */
+export function forecastCandidateLedger(modelCase, row, forecastIndex) {
+  const explicit = explicitAuthority(modelCase, row, forecastIndex);
+  const inferred = inferredAuthority(modelCase, row, forecastIndex);
+  const candidates = [];
+  if (explicit) {
+    candidates.push({
+      origin: "declared_period_authority",
+      ...explicit,
+      selected: true,
+      rejection_reason: null,
+    });
+  }
+  candidates.push({
+    origin: row?.forecast_capture_parent_id
+      ? "compiled_capture_candidate"
+      : "inferred_row_mechanism",
+    ...inferred,
+    selected: !explicit,
+    rejection_reason: explicit
+      ? "A stronger declared period authority exists."
+      : null,
+  });
+  return candidates;
 }
 
 /** Resolve an operating metric that is consumed outside a visible statement row. */

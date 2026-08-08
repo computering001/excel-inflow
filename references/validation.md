@@ -469,6 +469,17 @@ schedule authority direction against the hash-bound proof contract emitted from
 the sealed model IR. A physical mutation to any of those relationships blocks
 publication even when formula caches and headline values still agree.
 
+The architecture repair gate additionally proves: exact 3H/3F rejection before
+and after normalisation; direct forecast authority cannot be overwritten by
+capture; every capture has period certificates; investing and financing contain
+no invented catch-all aggregation; Change in Debt remains a visible child sum;
+mandatory repayment membership follows instrument states rather than row
+ranges; leverage-basis wording cannot claim company parity without evidence;
+acquisition timing helpers remain internal; every user screen is one fenced ASCII
+block; and optional raw broker sheets are evidence-only. Run
+`scripts/run_eight_fix_architecture_tests.mjs` on a representative case before
+the broader development gate.
+
 ### The Python render stage — `render/check_render.py` and `render/selftest.py`
 
 ```text

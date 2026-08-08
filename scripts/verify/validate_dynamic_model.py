@@ -505,14 +505,36 @@ def main(argv: List[str]) -> int:
 
     # ---------------------------------------------------------- sheet-contract
     sheets = workbook.sheet_names
-    allowed_sheets = ["Operating Model", "Brokers", "Forward Curves"]
+    core_sheets = ["Operating Model", "Brokers", "Forward Curves"]
+    def is_broker_evidence_sheet(name: str) -> bool:
+        import re
+        return name == "> Brokers" or re.match(r"^B(?:0[1-9]|10)\s", name) is not None
+    evidence_sheets = [name for name in sheets if is_broker_evidence_sheet(name)]
+    unknown_sheets = [
+        name for name in sheets
+        if name not in core_sheets and not is_broker_evidence_sheet(name)
+    ]
+    core_order = [name for name in sheets if name in core_sheets]
+    evidence_contract_valid = (
+        not evidence_sheets
+        or (
+            evidence_sheets[0] == "> Brokers"
+            and all(name.startswith("B") for name in evidence_sheets[1:])
+        )
+    )
     checks.append(
         record(
             "sheet-contract",
-            all(name in allowed_sheets for name in sheets)
-            and all(name in sheets for name in allowed_sheets),
-            "Workbook contains only the three approved production sheets.",
-            {"sheets": sheets, "allowedSheets": allowed_sheets},
+            not unknown_sheets
+            and core_order == core_sheets
+            and evidence_contract_valid,
+            "Workbook contains the three core sheets plus only an optional declared broker-evidence extension.",
+            {
+                "sheets": sheets,
+                "coreSheets": core_sheets,
+                "evidenceSheets": evidence_sheets,
+                "unknownSheets": unknown_sheets,
+            },
         )
     )
 

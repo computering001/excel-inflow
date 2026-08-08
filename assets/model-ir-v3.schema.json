@@ -102,7 +102,15 @@
         "source_kind": { "$ref": "#/$defs/nullableString" },
         "source_id": { "$ref": "#/$defs/nullableString" },
         "capture_parent_display_id": { "$ref": "#/$defs/nullableString" },
-        "reason": { "$ref": "#/$defs/nullableString" }
+        "reason": { "$ref": "#/$defs/nullableString" },
+        "material": { "type": ["boolean", "null"] },
+        "candidates": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "capture_certificate": {
+          "type": ["object", "null"]
+        }
       }
     },
     "calculationPlane": {

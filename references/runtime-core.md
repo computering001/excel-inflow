@@ -168,9 +168,10 @@ The visible run has exactly five labelled stages:
 4. `BUILD AND CHECKS` — solve, emit and validate without user contact; and
 5. `DELIVERY` — return the workbook, assumptions, findings and gate status.
 
-Use plain ASCII status screens no wider than 61 columns or 70 lines. Every
-screen states `STAGE n OF 5`, status and one unambiguous next action when user
-action is required. Do not expose raw logs, stack traces or internal file
+Use plain ASCII status screens no wider than 61 columns or 70 lines. Return each
+screen as exactly one fenced `text` block so spacing survives the chat renderer.
+Every screen states `STAGE n OF 5`, status and one unambiguous next action when
+user action is required. Do not expose raw logs, stack traces or internal file
 machinery. Preserve full detail in the stage artifact when the screen is a
 summary.
 

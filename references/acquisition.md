@@ -67,6 +67,15 @@ the full acquisition debt balance at closing; do not prorate the debt balance.
 Validate close month as an integer from 1 to 12 and close year as one of the
 three forecast years.
 
+The fraction and rolled target EBITDA are formula helpers, not user controls or
+visible statement rows. Keep them internal to the compiled formulas; rows 12 and
+13 remain blank so the period header retains the authority geometry. For an OFF
+illustrative shell with no supplied transaction, prefill a modest example only:
+target EBITDA of roughly 1% of first-forecast standalone EBITDA, 10.0x entry
+multiple, 50% debt funding, 5.0% incremental rate and a June close in the first
+forecast year. The switch remains OFF and supplied or enabled transaction data
+is never overwritten.
+
 ## Funding and debt
 
 This is a debt overlay, not a sources-and-uses schedule. The overlay has zero

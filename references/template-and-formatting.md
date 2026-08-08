@@ -254,12 +254,14 @@ are invisible to the style layer, impossible to change globally, and they corrup
 column-width measurement. Strip them from label strings wherever the indent lands,
 or the two compound.
 
-- level 0 — sections, subsection headers, totals
-- level 1 — ordinary children under a subtotal
-- level 2 — constituents beneath a consolidated line
+- level 0 — sections, label-only subsection headers, totals and ratio readings
+- level 1 — ordinary statement components and numbered aggregate parents
+- level 2 — constituents beneath a declared consolidated line
 
-Indent depth is tree depth. It is derived from the row hierarchy, not declared
-per row.
+Indent depth is compiled from the standardised statement grammar plus the
+declared presentation tree, never from a physical row, issuer caption or a
+convenient `SUM`. Only a source-declared parent or a compiler-declared
+consolidation parent may own level-two children.
 
 ## Fills — one fill, one meaning
 

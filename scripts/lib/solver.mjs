@@ -313,24 +313,73 @@ const NEGATED_NON_DEBT_FINANCING_ROLES = new Set([
  * Returns null when the statement declares no such rows — a case with no
  * statement structure at all keeps the aggregate-metric route unchanged.
  */
-function visibleNonDebtFinancing(modelCase, periodIndex) {
-  // Use the same semantic classification as the declared statement graph.
-  // Some issuer rows (notably dividends and buybacks) carry their economic
-  // role without redundantly restating `movement_type`.  Filtering only the
-  // literal field meant that adding one explicit other-financing row switched
-  // this function away from the aggregate fallback while silently dropping
-  // those role-classified rows.  De-duplicate by row id so an alias exposed by
-  // normalization cannot enter cash twice.
-  const rows = [
-    ...new Map(
-      (modelCase.statement_structure?.cash_flow ?? [])
-        .filter((row) => inferMovementType(row) === "non_debt_financing")
-        .map((row) => [row.row_id, row]),
-    ).values(),
-  ];
+function visibleNonDebtFinancing(
+  modelCase,
+  periodIndex,
+  previousValues,
+  acquisitionBaseValues = null,
+) {
+  // Consume the compiler-normalised graph. The raw filing rows do not yet
+  // contain the forecast waterfall decisions (carry, broker, formula, blank),
+  // so solving against them would price visible carried financing rows at zero
+  // while the emitted workbook correctly carried them forward.
+  const cashFlowRows = normaliseStatementRows(modelCase, "cash_flow");
+  const rowsById = new Map(cashFlowRows.map((row) => [row.row_id, row]));
+  const financingTotal = cashFlowRows.find(
+    (row) => row.semantic_role === "cash_from_financing",
+  );
+  const debtOrLiquidityMovements = new Set([
+    "debt_issuance",
+    "scheduled_amortisation",
+    "maturity_repayment",
+    "debt_issuance_cost",
+    "other_cash_debt_movement",
+    "rcf_draw",
+    "rcf_repayment",
+    "lease_principal",
+  ]);
+  // Membership comes from the statement topology, not from a label dictionary
+  // or an optional movement tag. Every leaf that the declared financing total
+  // owns is financing cash. Debt, RCF and lease leaves are solved in their
+  // dedicated schedules; every remaining leaf is non-debt financing and must
+  // enter liquidity exactly once. This preserves unusual issuer rows such as
+  // dividend hedges, NCI purchases or share-withholding cash without requiring
+  // the universe of possible labels to be encoded in advance.
+  const visited = new Set();
+  const rows = [];
+  const collect = (rowId) => {
+    if (visited.has(rowId)) return;
+    visited.add(rowId);
+    const row = rowsById.get(rowId);
+    if (!row) return;
+    const movementType = inferMovementType(row);
+    const refs = row.calculation?.operator === "sum"
+      ? row.calculation.refs ?? []
+      : [];
+    if (!movementType && refs.length > 0) {
+      for (const ref of refs) collect(ref);
+      return;
+    }
+    if (!debtOrLiquidityMovements.has(movementType)) rows.push(row);
+  };
+  for (const ref of financingTotal?.calculation?.refs ?? []) collect(ref);
+  // Legacy cases without a declared financing subtotal retain the explicit
+  // semantic-tag route. Production cases are required to declare the total.
+  if (!financingTotal) {
+    for (const row of cashFlowRows) {
+      if (inferMovementType(row) === "non_debt_financing") collect(row.row_id);
+    }
+  }
   if (rows.length === 0) return null;
+  const statementGraph = declaredStatementPeriod(
+    modelCase,
+    periodIndex,
+    new Map(),
+    previousValues,
+    acquisitionBaseValues,
+  );
   return rows.reduce((total, row) => {
-    const value = statementRowForecastValue(modelCase, row, periodIndex);
+    const value = statementGraph.resolve(row.row_id);
     return (
       total +
       (NEGATED_NON_DEBT_FINANCING_ROLES.has(row.semantic_role)
@@ -1689,6 +1738,8 @@ export function solveCase(
     const statementNonDebtFinancing = visibleNonDebtFinancing(
       modelCase,
       periodIndex,
+      previousStatementValues,
+      acquisitionBaseValues,
     );
     const taxRate =
       brokerForecastValue(

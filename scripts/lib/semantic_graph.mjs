@@ -1,5 +1,9 @@
 import { deterministicCaseHash } from "./validation_invariants.mjs";
-import { resolveForecastAuthority } from "./forecast_authority.mjs";
+import {
+  forecastCandidateLedger,
+  forecastRowMateriality,
+  resolveForecastAuthority,
+} from "./forecast_authority.mjs";
 import { compileStatementTopology } from "./statement_topology.mjs";
 
 const MOVEMENT_DEFINITIONS = {
@@ -277,6 +281,10 @@ function semanticForecastAuthorities(modelCase, row) {
           ? row.broker_metric_id ?? row.semantic_role ?? null
           : null,
       inferred: authority.inferred === true,
+      material: forecastRowMateriality(modelCase, row),
+      candidates: forecastCandidateLedger(modelCase, row, forecastIndex),
+      capture_certificate:
+        row.forecast_capture_certificates?.[forecastIndex] ?? null,
     };
   });
 }
@@ -310,10 +318,14 @@ function statementNodes(modelCase, rowPlan) {
       forecast_capture_parent_id: row.forecast_capture_parent_id ?? null,
       forecast_capture_mode: row.forecast_capture_mode ?? null,
       forecast_capture_note: row.forecast_capture_note ?? null,
+      forecast_capture_certificates:
+        row.forecast_capture_certificates ?? null,
       aggregation_role: row.aggregation_role ?? null,
       economic_class: row.economic_class ?? null,
       acquisition_driver_role: row.acquisition_driver_role ?? null,
       style_role: row.style_role ?? null,
+      display_role: row.display_role ?? null,
+      formula_role: row.formula_role ?? null,
       formula_authority: description.formula_authority,
       dependencies: description.dependency_refs,
       forecast_authorities: semanticForecastAuthorities(modelCase, row),
