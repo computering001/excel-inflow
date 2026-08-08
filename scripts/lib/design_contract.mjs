@@ -5,23 +5,65 @@ export const STANDARDISED_DESIGN_CONTRACT_SHA256 =
   "aea5808b7914cd699cdda42c5d3e09091634fbca5934ccd4141b5a3ffa4e84be";
 export const STANDARDISED_DESIGN_RUNTIME_SHA256 =
   "6bba4cb7a5348d8a16d0759596bf56c05ca8db695b334b5b315db00d292c6343";
+// The v3 runtime (presentation epoch 3: tiered statement grammar, badged
+// bridge, 46-character label column) exists as a prepared, digest-pinned
+// successor. It activates only through the explicit epoch switch below —
+// never as a side effect of being present on disk.
+export const STANDARDISED_DESIGN_RUNTIME_V3_SHA256 =
+  "ef791b83a5dd753270e7a4e32d48e2ceac2a5a8f7c71e835d313a029ef0b167c";
+export const STANDARDISED_DESIGN_CONTRACT_V3_SHA256 =
+  "bdc58eecda36ca8774a2fa498f1400c3992528ab2c366af79287d2058748cd47";
+
+// Epoch-aware identities for artifacts that stamp themselves with the
+// active design lattice. Shipped default remains the v2 pair.
+export function activeDesignContractSha256() {
+  return process.env.EXCEL_INFLOW_DESIGN_EPOCH === "3"
+    ? STANDARDISED_DESIGN_CONTRACT_V3_SHA256
+    : STANDARDISED_DESIGN_CONTRACT_SHA256;
+}
+
+export function activeDesignRuntimeSha256() {
+  return activeRuntimeSelection().sha256;
+}
 
 const CONTRACT_URL = new URL(
   "../../assets/standardised-design-runtime.v2.json",
   import.meta.url
 );
+const CONTRACT_V3_URL = new URL(
+  "../../assets/standardised-design-runtime.v3.json",
+  import.meta.url
+);
+
+// Deliberate, environment-scoped epoch selection for local epoch-3 exemplar
+// generation and certification work. The shipped default remains v2 until
+// the v3 authorities are approved and the default flips in one commit.
+function activeRuntimeSelection() {
+  if (process.env.EXCEL_INFLOW_DESIGN_EPOCH === "3") {
+    return {
+      url: CONTRACT_V3_URL,
+      sha256: STANDARDISED_DESIGN_RUNTIME_V3_SHA256,
+    };
+  }
+  return { url: CONTRACT_URL, sha256: STANDARDISED_DESIGN_RUNTIME_SHA256 };
+}
 
 let cachedContract;
+let cachedContractSha;
 
 export function standardisedDesignContract() {
-  if (cachedContract) return cachedContract;
-  const bytes = fs.readFileSync(CONTRACT_URL);
+  const selection = activeRuntimeSelection();
+  if (cachedContract && cachedContractSha === selection.sha256) {
+    return cachedContract;
+  }
+  const bytes = fs.readFileSync(selection.url);
   const digest = crypto.createHash("sha256").update(bytes).digest("hex");
-  if (digest !== STANDARDISED_DESIGN_RUNTIME_SHA256) {
+  if (digest !== selection.sha256) {
     throw new Error(
-      `Standardised runtime design contract digest drift: expected ${STANDARDISED_DESIGN_RUNTIME_SHA256}, got ${digest}.`,
+      `Standardised runtime design contract digest drift: expected ${selection.sha256}, got ${digest}.`,
     );
   }
+  cachedContractSha = selection.sha256;
   const contract = JSON.parse(bytes);
   if (
     contract.schema_version !== 2 ||

@@ -5,6 +5,8 @@ import {
 export { inferMovementType } from "./semantic_graph.mjs";
 import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
 import {
+  activeDesignContractSha256,
+  activeDesignRuntimeSha256,
   presentationEpoch,
   selectStandardisedProfile,
   STANDARDISED_DESIGN_CONTRACT_SHA256,
@@ -3327,8 +3329,8 @@ export function compileRowPlan(modelCase) {
     semantic_graph_version: 1,
     profile: "standardised_dynamic",
     authority_profile: authorityProfile,
-    authority_contract_sha256: STANDARDISED_DESIGN_CONTRACT_SHA256,
-    authority_runtime_contract_sha256: STANDARDISED_DESIGN_RUNTIME_SHA256,
+    authority_contract_sha256: activeDesignContractSha256(),
+    authority_runtime_contract_sha256: activeDesignRuntimeSha256(),
     // Bind every generated row map to the exact immutable workbook authority
     // selected for this profile.  The projection validator must be able to
     // prove that a maximal plan was measured against maximal (and net-cash
