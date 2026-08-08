@@ -241,6 +241,24 @@ function inferredAuthority(modelCase, row, forecastIndex) {
     treatment === "uncalculated" ||
     row?.formula_authority === "intentionally_blank"
   ) {
+    // A grey forecast cell is legal only when the capture transition actually
+    // ran and recorded its parent (markForecastCapturedBy is the single legal
+    // writer of that state), or the row is structurally uncalculated. A row
+    // that still carries its own calculation but has no capture certificate
+    // was authored grey without proof; it keeps its identity instead of
+    // falling silently blank, because a dead identity row zeroes every
+    // downstream consumer while every gate still passes.
+    const certifiedCapture =
+      row?.row_type === "uncalculated" ||
+      Boolean(row?.forecast_capture_parent_id);
+    if (!certifiedCapture && row?.calculation) {
+      const method = ["prior_period", "prior_period_scaled_by"].includes(
+        row.calculation.operator,
+      )
+        ? "roll_forward"
+        : "accounting_identity";
+      return { method, source_kind: "formula", inferred: true };
+    }
     const declaredMaterial = row?.forecast_period_authorities?.[forecastIndex]?.material;
     return {
       method: "not_separately_forecast",
@@ -660,6 +678,11 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         errors.push(`${label} requires a rationale note for ${authority.method}.`);
       }
       if (strict && authority.method === "not_separately_forecast") {
+        if (row.calculation && !row.forecast_capture_parent_id) {
+          errors.push(
+            `${label} declares not_separately_forecast on a row that carries its own calculation; an identity row may only go grey through a certified parent capture.`,
+          );
+        }
         const captureParentId = row.forecast_capture_parent_id ?? row.parent_row_id;
         const parent = captureParentId ? rowsById.get(captureParentId) : null;
         if (!parent || parent.row_id === row.row_id) {
@@ -696,6 +719,56 @@ export function validateForecastAuthorities(modelCase, rows = []) {
       ) {
         errors.push(
           `${label} is a material explicit zero without a company, user or historical-inference basis.`,
+        );
+      }
+      if (strict && authority.method === "explicit_zero" && authority.material !== false) {
+        // A zero is a forecast judgement, not a label. Against a materially
+        // non-zero history it needs genuine no-recurrence evidence: a company
+        // or user source with a checkable citation. "historical_inference"
+        // can only ever infer a zero from a history that actually is zero.
+        const historical = (row?.values ?? []).slice(0, 3);
+        const historyIsZero = !historical.some(
+          (value) => finite(value) && Math.abs(Number(value)) > 1e-9,
+        );
+        if (!historyIsZero) {
+          const evidencedKinds = new Set(["company_reported", "user_supplied"]);
+          if (!evidencedKinds.has(authority.source_kind)) {
+            errors.push(
+              `${label} is explicit_zero against non-zero historical activity; that requires company_reported or user_supplied no-recurrence evidence, not ${authority.source_kind ?? "none"}.`,
+            );
+          } else if (!authority.source_id || !authority.as_of_date) {
+            errors.push(
+              `${label} is explicit_zero against non-zero historical activity and must cite source_id and as_of_date for the no-recurrence evidence.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  if (strict) {
+    // Blanket-authority detector: many rows sharing one method and one
+    // verbatim rationale is case-authoring boilerplate, not evidence. The
+    // shipped failure was 38 material rows zeroed under a single copy-pasted
+    // "migration fixture" note that satisfied every per-row label check.
+    const boilerplate = new Map();
+    for (const row of rows) {
+      if (row?.row_type === "header") continue;
+      for (const authority of row?.forecast_period_authorities ?? []) {
+        if (!authority?.note) continue;
+        if (!["explicit_zero", "not_applicable", "carry_forward"].includes(authority.method)) {
+          continue;
+        }
+        const key = `${authority.method} ${String(authority.note).trim()}`;
+        if (!boilerplate.has(key)) boilerplate.set(key, new Set());
+        boilerplate.get(key).add(row.row_id);
+      }
+    }
+    for (const [key, rowIds] of boilerplate) {
+      if (rowIds.size >= 6) {
+        const [method] = key.split(" ");
+        errors.push(
+          `${rowIds.size} rows declare ${method} with an identical rationale note (${[...rowIds].slice(0, 5).join(", ")}, ...); a shared boilerplate note is not a per-row forecast judgement.`,
         );
       }
     }

@@ -935,6 +935,16 @@ def main(argv: List[str]) -> int:
 
     iterate_count = re.search(r'\biterateCount="([^"]+)"', workbook_xml)
     iterate_delta = re.search(r'\biterateDelta="([^"]+)"', workbook_xml)
+    # fullCalcOnLoad and the absence of a foreign calcChain are load-bearing:
+    # the shipped package carries the recalculation engine's caches, and a
+    # native reader that trusts them without a forced full calculation cannot
+    # re-solve the declared circular set — the loop freezes at the cached
+    # fixed point through F9 and even cell re-entry. Both facts must hold on
+    # the shipped bytes, not on any intermediate.
+    full_calc_on_load = bool(
+        re.search(r'\bfullCalcOnLoad="(?:1|true)"', workbook_xml)
+    )
+    calc_chain_absent = "xl/calcChain.xml" not in workbook.names
     checks.append(
         record(
             "iteration-contract",
@@ -946,8 +956,11 @@ def main(argv: List[str]) -> int:
             and (
                 not re.search(r"\biterateDelta=", workbook_xml)
                 or bool(re.search(r'\biterateDelta="0\.001"', workbook_xml))
-            ),
-            "Workbook calculation settings use 100 iterations and 0.001 tolerance.",
+            )
+            and full_calc_on_load
+            and calc_chain_absent,
+            "Workbook calculation settings use 100 iterations and 0.001 tolerance, "
+            "force a full calculation on load, and ship no calculation chain.",
             {
                 "iterate_enabled": bool(re.search(r'\biterate="(?:1|true)"', workbook_xml)),
                 "iterate_count": iterate_count.group(1)
@@ -956,7 +969,60 @@ def main(argv: List[str]) -> int:
                 "iterate_delta": iterate_delta.group(1)
                 if iterate_delta
                 else "0.001 (Excel default)",
+                "full_calc_on_load": full_calc_on_load,
+                "calc_chain_absent": calc_chain_absent,
             },
+        )
+    )
+
+    # ------------------------------------------------------ economic-plausibility
+    # Internal consistency is not plausibility: a model whose forecast shows a
+    # liquidity shortfall, negative ending cash or a near-exhausted revolver
+    # can be arithmetically perfect and still be describing a fictional
+    # funding crisis manufactured upstream. Each such finding must be named
+    # in the case's explicit acknowledgements to pass; an unacknowledged
+    # finding blocks instead of shipping as narrative.
+    plausibility_acknowledged = set(
+        solution.get("plausibility_acknowledgements") or []
+    )
+    plausibility_findings = []
+    for block_name in ("standalone", "pro_forma"):
+        block = solution.get(block_name) or {}
+        for index, period in enumerate(block.get("forecast") or []):
+            shortfall = float(period.get("liquidity_shortfall") or 0.0)
+            ending_cash_value = period.get("ending_cash")
+            ending_rcf_value = float(period.get("ending_rcf") or 0.0)
+            undrawn_rcf_value = float(period.get("undrawn_rcf") or 0.0)
+            if shortfall > 0.5:
+                plausibility_findings.append(
+                    "%s_liquidity_shortfall_period_%d" % (block_name, index + 1)
+                )
+            if ending_cash_value is not None and float(ending_cash_value) < -0.5:
+                plausibility_findings.append(
+                    "%s_negative_ending_cash_period_%d" % (block_name, index + 1)
+                )
+            rcf_commitment = ending_rcf_value + undrawn_rcf_value
+            if rcf_commitment > 0.5 and ending_rcf_value / rcf_commitment >= 0.95:
+                plausibility_findings.append(
+                    "%s_rcf_near_exhaustion_period_%d" % (block_name, index + 1)
+                )
+    unacknowledged = [
+        finding
+        for finding in plausibility_findings
+        if finding not in plausibility_acknowledged
+    ]
+    checks.append(
+        record(
+            "economic-plausibility",
+            not unacknowledged,
+            "Liquidity shortfalls, negative ending cash and near-exhausted RCF "
+            "capacity are absent or explicitly acknowledged in the case.",
+            {
+                "findings": plausibility_findings,
+                "acknowledged": sorted(plausibility_acknowledged),
+                "unacknowledged": unacknowledged,
+            },
+            violations=len(unacknowledged),
         )
     )
 

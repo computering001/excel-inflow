@@ -686,6 +686,24 @@ function isWorkingCapitalConstituent(row) {
  * an uncalculated row while the formula pass saw an explicit zero.  Centralise
  * the transition so no pass can create that split-brain state again.
  */
+// The post-anchor profit spine and the cash-flow spine may never be captured
+// into a parent: each is the visible authoritative answer other rows consume
+// (tax reads PBT, the cash flow reads PAT, the sweep reads CFO). Capturing one
+// silently zeroes every consumer while formula/cache parity still passes —
+// the shipped dead-PBT defect. Pre-anchor subtotals (gross profit, product
+// revenue) remain capturable inside the anchored slim-forecast band.
+const CAPTURE_PROTECTED_SPINE_ROLES = new Set([
+  "pre_tax_income",
+  "tax_expense",
+  "net_income",
+  "cash_from_operations",
+  "cash_from_investing",
+  "cash_from_financing",
+  "net_change_in_cash",
+  "opening_cash",
+  "ending_cash",
+]);
+
 function markForecastCapturedBy(
   row,
   parentRowId,
@@ -693,6 +711,7 @@ function markForecastCapturedBy(
   mode = "formula_membership",
   modelCase = null,
 ) {
+  if (CAPTURE_PROTECTED_SPINE_ROLES.has(row?.semantic_role)) return false;
   const explicit = row.forecast_period_authorities;
   const hasDirectAuthority =
     row.broker_metric_id ||
@@ -2890,22 +2909,22 @@ export function compileRowPlan(modelCase) {
   sectionHeaders.rcf_waterfall = cursor;
   cursor += 1;
   const waterfallRows = {};
-  const hasForecastNonRcfDebtProceeds = instrumentPlans.some((plan) => {
-    const instrument = instrumentById.get(plan.instrument_id);
-    return (
-      !isBalancingRcf(modelCase, instrument) &&
-      Number.isInteger(plan.issuance_row)
-    );
-  });
   // The sweep is a column of numbers that adds up, then a four-line revolver
   // roll-forward. Two rows that were only ever MAX(0, +/- the same difference)
   // collapse into ONE signed surplus / (deficit) line — which is what the
   // source model itself shows — and the revolver's spare capacity is read
   // inside the draw formula rather than parked on a row of its own next to the
   // undrawn-RCF line that already states it.
+  //
+  // Every structural row is allocated unconditionally. The issuance waterfall
+  // row used to exist only when an instrument carried sourced issuance, which
+  // left the statement's Change in Debt issuance child with no schedule row
+  // to reference and collapsed it to a literal zero — a dead audit trail on a
+  // row the contract requires to stay a live schedule-owned producer. A
+  // no-issuance case now simply shows the schedule row summing to nothing.
   for (const id of [
     "cash_before_debt",
-    ...(hasForecastNonRcfDebtProceeds ? ["non_rcf_debt_proceeds"] : []),
+    "non_rcf_debt_proceeds",
     "pre_rcf_debt_cash_flow",
     "lease_principal_waterfall",
     "cash_before_rcf",

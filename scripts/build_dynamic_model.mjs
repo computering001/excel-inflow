@@ -3271,6 +3271,20 @@ function configureOperatingModel(
           adjustmentColumn,
           periodForecastCalculation,
         );
+        // A roll-forward has no prior adjustment column to read in the first
+        // deal period, so its null compilation is a constructed zero. Every
+        // other operator that fails to compile is silent degradation of a
+        // declared calculation and must stop the build.
+        const rollForwardNull = [
+          "prior_period",
+          "prior_period_scaled_by",
+        ].includes(periodForecastCalculation?.operator);
+        if ((formula === null || formula === undefined) && !rollForwardNull) {
+          throw new Error(
+            `Adjustment-column formula for ${definition.row_id} did not compile; ` +
+              "a declared calculation may not silently become a live zero.",
+          );
+        }
         applyFormula(
           sheet,
           `${adjustmentColumn}${definition.row}`,
@@ -3285,6 +3299,16 @@ function configureOperatingModel(
           definition,
           adjustmentColumn,
         );
+        const rollForwardNull = [
+          "prior_period",
+          "prior_period_scaled_by",
+        ].includes(definition.calculation?.operator);
+        if ((formula === null || formula === undefined) && !rollForwardNull) {
+          throw new Error(
+            `Adjustment-column formula for ${definition.row_id} did not compile; ` +
+              "a declared calculation may not silently become a live zero.",
+          );
+        }
         applyFormula(
           sheet,
           `${adjustmentColumn}${definition.row}`,
@@ -9080,12 +9104,23 @@ function statementSolverValues(
       definition,
       forecastIndex,
     );
-    const calculation =
-      periodCalculation ??
-      (periodRulesDeclared ||
+    // Certificate rule, identical to resolveForecastAuthority and the
+    // solver's forecastRule: an "uncalculated" treatment suppresses the
+    // declared calculation only when the capture transition certified it or
+    // the row is structurally uncalculated. An identity row authored grey
+    // without proof keeps its identity in the cache exactly as in the cell.
+    const uncertifiedIdentityGrey =
+      definition.forecast_treatment === "uncalculated" &&
+      definition.row_type !== "uncalculated" &&
+      !definition.forecast_capture_parent_id &&
+      Boolean(definition.calculation);
+    const treatmentSuppressesCalculation =
       ["broker", "hardcode", "zero", "uncalculated"].includes(
         definition.forecast_treatment,
-      )
+      ) && !uncertifiedIdentityGrey;
+    const calculation =
+      periodCalculation ??
+      (periodRulesDeclared || treatmentSuppressesCalculation
         ? null
         : definition.calculation);
     // Mirrors the cell writer: the first forecast period is the hold-flat
@@ -10465,6 +10500,13 @@ async function writeModelSidecars(
         pro_forma: proFormaSolution,
         all_checks_pass:
           standaloneSolution.all_checks_pass && proFormaSolution.all_checks_pass,
+        // Explicit user/case acknowledgements of named plausibility findings
+        // (liquidity shortfall, negative ending cash, near-exhausted RCF).
+        // The independent validator refuses to pass an unacknowledged
+        // finding: a model showing a fictional funding crisis must block,
+        // not narrate.
+        plausibility_acknowledgements:
+          modelCase.plausibility_acknowledgements ?? [],
       },
       null,
       2,

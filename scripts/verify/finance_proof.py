@@ -281,6 +281,17 @@ class Proof:
         interest_rows = row_map["interest_summary_rows"]
         waterfall = row_map["waterfall_rows"]
         rows_by_id = row_map["rows_by_id"]
+        # The cash-flow spine, addressed by semantic role rather than issuer
+        # row id, so the proof can re-derive ending cash from the statement's
+        # own flows. Reading ending cash from the workbook alone proves the
+        # sweep self-consistent, not economically right: a collapsed CFO
+        # produces a maxed revolver and a deeply negative ending cash that a
+        # read-back "proof" happily confirms.
+        cash_flow_spine = {}
+        for statement_row in (row_map.get("statement_rows") or {}).get("cash_flow") or []:
+            role = statement_row.get("semantic_role")
+            if role and role not in cash_flow_spine:
+                cash_flow_spine[role] = statement_row.get("row")
         instrument_plans = {
             item["instrument_id"]: item for item in row_map["instruments"]
         }
@@ -606,6 +617,40 @@ class Proof:
 
                 opening_cash = number(self.value(column, rows_by_id["opening_cash"]))
                 ending_cash = number(self.value(column, rows_by_id["ending_cash"]))
+                spine_roles = (
+                    "cash_from_operations",
+                    "cash_from_investing",
+                    "cash_from_financing",
+                )
+                missing_spine = [
+                    role for role in spine_roles if cash_flow_spine.get(role) is None
+                ]
+                self.require(
+                    "cash",
+                    block_name,
+                    index,
+                    "cash_flow_spine_present",
+                    not missing_spine,
+                    actual=missing_spine,
+                    expected=[],
+                )
+                if not missing_spine:
+                    statement_flows = sum(
+                        number(self.value(column, cash_flow_spine[role]))
+                        for role in spine_roles
+                    )
+                    fx_row = cash_flow_spine.get("fx_effect_on_cash")
+                    fx_effect = (
+                        number(self.value(column, fx_row)) if fx_row is not None else 0.0
+                    )
+                    self.compare(
+                        "cash",
+                        block_name,
+                        index,
+                        "ending_cash_from_statement_flows",
+                        ending_cash,
+                        opening_cash + statement_flows + fx_effect,
+                    )
                 balancing_ending_cash = (
                     number(self.value(column, waterfall["cash_before_rcf"]))
                     + draw

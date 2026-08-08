@@ -158,7 +158,25 @@ function forecastRule(row, forecastIndex = null) {
     return row.forecast_period_calculations[forecastIndex] ?? null;
   }
   if (row.forecast_calculation) return row.forecast_calculation;
-  if (SUPPLIED_FORECAST_TREATMENTS.has(row.forecast_treatment)) return null;
+  if (SUPPLIED_FORECAST_TREATMENTS.has(row.forecast_treatment)) {
+    // "uncalculated" suppresses a declared calculation only when the capture
+    // transition actually certified it (or the row is structurally
+    // uncalculated). This mirrors resolveForecastAuthority's certificate
+    // rule: an identity row authored grey without proof keeps its identity,
+    // in the solver exactly as in the resolver and the emitter, so the three
+    // engines cannot disagree about whether the row is alive.
+    const certifiedCapture =
+      row.row_type === "uncalculated" ||
+      Boolean(row.forecast_capture_parent_id);
+    if (
+      row.forecast_treatment === "uncalculated" &&
+      !certifiedCapture &&
+      row.calculation
+    ) {
+      return row.calculation;
+    }
+    return null;
+  }
   return row.calculation ?? null;
 }
 

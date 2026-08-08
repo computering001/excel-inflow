@@ -658,6 +658,76 @@ def apply(plan, path, *, backup=None):
     members["docProps/app.xml"] = app_xml.encode("utf8")
     report["producer_application"] = "Microsoft Excel"
 
+    # CALCULATION CONTRACT. The package being patched is the recalculation
+    # engine's re-export, and that engine drops calcPr attributes the plan
+    # declared — fullCalcOnLoad and forceFullCalc — while preserving the
+    # iterate trio, which happens to be all the iteration-contract check
+    # reads. A native reader that trusts the shipped caches and never runs a
+    # full calculation cannot re-solve the declared circular set: the loop
+    # freezes at its cached fixed point and stays frozen through manual
+    # recalculation. The terminal pass is the only stage downstream of the
+    # re-export, so the declared contract is re-asserted here, and any
+    # recalculation-chain part is dropped so the reader rebuilds its own
+    # dependency order instead of trusting a foreign one.
+    calc_properties = workbook_spec.get("calc_properties") or {}
+    workbook_part = members.get("xl/workbook.xml")
+    if workbook_part is None:
+        raise PackageError(
+            "xl/workbook.xml is absent, so the calculation contract cannot be asserted."
+        )
+    workbook_xml = workbook_part.decode("utf8")
+    calc_attrs = []
+    if calc_properties.get("calc_id"):
+        calc_attrs.append(f'calcId="{calc_properties["calc_id"]}"')
+    if calc_properties.get("calc_mode"):
+        calc_attrs.append(f'calcMode="{calc_properties["calc_mode"]}"')
+    if calc_properties.get("full_calc_on_load", True):
+        calc_attrs.append('fullCalcOnLoad="1"')
+    if calc_properties.get("force_full_calc"):
+        calc_attrs.append('forceFullCalc="1"')
+    if calc_properties.get("iterate"):
+        calc_attrs.append('iterate="1"')
+    if calc_properties.get("iterate_count") is not None:
+        calc_attrs.append(f'iterateCount="{calc_properties["iterate_count"]}"')
+    if calc_properties.get("iterate_delta") is not None:
+        calc_attrs.append(f'iterateDelta="{calc_properties["iterate_delta"]}"')
+    calc_pattern = re.compile(r"<calcPr\b[^>]*/?>(?:\s*</calcPr>)?")
+    replacement_calc = f"<calcPr {' '.join(calc_attrs)}/>"
+    workbook_xml, calc_replacements = calc_pattern.subn(
+        replacement_calc, workbook_xml, count=1
+    )
+    if calc_replacements != 1:
+        raise PackageError(
+            "xl/workbook.xml has no calcPr element to carry the calculation contract."
+        )
+    members["xl/workbook.xml"] = workbook_xml.encode("utf8")
+    report["calc_properties"] = replacement_calc
+
+    calc_chain = "xl/calcChain.xml"
+    if calc_chain in members:
+        members.pop(calc_chain)
+        workbook_rels_path = "xl/_rels/workbook.xml.rels"
+        if workbook_rels_path in members:
+            rels_xml = members[workbook_rels_path].decode("utf8")
+            rels_xml = re.sub(
+                r'<Relationship\b[^>]*Target="[^"]*calcChain\.xml"[^>]*/>',
+                "",
+                rels_xml,
+            )
+            members[workbook_rels_path] = rels_xml.encode("utf8")
+        content_types = members.get("[Content_Types].xml")
+        if content_types is not None:
+            content_types_xml = content_types.decode("utf8")
+            content_types_xml = re.sub(
+                r'<Override\b[^>]*PartName="/xl/calcChain\.xml"[^>]*/>',
+                "",
+                content_types_xml,
+            )
+            members["[Content_Types].xml"] = content_types_xml.encode("utf8")
+        report["calc_chain_removed"] = True
+    else:
+        report["calc_chain_removed"] = False
+
     if content_type_overrides:
         content_type_overrides.append((f"/{_PERSON_PART}", "application/vnd.ms-excel.person+xml"))
         members[_PERSON_PART] = _person_part(author, person_id)
@@ -698,7 +768,9 @@ def apply(plan, path, *, backup=None):
 
     # Rewrite the package. Fixed timestamps so two builds of the same plan are
     # byte-identical; the determinism double-build compares bytes.
-    written = [name for name in order] + [name for name in members if name not in order]
+    written = [name for name in order if name in members] + [
+        name for name in members if name not in order
+    ]
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         for name in written:
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
