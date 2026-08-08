@@ -1,11 +1,11 @@
 {
-  "releaseName": "Excel Inflow v2.0.11",
+  "releaseName": "Excel Inflow v2.0.12",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.11",
+  "skillVersion": "2.0.12",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T20:00:44.344Z",
+  "generatedAt": "2026-08-08T20:08:46.081Z",
   "centralInstructionsWords": 3890,
   "profile": "assets/deployment-profile.json",
   "certification": {
