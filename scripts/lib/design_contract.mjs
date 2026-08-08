@@ -15,11 +15,12 @@ export const STANDARDISED_DESIGN_CONTRACT_V3_SHA256 =
   "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3";
 
 // Epoch-aware identities for artifacts that stamp themselves with the
-// active design lattice. Shipped default remains the v2 pair.
+// active design lattice. Epoch 3 is the production default; epoch 2 remains
+// available only as an explicit rollback switch.
 export function activeDesignContractSha256() {
-  return process.env.EXCEL_INFLOW_DESIGN_EPOCH === "3"
-    ? STANDARDISED_DESIGN_CONTRACT_V3_SHA256
-    : STANDARDISED_DESIGN_CONTRACT_SHA256;
+  return process.env.EXCEL_INFLOW_DESIGN_EPOCH === "2"
+    ? STANDARDISED_DESIGN_CONTRACT_SHA256
+    : STANDARDISED_DESIGN_CONTRACT_V3_SHA256;
 }
 
 export function activeDesignRuntimeSha256() {
@@ -35,17 +36,17 @@ const CONTRACT_V3_URL = new URL(
   import.meta.url
 );
 
-// Deliberate, environment-scoped epoch selection for local epoch-3 exemplar
-// generation and certification work. The shipped default remains v2 until
-// the v3 authorities are approved and the default flips in one commit.
+// Epoch 3 became the default only after both standardised authorities passed
+// dormant-candidate generation and focused native-Excel review. The explicit
+// epoch-2 branch is retained as a bounded rollback path.
 function activeRuntimeSelection() {
-  if (process.env.EXCEL_INFLOW_DESIGN_EPOCH === "3") {
-    return {
-      url: CONTRACT_V3_URL,
-      sha256: STANDARDISED_DESIGN_RUNTIME_V3_SHA256,
-    };
+  if (process.env.EXCEL_INFLOW_DESIGN_EPOCH === "2") {
+    return { url: CONTRACT_URL, sha256: STANDARDISED_DESIGN_RUNTIME_SHA256 };
   }
-  return { url: CONTRACT_URL, sha256: STANDARDISED_DESIGN_RUNTIME_SHA256 };
+  return {
+    url: CONTRACT_V3_URL,
+    sha256: STANDARDISED_DESIGN_RUNTIME_V3_SHA256,
+  };
 }
 
 let cachedContract;
@@ -66,9 +67,9 @@ export function standardisedDesignContract() {
   cachedContractSha = selection.sha256;
   const contract = JSON.parse(bytes);
   const expectedSourceContractSha =
-    process.env.EXCEL_INFLOW_DESIGN_EPOCH === "3"
-      ? STANDARDISED_DESIGN_CONTRACT_V3_SHA256
-      : STANDARDISED_DESIGN_CONTRACT_SHA256;
+    process.env.EXCEL_INFLOW_DESIGN_EPOCH === "2"
+      ? STANDARDISED_DESIGN_CONTRACT_SHA256
+      : STANDARDISED_DESIGN_CONTRACT_V3_SHA256;
   if (
     contract.schema_version !== 2 ||
     contract.status !== "RUNTIME_PROJECTION_OF_MEASURED_AUTHORITIES" ||

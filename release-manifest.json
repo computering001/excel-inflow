@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.0.12",
+  "releaseName": "Excel Inflow v2.1.0",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.0.12",
+  "skillVersion": "2.1.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T21:43:21.691Z",
+  "generatedAt": "2026-08-08T22:23:11.459Z",
   "centralInstructionsWords": 3937,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "800ded3c5eea3bd8fcf3e5b61d52d1b08940bf49f272ecb8e769e03e7e04f8f0",
+    "currentClosureSha256": "60a724abec2b4cdeae0c16cbd8028d1d70f90fec9f7362145a40a2a23d62875d",
     "closureFileCount": 102,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -266,30 +266,14 @@
             "openpyxl": "3.1.5",
             "fitz": null,
             "PIL": "12.2.0",
-            "numpy": "2.3.5",
+            "numpy": "2.4.4",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
-            "reportlab": "4.4.9"
+            "pypdf": "6.10.2",
+            "reportlab": "4.4.10"
           },
           "usable": true,
           "reason": "selected"
-        },
-        {
-          "candidate": "python3",
-          "version": "3.9.6",
-          "packages": {
-            "openpyxl": "3.1.5",
-            "fitz": "1.26.5",
-            "PIL": null,
-            "numpy": null,
-            "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
-          },
-          "usable": false,
-          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports"
         }
       ]
     },
@@ -819,18 +803,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "1f56a329fde13d2d26e1ae198a2f203e69397ec0264836ac9bf51e42ad1488fd",
-        "plan_sha256": "2ede1b708ae68d01645c817f507007c6c1bb6aba52ec65774ac58ce949349686",
-        "workbook_sha256": "29af4cec43850ae2cacfc73e62e720485e9a20492731aab35c96dc4bbd0360e6",
+        "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
+        "plan_sha256": "b6df7f9816ce2cbf011b209f4abe65b91e23e4b1afb2635675f123f5b3646577",
+        "workbook_sha256": "e7e8a270f92b55e9399a53eb5cd8e3a789aa6befc6ee05db67083e9bae4d2091",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "1f56a329fde13d2d26e1ae198a2f203e69397ec0264836ac9bf51e42ad1488fd",
-      "plan_sha256": "2ede1b708ae68d01645c817f507007c6c1bb6aba52ec65774ac58ce949349686",
-      "workbook_sha256": "29af4cec43850ae2cacfc73e62e720485e9a20492731aab35c96dc4bbd0360e6",
+      "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
+      "plan_sha256": "b6df7f9816ce2cbf011b209f4abe65b91e23e4b1afb2635675f123f5b3646577",
+      "workbook_sha256": "e7e8a270f92b55e9399a53eb5cd8e3a789aa6befc6ee05db67083e9bae4d2091",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -846,7 +830,7 @@
     "the allowlisted references and runtime contracts"
   ],
   "modelRouting": {
-    "routineBuild": "Terra",
+    "routineBuild": "Sol",
     "mechanicalCheck": "Luna",
     "materialAmbiguityOrPersistentFailure": "Sol"
   },
@@ -938,8 +922,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "00c08c4aa7bb01eba3e3cb24902a1332bdd63f3e5c72b59b1e9268cb87d042e7",
-      "bytes": 36049,
+      "sha256": "b5b21f270ce989ce48fa3a8da18b4f4d6e03bce0cfc7aa5176d339006ce9199b",
+      "bytes": 36047,
       "words": null
     },
     {
@@ -1124,8 +1108,8 @@
     },
     {
       "path": "scripts/lib/design_contract.mjs",
-      "sha256": "0f792aaeb122cd76d87ae62d1093af32f3fe06378d3a5e2345e2f69643605e43",
-      "bytes": 6231,
+      "sha256": "def74bc02c624fbbd5161cbec49f6e2b71dd4110c520ab2e78acf740add35312",
+      "bytes": 6279,
       "words": null
     },
     {

@@ -536,7 +536,7 @@
   "developer"
  ],
  "model_routing": {
-  "routine_build": "Terra",
+  "routine_build": "Sol",
   "mechanical_check": "Luna",
   "material_ambiguity_or_persistent_failure": "Sol"
  },
