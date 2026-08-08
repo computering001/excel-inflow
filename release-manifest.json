@@ -5,12 +5,12 @@
   "skillVersion": "2.0.11",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T19:50:52.882Z",
+  "generatedAt": "2026-08-08T20:00:44.344Z",
   "centralInstructionsWords": 3890,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "0c137b199ba8b8df118d497938fb0b348455f5e47f7ec1d15f63504c89843457",
+    "currentClosureSha256": "8bea8f5b76bc296b059133fc4ac9307993da3ab32f9f2d8894b80c8a4ee1e7a1",
     "closureFileCount": 100,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -1479,8 +1479,8 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "0b6ff9a0f2894e4f1b7a58c2b9f78903e2a4b429175628c613c9981713610fc1",
-      "bytes": 131956,
+      "sha256": "81ade4256dae03ed4aa690db4970b8d9285f821dd9416d863843541ef341651b",
+      "bytes": 134278,
       "words": null
     },
     {
