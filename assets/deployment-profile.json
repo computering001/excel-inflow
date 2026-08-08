@@ -31,6 +31,7 @@
   "row-taxonomy-v2.json",
   "statement-semantic-taxonomy.v1.json",
   "standardised-design-runtime.v2.json",
+  "standardised-design-runtime.v3.json",
   "style-tokens.json"
  ],
  "declared_only_assets": {

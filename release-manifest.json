@@ -5,13 +5,13 @@
   "skillVersion": "2.0.11",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T18:20:03.289Z",
+  "generatedAt": "2026-08-08T19:50:52.882Z",
   "centralInstructionsWords": 3890,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "db5197be9be30dede0fe027e12d8a080fa9e957ef2d73e6593b66571edca4dba",
-    "closureFileCount": 99,
+    "currentClosureSha256": "0c137b199ba8b8df118d497938fb0b348455f5e47f7ec1d15f63504c89843457",
+    "closureFileCount": 100,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -97,6 +97,7 @@
       "assets/production-contract-v2.json",
       "assets/public-test-run-v1.schema.json",
       "assets/standardised-design-runtime.v2.json",
+      "assets/standardised-design-runtime.v3.json",
       "assets/statement-semantic-taxonomy.v1.json",
       "assets/style-tokens.json"
     ],
@@ -795,18 +796,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "358182a6a50cef88ad627df04e896f8879ca64a8862b0aae919020f25e54b6c2",
-        "plan_sha256": "1b8a269e352688bdd9c3df65ad4cdcd40dd742a24b1e78feee5f9592e227fc03",
-        "workbook_sha256": "8b4076ea1eaabc9922eb773cb365aa4f630981fcde3533c50eb8e9327ab4f302",
+        "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
+        "plan_sha256": "08a0e8ae7837435f47677f8541d9f938a6f5f9d40294a044552ab7ccfa3df600",
+        "workbook_sha256": "29af4cec43850ae2cacfc73e62e720485e9a20492731aab35c96dc4bbd0360e6",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "358182a6a50cef88ad627df04e896f8879ca64a8862b0aae919020f25e54b6c2",
-      "plan_sha256": "1b8a269e352688bdd9c3df65ad4cdcd40dd742a24b1e78feee5f9592e227fc03",
-      "workbook_sha256": "8b4076ea1eaabc9922eb773cb365aa4f630981fcde3533c50eb8e9327ab4f302",
+      "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
+      "plan_sha256": "08a0e8ae7837435f47677f8541d9f938a6f5f9d40294a044552ab7ccfa3df600",
+      "workbook_sha256": "29af4cec43850ae2cacfc73e62e720485e9a20492731aab35c96dc4bbd0360e6",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -908,8 +909,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "f032739f1be3e172bfbbdd0723874aaf4b875eca2f636a67abbf3455da7851a2",
-      "bytes": 35645,
+      "sha256": "3a1eaec6df12bb8ebb5776439e6bab6af50cdfc52e7ddfbb68d2b41622f5cf01",
+      "bytes": 35686,
       "words": null
     },
     {
@@ -979,6 +980,12 @@
       "words": null
     },
     {
+      "path": "assets/standardised-design-runtime.v3.json",
+      "sha256": "f0392d0a7e6e9fe86b98075fdafc3831e438569cd975733243c79c43df2b99b1",
+      "bytes": 6584,
+      "words": null
+    },
+    {
       "path": "assets/statement-semantic-taxonomy.v1.json",
       "sha256": "74b431d0854aea04934fcde3090612a64f6f669e63494b2f5d4bf77028a966b6",
       "bytes": 4699,
@@ -992,8 +999,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "00981c6f51cf88948f38ec50d4a0c31f692f4eccf902288ff054d99d2b18ba3f",
-      "bytes": 467705,
+      "sha256": "b03e117a4a8fd43e0fc532eaf07582146ef317faaa9b7024c75c1fe37dcdd25f",
+      "bytes": 468959,
       "words": null
     },
     {
@@ -1088,8 +1095,8 @@
     },
     {
       "path": "scripts/lib/design_contract.mjs",
-      "sha256": "2842e51211303669af1dc9e2050d799aa34df7dd2266a7c8916a0a9ec3d15460",
-      "bytes": 4389,
+      "sha256": "41eae8f29e743fc2fa9d075b09a80c67abea0f47beb1e088e822ef9574f07b9c",
+      "bytes": 6063,
       "words": null
     },
     {
@@ -1154,8 +1161,8 @@
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "caf450780f7e10a1f0b2275e14d9c59df94f91298d3820ed252e6d264c930400",
-      "bytes": 30058,
+      "sha256": "3ac3dd3e1e680e9684798afc23f26a880fd16aa6a9c0b346938135be92e1da90",
+      "bytes": 30060,
       "words": null
     },
     {
@@ -1250,8 +1257,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "965d12cdee9ab4d2baf5fe6cc6b0e915b0111b8edf334a85b3d985c44d2399b1",
-      "bytes": 129915,
+      "sha256": "8c50e30ec60ce1a0d66f04516164b28d4156cfca5d0cfb28de20b8ba49b3dbdb",
+      "bytes": 132424,
       "words": null
     },
     {
