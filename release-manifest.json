@@ -5,13 +5,13 @@
   "skillVersion": "2.1.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T22:23:11.459Z",
-  "centralInstructionsWords": 3937,
+  "generatedAt": "2026-08-08T23:22:03.069Z",
+  "centralInstructionsWords": 4033,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "60a724abec2b4cdeae0c16cbd8028d1d70f90fec9f7362145a40a2a23d62875d",
-    "closureFileCount": 102,
+    "currentClosureSha256": "f50415aec756b7854b484365e02ccfe76401e979c8138e591123ffa12bee7a0c",
+    "closureFileCount": 110,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -104,7 +104,12 @@
     ],
     "assetsDeclaredOnly": [
       "assets/authority-projection-overrides.v3.json",
+      "assets/broker-crosswalk.schema.json",
+      "assets/broker-extraction-bundle.schema.json",
+      "assets/broker-extraction-request.schema.json",
       "assets/broker-pack.schema.json",
+      "assets/broker-source-tables.schema.json",
+      "assets/broker-vision-result.schema.json",
       "assets/dcs-export.schema.json",
       "assets/lineage-exceptions.json",
       "assets/model-ir-v3.schema.json",
@@ -261,16 +266,16 @@
       "candidates": [
         {
           "candidate": "python3",
-          "version": "3.12.13",
+          "version": "3.9.6",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": null,
-            "PIL": "12.2.0",
-            "numpy": "2.4.4",
+            "fitz": "1.26.5",
+            "PIL": null,
+            "numpy": null,
             "jsonschema": null,
-            "pdfplumber": "0.11.9",
-            "pypdf": "6.10.2",
-            "reportlab": "4.4.10"
+            "pdfplumber": null,
+            "pypdf": "6.12.1",
+            "reportlab": null
           },
           "usable": true,
           "reason": "selected"
@@ -278,6 +283,9 @@
       ]
     },
     "entryPoints": [
+      "scripts/extract_broker_evidence.py",
+      "scripts/compile_broker_vision.py",
+      "scripts/compile_broker_pack.py",
       "scripts/emit/__main__.py",
       "scripts/render/check_render.py",
       "scripts/render/selftest.py",
@@ -289,6 +297,8 @@
     ],
     "entryPointsUncommandedByInstructions": [],
     "modules": [
+      "scripts/compile_broker_pack.py",
+      "scripts/compile_broker_vision.py",
       "scripts/emit/__init__.py",
       "scripts/emit/__main__.py",
       "scripts/emit/patch.py",
@@ -296,6 +306,7 @@
       "scripts/emit/render.py",
       "scripts/emit/styles.py",
       "scripts/emit/verify.py",
+      "scripts/extract_broker_evidence.py",
       "scripts/render/__init__.py",
       "scripts/render/baseline.py",
       "scripts/render/calibrate.py",
@@ -320,7 +331,10 @@
       "scripts/verify/xlsx.py"
     ],
     "packages": [
+      "compile_broker_pack.py",
+      "compile_broker_vision.py",
       "emit",
+      "extract_broker_evidence.py",
       "render",
       "verify"
     ],
@@ -432,9 +446,13 @@
         "requiredAt": "runtime",
         "importedAtModuleTopLevel": false,
         "usedByPackages": [
+          "extract_broker_evidence.py",
           "render"
         ],
         "sites": [
+          "extract_broker_evidence.py:202 (fitz, deferred)",
+          "extract_broker_evidence.py:467 (fitz, deferred)",
+          "extract_broker_evidence.py:678 (fitz, deferred)",
           "render/pdfdoc.py:26 (fitz, deferred)",
           "render/pdfdoc.py:229 (fitz, deferred)",
           "render/soffice.py:199 (fitz, deferred)",
@@ -485,9 +503,12 @@
         "requiredAt": "import",
         "importedAtModuleTopLevel": true,
         "usedByPackages": [
-          "emit"
+          "emit",
+          "extract_broker_evidence.py"
         ],
         "sites": [
+          "extract_broker_evidence.py:371 (openpyxl, deferred)",
+          "extract_broker_evidence.py:683 (openpyxl, deferred)",
           "emit/render.py:26 (openpyxl, top-level)",
           "emit/render.py:27 (openpyxl.comments, top-level)",
           "emit/render.py:28 (openpyxl.formatting.rule, top-level)",
@@ -564,6 +585,21 @@
       }
     ],
     "dependencyPolicy": {
+      "extract_broker_evidence.py": {
+        "may_import_third_party": [
+          "fitz",
+          "openpyxl"
+        ],
+        "reason": "Broker evidence extraction prefers native PDF and workbook structure, preserves images, and defers every host-provided compiled dependency until the matching source type is encountered."
+      },
+      "compile_broker_vision.py": {
+        "may_import_third_party": [],
+        "reason": "The image-consensus compiler is stdlib-only so verification cannot depend on the extractor's PDF or image implementation."
+      },
+      "compile_broker_pack.py": {
+        "may_import_third_party": [],
+        "reason": "The broker crosswalk compiler is stdlib-only and operates only on already verified evidence artifacts."
+      },
       "emit": {
         "may_import_third_party": [
           "openpyxl",
@@ -642,16 +678,19 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 8,
+    "codeFences": 9,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 13,
-    "scriptReferencesScanned": 21,
+    "scriptReferencesScanned": 24,
     "scriptReferences": [
       "build_dynamic_model.mjs",
+      "compile_broker_pack.py",
+      "compile_broker_vision.py",
       "compile_evidence_run.mjs",
       "compile_public_test_run.mjs",
       "debt-model-economics.mjs",
       "emit/__main__.py",
+      "extract_broker_evidence.py",
       "flow_cli.mjs",
       "orchestrate_release.mjs",
       "render/check_render.py",
@@ -749,8 +788,26 @@
       },
       {
         "target": "python closure import probe",
-        "modules": 29,
+        "modules": 32,
         "allResolvedInsideRelease": true
+      },
+      {
+        "target": "scripts/extract_broker_evidence.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/compile_broker_vision.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/compile_broker_pack.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
       },
       {
         "target": "scripts/emit/__main__.py",
@@ -803,7 +860,7 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
+        "case_sha256": "b94ed0c055ef176968dfa533a35a0d9b5b53f007db98b554189efcadce904bc9",
         "plan_sha256": "b6df7f9816ce2cbf011b209f4abe65b91e23e4b1afb2635675f123f5b3646577",
         "workbook_sha256": "e7e8a270f92b55e9399a53eb5cd8e3a789aa6befc6ee05db67083e9bae4d2091",
         "validation_status": "PASS_PENDING_MANUAL",
@@ -812,7 +869,7 @@
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "b0cd9db5b4b024f2e987a56d10004ead94b15517a19124a7031924c0067774ff",
+      "case_sha256": "b94ed0c055ef176968dfa533a35a0d9b5b53f007db98b554189efcadce904bc9",
       "plan_sha256": "b6df7f9816ce2cbf011b209f4abe65b91e23e4b1afb2635675f123f5b3646577",
       "workbook_sha256": "e7e8a270f92b55e9399a53eb5cd8e3a789aa6befc6ee05db67083e9bae4d2091",
       "validation_status": "PASS_PENDING_MANUAL",
@@ -844,27 +901,27 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "3ed4ad5293b962f22d1c3a2646c82377da0aa40102c26f053c634dba2e10619f",
-      "bytes": 29395,
-      "words": 3937
+      "sha256": "0a9ed75b5b77461b07806df2f6de7806efbc2d4cef2b9ab9ab32bd74f9ed1b6b",
+      "bytes": 30314,
+      "words": 4033
     },
     {
       "path": "SKILL.md",
-      "sha256": "926203e0deb6f2ca36ba0d04e201db48a759bde682476bca01fddad64a04cbe2",
-      "bytes": 29882,
-      "words": 4006
+      "sha256": "19f9d1629ffad4cc025ccc880d88241992013fd86b9b58e1e6e4c5dd494c8155",
+      "bytes": 30801,
+      "words": 4102
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "00ee0c19212490249f4e3af2be2ef6b2d199fc98b543ad3f271b8992be7fac0c",
-      "bytes": 29415,
-      "words": 3939
+      "sha256": "60c889745dc0c9264601ce00e706b3c129fe3dc052b7ba68fa43827f0d236b82",
+      "bytes": 30334,
+      "words": 4035
     },
     {
       "path": "references/model-contract.md",
-      "sha256": "908a04a793e88242ee3ae6e2c0be67a8feb59efabb8efc0dd6f5c6757d411d37",
-      "bytes": 13257,
-      "words": 1989
+      "sha256": "f8a2acb4270abbde0aa576602e52eed1b030313e08e999478f7eef8905dcecf0",
+      "bytes": 13740,
+      "words": 2053
     },
     {
       "path": "references/calculation-rules.md",
@@ -897,10 +954,16 @@
       "words": 4323
     },
     {
+      "path": "references/broker-extraction.md",
+      "sha256": "4822d2282be9eb9b699bed95b729be87fce40102d990cc9bf5093f451c4ea111",
+      "bytes": 8027,
+      "words": 1138
+    },
+    {
       "path": "references/validation.md",
-      "sha256": "393e3e6d10ebeb253d3bb3afe6241c42a517879affee786b0562b12431fd18d0",
-      "bytes": 49321,
-      "words": 7036
+      "sha256": "b749b85239676cc90e3d010e2b4876039a9f064d890f9ec9677259da007e3fcd",
+      "bytes": 49642,
+      "words": 7077
     },
     {
       "path": "assets/authority-projection-overrides.v3.json",
@@ -909,9 +972,39 @@
       "words": null
     },
     {
+      "path": "assets/broker-crosswalk.schema.json",
+      "sha256": "a7873b6307ee1cbb2debecc0aec640f6b86acbaa78dcc320a1023e684bb2b940",
+      "bytes": 2897,
+      "words": null
+    },
+    {
+      "path": "assets/broker-extraction-bundle.schema.json",
+      "sha256": "9431970b0f842b7de2d000358891bcd25f126375cd3ec0c6c4377dc03a207e99",
+      "bytes": 9048,
+      "words": null
+    },
+    {
+      "path": "assets/broker-extraction-request.schema.json",
+      "sha256": "854901d188a83f27d3bd32c10da50ccd7e5e07bdd9ef74889ad8f17a026320d6",
+      "bytes": 1925,
+      "words": null
+    },
+    {
       "path": "assets/broker-pack.schema.json",
-      "sha256": "1285a50c30f4e6deee1df57298fd9a528ac15e44c2516476be0bbe39db51b587",
-      "bytes": 10830,
+      "sha256": "d6e677ba25565bed907fb08f9922330c2c2aac2052c09e9ab809987c33b00e4e",
+      "bytes": 11081,
+      "words": null
+    },
+    {
+      "path": "assets/broker-source-tables.schema.json",
+      "sha256": "16c609845c5d0e24db1e4b1e4c332037a32ce954d716743ce6508c6003df0812",
+      "bytes": 2127,
+      "words": null
+    },
+    {
+      "path": "assets/broker-vision-result.schema.json",
+      "sha256": "8d1cf4fa9ff40c2fdd86cb265d0d80a302a6a1fbe7132247b462e7b396478b82",
+      "bytes": 2059,
       "words": null
     },
     {
@@ -922,14 +1015,14 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "b5b21f270ce989ce48fa3a8da18b4f4d6e03bce0cfc7aa5176d339006ce9199b",
-      "bytes": 36047,
+      "sha256": "907d0af2da62e5bb8a830c61c5911e8af758a26cb4278edf81d065f214636de6",
+      "bytes": 38402,
       "words": null
     },
     {
       "path": "assets/evidence-run-v1.schema.json",
-      "sha256": "7f30fb683defe32a46c0f93646d2df374a5df8357d5b0c91ae45ad62898fe06a",
-      "bytes": 18994,
+      "sha256": "6baff6f6bff271c136823b6ab44174fabf0d51e120b4dcceb604fa9e331ba806",
+      "bytes": 22408,
       "words": null
     },
     {
@@ -940,8 +1033,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "4e8efbc86c5a96b49a6a7ef66f553995a8d697ad0311005a5ae813777b9127a2",
-      "bytes": 52608,
+      "sha256": "eec2c2fd5473f2a5ee29a0c3ef9cd240a0557d04935a701917e3abd4835b2722",
+      "bytes": 55408,
       "words": null
     },
     {
@@ -1012,8 +1105,20 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "53bdf02f7afa58530e1b6d33ba79e802fbdd602c75c0ea2d071df3447afda5c5",
-      "bytes": 469510,
+      "sha256": "71c9b5d82bf1d15e62374297a3332fac3eedf1cf66e94f8fabf7a644a0f6890f",
+      "bytes": 478735,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_broker_pack.py",
+      "sha256": "99a8ea808af337a1fb1e4dd1ab419c445d11591bf1b80f03a7ebe57553117e0c",
+      "bytes": 11174,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_broker_vision.py",
+      "sha256": "4d374527a6c092c6c1fa9f107b5a68009d6759e9db748112b15549c8752f5fe6",
+      "bytes": 13564,
       "words": null
     },
     {
@@ -1077,6 +1182,12 @@
       "words": null
     },
     {
+      "path": "scripts/extract_broker_evidence.py",
+      "sha256": "29fa5c114444b48c793bb9c8e853cd58e3b8c78a1f917d89ba9552e857373e4b",
+      "bytes": 32673,
+      "words": null
+    },
+    {
       "path": "scripts/flow_cli.mjs",
       "sha256": "f15584347ad5b12ba62ee047bc56a02c849313db6b64a13ebef0ad972e37266a",
       "bytes": 8497,
@@ -1090,8 +1201,8 @@
     },
     {
       "path": "scripts/lib/attachment_ingress.mjs",
-      "sha256": "f9487c0423c5cdd7f76c8778d6c53fa2af4c2a11cf5121585488f17baa58a3ca",
-      "bytes": 13417,
+      "sha256": "3037ab4687fae70922491b441381b0c28d2c5134d4cd8d4840bba04563bd7fe4",
+      "bytes": 18607,
       "words": null
     },
     {
@@ -1114,8 +1225,8 @@
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "961170585ea57eac3251400cfb0c4a97e0ee786e5bec678b8c703bfead9cc9f5",
-      "bytes": 63313,
+      "sha256": "0989359c77d71842fda649cfdb1417f5ec7b7306c5977bd76c32faebe9631aa2",
+      "bytes": 67564,
       "words": null
     },
     {
@@ -1204,8 +1315,8 @@
     },
     {
       "path": "scripts/lib/intake.mjs",
-      "sha256": "4085d343984a8806f3f6c99936687069c0e71fd91fc99f396d823d9346e00298",
-      "bytes": 51782,
+      "sha256": "02bf66839a0459e283096b521727e771790b0dada8fce3032a96f02ae21bc877",
+      "bytes": 51988,
       "words": null
     },
     {
@@ -1222,8 +1333,8 @@
     },
     {
       "path": "scripts/lib/model_ir_v3.mjs",
-      "sha256": "037ee5e2f0ab3b14ba95ef2b4c11c273ba8fdaa160f06b105c35617fe25b1a38",
-      "bytes": 27121,
+      "sha256": "3a85b7b199c198c51b4ed6f4341e92a1c791f31cf3bb59ba3b506e7a74ef3df2",
+      "bytes": 27199,
       "words": null
     },
     {
@@ -1504,8 +1615,8 @@
     },
     {
       "path": "scripts/verify/workbook_semantic_oracle.py",
-      "sha256": "4ff4ca86209a8d77d0ad28faf0f86103f2accc1a69be180e24470acfe90048f8",
-      "bytes": 22542,
+      "sha256": "25f4759c7cc5abf73b90bd59446fb7e55c7971b9fe06d9d7bcdf54e0863cd105",
+      "bytes": 25507,
       "words": null
     },
     {
