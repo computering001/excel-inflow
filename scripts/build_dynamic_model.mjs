@@ -5327,6 +5327,16 @@ function configureOperatingModel(
       movementType === "maturity_repayment"
     );
   });
+  // The issuance leg mirrors the repayment leg: the sweep consumes the
+  // visible statement issuance child (which itself links to the waterfall
+  // proceeds row), so every live financing component enters ending cash
+  // through the face of the statement exactly once instead of being
+  // bypassed by a direct schedule read.
+  const issuanceStatementRows = financingRows.filter((definition) => {
+    const role = definition.semantic_role;
+    const movementType = inferMovementType(definition);
+    return role === "debt_issuance" || movementType === "debt_issuance";
+  });
   const leasePrincipalRows = financingRows.filter(
     (definition) => inferMovementType(definition) === "lease_principal",
   );
@@ -5556,7 +5566,11 @@ function configureOperatingModel(
         `${blockColumn}${waterfallRows.cash_before_rcf}`,
         `=${blockColumn}${waterfallRows.cash_before_debt}+` +
           (Number.isInteger(waterfallRows.non_rcf_debt_proceeds)
-            ? `${blockColumn}${waterfallRows.non_rcf_debt_proceeds}+`
+            ? `${
+                issuanceStatementRows.length
+                  ? `${sumCells(blockColumn, issuanceStatementRows).replace(/^=/, "")}+`
+                  : `${blockColumn}${waterfallRows.non_rcf_debt_proceeds}+`
+              }`
             : "") +
           `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}+` +
           `${blockColumn}${waterfallRows.lease_principal_waterfall}`,

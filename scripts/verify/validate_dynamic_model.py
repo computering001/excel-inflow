@@ -1995,9 +1995,15 @@ def main(argv: List[str]) -> int:
                     waterfall_rows["lease_principal_waterfall"],
                 )
             elif debt_proceeds_component:
+                # The sweep consumes the visible statement issuance child
+                # directly (mirroring the repayment doctrine: statement lines,
+                # never a second schedule read); the always-allocated
+                # non_rcf_debt_proceeds row is the schedule owner the child
+                # links to. Exactly-once consumption is therefore proven on
+                # cash_before_rcf, the row that actually does the consuming.
                 bridge_address = "%s%s" % (
                     column,
-                    waterfall_rows["non_rcf_debt_proceeds"],
+                    waterfall_rows["cash_before_rcf"],
                 )
             elif debt_component:
                 bridge_address = "%s%s" % (
