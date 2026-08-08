@@ -2233,12 +2233,52 @@ def main(argv: List[str]) -> int:
                         ],
                     }
                 )
-    # A consolidation the check found constituents for but never reconciled is a
-    # scan that stopped looking.  See DEFECT 0.12.
+    # DEFECT 0.15 — "THE ISSUER DID NOT DISCLOSE IT" IS NOT "THE SCAN BROKE".
+    #
+    # DEFECT 0.12 made every visit counter non-zero, on the reasoning that an
+    # empty node set means the check read no cell and must not pass green. That
+    # is correct for the cash components and the waterfall rows: every compiled
+    # model has them, so empty there can only mean drift.
+    #
+    # It is WRONG for the revolver legs on the face of the cash flow. Those rows
+    # are never manufactured — `foldRevolverIntoChangeInDebt` only RELOCATES
+    # rows the issuer's own statement already mapped, and returns immediately
+    # when there are none; `ensureDebtScheduleLinkage` creates only
+    # `debt_issuance` and `debt_repayment`. So a filer that reports movements in
+    # borrowings without breaking out revolver draws — which is most
+    # investment-grade filers — legitimately has zero, and the check turned that
+    # ordinary disclosure choice into a hard block on delivery. The two
+    # standardised fixtures both happen to disclose the legs, which is exactly
+    # why no local run ever caught it.
+    #
+    # So the requirement becomes the same shape the consolidated-constituent
+    # clause already had, and for the same reason: if the rows are there, every
+    # one of them must have been inspected; if there are none, the empty scan is
+    # the truth about the filing rather than a failure of the scanner.
+    #
+    # The drift DEFECT 0.12 feared is still caught, and caught more precisely.
+    # The selector keys on `movement_type`, so a rename would empty it
+    # silently — but the compiler's own ids for these two rows are stable, so a
+    # node carrying one of those ids while failing the selector is drift, not
+    # absence, and is reported as an error rather than shrugged off.
+    for node in semantic_manifest["nodes"]:
+        if (
+            node.get("node_kind") == "statement_row"
+            and node.get("row_id") in ("rcf_draw", "rcf_repayment")
+            and node.get("movement_type") not in ("rcf_draw", "rcf_repayment")
+        ):
+            cash_component_parity_errors.append(
+                {
+                    "id": "statement_rcf_movement_type_drift",
+                    "row_id": node.get("row_id"),
+                    "movement_type": node.get("movement_type"),
+                    "physical_row": node.get("physical_row"),
+                }
+            )
     cash_component_parity_visited = (
         cash_component_visited > 0
         and waterfall_rows_visited > 0
-        and statement_rcf_visited > 0
+        and (statement_rcf_visited > 0 or not statement_rcf_nodes)
         and (consolidated_constituent_visited == 0 or consolidation_tie_visited > 0)
     )
     checks.append(
