@@ -21,6 +21,8 @@ const XLSX_MEDIA = new Set([
 const schema = (name) => JSON.parse(readFileSync(path.join(ASSETS, name), "utf8"));
 const DCS_SCHEMA = schema("dcs-export.schema.json");
 const BROKER_SCHEMA = schema("broker-pack.schema.json");
+const BROKER_EXTRACTION_SCHEMA = schema("broker-extraction-bundle.schema.json");
+const BROKER_SOURCE_TABLES_SCHEMA = schema("broker-source-tables.schema.json");
 
 export const INGRESS_SCHEMA_VERSION = "attachment-ingress/1.0";
 export const INGRESS_COMPILER_VERSION = "attachment-ingress/1.0";
@@ -91,7 +93,7 @@ function inspectRawFormat(bytes, format, mediaType, label) {
     // normalized JSON artifact rather than guessing a vendor layout.
     return { format: "xlsx", package_sha256: sha256(bytes), byte_length: bytes.length };
   }
-  if (["pdf", "docx", "text"].includes(format)) {
+  if (["pdf", "docx", "text", "image"].includes(format)) {
     return { format, byte_length: bytes.length };
   }
   throw new Error(`${label} uses unsupported adapter format ${JSON.stringify(format)}.`);
@@ -177,6 +179,138 @@ async function compileAttachment({ descriptor, sourceById, specDir, evidence }) 
   };
 }
 
+export async function compileBrokerEvidence({ declaration, specDir, evidence, sourceAttachment }) {
+  if (!declaration) return null;
+  if (typeof declaration !== "object" || Array.isArray(declaration)) {
+    throw new Error("broker_evidence must be an object when supplied.");
+  }
+  const artifact = async (field, label) => {
+    const artifactPath = resolved(specDir, declaration[field], `broker_evidence.${field}`);
+    const bytes = await fs.readFile(artifactPath);
+    return {
+      path: artifactPath,
+      bytes,
+      sha256: sha256(bytes),
+      json: await readJsonFile(artifactPath, label),
+    };
+  };
+  const extraction = await artifact(
+    "extraction_bundle_path",
+    "Broker extraction bundle",
+  );
+  const sourceTables = await artifact(
+    "source_tables_path",
+    "Broker source tables",
+  );
+  const crosswalk = await artifact("crosswalk_path", "Broker crosswalk");
+  const receipt = await artifact(
+    "crosswalk_receipt_path",
+    "Broker crosswalk receipt",
+  );
+  const extractionErrors = validateJsonSchema(
+    extraction.json,
+    BROKER_EXTRACTION_SCHEMA,
+  );
+  if (extractionErrors.length > 0) {
+    throw new Error(
+      `Broker extraction bundle fails its contract: ${extractionErrors[0]}`,
+    );
+  }
+  if (extraction.json.gate_status !== "PASS") {
+    throw new Error(
+      `Broker extraction bundle is ${extraction.json.gate_status}, not PASS.`,
+    );
+  }
+  const sourceTableErrors = validateJsonSchema(
+    sourceTables.json,
+    BROKER_SOURCE_TABLES_SCHEMA,
+  );
+  if (sourceTableErrors.length > 0) {
+    throw new Error(
+      `Broker source tables fail their contract: ${sourceTableErrors[0]}`,
+    );
+  }
+  if (
+    crosswalk.json.schema_version !== "broker-crosswalk/1.0" ||
+    receipt.json.schema_version !== "broker-crosswalk-receipt/1.0" ||
+    receipt.json.status !== "PASS"
+  ) {
+    throw new Error("Broker crosswalk or its receipt is not a supported PASS artifact.");
+  }
+  const runIds = new Set([
+    extraction.json.run_id,
+    sourceTables.json.run_id,
+    crosswalk.json.run_id,
+    receipt.json.run_id,
+  ]);
+  if (runIds.size !== 1) {
+    throw new Error("Broker extraction, source tables, crosswalk and receipt do not share one run_id.");
+  }
+  if (
+    receipt.json.bundle_sha256 !== extraction.sha256 ||
+    receipt.json.crosswalk_sha256 !== crosswalk.sha256
+  ) {
+    throw new Error("Broker crosswalk receipt is not hash-bound to the supplied bundle and crosswalk.");
+  }
+
+  const packHouses = new Map(
+    (evidence.broker_pack?.houses ?? []).map((house) => [house.house_id, house]),
+  );
+  const extractedByHouse = new Map(
+    (extraction.json.documents ?? []).map((document) => [document.house_id, document]),
+  );
+  for (const house of sourceTables.json.houses ?? []) {
+    const packHouse = packHouses.get(house.house_id);
+    const extracted = extractedByHouse.get(house.house_id);
+    if (!packHouse || packHouse.house_name !== house.house_name) {
+      throw new Error(
+        `Broker source-table house ${house.house_id} does not match the normalized broker pack.`,
+      );
+    }
+    const source = (evidence.source_inventory ?? []).find(
+      (entry) => entry.source_id === house.source_id,
+    );
+    const attachment = sourceAttachment.get(house.source_id);
+    if (
+      !source ||
+      source.kind !== "user_broker_research" ||
+      !attachment ||
+      !extracted ||
+      extracted.source_id !== house.source_id ||
+      extracted.raw_sha256 !== house.content_sha256 ||
+      house.content_sha256 !== attachment.raw_sha256 ||
+      house.file_name !== attachment.file_name ||
+      house.published_date !== packHouse.published_date ||
+      source.text_extractable !== packHouse.document?.text_extractable ||
+      packHouse.document?.extraction_evidence_sha256 !== extraction.sha256
+    ) {
+      throw new Error(
+        `Broker source-table evidence for ${house.house_name} is not bound to its raw attachment and normalized house metadata.`,
+      );
+    }
+  }
+  if (sourceTables.json.houses.length !== packHouses.size) {
+    throw new Error("Broker source-table evidence does not cover every normalized broker house exactly once.");
+  }
+  if (extractedByHouse.size !== packHouses.size) {
+    throw new Error("Broker extraction bundle does not cover every normalized broker house exactly once.");
+  }
+  evidence.broker_source_tables = sourceTables.json;
+  evidence.broker_crosswalk_receipt = receipt.json;
+  evidence.model_case.broker_pack.raw_tables = structuredClone(
+    sourceTables.json.houses,
+  );
+  evidence.model_case.broker_pack.source_mappings = structuredClone(
+    receipt.json.mappings,
+  );
+  return {
+    extraction_bundle_sha256: extraction.sha256,
+    source_tables_sha256: sourceTables.sha256,
+    crosswalk_sha256: crosswalk.sha256,
+    crosswalk_receipt_sha256: receipt.sha256,
+  };
+}
+
 export async function compileAttachmentIngress({ specPath }) {
   const absoluteSpec = path.resolve(specPath);
   const specDir = path.dirname(absoluteSpec);
@@ -206,6 +340,12 @@ export async function compileAttachmentIngress({ specPath }) {
     source.attachment_id = entry.attachment_id;
     source.content_sha256 = entry.raw_sha256;
   }
+  const brokerEvidence = await compileBrokerEvidence({
+    declaration: spec.broker_evidence,
+    specDir,
+    evidence,
+    sourceAttachment,
+  });
 
   // The evidence template is intentionally allowed to carry placeholder source
   // hashes.  Bind every face-statement authority to the raw bytes computed by
@@ -268,6 +408,7 @@ export async function compileAttachmentIngress({ specPath }) {
     schema_version: INGRESS_SCHEMA_VERSION,
     compiler_version: INGRESS_COMPILER_VERSION,
     manifest_sha256: manifestHash,
+    ...(brokerEvidence ? { broker_evidence: brokerEvidence } : {}),
   };
   return { evidence, manifest, manifest_sha256: manifestHash };
 }

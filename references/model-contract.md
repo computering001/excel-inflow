@@ -291,11 +291,19 @@ total finance expense including lease interest.
 
 ## Production sheets
 
-The v2 production workbook contains exactly:
+The v2 production workbook always contains these three calculation-authority
+sheets:
 
 - `Operating Model`
 - `Brokers`
 - `Forward Curves`
+
+A PASS hash-bound full-table broker bundle may add only the optional `> Brokers`
+divider and `B01`-`B10` values-only evidence sheets defined in
+`broker-extraction.md`. Those sheets preserve source tables for review. They
+must contain no formulas, `Operating Model` must never reference them directly,
+and every selected forecast still enters through `Brokers`. Without full-table
+evidence, the workbook remains exactly the three core sheets.
 
 Do not add `Historical Support`, `Legacy Entity`, a central source register or a
 dedicated checks sheet. Normalize predecessor, merger and calendarisation inputs

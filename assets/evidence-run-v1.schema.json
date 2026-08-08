@@ -39,6 +39,8 @@
     "filings": { "$ref": "#/$defs/filings" },
     "dcs_export": { "type": "object" },
     "broker_pack": { "type": "object" },
+    "broker_source_tables": { "$ref": "#/$defs/brokerSourceTables" },
+    "broker_crosswalk_receipt": { "type": "object" },
     "forecast_context": { "$ref": "#/$defs/forecastContext" },
     "model_case": { "type": "object" },
     "attachment_manifest": {
@@ -53,7 +55,18 @@
       "properties": {
         "schema_version": { "const": "attachment-ingress/1.0" },
         "compiler_version": { "type": "string", "minLength": 1 },
-        "manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        "manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "broker_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["extraction_bundle_sha256", "source_tables_sha256", "crosswalk_sha256", "crosswalk_receipt_sha256"],
+          "properties": {
+            "extraction_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "crosswalk_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
       }
     },
     "prior_case_receipt": {
@@ -85,6 +98,57 @@
     }
   },
   "$defs": {
+    "brokerSourceTables": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "run_id", "houses"],
+      "properties": {
+        "schema_version": { "const": "broker-source-tables/1.0" },
+        "run_id": { "type": "string", "minLength": 1 },
+        "houses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["house_id", "house_name", "source_id", "content_sha256", "tables"],
+            "properties": {
+              "house_id": { "type": "string", "minLength": 1 },
+              "house_name": { "type": "string", "minLength": 1 },
+              "source_id": { "type": "string", "minLength": 1 },
+              "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "published_date": { "type": "string", "format": "date" },
+              "file_name": { "type": "string", "minLength": 1 },
+              "tables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["table_id", "title", "source_location", "units", "extraction_method", "rows"],
+                  "properties": {
+                    "table_id": { "type": "string", "minLength": 1 },
+                    "title": { "type": ["string", "null"] },
+                    "source_location": { "type": "string", "minLength": 1 },
+                    "units": { "type": ["string", "null"] },
+                    "extraction_method": { "type": "string", "minLength": 1 },
+                    "rows": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": { "type": ["string", "number", "boolean", "null"] }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "forecastContext": {
       "type": "object",
       "additionalProperties": false,
@@ -195,7 +259,7 @@
           "required": ["domain", "format"],
           "properties": {
             "domain": { "enum": ["factset_dcs", "broker_pack", "document_extraction"] },
-            "format": { "enum": ["json", "csv", "xlsx", "pdf", "docx", "text"] },
+            "format": { "enum": ["json", "csv", "xlsx", "pdf", "docx", "text", "image"] },
             "table_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
           }
         },
@@ -207,6 +271,19 @@
             "path": { "type": "string", "minLength": 1 },
             "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "kind": { "enum": ["normalized_json", "explicit_extraction"] }
+          }
+        },
+        "auxiliary_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "kind"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "kind": { "enum": ["broker_source_tables", "broker_crosswalk_receipt", "broker_extraction_bundle"] }
+            }
           }
         }
       }

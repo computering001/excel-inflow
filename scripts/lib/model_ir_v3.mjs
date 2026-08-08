@@ -558,7 +558,11 @@ export function forecastDecisionReceiptCsv(rows) {
  * what the package must contain. It names semantic labels rather than physical
  * row numbers; the oracle resolves and proves those labels from raw OOXML.
  */
-export function workbookSemanticProofContract(modelIr, rowPlan = {}) {
+export function workbookSemanticProofContract(
+  modelIr,
+  rowPlan = {},
+  { brokerEvidence = null } = {},
+) {
   const statements = new Map(
     modelIr.planes.statement.map((node) => [node.display_id, node]),
   );
@@ -740,6 +744,7 @@ export function workbookSemanticProofContract(modelIr, rowPlan = {}) {
     semantic_scope_captures: semanticScopeCaptures,
     hierarchies,
     schedule_links: scheduleLinks,
+    broker_evidence: brokerEvidence,
     max_formula_characters: 8192,
   };
 }

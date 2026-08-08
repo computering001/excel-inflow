@@ -251,6 +251,31 @@ function compareEntity(findings, id, left, right) {
 
 function validateSourceInventory(run, findings) {
   const inventory = run.source_inventory ?? [];
+  const bundleHash = run.ingress?.broker_evidence?.extraction_bundle_sha256;
+  const receiptPass = run.broker_crosswalk_receipt?.status === "PASS";
+  const sourceTables = new Map(
+    (run.broker_source_tables?.houses ?? []).map((house) => [house.source_id, house]),
+  );
+  const packByHouse = new Map(
+    (run.broker_pack?.houses ?? []).map((house) => [house.house_id, house]),
+  );
+  const verifiedImageSource = (source) => {
+    if (
+      source.kind !== "user_broker_research" ||
+      !/^[a-f0-9]{64}$/.test(String(bundleHash ?? "")) ||
+      !receiptPass
+    ) return false;
+    const sourceTable = sourceTables.get(source.source_id);
+    const house = sourceTable ? packByHouse.get(sourceTable.house_id) : null;
+    const document = house?.document;
+    return Boolean(
+      sourceTable &&
+      sourceTable.content_sha256 === source.content_sha256 &&
+      document?.text_extractable === false &&
+      ["verified_image_transcription", "mixed_verified"].includes(document?.extraction_method) &&
+      document?.extraction_evidence_sha256 === bundleHash
+    );
+  };
   const ids = new Set();
   for (const source of inventory) {
     if (ids.has(source.source_id)) {
@@ -263,12 +288,16 @@ function validateSourceInventory(run, findings) {
       );
     }
     ids.add(source.source_id);
-    if (source.status === "used" && source.text_extractable === false) {
+    if (
+      source.status === "used" &&
+      source.text_extractable === false &&
+      !verifiedImageSource(source)
+    ) {
       findings.push(
         finding(
           "evidence.source.not_extractable",
           "BLOCK",
-          `Used source ${source.source_id} has no extractable text.`,
+          `Used source ${source.source_id} has no native text and lacks a PASS hash-bound broker image transcription.`,
         ),
       );
     }
@@ -1157,6 +1186,103 @@ function validateBrokerMapping(run, findings) {
   }
 }
 
+function validateBrokerSourceTables(run, findings) {
+  const evidenceTables = run.broker_source_tables ?? null;
+  const modelTables = run.model_case?.broker_pack?.raw_tables ?? null;
+  if (!evidenceTables && !modelTables) return;
+  if (!evidenceTables || !Array.isArray(modelTables)) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.envelope_mismatch",
+        "BLOCK",
+        "Full-table broker evidence must exist in both the evidence envelope and model case.",
+      ),
+    );
+    return;
+  }
+  if (hashValue(evidenceTables.houses ?? []) !== hashValue(modelTables)) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.model_case_mismatch",
+        "BLOCK",
+        "The model case does not preserve the full broker source tables exactly.",
+      ),
+    );
+  }
+  const receipt = run.broker_crosswalk_receipt ?? null;
+  const modelMappings = run.model_case?.broker_pack?.source_mappings ?? null;
+  if (
+    !receipt ||
+    receipt.status !== "PASS" ||
+    !Array.isArray(receipt.mappings) ||
+    !Array.isArray(modelMappings) ||
+    hashValue(receipt.mappings) !== hashValue(modelMappings)
+  ) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.crosswalk_mismatch",
+        "BLOCK",
+        "Broker source tables require one PASS crosswalk receipt preserved exactly in the model case.",
+      ),
+    );
+  }
+  const sourceIds = new Set();
+  const tableIds = new Set();
+  let cellsVisited = 0;
+  for (const house of evidenceTables.houses ?? []) {
+    if (sourceIds.has(house.source_id)) {
+      findings.push(
+        finding(
+          "evidence.broker_source_tables.duplicate_source",
+          "BLOCK",
+          `Broker source ${house.source_id} is represented more than once.`,
+        ),
+      );
+    }
+    sourceIds.add(house.source_id);
+    const source = (run.source_inventory ?? []).find(
+      (entry) => entry.source_id === house.source_id,
+    );
+    if (
+      !source ||
+      source.kind !== "user_broker_research" ||
+      source.status !== "used" ||
+      source.content_sha256 !== house.content_sha256 ||
+      source.name !== house.file_name
+    ) {
+      findings.push(
+        finding(
+          "evidence.broker_source_tables.source_binding",
+          "BLOCK",
+          `Full-table evidence for ${house.house_name} is not bound to one used broker attachment.`,
+        ),
+      );
+    }
+    for (const table of house.tables ?? []) {
+      if (tableIds.has(table.table_id)) {
+        findings.push(
+          finding(
+            "evidence.broker_source_tables.duplicate_table",
+            "BLOCK",
+            `Broker table id ${table.table_id} is duplicated.`,
+          ),
+        );
+      }
+      tableIds.add(table.table_id);
+      for (const row of table.rows ?? []) cellsVisited += row.length;
+    }
+  }
+  if (cellsVisited === 0) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.empty_visit",
+        "BLOCK",
+        "The broker source-table gate visited zero cells.",
+      ),
+    );
+  }
+}
+
 function validateRestatements(run, sourceIds, findings) {
   const historical = run.filings?.historical_periods ?? [];
   const decisions = run.decisions?.restatements ?? [];
@@ -1760,6 +1886,7 @@ export function validateEvidenceRun(run) {
   validateStatementMapping(run, sourceIds, findings);
   validateDebtMapping(run, findings);
   validateBrokerMapping(run, findings);
+  validateBrokerSourceTables(run, findings);
   validateRestatements(run, sourceIds, findings);
   validateDecisionSources(run, sourceIds, findings);
   validateForecastEvidence(run, findings);

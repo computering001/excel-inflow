@@ -1356,7 +1356,214 @@ const BROKER_MAGNITUDE_ROLES = new Set(["capex", "dividends", "share_buybacks"])
  * rows — and all three are colours this model already uses for exactly those
  * three ranks.
  */
-function buildBrokersSheet(workbook, modelCase, rowPlan) {
+function brokerEvidenceSheetName(index, houseName, used) {
+  const prefix = `B${String(index + 1).padStart(2, "0")} `;
+  const cleaned = String(houseName ?? "Broker")
+    .replace(/[\\/\?\*\[\]:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const base = `${prefix}${cleaned || "Broker"}`.slice(0, 31);
+  let name = base;
+  let suffix = 2;
+  while (used.has(name)) {
+    const tail = ` ${suffix}`;
+    name = `${base.slice(0, 31 - tail.length)}${tail}`;
+    suffix += 1;
+  }
+  used.add(name);
+  return name;
+}
+
+function compileBrokerEvidenceLayout(modelCase) {
+  const houses = modelCase.broker_pack?.raw_tables ?? [];
+  const mappings = modelCase.broker_pack?.source_mappings ?? [];
+  if (!Array.isArray(houses) || houses.length === 0) return null;
+  if (!Array.isArray(mappings) || mappings.length === 0) {
+    throw new Error(
+      "Full broker source tables were supplied without cell-addressed source_mappings.",
+    );
+  }
+  const usedNames = new Set(["Operating Model", "> Brokers", "Brokers", "Forward Curves"]);
+  const cellMap = new Map();
+  const houseByName = new Map();
+  const sheets = houses.map((house, houseIndex) => {
+    const name = brokerEvidenceSheetName(houseIndex, house.house_name, usedNames);
+    houseByName.set(house.house_name, house);
+    let row = 4;
+    const tableLayouts = (house.tables ?? []).map((table) => {
+      const metaRow = row;
+      const dataStartRow = metaRow + 1;
+      const maxColumns = Math.max(1, ...(table.rows ?? []).map((values) => values.length));
+      for (let sourceRow = 1; sourceRow <= (table.rows ?? []).length; sourceRow += 1) {
+        for (let sourceColumn = 1; sourceColumn <= maxColumns; sourceColumn += 1) {
+          const address = `${columnName(sourceColumn + 1)}${dataStartRow + sourceRow - 1}`;
+          const key = `${table.table_id}|${sourceRow}|${sourceColumn}`;
+          if (cellMap.has(key)) {
+            throw new Error(`Broker evidence cell key ${key} is duplicated.`);
+          }
+          cellMap.set(key, { sheetName: name, address, house_id: house.house_id });
+        }
+      }
+      row = dataStartRow + (table.rows ?? []).length + 2;
+      return { table, metaRow, dataStartRow, maxColumns };
+    });
+    return { house, name, tableLayouts, visibleEndRow: Math.max(3, row - 1) };
+  });
+  const mappingByKey = new Map();
+  for (const mapping of mappings) {
+    const key = `${mapping.house_id}|${mapping.metric_id}|${mapping.period_index}`;
+    if (mappingByKey.has(key)) {
+      throw new Error(`Broker source mapping ${key} is duplicated.`);
+    }
+    for (const component of mapping.components ?? []) {
+      const physical = cellMap.get(
+        `${component.table_id}|${component.row}|${component.column}`,
+      );
+      if (!physical || physical.house_id !== mapping.house_id) {
+        throw new Error(
+          `Broker mapping ${key} points to a missing or cross-house source cell.`,
+        );
+      }
+    }
+    mappingByKey.set(key, mapping);
+  }
+  return {
+    dividerName: "> Brokers",
+    sheets,
+    cellMap,
+    mappingByKey,
+    houseByName,
+  };
+}
+
+function brokerEvidenceProofSpec(layout) {
+  if (!layout) return null;
+  const expectedSourceReferences = [];
+  for (const mapping of layout.mappingByKey.values()) {
+    for (const component of mapping.components ?? []) {
+      const physical = layout.cellMap.get(
+        `${component.table_id}|${component.row}|${component.column}`,
+      );
+      expectedSourceReferences.push({
+        sheet: physical.sheetName,
+        address: physical.address,
+      });
+    }
+  }
+  return {
+    divider_sheet: layout.dividerName,
+    broker_sheet: "Brokers",
+    source_sheets: layout.sheets.map((sheet) => sheet.name),
+    expected_source_references: expectedSourceReferences,
+  };
+}
+
+function brokerEvidenceFormula(layout, houseName, metricId, periodIndex, expectedValue) {
+  if (!layout) return null;
+  const house = layout.houseByName.get(houseName);
+  if (!house) return null;
+  const mapping = layout.mappingByKey.get(
+    `${house.house_id}|${metricId}|${periodIndex}`,
+  );
+  if (!mapping) return null;
+  if (
+    expectedValue !== null &&
+    expectedValue !== undefined &&
+    Math.abs(Number(mapping.value) - Number(expectedValue)) > 1e-6
+  ) {
+    throw new Error(
+      `Broker source mapping for ${houseName}.${metricId}[${periodIndex}] resolves to ${mapping.value}, not ${expectedValue}.`,
+    );
+  }
+  const terms = (mapping.components ?? []).map((component) => {
+    const physical = layout.cellMap.get(
+      `${component.table_id}|${component.row}|${component.column}`,
+    );
+    const reference = `'${physical.sheetName.replace(/'/g, "''")}'!${physical.address}`;
+    const coefficient = Number(component.coefficient);
+    if (coefficient === 1) return reference;
+    if (coefficient === -1) return `-${reference}`;
+    return `${reference}*${coefficient}`;
+  });
+  let expression;
+  const constant = Number(mapping.constant ?? 0);
+  if (terms.length === 1 && constant === 0) expression = terms[0];
+  else {
+    const argumentsList = [...terms, ...(constant === 0 ? [] : [String(constant)])];
+    expression = `SUM(${argumentsList.join(",")})`;
+  }
+  const multiplier = Number(mapping.multiplier ?? 1);
+  if (multiplier !== 1) expression = `(${expression})*${multiplier}`;
+  return `=${expression}`;
+}
+
+function buildBrokerEvidenceDivider(workbook, layout) {
+  const sheet = workbook.worksheets.add(layout.dividerName);
+  sheet.showGridLines = false;
+  setValue(sheet, "B2", "BROKER SOURCE EVIDENCE");
+  styleFont(sheet, "B2", COLORS.navy, { bold: true });
+  setValue(
+    sheet,
+    "B4",
+    "Values-only evidence sheets follow. Model formulas reference them only through the Brokers sheet.",
+  );
+  styleFont(sheet, "B4", COLORS.grey);
+  sheet.getRange("A1:A8").format.columnWidth = 1;
+  sheet.getRange("B1:B8").format.columnWidth = 72;
+  return sheet;
+}
+
+function buildBrokerEvidenceSheets(workbook, layout) {
+  for (const sheetLayout of layout.sheets) {
+    const { house } = sheetLayout;
+    const sheet = workbook.worksheets.add(sheetLayout.name);
+    sheet.showGridLines = false;
+    setValue(sheet, "B1", `${house.house_name} — source tables`);
+    styleFont(sheet, "B1", COLORS.black, { bold: true });
+    setValue(
+      sheet,
+      "B2",
+      `${house.file_name} | published ${house.published_date} | source ${house.source_id} | SHA-256 ${house.content_sha256}`,
+    );
+    styleFont(sheet, "B2", COLORS.grey);
+    let globalMaxColumns = 1;
+    const maxWidths = new Map();
+    for (const { table, metaRow, dataStartRow, maxColumns } of sheetLayout.tableLayouts) {
+      globalMaxColumns = Math.max(globalMaxColumns, maxColumns);
+      const lastColumn = columnName(maxColumns + 1);
+      setValue(
+        sheet,
+        `B${metaRow}`,
+        [table.title, table.source_location, table.units].filter(Boolean).join(" | ") || table.table_id,
+      );
+      sheet.getRange(`B${metaRow}:${lastColumn}${metaRow}`).format.fill = COLORS.navy;
+      styleFont(sheet, `B${metaRow}:${lastColumn}${metaRow}`, COLORS.white, { bold: true });
+      for (let sourceRow = 0; sourceRow < table.rows.length; sourceRow += 1) {
+        const values = table.rows[sourceRow];
+        for (let sourceColumn = 0; sourceColumn < maxColumns; sourceColumn += 1) {
+          const value = sourceColumn < values.length ? values[sourceColumn] : null;
+          const address = `${columnName(sourceColumn + 2)}${dataStartRow + sourceRow}`;
+          setValue(sheet, address, value);
+          const width = Math.min(30, Math.max(9, String(value ?? "").length + 2));
+          maxWidths.set(sourceColumn + 2, Math.max(maxWidths.get(sourceColumn + 2) ?? 0, width));
+          if (sourceRow === 0) {
+            sheet.getRange(address).format.fill = COLORS.subsection;
+            styleFont(sheet, address, COLORS.black, { bold: true });
+          } else if (value !== null && value !== undefined && value !== "") {
+            styleInput(sheet, address);
+          }
+        }
+      }
+    }
+    sheet.getRange(`A1:A${sheetLayout.visibleEndRow}`).format.columnWidth = 1;
+    for (let column = 2; column <= globalMaxColumns + 1; column += 1) {
+      sheet.getRange(`${columnName(column)}1:${columnName(column)}${sheetLayout.visibleEndRow}`).format.columnWidth =
+        maxWidths.get(column) ?? (column === 2 ? 24 : 12);
+    }
+  }
+}
+
+function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) {
   const sheet = workbook.worksheets.add("Brokers");
   sheet.showGridLines = false;
 
@@ -1554,15 +1761,21 @@ function buildBrokersSheet(workbook, modelCase, rowPlan) {
       brokerRows.push(row);
       contributorRows.push(row);
       setValue(sheet, `B${row}`, name);
-      setRow(
-        sheet,
-        `${FORECAST_COLUMNS_BROKERS[0]}${row}:${LAST_COLUMN}${row}`,
-        values,
-      );
-      styleInput(
-        sheet,
-        `${FORECAST_COLUMNS_BROKERS[0]}${row}:${LAST_COLUMN}${row}`,
-      );
+      for (let index = 0; index < 3; index += 1) {
+        const address = `${FORECAST_COLUMNS_BROKERS[index]}${row}`;
+        const sourceFormula = brokerEvidenceFormula(
+          brokerEvidence,
+          name,
+          metricId,
+          index,
+          values[index],
+        );
+        if (sourceFormula) applyFormula(sheet, address, sourceFormula);
+        else {
+          setValue(sheet, address, values[index]);
+          styleInput(sheet, address);
+        }
+      }
       // The link goes down AFTER `styleInput`, which only ever touches D:F, so
       // the actual keeps the green a cross-sheet link is owed rather than the
       // blue of the hardcodes beside it. `assertFormulaProvenance` re-asserts it
@@ -10031,7 +10244,7 @@ function declareShippedFacts(rowPlan, brokerRows) {
   return {
     calc_properties: declaredCalcProperties(),
     default_font_name: "Calibri",
-    sheet_order: ["Operating Model", "Brokers", "Forward Curves"],
+    sheet_order: brokerRows?.sheetOrder ?? ["Operating Model", "Brokers", "Forward Curves"],
     operating_model: {
       freeze_pane: {
         x_split: 6,
@@ -10650,9 +10863,26 @@ function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
   } else if (typeof workbook.comments?.setSelf === "function") {
     workbook.comments.setSelf(commentAuthor);
   }
+  const brokerEvidence = compileBrokerEvidenceLayout(modelCase);
   const operatingModel = workbook.worksheets.add("Operating Model");
-  const brokerRows = buildBrokersSheet(workbook, modelCase, rowPlan);
+  if (brokerEvidence) buildBrokerEvidenceDivider(workbook, brokerEvidence);
+  const brokerRows = buildBrokersSheet(
+    workbook,
+    modelCase,
+    rowPlan,
+    brokerEvidence,
+  );
+  if (brokerEvidence) buildBrokerEvidenceSheets(workbook, brokerEvidence);
   const curveSheet = buildForwardCurvesSheet(workbook, modelCase);
+  brokerRows.sheetOrder = brokerEvidence
+    ? [
+        "Operating Model",
+        brokerEvidence.dividerName,
+        "Brokers",
+        ...brokerEvidence.sheets.map((sheet) => sheet.name),
+        "Forward Curves",
+      ]
+    : ["Operating Model", "Brokers", "Forward Curves"];
   configureOperatingModel(
     workbook,
     operatingModel,
@@ -10770,7 +11000,11 @@ async function main(packaging = null) {
     semanticManifest,
     modelIrV3,
   );
-  const workbookProofContract = workbookSemanticProofContract(modelIrV3, rowPlan);
+  const workbookProofContract = workbookSemanticProofContract(
+    modelIrV3,
+    rowPlan,
+    { brokerEvidence: brokerEvidenceProofSpec(compileBrokerEvidenceLayout(modelCase)) },
+  );
   if (shadowComparison.status !== "PASS") {
     throw new Error(
       `Candidate semantic shadow comparison blocked: ${JSON.stringify(shadowComparison)}`,

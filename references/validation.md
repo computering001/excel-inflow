@@ -87,7 +87,9 @@ Twenty-nine checks: `sheet-contract`, `coverage-gate`,
 `font-colour-contract`, `number-format-colour-contract`, `typography-contract`,
 `native-excel-toggle-restoration`, `visual-review`.
 
-**Proves:** the workbook contains the approved three sheets and no others; the
+**Proves:** the workbook contains the three approved calculation-authority
+sheets and, when declared by a PASS hash-bound broker bundle, no more than the
+optional values-only `> Brokers` / `B01`-`B10` evidence group; the
 period structure is three historical plus three forecast; every statement
 subtotal foots; the workbook agrees with the independently computed solution;
 debt, cash, RCF, interest, liquidity and leverage tie; standalone plus
@@ -671,8 +673,10 @@ Confirm:
   into calculation rows;
 - expanded debt instruments inside the Debt Schedule and their interest rows
   inside the Interest Schedule;
-- the production workbook contains only `Operating Model`, `Brokers` and
-  `Forward Curves`;
+- the production workbook contains the three calculation-authority sheets
+  `Operating Model`, `Brokers` and `Forward Curves`; an optional `> Brokers` /
+  `B01`-`B10` evidence group is permitted only when hash-bound, values-only and
+  fully crosswalked through `Brokers`;
 - **no hidden rows on the `Operating Model` and no content below the last
   visible row.** There is no hidden support block; every mechanical row is on
   the face of the schedule it belongs to. `hidden-mechanics` asserts both halves;

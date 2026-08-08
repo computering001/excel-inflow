@@ -6,7 +6,7 @@
   "x_contract_notes": {
     "why_three": "USER-FLOW-20260726.md stage 1: minimum 3 houses, maximum 10. Three is the minimum for a meaningful consensus and lets the model compare period-specific EBIT versus Adjusted EBITDA coverage, then use D&A as the bridge driver; headline ties resolve toward EBIT (scripts/lib/broker_anchor.mjs). A house contributes only in periods where it supplies a finite estimate. Ten is the operating cap because extraction and review cost scale with every additional source.",
     "authority": "The broker set is authoritative for the forecast anchor and consensus lines ONLY. Never for anything historic. Historic figures come from the filings.",
-    "accepted_file_types": "This list is stated here because no other document states it. A broker note may be supplied as: application/pdf (with a text layer), application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (.xlsx), application/vnd.ms-excel.sheet.macroEnabled.12 (.xlsm), text/csv, application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx), application/vnd.openxmlformats-officedocument.presentationml.presentation (.pptx), text/plain, text/markdown, text/html, or application/json for a pack that has already been extracted. EXPLICITLY REJECTED: any image/* type, and an application/pdf with no text layer (an image-only scan) — there is nothing to extract, and an OCR guess at a forecast number is worse than no forecast. Also rejected: legacy binary application/msword and application/vnd.ms-excel, and message containers (message/rfc822, application/vnd.ms-outlook) — unwrap the attachment first.",
+    "accepted_file_types": "A broker note may be supplied as PDF, OOXML spreadsheet, CSV, text/HTML/JSON, PNG or JPEG. Native text/cells are preferred. An image-only PDF or standalone image is accepted only through the hash-bound verified-image lane: two independent cell-addressed transcriptions must agree exactly, or a reviewed resolution must identify every disagreement. A raw OCR guess never satisfies the contract. Legacy binary Office files and message containers remain rejected; unwrap or resave the attachment first.",
     "estimate_date_gap": "Every house carries published_date because a six-month-old estimate and last week's estimate are not equivalent evidence. The v2 case preserves the date, source filename and source id in broker_pack.house_metadata while keeping each numeric broker series unchanged. Evidence-run validation blocks if that metadata is dropped."
   },
   "type": "object",
@@ -134,13 +134,24 @@
                 "text/plain",
                 "text/markdown",
                 "text/html",
-                "application/json"
+                "application/json",
+                "image/png",
+                "image/jpeg"
               ],
               "description": "The accepted list, enumerated so that an unaccepted type fails at upload rather than at extraction. See x_contract_notes.accepted_file_types for what is rejected and why."
             },
             "text_extractable": {
               "type": "boolean",
-              "description": "False for an image-only PDF. N0 rejects false: there is no text layer, and an OCR guess at a forecast is worse than an absent forecast."
+              "description": "Whether the raw document itself has a usable native text/cell layer. False is allowed only with a verified image extraction method and hash-bound evidence."
+            },
+            "extraction_method": {
+              "enum": ["native", "verified_image_transcription", "mixed_verified"],
+              "description": "How the normalized estimates were obtained. verified_image_transcription and mixed_verified require independently checked, cell-addressed image evidence."
+            },
+            "extraction_evidence_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "SHA-256 of the PASS broker-extraction bundle that proves the document, tables and image verification lane."
             },
             "page_reference": {
               "type": ["string", "null"],

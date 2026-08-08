@@ -13,6 +13,7 @@ import json
 import re
 import sys
 import zipfile
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -480,6 +481,69 @@ def verify(facts: WorkbookFacts, contract: dict) -> dict:
             formula_cells.append((candidate_sheet.name, cell, refs))
             if len(cell.formula) > int(contract.get("max_formula_characters", 8192)):
                 block("OOXML_FORMULA_TOO_LONG", f"Formula at {candidate_sheet.name}!{cell.address} exceeds the length budget.")
+
+    broker_evidence = contract.get("broker_evidence")
+    if broker_evidence:
+        source_sheets = set(broker_evidence.get("source_sheets", []))
+        broker_sheet_name = broker_evidence.get("broker_sheet", "Brokers")
+        divider_sheet = broker_evidence.get("divider_sheet", "> Brokers")
+        missing_sheets = sorted(
+            name for name in [divider_sheet, broker_sheet_name, *source_sheets]
+            if name not in facts.sheets
+        )
+        if missing_sheets:
+            block(
+                "OOXML_BROKER_EVIDENCE_SHEET_MISSING",
+                f"Broker evidence sheets are absent: {missing_sheets}.",
+            )
+        for source_sheet_name in sorted(source_sheets):
+            source_sheet = facts.sheets.get(source_sheet_name)
+            if source_sheet is None:
+                continue
+            source_formulas = [
+                cell.address for cell in source_sheet.cells.values() if cell.formula
+            ]
+            if source_formulas:
+                block(
+                    "OOXML_BROKER_EVIDENCE_NOT_VALUES_ONLY",
+                    f"Broker source sheet {source_sheet_name} contains formulas.",
+                    cells=source_formulas[:20],
+                )
+        expected = Counter(
+            (item["sheet"], item["address"].replace("$", ""))
+            for item in broker_evidence.get("expected_source_references", [])
+        )
+        observed = Counter()
+        for owner_sheet, cell, refs in formula_cells:
+            evidence_refs = Counter(
+                (ref_sheet, ref_address.replace("$", ""))
+                for ref_sheet, ref_address in refs
+                if ref_sheet in source_sheets
+            )
+            if evidence_refs and owner_sheet != broker_sheet_name:
+                block(
+                    "OOXML_BROKER_EVIDENCE_AUTHORITY_BYPASS",
+                    f"{owner_sheet}!{cell.address} references raw broker evidence without passing through Brokers.",
+                )
+            if owner_sheet == broker_sheet_name:
+                observed.update(evidence_refs)
+        if expected != observed:
+            block(
+                "OOXML_BROKER_EVIDENCE_CROSSWALK_MISMATCH",
+                "Physical broker-source references do not equal the sealed cell crosswalk.",
+                missing=[f"{sheet}!{address}" for (sheet, address), count in (expected - observed).items() for _ in range(count)][:30],
+                unexpected=[f"{sheet}!{address}" for (sheet, address), count in (observed - expected).items() for _ in range(count)][:30],
+            )
+    else:
+        unexpected = sorted(
+            name for name in facts.sheets
+            if name == "> Brokers" or re.fullmatch(r"B\d{2} .+", name)
+        )
+        if unexpected:
+            block(
+                "OOXML_UNDECLARED_BROKER_EVIDENCE_SHEET",
+                f"Workbook contains undeclared broker evidence sheets: {unexpected}.",
+            )
 
     return {
         "schema_version": 1,

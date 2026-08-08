@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-crosswalk.schema.json",
+  "title": "Cell-addressed broker evidence to model metric crosswalk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "as_of",
+    "reporting_currency",
+    "units",
+    "forecast_periods",
+    "metrics",
+    "mappings"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-crosswalk/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "as_of": { "type": "string", "format": "date" },
+    "source_label": { "type": "string", "minLength": 1 },
+    "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "units": { "enum": ["units", "thousands", "millions"] },
+    "forecast_periods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "unit_kind"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "unit_kind": { "enum": ["currency", "ratio", "percent_decimal"] },
+          "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] }
+        }
+      }
+    },
+    "mappings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["house_id", "metric_id", "period_index", "sources", "rationale"],
+        "properties": {
+          "house_id": { "type": "string", "minLength": 1 },
+          "metric_id": { "type": "string", "minLength": 1 },
+          "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["table_id", "row", "column", "coefficient"],
+              "properties": {
+                "table_id": { "type": "string", "minLength": 1 },
+                "row": { "type": "integer", "minimum": 1 },
+                "column": { "type": "integer", "minimum": 1 },
+                "coefficient": { "type": "number" }
+              }
+            }
+          },
+          "constant": { "type": "number" },
+          "multiplier": { "type": "number" },
+          "rationale": { "type": "string", "minLength": 1 },
+          "review_status": { "enum": ["auto_exact", "reviewed"] }
+        }
+      }
+    },
+    "provider_consensus": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

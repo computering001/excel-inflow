@@ -225,6 +225,22 @@ The public-test validator may hand its case to the same graph, solver and
 renderer so the product is exercised end to end. Its receipt can never be used
 as the production evidence-run receipt required for delivery.
 
+When raw broker documents are supplied, preserve the complete extracted tables
+before normalising model metrics. Run the hash-bound broker evidence lane
+outside the immutable skill tree:
+
+```text
+python3 scripts/extract_broker_evidence.py <broker-extraction-request.json> --out <run-folder>/extract
+python3 scripts/compile_broker_vision.py <bundle.json> --responses <responses-folder> --out <verified-bundle.json>
+python3 scripts/compile_broker_pack.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker
+```
+
+The first command captures native text, geometry, tables, workbook cells and
+images. Image-only surfaces remain unresolved until the second command proves
+two independent hash-bound cell transcriptions agree or records an explicit
+reviewed resolution. The third command compiles only reviewed, cell-addressed
+mappings; full unused source tables remain evidence rather than disappearing.
+
 The resumable production shell handles all five user-facing stages. Run the
 same command again after supplying answers or after an interruption; it verifies
 the input and output hashes on each receipt, reuses every unchanged successful

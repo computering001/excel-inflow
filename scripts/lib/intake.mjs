@@ -1011,7 +1011,13 @@ function checkBrokerHouses(pack, findings) {
         ),
       );
     }
-    if (doc.text_extractable === false) {
+    if (
+      doc.text_extractable === false &&
+      !(
+        ["verified_image_transcription", "mixed_verified"].includes(doc.extraction_method) &&
+        /^[a-f0-9]{64}$/.test(String(doc.extraction_evidence_sha256 ?? ""))
+      )
+    ) {
       findings.push(
         finding(
           "broker_document_not_text_extractable",
@@ -1019,7 +1025,7 @@ function checkBrokerHouses(pack, findings) {
           "malformed",
           REMEDY.RE_SUPPLY,
           `broker_pack.houses[${index}].document.text_extractable`,
-          `${house.house_name ?? `Entry ${index + 1}`}: "${doc.file_name ?? "note"}" has no text layer — it is an image-only scan. There is nothing to extract, and an OCR guess at a forecast figure is worse than an absent forecast. Re-supply a text PDF or a spreadsheet.`,
+          `${house.house_name ?? `Entry ${index + 1}`}: "${doc.file_name ?? "note"}" has no native text layer and lacks a hash-bound verified image transcription. Supply two agreeing cell-addressed passes (or a reviewed resolution), or re-supply a native-text PDF/spreadsheet.`,
         ),
       );
     }
