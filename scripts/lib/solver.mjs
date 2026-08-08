@@ -191,7 +191,10 @@ function forecastRule(row, forecastIndex = null) {
  */
 function statementRowForRole(modelCase, semanticRole) {
   return normalisedStatementDefinitions(modelCase).find(
-    (row) => row.semantic_role === semanticRole,
+    (row) =>
+      row.semantic_role === semanticRole ||
+      (Array.isArray(row.role_aliases) &&
+        row.role_aliases.includes(semanticRole)),
   ) ?? null;
 }
 

@@ -5,6 +5,7 @@ import {
 export { inferMovementType } from "./semantic_graph.mjs";
 import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
 import {
+  presentationEpoch,
   selectStandardisedProfile,
   STANDARDISED_DESIGN_CONTRACT_SHA256,
   STANDARDISED_DESIGN_RUNTIME_SHA256,
@@ -127,12 +128,12 @@ const SECTION_RANKS = {
     answers: new Set(["net_income"]),
     // NOT an answer here. It is a step between operating profit and profit
     // before tax; the interest schedule below is where it concludes something.
-    blocks: new Set(["net_interest_expense"]),
+    blocks: new Set(["net_interest_expense", "pre_tax_income"]),
     ratio_answers: new Set(),
   },
   [RANK_SECTION.CASH_FLOW]: {
     answers: new Set(["ending_cash"]),
-    blocks: new Set(),
+    blocks: new Set(["free_cash_flow"]),
     ratio_answers: new Set(),
   },
   [RANK_SECTION.DEBT_SCHEDULE]: {
@@ -296,6 +297,36 @@ export function headlineIds(section, presentIds) {
  * `Total Other Debt`, and the per-group interest subtotals. Structurally a
  * component sum in every case: it closes a run of instruments and nothing else.
  */
+/**
+ * Roles whose rows carry the total treatment by identity, whatever row_type
+ * the classifier or case author gave them. Gross profit compiled as a plain
+ * `calculation` row rendered indistinguishable from the expense lines around
+ * it; a key subtotal's weight comes from what the row IS, never from how its
+ * arithmetic happened to be typed. This is a role list, not a formula-shape
+ * heuristic: a SUM alone still earns nothing.
+ */
+const RANKED_TOTAL_ROLES = new Set([
+  "gross_profit",
+  "operating_profit",
+  "ebit",
+  "adjusted_ebitda",
+  "pre_tax_income",
+  "net_income",
+  "cash_from_operations",
+  "cash_from_investing",
+  "cash_from_financing",
+  "net_change_in_cash",
+  "ending_cash",
+  "free_cash_flow",
+]);
+
+export function isRankedTotalIdentity(identity) {
+  const keys = (Array.isArray(identity) ? identity : [identity]).filter(
+    (key) => typeof key === "string" && key.length > 0,
+  );
+  return keys.some((key) => RANKED_TOTAL_ROLES.has(key));
+}
+
 export function groupSubtotalRank() {
   return TOTAL_RANK.COMPONENT;
 }
@@ -1279,6 +1310,190 @@ function collapseRedundantStatementAliases(modelCase, section, rows) {
   }
 }
 
+/**
+ * One visible EBIT. When the issuer's operating profit and the compiled EBIT
+ * row are the same number in every filed period, they are one economic
+ * answer wearing two labels, and the statement may not print it twice. The
+ * operating-profit row (the issuer's own caption) survives; every reference
+ * to the EBIT row is retargeted onto it. Rows whose histories genuinely
+ * differ — non-trading items between the two — are both kept.
+ */
+function collapseEquivalentEbitOperatingProfit(rows) {
+  const operatingProfit = rows.find(
+    (row) => row.semantic_role === "operating_profit",
+  );
+  const ebit = rows.find((row) => row.semantic_role === "ebit");
+  if (!operatingProfit || !ebit || operatingProfit === ebit) return;
+  const historyOf = (row) =>
+    (row.values ?? []).slice(0, 3).map((value) => Number(value));
+  const left = historyOf(operatingProfit);
+  const right = historyOf(ebit);
+  const identical =
+    left.length === 3 &&
+    left.every(
+      (value, index) =>
+        Number.isFinite(value) &&
+        Number.isFinite(right[index]) &&
+        Math.abs(value - right[index]) <= 1e-9,
+    );
+  if (!identical) return;
+  for (const row of rows) {
+    for (const rule of statementRules(row)) {
+      if (!Array.isArray(rule.refs)) continue;
+      rule.refs = rule.refs.map((ref) =>
+        ref === ebit.row_id ? operatingProfit.row_id : ref,
+      );
+    }
+    if (row.parent_row_id === ebit.row_id) {
+      row.parent_row_id = operatingProfit.row_id;
+    }
+    if (row.forecast_capture_parent_id === ebit.row_id) {
+      row.forecast_capture_parent_id = operatingProfit.row_id;
+    }
+  }
+  // Retargeting can turn the survivor's own link-to-EBIT into a link to
+  // itself; where that happens the survivor adopts the collapsed row's rule
+  // for the same named slot, so the one visible answer keeps a real
+  // calculation instead of a self-reference.
+  const selfLink = (rule) =>
+    rule?.operator === "link" &&
+    rule.refs?.length === 1 &&
+    rule.refs[0] === operatingProfit.row_id;
+  const adopt = (rule, replacement) => {
+    if (!replacement || replacement === rule) return;
+    rule.operator = replacement.operator;
+    rule.refs = [...(replacement.refs ?? [])];
+  };
+  if (selfLink(operatingProfit.calculation)) {
+    adopt(operatingProfit.calculation, ebit.calculation);
+  }
+  if (selfLink(operatingProfit.forecast_calculation)) {
+    adopt(
+      operatingProfit.forecast_calculation,
+      ebit.forecast_calculation ?? ebit.calculation,
+    );
+  }
+  for (const [index, rule] of (
+    operatingProfit.forecast_period_calculations ?? []
+  ).entries()) {
+    if (selfLink(rule)) {
+      adopt(
+        rule,
+        ebit.forecast_period_calculations?.[index] ??
+          ebit.forecast_calculation ??
+          ebit.calculation,
+      );
+    }
+  }
+  // A collapsed row with no rule of its own leaves nothing to adopt; the
+  // survivor then simply stops being a formula row — its sourced values
+  // already carry the identical history — rather than keeping a self-link.
+  if (selfLink(operatingProfit.calculation)) delete operatingProfit.calculation;
+  if (selfLink(operatingProfit.forecast_calculation)) {
+    delete operatingProfit.forecast_calculation;
+  }
+  if (Array.isArray(operatingProfit.forecast_period_calculations)) {
+    operatingProfit.forecast_period_calculations =
+      operatingProfit.forecast_period_calculations.map((rule) =>
+        selfLink(rule) ? null : rule,
+      );
+  }
+  // The surviving row owns both identities: solver and emitters that resolve
+  // by the ebit role must land on the one visible answer.
+  operatingProfit.role_aliases = [
+    ...new Set([...(operatingProfit.role_aliases ?? []), "ebit"]),
+  ];
+  rows.splice(rows.indexOf(ebit), 1);
+}
+
+/**
+ * A derived row that no formula references and no child declares as parent
+ * is display noise: it repeats an answer that already has a visible owner
+ * (a profit alias at the top of the cash flow, a manufactured negation twin
+ * beside a filed finance line). Removing it changes no total, because
+ * nothing consumes it. Source-owned rows, headers, spine roles for the
+ * section, and rows carrying their own sourced values are never touched.
+ */
+function removeOrphanDerivedStatementRows(section, rows) {
+  const protectedRoles = new Set(
+    section === "cash_flow"
+      ? [
+          "cash_from_operations",
+          "cash_from_investing",
+          "cash_from_financing",
+          "net_change_in_cash",
+          "opening_cash",
+          "ending_cash",
+          "free_cash_flow",
+        ]
+      : [
+          "revenue",
+          "gross_profit",
+          "operating_profit",
+          "ebit",
+          "adjusted_ebitda",
+          "pre_tax_income",
+          "tax_expense",
+          "net_income",
+        ],
+  );
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const referenced = new Set();
+    for (const row of rows) {
+      for (const rule of statementRules(row)) {
+        for (const ref of rule.refs ?? []) referenced.add(ref);
+      }
+      if (row.parent_row_id) referenced.add(row.parent_row_id);
+      if (row.forecast_capture_parent_id) {
+        referenced.add(row.forecast_capture_parent_id);
+      }
+    }
+    for (const row of rows) {
+      if (row.row_type === "header") continue;
+      if (referenced.has(row.row_id)) continue;
+      if (protectedRoles.has(row.semantic_role)) continue;
+      if (Array.isArray(row.source_line_ids) && row.source_line_ids.length > 0) {
+        continue;
+      }
+      const derived =
+        row.calculation &&
+        ["link", "sum", "subtract", "negate"].includes(row.calculation.operator);
+      if (!derived) continue;
+      rows.splice(rows.indexOf(row), 1);
+      changed = true;
+      break;
+    }
+  }
+}
+
+/**
+ * The EBITDA bridge is a reconciliation, not a second income statement. A
+ * bare run of EBITDA, margin and D&A sitting mid-statement reads as more
+ * P&L; a title bar in front of it declares the block for what it is. Purely
+ * presentational: no calculation, no values, no authority.
+ */
+function badgeAdjustedEbitdaBridge(rows) {
+  if (presentationEpoch() < 3) return;
+  const ebitda = rows.find((row) => row.semantic_role === "adjusted_ebitda");
+  if (!ebitda) return;
+  if (rows.some((row) => row.row_id === "adjusted_ebitda_bridge_header")) {
+    return;
+  }
+  const index = rows.indexOf(ebitda);
+  const previous = rows[index - 1];
+  if (previous?.row_type === "header") return;
+  rows.splice(index, 0, {
+    row_id: "adjusted_ebitda_bridge_header",
+    label: "Adjusted EBITDA bridge",
+    row_type: "header",
+    // The bridge can sit below net income; a block header there is exactly
+    // the declared necessity the projection gate demands.
+    projection_origin: "required_block_header",
+  });
+}
+
 function cashFlowIncomeRootKind(row) {
   const refs = row.calculation?.operator === "link"
     ? row.calculation.refs ?? []
@@ -2163,6 +2378,13 @@ export function normaliseStatementRows(modelCase, section) {
   // Last, so it sees the final row order. The presentation-tree compiler is
   // the single writer for parentage, indentation and outline levels.
   removeRedundantDuplicateHeaders(rows);
+  if (section === "income_statement") {
+    collapseEquivalentEbitOperatingProfit(rows);
+  }
+  removeOrphanDerivedStatementRows(section, rows);
+  if (section === "income_statement") {
+    badgeAdjustedEbitdaBridge(rows);
+  }
   captureChildrenOfDirectForecastParents(modelCase, rows);
   applyDefaultForecastWaterfall(modelCase, rows);
   materializeStatementPresentationTree(rows, section);

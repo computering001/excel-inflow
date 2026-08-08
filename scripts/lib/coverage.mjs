@@ -1214,6 +1214,52 @@ function instrumentChecks(modelCase) {
         ),
       );
     }
+    // Rate-band plausibility. Rates are decimals (0.04 = 4.0%), and the
+    // commonest ingestion defect is a percent value divided by 100 a second
+    // time: a 0.700% coupon arriving as 0.00007 prices a bond's interest at
+    // zero while every parity gate still agrees. A coupon or spread strictly
+    // between zero and five basis points, or above 25%, is mis-scaled until
+    // the evidence says otherwise; an exact zero remains a legal zero-coupon.
+    {
+      const couponValues = (Array.isArray(instrument.coupon_or_all_in_rate)
+        ? instrument.coupon_or_all_in_rate
+        : []
+      ).map(Number);
+      const misScaled = couponValues.filter(
+        (value) =>
+          Number.isFinite(value) &&
+          ((value > 0 && value < 0.0005) || value > 0.25),
+      );
+      if (misScaled.length > 0) {
+        checks.push(
+          result(
+            `instrument.${id}.rate_band`,
+            "BLOCK",
+            `${id} carries a coupon or all-in rate of ${misScaled[0]} — below ` +
+              "five basis points or above 25% as a decimal. Rates are " +
+              "decimals (0.04 = 4.0%); a value this size is a percent divided " +
+              "by 100 twice (or not at all) until the source evidence " +
+              "explicitly says otherwise.",
+          ),
+        );
+      }
+      const spreadBps = Number(instrument.spread_bps);
+      if (
+        Number.isFinite(spreadBps) &&
+        ((spreadBps > 0 && spreadBps < 5) || spreadBps > 2500)
+      ) {
+        checks.push(
+          result(
+            `instrument.${id}.spread_band`,
+            "BLOCK",
+            `${id} declares a floating spread of ${spreadBps}bps — below five ` +
+              "basis points or above 2,500. spread_bps is an integer in basis " +
+              "points; a value this size is a decimal fraction or a percent " +
+              "that slipped into a bps field.",
+          ),
+        );
+      }
+    }
     if (instrument.class === "rcf") {
       if (!finite(instrument.facility_capacity)) {
         checks.push(

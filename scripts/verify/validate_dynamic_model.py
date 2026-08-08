@@ -1026,6 +1026,41 @@ def main(argv: List[str]) -> int:
         )
     )
 
+    # --------------------------------------------------------- instrument-rate-band
+    # Rates in the schedule's rate/spread column are decimals (0.04 = 4.0%).
+    # The percent-vs-decimal ingestion defect prices instruments at ~zero
+    # interest while every internal parity gate agrees with itself, and the
+    # face gives it away only through absurd coverage multiples. A rate cell
+    # strictly between zero and five basis points, or above 25%, fails on the
+    # shipped bytes; an exact zero remains a legal zero-coupon.
+    rate_band_errors = []
+    for plan in row_plan.get("instruments") or []:
+        interest_row = plan.get("interest_row")
+        if not isinstance(interest_row, int):
+            continue
+        rate_value = value("D%d" % interest_row)
+        if rate_value is None:
+            continue
+        rate = numeric(rate_value)
+        if (0 < rate < 0.0005) or rate > 0.25:
+            rate_band_errors.append(
+                {
+                    "instrument_id": plan.get("instrument_id"),
+                    "rate_cell": "D%d" % interest_row,
+                    "rate": rate,
+                }
+            )
+    checks.append(
+        record(
+            "instrument-rate-band",
+            not rate_band_errors,
+            "Every instrument rate or spread on the interest schedule is zero "
+            "or sits between five basis points and 25% as a decimal.",
+            {"mis_scaled": rate_band_errors},
+            violations=len(rate_band_errors),
+        )
+    )
+
     # ----------------------------------------------------------- hidden-mechanics
     hidden_rows = [
         int(match.group(1))

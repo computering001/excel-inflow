@@ -606,6 +606,35 @@ function auditInstrument(row, index, exp, expected, findings) {
       ),
     );
   }
+  // Percent-vs-decimal is the schema's own named scale hazard, and the
+  // production failure it produces is silent: a 0.700% coupon divided by 100
+  // a second time prices the bond's interest at zero while every internal
+  // parity gate still agrees with itself. A rate strictly between zero and
+  // five basis points, or above 25%, is treated as mis-scaled evidence to be
+  // re-supplied; an exact zero remains a legal zero-coupon.
+  for (const key of ["coupon_rate", "all_in_rate"]) {
+    if (!has(key)) continue;
+    const value = Number(row[key]);
+    if (!Number.isFinite(value)) continue;
+    if ((value > 0 && value < 0.0005) || value > 0.25) {
+      findings.push(
+        finding(
+          "instrument_rate_mis_scaled",
+          SEVERITY.ERROR,
+          "inconsistent",
+          REMEDY.RE_SUPPLY,
+          `${where}.${key}`,
+          `${label} gives ${key} = ${value}. The contract unit is a decimal ` +
+            `(0.04 for 4.0%), so this is below five basis points or above ` +
+            `25% — almost certainly a percent divided by 100 twice, or a ` +
+            `percent left undivided. Re-supply the export with the decimal ` +
+            `rate, or state explicitly that the instrument genuinely ` +
+            `carries this rate.`,
+          { instrument_id: row?.instrument_id, value },
+        ),
+      );
+    }
+  }
 
   // --- revolver mechanics --------------------------------------------------
   if (row?.instrument_type === "rcf") {

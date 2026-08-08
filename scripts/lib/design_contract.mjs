@@ -55,7 +55,8 @@ export function sharedHorizontalGrammar() {
       Number(item.width),
     ]),
   );
-  if (widths.B !== 39 || Object.keys(widths).length !== 21) {
+  const expectedLabelWidth = presentationEpoch() >= 3 ? 46 : 39;
+  if (widths.B !== expectedLabelWidth || Object.keys(widths).length !== 21) {
     throw new Error("The measured A:U standardised column grammar is incomplete or changed.");
   }
   return {
@@ -84,6 +85,17 @@ export function selectStandardisedProfile(modelCase) {
       standardisedDesignContract().profiles.net_cash.selection.max_instruments &&
     Number(modelCase.acquisition?.enabled ?? 0) === 0;
   return simpleNetCash ? "net_cash" : "maximal";
+}
+
+/**
+ * The design epoch the runtime contract declares. Epoch 2 is the frozen v2
+ * grammar (banded group parents, 39-character label column, no bridge title
+ * bar). Epoch 3 carries the tiered presentation grammar. The switch lives in
+ * the digest-pinned runtime contract, so a look can only change when the
+ * design authority itself changes — never as a side effect of a code edit.
+ */
+export function presentationEpoch() {
+  return Number(standardisedDesignContract().presentation_epoch ?? 2);
 }
 
 export function standardisedProfile(profileName) {

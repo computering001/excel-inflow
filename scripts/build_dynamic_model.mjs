@@ -20,7 +20,7 @@ import { fillCachedValues, planNumericCaches } from "./lib/plan_values.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { instrumentDisplayLabel } from "./lib/instrument_display.mjs";
-import { sharedHorizontalGrammar } from "./lib/design_contract.mjs";
+import { presentationEpoch, sharedHorizontalGrammar } from "./lib/design_contract.mjs";
 // IMPORTED, NOT REIMPLEMENTED. The Brokers sheet states how many named houses
 // supply each metric, and the broker-anchor rule DECIDES on that same number. A
 // second count written beside the first is a second definition of "contributes",
@@ -31,6 +31,7 @@ import {
   compileRowPlan,
   groupSubtotalRank,
   headlineIds,
+  isRankedTotalIdentity,
   RANK_SECTION,
   TOTAL_RANK,
   totalRank,
@@ -1043,7 +1044,12 @@ function styleStatementRow(
   const isTotal =
     definition.display_role === "answer" ||
     definition.style_role === "total" ||
-    definition.row_type === "subtotal";
+    definition.row_type === "subtotal" ||
+    // Epoch 3: a key subtotal is a total by identity, whatever row_type its
+    // arithmetic was authored with — gross profit typed as a plain
+    // calculation must not dress like the expense lines around it.
+    (presentationEpoch() >= 3 &&
+      isRankedTotalIdentity([definition.row_id, definition.semantic_role]));
   // Rank is resolved from the row's OWN identity AND ITS SECTION, never from a
   // row number, and the treatment is applied once at the end of the build by
   // applyTotalHierarchy(). A ratio row can still be an ANSWER — the leverage
@@ -1069,20 +1075,26 @@ function styleStatementRow(
     definition.style_role === "subsection" ||
     definition.row_type === "header"
   ) {
-    applyRowFill(sheet, row, COLORS.subsection);
-    // A TITLE BAR IS BOLD; A NUMBER LINE THAT MERELY OPENS A RUN IS NOT.
+    // A TITLE BAR IS CHROME; A NUMBERED PARENT LINE IS A ROW.
     //
     // `style_role: "subsection"` covers two different things: a label-only row
-    // that titles a sub-block (`Cash from Investing (CFI)`, `Free cash flow`)
-    // and a NUMBERED parent line whose constituents are indented beneath it
-    // (`Change in working capital`, `Capital expenditure`, `Opening cash`). Both
-    // used to take the header's fill AND its bold, which is why a reader looking
-    // at the cash flow could not say why change in working capital was shouting
-    // at them — it is neither a heading nor a figure anyone came for. Only the
-    // label-only row is chrome, so only it keeps the weight. The parent keeps
-    // the fill, which is what still ties its indented children to it.
+    // that titles a sub-block (`Cash from Investing (CFI)`) and a NUMBERED
+    // parent line whose constituents are indented beneath it (`Change in
+    // working capital`, `Capital expenditure`, `Change in Debt`). The banded
+    // fill on the numbered parents made a component family read as a key
+    // total — the same costume as the rows that close a section. Only the
+    // label-only title bar keeps the fill and the weight; a numbered parent
+    // is marked by a BOLD LABEL alone, and its indented children do the rest.
     const isTitleBar = definition.row_type === "header";
-    styleFont(sheet, `B${row}:U${row}`, COLORS.black, { bold: isTitleBar });
+    if (isTitleBar) {
+      applyRowFill(sheet, row, COLORS.subsection);
+      styleFont(sheet, `B${row}:U${row}`, COLORS.black, { bold: true });
+    } else if (presentationEpoch() >= 3) {
+      sheet.getRange(`B${row}`).format.font = { bold: true };
+    } else {
+      applyRowFill(sheet, row, COLORS.subsection);
+      styleFont(sheet, `B${row}:U${row}`, COLORS.black, { bold: false });
+    }
   }
   if (
     definition.row_type === "uncalculated" ||
@@ -2803,6 +2815,14 @@ function configureOperatingModel(
       .filter((row) => row.semantic_role)
       .map((row) => [row.semantic_role, row]),
   );
+  // A collapsed duplicate answer (one visible EBIT) leaves its role behind
+  // as an alias on the surviving row; role lookups must land on the single
+  // visible owner. Aliases never displace a row that genuinely owns a role.
+  for (const row of allStatementRows) {
+    for (const alias of row.role_aliases ?? []) {
+      if (!statementByRole.has(alias)) statementByRole.set(alias, row);
+    }
+  }
   const nonBalancingCashBuckets = cashBucketPlans.filter(
     (bucket) =>
       bucket.forecast_treatment !== "balancing" &&
@@ -2995,8 +3015,22 @@ function configureOperatingModel(
   for (const definition of allStatementRows) {
     if (definition.row_type === "header") continue;
     const values = rowValues(modelCase, definition);
+    // The revolver legs exist only where the forecast waterfall exists. A
+    // history with no sourced draw or repayment has nothing to calculate —
+    // the cells are structurally empty and render grey-blank, never as
+    // white dash-zeros pretending a schedule ran in a year it did not.
+    const structurallyEmptyHistory =
+      presentationEpoch() >= 3 &&
+      ["rcf_draw", "rcf_repayment"].includes(definition.semantic_role) &&
+      ![0, 1, 2].some(
+        (index) =>
+          values[index] !== null &&
+          values[index] !== undefined &&
+          Math.abs(Number(values[index])) > 1e-9,
+      );
     for (let index = 0; index < 3; index += 1) {
       const column = HISTORICAL_COLUMNS[index];
+      if (structurallyEmptyHistory) continue;
       const semantic = historicalSemanticFormula(definition, column);
       // The hold-flat chain belongs to the FORECAST. In the historic block the
       // row must state the period's own reported figure, so a self-carry gives
@@ -3537,7 +3571,15 @@ function configureOperatingModel(
         );
       }
     }
-    applyFormula(sheet, `R${definition.row}`, `=I${definition.row}`);
+    if (structurallyEmptyHistory) {
+      // The pro-forma reference column mirrors the last actual; a
+      // structurally empty history mirrors as the same grey blank.
+      sheet.getRange(`G${definition.row}:I${definition.row}`).format.fill =
+        COLORS.grey;
+      sheet.getRange(`R${definition.row}`).format.fill = COLORS.grey;
+    } else {
+      applyFormula(sheet, `R${definition.row}`, `=I${definition.row}`);
+    }
   }
 
   // A HEADING WIDER THAN ITS OWN COLUMN IS CLIPPED IN EXCEL TOO.
@@ -3773,7 +3815,11 @@ function configureOperatingModel(
   }
   for (const plan of rowPlan.instruments) {
     const instrument = instrumentById.get(plan.instrument_id);
-    setValue(sheet, `B${plan.debt_row}`, instrumentDisplayLabel(instrument));
+    setValue(
+      sheet,
+      `B${plan.debt_row}`,
+      instrumentDisplayLabel(instrument, modelCase.issuer.reporting_currency),
+    );
     setValue(sheet, `C${plan.debt_row}`, instrument.currency);
     // Column C is always legal denomination.  Column D is deliberately called
     // Amount rather than Nominal: it may be native principal, a reporting-
