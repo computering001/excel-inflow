@@ -759,14 +759,14 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         if (!["explicit_zero", "not_applicable", "carry_forward"].includes(authority.method)) {
           continue;
         }
-        const key = `${authority.method} ${String(authority.note).trim()}`;
+        const key = `${authority.method}\0${String(authority.note).trim()}`;
         if (!boilerplate.has(key)) boilerplate.set(key, new Set());
         boilerplate.get(key).add(row.row_id);
       }
     }
     for (const [key, rowIds] of boilerplate) {
       if (rowIds.size >= 6) {
-        const [method] = key.split(" ");
+        const [method] = key.split("\0");
         errors.push(
           `${rowIds.size} rows declare ${method} with an identical rationale note (${[...rowIds].slice(0, 5).join(", ")}, ...); a shared boilerplate note is not a per-row forecast judgement.`,
         );
