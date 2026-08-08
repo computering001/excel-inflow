@@ -103,6 +103,7 @@ def _styles(archive: zipfile.ZipFile) -> list[dict]:
     fills_node = root.find("m:fills", NS)
     fonts_node = root.find("m:fonts", NS)
     xfs_node = root.find("m:cellXfs", NS)
+    borders_node = root.find("m:borders", NS)
     fills = []
     for fill in list(fills_node) if fills_node is not None else []:
         pattern = fill.find("m:patternFill", NS)
@@ -115,17 +116,27 @@ def _styles(archive: zipfile.ZipFile) -> list[dict]:
     for font in list(fonts_node) if fonts_node is not None else []:
         colour = font.find("m:color", NS)
         fonts.append({"color": dict(colour.attrib) if colour is not None else {}})
+    borders = []
+    for border in list(borders_node) if borders_node is not None else []:
+        borders.append({
+            side: (border.find(f"m:{side}", NS).get("style")
+                   if border.find(f"m:{side}", NS) is not None else None)
+            for side in ("left", "right", "top", "bottom")
+        })
     styles = []
     for xf in list(xfs_node) if xfs_node is not None else []:
         alignment = xf.find("m:alignment", NS)
         alignment_attributes = alignment.attrib if alignment is not None else {}
         fill_id = int(xf.get("fillId", "0"))
         font_id = int(xf.get("fontId", "0"))
+        border_id = int(xf.get("borderId", "0"))
         styles.append({
             "fill_id": fill_id,
             "font_id": font_id,
             "fill": fills[fill_id] if fill_id < len(fills) else {},
             "font": fonts[font_id] if font_id < len(fonts) else {},
+            "border_id": border_id,
+            "border": borders[border_id] if border_id < len(borders) else {},
             "indent": int(alignment_attributes.get("indent", "0")),
             "horizontal": alignment_attributes.get("horizontal"),
         })
@@ -255,6 +266,63 @@ def verify(facts: WorkbookFacts, contract: dict) -> dict:
                 rows=rows,
             )
 
+    # The compiler declares the semantic conclusion in the sealed proof
+    # contract; this verifier independently reads the workbook package and
+    # proves that exactly that physical row, and no competing row in the same
+    # statement block, wears the answer treatment.  Formula fan-out is
+    # deliberately irrelevant: an attribution line or EBITDA appendix may be
+    # consumed more often without becoming the statement conclusion.
+    for rule in contract.get("section_conclusions", []):
+        rows = _find_rows(sheet, [rule["label"]], label_column)
+        expected_row = int(rule.get("row") or 0)
+        if expected_row not in rows:
+            block(
+                "OOXML_SECTION_CONCLUSION_UNRESOLVED",
+                f"{rule['section']} conclusion does not resolve to its sealed owner.",
+                expected_row=expected_row,
+                resolved_rows=rows,
+            )
+            continue
+        fill_rgb = str(rule.get("answer_fill_rgb", "")).upper()
+        bottom = rule.get("answer_bottom_border")
+        body_columns = rule.get("body_columns", forecast_columns)
+
+        def has_answer_treatment(row: int) -> bool:
+            observed = []
+            for column in body_columns:
+                cell = _cell(sheet, column, row)
+                if cell is None or cell.style_id >= len(facts.styles):
+                    continue
+                style = facts.styles[cell.style_id]
+                fill = style.get("fill", {}).get("fg", {})
+                rgb = str(fill.get("rgb", "")).upper()
+                if len(rgb) == 8:
+                    rgb = rgb[-6:]
+                observed.append(
+                    rgb == fill_rgb and style.get("border", {}).get("bottom") == bottom
+                )
+            return bool(observed) and all(observed)
+
+        if not has_answer_treatment(expected_row):
+            block(
+                "OOXML_SECTION_CONCLUSION_STYLE_MISSING",
+                f"{rule['section']} conclusion lacks the answer treatment.",
+                row=expected_row,
+            )
+        first_row = int(rule.get("first_row") or expected_row)
+        last_row = int(rule.get("last_row") or expected_row)
+        competitors = [
+            row for row in range(first_row, last_row + 1)
+            if row != expected_row and has_answer_treatment(row)
+        ]
+        if competitors:
+            block(
+                "OOXML_SECTION_CONCLUSION_STYLE_DUPLICATED",
+                f"{rule['section']} has competing answer treatments.",
+                expected_row=expected_row,
+                competing_rows=competitors,
+            )
+
     for rule in contract.get("single_writer_groups", []):
         rows = [int(row) for row in rule.get("rows", []) if isinstance(row, int)]
         if not rows:
@@ -289,6 +357,58 @@ def verify(facts: WorkbookFacts, contract: dict) -> dict:
                     "OOXML_CAPTURE_MEMBERSHIP_MISSING",
                     f"{rule['child_label']} is not a member of {rule['parent_label']} in {column}.",
                     parent_cell=f"{column}{parent_row}",
+                    child_cell=f"{column}{child_row}",
+                )
+
+    # A semantic-scope capture is intentionally different from physical formula
+    # membership.  The parent owns a direct forecast authority (for example a
+    # broker-linked aggregate) and the disclosed children remain visible only
+    # for history.  Prove the physical consequence: one live independent parent
+    # writer and blank forecast children.  Requiring the parent's formula to
+    # reference those blank children would turn a valid aggregate forecast into
+    # zero and contradict the sealed authority graph.
+    for rule in contract.get("semantic_scope_captures", []):
+        parents = _rule_rows(sheet, rule, "parent", label_column)
+        children = _rule_rows(sheet, rule, "child", label_column)
+        if len(parents) != 1 or len(children) != 1:
+            block(
+                "OOXML_SCOPE_CAPTURE_LABEL_UNRESOLVED",
+                f"Semantic-scope capture labels do not resolve uniquely: {rule}.",
+            )
+            continue
+        parent_row, child_row = parents[0], children[0]
+        for column in rule.get("columns", forecast_columns):
+            parent_cell = _cell(sheet, column, parent_row)
+            child_cell = _cell(sheet, column, child_row)
+            parent_live = bool(
+                parent_cell
+                and (
+                    parent_cell.formula
+                    or parent_cell.value not in (None, "")
+                )
+            )
+            parent_refs = expand_formula_references(
+                parent_cell.formula if parent_cell else None,
+                sheet_name,
+            )
+            child_ref = (sheet_name, f"{column}{child_row}")
+            if not parent_live or child_ref in parent_refs:
+                block(
+                    "OOXML_SCOPE_CAPTURE_PARENT_NOT_AUTHORITATIVE",
+                    f"{rule['parent_label']} does not own an independent semantic-scope forecast in {column}.",
+                    parent_cell=f"{column}{parent_row}",
+                )
+            child_populated = bool(
+                child_cell
+                and (
+                    child_cell.formula
+                    or child_cell.value not in (None, "")
+                )
+            )
+            if child_populated:
+                block(
+                    "OOXML_SCOPE_CAPTURE_CHILD_NOT_BLANK",
+                    f"{rule['child_label']} competes with its semantic parent in {column}.",
                     child_cell=f"{column}{child_row}",
                 )
 

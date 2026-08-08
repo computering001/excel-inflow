@@ -1474,10 +1474,31 @@ def main(argv: List[str]) -> int:
         actual_address = "I%s" % definition["row"]
         pro_forma_actual_address = "R%s" % definition["row"]
         text = cell_formula(pro_forma_actual_address)
+        actual_value = value(actual_address)
+        pro_forma_actual_value = value(pro_forma_actual_address)
+        declared_values = definition.get("values") or []
+        declared_actual = declared_values[2] if len(declared_values) > 2 else None
+        intentionally_blank_zero = (
+            actual_value is None
+            and pro_forma_actual_value is None
+            and not text
+            and isinstance(declared_actual, (int, float))
+            and not isinstance(declared_actual, bool)
+            and equal(
+                declared_actual,
+                0,
+                policy.class_for(
+                    "cross-row-equality",
+                    metric_class_for(definition, definition.get("calculation")),
+                ),
+            )
+        )
+        if intentionally_blank_zero:
+            continue
         formula_ties = re.sub(r"^=", "", str(text)) == "I%s" % definition["row"]
         if not formula_ties or not equal(
-            value(actual_address),
-            value(pro_forma_actual_address),
+            actual_value,
+            pro_forma_actual_value,
             policy.class_for(
                 "cross-row-equality",
                 metric_class_for(definition, definition.get("calculation")),
@@ -1488,8 +1509,8 @@ def main(argv: List[str]) -> int:
                     "row_id": definition["row_id"],
                     "actual_address": actual_address,
                     "pro_forma_actual_address": pro_forma_actual_address,
-                    "actual": value(actual_address),
-                    "pro_forma_actual": value(pro_forma_actual_address),
+                    "actual": actual_value,
+                    "pro_forma_actual": pro_forma_actual_value,
                     "formula": text,
                 }
             )

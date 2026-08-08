@@ -5,6 +5,7 @@ import {
   resolveForecastAuthority,
 } from "./forecast_authority.mjs";
 import { compileStatementTopology } from "./statement_topology.mjs";
+import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 
 const MOVEMENT_DEFINITIONS = {
   operating_cash_flow: {
@@ -315,6 +316,11 @@ function statementNodes(modelCase, rowPlan) {
       presentation_parent_id: row.presentation_parent_id ?? null,
       presentation_depth: row.presentation_depth ?? 0,
       presentation_role: row.presentation_role ?? null,
+      presentation_rank: row.presentation_rank ?? null,
+      section_conclusion_owner: row.section_conclusion_owner === true,
+      section_conclusion_id: row.section_conclusion_id ?? null,
+      in_section_conclusion_closure:
+        row.in_section_conclusion_closure === true,
       forecast_capture_parent_id: row.forecast_capture_parent_id ?? null,
       forecast_capture_mode: row.forecast_capture_mode ?? null,
       forecast_capture_note: row.forecast_capture_note ?? null,
@@ -988,6 +994,13 @@ export function compileSemanticManifest(modelCase, rowPlan) {
         Number(right.physical_row ?? Number.MAX_SAFE_INTEGER) ||
       left.node_id.localeCompare(right.node_id),
   );
+  const historicalInterestAuthority =
+    resolveHistoricalInterestAuthority(modelCase);
+  if (!historicalInterestAuthority.valid) {
+    throw new Error(
+      `Cannot seal semantic graph with invalid historical interest authority: ${historicalInterestAuthority.errors.join(" ")}`,
+    );
+  }
   return {
     schema_version: 1,
     contract_version: Number(modelCase.contract_version),
@@ -1019,6 +1032,25 @@ export function compileSemanticManifest(modelCase, rowPlan) {
       status: period.status,
     })),
     movement_contract: MOVEMENT_DEFINITIONS,
+    historical_interest_authority: historicalInterestAuthority.present
+      ? {
+          basis: historicalInterestAuthority.basis,
+          basis_was_explicit:
+            historicalInterestAuthority.basis_was_explicit,
+          has_filed_total: historicalInterestAuthority.has_filed_total,
+          filed_finance_expense:
+            historicalInterestAuthority.filed_finance_expense,
+          reported_debt_interest:
+            historicalInterestAuthority.reported_debt_interest,
+          identified_finance_components:
+            historicalInterestAuthority.identified_finance_components,
+          identified_debt_components:
+            historicalInterestAuthority.identified_debt_components,
+          lease_interest: historicalInterestAuthority.lease_interest,
+          unallocated_interest:
+            historicalInterestAuthority.unallocated_interest,
+        }
+      : null,
     statement_topology: Object.fromEntries(
       ["income_statement", "cash_flow"].map((section) => [
         section,

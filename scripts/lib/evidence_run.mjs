@@ -1695,6 +1695,18 @@ export function validateEvidenceRun(run) {
   for (const message of caseErrors) {
     findings.push(finding("evidence.model_case.schema", "BLOCK", message));
   }
+  if (
+    modelCase.historical_interest_reconciliation &&
+    !modelCase.historical_interest_reconciliation.reported_interest_basis
+  ) {
+    findings.push(
+      finding(
+        "evidence.historical_interest.basis_missing",
+        "BLOCK",
+        "A production evidence run must state historical_interest_reconciliation.reported_interest_basis explicitly; the legacy default is not evidence.",
+      ),
+    );
+  }
 
   const historical = modelPeriods(modelCase, "historical");
   const forecast = modelPeriods(modelCase, "forecast");

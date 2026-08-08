@@ -364,7 +364,9 @@
       "header, the control block and label-only sub-block titles (row_type ===",
       "'header') are bold because they are chrome, not because they are prominent.",
       "A NUMBERED row carrying style_role 'subsection' — a consolidated parent",
-      "with its constituents indented beneath it — is NOT chrome and is NOT bold."
+      "with its constituents indented beneath it — is not chrome or a ranked",
+      "total. Its label alone is bold; its numeric cells remain unbanded so the",
+      "indented children read as the auditable composition of that parent."
     ],
     "resolver": "scripts/lib/row_plan.mjs :: headlineIds",
     "ladders": {

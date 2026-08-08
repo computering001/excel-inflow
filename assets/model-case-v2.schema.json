@@ -276,18 +276,25 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "reported_interest",
         "identified_interest",
         "maximum_plug_percentage"
       ],
       "properties": {
+        "reported_interest_basis": {
+          "enum": [
+            "filed_finance_expense_including_lease_interest",
+            "reported_debt_interest_excluding_separately_disclosed_lease_interest",
+            "identified_components_only"
+          ],
+          "description": "Explicit authority basis for historical interest. filed_finance_expense_including_lease_interest means reported_interest and identified_interest already include any separately disclosed lease interest. reported_debt_interest_excluding_separately_disclosed_lease_interest means both series exclude lease interest and the runtime adds historical_supplement.lease_interest_expense exactly once to obtain total finance expense. identified_components_only is used only when no filed total is available: reported_interest must be omitted, identified_interest includes every named component including any separately disclosed lease interest, and no residual authority is asserted. Legacy cases without this field retain the original filed-total-including-lease meaning; new evidence runs must state the basis explicitly."
+        },
         "reported_interest": {
           "$ref": "#/$defs/series3",
-          "description": "Filed total finance expense for each historical period, including lease interest where the issuer's finance-expense line includes it."
+          "description": "Reported historical authority expressed on reported_interest_basis. It is the filed total finance expense when the basis includes lease interest, reported debt interest when the basis excludes separately disclosed lease interest, and must be omitted for identified_components_only."
         },
         "identified_interest": {
           "$ref": "#/$defs/series3",
-          "description": "Portion of filed finance expense identified across named schedule components, including separately disclosed lease interest; the remainder is the visible other/unallocated reconciliation."
+          "description": "Interest identified across named schedule components on the SAME basis as reported_interest. Under identified_components_only it includes every named component, including separately disclosed lease interest. The runtime canonicalises both series before calculating any residual."
         },
         "maximum_plug_percentage": {
           "type": "number",

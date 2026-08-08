@@ -27,19 +27,17 @@ WHAT IT NEEDS, AND WHERE IT NOW GETS IT
     workbook formulas                        the workbook (was: inspect.ndjson)
     row topology                             the workbook (was: inspect.ndjson)
     stable package parts                     the .xlsx zip, reached through the
-                                             workbook's RELATIONSHIPS (styles,
-                                             theme, each stable worksheet by
-                                             sheet NAME) rather than by guessed
-                                             path
+                                             workbook's RELATIONSHIPS (styles
+                                             and theme) rather than guessed paths
     comment anchors and text                 the workbook, through each
                                              worksheet's comments relationships
                                              (NEW -- the incumbent only saw
                                              threads via the snapshot, and the
                                              name regex that replaced it could
                                              not see openpyxl's spelling)
-    Operating Model, volatile ids masked     the .xlsx zip, resolved by sheet
-                                             name (NEW -- the incumbent skipped
-                                             the sheet entirely)
+    every worksheet, volatile ids masked     the .xlsx zip, resolved by sheet
+                                             name. Volatile relationships are
+                                             treated identically on all sheets.
 
 USAGE
     # build twice from a case and compare (needs the Node emitter)
@@ -74,10 +72,8 @@ from verify.xlsx import (  # noqa: E402
 SCRIPT_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Package parts whose bytes are stable across builds, named by the RELATIONSHIP
-# that reaches them rather than by a guessed path.  The Operating Model sheet is
-# excluded from the byte comparison because it carries freshly minted
-# relationship ids for the comment and VML parts; it is compared with those ids
-# masked instead.
+# that reaches them rather than by a guessed path. Every worksheet is compared
+# after masking the closed list of volatile relationship/comment identifiers.
 #
 # DEFECT 0.15, the same class as the validators'.  These were literals --
 # "xl/styles.xml", "xl/worksheets/sheet2.xml", "xl/worksheets/sheet3.xml" -- and
@@ -86,9 +82,6 @@ SCRIPT_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # raises on a name that is not in the package, but `sheet1_masked` went through
 # `part()`, which returns "" for an absent part, so two builds whose Operating
 # Model could not be found compared "" against "" and PASSED having read nothing.
-STABLE_SHEETS = ["Brokers", "Forward Curves"]
-MASKED_SHEET = "Operating Model"
-
 # Identifiers the emitter regenerates on every build.  Masking them is what
 # lets the Operating Model part and the comment parts be compared at all.
 VOLATILE_PATTERNS = [
@@ -214,23 +207,21 @@ def workbook_comments(path: str) -> str:
     return canonical_json(payload)
 
 
-def operating_model_masked(path: str) -> str:
-    """The Operating Model part, with the volatile relationship ids masked.
-
-    Resolved by SHEET NAME through the workbook's relationships.  It used to ask
-    for `xl/worksheets/sheet1.xml`, and `part()` returns "" for a part that is
-    not there -- so a renamed or renumbered worksheet made this compare "" with
-    "" and pass.
-    """
+def worksheets_masked(path: str) -> str:
+    """Every worksheet part, keyed by sheet name, with volatile ids masked."""
     workbook = Workbook.open(path)
-    sheet = workbook.sheet(MASKED_SHEET)
-    text = workbook.part(sheet.part)
-    if not text:
-        raise PartResolutionError(
-            "sheet %r resolved to %r, which is absent or empty in %s"
-            % (MASKED_SHEET, sheet.part, path)
-        )
-    return mask_volatile(text)
+    payload = {}
+    for sheet in workbook.sheets:
+        text = workbook.part(sheet.part)
+        if not text:
+            raise PartResolutionError(
+                "sheet %r resolved to %r, which is absent or empty in %s"
+                % (sheet.name, sheet.part, path)
+            )
+        payload[sheet.name] = mask_volatile(text)
+    if not payload:
+        raise PartResolutionError("no worksheets resolved in %s" % path)
+    return canonical_json(payload)
 
 
 def address_key(address: str) -> Tuple[int, int]:
@@ -252,7 +243,7 @@ COMPARISONS = [
     ("workbook-formulas", "{workbook}", workbook_formulas),
     ("workbook-row-topology", "{workbook}", workbook_row_topology),
     ("workbook-comments", "{workbook}", workbook_comments),
-    ("worksheet-operating-model-masked", "{workbook}", operating_model_masked),
+    ("worksheets-all-masked", "{workbook}", worksheets_masked),
 ]
 
 
@@ -350,7 +341,8 @@ def main(argv: List[str]) -> int:
     first_package = Workbook.open(first_workbook)
     second_package = Workbook.open(second_workbook)
     # Resolved, not guessed: the styles part through the workbook's own
-    # relationship, each stable worksheet through the <sheet> that names it.
+    # relationship. Worksheets are compared separately after masking only the
+    # enumerated volatile identifiers.
     # A part that resolves differently in the two builds is itself a
     # determinism failure and is reported rather than quietly compared.
     stable_parts = [("styles", first_package.styles_part, second_package.styles_part)]
@@ -361,14 +353,6 @@ def main(argv: List[str]) -> int:
             next(iter(second_package.related_parts(second_package.workbook_part, REL_THEME)), None),
         )
     )
-    for sheet_name in STABLE_SHEETS:
-        stable_parts.append(
-            (
-                "sheet:%s" % sheet_name,
-                first_package.sheet(sheet_name).part,
-                second_package.sheet(sheet_name).part,
-            )
-        )
     for label, first_part, second_part in stable_parts:
         if not first_part or not second_part:
             comparisons.append(

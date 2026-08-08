@@ -1,5 +1,17 @@
 const SECTIONS = new Set(["income_statement", "cash_flow"]);
 
+// A statement has one economic conclusion even when its forecast happens to be
+// solved from a lower or higher anchor.  The conclusion is identified by the
+// section's required output concept, then proved through the compiled dependency
+// graph; it is never inferred from a physical row, a label or formula fan-out.
+// Attribution, EPS, discontinued-operation detail and analytical appendices may
+// follow the conclusion in source evidence, but none of them silently becomes a
+// second owner merely because another part of the workbook reads it more often.
+const SECTION_CONCLUSION_ROLE = Object.freeze({
+  income_statement: "net_income",
+  cash_flow: "ending_cash",
+});
+
 const UNIQUE_VISIBLE_ROLES = Object.freeze({
   income_statement: new Set([
     "revenue",
@@ -80,6 +92,64 @@ function rootIndentDepth(row) {
   return isIndentAnchor(row) ? 0 : 1;
 }
 
+function dependencyClosure(rows, rootId) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const closure = new Set();
+  const visit = (rowId) => {
+    if (!rowId || closure.has(rowId) || !byId.has(rowId)) return;
+    closure.add(rowId);
+    for (const ref of byId.get(rowId)?.calculation?.refs ?? []) visit(ref);
+  };
+  visit(rootId);
+  return closure;
+}
+
+/**
+ * Compile the presentation conclusion from the statement dependency graph.
+ *
+ * `semantic_role` names the economic concept; the graph proves which displayed
+ * node owns it and what feeds it.  Forecast direction is irrelevant: a PBT-led
+ * or net-income-led case still presents the same statement conclusion, while an
+ * EBITDA appendix remains outside the conclusion closure unless the statement
+ * answer genuinely depends on it.
+ */
+export function compileSectionConclusionOwnership(rows, section) {
+  assertSection(section);
+  const requiredRole = SECTION_CONCLUSION_ROLE[section];
+  const owners = rows.filter(
+    (row) =>
+      row.row_type !== "header" &&
+      row.projection_status !== "evidence_only" &&
+      row.semantic_role === requiredRole,
+  );
+  const owner = owners.length === 1 ? owners[0] : null;
+  const closure = owner ? dependencyClosure(rows, owner.row_id) : new Set();
+  const errors = [];
+  if (owners.length > 1) {
+    errors.push({
+      code: "MULTIPLE_SECTION_CONCLUSION_OWNERS",
+      section,
+      semantic_role: requiredRole,
+      row_ids: owners.map((row) => row.row_id),
+    });
+  }
+  for (const row of rows) {
+    row.section_conclusion_owner = row === owner;
+    row.section_conclusion_id = owner?.row_id ?? null;
+    row.in_section_conclusion_closure = closure.has(row.row_id);
+    if (row === owner) row.presentation_rank = "answer";
+    else if (row.presentation_rank === "answer") delete row.presentation_rank;
+  }
+  return {
+    schema_version: "section-conclusion/1.0",
+    section,
+    required_semantic_role: requiredRole,
+    owner_display_id: owner?.row_id ?? null,
+    dependency_closure: [...closure],
+    errors,
+  };
+}
+
 function inferPresentationParents(rows) {
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const parentOf = new Map();
@@ -147,6 +217,7 @@ function presentationDepth(rowId, parentOf, byId, visiting = new Set()) {
  */
 export function materializeStatementPresentationTree(rows, section) {
   assertSection(section);
+  const conclusion = compileSectionConclusionOwnership(rows, section);
   const parentOf = inferPresentationParents(rows);
   const initialById = new Map(rows.map((row) => [row.row_id, row]));
   const depths = new Map(
@@ -192,8 +263,10 @@ export function materializeStatementPresentationTree(rows, section) {
     row.presentation_role =
       row.row_type === "header"
         ? "header"
-        : row.style_role === "total" || row.row_type === "subtotal"
+        : row.section_conclusion_owner
           ? "answer"
+          : row.style_role === "total" || row.row_type === "subtotal"
+            ? "subtotal"
           : parentId
             ? "component"
             : row.formula_authority === "compiler"
@@ -203,6 +276,7 @@ export function materializeStatementPresentationTree(rows, section) {
   return {
     section,
     reordered,
+    conclusion,
     nodes: rows.map((row, order) => ({
       display_id: row.row_id,
       parent_display_id: row.presentation_parent_id,
@@ -465,6 +539,8 @@ export function compileStatementTopology(modelCase, section, rows) {
     projection_required_by: row.projection_required_by ?? null,
   }));
   const errors = [];
+  const conclusion = compileSectionConclusionOwnership(rows, section);
+  errors.push(...conclusion.errors);
 
   const expectedIndents = deriveStatementIndentMap(rows, section);
   for (const row of rows) {
@@ -626,6 +702,7 @@ export function compileStatementTopology(modelCase, section, rows) {
   return {
     schema_version: "statement-topology/1.0",
     section,
+    section_conclusion: conclusion,
     nodes,
     edges,
     errors,

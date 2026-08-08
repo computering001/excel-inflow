@@ -304,6 +304,11 @@ export function compileModelIrV3({
             ? displayRole(node)
             : node.presentation_role ?? displayRole(node),
         style_role: node.style_role ?? null,
+        presentation_rank: node.presentation_rank ?? null,
+        section_conclusion_owner: node.section_conclusion_owner === true,
+        section_conclusion_id: node.section_conclusion_id ?? null,
+        in_section_conclusion_closure:
+          node.in_section_conclusion_closure === true,
         indent: depth,
       });
     });
@@ -586,6 +591,45 @@ export function workbookSemanticProofContract(modelIr, rowPlan = {}) {
     }
   }
 
+  const sectionConclusions = [];
+  for (const [section, rows] of ["income_statement", "cash_flow"].map(
+    (section) => [
+      section,
+      modelIr.planes.statement.filter(
+        (node) =>
+          node.section === section &&
+          presentation.get(node.display_id)?.section_conclusion_owner === true,
+      ),
+    ],
+  )) {
+    if (rows.length !== 1) continue;
+    const node = rows[0];
+    sectionConclusions.push({
+      section,
+      concept_id: node.economic_concept_id,
+      label: node.label,
+      row: physicalRow(node.display_id),
+      first_row: rowPlan.section_headers?.[section]
+        ? Number(rowPlan.section_headers[section]) + 1
+        : null,
+      last_row:
+        section === "income_statement"
+          ? Number(rowPlan.section_headers?.cash_flow ?? 0) - 2
+          : Number(rowPlan.section_headers?.debt_schedule ?? 0) - 2,
+      body_columns: ["G", "H", "I", "J", "K", "L"],
+      answer_fill_rgb: "D9EAF7",
+      answer_bottom_border: "double",
+      dependency_labels: modelIr.planes.statement
+        .filter(
+          (candidate) =>
+            candidate.section === section &&
+            presentation.get(candidate.display_id)
+              ?.in_section_conclusion_closure === true,
+        )
+        .map((candidate) => candidate.label),
+    });
+  }
+
   const identityRoles = [
     "ebit",
     "adjusted_ebitda",
@@ -607,6 +651,7 @@ export function workbookSemanticProofContract(modelIr, rowPlan = {}) {
     : [];
 
   const captureMemberships = [];
+  const semanticScopeCaptures = [];
   const hierarchies = [];
   for (const node of modelIr.planes.statement) {
     const childDisplay = presentation.get(node.display_id);
@@ -625,6 +670,22 @@ export function workbookSemanticProofContract(modelIr, rowPlan = {}) {
       const captureParent = statements.get(node.forecast_capture_parent_id);
       if (captureParent && uniquelyNamed(captureParent)) {
         captureMemberships.push({
+          parent_label: captureParent.label,
+          child_label: node.label,
+          parent_row: physicalRow(captureParent.display_id),
+          child_row: physicalRow(node.display_id),
+          columns: ["J", "K", "L"],
+        });
+      }
+    }
+    if (
+      node.forecast_capture_mode === "semantic_scope" &&
+      node.forecast_capture_parent_id &&
+      uniquelyNamed(node)
+    ) {
+      const captureParent = statements.get(node.forecast_capture_parent_id);
+      if (captureParent && uniquelyNamed(captureParent)) {
+        semanticScopeCaptures.push({
           parent_label: captureParent.label,
           child_label: node.label,
           parent_row: physicalRow(captureParent.display_id),
@@ -673,8 +734,10 @@ export function workbookSemanticProofContract(modelIr, rowPlan = {}) {
     label_column: "B",
     forecast_columns: ["J", "K", "L"],
     unique_answers: uniqueAnswers,
+    section_conclusions: sectionConclusions,
     single_writer_groups: singleWriterGroups,
     capture_memberships: captureMemberships,
+    semantic_scope_captures: semanticScopeCaptures,
     hierarchies,
     schedule_links: scheduleLinks,
     max_formula_characters: 8192,

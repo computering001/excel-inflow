@@ -19,6 +19,7 @@ import { leaseOpeningLiability } from "./solver.mjs";
 import { formatMoney, formatTurns } from "./flow_screens.mjs";
 import { resolveBrokerForecastSelection } from "./broker_anchor.mjs";
 import { resolveForecastAuthority } from "./forecast_authority.mjs";
+import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 
 function pct(value, { decimals = 0 } = {}) {
   return `${(Number(value) * 100).toFixed(decimals)}%`;
@@ -366,16 +367,14 @@ function tiesToFilings(modelCase, reconciliation) {
         `(${share} unexplained).`,
     );
   }
-  const interest = modelCase.historical_interest_reconciliation;
-  if (interest) {
-    const reported = interest.reported_interest ?? [];
-    const identified = interest.identified_interest ?? [];
-    const residuals = reported.map(
-      (value, index) => Number(value) - Number(identified[index] ?? 0),
-    );
+  const interest = resolveHistoricalInterestAuthority(modelCase);
+  if (interest.present && interest.valid) {
+    const residuals = interest.unallocated_interest ?? [0, 0, 0];
     const worst = Math.max(...residuals.map(Math.abs), 0);
     ties.push(
-      worst <= 1e-6
+      !interest.has_filed_total
+        ? `Historical finance expense is supported by identified components only; no filed-total residual is asserted.`
+        : worst <= 1e-6
         ? `Interest identified by instrument equals reported gross interest in every historical year.`
         : `Interest identified by instrument leaves at most ${formatMoney(worst, currency)} unallocated in a historical year, carried as its own line.`,
     );
@@ -542,12 +541,10 @@ export function plausibilityChecks(modelCase, solved, read) {
   const currency = modelCase.issuer?.reporting_currency;
   const notes = [];
 
-  const interest = modelCase.historical_interest_reconciliation;
-  const historicalPlug = interest
+  const interest = resolveHistoricalInterestAuthority(modelCase);
+  const historicalPlug = interest.present && interest.valid
     ? Math.max(
-        ...(interest.reported_interest ?? []).map((value, index) =>
-          Math.abs(Number(value) - Number(interest.identified_interest?.[index] ?? 0)),
-        ),
+        ...(interest.unallocated_interest ?? []).map(Math.abs),
         0,
       )
     : 0;

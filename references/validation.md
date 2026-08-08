@@ -476,9 +476,12 @@ no invented catch-all aggregation; Change in Debt remains a visible child sum;
 mandatory repayment membership follows instrument states rather than row
 ranges; leverage-basis wording cannot claim company parity without evidence;
 acquisition timing helpers remain internal; every user screen is one fenced ASCII
-block; and optional raw broker sheets are evidence-only. Run
-`scripts/run_eight_fix_architecture_tests.mjs` on a representative case before
-the broader development gate.
+block; and optional raw broker sheets are evidence-only. The local authoring
+tree runs a dedicated architecture-repair development gate on a representative
+case before the broader development gate. That authoring-only harness is not a
+deployed entry point; installed packages enforce the same physical workbook
+relationships through `workbook_semantic_oracle.py` and its hash-bound proof
+contract.
 
 ### The Python render stage — `render/check_render.py` and `render/selftest.py`
 
@@ -542,10 +545,13 @@ regression check assert against fiction for the life of the file.
 Do not generate a baseline tree from a separately supplied raw authority
 workbook in a deployment host. It has no semantic row-map sidecar and may use a
 different producer row model. Deployment parity instead binds physical-
-authority structure to a frozen local canary, requires exact installed workbook
-byte identity for that canary, and requires the installed structural render to
-match the expected visible-sheet and pagination contract. Pixel baselines are
-external local release evidence only and are never a production-run dependency.
+authority structure to a frozen local canary, requires exact installed canonical
+package identity for that canary, and requires the installed structural render
+to match the expected visible-sheet and pagination contract. Canonical identity
+masks only the closed set of volatile producer-assigned relationship identifiers;
+formulas, values, semantics, styles, comments and all other package content must
+match. Pixel baselines are external local release evidence only and are never a
+production-run dependency.
 
 **A comparison run cannot create or extend a baseline.** Not on the first run,
 not for a page the baseline does not yet have, not for anything. Writing one

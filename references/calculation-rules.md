@@ -96,11 +96,19 @@ Do not reinterpret a percentage-of-margin convention as basis points.
 
 Keep historical reconciliation and the forecast plug economically distinct.
 
-For historical periods, calculate `Other / unallocated interest` as the visible
-residual between filed total finance expense and the interest identified from
-the available instrument, RCF, commitment-fee, lease and other named detail.
-Separately disclosed lease interest is a component of filed finance expense
-when the issuer includes it there; display it once and never add it again on top:
+Every historical case declares `reported_interest_basis`. Use
+`filed_finance_expense_including_lease_interest` when the reported and identified
+series already include lease interest; use
+`reported_debt_interest_excluding_separately_disclosed_lease_interest` when both
+series exclude a separately disclosed lease charge; and use
+`identified_components_only` only where no filed total exists. Legacy cases
+without the field retain the first meaning, but new evidence runs must be
+explicit. Canonicalise the selected basis before any residual is calculated.
+
+For historical periods with a reported total, calculate `Other / unallocated
+interest` as the visible residual between canonical filed total finance expense
+and canonical identified components. Add separately disclosed lease interest
+exactly once when—and only when—the declared basis excludes it:
 
 ```text
 other interest
@@ -295,11 +303,11 @@ The visible Change in Debt parent sums those children. No schedule or sweep may
 bypass the statement and no movement may enter ending cash twice.
 
 Historical reported debt interest and separately reported lease interest are
-distinct authorities. Reconcile named debt-interest components and any residual
-to reported debt interest; add lease interest once when calculating gross
-finance expense. Do not absorb lease interest into the debt-interest residual
-and do not subtract it from the instrument total merely because both appear in
-the same interest schedule.
+distinct authorities only when the declared basis says the reported series
+excludes leases. When the filed total already includes leases, reconcile to that
+total without adding leases again. When only identified components exist, show
+their formula total and assert no filed-total residual. Never infer the basis
+from an issuer name, a row label or the mere presence of a lease series.
 
 ## Credit outputs
 

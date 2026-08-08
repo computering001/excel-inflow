@@ -10,7 +10,7 @@ export const STANDARDISED_DESIGN_RUNTIME_SHA256 =
 // successor. It activates only through the explicit epoch switch below —
 // never as a side effect of being present on disk.
 export const STANDARDISED_DESIGN_RUNTIME_V3_SHA256 =
-  "f0392d0a7e6e9fe86b98075fdafc3831e438569cd975733243c79c43df2b99b1";
+  "87e6d132611a1983c758a4b72d4e38f579678154ee18260a06241b4432f34026";
 export const STANDARDISED_DESIGN_CONTRACT_V3_SHA256 =
   "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3";
 
@@ -65,10 +65,14 @@ export function standardisedDesignContract() {
   }
   cachedContractSha = selection.sha256;
   const contract = JSON.parse(bytes);
+  const expectedSourceContractSha =
+    process.env.EXCEL_INFLOW_DESIGN_EPOCH === "3"
+      ? STANDARDISED_DESIGN_CONTRACT_V3_SHA256
+      : STANDARDISED_DESIGN_CONTRACT_SHA256;
   if (
     contract.schema_version !== 2 ||
     contract.status !== "RUNTIME_PROJECTION_OF_MEASURED_AUTHORITIES" ||
-    contract.source_contract_sha256 !== STANDARDISED_DESIGN_CONTRACT_SHA256
+    contract.source_contract_sha256 !== expectedSourceContractSha
   ) {
     throw new Error("Standardised design contract has an unsupported identity.");
   }

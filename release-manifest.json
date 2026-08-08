@@ -5,13 +5,13 @@
   "skillVersion": "2.0.12",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T20:08:46.081Z",
-  "centralInstructionsWords": 3890,
+  "generatedAt": "2026-08-08T21:43:21.691Z",
+  "centralInstructionsWords": 3937,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "8bea8f5b76bc296b059133fc4ac9307993da3ab32f9f2d8894b80c8a4ee1e7a1",
-    "closureFileCount": 100,
+    "currentClosureSha256": "800ded3c5eea3bd8fcf3e5b61d52d1b08940bf49f272ecb8e769e03e7e04f8f0",
+    "closureFileCount": 102,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -55,6 +55,7 @@
       "scripts/lib/flow_screens.mjs",
       "scripts/lib/forecast_authority.mjs",
       "scripts/lib/formula_dsl.mjs",
+      "scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/historical_normalisation.mjs",
       "scripts/lib/instrument_display.mjs",
       "scripts/lib/intake.mjs",
@@ -102,6 +103,7 @@
       "assets/style-tokens.json"
     ],
     "assetsDeclaredOnly": [
+      "assets/authority-projection-overrides.v3.json",
       "assets/broker-pack.schema.json",
       "assets/dcs-export.schema.json",
       "assets/lineage-exceptions.json",
@@ -118,6 +120,7 @@
       "scripts/build_dynamic_model.mjs -> scripts/lib/design_contract.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/formula_dsl.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_display.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/json_schema.mjs",
@@ -144,6 +147,7 @@
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/coverage.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_topology.mjs",
@@ -175,6 +179,7 @@
       "scripts/lib/flow_read.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/flow_screens.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/flow_read.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/flow_read.mjs -> scripts/lib/solver.mjs",
       "scripts/lib/flow_reconcile.mjs -> scripts/lib/flow_screens.mjs",
       "scripts/lib/flow_runtime.mjs -> scripts/lib/run_store.mjs",
@@ -213,10 +218,12 @@
       "scripts/lib/row_plan.mjs -> scripts/lib/statement_topology.mjs",
       "scripts/lib/run_carrier.mjs -> scripts/lib/runtime_isolation.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/semantic_graph.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/statement_topology.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/validation_invariants.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/lease_policy.mjs",
@@ -267,6 +274,22 @@
           },
           "usable": true,
           "reason": "selected"
+        },
+        {
+          "candidate": "python3",
+          "version": "3.9.6",
+          "packages": {
+            "openpyxl": "3.1.5",
+            "fitz": "1.26.5",
+            "PIL": null,
+            "numpy": null,
+            "jsonschema": null,
+            "pdfplumber": null,
+            "pypdf": "6.12.1",
+            "reportlab": null
+          },
+          "usable": false,
+          "reason": "no sys.stdlib_module_names (needs 3.10+); the closure could not classify stdlib imports"
         }
       ]
     },
@@ -796,8 +819,8 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
-        "plan_sha256": "08a0e8ae7837435f47677f8541d9f938a6f5f9d40294a044552ab7ccfa3df600",
+        "case_sha256": "1f56a329fde13d2d26e1ae198a2f203e69397ec0264836ac9bf51e42ad1488fd",
+        "plan_sha256": "2ede1b708ae68d01645c817f507007c6c1bb6aba52ec65774ac58ce949349686",
         "workbook_sha256": "29af4cec43850ae2cacfc73e62e720485e9a20492731aab35c96dc4bbd0360e6",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
@@ -805,8 +828,8 @@
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
-      "plan_sha256": "08a0e8ae7837435f47677f8541d9f938a6f5f9d40294a044552ab7ccfa3df600",
+      "case_sha256": "1f56a329fde13d2d26e1ae198a2f203e69397ec0264836ac9bf51e42ad1488fd",
+      "plan_sha256": "2ede1b708ae68d01645c817f507007c6c1bb6aba52ec65774ac58ce949349686",
       "workbook_sha256": "29af4cec43850ae2cacfc73e62e720485e9a20492731aab35c96dc4bbd0360e6",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
@@ -837,33 +860,33 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "1ca69a58670972b1938aa252c1f8cc927f5ff58f49badb7cc15604fd23427b64",
-      "bytes": 29033,
-      "words": 3890
+      "sha256": "3ed4ad5293b962f22d1c3a2646c82377da0aa40102c26f053c634dba2e10619f",
+      "bytes": 29395,
+      "words": 3937
     },
     {
       "path": "SKILL.md",
-      "sha256": "6c395bab9383d01a89aeb6994d47408910114d429013a6313aa2f84dcf5071d2",
-      "bytes": 29520,
-      "words": 3959
+      "sha256": "926203e0deb6f2ca36ba0d04e201db48a759bde682476bca01fddad64a04cbe2",
+      "bytes": 29882,
+      "words": 4006
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "4768dd751214788358f6420fb83a25ae8e341379a341a73076cde56892176858",
-      "bytes": 29053,
-      "words": 3892
+      "sha256": "00ee0c19212490249f4e3af2be2ef6b2d199fc98b543ad3f271b8992be7fac0c",
+      "bytes": 29415,
+      "words": 3939
     },
     {
       "path": "references/model-contract.md",
-      "sha256": "c83b6bc3e355b16212ee512c20e5ab1fe76f8954ce314baab3e379f90bcafb3c",
-      "bytes": 12686,
-      "words": 1921
+      "sha256": "908a04a793e88242ee3ae6e2c0be67a8feb59efabb8efc0dd6f5c6757d411d37",
+      "bytes": 13257,
+      "words": 1989
     },
     {
       "path": "references/calculation-rules.md",
-      "sha256": "60831ad60166949d1a7208bdd1724178b601cffffad1f09c43dfbff0fbf5e9dc",
-      "bytes": 12582,
-      "words": 1876
+      "sha256": "17e3954b035181260dd35680cd7bdaca1395b6f8d282eed307e579a46edae517",
+      "bytes": 13094,
+      "words": 1931
     },
     {
       "path": "references/forecast-and-input-policy.md",
@@ -891,9 +914,15 @@
     },
     {
       "path": "references/validation.md",
-      "sha256": "ba4ba93a5d6578ff1bec5187c7b50088a78c1be58e5e754f03c2582cb59e6c98",
-      "bytes": 48900,
-      "words": 6980
+      "sha256": "393e3e6d10ebeb253d3bb3afe6241c42a517879affee786b0562b12431fd18d0",
+      "bytes": 49321,
+      "words": 7036
+    },
+    {
+      "path": "assets/authority-projection-overrides.v3.json",
+      "sha256": "bad4426065836427cf856651a51a44f397c91df266a69c4f39c7407949848f73",
+      "bytes": 699,
+      "words": null
     },
     {
       "path": "assets/broker-pack.schema.json",
@@ -909,8 +938,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "3a1eaec6df12bb8ebb5776439e6bab6af50cdfc52e7ddfbb68d2b41622f5cf01",
-      "bytes": 35686,
+      "sha256": "00c08c4aa7bb01eba3e3cb24902a1332bdd63f3e5c72b59b1e9268cb87d042e7",
+      "bytes": 36049,
       "words": null
     },
     {
@@ -927,8 +956,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "68be4b1047527d91a4ee122265b127d668c2ba07a7a5414475280d7ed0f16aeb",
-      "bytes": 51289,
+      "sha256": "4e8efbc86c5a96b49a6a7ef66f553995a8d697ad0311005a5ae813777b9127a2",
+      "bytes": 52608,
       "words": null
     },
     {
@@ -939,8 +968,8 @@
     },
     {
       "path": "assets/model-ir-v3.schema.json",
-      "sha256": "1bf3679960c4a2e6bdb2701b1c695b3d875e725bfc246a44f642ba75dd8ac749",
-      "bytes": 6412,
+      "sha256": "a18e18efaef0b87e9cc6103bd53e4de1ed865df52a6ed93b62336c6126600550",
+      "bytes": 6685,
       "words": null
     },
     {
@@ -981,7 +1010,7 @@
     },
     {
       "path": "assets/standardised-design-runtime.v3.json",
-      "sha256": "f0392d0a7e6e9fe86b98075fdafc3831e438569cd975733243c79c43df2b99b1",
+      "sha256": "87e6d132611a1983c758a4b72d4e38f579678154ee18260a06241b4432f34026",
       "bytes": 6584,
       "words": null
     },
@@ -993,14 +1022,14 @@
     },
     {
       "path": "assets/style-tokens.json",
-      "sha256": "ade2c22344cae06978c17c77f45f1227a2299b52d531b3684bc4e8825c752f6f",
-      "bytes": 35287,
+      "sha256": "9cb892e57cd8f43476d6cba2699dba5b217978b0b52509005de48dd6d3f709bd",
+      "bytes": 35441,
       "words": null
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "b03e117a4a8fd43e0fc532eaf07582146ef317faaa9b7024c75c1fe37dcdd25f",
-      "bytes": 468959,
+      "sha256": "53bdf02f7afa58530e1b6d33ba79e802fbdd602c75c0ea2d071df3447afda5c5",
+      "bytes": 469510,
       "words": null
     },
     {
@@ -1089,20 +1118,20 @@
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "93a24c108c08763b939a69a8274199f8c8d5ed1ba2fc04c2559669b71592c7ad",
-      "bytes": 73176,
+      "sha256": "d064eb94a9d0a31d0555028134279a56eb22aeeea92f47dd6c393e10887c2444",
+      "bytes": 74563,
       "words": null
     },
     {
       "path": "scripts/lib/design_contract.mjs",
-      "sha256": "41eae8f29e743fc2fa9d075b09a80c67abea0f47beb1e088e822ef9574f07b9c",
-      "bytes": 6063,
+      "sha256": "0f792aaeb122cd76d87ae62d1093af32f3fe06378d3a5e2345e2f69643605e43",
+      "bytes": 6231,
       "words": null
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "207c28664937c96f7822c64f63912e6d43b97188195cac72a7c66e4fe1de2c93",
-      "bytes": 62894,
+      "sha256": "961170585ea57eac3251400cfb0c4a97e0ee786e5bec678b8c703bfead9cc9f5",
+      "bytes": 63313,
       "words": null
     },
     {
@@ -1137,8 +1166,8 @@
     },
     {
       "path": "scripts/lib/flow_read.mjs",
-      "sha256": "d460996649ae007c0832f606cefdd12d8be46e766dea56307d13b5adb2a6bce7",
-      "bytes": 27092,
+      "sha256": "298ec268c3a7800d52a9f349f606df09309ce7b380d1064cfa43e878dd5a846c",
+      "bytes": 27126,
       "words": null
     },
     {
@@ -1169,6 +1198,12 @@
       "path": "scripts/lib/formula_dsl.mjs",
       "sha256": "6c9630232283693b54036f563a3d5cfed5779b8c8b9f2985771864efe3036b6e",
       "bytes": 7872,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/historical_interest_authority.mjs",
+      "sha256": "6d0901fccf556fea017571b0c84a72077b2930f3952078d44b1ae349aac379a4",
+      "bytes": 6411,
       "words": null
     },
     {
@@ -1203,8 +1238,8 @@
     },
     {
       "path": "scripts/lib/model_ir_v3.mjs",
-      "sha256": "0c3859669a7346cab5f190fc2211fbba85a2c56cd1e1d007deab6457eba0d4c9",
-      "bytes": 24825,
+      "sha256": "037ee5e2f0ab3b14ba95ef2b4c11c273ba8fdaa160f06b105c35617fe25b1a38",
+      "bytes": 27121,
       "words": null
     },
     {
@@ -1227,8 +1262,8 @@
     },
     {
       "path": "scripts/lib/public_test_run.mjs",
-      "sha256": "88948d466387095cbd478b171079352f4f7ef78c523e9407a77b8b0b056243ae",
-      "bytes": 14322,
+      "sha256": "a1cac92e3360edff596b13c62960221ce9f811fa7b60bd1c3f92994d3b9e531a",
+      "bytes": 14729,
       "words": null
     },
     {
@@ -1257,8 +1292,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "8c50e30ec60ce1a0d66f04516164b28d4156cfca5d0cfb28de20b8ba49b3dbdb",
-      "bytes": 132424,
+      "sha256": "4252a11b1dac0ac20a72555dc44cee96358456ee20d05faf7be512b72dfc263e",
+      "bytes": 133986,
       "words": null
     },
     {
@@ -1281,14 +1316,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "4f828adcf3bb4edc1c82b855679ea2af9f7a1251ae8fb770c6aed22e9971e596",
-      "bytes": 41117,
+      "sha256": "21f846bb53cb37e0d2383814e3d7d6d76b00a5f89021dae1dcc2ba5c8131dba4",
+      "bytes": 42675,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "0425d788aac141438005237d6299452d7cb62c61ef8f93d1b3a06a2e2fabdea6",
-      "bytes": 110698,
+      "sha256": "0815051f2a4d1c21f834d0a86672e92e083a63b0e19fa2c0e4efbdea0decc3d1",
+      "bytes": 110937,
       "words": null
     },
     {
@@ -1299,8 +1334,8 @@
     },
     {
       "path": "scripts/lib/statement_topology.mjs",
-      "sha256": "d4e50be4939542f1c5ae709804d3840f22d809fcc20ed336b5953551615da664",
-      "bytes": 22389,
+      "sha256": "7bca8665cb29754de319832f9fd710b5a5f322e7e57e0e33192e35654b52c851",
+      "bytes": 25416,
       "words": null
     },
     {
@@ -1437,8 +1472,8 @@
     },
     {
       "path": "scripts/validate_style_tokens.mjs",
-      "sha256": "a6d9a01e352dd511b99d177871fbe86fec17c46e399651eb014940f128e660b8",
-      "bytes": 36261,
+      "sha256": "67e7b7480cfdb6b72cab01fb1654cc5e48ce1f2e4188f7f3aadca5567c3992e2",
+      "bytes": 32509,
       "words": null
     },
     {
@@ -1461,8 +1496,8 @@
     },
     {
       "path": "scripts/verify/run_deterministic_tests.py",
-      "sha256": "5dbe210f42f19009eb4141a0f88547d7518fee749d55f31cc24ee409e0536386",
-      "bytes": 18531,
+      "sha256": "83e909214d891e605f06585c8aed0cfd896e81ee2874a3a3b322e0f1d7e56350",
+      "bytes": 17927,
       "words": null
     },
     {
@@ -1479,14 +1514,14 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "81ade4256dae03ed4aa690db4970b8d9285f821dd9416d863843541ef341651b",
-      "bytes": 134278,
+      "sha256": "e6695d07a63f2a2af08e24bbebf99270ad3a3fa109eb8467ae06c86d6dc9822e",
+      "bytes": 135079,
       "words": null
     },
     {
       "path": "scripts/verify/workbook_semantic_oracle.py",
-      "sha256": "5c578a70d940ca2662ce65b50adfa11dfff6cf2a4aa05d7789d6bcab29ca5d9d",
-      "bytes": 16940,
+      "sha256": "4ff4ca86209a8d77d0ad28faf0f86103f2accc1a69be180e24470acfe90048f8",
+      "bytes": 22542,
       "words": null
     },
     {

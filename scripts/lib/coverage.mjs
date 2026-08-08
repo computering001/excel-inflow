@@ -4,6 +4,7 @@ import { classifyStatementLine, isHighImpactRole } from "./statement_classifier.
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { compileStatementTopology } from "./statement_topology.mjs";
 import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
+import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -1654,16 +1655,15 @@ function debtReconciliationChecks(modelCase) {
 }
 
 function historicalInterestChecks(modelCase) {
-  const reported = modelCase.historical_interest_reconciliation?.reported_interest;
-  const identified =
-    modelCase.historical_interest_reconciliation?.identified_interest;
-  if (reported === undefined && identified === undefined) return [];
-  if (!series(reported, 3) || !series(identified, 3)) {
+  const authority = resolveHistoricalInterestAuthority(modelCase);
+  if (!authority.present) return [];
+  if (!authority.valid) {
     return [
       result(
         "historical_interest.shape",
         "BLOCK",
-        "Historical interest reconciliation needs three reported and three identified values.",
+        authority.errors.join(" "),
+        { basis: authority.basis, errors: authority.errors },
       ),
     ];
   }
@@ -1672,9 +1672,41 @@ function historicalInterestChecks(modelCase) {
       0.1,
   );
   const checks = [];
+  checks.push(
+    result(
+      "historical_interest.basis",
+      "PASS",
+      authority.has_filed_total
+        ? `Historical interest uses ${authority.basis}; lease interest is canonicalised exactly once before the residual is tested.`
+        : "Historical interest uses identified_components_only; no filed total or unallocated residual is asserted.",
+      {
+        basis: authority.basis,
+        basis_was_explicit: authority.basis_was_explicit,
+        has_filed_total: authority.has_filed_total,
+      },
+    ),
+  );
   for (let index = 0; index < 3; index += 1) {
-    const reportedAbs = Math.abs(number(reported[index]));
-    const plug = number(reported[index]) - number(identified[index]);
+    if (!authority.has_filed_total) {
+      checks.push(
+        result(
+          `historical_interest.${index}`,
+          "PASS",
+          `Historical interest period ${index + 1} is component-only; the visible schedule has no asserted filed-total residual.`,
+          {
+            basis: authority.basis,
+            identified:
+              authority.identified_finance_components[index],
+            lease_interest: authority.lease_interest[index],
+          },
+        ),
+      );
+      continue;
+    }
+    const reportedAbs = Math.abs(
+      number(authority.filed_finance_expense[index]),
+    );
+    const plug = number(authority.unallocated_interest[index]);
     const percentage =
       reportedAbs === 0 ? (Math.abs(plug) <= 0.01 ? 0 : Infinity) : Math.abs(plug) / reportedAbs;
     checks.push(
@@ -1684,7 +1716,21 @@ function historicalInterestChecks(modelCase) {
         percentage > limit + 1e-12
           ? `Historical interest plug in period ${index + 1} is above the ${(limit * 100).toFixed(1)}% limit.`
           : `Historical interest period ${index + 1} is within the plug limit.`,
-        { reported: number(reported[index]), identified: number(identified[index]), plug, percentage },
+        {
+          basis: authority.basis,
+          filed_finance_expense: number(
+            authority.filed_finance_expense[index],
+          ),
+          reported_debt_interest: number(
+            authority.reported_debt_interest[index],
+          ),
+          identified_finance_components: number(
+            authority.identified_finance_components[index],
+          ),
+          lease_interest: number(authority.lease_interest[index]),
+          plug,
+          percentage,
+        },
       ),
     );
   }

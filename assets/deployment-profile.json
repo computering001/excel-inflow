@@ -17,6 +17,7 @@
  ],
  "asset_allowlist": [
   "broker-pack.schema.json",
+  "authority-projection-overrides.v3.json",
     "dcs-export.schema.json",
     "evidence-run-v1.schema.json",
   "lineage-exceptions.json",
@@ -34,7 +35,8 @@
   "standardised-design-runtime.v3.json",
   "style-tokens.json"
  ],
- "declared_only_assets": {
+  "declared_only_assets": {
+  "authority-projection-overrides.v3.json": "Prepared, empty correction registry for the dormant presentation epoch 3. It ships with the v3 contract/runtime so activation cannot silently fall back to v2 corrections; the default epoch remains 2 until native Excel approval.",
   "broker-pack.schema.json": "Stage-1 normalised broker-pack contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
     "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
     "lineage-exceptions.json": "L0 immutable exception registry. Named as immutable-at-runtime; must be present so a runtime exception claim can be checked against it.",
@@ -82,6 +84,7 @@
     "lib/forecast_authority.mjs",
     "lib/formula_dsl.mjs",
     "lib/historical_normalisation.mjs",
+  "lib/historical_interest_authority.mjs",
   "lib/user_flow_controller.mjs",
   "lib/intake.mjs",
   "lib/instrument_display.mjs",

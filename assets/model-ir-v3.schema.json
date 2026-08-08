@@ -133,8 +133,12 @@
         "physical_row": { "type": ["integer", "null"] },
         "parent_display_id": { "$ref": "#/$defs/nullableString" },
         "depth": { "type": "integer", "minimum": 0 },
-        "display_role": { "enum": ["answer", "component", "consumer", "memo", "control", "header"] },
+        "display_role": { "enum": ["answer", "subtotal", "component", "consumer", "memo", "control", "header"] },
         "style_role": { "$ref": "#/$defs/nullableString" },
+        "presentation_rank": { "$ref": "#/$defs/nullableString" },
+        "section_conclusion_owner": { "type": "boolean" },
+        "section_conclusion_id": { "$ref": "#/$defs/nullableString" },
+        "in_section_conclusion_closure": { "type": "boolean" },
         "indent": { "type": "integer", "minimum": 0 }
       }
     },

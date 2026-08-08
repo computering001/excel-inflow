@@ -71,6 +71,10 @@ import {
 } from "./lib/lease_policy.mjs";
 import { resolveForecastAuthority } from "./lib/forecast_authority.mjs";
 import { compileStatementFormula } from "./lib/formula_dsl.mjs";
+import {
+  historicalInterestBasisLabel,
+  resolveHistoricalInterestAuthority,
+} from "./lib/historical_interest_authority.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -1065,7 +1069,7 @@ function styleStatementRow(
   // applyTotalHierarchy(). A ratio row can still be an ANSWER — the leverage
   // multiples are — so ask before the ratio branch claims it.
   const rank = ranks
-    ? totalRank([definition.row_id, definition.semantic_role], isTotal, section)
+    ? totalRank(definition, isTotal, section)
     : null;
   if (rank) ranks.set(row, rank);
   if (isTotal) {
@@ -6357,6 +6361,13 @@ function configureOperatingModel(
       );
     }
   }
+  const historicalInterestAuthority =
+    resolveHistoricalInterestAuthority(modelCase);
+  if (!historicalInterestAuthority.valid) {
+    throw new Error(
+      `Historical interest authority is invalid: ${historicalInterestAuthority.errors.join(" ")}`,
+    );
+  }
   const interestLabels = {
     instrument_interest: "Instrument-modelled interest",
     acquisition_interest: "Acquisition debt interest",
@@ -6368,7 +6379,9 @@ function configureOperatingModel(
         ? "Lease interest — not separately modelled"
         : "Lease interest",
     other_unallocated_interest: "Other / unallocated interest",
-    interest_reported_total: "Filed finance expense (statement authority)",
+    interest_reported_total:
+      historicalInterestBasisLabel(historicalInterestAuthority) ??
+      "Filed finance expense (statement authority)",
     interest_identified_total: "Less: finance expense identified",
     non_cash_interest: "Non-cash interest",
     gross_interest_expense: "Gross interest expense",
@@ -6542,10 +6555,8 @@ function configureOperatingModel(
     sheet.getRange(`D${interestRows.interest_income_schedule}`).format.numberFormat =
       PERCENT;
   }
-  const historicalReportedInterest =
-    modelCase.historical_interest_reconciliation?.reported_interest ?? [0, 0, 0];
   const historicalIdentifiedInterest =
-    modelCase.historical_interest_reconciliation?.identified_interest ?? [0, 0, 0];
+    historicalInterestAuthority.identified_finance_components ?? [0, 0, 0];
   // THE HISTORICAL COLUMNS BUILD UP THE SAME WAY THE FORECAST DOES.
   //
   // `identified_interest` is the portion of filed finance expense that has
@@ -6563,14 +6574,12 @@ function configureOperatingModel(
   //   = (identified - lease - RCF - non-cash) + lease + RCF + non-cash
   //     + (reported - identified)
   //   = filed finance expense.
-  const historicalLeaseInterest =
-    modelCase.historical_supplement?.lease_interest_expense ?? [0, 0, 0];
+  const historicalLeaseInterest = historicalInterestAuthority.lease_interest;
   const historicalRcfCommitmentFee =
     modelCase.historical_supplement?.rcf_commitment_fee ?? [0, 0, 0];
   const historicalNonCashInterest =
     modelCase.historical_supplement?.non_cash_interest ?? [0, 0, 0];
-  const namedHistoricalComponent = (index) =>
-    Math.abs(Number(historicalLeaseInterest[index] ?? 0)) +
+  const namedHistoricalDebtComponent = (index) =>
     Math.abs(Number(historicalRcfCommitmentFee[index] ?? 0)) +
     Math.abs(Number(historicalNonCashInterest[index] ?? 0));
   setRow(
@@ -6578,7 +6587,15 @@ function configureOperatingModel(
     `G${interestRows.instrument_interest}:I${interestRows.instrument_interest}`,
     historicalIdentifiedInterest.map(
       (value, index) =>
-        -(Math.abs(Number(value)) - namedHistoricalComponent(index)),
+        -(
+          Math.abs(
+            Number(
+              historicalInterestAuthority.identified_debt_components?.[
+                index
+              ] ?? value,
+            ),
+          ) - namedHistoricalDebtComponent(index)
+        ),
     ),
   );
   // THE RESIDUAL IS NOW A DIFFERENCE ON THE FACE, NOT A TYPED NUMBER.
@@ -6617,29 +6634,34 @@ function configureOperatingModel(
   // forecast alike.  That preserves the filed statement as source authority
   // without creating two hardcodes or letting the schedule depend on one of
   // its consumers.
-  const filedFinanceExpenseValues = rowValues(
-    modelCase,
-    filedFinanceExpenseDefinition,
-  );
   for (const [index, column] of HISTORICAL_COLUMNS.entries()) {
-    const filedValue = filedFinanceExpenseValues[index];
-    setValue(
-      sheet,
-      `${column}${interestRows.interest_reported_total}`,
-      filedValue !== null && Number.isFinite(Number(filedValue))
-        ? Number(filedValue)
-        : -Math.abs(Number(historicalReportedInterest[index] ?? 0)),
-    );
-    styleInput(sheet, `${column}${interestRows.interest_reported_total}`);
-    const provenance = (modelCase.provenance?.[
-      filedFinanceExpenseDefinition.row_id
-    ] ?? []).find((entry) => Number(entry.period_index) === index);
-    if (provenance) {
-      addCommentOnce(
-        workbook,
+    if (historicalInterestAuthority.has_filed_total) {
+      setValue(
         sheet,
         `${column}${interestRows.interest_reported_total}`,
-        provenanceComment(provenance),
+        -Math.abs(
+          Number(
+            historicalInterestAuthority.filed_finance_expense[index] ?? 0,
+          ),
+        ),
+      );
+      styleInput(sheet, `${column}${interestRows.interest_reported_total}`);
+      const provenance = (modelCase.provenance?.[
+        filedFinanceExpenseDefinition.row_id
+      ] ?? []).find((entry) => Number(entry.period_index) === index);
+      if (provenance) {
+        addCommentOnce(
+          workbook,
+          sheet,
+          `${column}${interestRows.interest_reported_total}`,
+          provenanceComment(provenance),
+        );
+      }
+    } else {
+      applyFormula(
+        sheet,
+        `${column}${interestRows.interest_reported_total}`,
+        `=${column}${interestRows.interest_identified_total}`,
       );
     }
   }
@@ -6663,7 +6685,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${interestRows.other_unallocated_interest}`,
-      `=${column}${interestRows.interest_reported_total}-${column}${interestRows.interest_identified_total}`,
+      historicalInterestAuthority.has_filed_total
+        ? `=${column}${interestRows.interest_reported_total}-${column}${interestRows.interest_identified_total}`
+        : "=0",
     );
   }
   setRow(

@@ -378,8 +378,13 @@ labels and values against the example company's pixels.
 Installed parity is transitive and non-vacuous: first validate each physical
 authority against the portable design contract; then prove the frozen local
 canary against that authority; then require the installed host to produce the
-same workbook bytes and a PASS structural render with the same visible sheets
-and pagination. This is the deployment-host gate and needs no PNG upload.
+same canonical workbook package and a PASS structural render with the same
+visible sheets and pagination. Canonical identity covers semantic row maps,
+formula and value content, styles, comments and every non-volatile package
+relationship after masking the closed set of producer-assigned relationship
+identifiers. Raw archive-byte identity may be reported only when the producer
+is itself byte-deterministic; it is never substituted for canonical parity.
+This is the deployment-host gate and needs no PNG upload.
 
 Exact pixel comparison remains a separate **local** release-certification gate.
 It replays the two frozen shipping-path profiles against a matching independently

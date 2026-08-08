@@ -243,6 +243,17 @@ export function validatePublicTestRun(run) {
   for (const message of validateCaseShape(modelCase)) {
     findings.push(finding("public_test.model_case.schema", message));
   }
+  if (
+    modelCase.historical_interest_reconciliation &&
+    !modelCase.historical_interest_reconciliation.reported_interest_basis
+  ) {
+    findings.push(
+      finding(
+        "public_test.historical_interest.basis_missing",
+        "Public-company tests must state historical_interest_reconciliation.reported_interest_basis explicitly; the legacy default is not source evidence.",
+      ),
+    );
+  }
   compareEntity(findings, "public_test.entity.case", run.company_name, modelCase.issuer?.name);
   compareEntity(findings, "public_test.entity.filings", run.company_name, run.filings?.entity_name);
 

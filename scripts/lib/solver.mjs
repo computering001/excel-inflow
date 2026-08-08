@@ -13,6 +13,7 @@ import {
   resolveMetricForecastAuthority,
   validateForecastAuthorities,
 } from "./forecast_authority.mjs";
+import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 
 const NORMALISED_STATEMENT_CACHE = new WeakMap();
 
@@ -924,6 +925,9 @@ export function validateCaseShape(modelCase) {
     errors.push("cash_policy.opening_cash is required and must be non-negative.");
   }
   if (Number(modelCase.contract_version) === 2) {
+    const historicalInterestAuthority =
+      resolveHistoricalInterestAuthority(modelCase);
+    errors.push(...historicalInterestAuthority.errors);
     if (!explicitCashBuckets && !isSeries3(cash?.historical_year_end_cash)) {
       errors.push(
         "cash_policy.historical_year_end_cash must contain three balances.",

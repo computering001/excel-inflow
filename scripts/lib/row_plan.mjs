@@ -268,9 +268,28 @@ function assertSection(section) {
 export function totalRank(identity, isTotal = true, section = undefined) {
   assertSection(section);
   const table = SECTION_RANKS[section];
+  const explicitConclusion =
+    identity &&
+    typeof identity === "object" &&
+    !Array.isArray(identity) &&
+    identity.section_conclusion_owner === true;
   const keys = (
-    Array.isArray(identity) ? identity : [identity]
+    Array.isArray(identity)
+      ? identity
+      : identity && typeof identity === "object"
+        ? [identity.row_id, identity.semantic_role]
+        : [identity]
   ).filter((key) => typeof key === "string" && key.length > 0);
+  // Statement conclusions come from the compiled dependency graph.  The legacy
+  // per-section answer table remains only for mechanical schedules whose rows
+  // are the graph's fixed outputs; it is never allowed to override a statement
+  // compiler decision.
+  if (
+    explicitConclusion &&
+    [RANK_SECTION.INCOME_STATEMENT, RANK_SECTION.CASH_FLOW].includes(section)
+  ) {
+    return TOTAL_RANK.ANSWER;
+  }
   for (const key of keys) {
     if (table.ratio_answers.has(key)) return TOTAL_RANK.ANSWER;
   }
@@ -278,8 +297,10 @@ export function totalRank(identity, isTotal = true, section = undefined) {
   for (const key of keys) {
     if (COMPONENT_SUM_IDS.has(key)) return TOTAL_RANK.COMPONENT;
   }
-  for (const key of keys) {
-    if (table.answers.has(key)) return TOTAL_RANK.ANSWER;
+  if (![RANK_SECTION.INCOME_STATEMENT, RANK_SECTION.CASH_FLOW].includes(section)) {
+    for (const key of keys) {
+      if (table.answers.has(key)) return TOTAL_RANK.ANSWER;
+    }
   }
   // EPOCH 3 INVERTS THE DEFAULT, AND THAT IS THE WHOLE DESIGN CHANGE.
   //
@@ -779,7 +800,7 @@ function markForecastCapturedBy(
   row,
   parentRowId,
   note,
-  mode = "formula_membership",
+  mode = "semantic_scope",
   modelCase = null,
 ) {
   if (CAPTURE_PROTECTED_SPINE_ROLES.has(row?.semantic_role)) return false;
@@ -817,7 +838,7 @@ function markForecastCapturedBy(
     proof:
       mode === "formula_membership"
         ? "Parent formula contains this row exactly once."
-        : "Immaterial detail is represented by the declared semantic parent.",
+        : "The row's forecast scope is represented by the declared parent authority while this child remains intentionally blank.",
   }));
   return true;
 }
@@ -2236,7 +2257,7 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
         child,
         parent.row_id,
         `Forecast detail is captured by directly forecast parent ${parent.label}.`,
-        "formula_membership",
+        "semantic_scope",
         modelCase,
       );
     }
@@ -3406,6 +3427,27 @@ export function compileRowPlan(modelCase) {
       income_statement: income.rows,
       cash_flow: cashFlow.rows,
     },
+    section_conclusions: Object.fromEntries(
+      [income, cashFlow].map((allocation) => {
+        const owner = allocation.rows.find(
+          (definition) => definition.section_conclusion_owner === true,
+        );
+        const section = allocation.rows[0]?.section;
+        return [
+          section,
+          owner
+            ? {
+                owner_row_id: owner.row_id,
+                owner_row: owner.row,
+                semantic_role: owner.semantic_role,
+                dependency_closure: allocation.rows
+                  .filter((definition) => definition.in_section_conclusion_closure)
+                  .map((definition) => definition.row_id),
+              }
+            : null,
+        ];
+      }),
+    ),
     debt_term_header_row: debtTermHeaderRow,
     debt_fx_rows: debtFxRows,
     debt_groups: debtGroups,

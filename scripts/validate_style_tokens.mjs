@@ -397,13 +397,23 @@ if (!plan) {
   // statement totals/subtotals, dynamic instrument-group subtotals, and named
   // schedule totals declared by the style authority.
   const totalRows = new Set();
+  const subsectionLabelRows = new Set();
+  const numberedParentRows = new Set();
   const statementPhysicalRows = new Set();
   for (const definitions of Object.values(plan.statement_rows ?? {})) {
     for (const definition of definitions ?? []) {
       statementPhysicalRows.add(Number(definition.row));
+      const subsectionLabel =
+        definition.style_role === "subsection" &&
+        definition.row_type !== "header";
+      if (subsectionLabel) subsectionLabelRows.add(Number(definition.row));
+      const numberedParent =
+        subsectionLabel && definition.display_role === "group_parent";
+      if (numberedParent) numberedParentRows.add(Number(definition.row));
       if (
-        definition.style_role === "total" ||
-        definition.row_type === "subtotal"
+        !numberedParent &&
+        (definition.style_role === "total" ||
+          definition.row_type === "subtotal")
       ) {
         totalRows.add(Number(definition.row));
       }
@@ -470,7 +480,12 @@ if (!plan) {
     // Everything above the first section band is the title, the control block
     // and the period header: chrome by position, not by declaration.
     if (row < firstSectionRow) continue;
-    if (chromeRows.has(row) || headlineRows.has(row) || totalRows.has(row)) continue;
+    if (
+      chromeRows.has(row) ||
+      headlineRows.has(row) ||
+      totalRows.has(row) ||
+      (subsectionLabelRows.has(row) && columnOf(ref) === "B")
+    ) continue;
     strayBold.push(ref);
   }
   const strayBoldRows = [...new Set(strayBold.map(rowOf))].sort((a, b) => a - b);
@@ -496,6 +511,24 @@ if (!plan) {
     nonBoldTotals.length === 0,
     `Every semantic total/subtotal row is bold across its populated body cells.`,
     nonBoldTotals.length ? { rows: nonBoldTotals.slice(0, 20) } : { rows: [...totalRows].sort((a, b) => a - b) },
+  );
+
+  const malformedNumberedParents = [...numberedParentRows]
+    .filter((row) => {
+      const label = `B${row}`;
+      if (!cellStyle.has(label) || !styleOf(label).bold) return true;
+      return [...BODY_COLUMNS]
+        .filter((column) => column !== "B")
+        .some((column) => cellStyle.has(`${column}${row}`) && styleOf(`${column}${row}`).bold);
+    })
+    .sort((a, b) => a - b);
+  check(
+    "numbered-parent-uses-bold-label-only",
+    malformedNumberedParents.length === 0,
+    "Numbered consolidation parents use one bold label over indented children without inheriting a total band.",
+    malformedNumberedParents.length
+      ? { rows: malformedNumberedParents.slice(0, 20) }
+      : { rows: [...numberedParentRows].sort((a, b) => a - b) },
   );
 
   // A closed border vocabulary prevents a fragment inherited from an input
@@ -600,153 +633,42 @@ if (!plan) {
       : symmetryEvidence,
   );
 
-  // --- the answer rank, held to an INDEPENDENT signal ------------------------
-  //
-  // STANDING PROJECT RULE: the compiler and the validator must not trust the
-  // same classification blindly. Everything above resolves through a declared
-  // list. This does not: it counts, from the emitted formulas alone, how many
-  // other rows READ each row, and holds the answer rank to that.
-  //
-  // THE TEST IS COMPARATIVE, NOT ABSOLUTE. "reach >= 1" is the wrong bar, and
-  // three of the six cases prove it: Kerry's interest schedule ends on `Net P&L
-  // interest` and NOTHING reads it, because that income statement takes gross
-  // interest and interest income as two separate lines; AstraZeneca's `Profit
-  // for the period` is read by nothing either. Both are still the figure their
-  // statement builds to. A reach of zero is only damning RELATIVE to what sits
-  // beneath it.
-  //
-  // So: AN ANSWER MUST NOT BE OUT-READ BY A TOTAL BELOW IT IN ITS OWN BLOCK. If
-  // a row further down is referenced by strictly more of the model than the row
-  // wearing the answer fill, the answer is in the wrong place — the model is
-  // saying which line it actually depends on.
-  //
-  // THE SCAN STOPS AT THE NEXT SUB-BLOCK HEADER, and that boundary matters. On
-  // Kingspan and AstraZeneca the EBITDA BRIDGE sits BELOW net income, under its
-  // own header, and `adjusted_ebitda` is read by six rows — leverage, the
-  // margin, free cash flow conversion. It is an appendix to the statement, not a
-  // continuation of it, and comparing the statement's answer against an appendix
-  // that follows it would condemn a correct model. A sub-block header is read
-  // off the file the same way everything else here is: the subsection fill with
-  // NO rank rule under it.
-  //
-  // Ratio rows are exempt outright: nothing ever sums a multiple or a margin, so
-  // their reach is structurally zero and says nothing either way. That exemption
-  // is decided from the emitted NUMBER FORMAT — evidence in the file, not a
-  // classification borrowed from the compiler.
-  //
-  // The defect this was written for: on the Smurfit income statement
-  // `net_interest_expense` is read by NOTHING, is not a ratio, and sits — with
-  // no header between them — above `pre_tax_income` (read by 3) and `net_income`
-  // (read by 2), yet it carried the answer fill and net income did not.
-  const expandTargets = (formula) => {
-    const rows = new Set();
-    const text = String(formula);
-    for (const m of text.matchAll(
-      /\$?[A-Z]{1,2}\$?(\d+)\s*:\s*\$?[A-Z]{1,2}\$?(\d+)/g,
-    )) {
-      const [a, b] = [Number(m[1]), Number(m[2])];
-      for (let r = Math.min(a, b); r <= Math.max(a, b); r += 1) rows.add(r);
+  // --- statement conclusions -------------------------------------------------
+  // Formula fan-out is not economic ownership. Attribution rows and analytical
+  // appendices can be read more often than the statement conclusion, while a
+  // perfectly valid conclusion can have no downstream reader at all. The row
+  // plan therefore carries the dependency-graph conclusion, and this style
+  // check reads only the emitted OOXML treatment. The separate standard-library
+  // workbook semantic oracle binds that physical treatment to the sealed IR, so
+  // the renderer is not validating its own classification.
+  const conclusionFailures = [];
+  const conclusionEvidence = {};
+  for (const section of ["income_statement", "cash_flow"]) {
+    const declaration = plan.section_conclusions?.[section];
+    const header = Number(plan.section_headers?.[section]);
+    const nextHeader =
+      section === "income_statement"
+        ? Number(plan.section_headers?.cash_flow)
+        : Number(plan.section_headers?.debt_schedule);
+    const expected = Number(declaration?.owner_row);
+    const observed = [];
+    for (let row = header + 1; row <= nextHeader - 2; row += 1) {
+      if (
+        ["G", "H", "I", "J", "K", "L"].some(
+          (column) => styleOf(`${column}${row}`).fill === answerFill,
+        )
+      ) observed.push(row);
     }
-    const singles = text.replace(
-      /\$?[A-Z]{1,2}\$?\d+\s*:\s*\$?[A-Z]{1,2}\$?\d+/g,
-      " ",
-    );
-    for (const m of singles.matchAll(/\$?[A-Z]{1,2}\$?(\d+)/g)) rows.add(Number(m[1]));
-    return rows;
-  };
-  const reach = new Map();
-  for (const [ref, formula] of cellFormula) {
-    const from = rowOf(ref);
-    for (const target of expandTargets(formula)) {
-      if (target === from) continue;
-      if (!reach.has(target)) reach.set(target, new Set());
-      reach.get(target).add(from);
-    }
-  }
-  const readersOf = (row) => reach.get(row)?.size ?? 0;
-  const isRatioFormat = (row) =>
-    ["G", "H", "I", "J", "K", "L"].some((c) =>
-      /0\.0x|0\.0%|%/.test(
-        String(styleOf(`${c}${row}`).numberFormat ?? "")
-          .replaceAll("\\", "")
-          .replaceAll('"', ""),
-      ),
-    );
-  // A ROW THAT CARRIES A RANK RULE, read off the emitted borders rather than
-  // taken from any list: the rank pass is the only thing that puts a top rule
-  // across the number block, so a thin or double top edge there IS the mark of
-  // a total. Read this way the check cannot inherit the compiler's opinion of
-  // which rows are totals.
-  const carriesARankRule = (row) =>
-    ["G", "H", "I", "J", "K", "L"].some((c) => {
-      const top = edgesOf(`${c}${row}`).top;
-      return top === "thin" || top === "double";
-    });
-  const answerFilledRows = [
-    ...new Set(
-      [...cellStyle.keys()]
-        .filter((ref) => styleOf(ref).fill === answerFill)
-        .map(rowOf),
-    ),
-  ].sort((a, b) => a - b);
-  const answerRowSet = new Set(answerFilledRows);
-  const subsectionFill = (TOKENS.colors?.subsection_fill ?? "#EFF5F9")
-    .replace("#", "")
-    .toUpperCase();
-  // A SUB-BLOCK HEADER: the subsection fill with no rank rule beneath it. The
-  // fill alone is not enough — a block subtotal wears the same colour, which is
-  // exactly why `adjacent_section_boundary` exists — so the absence of the rank
-  // rule is what tells a bar that OPENS a block from one that CLOSES one.
-  const opensASubBlock = (row) =>
-    ["G", "H", "I"].some((c) => styleOf(`${c}${row}`).fill === subsectionFill) &&
-    !carriesARankRule(row);
-  const lastRow = Math.max(...[...cellStyle.keys()].map(rowOf));
-  const outRead = [];
-  const earnedEvidence = {};
-  for (const row of answerFilledRows) {
-    const section = sectionOf(row);
-    const mine = readersOf(row);
-    if (isRatioFormat(row)) {
-      earnedEvidence[row] = { section, reach: mine, exempt: "ratio row" };
-      continue;
-    }
-    let worst = null;
-    let stoppedAt = "end of section";
-    for (let below = row + 1; below <= lastRow; below += 1) {
-      if (sectionOf(below) !== section) break;
-      if (opensASubBlock(below)) {
-        stoppedAt = `sub-block header at row ${below}`;
-        break;
-      }
-      // A ratio terminates the amount ladder it reads.  Anything beneath that
-      // ratio belongs to the next analytical question even when the layout
-      // deliberately keeps both questions inside one bordered panel (net debt
-      // and leverage followed by mandatory repayments is the canonical
-      // example).  Continuing past the ratio compares unrelated outputs and
-      // turns formula fan-out into a false style hierarchy.
-      if (isRatioFormat(below)) {
-        stoppedAt = `ratio terminus at row ${below}`;
-        break;
-      }
-      if (answerRowSet.has(below)) continue;
-      if (!carriesARankRule(below)) continue;
-      const theirs = readersOf(below);
-      if (theirs > mine && (worst === null || theirs > worst.reach)) {
-        worst = { row: below, reach: theirs };
-      }
-    }
-    earnedEvidence[row] = { section, reach: mine, compared_until: stoppedAt, out_read_by: worst };
-    if (worst) {
-      outRead.push(
-        `row ${row} (${section}, read by ${mine}) sits above row ${worst.row}, a total read by ${worst.reach}`,
-      );
+    conclusionEvidence[section] = { expected, observed };
+    if (!Number.isFinite(expected) || observed.length !== 1 || observed[0] !== expected) {
+      conclusionFailures.push({ section, expected, observed });
     }
   }
   check(
     "answer-rank-is-earned-not-asserted",
-    outRead.length === 0,
-    `No answer row is out-read by a total below it in its own section. Counted from the emitted formulas and the emitted borders — this check shares no classification with the declaration it is testing.`,
-    outRead.length ? outRead : { answer_rows: answerFilledRows.length, earnedEvidence },
+    conclusionFailures.length === 0,
+    "Each statement carries exactly one answer treatment and it lands on the dependency-graph conclusion owner; formula fan-out is not used as an ownership proxy.",
+    conclusionFailures.length ? conclusionFailures : conclusionEvidence,
   );
 }
 

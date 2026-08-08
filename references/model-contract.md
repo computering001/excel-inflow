@@ -265,9 +265,14 @@ year-end cash, total liquidity.
 Link final net interest to the Income Statement.
 
 Historical `Other / unallocated interest` is a reconciliation, never a typed
-number. It is reported gross interest less the interest the schedule can
-attribute to named components, so it falls out as a difference the reader can
-check. The two derivation rows are grouped beneath the residual they produce,
+number. The case explicitly declares whether reported interest is filed total
+finance expense including leases, debt interest excluding a separately
+disclosed lease charge, or identified components only. The runtime canonicalises
+that basis first. Where a filed total exists, the residual is canonical filed
+finance expense less canonical identified components. Where it does not, the
+reported-total row is a formula sum of identified components and the residual
+is formula-driven zero without claiming filing authority. The two derivation
+rows are grouped beneath the residual they produce,
 collapsible, in the same shape as the RCF's two constituents: the answer first,
 its workings below. **Gross interest expense skips both derivation rows** — they
 are a derivation, not a component, and adding them in would count reported
@@ -279,7 +284,10 @@ rate on an identifiable debt base, or a supplied forecast total-interest
 bridge. Do not use the historical residual as the forecast assumption and do
 not present a typed forecast subtotal as though it were a reconciliation. Use
 `historical_supplement` only to retain historical reported debt interest, lease
-interest and interest income where instrument detail is unavailable.
+interest and interest income where instrument detail is unavailable. New cases
+must state `historical_interest_reconciliation.reported_interest_basis`;
+omission is supported only as a backwards-compatible legacy meaning of filed
+total finance expense including lease interest.
 
 ## Production sheets
 

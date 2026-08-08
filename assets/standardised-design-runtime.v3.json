@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "status": "RUNTIME_PROJECTION_OF_MEASURED_AUTHORITIES",
-  "source_contract_sha256": "aea5808b7914cd699cdda42c5d3e09091634fbca5934ccd4141b5a3ffa4e84be",
+  "source_contract_sha256": "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3",
   "authority_rule": "Production may expand company-specific semantic rows only inside the selected standardised profile's named zones. It may not alter the shared A:U grammar, section order, controls, provenance channels or profile identity.",
   "production_controls": {
     "broker_choice": "semantic source selector",
