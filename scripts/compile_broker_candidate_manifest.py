@@ -117,13 +117,13 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                         if kind == "unresolved_period_header":
                             findings.append({
                                 "id": "broker_candidates.unresolved_period_header",
-                                "severity": "blocker",
+                                "severity": "warning",
                                 "document_id": document.get("document_id"),
                                 "table_id": table_id,
                                 "row": row_number,
                                 "column": int(cell.get("column", 0)),
                                 "label": label_value,
-                                "message": "A period-like header is preserved but requires an explicit reviewed resolution.",
+                                "message": "A period-like label is preserved for semantic review; it blocks only if a model-relevant mapping needs it as a period.",
                             })
                 label = row_label(row)
                 owner_cell = label_cell(row) or {}
@@ -170,12 +170,12 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                     period_basis = "unresolved_period_header"
                     findings.append({
                         "id": "broker_candidates.mixed_period_header",
-                        "severity": "blocker",
+                        "severity": "warning",
                         "document_id": document.get("document_id"),
                         "table_id": table_id,
                         "row": row_number,
                         "period_kinds": kinds,
-                        "message": "Mixed period-header kinds are preserved but require explicit review.",
+                        "message": "Mixed period labels are preserved for semantic review and do not block evidence-only tables.",
                     })
                 else:
                     period_basis = "non_periodic"
@@ -234,7 +234,7 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
         "canonical_tables_sha256": canonical_tables_sha256,
         "candidates": candidates,
         "findings": findings,
-        "gate_status": "BLOCKED" if findings else "PASS",
+        "gate_status": "BLOCKED" if any(item.get("severity") == "blocker" for item in findings) else "PASS",
         "summary": {
             "candidate_count": len(candidates),
             "numeric_candidate_count": sum(1 for item in candidates if item["numeric"]),

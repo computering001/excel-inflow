@@ -177,6 +177,21 @@ def has_rendered_authority(table: dict[str, Any]) -> bool:
     return any("vision" in str(method) or "manual" in str(method) for method in methods if method)
 
 
+def is_discovery_only(table: dict[str, Any]) -> bool:
+    return (
+        table.get("authority_role") == "discovery_only"
+        or str(table.get("extraction_method") or "") == "native_pdf_text"
+    )
+
+
+def bounded_native_pair(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    methods = {
+        str(left.get("extraction_method") or ""),
+        str(right.get("extraction_method") or ""),
+    }
+    return methods == {"native_pdf_lines", "native_pdf_lines_strict"}
+
+
 def segmentation_equivalent(left: dict[str, Any], right: dict[str, Any]) -> bool:
     """Recognise one physical table split differently by extraction lanes.
 
@@ -189,7 +204,11 @@ def segmentation_equivalent(left: dict[str, Any], right: dict[str, Any]) -> bool
     nested_overlap = bbox_min_overlap(left.get("bbox"), right.get("bbox"))
     if overlap < 0.70 and nested_overlap < 0.85:
         return False
-    if not (has_rendered_authority(left) or has_rendered_authority(right)):
+    if not (
+        has_rendered_authority(left)
+        or has_rendered_authority(right)
+        or bounded_native_pair(left, right)
+    ):
         return False
     if observation_conflicts(left, right):
         return False
@@ -244,6 +263,21 @@ def merged_table(primary: dict[str, Any], contributors: list[dict[str, Any]]) ->
         "signature": table_signature(output),
     })).hexdigest()[:20]
     output["table_id"] = output["canonical_table_id"]
+    output["physical_table_id"] = "pt-" + hashlib.sha256(canonical_bytes({
+        "surface_id": output["surface_id"],
+        "bbox": [round(float(value), 2) for value in (output.get("bbox") or [])],
+        "signature": table_signature(output),
+    })).hexdigest()[:20]
+    output["authority_role"] = (
+        "rendered_authority"
+        if any(has_rendered_authority(item) for item in contributors)
+        else "native_structured_authority"
+    )
+    output["verification_basis"] = (
+        "two_pass_visual"
+        if any(has_rendered_authority(item) for item in contributors)
+        else "bounded_native_geometry"
+    )
     return output
 
 
@@ -252,6 +286,8 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
     canonical: list[dict[str, Any]] = []
     by_surface: dict[str, list[dict[str, Any]]] = {}
     for table in tables:
+        if is_discovery_only(table):
+            continue
         by_surface.setdefault(str(table.get("surface_id")), []).append(table)
 
     for surface_id in sorted(by_surface):

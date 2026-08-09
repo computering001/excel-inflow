@@ -224,8 +224,15 @@
         },
         "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
         "canonical_table_id": { "type": "string", "minLength": 1 },
+        "physical_table_id": { "type": "string", "minLength": 1 },
         "source_table_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "extraction_methods": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "authority_role": {
+          "enum": ["discovery_only", "bounded_native", "rendered_authority", "native_structured_authority"]
+        },
+        "verification_basis": {
+          "enum": ["two_pass_visual", "bounded_native_geometry", "native_structured_cells"]
+        },
         "discovery_lane": { "type": ["string", "null"] },
         "footnotes": { "type": "array", "items": { "type": "string" } },
         "continuation_of": { "type": ["string", "null"] },

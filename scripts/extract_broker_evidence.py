@@ -239,14 +239,39 @@ def record_inside_any_bbox(record: dict[str, Any], bboxes: list[list[float]]) ->
 
 
 def uncovered_numeric_regions(records: list[dict[str, Any]], bboxes: list[list[float]]) -> list[dict[str, Any]]:
-    """Cluster source numbers not covered by any discovered table rectangle."""
+    """Cluster source numbers not covered by a bounded table rectangle.
+
+    A single narrative sentence often contains two or three numbers.  That is
+    not a missing table.  An uncovered line is material only when it belongs
+    to a nearby multi-line numeric grid with at least two aligned numeric
+    columns.  Broad native-text table candidates are handled separately as
+    discovery hints and cannot turn whole-page prose into a table denominator.
+    """
     uncovered = [record for record in records if not record_inside_any_bbox(record, bboxes)]
     by_line: dict[tuple[int, int], list[dict[str, Any]]] = {}
     for record in uncovered:
         by_line.setdefault((record["block"], record["line"]), []).append(record)
-    regions: list[dict[str, Any]] = []
-    for region_index, ((block, line), items) in enumerate(sorted(by_line.items()), start=1):
+    line_items = []
+    for key, items in by_line.items():
         items.sort(key=lambda item: (item["bbox"][0], item["token_id"]))
+        line_items.append((key, items, sum((item["bbox"][1] + item["bbox"][3]) / 2.0 for item in items) / len(items)))
+
+    def aligned(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> bool:
+        if len(left) < 2 or len(right) < 2:
+            return False
+        left_x = [(item["bbox"][0] + item["bbox"][2]) / 2.0 for item in left]
+        right_x = [(item["bbox"][0] + item["bbox"][2]) / 2.0 for item in right]
+        matches = sum(1 for x in left_x if any(abs(x - other) <= 24.0 for other in right_x))
+        return matches >= 2
+
+    regions: list[dict[str, Any]] = []
+    for region_index, ((block, line), items, y_mid) in enumerate(sorted(line_items), start=1):
+        material = any(
+            other_key != (block, line)
+            and abs(other_y - y_mid) <= 54.0
+            and aligned(items, other_items)
+            for other_key, other_items, other_y in line_items
+        )
         bbox = [
             min(item["bbox"][0] for item in items),
             min(item["bbox"][1] for item in items),
@@ -260,8 +285,8 @@ def uncovered_numeric_regions(records: list[dict[str, Any]], bboxes: list[list[f
             "bbox": bbox,
             "token_ids": [item["token_id"] for item in items],
             "tokens": [item["token"] for item in items],
-            "material": len(items) >= 2,
-            "disposition": "requires_vision" if len(items) >= 2 else "unclassified_singleton",
+            "material": material,
+            "disposition": "requires_vision" if material else "evidence_only_narrative_or_singleton",
         })
     return regions
 
@@ -331,11 +356,10 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         ]
         words_ref = writer.write_json(f"pages/page-{page_index + 1:04d}.words.json", "word_geometry", word_payload)
 
-        # The source denominator is created before any table lane runs.  It is
-        # deliberately the whole page rather than the union of accepted table
-        # rectangles, which was the former self-certifying boundary.
+        # Whole-page records are an immutable discovery census, not the table
+        # denominator.  Narrative, valuation and disclosure prose must remain
+        # available as evidence without being forced into broker table sheets.
         source_numeric_records = word_numeric_records(words)
-        source_table_tokens.extend(record["token"] for record in source_numeric_records)
 
         discovery_specs = [
             ("lines", {}),
@@ -354,13 +378,18 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 lane_summaries.append({"lane_id": lane_id, "status": "error", "candidate_count": 0, "message": str(error)})
 
         table_bboxes: list[list[float]] = []
+        text_discovery_bboxes: list[list[float]] = []
+        lane_tables: dict[str, list[dict[str, Any]]] = {lane_id: [] for lane_id, _ in discovery_specs}
         for table_index, (lane_id, native_table) in enumerate(page_tables, start=1):
             extracted = native_table.extract() or []
             if not extracted:
                 continue
             table_id = f"{surface_id}.{lane_id}-t{table_index}"
             bbox = [float(value) for value in native_table.bbox]
-            table_bboxes.append(bbox)
+            if lane_id == "text":
+                text_discovery_bboxes.append(bbox)
+            else:
+                table_bboxes.append(bbox)
             rows: list[list[dict[str, Any]]] = []
             for row_index, row in enumerate(extracted, start=1):
                 cells: list[dict[str, Any]] = []
@@ -385,11 +414,12 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 "bbox": bbox,
                 "extraction_method": f"native_pdf_{lane_id}",
                 "discovery_lane": lane_id,
+                "authority_role": "discovery_only" if lane_id == "text" else "bounded_native",
                 "confidence": 0.98 if lane_id != "text" else 0.90,
                 "rows": rows,
             }
             tables.append(table)
-            captured_table_tokens.extend(table_tokens(table))
+            lane_tables[lane_id].append(table)
             writer.write_json(f"tables/{safe_id(table_id)}.json", "table_json", table)
 
         uncovered_regions = uncovered_numeric_regions(source_numeric_records, table_bboxes)
@@ -398,6 +428,30 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             record["token"] for record in source_numeric_records
             if record_inside_any_bbox(record, table_bboxes)
         ]
+        source_table_tokens.extend(source_table_numeric_tokens)
+
+        # Select the best bounded native lane only for the provisional capture
+        # ledger.  Alternative lanes are corroboration, never additive owners.
+        bounded_lane_tokens = {
+            lane_id: [token for table in lane_tables[lane_id] for token in table_tokens(table)]
+            for lane_id in ("lines", "lines_strict")
+        }
+        best_native_tokens = min(
+            bounded_lane_tokens.values(),
+            key=lambda tokens: (
+                sum((Counter(source_table_numeric_tokens) - Counter(tokens)).values()),
+                sum((Counter(tokens) - Counter(source_table_numeric_tokens)).values()),
+                -len(tokens),
+            ),
+            default=[],
+        )
+        captured_table_tokens.extend(best_native_tokens)
+        native_table_missing = bool(Counter(source_table_numeric_tokens) - Counter(best_native_tokens))
+
+        def overlaps_bounded(box: list[float]) -> bool:
+            return any(bbox_iou(box, bounded) >= 0.25 for bounded in table_bboxes)
+
+        text_only_discovery = any(not overlaps_bounded(box) for box in text_discovery_bboxes)
         census = {
             "schema_version": "broker-surface-census/1.0",
             "document_id": descriptor["document_id"],
@@ -442,7 +496,12 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         page_numeric_count = len(source_numeric_records)
         sparse = len(text.strip()) < 40
         undetected_numeric_grid = bool(material_uncovered)
-        vision_required = (material_image and (page_numeric_count >= 2 or sparse)) or undetected_numeric_grid
+        vision_required = (
+            (material_image and (page_numeric_count >= 2 or sparse))
+            or undetected_numeric_grid
+            or text_only_discovery
+            or native_table_missing
+        )
         vision_reason = None
         if vision_required:
             unresolved = True
@@ -453,10 +512,14 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 reasons.append("sparse native text")
             if undetected_numeric_grid:
                 reasons.append(f"{len(material_uncovered)} material numeric region(s) outside discovered tables")
+            if text_only_discovery:
+                reasons.append("unruled table candidate discovered only by native text geometry")
+            if native_table_missing:
+                reasons.append("bounded native lane omits source words inside a table region")
             vision_reason = "; ".join(reasons)
 
         artifact_refs = [text_ref, words_ref, census_ref, *image_refs]
-        if vision_required or page_tables:
+        if vision_required or table_bboxes or text_discovery_bboxes:
             matrix = fitz.Matrix(render_dpi / 72.0, render_dpi / 72.0)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
             page_image_ref = writer.write(
@@ -850,8 +913,8 @@ def build_ledger(source_tokens: list[str], captured_tokens: list[str]) -> dict[s
         "missing_tokens": missing,
         "duplicate_tokens": extra,
         "recall": recall,
-        "denominator_scope": "whole_surface",
-        "captured_scope": "discovered_table_cells",
+        "denominator_scope": "physical_table_regions",
+        "captured_scope": "single_best_authority_lane",
     }
 
 
@@ -971,7 +1034,7 @@ def main() -> int:
                 "severity": "warning",
                 "document_id": document["document_id"],
                 "surface_id": None,
-                "message": f"{len(document['numeric_ledger']['missing_tokens'])} whole-surface numeric tokens are outside discovered table cells; their regions remain explicit in the surface census.",
+                "message": f"{len(document['numeric_ledger']['missing_tokens'])} numeric tokens inside bounded physical-table regions are absent from the best native lane; visual verification is required.",
             })
         if document["extraction_status"] == "needs_vision":
             findings.append({

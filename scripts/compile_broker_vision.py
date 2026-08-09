@@ -205,6 +205,7 @@ def accepted_tables(result: dict[str, Any], surface_id: str, source_name: str) -
             }),
             "bbox": raw_table.get("bbox"),
             "extraction_method": "manual_verified" if result.get("pass_index") == "resolution" else "vision_pass_consensus",
+            "authority_role": "rendered_authority",
             "confidence": 1.0,
             "rows": rows,
         })
@@ -242,6 +243,11 @@ def add_vision_tokens(document: dict[str, Any], tables: list[dict[str, Any]], *,
 
 
 def recompute_ledger(document: dict[str, Any]) -> None:
+    document["numeric_ledger"]["source_tokens"] = [
+        token
+        for surface in document.get("surfaces", [])
+        for token in surface.get("source_table_numeric_tokens", [])
+    ]
     document["numeric_ledger"]["captured_tokens"] = table_numeric_tokens(document.get("tables", []))
     source = Counter(document["numeric_ledger"].get("source_tokens", []))
     captured = Counter(document["numeric_ledger"]["captured_tokens"])
@@ -375,22 +381,12 @@ def main() -> int:
                 for value in row
                 if numeric_token(value) is not None
             ]
-            existing_tokens = list(surface.get("source_table_numeric_tokens") or [])
-            # Pass 2 is an independent whole-surface denominator. Native table
-            # tokens already owned by another extraction lane are not counted
-            # twice; only the positive multiset difference is added. This is
-            # what makes a partially captured PDF page lossless without
-            # inflating repeated values that both lanes correctly saw.
-            existing_counts = Counter(existing_tokens)
-            extra_counts = Counter(vision_tokens) - existing_counts
-            independent_tokens = list(extra_counts.elements())
-            if surface.get("kind") == "image_page":
-                combined_tokens = list(vision_tokens)
-                independent_tokens = list(vision_tokens)
-            else:
-                combined_tokens = existing_tokens + independent_tokens
-            surface["source_table_numeric_tokens"] = combined_tokens
-            surface["whole_surface_numeric_token_count"] = len(combined_tokens)
+            # Pass 2 is the independent physical-table denominator whenever
+            # visual certification runs. Native extraction lanes are
+            # alternative observations, never additive ownership universes.
+            independent_tokens = list(vision_tokens)
+            surface["source_table_numeric_tokens"] = list(vision_tokens)
+            surface["whole_surface_numeric_token_count"] = len(vision_tokens)
             surface["vision_source_census"] = {
                 "source": "independent_pass_2",
                 "producer_id": passes[1]["producer_id"],
@@ -398,12 +394,12 @@ def main() -> int:
                 "image_sha256": image_artifact["sha256"],
                 "source_numeric_tokens": list(vision_tokens),
                 "newly_owned_numeric_tokens": list(independent_tokens),
+                "denominator_scope": "physical_tables_only",
             }
             add_vision_tokens(
                 document,
                 new_tables,
-                independent_source_tokens=independent_tokens,
-                replace_source=surface.get("kind") == "image_page",
+                independent_source_tokens=None,
             )
             surface["table_count"] += len(new_tables)
             surface["lane_status"]["vision"] = "complete"
