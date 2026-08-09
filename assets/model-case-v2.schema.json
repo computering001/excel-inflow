@@ -292,6 +292,11 @@
                     "source_location": { "type": "string", "minLength": 1 },
                     "units": { "type": ["string", "null"] },
                     "extraction_method": { "type": "string", "minLength": 1 },
+                    "workbook_presentation": {
+                      "enum": ["analytical_table", "evidence_only"],
+                      "description": "Optional for legacy cases. evidence_only tables remain hash-bound run evidence and are not rendered in the analyst workbook."
+                    },
+                    "workbook_presentation_reason": { "type": "string", "minLength": 1 },
                     "rows": {
                       "type": "array",
                       "minItems": 1,
@@ -428,7 +433,7 @@
           "description": "Opening drawn balance in the matched RCF instrument's native currency. It must equal that instrument's opening_balance before any FX translation."
         },
         "commitment_fee_convention": {
-          "enum": ["none", "bps_on_undrawn"]
+          "enum": ["none", "bps_on_undrawn", "captured_in_residual"]
         },
         "commitment_fee_value": { "type": "number", "minimum": 0 }
       }
@@ -1316,6 +1321,14 @@
           "enum": ["day", "month", "year", "derived", null],
           "description": "Precision actually disclosed for maturity_date. The schedule renders only this much: a day where a filing gives one, a month where only a month is disclosed, a year otherwise. Prevents padding a date to a day nobody sourced."
         },
+        "maturity_source_value": {
+          "type": ["string", "null"],
+          "description": "Source-owned maturity representation before a deterministic model timing convention is applied."
+        },
+        "maturity_timing_convention": {
+          "enum": ["source_exact", "month_end", "year_end", "not_applicable"],
+          "description": "Makes any derived day explicit. Month-only maturities use month_end; year-only maturities use year_end."
+        },
         "maturity_treatment": {
           "enum": ["contractual", "non_maturing_within_forecast"]
         },
@@ -1356,7 +1369,12 @@
           "maxItems": 3,
           "items": { "type": ["string", "null"], "format": "date" }
         },
-        "rate_type": { "enum": ["fixed", "floating", "manual_all_in"] },
+        "rate_type": { "enum": ["fixed", "floating", "manual_all_in", "unpriced"] },
+        "pricing_treatment": {
+          "enum": ["source_terms", "residual_interest_plug"],
+          "description": "unpriced instruments keep their debt/liquidity mechanics while forecast interest is captured by the visible Other / unallocated interest bridge."
+        },
+        "pricing_treatment_reason": { "type": "string", "minLength": 1 },
         "coupon_or_all_in_rate": { "$ref": "#/$defs/series3" },
         "benchmark": { "type": ["string", "null"] },
         "benchmark_rate": { "$ref": "#/$defs/series3" },

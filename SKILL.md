@@ -272,8 +272,11 @@ bind every model-driving instrument term to source cells or a visible reviewed
 supplement. The compiler receipt and independent oracle must both be PASS with
 zero violations. Preserve zero-balance commercial paper and undrawn RCFs, and
 retain issue date, price, YTW and OAS as audit evidence even when they do not
-drive the model. Month, year and bucket maturities remain non-exact; never turn
-them into an invented day to satisfy the compatibility projection.
+drive the model. Month and year maturities remain visibly non-exact while the
+annual model uses a declared month-end or year-end timing convention. The
+projected day is a modelling convention, not source precision; an unresolved
+bucket still blocks. Keep the raw DCS and its ledgers outside the workbook and
+write selected terms as visible blue debt-schedule hardcodes.
 
 The resumable production shell handles all five user-facing stages. Run the
 same command again after supplying answers or after an interruption; it verifies
@@ -330,7 +333,7 @@ Optional sourced forecast ending balances corroborate this formula path; they
 never replace it, and any divergence blocks. Maturity roll and refinancing
 intent remain economically distinct.
 
-Calculate fixed and floating interest from average balances, with explicit period fractions for material mid-year maturity or closing timing. Floating rates equal the relevant curve plus margin. RCF interest uses average drawn balance. Commitment fee uses average undrawn committed capacity and its own fee rate, not the RCF margin. Other interest must be a visible, documented plug if used. Forecast **interest income** from average eligible cash and a visible yield; never hold it flat by default.
+Calculate fixed and floating interest from average balances, with explicit period fractions for material mid-year maturity or closing timing. Floating rates equal the relevant curve plus margin. RCF interest uses average drawn balance. Commitment fee uses average undrawn committed capacity and its own fee rate, not the RCF margin. Other interest must be a visible, documented plug if used. Forecast **interest income** from average eligible cash and a visible yield; never hold it flat by default. When reliable instrument or RCF pricing is unavailable, retain its debt and liquidity mechanics, classify it `unpriced`, leave the rate cells intentionally blank and capture only the residual required to reconcile the selected total-interest authority through `Other / unallocated interest`; never create a sourced 0% rate.
 
 Resolve cash by semantic basis, not by one overloaded number. Cash-flow rows use
 the buckets marked as cash-flow cash, the RCF waterfall uses only the balancing

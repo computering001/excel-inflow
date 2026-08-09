@@ -135,6 +135,15 @@ interest-schedule output is a formula. Never carry the historical residual
 forward merely because it reconciled history, never bury the forecast plug in
 instrument rows, and never hardcode a forecast interest subtotal.
 
+An instrument whose DCS balance and maturity are reliable but whose pricing is
+not must remain in the debt and liquidity schedules with
+`pricing_treatment=residual_interest_plug`. Its individual rate cells are blank
+and intentionally uncalculated, its individual calculated interest is zero, and
+the missing cost is captured only by the bridge to the selected forecast
+total-interest authority. `rate_type=unpriced` describes missing evidence; it is
+not a 0% economic assumption. Apply the same treatment to an unavailable RCF
+margin or commitment fee while retaining committed capacity and drawn balance.
+
 Allow a simple flat non-cash-interest assumption when detail is limited. Do not build a detailed issuance-cost roll-forward unless scope is expanded.
 
 ```text

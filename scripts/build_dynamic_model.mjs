@@ -392,6 +392,7 @@ const RATE_TYPE_LABEL = {
   fixed: "FIXED",
   floating: "FLOATING",
   manual_all_in: "ALL-IN",
+  unpriced: "PLUG",
 };
 const rateTypeLabel = (rateType) =>
   RATE_TYPE_LABEL[String(rateType)] ?? String(rateType).toUpperCase();
@@ -1390,7 +1391,10 @@ function compileBrokerEvidenceLayout(modelCase) {
     const name = brokerEvidenceSheetName(houseIndex, house.house_name, usedNames);
     houseByName.set(house.house_name, house);
     let row = 4;
-    const tableLayouts = (house.tables ?? []).map((table) => {
+    const presentationTables = (house.tables ?? []).filter(
+      (table) => table.workbook_presentation !== "evidence_only",
+    );
+    const tableLayouts = presentationTables.map((table) => {
       const metaRow = row;
       const dataStartRow = metaRow + 1;
       const maxColumns = Math.max(1, ...(table.rows ?? []).map((values) => values.length));
@@ -1549,8 +1553,13 @@ function buildBrokerEvidenceSheets(workbook, layout) {
           if (sourceRow === 0) {
             sheet.getRange(address).format.fill = COLORS.subsection;
             styleFont(sheet, address, COLORS.black, { bold: true });
-          } else if (value !== null && value !== undefined && value !== "") {
+          } else if (
+            typeof value === "number" &&
+            Number.isFinite(value)
+          ) {
             styleInput(sheet, address);
+          } else if (value !== null && value !== undefined && value !== "") {
+            styleFont(sheet, address, COLORS.black);
           }
         }
       }
@@ -2093,6 +2102,7 @@ function rateFormula(
   curveKey = null,
   visibleFloorCell = null,
 ) {
+  if (instrument.rate_type === "unpriced") return "0";
   if (instrument.rate_type === "manual_all_in") {
     const row = curveRows.manualRates?.[instrument.instrument_id];
     if (row) {
@@ -6294,18 +6304,27 @@ function configureOperatingModel(
     setValue(
       sheet,
       `D${plan.interest_row}`,
-      instrument.rate_type === "floating"
+      instrument.rate_type === "unpriced"
+        ? null
+        : instrument.rate_type === "floating"
         ? Number(instrument.spread_bps ?? 0) / 10000
         : Number(instrument.coupon_or_all_in_rate?.[0] ?? 0),
     );
     setValue(
       sheet,
       `E${plan.interest_row}`,
-      instrument.rate_type === "floating"
+      instrument.rate_type === "unpriced"
+        ? null
+        : instrument.rate_type === "floating"
         ? (curveLabelForInstrument(instrument) ?? null)
         : null,
     );
-    styleInput(sheet, `C${plan.interest_row}:E${plan.interest_row}`);
+    if (instrument.rate_type === "unpriced") {
+      styleFont(sheet, `C${plan.interest_row}`, COLORS.black);
+      sheet.getRange(`D${plan.interest_row}:E${plan.interest_row}`).format.fill = COLORS.grey;
+    } else {
+      styleInput(sheet, `C${plan.interest_row}:E${plan.interest_row}`);
+    }
     // Column D is a coupon on a fixed instrument and a spread on a floating
     // one, so it takes the format of whichever it is holding. One shared rate
     // format could only be right about one of them.
@@ -6659,6 +6678,8 @@ function configureOperatingModel(
     modelCase.rcf_policy.commitment_fee_convention === "bps_on_undrawn"
       ? Number(modelCase.rcf_policy.commitment_fee_value ?? 0) / 10000
       : 0;
+  const commitmentFeeCapturedInResidual =
+    modelCase.rcf_policy.commitment_fee_convention === "captured_in_residual";
   // The revolver now states its own terms here, on the two rows that carry its
   // cost, under the same three column headings as every instrument above:
   // rate type, coupon / spread, benchmark.
@@ -6671,21 +6692,30 @@ function configureOperatingModel(
     setValue(
       sheet,
       `D${interestRows.rcf_interest}`,
-      rcfInstrument.rate_type === "floating"
+      rcfInstrument.rate_type === "unpriced"
+        ? null
+        : rcfInstrument.rate_type === "floating"
         ? Number(rcfInstrument.spread_bps ?? 0) / 10000
         : Number(rcfInstrument.coupon_or_all_in_rate?.[0] ?? 0),
     );
     setValue(
       sheet,
       `E${interestRows.rcf_interest}`,
-      rcfInstrument.rate_type === "floating"
+      rcfInstrument.rate_type === "unpriced"
+        ? null
+        : rcfInstrument.rate_type === "floating"
         ? (curveLabelForInstrument(rcfInstrument) ?? null)
         : null,
     );
-    styleInput(
-      sheet,
-      `C${interestRows.rcf_interest}:E${interestRows.rcf_interest}`,
-    );
+    if (rcfInstrument.rate_type === "unpriced") {
+      styleFont(sheet, `C${interestRows.rcf_interest}`, COLORS.black);
+      sheet.getRange(`D${interestRows.rcf_interest}:E${interestRows.rcf_interest}`).format.fill = COLORS.grey;
+    } else {
+      styleInput(
+        sheet,
+        `C${interestRows.rcf_interest}:E${interestRows.rcf_interest}`,
+      );
+    }
     sheet.getRange(`D${interestRows.rcf_interest}`).format.numberFormat =
       rcfInstrument.rate_type === "floating" ? BENCHMARK : COUPON;
   }
@@ -6697,18 +6727,23 @@ function configureOperatingModel(
   setValue(
     sheet,
     `C${interestRows.rcf_commitment_fee}`,
-    COMMITMENT_FEE_BASIS_LABEL,
+    commitmentFeeCapturedInResidual ? RATE_TYPE_LABEL.unpriced : COMMITMENT_FEE_BASIS_LABEL,
   );
   setValue(
     sheet,
     `D${interestRows.rcf_commitment_fee}`,
-    visibleCommitmentFeeRate,
+    commitmentFeeCapturedInResidual ? null : visibleCommitmentFeeRate,
   );
   setValue(sheet, `E${interestRows.rcf_commitment_fee}`, null);
-  styleInput(
-    sheet,
-    `D${interestRows.rcf_commitment_fee}`,
-  );
+  if (commitmentFeeCapturedInResidual) {
+    styleFont(sheet, `C${interestRows.rcf_commitment_fee}`, COLORS.black);
+    sheet.getRange(`D${interestRows.rcf_commitment_fee}:E${interestRows.rcf_commitment_fee}`).format.fill = COLORS.grey;
+  } else {
+    styleInput(
+      sheet,
+      `D${interestRows.rcf_commitment_fee}`,
+    );
+  }
   // A commitment fee is quoted in basis points over the undrawn balance, the
   // same way a margin is. It belongs on the spread rung, not the coupon rung.
   sheet.getRange(`D${interestRows.rcf_commitment_fee}`).format.numberFormat =

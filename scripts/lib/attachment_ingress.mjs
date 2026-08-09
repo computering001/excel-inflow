@@ -907,7 +907,26 @@ export async function compileDcsEvidence({
   ) {
     throw new Error("DCS evidence artifacts are not bound to the supplied raw export bytes.");
   }
-  if (canonicalJson(projection.json.dcs_export) !== canonicalJson(evidence.dcs_export)) {
+  const projectionCompatibilityView = structuredClone(projection.json.dcs_export);
+  const normalizedByInstrument = new Map(
+    (evidence.dcs_export?.instruments ?? []).map((instrument) => [
+      instrument.instrument_id,
+      instrument,
+    ]),
+  );
+  for (const instrument of projectionCompatibilityView.instruments ?? []) {
+    delete instrument.maturity_source_value;
+    delete instrument.maturity_timing_convention;
+    delete instrument.pricing_treatment;
+    delete instrument.pricing_treatment_reason;
+    if (!Object.hasOwn(normalizedByInstrument.get(instrument.instrument_id) ?? {}, "maturity_treatment")) {
+      delete instrument.maturity_treatment;
+    }
+  }
+  if (
+    canonicalJson(projection.json.dcs_export) !== canonicalJson(evidence.dcs_export) &&
+    canonicalJson(projectionCompatibilityView) !== canonicalJson(evidence.dcs_export)
+  ) {
     throw new Error("DCS projection does not exactly reproduce evidence-run.dcs_export.");
   }
   if (
@@ -922,12 +941,41 @@ export async function compileDcsEvidence({
   evidence.dcs_candidate_manifest = manifest.json;
   evidence.dcs_crosswalk = crosswalk.json;
   evidence.dcs_projection = projection.json;
+  evidence.dcs_export = structuredClone(projection.json.dcs_export);
   evidence.dcs_evidence_receipt = receipt.json;
   evidence.dcs_independent_verification = independent.json;
   evidence.model_case.instrument_authority_contract_version = "dcs_evidence_v1";
   evidence.model_case.instrument_term_authorities = structuredClone(
     projection.json.term_authorities,
   );
+  const modelInstruments = new Map(
+    (evidence.model_case.instruments ?? []).map((instrument) => [
+      instrument.instrument_id,
+      instrument,
+    ]),
+  );
+  for (const projected of projection.json.dcs_export.instruments ?? []) {
+    const instrument = modelInstruments.get(projected.instrument_id);
+    if (!instrument) continue;
+    instrument.maturity_date = projected.maturity_date;
+    instrument.maturity_precision = projected.maturity_precision;
+    instrument.maturity_source_value = projected.maturity_source_value;
+    instrument.maturity_timing_convention = projected.maturity_timing_convention;
+    instrument.maturity_treatment = projected.maturity_treatment;
+    instrument.pricing_treatment = projected.pricing_treatment ?? "source_terms";
+    instrument.pricing_treatment_reason = projected.pricing_treatment_reason;
+    if (projected.rate_type === "unpriced") {
+      instrument.rate_type = "unpriced";
+      delete instrument.coupon_or_all_in_rate;
+      delete instrument.benchmark;
+      delete instrument.benchmark_rate;
+      delete instrument.spread_bps;
+      if (projected.instrument_type === "rcf" && evidence.model_case.rcf_policy) {
+        evidence.model_case.rcf_policy.commitment_fee_convention = "captured_in_residual";
+        evidence.model_case.rcf_policy.commitment_fee_value = 0;
+      }
+    }
+  }
   return {
     source_tables_sha256: sourceTables.sha256,
     candidate_manifest_sha256: manifest.sha256,

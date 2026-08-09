@@ -564,6 +564,26 @@ function auditInstrument(row, index, exp, expected, findings) {
   }
 
   // --- rate ----------------------------------------------------------------
+  if (row?.rate_type === "unpriced") {
+    const validTreatment =
+      row.pricing_treatment === "residual_interest_plug" &&
+      String(row.pricing_treatment_reason ?? "").trim();
+    findings.push(
+      finding(
+        validTreatment
+          ? "instrument_pricing_captured_by_residual"
+          : "instrument_unpriced_without_treatment",
+        validTreatment ? SEVERITY.INFO : SEVERITY.ERROR,
+        validTreatment ? "complete" : "incomplete",
+        validTreatment ? REMEDY.PROCEED_WITH_NOTE : REMEDY.RE_SUPPLY,
+        `${where}.pricing_treatment`,
+        validTreatment
+          ? `${label} has no sourced instrument pricing. It remains in debt and liquidity, while forecast interest is captured through the visible Other / unallocated interest bridge.`
+          : `${label} is unpriced but has no declared residual-interest treatment and reason.`,
+        { instrument_id: row?.instrument_id },
+      ),
+    );
+  }
   if (row?.rate_type === "fixed" && !has("coupon_rate")) {
     findings.push(
       finding(

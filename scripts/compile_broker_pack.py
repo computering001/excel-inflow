@@ -944,6 +944,15 @@ def main() -> int:
         candidate_manifest=candidate_manifest,
         semantic_violation_count=int((semantic_report or {}).get("total_violation_count", 0)),
     )
+    review_by_table = {
+        review["table_id"]: review
+        for review in crosswalk["table_reviews"]
+    }
+    mapped_table_ids = {
+        component["table_id"]
+        for mapping in mapping_receipts
+        for component in mapping["components"]
+    }
 
     source_label = crosswalk.get("source_label") or (
         f"{len(documents_by_house)}-house broker pack extracted and cell-crosswalked from hash-bound source documents"
@@ -1013,6 +1022,18 @@ def main() -> int:
                         "source_location": table["source_location"],
                         "units": table.get("units"),
                         "extraction_method": table["extraction_method"],
+                        "workbook_presentation": (
+                            "analytical_table"
+                            if review_by_table[table["table_id"]]["classification"] != "non_forecast"
+                            or table["table_id"] in mapped_table_ids
+                            else "evidence_only"
+                        ),
+                        "workbook_presentation_reason": (
+                            "Reviewed analytical/financial table retained on the values-only broker evidence sheet."
+                            if review_by_table[table["table_id"]]["classification"] != "non_forecast"
+                            or table["table_id"] in mapped_table_ids
+                            else "Reviewed non-forecast legal, disclosure or narrative table retained in the run evidence but omitted from the analyst workbook."
+                        ),
                         "rows": scalar_rows(table),
                     }
                     for table in document["tables"]

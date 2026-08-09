@@ -1094,12 +1094,25 @@ function instrumentChecks(modelCase) {
         ),
       );
     }
-    if (!["fixed", "floating", "manual_all_in"].includes(instrument.rate_type)) {
+    if (!["fixed", "floating", "manual_all_in", "unpriced"].includes(instrument.rate_type)) {
       checks.push(
         result(
           `instrument.${id}.rate_type`,
           "BLOCK",
           `${id} has no valid rate type.`,
+        ),
+      );
+    }
+    if (
+      instrument.rate_type === "unpriced" &&
+      (instrument.pricing_treatment !== "residual_interest_plug" ||
+        !String(instrument.pricing_treatment_reason ?? "").trim())
+    ) {
+      checks.push(
+        result(
+          `instrument.${id}.pricing_treatment`,
+          "BLOCK",
+          `${id} is unpriced but lacks the visible residual-interest-plug treatment and reason.`,
         ),
       );
     }
@@ -1204,7 +1217,7 @@ function instrumentChecks(modelCase) {
       }
     }
     if (
-      instrument.rate_type !== "floating" &&
+      ["fixed", "manual_all_in"].includes(instrument.rate_type) &&
       !series(instrument.coupon_or_all_in_rate, 3)
     ) {
       checks.push(
@@ -1284,7 +1297,7 @@ function instrumentChecks(modelCase) {
           ),
         );
       } else if (
-        modelCase.rcf_policy.commitment_fee_convention !== "none" &&
+        modelCase.rcf_policy.commitment_fee_convention === "bps_on_undrawn" &&
         !(Number(modelCase.rcf_policy.commitment_fee_value) > 0)
       ) {
         checks.push(
@@ -1292,6 +1305,17 @@ function instrumentChecks(modelCase) {
             `instrument.${id}.commitment_fee_basis`,
             "BLOCK",
             `${id} declares a charged commitment-fee convention but a zero fee. Use convention "none" for a sourced no-fee facility, or supply a positive sourced fee.`,
+          ),
+        );
+      } else if (
+        modelCase.rcf_policy.commitment_fee_convention === "captured_in_residual" &&
+        instrument.rate_type !== "unpriced"
+      ) {
+        checks.push(
+          result(
+            `instrument.${id}.commitment_fee_residual_basis`,
+            "BLOCK",
+            `${id} may capture its commitment fee in the residual bridge only when the facility is explicitly unpriced.`,
           ),
         );
       }

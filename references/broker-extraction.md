@@ -205,9 +205,15 @@ Forward Curves
 ```
 
 `> Brokers` is a lightweight divider. Each `B01`-`B10` sheet presents the
-house's extracted tables in clean blocks with title, source location, units,
-publication date, filename and source hash. It contains values only and must not
-be an economic calculation surface.
+house's analytical and financial tables in clean vertical blocks with title,
+source location, units, publication date, filename and source hash. Preserve
+source row and column order, use two blank rows between blocks, keep numeric
+values as blue hardcodes and labels as black text, and never place tables side
+by side. It contains values only and must not be an economic calculation
+surface. Legal boilerplate, third-party disclosure tables and narrative-only
+material remain losslessly preserved in the run artifact with
+`workbook_presentation=evidence_only` but are not rendered in the analyst
+workbook. Every table used by a model mapping must be rendered.
 
 The main `Brokers` sheet links mapped house estimates to those evidence cells.
 The Operating Model continues to link only to `Brokers`; it must never reference

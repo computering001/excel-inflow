@@ -202,6 +202,14 @@
           "enum": ["day", "month", "year", "derived", null],
           "description": "How precisely maturity was actually disclosed. The schedule renders only this much, so that a date nobody sourced is never padded to a day. Absent is treated as 'day' when a full date is present, and that treatment is printed as a stated assumption."
         },
+        "maturity_source_value": {
+          "type": ["string", "null"],
+          "description": "The source-owned maturity representation before any deterministic timing convention, such as 2028-04 for month precision."
+        },
+        "maturity_timing_convention": {
+          "enum": ["source_exact", "month_end", "year_end", "not_applicable"],
+          "description": "States whether maturity_date is source exact or a visible deterministic annual-model timing convention."
+        },
         "maturity_treatment": {
           "enum": ["contractual", "non_maturing_within_forecast"],
           "description": "Required when maturity_date is null."
@@ -243,9 +251,14 @@
           }
         },
         "rate_type": {
-          "enum": ["fixed", "floating", "manual_all_in"],
+          "enum": ["fixed", "floating", "manual_all_in", "unpriced"],
           "description": "Mirrors model-case-v2 instrument.rate_type. Drives which rate fields are required: fixed needs coupon_rate; floating needs reference_rate and margin_bps; manual_all_in needs all_in_rate."
         },
+        "pricing_treatment": {
+          "enum": ["source_terms", "residual_interest_plug"],
+          "description": "unpriced instruments remain in debt and liquidity but their interest is captured only through the visible residual-interest bridge."
+        },
+        "pricing_treatment_reason": { "type": "string", "minLength": 1 },
         "coupon_rate": {
           "type": ["number", "null"],
           "description": "Decimal, not percent: 0.04 for a 4.0% coupon. Required when rate_type is 'fixed'. Percent-vs-decimal is the second-commonest scale error after thousands-vs-millions, so the unit is fixed by the contract rather than sniffed."

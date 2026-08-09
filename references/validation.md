@@ -677,6 +677,12 @@ Confirm:
   `Operating Model`, `Brokers` and `Forward Curves`; an optional `> Brokers` /
   `B01`-`B10` evidence group is permitted only when hash-bound, values-only and
   fully crosswalked through `Brokers`;
+- broker evidence tabs contain only tables declared for workbook presentation,
+  stacked vertically with two blank rows between blocks; evidence-only legal or
+  disclosure tables remain outside the workbook;
+- no raw FactSet/DCS evidence sheet is present; selected DCS terms appear as
+  blue hardcodes in the debt schedule and are checked against the external
+  lossless receipt;
 - **no hidden rows on the `Operating Model` and no content below the last
   visible row.** There is no hidden support block; every mechanical row is on
   the face of the schedule it belongs to. `hidden-mechanics` asserts both halves;
@@ -800,6 +806,8 @@ Cash roll-forward failure or an out-of-bounds RCF is critical.
 Confirm:
 
 - fixed and floating interest follow applicable balances and rates;
+- an unpriced instrument has blank individual rate cells, a declared
+  `residual_interest_plug` treatment and no synthetic 0% source term;
 - maturity timing and the acquisition close-month fraction are reflected when
   applicable;
 - the acquisition leg is priced on the average of its opening and closing

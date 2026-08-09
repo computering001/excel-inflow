@@ -121,8 +121,8 @@ def economic_observations(table: dict[str, Any]) -> dict[tuple[str, str], list[s
     """Return row/period/value observations independent of PDF cell geometry.
 
     Native PDF lanes often split one visible row into several cells while the
-    rendered-image lane emits the same row as one matrix. Cell coordinates are
-    therefore evidence provenance, not economic identity. The comparison key
+    rendered-image lane emits the same row as one matrix.  Cell coordinates are
+    therefore evidence provenance, not economic identity.  The comparison key
     is the visible row label plus visible period header; when a source has no
     period header the numeric ordinal is used only within that labelled row.
     """

@@ -1142,7 +1142,14 @@ export function validateCaseShape(modelCase) {
     if (!/^[A-Z]{3}$/.test(instrument.currency ?? "")) errors.push(`Instrument ${instrument.instrument_id ?? "[unknown]"} needs a three-letter currency.`);
     if (!Number.isFinite(Number(instrument.opening_balance)) || Number(instrument.opening_balance) < 0) errors.push(`Instrument ${instrument.instrument_id ?? "[unknown]"} has an invalid opening_balance.`);
     if (!Number.isInteger(instrument.display_order)) errors.push(`Instrument ${instrument.instrument_id ?? "[unknown]"} needs an integer display_order.`);
-    if (!["fixed", "floating", "manual_all_in"].includes(instrument.rate_type)) errors.push(`Instrument ${instrument.instrument_id ?? "[unknown]"} has an invalid rate_type.`);
+    if (!["fixed", "floating", "manual_all_in", "unpriced"].includes(instrument.rate_type)) errors.push(`Instrument ${instrument.instrument_id ?? "[unknown]"} has an invalid rate_type.`);
+    if (
+      instrument.rate_type === "unpriced" &&
+      (instrument.pricing_treatment !== "residual_interest_plug" ||
+        !String(instrument.pricing_treatment_reason ?? "").trim())
+    ) {
+      errors.push(`Unpriced instrument ${instrument.instrument_id} needs a residual-interest-plug treatment and reason.`);
+    }
     if (
       (!instrument.maturity_date ||
         Number.isNaN(new Date(instrument.maturity_date).getTime())) &&
@@ -1220,7 +1227,10 @@ export function validateCaseShape(modelCase) {
         }
       }
     }
-    if (instrument.rate_type !== "floating" && !isSeries3(instrument.coupon_or_all_in_rate)) errors.push(`Instrument ${instrument.instrument_id} needs three coupon/all-in rates.`);
+    if (
+      ["fixed", "manual_all_in"].includes(instrument.rate_type) &&
+      !isSeries3(instrument.coupon_or_all_in_rate)
+    ) errors.push(`Instrument ${instrument.instrument_id} needs three coupon/all-in rates.`);
     if (instrument.new_issuance !== undefined && !isSeries3(instrument.new_issuance)) errors.push(`Instrument ${instrument.instrument_id} new_issuance must contain three values.`);
     if (
       instrument.forecast_ending_balances !== undefined &&

@@ -1251,7 +1251,9 @@ function validateDcsEvidence(run, findings) {
     if (field === "description") return instrument.name;
     if (field === "instrument_type") return instrument.class;
     if (field === "outstanding_amount") return instrument.opening_balance;
-    if (field === "maturity") return instrument.maturity_date ?? null;
+    if (field === "maturity") {
+      return instrument.maturity_source_value ?? instrument.maturity_date ?? null;
+    }
     if (field === "coupon_rate" || field === "all_in_rate") {
       return instrument.coupon_or_all_in_rate;
     }
@@ -1279,8 +1281,8 @@ function validateDcsEvidence(run, findings) {
       "currency",
       "balance_basis",
       "outstanding_amount",
-      "rate_type",
       "maturity",
+      ...(exported.rate_type === "unpriced" ? [] : ["rate_type"]),
       ...(exported.rate_type === "fixed" ? ["coupon_rate"] : []),
       ...(exported.rate_type === "floating"
         ? ["reference_rate", "margin_bps"]
@@ -1291,8 +1293,9 @@ function validateDcsEvidence(run, findings) {
             "facility_limit",
             "drawn_amount",
             "committed",
-            "commitment_fee_convention",
-            "commitment_fee_value",
+            ...(exported.pricing_treatment === "residual_interest_plug"
+              ? []
+              : ["commitment_fee_convention", "commitment_fee_value"]),
           ]
         : []),
       ...[
@@ -1318,7 +1321,7 @@ function validateDcsEvidence(run, findings) {
         continue;
       }
       const expected = field === "maturity"
-        ? exported.maturity_date ?? null
+        ? exported.maturity_source_value ?? exported.maturity_date ?? null
         : field === "balance_basis"
           ? instrument.balance_basis
           : Object.hasOwn(exported, field)
@@ -1386,6 +1389,27 @@ function validateDcsEvidence(run, findings) {
             "evidence.dcs.authority_case_mismatch",
             "BLOCK",
             `${exported.instrument_id}.${field} does not flow unchanged into the model-driving case field.`,
+          ),
+        );
+      }
+    }
+    const inferredTimingConvention =
+      instrument.maturity_timing_convention ??
+      (instrument.maturity_precision === "day" ? "source_exact" : null);
+    for (const [field, actual, expected] of [
+      ["maturity_date", instrument.maturity_date ?? null, exported.maturity_date ?? null],
+      ["maturity_precision", instrument.maturity_precision ?? null, exported.maturity_precision ?? null],
+      ["maturity_source_value", instrument.maturity_source_value ?? instrument.maturity_date ?? null, exported.maturity_source_value ?? exported.maturity_date ?? null],
+      ["maturity_timing_convention", inferredTimingConvention, exported.maturity_timing_convention ?? (exported.maturity_precision === "day" ? "source_exact" : null)],
+      ["pricing_treatment", instrument.pricing_treatment ?? "source_terms", exported.pricing_treatment ?? "source_terms"],
+      ["pricing_treatment_reason", instrument.pricing_treatment_reason ?? null, exported.pricing_treatment_reason ?? null],
+    ]) {
+      if (!matches(actual, expected)) {
+        findings.push(
+          finding(
+            "evidence.dcs.maturity_case_mismatch",
+            "BLOCK",
+            `${exported.instrument_id}.${field} does not preserve the DCS maturity precision and timing convention.`,
           ),
         );
       }

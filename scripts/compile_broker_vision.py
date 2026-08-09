@@ -382,8 +382,9 @@ def main() -> int:
                 if numeric_token(value) is not None
             ]
             # Pass 2 is the independent physical-table denominator whenever
-            # visual certification runs. Native extraction lanes are
-            # alternative observations, never additive ownership universes.
+            # visual certification runs.  Native text, strict-native and
+            # rendered lanes are alternative observations of the same visible
+            # tables, never additive ownership universes.
             independent_tokens = list(vision_tokens)
             surface["source_table_numeric_tokens"] = list(vision_tokens)
             surface["whole_surface_numeric_token_count"] = len(vision_tokens)

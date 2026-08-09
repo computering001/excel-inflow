@@ -143,7 +143,7 @@ export function instrumentDisplayLabel(instrument, reportingCurrency = null) {
   // replay depends on byte-stable labels); only a token proved wrong by
   // the audited fields is replaced.
   const structuredPercent =
-    instrument?.rate_type === "floating"
+    ["floating", "unpriced"].includes(instrument?.rate_type)
       ? null
       : Number(instrument?.coupon_or_all_in_rate?.[0]) * 100;
   if (
@@ -189,7 +189,10 @@ export function instrumentDisplayLabel(instrument, reportingCurrency = null) {
   const parts = [name];
   const hasRate = RATE_TOKEN.test(name) || /\d\s*bps/i.test(name);
   if (!hasRate) {
-    if (instrument?.rate_type === "floating" && instrument?.benchmark) {
+    if (instrument?.rate_type === "unpriced") {
+      // Pricing is deliberately absent and captured by the visible residual
+      // interest bridge; never manufacture a 0% token in the instrument name.
+    } else if (instrument?.rate_type === "floating" && instrument?.benchmark) {
       const spread = Number(instrument.spread_bps ?? 0);
       parts.push(
         spread

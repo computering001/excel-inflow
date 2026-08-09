@@ -10,6 +10,7 @@ findings before deciding PASS/BLOCKED.
 from __future__ import annotations
 
 import argparse
+import calendar
 import datetime as dt
 import hashlib
 import json
@@ -24,9 +25,11 @@ MODEL_INSTRUMENT_DISPOSITIONS = {"model_input", "derived_model_input"}
 PRECISIONS = {"exact", "month", "year", "bucket", "non_maturing"}
 EXPORT_FIELDS = {
     "instrument_id", "source_row", "description", "display_group", "instrument_type", "currency",
-    "outstanding_amount", "maturity_date", "maturity_precision", "maturity_treatment", "next_call_date",
+    "outstanding_amount", "maturity_date", "maturity_precision", "maturity_treatment",
+    "maturity_source_value", "maturity_timing_convention", "next_call_date",
     "refinancing_intent", "is_backstop_for_paper", "benchmark_curve", "rate_type", "coupon_rate",
-    "reference_rate", "margin_bps", "all_in_rate", "committed", "facility_limit", "drawn_amount",
+    "reference_rate", "margin_bps", "all_in_rate", "pricing_treatment", "pricing_treatment_reason",
+    "committed", "facility_limit", "drawn_amount",
     "undrawn_amount", "accrued_interest", "interest_settlement", "debt_classification",
     "amortisation_schedule", "issuing_entity", "security", "notes",
 }
@@ -160,6 +163,53 @@ def valid_date(value: Any) -> bool:
         return False
 
 
+def projected_maturity(authority: dict[str, Any]) -> dict[str, Any] | None:
+    """Translate disclosed maturity precision into an explicit model convention.
+
+    The authority continues to carry the source-owned value (for example
+    ``2028-04``).  The compatibility projection may carry a full date only when
+    it also states that the day is a deterministic timing convention rather
+    than source evidence.
+    """
+    precision = authority.get("precision")
+    value = authority.get("output_value")
+    if precision == "exact" and valid_date(value):
+        return {
+            "maturity_date": value,
+            "maturity_precision": "day",
+            "maturity_source_value": value,
+            "maturity_timing_convention": "source_exact",
+            "maturity_treatment": "contractual",
+        }
+    if precision == "month" and isinstance(value, str) and re.fullmatch(r"\d{4}-(?:0[1-9]|1[0-2])", value):
+        year, month = map(int, value.split("-"))
+        day = calendar.monthrange(year, month)[1]
+        return {
+            "maturity_date": f"{year:04d}-{month:02d}-{day:02d}",
+            "maturity_precision": "month",
+            "maturity_source_value": value,
+            "maturity_timing_convention": "month_end",
+            "maturity_treatment": "contractual",
+        }
+    if precision == "year" and isinstance(value, str) and re.fullmatch(r"\d{4}", value):
+        return {
+            "maturity_date": f"{int(value):04d}-12-31",
+            "maturity_precision": "year",
+            "maturity_source_value": value,
+            "maturity_timing_convention": "year_end",
+            "maturity_treatment": "contractual",
+        }
+    if precision == "non_maturing" and value is None:
+        return {
+            "maturity_date": None,
+            "maturity_precision": None,
+            "maturity_source_value": None,
+            "maturity_timing_convention": "not_applicable",
+            "maturity_treatment": "non_maturing_within_forecast",
+        }
+    return None
+
+
 def cell_index(source: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {cell["cell_id"]: cell for sheet in source.get("sheets", []) for row in sheet.get("rows", []) for cell in row.get("cells", [])}
 
@@ -241,17 +291,21 @@ def validate_dispositions(manifest: dict[str, Any], crosswalk: dict[str, Any], f
                     findings.append(finding("DCS-DUPLICATE-TARGET", "%s %r has invalid duplicate target %r" % (category, item.get(id_key), target)))
 
 
-def required_fields(instrument: dict[str, Any]) -> list[str]:
-    fields = ["description", "instrument_type", "currency", "balance_basis", "outstanding_amount", "rate_type", "maturity"]
+def required_fields(instrument: dict[str, Any], pricing_treatment: str) -> list[str]:
+    fields = ["description", "instrument_type", "currency", "balance_basis", "outstanding_amount", "maturity"]
     rate_type = instrument.get("rate_type")
-    if rate_type == "fixed":
-        fields.append("coupon_rate")
-    elif rate_type == "floating":
-        fields += ["reference_rate", "margin_bps"]
-    elif rate_type == "manual_all_in":
-        fields.append("all_in_rate")
+    if pricing_treatment == "source_terms":
+        fields.append("rate_type")
+        if rate_type == "fixed":
+            fields.append("coupon_rate")
+        elif rate_type == "floating":
+            fields += ["reference_rate", "margin_bps"]
+        elif rate_type == "manual_all_in":
+            fields.append("all_in_rate")
     if instrument.get("instrument_type") == "rcf":
-        fields += ["facility_limit", "drawn_amount", "committed", "commitment_fee_convention", "commitment_fee_value"]
+        fields += ["facility_limit", "drawn_amount", "committed"]
+        if pricing_treatment == "source_terms":
+            fields += ["commitment_fee_convention", "commitment_fee_value"]
     if instrument.get("balance_basis") == "native_principal" and instrument.get("currency") != instrument.get("reporting_currency"):
         fields += ["native_principal", "fx_rate"]
     return fields
@@ -346,6 +400,12 @@ def main() -> int:
                 findings.append(finding("DCS-INSTRUMENT-DUPLICATE-ID", "instrument_id %s is duplicated" % instrument_id))
             seen_instrument_ids.add(instrument_id)
         field_values: dict[str, Any] = {"instrument_id": instrument_id, "reporting_currency": reporting_currency}
+        pricing_treatment = candidate.get("pricing_treatment", "source_terms")
+        pricing_treatment_reason = str(candidate.get("pricing_treatment_reason") or "").strip()
+        if pricing_treatment not in {"source_terms", "residual_interest_plug"}:
+            findings.append(finding("DCS-PRICING-TREATMENT", "%s has invalid pricing treatment %r" % (instrument_id, pricing_treatment)))
+        if pricing_treatment == "residual_interest_plug" and not pricing_treatment_reason:
+            findings.append(finding("DCS-PRICING-TREATMENT-REASON", "%s uses the residual interest plug without a reason" % instrument_id))
         instrument_authorities: list[dict[str, Any]] = []
         seen_fields: set[str] = set()
         for auth_index, authority in enumerate(candidate.get("term_authorities", [])):
@@ -411,7 +471,7 @@ def main() -> int:
             continue
         if disposition not in MODEL_INSTRUMENT_DISPOSITIONS:
             continue
-        for field in required_fields(field_values):
+        for field in required_fields(field_values, pricing_treatment):
             if field == "maturity":
                 if field not in field_values:
                     findings.append(finding("DCS-REQUIRED-TERM", "%s is missing required maturity evidence" % instrument_id))
@@ -438,7 +498,7 @@ def main() -> int:
                 fx_cell = transform.get("fx_rate_cell")
                 if fx_cell and fx_cell not in fx_auth.get("source_cells", []):
                     findings.append(finding("DCS-FX-RATE-SOURCE", "%s outstanding FX transform does not consume its FX-rate authority cell" % instrument_id))
-        if field_values.get("instrument_type") == "rcf":
+        if field_values.get("instrument_type") == "rcf" and pricing_treatment == "source_terms":
             convention = field_values.get("commitment_fee_convention")
             fee_value = field_values.get("commitment_fee_value")
             if convention not in {"none", "bps_on_undrawn"}:
@@ -464,19 +524,31 @@ def main() -> int:
             findings.append(finding("DCS-BACKSTOP-TYPE", "%s backstop indicator is not boolean" % instrument_id))
         if "next_call_date" in field_values and not valid_date(field_values.get("next_call_date")):
             findings.append(finding("DCS-CALL-DATE", "%s has invalid next call date" % instrument_id))
-        if field_values.get("maturity") is not None:
-            maturity_auth = next((item for item in instrument_authorities if item["model_field"] == "maturity"), None)
-            if maturity_auth and maturity_auth["precision"] != "exact":
-                findings.append(finding("DCS-MATURITY-NOT-MODEL-READY", "%s maturity is only %s precision; no exact date will be invented" % (instrument_id, maturity_auth["precision"])))
         export_instrument = {key: value for key, value in field_values.items() if key in EXPORT_FIELDS and value is not None}
+        export_instrument["pricing_treatment"] = pricing_treatment
+        export_instrument["pricing_treatment_reason"] = (
+            pricing_treatment_reason
+            if pricing_treatment == "residual_interest_plug"
+            else "Instrument pricing is sourced through the field-level DCS authority ledger."
+        )
+        if pricing_treatment == "residual_interest_plug":
+            export_instrument["rate_type"] = "unpriced"
+            for pricing_field in [
+                "coupon_rate", "reference_rate", "margin_bps", "all_in_rate",
+                "benchmark_curve", "commitment_fee_convention", "commitment_fee_value",
+            ]:
+                export_instrument.pop(pricing_field, None)
         maturity_auth = next((item for item in instrument_authorities if item["model_field"] == "maturity"), None)
         if maturity_auth:
-            if maturity_auth["precision"] == "exact":
-                export_instrument["maturity_date"] = maturity_auth["output_value"]
-                export_instrument["maturity_precision"] = "day"
-            elif maturity_auth["precision"] == "non_maturing":
-                export_instrument["maturity_date"] = None
-                export_instrument["maturity_treatment"] = "non_maturing_within_forecast"
+            maturity_projection = projected_maturity(maturity_auth)
+            if maturity_projection is None:
+                findings.append(finding(
+                    "DCS-MATURITY-NOT-MODEL-READY",
+                    "%s maturity precision %s cannot enter the annual model without a declared timing convention" %
+                    (instrument_id, maturity_auth["precision"]),
+                ))
+            else:
+                export_instrument.update(maturity_projection)
         projected_instruments.append(export_instrument)
 
     valid_owners = {item.get("instrument_id") for item in crosswalk.get("instruments", []) if item.get("disposition") in MODEL_INSTRUMENT_DISPOSITIONS}

@@ -9,6 +9,7 @@ artifacts and returns every finding in one report.
 from __future__ import annotations
 
 import argparse
+import calendar
 import datetime as dt
 import hashlib
 import json
@@ -147,25 +148,69 @@ def valid_date(value: Any) -> bool:
         return False
 
 
-def independently_required_fields(declared: dict[str, dict[str, Any]], reporting_currency: Any) -> set[str]:
+def expected_maturity_projection(authority: dict[str, Any]) -> dict[str, Any] | None:
+    precision = authority.get("precision")
+    value = authority.get("output_value")
+    if precision == "exact" and valid_date(value):
+        return {
+            "maturity_date": value,
+            "maturity_precision": "day",
+            "maturity_source_value": value,
+            "maturity_timing_convention": "source_exact",
+            "maturity_treatment": "contractual",
+        }
+    if precision == "month" and isinstance(value, str) and re.fullmatch(r"\d{4}-(?:0[1-9]|1[0-2])", value):
+        year, month = map(int, value.split("-"))
+        return {
+            "maturity_date": f"{year:04d}-{month:02d}-{calendar.monthrange(year, month)[1]:02d}",
+            "maturity_precision": "month",
+            "maturity_source_value": value,
+            "maturity_timing_convention": "month_end",
+            "maturity_treatment": "contractual",
+        }
+    if precision == "year" and isinstance(value, str) and re.fullmatch(r"\d{4}", value):
+        return {
+            "maturity_date": f"{int(value):04d}-12-31",
+            "maturity_precision": "year",
+            "maturity_source_value": value,
+            "maturity_timing_convention": "year_end",
+            "maturity_treatment": "contractual",
+        }
+    if precision == "non_maturing" and value is None:
+        return {
+            "maturity_date": None,
+            "maturity_precision": None,
+            "maturity_source_value": None,
+            "maturity_timing_convention": "not_applicable",
+            "maturity_treatment": "non_maturing_within_forecast",
+        }
+    return None
+
+
+def independently_required_fields(
+    declared: dict[str, dict[str, Any]],
+    reporting_currency: Any,
+    pricing_treatment: str,
+) -> set[str]:
     """Reconstruct model readiness without importing or trusting the compiler."""
     output = {
         "description", "instrument_type", "currency", "balance_basis",
-        "outstanding_amount", "maturity", "rate_type",
+        "outstanding_amount", "maturity",
     }
     value = lambda field: (declared.get(field) or {}).get("output_value")
     rate_type = value("rate_type")
-    if rate_type == "fixed":
-        output.add("coupon_rate")
-    elif rate_type == "floating":
-        output.update({"reference_rate", "margin_bps"})
-    elif rate_type == "manual_all_in":
-        output.add("all_in_rate")
+    if pricing_treatment == "source_terms":
+        output.add("rate_type")
+        if rate_type == "fixed":
+            output.add("coupon_rate")
+        elif rate_type == "floating":
+            output.update({"reference_rate", "margin_bps"})
+        elif rate_type == "manual_all_in":
+            output.add("all_in_rate")
     if value("instrument_type") == "rcf":
-        output.update({
-            "facility_limit", "drawn_amount", "committed",
-            "commitment_fee_convention", "commitment_fee_value",
-        })
+        output.update({"facility_limit", "drawn_amount", "committed"})
+        if pricing_treatment == "source_terms":
+            output.update({"commitment_fee_convention", "commitment_fee_value"})
     if value("balance_basis") == "native_principal" and value("currency") != reporting_currency:
         output.update({"native_principal", "fx_rate"})
     return output
@@ -329,6 +374,7 @@ def main() -> int:
 
     valid_owners = {item.get("instrument_id") for item in crosswalk.get("instruments", []) if item.get("disposition") in {"model_input", "derived_model_input"}}
     model_rows: dict[str, set[str]] = {}
+    candidate_by_instrument: dict[str, dict[str, Any]] = {}
     for candidate in crosswalk.get("instruments", []):
         if candidate.get("disposition") in {"model_input", "derived_model_input"}:
             for row_id in candidate.get("row_ids", []):
@@ -351,6 +397,8 @@ def main() -> int:
         if candidate_id in candidate_ids:
             violation(failures, "DCS-ORACLE-DUPLICATE-CANDIDATE", "candidate_id %r is duplicated" % candidate_id)
         candidate_ids.add(candidate_id)
+        if candidate.get("disposition") in {"model_input", "derived_model_input"}:
+            candidate_by_instrument[candidate.get("instrument_id")] = candidate
         unknown_rows = set(candidate.get("row_ids") or []) - rows
         if unknown_rows:
             violation(failures, "DCS-ORACLE-CANDIDATE-ROW", "candidate %r uses unknown rows %s" % (candidate_id, sorted(unknown_rows)))
@@ -386,11 +434,16 @@ def main() -> int:
         if candidate.get("disposition") not in {"model_input", "derived_model_input"}:
             continue
         instrument_id = candidate.get("instrument_id")
+        pricing_treatment = candidate.get("pricing_treatment", "source_terms")
+        if pricing_treatment not in {"source_terms", "residual_interest_plug"}:
+            violation(failures, "DCS-ORACLE-PRICING-TREATMENT", "%s has invalid pricing treatment" % instrument_id)
+        if pricing_treatment == "residual_interest_plug" and not str(candidate.get("pricing_treatment_reason") or "").strip():
+            violation(failures, "DCS-ORACLE-PRICING-TREATMENT", "%s residual plug treatment has no reason" % instrument_id)
         declared = {item.get("model_field"): item for item in candidate.get("term_authorities", [])}
         balance_basis = (declared.get("balance_basis") or {}).get("output_value")
         currency = (declared.get("currency") or {}).get("output_value")
         reporting_currency = crosswalk.get("export_metadata", {}).get("reporting_currency")
-        missing_required = independently_required_fields(declared, reporting_currency) - set(declared)
+        missing_required = independently_required_fields(declared, reporting_currency, pricing_treatment) - set(declared)
         if missing_required:
             violation(
                 failures,
@@ -406,7 +459,10 @@ def main() -> int:
         if balance_basis == "native_principal" and currency != reporting_currency:
             if outstanding.get("transform", {}).get("kind") != "fx_translate" or "native_principal" not in declared or "fx_rate" not in declared:
                 violation(failures, "DCS-ORACLE-NATIVE-FX", "%s foreign native principal lacks explicit FX authority" % instrument_id)
-        if (declared.get("instrument_type") or {}).get("output_value") == "rcf":
+        if (
+            (declared.get("instrument_type") or {}).get("output_value") == "rcf"
+            and pricing_treatment == "source_terms"
+        ):
             convention = (declared.get("commitment_fee_convention") or {}).get("output_value")
             fee_value = (declared.get("commitment_fee_value") or {}).get("output_value")
             if convention not in {"none", "bps_on_undrawn"}:
@@ -488,13 +544,47 @@ def main() -> int:
         instrument_id = instrument.get("instrument_id")
         for field, value in instrument.items():
             authority_field = "maturity" if field == "maturity_date" else field
-            if field in {"instrument_id", "maturity_precision", "maturity_treatment"}:
+            if field in {
+                "instrument_id", "maturity_date", "maturity_precision",
+                "maturity_source_value", "maturity_timing_convention",
+                "maturity_treatment", "pricing_treatment", "pricing_treatment_reason",
+            } or (field == "rate_type" and value == "unpriced"):
                 continue
             authority = projection_by_key.get((instrument_id, authority_field))
             if authority is None:
                 violation(failures, "DCS-ORACLE-PROJECTION-WITHOUT-AUTHORITY", "%s.%s has no term authority" % (instrument_id, field))
             elif not same(value, authority.get("output_value")):
                 violation(failures, "DCS-ORACLE-PROJECTION-VALUE", "%s.%s differs from its authority" % (instrument_id, field))
+        maturity_authority = projection_by_key.get((instrument_id, "maturity"))
+        expected_maturity = expected_maturity_projection(maturity_authority or {})
+        if expected_maturity is None:
+            violation(
+                failures,
+                "DCS-ORACLE-MATURITY-CONVENTION",
+                "%s has no independently reproducible maturity timing convention" % instrument_id,
+            )
+        else:
+            for field, expected_value in expected_maturity.items():
+                if not same(instrument.get(field), expected_value):
+                    violation(
+                        failures,
+                        "DCS-ORACLE-MATURITY-CONVENTION",
+                        "%s.%s is %r, expected %r from source precision" %
+                        (instrument_id, field, instrument.get(field), expected_value),
+                    )
+        candidate = candidate_by_instrument.get(instrument_id) or {}
+        expected_pricing_treatment = candidate.get("pricing_treatment", "source_terms")
+        expected_pricing_reason = (
+            str(candidate.get("pricing_treatment_reason") or "").strip()
+            if expected_pricing_treatment == "residual_interest_plug"
+            else "Instrument pricing is sourced through the field-level DCS authority ledger."
+        )
+        if instrument.get("pricing_treatment") != expected_pricing_treatment:
+            violation(failures, "DCS-ORACLE-PRICING-TREATMENT", "%s projection changes its pricing treatment" % instrument_id)
+        if instrument.get("pricing_treatment_reason") != expected_pricing_reason:
+            violation(failures, "DCS-ORACLE-PRICING-TREATMENT", "%s projection changes its pricing-treatment reason" % instrument_id)
+        if expected_pricing_treatment == "residual_interest_plug" and instrument.get("rate_type") != "unpriced":
+            violation(failures, "DCS-ORACLE-PRICING-TREATMENT", "%s residual-plug projection is not visibly unpriced" % instrument_id)
 
     for supplement_id, supplement in supplements.items():
         used = [item for item in projection.get("term_authorities", []) if item.get("supplement_id") == supplement_id]
