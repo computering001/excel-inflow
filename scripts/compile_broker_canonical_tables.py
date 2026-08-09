@@ -103,6 +103,109 @@ def table_numeric_tokens(table: dict[str, Any]) -> list[str]:
     ]
 
 
+PERIOD_TOKEN = re.compile(
+    r"^(?:(?:fy|cy)\s*\d{2,4}[eaf]?|(?:19|20)\d{2}[eaf]?|"
+    r"(?:(?:fy|cy)\s*)?(?:(?:19|20)\d{2}|\d{2})\s*/\s*(?:(?:19|20)\d{2}|\d{2})[eaf]?|"
+    r"(?:q[1-4]|[1-4]q|h[12]|[12]h|[369]m)\s*(?:fy|cy)?\s*(?:19|20)?\d{2}[eaf]?|"
+    r"ltm|ttm|ntm)$",
+    re.I,
+)
+
+
+def period_token(value: Any) -> str | None:
+    candidate = re.sub(r"\s+", " ", str(value or "").strip())
+    return normalise(candidate) if PERIOD_TOKEN.fullmatch(candidate) else None
+
+
+def economic_observations(table: dict[str, Any]) -> dict[tuple[str, str], list[str]]:
+    """Return row/period/value observations independent of PDF cell geometry.
+
+    Native PDF lanes often split one visible row into several cells while the
+    rendered-image lane emits the same row as one matrix. Cell coordinates are
+    therefore evidence provenance, not economic identity. The comparison key
+    is the visible row label plus visible period header; when a source has no
+    period header the numeric ordinal is used only within that labelled row.
+    """
+    headers: dict[int, str] = {}
+    observations: dict[tuple[str, str], list[str]] = {}
+    for row in table.get("rows", []):
+        for cell in row:
+            period = period_token(cell.get("raw_text"))
+            if period:
+                headers[int(cell.get("column", 0))] = period
+    for row in table.get("rows", []):
+        label = next((
+            normalise(cell.get("raw_text"))
+            for cell in row
+            if normalise(cell.get("raw_text"))
+            and numeric_token(cell.get("raw_text")) is None
+            and period_token(cell.get("raw_text")) is None
+        ), "")
+        if not label:
+            continue
+        ordinal = 0
+        for cell in row:
+            token = numeric_token(cell.get("raw_text"))
+            if token is None:
+                continue
+            ordinal += 1
+            column = int(cell.get("column", 0))
+            period = headers.get(column, f"ordinal:{ordinal}")
+            observations.setdefault((label, period), []).append(token)
+    return observations
+
+
+def observation_conflicts(left: dict[str, Any], right: dict[str, Any]) -> list[dict[str, Any]]:
+    left_observations = economic_observations(left)
+    right_observations = economic_observations(right)
+    conflicts = []
+    for key in sorted(set(left_observations).intersection(right_observations)):
+        left_values = Counter(left_observations[key])
+        right_values = Counter(right_observations[key])
+        if left_values != right_values:
+            conflicts.append({
+                "label": key[0],
+                "period": key[1],
+                "left_values": sorted(left_values.elements()),
+                "right_values": sorted(right_values.elements()),
+            })
+    return conflicts
+
+
+def has_rendered_authority(table: dict[str, Any]) -> bool:
+    methods = table.get("extraction_methods") or [table.get("extraction_method")]
+    return any("vision" in str(method) or "manual" in str(method) for method in methods if method)
+
+
+def segmentation_equivalent(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    """Recognise one physical table split differently by extraction lanes.
+
+    This is deliberately narrower than fuzzy table matching: geometry must
+    strongly overlap, at least one lane must be independently rendered, there
+    must be no row/period value conflict, and the numeric evidence must either
+    share a verified observation or have a multiset containment relationship.
+    """
+    overlap = bbox_iou(left.get("bbox"), right.get("bbox"))
+    nested_overlap = bbox_min_overlap(left.get("bbox"), right.get("bbox"))
+    if overlap < 0.70 and nested_overlap < 0.85:
+        return False
+    if not (has_rendered_authority(left) or has_rendered_authority(right)):
+        return False
+    if observation_conflicts(left, right):
+        return False
+    left_observations = economic_observations(left)
+    right_observations = economic_observations(right)
+    shared_observation = any(
+        Counter(left_observations[key]) == Counter(right_observations[key])
+        for key in set(left_observations).intersection(right_observations)
+    )
+    left_tokens, right_tokens = Counter(table_numeric_tokens(left)), Counter(table_numeric_tokens(right))
+    numeric_containment = bool(left_tokens and right_tokens) and (
+        not (left_tokens - right_tokens) or not (right_tokens - left_tokens)
+    )
+    return shared_observation or numeric_containment
+
+
 def matrix_contains(left: list[list[str]], right: list[list[str]]) -> bool:
     """True when every nonblank row of right appears in order in left."""
     needle = [row for row in right if any(row)]
@@ -170,7 +273,7 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
                 exact_same_region = exact and (
                     nested_overlap > 0.0 or explicitly_equivalent_lanes(seed, candidate)
                 )
-                if exact_same_region or ((overlap >= 0.70 or nested_overlap >= 0.85) and contained):
+                if exact_same_region or ((overlap >= 0.70 or nested_overlap >= 0.85) and contained) or segmentation_equivalent(seed, candidate):
                     group.append(candidate)
                     remaining.remove(candidate)
                 elif overlap >= 0.70 or nested_overlap >= 0.85:
@@ -181,13 +284,19 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
                     "severity": "blocker",
                     "surface_id": surface_id,
                     "table_ids": [seed["table_id"], *[item["table_id"] for item in conflicts]],
-                    "message": "Overlapping extraction lanes disagree and neither table is a faithful superset.",
+                    "conflicts": [
+                        conflict
+                        for candidate in conflicts
+                        for conflict in observation_conflicts(seed, candidate)
+                    ],
+                    "message": "Overlapping extraction lanes contain a displayed economic conflict or cannot be reconciled to an independently rendered table.",
                 })
             ranked = sorted(
                 group,
                 key=lambda item: (
-                    nonblank_count(item),
                     1 if "vision" in str(item.get("extraction_method")) or "manual" in str(item.get("extraction_method")) else 0,
+                    len(economic_observations(item)),
+                    nonblank_count(item),
                     item["table_id"],
                 ),
                 reverse=True,

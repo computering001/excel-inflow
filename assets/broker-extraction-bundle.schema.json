@@ -211,6 +211,8 @@
         "extraction_method": {
           "enum": [
             "native_pdf_table",
+            "native_pdf_lines",
+            "native_pdf_lines_strict",
             "native_pdf_text",
             "geometry_grid",
             "xlsx_cells",
