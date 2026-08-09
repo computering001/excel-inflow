@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-VERSION = "broker-evidence-extractor/1.0"
+VERSION = "broker-evidence-extractor/1.1"
 NUMERIC_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?%?\)?|[-+]?\d+(?:\.\d+)?x)(?![A-Za-z])",
 )
@@ -196,6 +196,109 @@ def pdf_words_in_bbox(words: list[list[Any]], bbox: tuple[float, float, float, f
     return values
 
 
+def bbox_iou(left: list[float] | tuple[float, ...] | None,
+             right: list[float] | tuple[float, ...] | None) -> float:
+    """Return intersection-over-union for two page-space rectangles."""
+    if not left or not right or len(left) != 4 or len(right) != 4:
+        return 0.0
+    lx0, ly0, lx1, ly1 = map(float, left)
+    rx0, ry0, rx1, ry1 = map(float, right)
+    width = max(0.0, min(lx1, rx1) - max(lx0, rx0))
+    height = max(0.0, min(ly1, ry1) - max(ly0, ry0))
+    intersection = width * height
+    union = max(0.0, (lx1 - lx0) * (ly1 - ly0)) + max(0.0, (rx1 - rx0) * (ry1 - ry0)) - intersection
+    return 0.0 if union <= 0 else intersection / union
+
+
+def word_numeric_records(words: list[list[Any]]) -> list[dict[str, Any]]:
+    """Create the source-owned whole-surface numeric denominator.
+
+    These records are generated before table discovery.  Later table or vision
+    lanes may account for them, but may never create or remove them.
+    """
+    records: list[dict[str, Any]] = []
+    for word_index, word in enumerate(words):
+        raw = str(word[4])
+        for token_index, token in enumerate(numeric_tokens(raw)):
+            records.append({
+                "token_id": f"w{word_index + 1}.n{token_index + 1}",
+                "token": token,
+                "raw_text": raw,
+                "bbox": [float(value) for value in word[:4]],
+                "block": int(word[5]),
+                "line": int(word[6]),
+                "word": int(word[7]),
+            })
+    return records
+
+
+def record_inside_any_bbox(record: dict[str, Any], bboxes: list[list[float]]) -> bool:
+    x0, y0, x1, y1 = map(float, record["bbox"])
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    return any(float(box[0]) <= cx <= float(box[2]) and float(box[1]) <= cy <= float(box[3]) for box in bboxes)
+
+
+def uncovered_numeric_regions(records: list[dict[str, Any]], bboxes: list[list[float]]) -> list[dict[str, Any]]:
+    """Cluster source numbers not covered by any discovered table rectangle."""
+    uncovered = [record for record in records if not record_inside_any_bbox(record, bboxes)]
+    by_line: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for record in uncovered:
+        by_line.setdefault((record["block"], record["line"]), []).append(record)
+    regions: list[dict[str, Any]] = []
+    for region_index, ((block, line), items) in enumerate(sorted(by_line.items()), start=1):
+        items.sort(key=lambda item: (item["bbox"][0], item["token_id"]))
+        bbox = [
+            min(item["bbox"][0] for item in items),
+            min(item["bbox"][1] for item in items),
+            max(item["bbox"][2] for item in items),
+            max(item["bbox"][3] for item in items),
+        ]
+        regions.append({
+            "region_id": f"uncovered-{region_index}",
+            "block": block,
+            "line": line,
+            "bbox": bbox,
+            "token_ids": [item["token_id"] for item in items],
+            "tokens": [item["token"] for item in items],
+            "material": len(items) >= 2,
+            "disposition": "requires_vision" if len(items) >= 2 else "unclassified_singleton",
+        })
+    return regions
+
+
+def table_context(words: list[list[Any]], bbox: list[float]) -> tuple[str | None, str | None, list[str]]:
+    """Preserve nearby caption, unit and footnote text without interpreting metrics."""
+    x0, y0, x1, y1 = map(float, bbox)
+    above: list[tuple[float, str]] = []
+    below: list[tuple[float, str]] = []
+    for word in words:
+        wx0, wy0, wx1, wy1 = map(float, word[:4])
+        if wx1 < x0 - 20 or wx0 > x1 + 20:
+            continue
+        text = str(word[4]).strip()
+        if not text:
+            continue
+        if 0 <= y0 - wy1 <= 42:
+            above.append((wy0, text))
+        elif 0 <= wy0 - y1 <= 48:
+            below.append((wy0, text))
+    caption = " ".join(text for _, text in sorted(above)) or None
+    footnote_text = " ".join(text for _, text in sorted(below))
+    footnotes = [footnote_text] if footnote_text else []
+    unit_match = re.search(r"(?:in\s+)?(?:[$€£¥]|usd|eur|gbp)?\s*(?:m|mn|mm|bn|billions?|millions?|thousands?|%|x)\b", caption or "", re.I)
+    units = unit_match.group(0).strip() if unit_match else None
+    return caption, units, footnotes
+
+
+def native_cell_bbox(native_table: Any, row_index: int, column_index: int) -> list[float] | None:
+    try:
+        row = native_table.rows[row_index - 1]
+        bbox = row.cells[column_index - 1]
+        return None if bbox is None else [float(value) for value in bbox]
+    except Exception:
+        return None
+
+
 def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 render_dpi: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str], str]:
     try:
@@ -228,21 +331,36 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         ]
         words_ref = writer.write_json(f"pages/page-{page_index + 1:04d}.words.json", "word_geometry", word_payload)
 
-        page_tables: list[Any] = []
-        table_status = "none"
-        try:
-            finder = page.find_tables()
-            page_tables = list(getattr(finder, "tables", []) or [])
-            table_status = "pass" if page_tables else "none"
-        except Exception:
-            table_status = "error"
+        # The source denominator is created before any table lane runs.  It is
+        # deliberately the whole page rather than the union of accepted table
+        # rectangles, which was the former self-certifying boundary.
+        source_numeric_records = word_numeric_records(words)
+        source_table_tokens.extend(record["token"] for record in source_numeric_records)
 
-        for table_index, native_table in enumerate(page_tables, start=1):
+        discovery_specs = [
+            ("lines", {}),
+            ("lines_strict", {"vertical_strategy": "lines_strict", "horizontal_strategy": "lines_strict"}),
+            ("text", {"vertical_strategy": "text", "horizontal_strategy": "text", "min_words_vertical": 2, "min_words_horizontal": 1}),
+        ]
+        page_tables: list[tuple[str, Any]] = []
+        lane_summaries: list[dict[str, Any]] = []
+        for lane_id, kwargs in discovery_specs:
+            try:
+                finder = page.find_tables(**kwargs)
+                found = list(getattr(finder, "tables", []) or [])
+                lane_summaries.append({"lane_id": lane_id, "status": "pass" if found else "empty", "candidate_count": len(found)})
+                page_tables.extend((lane_id, item) for item in found)
+            except Exception as error:
+                lane_summaries.append({"lane_id": lane_id, "status": "error", "candidate_count": 0, "message": str(error)})
+
+        table_bboxes: list[list[float]] = []
+        for table_index, (lane_id, native_table) in enumerate(page_tables, start=1):
             extracted = native_table.extract() or []
             if not extracted:
                 continue
-            table_id = f"{surface_id}.t{table_index}"
-            bbox_tuple = tuple(float(value) for value in native_table.bbox)
+            table_id = f"{surface_id}.{lane_id}-t{table_index}"
+            bbox = [float(value) for value in native_table.bbox]
+            table_bboxes.append(bbox)
             rows: list[list[dict[str, Any]]] = []
             for row_index, row in enumerate(extracted, start=1):
                 cells: list[dict[str, Any]] = []
@@ -251,25 +369,49 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                         row_index,
                         column_index,
                         value,
-                        f"{path.name}#page={page_index + 1};table={table_index};r={row_index};c={column_index}",
-                        confidence=0.98,
+                        f"{path.name}#page={page_index + 1};lane={lane_id};table={table_index};r={row_index};c={column_index}",
+                        bbox=native_cell_bbox(native_table, row_index, column_index),
+                        confidence=0.98 if lane_id != "text" else 0.90,
                     ))
                 rows.append(cells)
+            caption, units, footnotes = table_context(words, bbox)
             table = {
                 "table_id": table_id,
                 "surface_id": surface_id,
-                "source_location": f"page {page_index + 1}, table {table_index}",
-                "title": None,
-                "units": None,
-                "bbox": list(bbox_tuple),
-                "extraction_method": "native_pdf_table",
-                "confidence": 0.98,
+                "source_location": f"page {page_index + 1}, {lane_id} table {table_index}",
+                "title": caption,
+                "units": units,
+                "footnotes": footnotes,
+                "bbox": bbox,
+                "extraction_method": f"native_pdf_{lane_id}",
+                "discovery_lane": lane_id,
+                "confidence": 0.98 if lane_id != "text" else 0.90,
                 "rows": rows,
             }
             tables.append(table)
-            source_table_tokens.extend(pdf_words_in_bbox(words, bbox_tuple))
             captured_table_tokens.extend(table_tokens(table))
             writer.write_json(f"tables/{safe_id(table_id)}.json", "table_json", table)
+
+        uncovered_regions = uncovered_numeric_regions(source_numeric_records, table_bboxes)
+        material_uncovered = [region for region in uncovered_regions if region["material"]]
+        source_table_numeric_tokens = [
+            record["token"] for record in source_numeric_records
+            if record_inside_any_bbox(record, table_bboxes)
+        ]
+        census = {
+            "schema_version": "broker-surface-census/1.0",
+            "document_id": descriptor["document_id"],
+            "surface_id": surface_id,
+            "kind": "pdf_page",
+            "source_numeric_tokens": source_numeric_records,
+            "whole_surface_numeric_token_count": len(source_numeric_records),
+            "source_table_numeric_tokens": source_table_numeric_tokens,
+            "table_discovery_lanes": lane_summaries,
+            "discovered_table_bboxes": table_bboxes,
+            "uncovered_numeric_regions": uncovered_regions,
+            "material_uncovered_region_count": len(material_uncovered),
+        }
+        census_ref = writer.write_json(f"census/page-{page_index + 1:04d}.json", "surface_census", census)
 
         image_infos = page.get_image_info(xrefs=True) or []
         page_area = max(float(page.rect.width * page.rect.height), 1.0)
@@ -297,9 +439,9 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             except Exception:
                 continue
 
-        page_numeric_count = len(numeric_tokens(text))
+        page_numeric_count = len(source_numeric_records)
         sparse = len(text.strip()) < 40
-        undetected_numeric_grid = page_numeric_count >= 6 and not page_tables
+        undetected_numeric_grid = bool(material_uncovered)
         vision_required = (material_image and (page_numeric_count >= 2 or sparse)) or undetected_numeric_grid
         vision_reason = None
         if vision_required:
@@ -310,10 +452,10 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             if sparse:
                 reasons.append("sparse native text")
             if undetected_numeric_grid:
-                reasons.append("numeric page without native table")
+                reasons.append(f"{len(material_uncovered)} material numeric region(s) outside discovered tables")
             vision_reason = "; ".join(reasons)
 
-        artifact_refs = [text_ref, words_ref, *image_refs]
+        artifact_refs = [text_ref, words_ref, census_ref, *image_refs]
         if vision_required or page_tables:
             matrix = fitz.Matrix(render_dpi / 72.0, render_dpi / 72.0)
             pixmap = page.get_pixmap(matrix=matrix, alpha=False)
@@ -331,7 +473,9 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                     "image_artifact_id": page_image_ref,
                     "reason": vision_reason,
                     "required_passes": 2,
-                    "instruction": "Transcribe every visible table cell and table footnote independently. Preserve blanks, dashes, parentheses, percentages, units and period headings. Return cell coordinates plus confidence; do not normalize metrics in this step.",
+                    "source_census_artifact_id": census_ref,
+                    "uncovered_region_ids": [region["region_id"] for region in material_uncovered],
+                    "instruction": "Inventory the complete page first, then transcribe every visible table cell, caption, unit and footnote independently. Preserve blanks, dashes, parentheses, percentages, units, period headings, bboxes and continuations. Return all tables, including tables already visible to native extraction; do not normalize metrics.",
                 }
                 task_ref = writer.write_json(
                     f"vision/page-{page_index + 1:04d}.task.json",
@@ -350,16 +494,21 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             "native_text_chars": len(text),
             "native_word_count": len(words),
             "numeric_token_count": page_numeric_count,
-            "table_count": len(page_tables),
+            "table_count": len([table for table in tables if table["surface_id"] == surface_id]),
             "image_count": len(image_infos),
             "artifact_refs": artifact_refs,
             "lane_status": {
                 "native_text": "pass" if text.strip() else "empty",
                 "geometry": "pass" if words else "empty",
-                "tables": table_status,
+                "tables": "pass" if page_tables else ("error" if all(item["status"] == "error" for item in lane_summaries) else "none"),
                 "images": "pass" if image_infos else "none",
                 "vision": "required" if vision_required else "not_required",
             },
+            "surface_census_artifact_id": census_ref,
+            "whole_surface_numeric_token_count": len(source_numeric_records),
+            "source_table_numeric_tokens": source_table_numeric_tokens,
+            "uncovered_numeric_regions": uncovered_regions,
+            "table_discovery_lanes": lane_summaries,
             "vision_reason": vision_reason,
         })
 
@@ -395,6 +544,28 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
         if cell_span > 200000:
             raise RuntimeError(f"Workbook sheet {sheet.title!r} has a {cell_span:,}-cell used rectangle; trim the workbook before extraction.")
         surface_id = f"{descriptor['document_id']}.s{sheet_index}"
+        source_cell_records: list[dict[str, Any]] = []
+        for formula_cell in nonempty:
+            value_cell = value_sheet[formula_cell.coordinate]
+            formula = str(formula_cell.value) if formula_cell.data_type == "f" else None
+            value = value_cell.value if formula else formula_cell.value
+            token = normalise_numeric_token(value)
+            source_cell_records.append({
+                "cell": formula_cell.coordinate,
+                "row": formula_cell.row,
+                "column": formula_cell.column,
+                "raw_value": serialise_value(formula_cell.value),
+                "display_value": serialise_value(value),
+                "formula": formula,
+                "number_format": formula_cell.number_format,
+                "numeric_token": token,
+                "bold": bool(formula_cell.font.bold),
+                "indent": float(formula_cell.alignment.indent or 0),
+                "row_hidden": bool(sheet.row_dimensions[formula_cell.row].hidden),
+                "column_hidden": bool(sheet.column_dimensions[formula_cell.column_letter].hidden),
+            })
+            if token is not None:
+                source_tokens.append(token)
         rows: list[list[dict[str, Any]]] = []
         for row_number in range(min_row, max_row + 1):
             cells: list[dict[str, Any]] = []
@@ -403,7 +574,7 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
                 value_cell = value_sheet.cell(row_number, column_number)
                 formula = str(formula_cell.value) if formula_cell.data_type == "f" else None
                 value = value_cell.value if formula else formula_cell.value
-                cells.append(cell_record(
+                record = cell_record(
                     row_number - min_row + 1,
                     column_number - min_col + 1,
                     value,
@@ -411,10 +582,13 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
                     formula=formula,
                     number_format=formula_cell.number_format,
                     confidence=1.0,
-                ))
+                )
+                record["address"] = formula_cell.coordinate
+                record["bold"] = bool(formula_cell.font.bold)
+                record["indent"] = float(formula_cell.alignment.indent or 0)
+                cells.append(record)
                 token = normalise_numeric_token(value)
                 if token is not None:
-                    source_tokens.append(token)
                     captured_tokens.append(token)
             rows.append(cells)
         table_id = f"{surface_id}.used-range"
@@ -431,6 +605,23 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
         }
         tables.append(table)
         grid_ref = writer.write_json(f"sheets/{sheet_index:03d}-{safe_id(sheet.title)}.json", "xlsx_grid", table)
+        census = {
+            "schema_version": "broker-surface-census/1.0",
+            "document_id": descriptor["document_id"],
+            "surface_id": surface_id,
+            "kind": "workbook_sheet",
+            "source_cells": source_cell_records,
+            "nonblank_cell_count": len(source_cell_records),
+            "whole_surface_numeric_token_count": sum(1 for cell in source_cell_records if cell["numeric_token"] is not None),
+            "source_table_numeric_tokens": [cell["numeric_token"] for cell in source_cell_records if cell["numeric_token"] is not None],
+            "merged_ranges": sorted(str(item) for item in sheet.merged_cells.ranges),
+            "hidden_rows": sorted(index for index, dimension in sheet.row_dimensions.items() if dimension.hidden),
+            "hidden_columns": sorted(key for key, dimension in sheet.column_dimensions.items() if dimension.hidden),
+            "table_discovery_lanes": [{"lane_id": "xlsx_used_range", "status": "pass", "candidate_count": 1}],
+            "uncovered_numeric_regions": [],
+            "material_uncovered_region_count": 0,
+        }
+        census_ref = writer.write_json(f"census/sheet-{sheet_index:04d}.json", "surface_census", census)
         surfaces.append({
             "surface_id": surface_id,
             "kind": "workbook_sheet",
@@ -443,7 +634,7 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
             "numeric_token_count": len(table_tokens(table)),
             "table_count": 1,
             "image_count": len(getattr(sheet, "_images", [])),
-            "artifact_refs": [grid_ref],
+            "artifact_refs": [grid_ref, census_ref],
             "lane_status": {
                 "native_text": "pass",
                 "geometry": "pass",
@@ -451,6 +642,11 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
                 "images": "unsupported" if getattr(sheet, "_images", []) else "none",
                 "vision": "not_required",
             },
+            "surface_census_artifact_id": census_ref,
+            "whole_surface_numeric_token_count": census["whole_surface_numeric_token_count"],
+            "source_table_numeric_tokens": [cell["numeric_token"] for cell in source_cell_records if cell["numeric_token"] is not None],
+            "uncovered_numeric_regions": [],
+            "table_discovery_lanes": census["table_discovery_lanes"],
             "vision_reason": None,
         })
     return surfaces, tables, source_tokens, captured_tokens, "complete"
@@ -477,12 +673,34 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
     image_document.close()
     surface_id = f"{descriptor['document_id']}.i1"
     image_ref = writer.write("pages/page-0001.png", "page_image", raw)
+    census = {
+        "schema_version": "broker-surface-census/1.0",
+        "document_id": descriptor["document_id"],
+        "surface_id": surface_id,
+        "kind": "image_page",
+        "source_numeric_tokens": [],
+        "whole_surface_numeric_token_count": None,
+        "source_table_numeric_tokens": [],
+        "table_discovery_lanes": [{"lane_id": "native", "status": "unsupported", "candidate_count": 0}],
+        "uncovered_numeric_regions": [{
+            "region_id": "full-image",
+            "bbox": [0.0, 0.0, float(width), float(height)],
+            "token_ids": [],
+            "tokens": [],
+            "material": True,
+            "disposition": "requires_vision",
+        }],
+        "material_uncovered_region_count": 1,
+    }
+    census_ref = writer.write_json("census/image-0001.json", "surface_census", census)
     task = {
         "schema_version": "broker-vision-task/1.0",
         "document_id": descriptor["document_id"],
         "surface_id": surface_id,
         "image_artifact_id": image_ref,
-        "instruction": "Transcribe every visible table cell in reading order. Preserve labels, blanks, signs, units, periods and column positions. Do not normalize metrics.",
+        "source_census_artifact_id": census_ref,
+        "uncovered_region_ids": ["full-image"],
+        "instruction": "Inventory the complete image, then transcribe every visible table cell, caption, unit and footnote in reading order. Preserve labels, blanks, signs, units, periods, bboxes and column positions. Do not normalize metrics.",
         "required_independent_passes": 2,
     }
     task_ref = writer.write_json("vision/image-0001.task.json", "vision_task", task)
@@ -498,7 +716,7 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
         "numeric_token_count": 0,
         "table_count": 0,
         "image_count": 1,
-        "artifact_refs": [image_ref, task_ref],
+        "artifact_refs": [image_ref, census_ref, task_ref],
         "lane_status": {
             "native_text": "empty",
             "geometry": "unsupported",
@@ -506,6 +724,11 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
             "images": "pass",
             "vision": "required",
         },
+        "surface_census_artifact_id": census_ref,
+        "whole_surface_numeric_token_count": None,
+        "source_table_numeric_tokens": [],
+        "uncovered_numeric_regions": census["uncovered_numeric_regions"],
+        "table_discovery_lanes": census["table_discovery_lanes"],
         "vision_reason": "Standalone image requires two-pass cell-addressed table transcription.",
     }
     return [surface], [], [], [], "needs_vision"
@@ -568,7 +791,24 @@ def extract_delimited_or_text(path: Path, descriptor: dict[str, Any], writer: Ar
         rows = [[None]]
     table = rectangular_rows(rows, path.name, surface_id, method)
     table_ref = writer.write_json("table.json", "table_json", table)
-    tokens = table_tokens(table)
+    source_tokens = numeric_tokens(text)
+    captured_tokens = table_tokens(table)
+    census = {
+        "schema_version": "broker-surface-census/1.0",
+        "document_id": descriptor["document_id"],
+        "surface_id": surface_id,
+        "kind": "text_document",
+        "source_numeric_tokens": [
+            {"token_id": f"n{index}", "token": token, "raw_text": token, "bbox": None}
+            for index, token in enumerate(source_tokens, start=1)
+        ],
+        "whole_surface_numeric_token_count": len(source_tokens),
+        "source_table_numeric_tokens": source_tokens,
+        "table_discovery_lanes": [{"lane_id": method, "status": "pass", "candidate_count": 1}],
+        "uncovered_numeric_regions": [],
+        "material_uncovered_region_count": 0,
+    }
+    census_ref = writer.write_json("census/document.json", "surface_census", census)
     surface = {
         "surface_id": surface_id,
         "kind": "text_document",
@@ -581,7 +821,7 @@ def extract_delimited_or_text(path: Path, descriptor: dict[str, Any], writer: Ar
         "numeric_token_count": len(numeric_tokens(text)),
         "table_count": 1,
         "image_count": 0,
-        "artifact_refs": [text_ref, table_ref],
+        "artifact_refs": [text_ref, table_ref, census_ref],
         "lane_status": {
             "native_text": "pass",
             "geometry": "unsupported",
@@ -589,9 +829,14 @@ def extract_delimited_or_text(path: Path, descriptor: dict[str, Any], writer: Ar
             "images": "none",
             "vision": "not_required",
         },
+        "surface_census_artifact_id": census_ref,
+        "whole_surface_numeric_token_count": len(source_tokens),
+        "source_table_numeric_tokens": source_tokens,
+        "uncovered_numeric_regions": [],
+        "table_discovery_lanes": census["table_discovery_lanes"],
         "vision_reason": None,
     }
-    return [surface], [table], tokens, tokens, "complete"
+    return [surface], [table], source_tokens, captured_tokens, "complete"
 
 
 def build_ledger(source_tokens: list[str], captured_tokens: list[str]) -> dict[str, Any]:
@@ -605,6 +850,8 @@ def build_ledger(source_tokens: list[str], captured_tokens: list[str]) -> dict[s
         "missing_tokens": missing,
         "duplicate_tokens": extra,
         "recall": recall,
+        "denominator_scope": "whole_surface",
+        "captured_scope": "discovered_table_cells",
     }
 
 
@@ -633,8 +880,6 @@ def extract_document(root: Path, request_dir: Path, descriptor: dict[str, Any], 
     else:
         surfaces, tables, source_tokens, captured_tokens, status = extract_delimited_or_text(source_path, descriptor, writer)
     ledger = build_ledger(source_tokens, captured_tokens)
-    if ledger["missing_tokens"]:
-        status = "blocked"
     return {
         "document_id": descriptor["document_id"],
         "house_id": descriptor["house_id"],
@@ -722,11 +967,11 @@ def main() -> int:
     for document in documents:
         if document["numeric_ledger"]["missing_tokens"]:
             findings.append({
-                "id": "broker_extraction.numeric_tokens_missing",
-                "severity": "blocker",
+                "id": "broker_extraction.numeric_tokens_outside_tables",
+                "severity": "warning",
                 "document_id": document["document_id"],
                 "surface_id": None,
-                "message": f"{len(document['numeric_ledger']['missing_tokens'])} native table numeric tokens were not captured.",
+                "message": f"{len(document['numeric_ledger']['missing_tokens'])} whole-surface numeric tokens are outside discovered table cells; their regions remain explicit in the surface census.",
             })
         if document["extraction_status"] == "needs_vision":
             findings.append({
@@ -750,12 +995,21 @@ def main() -> int:
     missing_token_count = sum(len(document["numeric_ledger"]["missing_tokens"]) for document in documents)
     recall = 1.0 if source_token_count == 0 else (source_token_count - missing_token_count) / source_token_count
     duplicate_count = sum(len(document["numeric_ledger"]["duplicate_tokens"]) for document in documents)
+    uncovered_region_count = sum(
+        len(surface.get("uncovered_numeric_regions", []))
+        for document in documents for surface in document["surfaces"]
+    )
+    material_uncovered_region_count = sum(
+        sum(1 for region in surface.get("uncovered_numeric_regions", []) if region.get("material"))
+        for document in documents for surface in document["surfaces"]
+    )
     bundle = {
         "schema_version": "broker-extraction-bundle/1.0",
         "run_id": request["run_id"],
         "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "extractor_version": VERSION,
         "tool_versions": tool_versions(),
+        "artifact_root": str(output_root),
         "documents": documents,
         "summary": {
             "document_count": len(documents),
@@ -766,6 +1020,8 @@ def main() -> int:
             "native_numeric_recall": recall,
             "unresolved_surface_count": unresolved,
             "duplicate_cell_count": duplicate_count,
+            "uncovered_numeric_region_count": uncovered_region_count,
+            "material_uncovered_region_count": material_uncovered_region_count,
         },
         "gate_status": gate_status,
         "findings": findings,

@@ -8,6 +8,8 @@ import hashlib
 import json
 import math
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +35,8 @@ SEMANTIC_ROLES = {
 }
 EVIDENCE_KINDS = {
     "broker_estimate", "company_guidance", "broker_derived_estimate",
-    "partial_period", "calculated_check", "market_data", "non_numeric",
+    "partial_period", "calculated_check", "market_data",
+    "historical_observation", "non_numeric",
 }
 DISPOSITIONS = {
     "mapped_metric", "mapped_guidance", "broker_derived_estimate",
@@ -52,6 +55,69 @@ VALUATION_LABEL = re.compile(
     r"price\s*/|free\s+cash\s+flow\s+yield|\bfcf\s+yield|\bp/?bv|net\s+yield)",
     re.IGNORECASE,
 )
+ECONOMIC_DOMAINS = {
+    "operating", "cash_flow", "debt_liquidity", "leverage_coverage",
+    "interest_finance", "lease", "tax", "guidance", "valuation",
+    "presentation_metadata", "other",
+}
+DOMAIN_BY_LEGACY_ROLE = {
+    "operating_forecast": "operating", "cash_flow_forecast": "cash_flow",
+    "debt_or_liquidity": "debt_liquidity", "leverage_or_coverage": "leverage_coverage",
+    "interest_or_finance": "interest_finance", "lease": "lease", "tax": "tax",
+    "management_guidance": "guidance", "broker_derived_estimate": "other",
+    "valuation_market_data": "valuation", "presentation_only": "presentation_metadata",
+    "metadata": "presentation_metadata", "other_model_check": "other",
+}
+MODEL_USES = {"active_input", "reference_only", "exact_duplicate", "derived_input", "unresolved"}
+MODEL_USE_BY_DISPOSITION = {
+    "mapped_metric": "active_input", "supplemental_check": "reference_only",
+    "mapped_guidance": "reference_only", "broker_derived_estimate": "reference_only",
+    "partial_period_evidence": "reference_only", "duplicate": "exact_duplicate",
+    "not_model_relevant": "reference_only", "unusable": "unresolved",
+}
+
+
+def semantic_slug(value: Any) -> str:
+    slug = re.sub(r"[^a-z0-9]+", ".", str(value or "unknown").casefold()).strip(".")
+    return slug[:80] or "unknown"
+
+
+def normalize_semantic_entry(
+    entry: dict[str, Any],
+    metric: dict[str, Any] | None,
+    schema_version: str,
+) -> dict[str, Any]:
+    """Return split semantic axes; legacy input is accepted only via explicit fail-closed derivation."""
+
+    resolved = dict(entry)
+    resolved["economic_domain"] = resolved.get("economic_domain") or DOMAIN_BY_LEGACY_ROLE.get(resolved.get("semantic_role"))
+    resolved["concept_id"] = resolved.get("concept_id") or resolved.get("metric_id") or f"custom.{semantic_slug(resolved.get('label'))}"
+    resolved["model_use"] = resolved.get("model_use") or MODEL_USE_BY_DISPOSITION.get(resolved.get("disposition"))
+    fingerprint = dict(resolved.get("definition_fingerprint") or (metric or {}).get("definition_signature") or {})
+    fingerprint.setdefault("concept_id", resolved["concept_id"])
+    fingerprint.setdefault("measurement_basis", fingerprint.pop("adjustment_basis", None) or "unspecified")
+    fingerprint.setdefault("restatement_basis", "unspecified")
+    fingerprint.setdefault("cash_flow_basis", "unspecified")
+    fingerprint.setdefault("lease_basis", "unspecified")
+    fingerprint.setdefault("units", None)
+    fingerprint.setdefault("currency", None)
+    fingerprint.setdefault("period_basis", resolved.get("period_basis"))
+    fingerprint.setdefault("sign_convention", (metric or {}).get("sign_convention") or "as_reported")
+    fingerprint.setdefault("accounting_basis", "unspecified")
+    fingerprint.setdefault("operating_scope", fingerprint.pop("operation_scope", None) or "unspecified")
+    resolved["definition_fingerprint"] = fingerprint
+    if schema_version == "broker-crosswalk/1.2":
+        missing = [
+            field for field in ("economic_domain", "concept_id", "model_use", "definition_fingerprint", "definition_evidence")
+            if field not in entry
+        ]
+        if missing:
+            raise ValueError(f"Candidate {entry.get('candidate_id')!r} lacks required split semantic fields: {', '.join(missing)}.")
+    return resolved
+
+
+def fingerprint_hash(value: dict[str, Any]) -> str:
+    return hash_json(value)
 
 
 def hash_json(value: Any) -> str:
@@ -129,12 +195,11 @@ def normalized_evidence_value(value: Any) -> tuple[str, Any]:
 
 def candidate_value_signature(entry: dict[str, Any]) -> tuple[Any, ...]:
     cells = sorted(entry.get("source_cells") or [], key=lambda item: (int(item["row"]), int(item["column"])))
-    values = [normalized_evidence_value(item.get("raw_value")) for item in cells]
-    if entry.get("period_basis") == "annual_forecast":
-        indexes = sorted(int(value) for value in entry.get("period_indexes") or [])
-        if len(indexes) != len(values):
-            raise ValueError(f"Candidate {entry.get('candidate_id')!r} has a period/value cardinality mismatch.")
-        return tuple(zip(indexes, values))
+    values = []
+    for item in cells:
+        normalized = normalized_evidence_value(item.get("raw_value"))
+        if normalized[0] == "number":
+            values.append(normalized)
     return tuple(values)
 
 
@@ -172,6 +237,8 @@ def validate_coverage(
     documents_by_house: dict[str, dict[str, Any]],
     tables: dict[str, tuple[dict[str, Any], dict[str, Any]]],
     mapping_receipts: list[dict[str, Any]],
+    candidate_manifest: dict[str, Any] | None = None,
+    semantic_violation_count: int = 0,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     """Prove every declared future-period table row has one reviewed disposition."""
 
@@ -184,6 +251,62 @@ def validate_coverage(
     forecast_years = [int(str(period)[:4]) for period in crosswalk["forecast_periods"]]
     review_by_table: dict[str, dict[str, Any]] = {}
     expected: dict[tuple[str, int, str], dict[str, Any]] = {}
+    expected_by_candidate_id: dict[str, dict[str, Any]] = {}
+    if candidate_manifest is not None:
+        if candidate_manifest.get("manifest_version") != "broker-candidate-manifest/1.0":
+            raise ValueError("The deterministic candidate manifest has an unsupported version.")
+        if candidate_manifest.get("run_id") != crosswalk.get("run_id") or candidate_manifest.get("gate_status") != "PASS":
+            raise ValueError("The deterministic candidate manifest must be PASS and bound to the crosswalk run_id.")
+        for index, candidate in enumerate(candidate_manifest.get("candidates") or []):
+            candidate_id = candidate.get("candidate_id")
+            if not isinstance(candidate_id, str) or not candidate_id or candidate_id in expected_by_candidate_id:
+                raise ValueError(f"candidate_manifest.candidates[{index}] has an absent or duplicate candidate_id.")
+            table_id = candidate.get("table_id")
+            if table_id not in tables:
+                raise ValueError(f"Candidate {candidate_id!r} names unknown table {table_id!r}.")
+            document, _table = tables[table_id]
+            if document.get("house_id") != candidate.get("house_id"):
+                raise ValueError(f"Candidate {candidate_id!r} reaches across houses.")
+            cells = [
+                {"row": int(item.get("row", 0)), "column": int(item.get("column", 0))}
+                for item in candidate.get("source_cells") or []
+            ]
+            if not cells:
+                raise ValueError(f"Candidate {candidate_id!r} has no immutable source cells.")
+            period_indexes = []
+            period_columns_by_index: dict[int, int] = {}
+            declared_period_kinds: set[str] = set()
+            for item in candidate.get("period_indexes") or []:
+                if isinstance(item, int):
+                    period_indexes.append(item)
+                    continue
+                if isinstance(item, dict):
+                    declared_period_kinds.add(str(item.get("period_kind") or ""))
+                    detected = header_year(item.get("period_label"), forecast_years)
+                    if detected in forecast_years:
+                        resolved_period_index = forecast_years.index(detected)
+                        period_indexes.append(resolved_period_index)
+                        period_columns_by_index[resolved_period_index] = int(item.get("column", 0))
+            manifest_basis = candidate.get("period_basis")
+            if period_indexes:
+                normalized_basis = "annual_forecast"
+            elif manifest_basis in {"quarter", "half_year", "partial_period"} or declared_period_kinds & {"quarter", "half_year"}:
+                normalized_basis = "partial_period"
+            elif manifest_basis in {"event_date", "non_periodic"} or "event_date" in declared_period_kinds:
+                normalized_basis = "non_periodic"
+            elif manifest_basis in {"annual", "historical"}:
+                normalized_basis = "historical"
+            else:
+                normalized_basis = "non_periodic"
+            expected_by_candidate_id[candidate_id] = {
+                **candidate,
+                "period_basis": normalized_basis,
+                "source_cells": sorted(cells, key=lambda item: (item["row"], item["column"])),
+                "period_indexes": sorted(set(period_indexes)),
+                "period_columns_by_index": period_columns_by_index,
+            }
+        if not expected_by_candidate_id:
+            raise ValueError("The deterministic candidate manifest cannot be empty.")
 
     for index, review in enumerate(reviews):
         table_id = review.get("table_id")
@@ -292,10 +415,20 @@ def validate_coverage(
 
     mapping_by_id: dict[str, dict[str, Any]] = {}
     mapping_cells: dict[str, set[tuple[str, int, int]]] = {}
+    derived_mapping_ids = {
+        item.get("mapping_id")
+        for item in (crosswalk.get("derived_mappings") or [])
+        if isinstance(item.get("mapping_id"), str)
+    }
     for mapping in mapping_receipts:
         mapping_id = mapping["mapping_id"]
         if mapping_id in mapping_by_id:
             raise ValueError(f"Duplicate mapping_id {mapping_id!r}.")
+        if any(float(component.get("coefficient", 0)) == 0 for component in mapping["components"]):
+            raise ValueError(
+                f"Mapping {mapping_id!r} contains a zero-coefficient source cell; "
+                "a cell that contributes nothing is not valid provenance."
+            )
         mapping_by_id[mapping_id] = mapping
         mapping_cells[mapping_id] = {
             (component["table_id"], int(component["row"]), int(component["column"]))
@@ -322,8 +455,22 @@ def validate_coverage(
         if document["house_id"] != house_id:
             raise ValueError(f"coverage_ledger[{index}] reaches across houses.")
         key = (table_id, row, basis)
-        expected_entry = expected.get(key)
-        if basis in PERIOD_BASES:
+        expected_entry = expected_by_candidate_id.get(candidate_id) if candidate_manifest is not None else expected.get(key)
+        if candidate_manifest is not None:
+            if expected_entry is None:
+                raise ValueError(f"coverage_ledger[{index}] candidate_id is outside the immutable candidate manifest.")
+            for field in ("house_id", "table_id", "row", "period_basis"):
+                if expected_entry.get(field) != entry.get(field):
+                    raise ValueError(f"coverage_ledger[{index}] disagrees with the immutable candidate manifest on {field}.")
+            expected_cells = {(int(item["row"]), int(item["column"])) for item in expected_entry["source_cells"]}
+            actual_cells = {(int(item.get("row", 0)), int(item.get("column", 0))) for item in entry.get("source_cells") or []}
+            if actual_cells != expected_cells:
+                raise ValueError(f"coverage_ledger[{index}] source cells do not equal the immutable candidate cells.")
+            if expected_entry.get("period_indexes") and sorted(entry.get("period_indexes") or []) != expected_entry["period_indexes"]:
+                raise ValueError(f"coverage_ledger[{index}] period indexes do not equal the immutable candidate periods.")
+            if expected_entry.get("parent_candidate_id") != entry.get("parent_candidate_id"):
+                raise ValueError(f"coverage_ledger[{index}] parent relationship differs from the immutable candidate manifest.")
+        elif basis in PERIOD_BASES:
             if expected_entry is None:
                 raise ValueError(f"coverage_ledger[{index}] does not match a declared nonblank {basis} row.")
             if key in by_expected_key:
@@ -356,18 +503,32 @@ def validate_coverage(
                 "raw_value": cell.get("value"),
             })
         disposition = entry.get("disposition")
+        metric_id = entry.get("metric_id")
+        normalized_entry = normalize_semantic_entry(
+            entry,
+            (crosswalk.get("metrics") or {}).get(metric_id),
+            crosswalk.get("schema_version", "broker-crosswalk/1.1"),
+        )
         semantic_role = entry.get("semantic_role")
+        economic_domain = normalized_entry.get("economic_domain")
+        concept_id = normalized_entry.get("concept_id")
+        model_use = normalized_entry.get("model_use")
         evidence_kind = entry.get("evidence_kind")
         definition_id = entry.get("definition_id")
-        if semantic_role not in SEMANTIC_ROLES:
+        if crosswalk.get("schema_version") == "broker-crosswalk/1.1" and semantic_role not in SEMANTIC_ROLES:
             raise ValueError(f"coverage_ledger[{index}] has unsupported semantic_role {semantic_role!r}.")
+        if economic_domain not in ECONOMIC_DOMAINS:
+            raise ValueError(f"coverage_ledger[{index}] has unsupported economic_domain {economic_domain!r}.")
+        if not isinstance(concept_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", concept_id):
+            raise ValueError(f"coverage_ledger[{index}] has invalid concept_id {concept_id!r}.")
+        if model_use not in MODEL_USES:
+            raise ValueError(f"coverage_ledger[{index}] has unsupported model_use {model_use!r}.")
         if evidence_kind not in EVIDENCE_KINDS:
             raise ValueError(f"coverage_ledger[{index}] has unsupported evidence_kind {evidence_kind!r}.")
         if not isinstance(definition_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", definition_id):
             raise ValueError(f"coverage_ledger[{index}] has no valid definition_id.")
         if disposition not in DISPOSITIONS:
             raise ValueError(f"coverage_ledger[{index}] has unsupported disposition {disposition!r}.")
-        metric_id = entry.get("metric_id")
         mapping_ids = entry.get("mapping_ids") or []
         if disposition in MAPPED_DISPOSITIONS:
             if metric_id not in (crosswalk.get("metrics") or {}):
@@ -375,7 +536,11 @@ def validate_coverage(
             metric = crosswalk["metrics"][metric_id]
             if metric.get("definition_id") != definition_id:
                 raise ValueError(f"coverage_ledger[{index}] definition_id does not match metric {metric_id!r}.")
-            if metric.get("semantic_role") != semantic_role:
+            metric_domain = metric.get("economic_domain") or DOMAIN_BY_LEGACY_ROLE.get(metric.get("semantic_role"))
+            metric_concept = metric.get("concept_id") or metric_id
+            if metric_domain != economic_domain or metric_concept != concept_id:
+                raise ValueError(f"coverage_ledger[{index}] semantic axes do not match metric {metric_id!r}.")
+            if crosswalk.get("schema_version") == "broker-crosswalk/1.1" and metric.get("semantic_role") != semantic_role:
                 raise ValueError(f"coverage_ledger[{index}] semantic_role does not match metric {metric_id!r}.")
             if not str(entry.get("definition_evidence") or "").strip():
                 raise ValueError(f"coverage_ledger[{index}] mapped evidence lacks definition_evidence.")
@@ -392,8 +557,28 @@ def validate_coverage(
                     raise ValueError(f"coverage_ledger[{index}] mapping {mapping_id!r} has a different house or metric.")
                 if mapping.get("definition_id") != definition_id:
                     raise ValueError(f"coverage_ledger[{index}] mapping {mapping_id!r} has a different definition_id.")
-                if not (mapping_cells[mapping_id] & candidate_cells):
+                component_cells = mapping_cells[mapping_id]
+                if not (component_cells & candidate_cells):
                     raise ValueError(f"coverage_ledger[{index}] mapping {mapping_id!r} does not consume one of the candidate's source cells.")
+                if mapping_id not in derived_mapping_ids and not component_cells <= candidate_cells:
+                    raise ValueError(
+                        f"coverage_ledger[{index}] direct mapping {mapping_id!r} contains source cells "
+                        "outside its immutable candidate; multi-candidate arithmetic requires a declared derived_mapping."
+                    )
+                if mapping_id not in derived_mapping_ids and candidate_manifest is not None and basis == "annual_forecast":
+                    period_index = int(mapping.get("period_index", -1))
+                    period_columns = expected_entry.get("period_columns_by_index") or {}
+                    if period_index not in period_columns:
+                        raise ValueError(
+                            f"coverage_ledger[{index}] direct mapping {mapping_id!r} has no immutable candidate period at index {period_index}."
+                        )
+                    period_column = int(period_columns[period_index])
+                    period_cells = {(table_id, row, period_column)}
+                    if not component_cells <= period_cells:
+                        raise ValueError(
+                            f"coverage_ledger[{index}] direct mapping {mapping_id!r} contains a source cell "
+                            "from another forecast period; each direct mapping must cite only its own immutable period cell."
+                        )
                 referenced_mappings.add(mapping_id)
             if disposition == "supplemental_check" and (crosswalk["metrics"][metric_id].get("model_disposition") != "reference_only"):
                 raise ValueError(f"Supplemental metric {metric_id!r} must declare model_disposition=reference_only.")
@@ -425,7 +610,9 @@ def validate_coverage(
             raise ValueError(f"coverage_ledger[{index}] broker-derived estimate lacks its semantic role.")
         if disposition == "not_model_relevant":
             label = str(entry.get("label") or (expected_entry or {}).get("label") or "")
-            if semantic_role not in NOT_MODEL_RELEVANT_ROLES:
+            if model_use != "reference_only":
+                raise ValueError(f"coverage_ledger[{index}] excluded evidence must remain reference_only.")
+            if semantic_role is not None and semantic_role not in NOT_MODEL_RELEVANT_ROLES:
                 raise ValueError(f"coverage_ledger[{index}] excludes model-relevant semantic role {semantic_role!r}.")
             if MODEL_RELEVANT_LABEL.search(label) and not (
                 semantic_role == "valuation_market_data" and VALUATION_LABEL.search(label)
@@ -445,13 +632,24 @@ def validate_coverage(
             raise ValueError(f"coverage_ledger[{index}] has duplicate_of without duplicate disposition.")
         if entry.get("review_status") != "reviewed" or not str(entry.get("rationale") or "").strip():
             raise ValueError(f"coverage_ledger[{index}] lacks a reviewed rationale.")
-        resolved = dict(entry)
+        if any(has_numeric_signal(item.get("raw_value")) for item in resolved_cells) and concept_id.startswith("custom.") and model_use != "reference_only":
+            raise ValueError(f"coverage_ledger[{index}] unknown numeric concept must be custom.* reference_only.")
+        resolved = normalized_entry
         resolved["source_cells"] = resolved_cells
         resolved.setdefault("label", expected_entry["label"] if expected_entry else row_label(table, row, min(item["column"] for item in resolved_cells)))
         resolved_ledger.append(resolved)
         by_candidate_id[candidate_id] = resolved
 
-    missing_candidates = sorted(set(expected) - set(by_expected_key))
+    if candidate_manifest is not None:
+        missing_candidate_ids = sorted(set(expected_by_candidate_id) - set(by_candidate_id))
+        if missing_candidate_ids:
+            raise ValueError(
+                f"Broker candidate-manifest coverage is incomplete; {len(missing_candidate_ids)} candidates have no disposition: "
+                + ", ".join(missing_candidate_ids[:8])
+            )
+        missing_candidates = []
+    else:
+        missing_candidates = sorted(set(expected) - set(by_expected_key))
     if missing_candidates:
         preview = ", ".join(f"{table}!R{row}:{basis}" for table, row, basis in missing_candidates[:8])
         raise ValueError(f"Broker forecast coverage is incomplete; {len(missing_candidates)} candidate rows have no disposition: {preview}.")
@@ -465,7 +663,7 @@ def validate_coverage(
             raise ValueError(f"Duplicate candidate {candidate_id!r} points across houses.")
         if target.get("disposition") == "duplicate":
             raise ValueError(f"Duplicate candidate {candidate_id!r} points to another duplicate instead of a canonical candidate.")
-        for field in ("period_basis", "period_indexes", "definition_id", "semantic_role", "evidence_kind"):
+        for field in ("period_basis", "period_indexes", "definition_id", "economic_domain", "concept_id", "evidence_kind", "definition_fingerprint"):
             if target.get(field) != entry.get(field):
                 raise ValueError(f"Duplicate candidate {candidate_id!r} disagrees with its target on {field}.")
         if candidate_value_signature(target) != candidate_value_signature(entry):
@@ -478,10 +676,10 @@ def validate_coverage(
         if entry.get("disposition") in MAPPED_DISPOSITIONS:
             mapped_by_metric.setdefault(entry["metric_id"], []).append(entry)
     for metric_id, entries in mapped_by_metric.items():
-        signatures = {label_definition_signature(entry.get("label", "")) for entry in entries}
+        signatures = {fingerprint_hash(entry.get("definition_fingerprint") or {}) for entry in entries}
         if len(signatures) > 1:
-            rendered = ", ".join(f"{entry['candidate_id']}={list(label_definition_signature(entry.get('label', '')))}" for entry in entries)
-            raise ValueError(f"Metric {metric_id!r} combines incompatible source-definition cues: {rendered}.")
+            rendered = ", ".join(entry["candidate_id"] for entry in entries)
+            raise ValueError(f"Metric {metric_id!r} combines incompatible structured definition fingerprints: {rendered}.")
 
     resolved_derivations = []
     derivation_ids: set[str] = set()
@@ -535,10 +733,12 @@ def validate_coverage(
     summary = {
         "table_count": len(tables),
         "table_review_count": len(review_by_table),
-        "detected_forecast_candidate_count": len(expected),
+        "detected_forecast_candidate_count": len(expected_by_candidate_id) if candidate_manifest is not None else len(expected),
         "coverage_entry_count": len(resolved_ledger),
         "unresolved_candidate_count": 0,
-        "semantic_quality_violation_count": 0,
+        "semantic_quality_violation_count": int(semantic_violation_count),
+        "candidate_manifest_count": len(expected_by_candidate_id),
+        "candidate_authority": "deterministic_manifest" if candidate_manifest is not None else "legacy_reviewer_columns_fail_closed",
         "mapping_count": len(mapping_by_id),
         "derived_mapping_count": len(resolved_derivations),
         "disposition_counts": dict(sorted(disposition_counts.items())),
@@ -584,7 +784,7 @@ def main() -> int:
     output_root.mkdir(parents=True, exist_ok=True)
     if bundle.get("schema_version") != "broker-extraction-bundle/1.0" or bundle.get("gate_status") != "PASS":
         raise ValueError("Broker evidence must be a PASS broker-extraction-bundle/1.0 before semantic mapping.")
-    if crosswalk.get("schema_version") != "broker-crosswalk/1.1":
+    if crosswalk.get("schema_version") not in {"broker-crosswalk/1.1", "broker-crosswalk/1.2"}:
         raise ValueError("Unsupported broker crosswalk schema.")
     if crosswalk.get("run_id") != bundle.get("run_id"):
         raise ValueError("The crosswalk run_id is not bound to the extraction bundle.")
@@ -603,6 +803,27 @@ def main() -> int:
                 raise ValueError(f"Duplicate table_id {table_id!r}.")
             tables[table_id] = (document, table)
 
+    semantic_report = None
+    candidate_manifest = bundle.get("candidate_manifest")
+    if candidate_manifest is not None or crosswalk.get("schema_version") == "broker-crosswalk/1.2":
+        report_path = output_root / "broker-semantic-verification-report.json"
+        verifier = Path(__file__).with_name("verify_broker_semantics.py")
+        process = subprocess.run(
+            [sys.executable, str(verifier), str(Path(args.bundle).resolve()), str(Path(args.crosswalk).resolve()), "--out", str(report_path)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if not report_path.exists():
+            raise ValueError(f"Independent broker semantic verifier produced no report: {process.stderr or process.stdout}")
+        semantic_report = json.loads(report_path.read_text("utf-8"))
+        if semantic_report.get("crosswalk_sha256") != hash_json(crosswalk):
+            raise ValueError("Independent semantic report is not bound to the canonical crosswalk payload.")
+        if process.returncode != 0 or semantic_report.get("status") != "PASS":
+            total = int(semantic_report.get("total_violation_count", -1))
+            print(json.dumps({"status": "BLOCKED", "total_violation_count": total}, sort_keys=True))
+            return 2
+
     if not 3 <= len(documents_by_house) <= 10:
         raise ValueError("A production broker pack requires 3-10 distinct houses.")
     metrics = crosswalk.get("metrics") or {}
@@ -616,10 +837,23 @@ def main() -> int:
     for metric_id, declaration in metrics.items():
         definition_id = declaration.get("definition_id")
         semantic_role = declaration.get("semantic_role")
+        economic_domain = declaration.get("economic_domain") or DOMAIN_BY_LEGACY_ROLE.get(semantic_role)
+        concept_id = declaration.get("concept_id") or metric_id
         if not isinstance(definition_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", definition_id):
             raise ValueError(f"Metric {metric_id!r} requires a valid definition_id.")
-        if semantic_role not in SEMANTIC_ROLES:
+        if crosswalk.get("schema_version") == "broker-crosswalk/1.1" and semantic_role not in SEMANTIC_ROLES:
             raise ValueError(f"Metric {metric_id!r} requires a supported semantic_role.")
+        if economic_domain not in ECONOMIC_DOMAINS:
+            raise ValueError(f"Metric {metric_id!r} requires a supported economic_domain.")
+        if not isinstance(concept_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", concept_id):
+            raise ValueError(f"Metric {metric_id!r} requires a valid concept_id.")
+        if crosswalk.get("schema_version") == "broker-crosswalk/1.2":
+            if declaration.get("evidence_kind") not in EVIDENCE_KINDS:
+                raise ValueError(f"Metric {metric_id!r} requires a supported evidence_kind.")
+            if declaration.get("model_use") not in MODEL_USES:
+                raise ValueError(f"Metric {metric_id!r} requires a supported model_use.")
+            if not isinstance(declaration.get("definition_fingerprint"), dict):
+                raise ValueError(f"Metric {metric_id!r} requires a structured definition_fingerprint.")
         disposition = declaration.get("model_disposition")
         reason = declaration.get("model_disposition_reason")
         if bool(disposition) != bool(isinstance(reason, str) and reason.strip()):
@@ -707,6 +941,8 @@ def main() -> int:
         documents_by_house,
         tables,
         mapping_receipts,
+        candidate_manifest=candidate_manifest,
+        semantic_violation_count=int((semantic_report or {}).get("total_violation_count", 0)),
     )
 
     source_label = crosswalk.get("source_label") or (
@@ -786,7 +1022,7 @@ def main() -> int:
         ],
     }
     receipt = {
-        "schema_version": "broker-crosswalk-receipt/1.1",
+        "schema_version": "broker-crosswalk-receipt/1.2" if crosswalk.get("schema_version") == "broker-crosswalk/1.2" else "broker-crosswalk-receipt/1.1",
         "run_id": bundle["run_id"],
         "bundle_sha256": bundle_sha256,
         "crosswalk_sha256": hashlib.sha256(Path(args.crosswalk).read_bytes()).hexdigest(),
@@ -797,6 +1033,11 @@ def main() -> int:
         "coverage_summary": coverage_summary,
         "coverage_ledger": resolved_coverage,
         "derived_mappings": resolved_derivations,
+        **({
+            "candidate_manifest_sha256": semantic_report["candidate_manifest_sha256"],
+            "crosswalk_canonical_sha256": semantic_report["crosswalk_sha256"],
+            "independent_semantic_report_sha256": hashlib.sha256((output_root / "broker-semantic-verification-report.json").read_bytes()).hexdigest(),
+        } if semantic_report else {}),
         "status": "PASS",
     }
     (output_root / "broker-pack.json").write_text(json.dumps(broker_pack, indent=2, ensure_ascii=False) + "\n", "utf-8")

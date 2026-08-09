@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-crosswalk-receipt.schema.json",
+  "title": "Broker crosswalk compilation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "bundle_sha256", "crosswalk_sha256",
+    "mapping_count", "mappings", "table_reviews_sha256",
+    "coverage_ledger_sha256", "coverage_summary", "coverage_ledger",
+    "derived_mappings", "status"
+  ],
+  "properties": {
+    "schema_version": {"enum": ["broker-crosswalk-receipt/1.1", "broker-crosswalk-receipt/1.2"]},
+    "run_id": {"type": "string", "minLength": 1},
+    "bundle_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "crosswalk_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mapping_count": {"type": "integer", "minimum": 0},
+    "mappings": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["mapping_id", "house_id", "metric_id", "definition_id", "period_index", "components", "constant", "multiplier", "value", "rationale", "review_status"],
+        "properties": {
+          "mapping_id": {"type": "string", "minLength": 1},
+          "house_id": {"type": "string", "minLength": 1},
+          "metric_id": {"type": "string", "minLength": 1},
+          "definition_id": {"type": "string", "minLength": 1},
+          "period_index": {"type": "integer", "minimum": 0},
+          "components": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["table_id", "row", "column", "source_ref", "raw_value", "coefficient", "contribution"],
+              "properties": {
+                "table_id": {"type": "string", "minLength": 1},
+                "row": {"type": "integer", "minimum": 1},
+                "column": {"type": "integer", "minimum": 1},
+                "source_ref": {"type": "string", "minLength": 1},
+                "raw_value": {"type": "number"},
+                "coefficient": {"type": "number"},
+                "contribution": {"type": "number"}
+              }
+            }
+          },
+          "constant": {"type": "number"},
+          "multiplier": {"type": "number"},
+          "value": {"type": "number"},
+          "rationale": {"type": "string", "minLength": 1},
+          "review_status": {"enum": ["auto_exact", "reviewed"]}
+        }
+      }
+    },
+    "table_reviews_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "coverage_ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "coverage_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["table_count", "table_review_count", "detected_forecast_candidate_count", "coverage_entry_count", "unresolved_candidate_count", "semantic_quality_violation_count", "mapping_count", "derived_mapping_count", "disposition_counts"],
+      "properties": {
+        "table_count": {"type": "integer", "minimum": 0},
+        "table_review_count": {"type": "integer", "minimum": 0},
+        "detected_forecast_candidate_count": {"type": "integer", "minimum": 0},
+        "coverage_entry_count": {"type": "integer", "minimum": 0},
+        "unresolved_candidate_count": {"type": "integer", "minimum": 0},
+        "semantic_quality_violation_count": {"type": "integer", "minimum": 0},
+        "candidate_manifest_count": {"type": "integer", "minimum": 0},
+        "candidate_authority": {"enum": ["deterministic_manifest"]},
+        "mapping_count": {"type": "integer", "minimum": 0},
+        "derived_mapping_count": {"type": "integer", "minimum": 0},
+        "disposition_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+      }
+    },
+    "coverage_ledger": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "derived_mappings": {"type": "array", "items": {"type": "object"}},
+    "candidate_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "crosswalk_canonical_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "independent_semantic_report_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "status": {"const": "PASS"}
+  }
+}

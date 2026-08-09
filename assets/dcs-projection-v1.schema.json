@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-projection-v1.schema.json",
+  "title": "Lossless DCS model projection and term authorities",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "source_sha256", "source_tables_sha256", "candidate_manifest_sha256", "crosswalk_sha256", "instrument_authority_contract_version", "term_authorities", "supplemental_fields", "dcs_export"],
+  "properties": {
+    "schema_version": {"const": "dcs-projection/1.0"},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_tables_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidate_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "crosswalk_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "instrument_authority_contract_version": {"const": "dcs_evidence_v1"},
+    "term_authorities": {"type": "array", "items": {"$ref": "#/$defs/authority"}},
+    "supplemental_fields": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["candidate_id", "instrument_id", "term_authorities"],
+        "properties": {
+          "candidate_id": {"type": "string"},
+          "instrument_id": {"type": ["string", "null"]},
+          "term_authorities": {"type": "array", "items": {"$ref": "#/$defs/authority"}}
+        }
+      }
+    },
+    "dcs_export": {"type": "object"}
+  },
+  "$defs": {
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["instrument_id", "model_field", "output_value", "source_cells", "transform", "authority_kind", "precision"],
+      "properties": {
+        "instrument_id": {"type": "string"}, "model_field": {"type": "string"}, "output_value": {},
+        "source_cells": {"type": "array", "items": {"type": "string"}}, "transform": {"type": "object"},
+        "authority_kind": {"enum": ["source_cell", "derived_source_cells", "supplement"]},
+        "precision": {"enum": ["exact", "month", "year", "bucket", "non_maturing"]},
+        "supplement_id": {"type": "string"}, "basis": {"type": "object"}
+      }
+    }
+  }
+}

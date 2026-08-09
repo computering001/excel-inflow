@@ -34,7 +34,7 @@ The chain is:
 raw document bytes
 -> broker-extraction-bundle/1.0
 -> broker-source-tables/1.0
--> broker-crosswalk/1.1 + semantic coverage ledger + PASS receipt
+-> broker-crosswalk/1.2 + semantic coverage ledger + PASS receipt
 -> broker-pack/1.0
 -> model-case broker source mappings
 -> values-only broker evidence sheets
@@ -104,7 +104,7 @@ semantic mapping does not cure an incomplete source extraction.
 
 ## Semantic crosswalk
 
-Create one `broker-crosswalk/1.1` only after the extraction bundle is `PASS`.
+Create one `broker-crosswalk/1.2` only after the extraction bundle is `PASS`.
 Map by stable house id, metric id and forecast period. Each mapped value names
 one or more source table cells, a coefficient, optional constant, optional
 multiplier, rationale and review status. This declarative form supports a direct
@@ -227,11 +227,30 @@ Create the raw extraction bundle outside the immutable skill tree:
 python3 scripts/extract_broker_evidence.py <broker-extraction-request.json> --out <run-folder>/extract
 ```
 
+Independently recompute the whole-surface census before accepting native table
+coverage. A partial native table never excuses uncovered numeric regions:
+
+```text
+python3 scripts/compile_broker_surface_census.py <bundle.json> --out <run-folder>/broker-surface-census.json
+```
+
 If the result is `NEEDS_VISION`, produce two independent results for every
 emitted task and merge them:
 
 ```text
 python3 scripts/compile_broker_vision.py <bundle.json> --responses <responses-folder> --out <verified-bundle.json>
+```
+
+The vision compiler reconciles native and image contributors into canonical
+tables and compiles the immutable candidate manifest from those tables. Header,
+period and candidate membership cannot come from the reviewer-authored
+crosswalk.
+
+Challenge the reviewed crosswalk with the independent semantic oracle before
+pack compilation:
+
+```text
+python3 scripts/verify_broker_semantics.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker-semantic-verification-report.json
 ```
 
 Compile the verified evidence and reviewed crosswalk:

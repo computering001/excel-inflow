@@ -104,6 +104,96 @@ function instrumentOf(modelCase, instrumentId) {
   );
 }
 
+function applyFacilityCommitment(modelCase, row, committed) {
+  if (committed) return modelCase;
+  const capacity = facilityLimit(row);
+  // Uncommitted capacity is not liquidity. Keep the aggregate RCF policy and
+  // the model-driving facility in lockstep; a stated source value must have the
+  // same economics as the equivalent stage-3 answer.
+  if (modelCase.rcf_policy) {
+    modelCase.rcf_policy.capacity = Math.max(
+      0,
+      Number(modelCase.rcf_policy.capacity) - capacity,
+    );
+    const revolver = instrumentOf(
+      modelCase,
+      modelCase.rcf_policy.instrument_id,
+    );
+    if (revolver) revolver.facility_capacity = modelCase.rcf_policy.capacity;
+  }
+  const instrument = instrumentOf(modelCase, row.instrument_id);
+  if (instrument && instrument.class !== "rcf") {
+    instrument.facility_capacity = 0;
+  }
+  return modelCase;
+}
+
+function applyCommercialPaperBackstop(modelCase, backstopped) {
+  if (backstopped) return modelCase;
+  for (const instrument of modelCase.instruments ?? []) {
+    if (instrument.class === "commercial_paper") {
+      instrument.class = "other_debt";
+    }
+  }
+  return modelCase;
+}
+
+function applyRefinancingIntent(modelCase, row, intent) {
+  const instrument = instrumentOf(modelCase, row.instrument_id);
+  if (!instrument) return modelCase;
+  const normalised = String(intent ?? "").toLowerCase();
+  if (normalised === "refinanced") {
+    const maturityYear = yearOf(row.maturity_date);
+    instrument.maturity_treatment = "non_maturing_within_forecast";
+    instrument.maturity_date = null;
+    instrument.assumption_note = `Refinanced at its ${maturityYear} maturity and carried across the forecast, per source-backed refinancing intent.`;
+  } else if (normalised === "repaid") {
+    instrument.maturity_treatment = "contractual";
+  }
+  return modelCase;
+}
+
+/**
+ * Apply decisions that the source evidence has already settled.
+ *
+ * A populated DCS field must not merely suppress its corresponding question:
+ * it must drive exactly the same case mutation as that question's answer. This
+ * function is deliberately small and semantic; it knows instrument IDs and
+ * declared policy fields, never workbook rows or issuer names.
+ */
+export function applyExplicitSourcePolicies({ modelCase, intake }) {
+  let next = modelCase;
+  const applied = new Map();
+  for (const row of exportInstruments(intake)) {
+    if (row.committed === true || row.committed === false) {
+      next = applyFacilityCommitment(next, row, row.committed);
+      applied.set(
+        `facility_commitment:${row.instrument_id}`,
+        row.committed ? "yes" : "no",
+      );
+    }
+    if (
+      row.is_backstop_for_paper === true ||
+      row.is_backstop_for_paper === false
+    ) {
+      next = applyCommercialPaperBackstop(
+        next,
+        row.is_backstop_for_paper,
+      );
+      applied.set(
+        `commercial_paper_backstop:${row.instrument_id}`,
+        row.is_backstop_for_paper ? "yes" : "no",
+      );
+    }
+    const intent = String(row.refinancing_intent ?? "").toLowerCase();
+    if (intent === "refinanced" || intent === "repaid") {
+      next = applyRefinancingIntent(next, row, intent);
+      applied.set(`refinance_at_maturity:${row.instrument_id}`, intent);
+    }
+  }
+  return { modelCase: next, applied };
+}
+
 function forecastYears(modelCase) {
   return (modelCase.periods ?? [])
     .filter((period) => period.status === "forecast")
@@ -157,33 +247,8 @@ const KINDS = [
               {
                 id: "no",
                 word: "no",
-                apply: (modelCase) => {
-                  // Uncommitted capacity is not liquidity. The case contract
-                  // requires the policy capacity and the revolver instrument's
-                  // own capacity to agree, so both move together or neither
-                  // branch solves.
-                  if (modelCase.rcf_policy) {
-                    modelCase.rcf_policy.capacity = Math.max(
-                      0,
-                      Number(modelCase.rcf_policy.capacity) - capacity,
-                    );
-                    const revolver = instrumentOf(
-                      modelCase,
-                      modelCase.rcf_policy.instrument_id,
-                    );
-                    if (revolver) {
-                      revolver.facility_capacity = modelCase.rcf_policy.capacity;
-                    }
-                  }
-                  const instrument = instrumentOf(
-                    modelCase,
-                    row.instrument_id,
-                  );
-                  if (instrument && instrument.class !== "rcf") {
-                    instrument.facility_capacity = 0;
-                  }
-                  return modelCase;
-                },
+                apply: (modelCase) =>
+                  applyFacilityCommitment(modelCase, row, false),
               },
             ],
             // A facility carried in a DCS debt export with a stated capacity is
@@ -241,14 +306,8 @@ const KINDS = [
               {
                 id: "no",
                 word: "no",
-                apply: (modelCase) => {
-                  for (const instrument of modelCase.instruments ?? []) {
-                    if (instrument.class === "commercial_paper") {
-                      instrument.class = "other_debt";
-                    }
-                  }
-                  return modelCase;
-                },
+                apply: (modelCase) =>
+                  applyCommercialPaperBackstop(modelCase, false),
               },
             ],
             default_option: "yes",
@@ -304,33 +363,14 @@ const KINDS = [
               {
                 id: "refinanced",
                 word: "refinanced",
-                apply: (modelCase) => {
-                  const instrument = instrumentOf(modelCase, row.instrument_id);
-                  if (instrument) {
-                    instrument.maturity_treatment =
-                      "non_maturing_within_forecast";
-                    // The solver keys repayment off maturity_date and the
-                    // debt_maturities_roll control; maturity_treatment is a
-                    // documentation field it does not read. Clearing the date
-                    // is therefore what actually carries the instrument past
-                    // the forecast, and the treatment records why.
-                    instrument.maturity_date = null;
-                    // The case contract requires a note whenever an instrument
-                    // is held past its contractual maturity. The note is the
-                    // answer itself, so it can never go missing.
-                    instrument.assumption_note = `Refinanced at its ${maturityYear} maturity and carried across the forecast, per the stage-3 answer.`;
-                  }
-                  return modelCase;
-                },
+                apply: (modelCase) =>
+                  applyRefinancingIntent(modelCase, row, "refinanced"),
               },
               {
                 id: "repaid",
                 word: "repaid",
-                apply: (modelCase) => {
-                  const instrument = instrumentOf(modelCase, row.instrument_id);
-                  if (instrument) instrument.maturity_treatment = "contractual";
-                  return modelCase;
-                },
+                apply: (modelCase) =>
+                  applyRefinancingIntent(modelCase, row, "repaid"),
               },
             ],
             // Contractual terms are what the filings evidence. A refinancing

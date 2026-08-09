@@ -4,7 +4,7 @@
  "central_instruction_source": "compiled",
  "default_reference_policy": "central-only-first",
  "instruction_strip_rules_runtime": [],
- "_note": "This file is the single source of truth for what ships to deployment host. scripts/compile_skill_release.mjs reads every list below; it holds no duplicate hardcoded set. script_allowlist is the transitive import closure of script_entry_points and is verified against a freshly computed closure on every compile — a disagreement fails the build rather than shipping a package that cannot resolve. python_module_allowlist is the same statement for the three Python packages, computed by the same both-directions rule from an `ast` walk rather than a regex.",
+ "_note": "This file is the single source of truth for what ships to deployment host. scripts/compile_skill_release.mjs reads every list below; it holds no duplicate hardcoded set. script_allowlist is the transitive import closure of script_entry_points and is verified against a freshly computed closure on every compile — a disagreement fails the build rather than shipping a package that cannot resolve. python_module_allowlist is the same statement for every Python runtime module, computed by the same both-directions rule from an `ast` walk rather than a regex.",
  "reference_allowlist": [
   "runtime-core.md",
   "model-contract.md",
@@ -22,10 +22,23 @@
   "broker-extraction-bundle.schema.json",
   "broker-vision-result.schema.json",
   "broker-crosswalk.schema.json",
+  "broker-crosswalk-receipt.schema.json",
   "broker-source-tables.schema.json",
+  "broker-candidate-manifest.schema.json",
+  "broker-canonical-tables.schema.json",
+  "broker-semantic-verification-report.schema.json",
+  "broker-surface-census.schema.json",
   "authority-projection-overrides.v3.json",
-    "dcs-export.schema.json",
-    "evidence-run-v1.schema.json",
+  "dcs-export.schema.json",
+  "dcs-candidate-manifest-v1.schema.json",
+  "dcs-crosswalk-v1.schema.json",
+  "dcs-evidence-receipt-v1.schema.json",
+  "dcs-extraction-receipt-v1.schema.json",
+  "dcs-extraction-request-v1.schema.json",
+  "dcs-independent-verification-v1.schema.json",
+  "dcs-projection-v1.schema.json",
+  "dcs-source-tables-v1.schema.json",
+  "evidence-run-v1.schema.json",
   "lineage-exceptions.json",
   "model-case-v2.schema.json",
   "model-case.schema.json",
@@ -48,8 +61,21 @@
     "broker-extraction-bundle.schema.json": "Lossless broker evidence bundle contract; loaded through the attachment-ingress schema helper and retained for independent validation.",
     "broker-vision-result.schema.json": "Hash-bound independent image-table transcription contract; responses are inputs to the vision consensus compiler.",
     "broker-crosswalk.schema.json": "Declarative cell-addressed broker crosswalk contract; consumed by the stdlib broker-pack compiler.",
+    "broker-crosswalk-receipt.schema.json": "Hash-bound broker mapping and semantic-gate receipt contract loaded through the attachment-ingress schema helper.",
     "broker-source-tables.schema.json": "Structured full-table evidence contract loaded through the attachment-ingress schema helper.",
+    "broker-candidate-manifest.schema.json": "Immutable broker candidate-universe contract retained for independent validation.",
+    "broker-canonical-tables.schema.json": "Canonical broker-table contract retained for independent validation.",
+    "broker-semantic-verification-report.schema.json": "Independent broker semantic-verification report contract loaded through the attachment-ingress schema helper.",
+    "broker-surface-census.schema.json": "Whole-surface broker census contract retained for independent validation.",
     "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
+    "dcs-candidate-manifest-v1.schema.json": "Lossless DCS candidate-universe contract loaded through the attachment-ingress schema helper.",
+    "dcs-crosswalk-v1.schema.json": "Cell-addressed DCS crosswalk contract loaded through the attachment-ingress schema helper.",
+    "dcs-evidence-receipt-v1.schema.json": "DCS compiler receipt contract loaded through the attachment-ingress schema helper.",
+    "dcs-extraction-receipt-v1.schema.json": "Lossless DCS extraction receipt contract retained for independent validation.",
+    "dcs-extraction-request-v1.schema.json": "Lossless DCS extraction request contract consumed before the extractor runs.",
+    "dcs-independent-verification-v1.schema.json": "Independent DCS verification report contract loaded through the attachment-ingress schema helper.",
+    "dcs-projection-v1.schema.json": "DCS model-projection and term-authority contract loaded through the attachment-ingress schema helper.",
+    "dcs-source-tables-v1.schema.json": "Lossless DCS source-cell ledger contract loaded through the attachment-ingress schema helper.",
     "lineage-exceptions.json": "L0 immutable exception registry. Named as immutable-at-runtime; must be present so a runtime exception claim can be checked against it.",
     "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
     "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
@@ -71,7 +97,7 @@
   "validate_structure.mjs",
   "validate_style_tokens.mjs"
  ],
- "_entry_point_note": "Twelve entry points, none assumed discoverable from all the others. run_user_flow.mjs is the resumable five-stage production shell; flow_cli.mjs remains the lower-level deterministic diagnostic shell. orchestrate_release.mjs is the portable fail-closed production controller; the private-tool orchestrate.mjs remains local-certification-only and does not ship. The portable validators are explicit entry points because the economics CLI does not import them. build_dynamic_model.mjs ships in --plan-only form for the portable Python renderer. Its private --out writer path remains outside the release. The full standardised-authority validator and its mutation suite remain local certification tools. validate_dynamic_model.mjs and validate_model.mjs remain absent because they import private workbook library, which is private, native and unvendorable.",
+ "_entry_point_note": "Thirteen JavaScript entry points, none assumed discoverable from all the others. run_user_flow.mjs is the resumable five-stage production shell; flow_cli.mjs remains the lower-level deterministic diagnostic shell. orchestrate_release.mjs is the portable fail-closed production controller; the private-tool orchestrate.mjs remains local-certification-only and does not ship. The portable validators are explicit entry points because the economics CLI does not import them. build_dynamic_model.mjs ships in --plan-only form for the portable Python renderer. Its private --out writer path remains outside the release. The full standardised-authority validator and its mutation suite remain local certification tools. validate_dynamic_model.mjs and validate_model.mjs remain absent because they import private workbook library, which is private, native and unvendorable.",
  "script_allowlist": [
   "build_dynamic_model.mjs",
   "compile_evidence_run.mjs",
@@ -150,11 +176,16 @@
    "note": "Shipped as the pre-built UMD bundle so the vendored copy has no transitive dependencies of its own. It sits at node_modules/jszip because that is where Node resolves a bare specifier; the shipped validators are byte-identical to their local sources and must stay that way for source parity."
   }
  ],
- "_python_note": "Three Python packages ship alongside the JavaScript closure. They are held to the same standard: the closure is COMPUTED from python_entry_points by an ast walk (never a regex — this tree has docstring lines beginning `from ...` that a regex reads as imports) and compared with python_module_allowlist in both directions; a disagreement fails the build. Third-party imports are checked against allowed_python_third_party_imports exactly as a bare JS specifier is checked against allowed_bare_imports.",
+ "_python_note": "The Python runtime modules ship alongside the JavaScript closure. They are held to the same standard: the closure is COMPUTED from python_entry_points by an ast walk (never a regex — this tree has docstring lines beginning `from ...` that a regex reads as imports) and compared with python_module_allowlist in both directions; a disagreement fails the build. Third-party imports are checked against allowed_python_third_party_imports exactly as a bare JS specifier is checked against allowed_bare_imports.",
  "python_entry_points": [
   "extract_broker_evidence.py",
   "compile_broker_vision.py",
   "compile_broker_pack.py",
+  "compile_broker_surface_census.py",
+  "verify_broker_semantics.py",
+  "extract_dcs_evidence.py",
+  "compile_dcs_evidence.py",
+  "verify/dcs_evidence_oracle.py",
   "emit/__main__.py",
   "render/check_render.py",
   "render/selftest.py",
@@ -164,8 +195,8 @@
   "verify/validate_dynamic_model.py",
   "verify/workbook_semantic_oracle.py"
  ],
- "_python_entry_point_note": "Why each entry is distinct from a module the closure happens to reach. emit/__main__.py is the Phase 2 renderer CLI. render/check_render.py and render/selftest.py prove image checks and their injected-defect behavior. verify/finance_proof.py is the independent finance oracle and verify/run_finance_proof_mutations.py proves that oracle detects targeted corruption. verify/run_deterministic_tests.py is the stdlib-only determinism harness. verify/validate_dynamic_model.py is the portable Python model validator.",
- "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship WITHOUT a runnable command naming them. It is empty because none do: the instructions now carry a python3 command for all eight, and the compiler reports entryPointsUncommandedByInstructions as empty. The former blanket exemptions were deleted rather than kept as description; a note that outlives its condition silently satisfies the assertion for the wrong entry point. Add an entry here only when an entry point actually loses its command.",
+ "_python_entry_point_note": "Sixteen Python entry points are independently runnable. The broker and DCS entries own lossless evidence capture, independent census/semantic verification and term-authority compilation. emit/__main__.py is the Phase 2 renderer CLI. render/check_render.py and render/selftest.py prove image checks and their injected-defect behavior. verify/finance_proof.py is the independent finance oracle and verify/run_finance_proof_mutations.py proves that oracle detects targeted corruption. verify/run_deterministic_tests.py is the stdlib-only determinism harness. verify/validate_dynamic_model.py is the portable Python model validator.",
+ "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship WITHOUT a runnable command naming them. It is empty because none do: the instructions carry a python3 command for all sixteen, and the compiler reports entryPointsUncommandedByInstructions as empty. The former blanket exemptions were deleted rather than kept as description; a note that outlives its condition silently satisfies the assertion for the wrong entry point. Add an entry here only when an entry point actually loses its command.",
  "python_entry_point_notes": {},
  "python_entry_point_smoke": {
   "extract_broker_evidence.py": {
@@ -182,6 +213,31 @@
    "argv": ["--help"],
    "expect_exit": [0],
    "expect_output_contains": "usage: compile_broker_pack.py"
+  },
+  "compile_broker_surface_census.py": {
+   "argv": ["--help"],
+   "expect_exit": [0],
+   "expect_output_contains": "usage: compile_broker_surface_census.py"
+  },
+  "verify_broker_semantics.py": {
+   "argv": ["--help"],
+   "expect_exit": [0],
+   "expect_output_contains": "usage: verify_broker_semantics.py"
+  },
+  "extract_dcs_evidence.py": {
+   "argv": ["--help"],
+   "expect_exit": [0],
+   "expect_output_contains": "usage: extract_dcs_evidence.py"
+  },
+  "compile_dcs_evidence.py": {
+   "argv": ["--help"],
+   "expect_exit": [0],
+   "expect_output_contains": "usage: compile_dcs_evidence.py"
+  },
+  "verify/dcs_evidence_oracle.py": {
+   "argv": ["--help"],
+   "expect_exit": [0],
+   "expect_output_contains": "usage: dcs_evidence_oracle.py"
   },
   "_note": "What running each entry point from the clean release root must produce. Exit status alone is not the contract: two of these treat --help as an unrecognised argument and exit 1 with a usage line, and an entry point that had lost its imports would also exit non-zero. The required substring is what separates the two.",
   "emit/__main__.py": {
@@ -261,6 +317,12 @@
   "extract_broker_evidence.py",
   "compile_broker_vision.py",
   "compile_broker_pack.py",
+  "compile_broker_candidate_manifest.py",
+  "compile_broker_canonical_tables.py",
+  "compile_broker_surface_census.py",
+  "verify_broker_semantics.py",
+  "extract_dcs_evidence.py",
+  "compile_dcs_evidence.py",
   "emit/__init__.py",
   "emit/__main__.py",
   "emit/patch.py",
@@ -286,6 +348,7 @@
   "verify/invariants.py",
   "verify/run_finance_proof_mutations.py",
   "verify/run_deterministic_tests.py",
+  "verify/dcs_evidence_oracle.py",
   "verify/tolerances.py",
   "verify/validate_dynamic_model.py",
   "verify/workbook_semantic_oracle.py",
@@ -392,6 +455,30 @@
   "compile_broker_pack.py": {
    "may_import_third_party": [],
    "reason": "The broker crosswalk compiler is stdlib-only and operates only on already verified evidence artifacts."
+  },
+  "compile_broker_candidate_manifest.py": {
+   "may_import_third_party": [],
+   "reason": "The immutable broker candidate-universe compiler is stdlib-only and cannot inherit reviewer-authored semantic classifications."
+  },
+  "compile_broker_canonical_tables.py": {
+   "may_import_third_party": [],
+   "reason": "The canonical broker-table compiler is stdlib-only and reconciles already captured native and vision contributors."
+  },
+  "compile_broker_surface_census.py": {
+   "may_import_third_party": [],
+   "reason": "The independent broker whole-surface census compiler is stdlib-only and recomputes coverage from hash-bound capture artifacts."
+  },
+  "verify_broker_semantics.py": {
+   "may_import_third_party": [],
+   "reason": "The broker semantic oracle is stdlib-only and deliberately shares no compiler implementation with the broker-pack compiler."
+  },
+  "extract_dcs_evidence.py": {
+   "may_import_third_party": [],
+   "reason": "The lossless DCS extractor is stdlib-only and reads CSV, JSON and OOXML directly into a source-owned cell ledger."
+  },
+  "compile_dcs_evidence.py": {
+   "may_import_third_party": [],
+   "reason": "The DCS term-authority compiler is stdlib-only and operates only on sealed source tables, the immutable manifest and a reviewed cell crosswalk."
   },
   "emit": {
    "may_import_third_party": [

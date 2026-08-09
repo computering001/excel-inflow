@@ -36,6 +36,15 @@
       "enum": ["legacy", "authority_v1"],
       "description": "authority_v1 requires every visible non-header statement row to declare whether its historical cells are sourced inputs, derived formulas, reported totals reconciled to visible components, or links to a schedule authority."
     },
+    "instrument_authority_contract_version": {
+      "const": "dcs_evidence_v1",
+      "description": "dcs_evidence_v1 proves every model-driving debt term against the immutable, per-run DCS evidence ledger. It is optional only for archived diagnostic fixtures; a production attachment-ingress run requires it."
+    },
+    "instrument_term_authorities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/instrumentTermAuthority" },
+      "description": "Field-level authorities copied from the validated DCS projection. These records are proof metadata, not an alternative instrument register."
+    },
     "presentation_profile": {
       "const": "crh_dynamic",
       "default": "crh_dynamic"
@@ -548,7 +557,56 @@
       "description": "Predecessor or calendarised historical contributors expressed in reporting-currency semantic metrics. The production compiler combines these values, less metric-specific eliminations, into the first three periods of the canonical case."
     }
   },
+  "allOf": [
+    {
+      "if": {"required": ["instrument_authority_contract_version"]},
+      "then": {
+        "required": ["instrument_term_authorities"],
+        "properties": {"instrument_term_authorities": {"minItems": 1}}
+      }
+    },
+    {
+      "if": {"required": ["instrument_term_authorities"]},
+      "then": {"required": ["instrument_authority_contract_version"]}
+    }
+  ],
   "$defs": {
+    "instrumentTermAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "model_field",
+        "output_value",
+        "source_cells",
+        "transform",
+        "authority_kind",
+        "precision"
+      ],
+      "properties": {
+        "instrument_id": { "type": "string", "minLength": 1 },
+        "model_field": { "type": "string", "minLength": 1 },
+        "output_value": {},
+        "source_cells": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "transform": { "type": "object" },
+        "authority_kind": { "enum": ["source_cell", "derived_source_cells", "supplement"] },
+        "precision": { "enum": ["exact", "month", "year", "bucket", "non_maturing"] },
+        "supplement_id": { "type": "string", "minLength": 1 },
+        "basis": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "authority_kind": { "const": "supplement" } },
+            "required": ["authority_kind"]
+          },
+          "then": { "required": ["supplement_id"] }
+        }
+      ]
+    },
     "historicalPeriod": {
       "type": "object",
       "additionalProperties": false,

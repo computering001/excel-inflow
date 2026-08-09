@@ -12,6 +12,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from compile_broker_candidate_manifest import compile_manifest
+from compile_broker_canonical_tables import canonicalise_bundle
+
 
 NUMERIC_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?%?\)?|[-+]?\d+(?:\.\d+)?x)(?![A-Za-z])",
@@ -24,6 +27,77 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def bind_final_surface_census(
+    *, bundle: dict[str, Any], document: dict[str, Any], surface: dict[str, Any]
+) -> None:
+    """Write a new immutable census after independent vision has completed.
+
+    The extraction-time census is never overwritten. Vision can legitimately
+    discover numeric content on a surface whose native lanes were empty, so the
+    verified bundle must point at a successor census whose bytes bind that
+    independently observed surface universe.
+    """
+    artifacts = {item["artifact_id"]: item for item in document.get("artifacts", [])}
+    prior = artifacts.get(surface.get("surface_census_artifact_id"))
+    artifact_root = Path(str(bundle.get("artifact_root") or "")).resolve()
+    prior_payload: dict[str, Any] = {}
+    if prior and artifact_root:
+        prior_path = (artifact_root / str(prior.get("path") or "")).resolve()
+        if prior_path.is_file():
+            prior_payload = json.loads(prior_path.read_text("utf-8"))
+    payload = {
+        **prior_payload,
+        "schema_version": "broker-surface-census/1.0",
+        "document_id": document["document_id"],
+        "surface_id": surface["surface_id"],
+        "kind": surface["kind"],
+        "whole_surface_numeric_token_count": surface.get(
+            "whole_surface_numeric_token_count"
+        ),
+        "source_numeric_tokens": list(
+            surface.get("vision_source_census", {}).get(
+                "source_numeric_tokens",
+                surface.get("source_table_numeric_tokens", []),
+            )
+        ),
+        "source_table_numeric_tokens": list(
+            surface.get("source_table_numeric_tokens", [])
+        ),
+        "table_discovery_lanes": copy.deepcopy(
+            surface.get("table_discovery_lanes", [])
+        ),
+        "uncovered_numeric_regions": copy.deepcopy(
+            surface.get("uncovered_numeric_regions", [])
+        ),
+        "material_uncovered_region_count": sum(
+            1
+            for region in surface.get("uncovered_numeric_regions", [])
+            if region.get("material")
+            and region.get("disposition") not in {"covered", "covered_by_vision"}
+        ),
+    }
+    relative = Path("artifacts") / document["document_id"] / "census-final" / f"{surface['surface_id']}.json"
+    output = (artifact_root / relative).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    encoded = (json.dumps(payload, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    output.write_bytes(encoded)
+    artifact_id = f"{document['document_id']}.census-final-{surface['surface_id']}.json"
+    document.setdefault("artifacts", []).append(
+        {
+            "artifact_id": artifact_id,
+            "kind": "surface_census",
+            "path": relative.as_posix(),
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+        }
+    )
+    surface["artifact_refs"] = [
+        item
+        for item in surface.get("artifact_refs", [])
+        if item != surface.get("surface_census_artifact_id")
+    ] + [artifact_id]
+    surface["surface_census_artifact_id"] = artifact_id
 
 
 def canonical(value: Any) -> str:
@@ -50,6 +124,14 @@ def comparable_tables(tables: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def comparable_response(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "tables": comparable_tables(result.get("tables", [])),
+        "footnotes": sorted(normalise_scalar(item) for item in result.get("footnotes", []) if normalise_scalar(item)),
+        "surface_numeric_tokens": sorted(str(item) for item in result.get("surface_numeric_tokens", [])),
+    }
+
+
 def numeric_token(value: Any) -> str | None:
     if value is None or isinstance(value, bool):
         return None
@@ -69,7 +151,7 @@ def numeric_token(value: Any) -> str | None:
     return base + suffix
 
 
-def make_cell(value: Any, row: int, column: int, source_ref: str) -> dict[str, Any]:
+def make_cell(value: Any, row: int, column: int, source_ref: str, bbox: Any = None) -> dict[str, Any]:
     if value is None:
         kind = "blank"
     elif isinstance(value, bool):
@@ -86,7 +168,7 @@ def make_cell(value: Any, row: int, column: int, source_ref: str) -> dict[str, A
         "value_kind": kind,
         "number_format": None,
         "formula": None,
-        "bbox": None,
+        "bbox": bbox,
         "source_ref": source_ref,
         "confidence": 1.0,
     }
@@ -97,9 +179,17 @@ def accepted_tables(result: dict[str, Any], surface_id: str, source_name: str) -
     for table_index, raw_table in enumerate(result.get("tables", []), start=1):
         table_id = f"{surface_id}.vision-t{table_index}"
         rows = []
+        cell_bboxes = raw_table.get("cell_bboxes") or []
         for row_index, raw_row in enumerate(raw_table.get("rows", []), start=1):
             rows.append([
-                make_cell(value, row_index, column_index, f"{source_name}#{surface_id};vision-table={table_index};r={row_index};c={column_index}")
+                make_cell(
+                    value,
+                    row_index,
+                    column_index,
+                    f"{source_name}#{surface_id};vision-table={table_index};r={row_index};c={column_index}",
+                    cell_bboxes[row_index - 1][column_index - 1]
+                    if row_index <= len(cell_bboxes) and column_index <= len(cell_bboxes[row_index - 1]) else None,
+                )
                 for column_index, value in enumerate(raw_row, start=1)
             ])
         compiled.append({
@@ -108,6 +198,11 @@ def accepted_tables(result: dict[str, Any], surface_id: str, source_name: str) -
             "source_location": f"{surface_id}, vision table {table_index}",
             "title": raw_table.get("title"),
             "units": raw_table.get("units"),
+            "footnotes": sorted({
+                str(note).strip()
+                for note in [*raw_table.get("footnotes", []), *result.get("footnotes", [])]
+                if str(note).strip()
+            }),
             "bbox": raw_table.get("bbox"),
             "extraction_method": "manual_verified" if result.get("pass_index") == "resolution" else "vision_pass_consensus",
             "confidence": 1.0,
@@ -116,7 +211,7 @@ def accepted_tables(result: dict[str, Any], surface_id: str, source_name: str) -
     return compiled
 
 
-def add_vision_tokens(document: dict[str, Any], tables: list[dict[str, Any]]) -> None:
+def table_numeric_tokens(tables: list[dict[str, Any]]) -> list[str]:
     tokens = []
     for table in tables:
         for row in table["rows"]:
@@ -124,7 +219,17 @@ def add_vision_tokens(document: dict[str, Any], tables: list[dict[str, Any]]) ->
                 token = numeric_token(cell.get("raw_text"))
                 if token is not None:
                     tokens.append(token)
-    document["numeric_ledger"]["source_tokens"].extend(tokens)
+    return tokens
+
+
+def add_vision_tokens(document: dict[str, Any], tables: list[dict[str, Any]], *, independent_source_tokens: list[str] | None = None,
+                      replace_source: bool = False) -> None:
+    tokens = table_numeric_tokens(tables)
+    if independent_source_tokens is not None:
+        if replace_source:
+            document["numeric_ledger"]["source_tokens"] = list(independent_source_tokens)
+        else:
+            document["numeric_ledger"]["source_tokens"].extend(independent_source_tokens)
     document["numeric_ledger"]["captured_tokens"].extend(tokens)
     source = Counter(document["numeric_ledger"]["source_tokens"])
     captured = Counter(document["numeric_ledger"]["captured_tokens"])
@@ -132,6 +237,18 @@ def add_vision_tokens(document: dict[str, Any], tables: list[dict[str, Any]]) ->
     duplicate = captured - source
     document["numeric_ledger"]["missing_tokens"] = sorted(k for k, n in missing.items() for _ in range(n))
     document["numeric_ledger"]["duplicate_tokens"] = sorted(k for k, n in duplicate.items() for _ in range(n))
+    count = sum(source.values())
+    document["numeric_ledger"]["recall"] = 1.0 if count == 0 else (count - sum(missing.values())) / count
+
+
+def recompute_ledger(document: dict[str, Any]) -> None:
+    document["numeric_ledger"]["captured_tokens"] = table_numeric_tokens(document.get("tables", []))
+    source = Counter(document["numeric_ledger"].get("source_tokens", []))
+    captured = Counter(document["numeric_ledger"]["captured_tokens"])
+    missing = source - captured
+    duplicate = captured - source
+    document["numeric_ledger"]["missing_tokens"] = sorted(token for token, count in missing.items() for _ in range(count))
+    document["numeric_ledger"]["duplicate_tokens"] = sorted(token for token, count in duplicate.items() for _ in range(count))
     count = sum(source.values())
     document["numeric_ledger"]["recall"] = 1.0 if count == 0 else (count - sum(missing.values())) / count
 
@@ -201,6 +318,7 @@ def main() -> int:
                 and result.get("image_sha256") == image_artifact["sha256"]
                 and result.get("pass_index") == index
                 and str(result.get("producer_id") or "").strip()
+                and str(result.get("producer_fingerprint") or "").strip()
                 and result.get("method") in {"ocr_geometry", "vision_model", "manual_transcription"}
                 for index, result in enumerate(passes, start=1)
             )
@@ -208,11 +326,14 @@ def main() -> int:
                 unresolved += 1
                 findings.append({"id": "broker_vision.response_binding_invalid", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "A vision response is not bound to the source image, surface and pass number."})
                 continue
-            if passes[0]["producer_id"] == passes[1]["producer_id"]:
+            if (
+                passes[0]["producer_id"] == passes[1]["producer_id"]
+                or passes[0]["producer_fingerprint"] == passes[1]["producer_fingerprint"]
+            ):
                 unresolved += 1
-                findings.append({"id": "broker_vision.passes_not_independent", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Pass 1 and pass 2 declare the same producer_id; independent runs are required."})
+                findings.append({"id": "broker_vision.passes_not_independent", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Pass 1 and pass 2 must have distinct producer IDs and execution fingerprints; renaming one producer is not independence."})
                 continue
-            if canonical(comparable_tables(passes[0]["tables"])) == canonical(comparable_tables(passes[1]["tables"])):
+            if canonical(comparable_response(passes[0])) == canonical(comparable_response(passes[1])):
                 accepted = passes[0]
             elif resolution_path.is_file():
                 resolution = json.loads(resolution_path.read_text("utf-8"))
@@ -235,16 +356,84 @@ def main() -> int:
                 findings.append({"id": "broker_vision.pass_disagreement", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Independent image-table transcriptions disagree; a reviewed resolution is required."})
                 continue
             new_tables = accepted_tables(accepted, surface_id, document["file_name"])
+            material_surface = surface.get("kind") == "image_page" or any(
+                region.get("material") for region in surface.get("uncovered_numeric_regions", [])
+            )
+            if material_surface and not new_tables:
+                unresolved += 1
+                findings.append({"id": "broker_vision.vacuous_consensus", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Two empty transcriptions cannot certify a material image or uncovered numeric region."})
+                continue
+            if any(not table.get("rows") or not any(any(str(cell.get("raw_text") or "").strip() for cell in row) for row in table["rows"]) for table in new_tables):
+                unresolved += 1
+                findings.append({"id": "broker_vision.empty_table", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "A vision table is empty and cannot certify source coverage."})
+                continue
             document["tables"].extend(new_tables)
-            add_vision_tokens(document, new_tables)
+            vision_tokens = [
+                numeric_token(value)
+                for table in passes[1].get("tables", [])
+                for row in table.get("rows", [])
+                for value in row
+                if numeric_token(value) is not None
+            ]
+            existing_tokens = list(surface.get("source_table_numeric_tokens") or [])
+            # Pass 2 is an independent whole-surface denominator. Native table
+            # tokens already owned by another extraction lane are not counted
+            # twice; only the positive multiset difference is added. This is
+            # what makes a partially captured PDF page lossless without
+            # inflating repeated values that both lanes correctly saw.
+            existing_counts = Counter(existing_tokens)
+            extra_counts = Counter(vision_tokens) - existing_counts
+            independent_tokens = list(extra_counts.elements())
+            if surface.get("kind") == "image_page":
+                combined_tokens = list(vision_tokens)
+                independent_tokens = list(vision_tokens)
+            else:
+                combined_tokens = existing_tokens + independent_tokens
+            surface["source_table_numeric_tokens"] = combined_tokens
+            surface["whole_surface_numeric_token_count"] = len(combined_tokens)
+            surface["vision_source_census"] = {
+                "source": "independent_pass_2",
+                "producer_id": passes[1]["producer_id"],
+                "producer_fingerprint": passes[1]["producer_fingerprint"],
+                "image_sha256": image_artifact["sha256"],
+                "source_numeric_tokens": list(vision_tokens),
+                "newly_owned_numeric_tokens": list(independent_tokens),
+            }
+            add_vision_tokens(
+                document,
+                new_tables,
+                independent_source_tokens=independent_tokens,
+                replace_source=surface.get("kind") == "image_page",
+            )
             surface["table_count"] += len(new_tables)
             surface["lane_status"]["vision"] = "complete"
             surface["vision_reason"] = None
+            for region in surface.get("uncovered_numeric_regions", []):
+                if region.get("material"):
+                    region["disposition"] = "covered_by_vision"
+            bind_final_surface_census(
+                bundle=bundle,
+                document=document,
+                surface=surface,
+            )
 
         states = {surface["lane_status"]["vision"] for surface in document["surfaces"]}
         document["extraction_status"] = "complete" if "required" not in states and "error" not in states else "needs_vision"
 
-    table_count = sum(len(document["tables"]) for document in bundle["documents"])
+    bundle, canonical_findings = canonicalise_bundle(bundle)
+    findings.extend(canonical_findings)
+    # The verified bundle is the compatibility boundary consumed by the
+    # existing pack compiler.  Expose only reconciled tables there while
+    # retaining every contributor in source_table_ids / extraction_methods.
+    for document in bundle["documents"]:
+        document["tables"] = copy.deepcopy(document.get("canonical_tables", []))
+        recompute_ledger(document)
+    bundle["candidate_manifest"] = compile_manifest(
+        bundle,
+        source_bundle_sha256=hashlib.sha256(bundle_path.read_bytes()).hexdigest(),
+    )
+    findings.extend(bundle["candidate_manifest"].get("findings", []))
+    table_count = sum(len(document.get("canonical_tables") or document["tables"]) for document in bundle["documents"])
     cell_count = sum(len(row) for document in bundle["documents"] for table in document["tables"] for row in table["rows"])
     source_count = sum(len(document["numeric_ledger"]["source_tokens"]) for document in bundle["documents"])
     missing_count = sum(len(document["numeric_ledger"]["missing_tokens"]) for document in bundle["documents"])

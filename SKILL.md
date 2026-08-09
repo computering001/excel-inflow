@@ -236,14 +236,16 @@ outside the immutable skill tree:
 
 ```text
 python3 scripts/extract_broker_evidence.py <broker-extraction-request.json> --out <run-folder>/extract
+python3 scripts/compile_broker_surface_census.py <bundle.json> --out <run-folder>/broker-surface-census.json
 python3 scripts/compile_broker_vision.py <bundle.json> --responses <responses-folder> --out <verified-bundle.json>
+python3 scripts/verify_broker_semantics.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker-semantic-verification-report.json
 python3 scripts/compile_broker_pack.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker
 ```
 
-The first command captures native text, geometry, tables, workbook cells and
-images. Image-only surfaces remain unresolved until the second command proves
+The extractor captures native text, geometry, tables, workbook cells and
+images. Image-only surfaces remain unresolved until the vision command proves
 two independent hash-bound cell transcriptions agree or records an explicit
-reviewed resolution. The third command compiles only reviewed, cell-addressed
+reviewed resolution. The pack compiler accepts only reviewed, cell-addressed
 mappings. Before it can pass, every extracted table is reviewed and every
 nonblank annual or partial-period candidate row has one reasoned semantic
 disposition; a missing row or unowned mapping blocks. Coverage count alone is
@@ -254,6 +256,24 @@ collisions and unowned derivations. Full unused source tables, guidance,
 broker-derived and partial-period evidence, distinct metric definitions and
 supplemental checks remain evidence rather than disappearing or being forced
 into annual consensus.
+
+When a raw DCS export is supplied, preserve its entire source-owned row and cell
+universe before projecting instruments. Run the lossless lane outside the
+immutable skill tree:
+
+```text
+python3 scripts/extract_dcs_evidence.py <dcs-extraction-request.json> --out <run-folder>/dcs-extract
+python3 scripts/compile_dcs_evidence.py <dcs-source-tables.json> <dcs-candidate-manifest.json> <dcs-crosswalk.json> --out <run-folder>/dcs
+python3 scripts/verify/dcs_evidence_oracle.py --source <dcs-source-tables.json> --manifest <dcs-candidate-manifest.json> --crosswalk <dcs-crosswalk.json> --projection <dcs-projection.json> --receipt <dcs-evidence-receipt.json> --out <dcs-independent-verification.json>
+```
+
+The crosswalk must disposition every captured row and cell exactly once and
+bind every model-driving instrument term to source cells or a visible reviewed
+supplement. The compiler receipt and independent oracle must both be PASS with
+zero violations. Preserve zero-balance commercial paper and undrawn RCFs, and
+retain issue date, price, YTW and OAS as audit evidence even when they do not
+drive the model. Month, year and bucket maturities remain non-exact; never turn
+them into an invented day to satisfy the compatibility projection.
 
 The resumable production shell handles all five user-facing stages. Run the
 same command again after supplying answers or after an interruption; it verifies

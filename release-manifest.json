@@ -5,13 +5,13 @@
   "skillVersion": "2.1.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-09T06:15:18.981Z",
-  "centralInstructionsWords": 4113,
+  "generatedAt": "2026-08-09T08:43:50.159Z",
+  "centralInstructionsWords": 4261,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "a9951994dd1b99f61407779b072119d66a2597b576bfea64aef32c28153f307a",
-    "closureFileCount": 110,
+    "currentClosureSha256": "cd8bcd7521b567efca44d2c5b53f935f84be472e2363c2fe35be904ceecfaecc",
+    "closureFileCount": 130,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -104,13 +104,26 @@
     ],
     "assetsDeclaredOnly": [
       "assets/authority-projection-overrides.v3.json",
+      "assets/broker-candidate-manifest.schema.json",
+      "assets/broker-canonical-tables.schema.json",
+      "assets/broker-crosswalk-receipt.schema.json",
       "assets/broker-crosswalk.schema.json",
       "assets/broker-extraction-bundle.schema.json",
       "assets/broker-extraction-request.schema.json",
       "assets/broker-pack.schema.json",
+      "assets/broker-semantic-verification-report.schema.json",
       "assets/broker-source-tables.schema.json",
+      "assets/broker-surface-census.schema.json",
       "assets/broker-vision-result.schema.json",
+      "assets/dcs-candidate-manifest-v1.schema.json",
+      "assets/dcs-crosswalk-v1.schema.json",
+      "assets/dcs-evidence-receipt-v1.schema.json",
       "assets/dcs-export.schema.json",
+      "assets/dcs-extraction-receipt-v1.schema.json",
+      "assets/dcs-extraction-request-v1.schema.json",
+      "assets/dcs-independent-verification-v1.schema.json",
+      "assets/dcs-projection-v1.schema.json",
+      "assets/dcs-source-tables-v1.schema.json",
       "assets/lineage-exceptions.json",
       "assets/model-ir-v3.schema.json",
       "assets/native-excel-evidence-v3.schema.json",
@@ -286,6 +299,11 @@
       "scripts/extract_broker_evidence.py",
       "scripts/compile_broker_vision.py",
       "scripts/compile_broker_pack.py",
+      "scripts/compile_broker_surface_census.py",
+      "scripts/verify_broker_semantics.py",
+      "scripts/extract_dcs_evidence.py",
+      "scripts/compile_dcs_evidence.py",
+      "scripts/verify/dcs_evidence_oracle.py",
       "scripts/emit/__main__.py",
       "scripts/render/check_render.py",
       "scripts/render/selftest.py",
@@ -297,8 +315,12 @@
     ],
     "entryPointsUncommandedByInstructions": [],
     "modules": [
+      "scripts/compile_broker_candidate_manifest.py",
+      "scripts/compile_broker_canonical_tables.py",
       "scripts/compile_broker_pack.py",
+      "scripts/compile_broker_surface_census.py",
       "scripts/compile_broker_vision.py",
+      "scripts/compile_dcs_evidence.py",
       "scripts/emit/__init__.py",
       "scripts/emit/__main__.py",
       "scripts/emit/patch.py",
@@ -307,6 +329,7 @@
       "scripts/emit/styles.py",
       "scripts/emit/verify.py",
       "scripts/extract_broker_evidence.py",
+      "scripts/extract_dcs_evidence.py",
       "scripts/render/__init__.py",
       "scripts/render/baseline.py",
       "scripts/render/calibrate.py",
@@ -321,6 +344,7 @@
       "scripts/render/textfit.py",
       "scripts/render/xlsx_model.py",
       "scripts/verify/__init__.py",
+      "scripts/verify/dcs_evidence_oracle.py",
       "scripts/verify/finance_proof.py",
       "scripts/verify/invariants.py",
       "scripts/verify/run_deterministic_tests.py",
@@ -328,17 +352,26 @@
       "scripts/verify/tolerances.py",
       "scripts/verify/validate_dynamic_model.py",
       "scripts/verify/workbook_semantic_oracle.py",
-      "scripts/verify/xlsx.py"
+      "scripts/verify/xlsx.py",
+      "scripts/verify_broker_semantics.py"
     ],
     "packages": [
+      "compile_broker_candidate_manifest.py",
+      "compile_broker_canonical_tables.py",
       "compile_broker_pack.py",
+      "compile_broker_surface_census.py",
       "compile_broker_vision.py",
+      "compile_dcs_evidence.py",
       "emit",
       "extract_broker_evidence.py",
+      "extract_dcs_evidence.py",
       "render",
-      "verify"
+      "verify",
+      "verify_broker_semantics.py"
     ],
     "imports": [
+      "scripts/compile_broker_vision.py -> scripts/compile_broker_candidate_manifest.py (absolute-internal)",
+      "scripts/compile_broker_vision.py -> scripts/compile_broker_canonical_tables.py (absolute-internal)",
       "scripts/emit/__main__.py -> scripts/emit/__init__.py (package-init)",
       "scripts/emit/__main__.py -> scripts/emit/patch.py (relative)",
       "scripts/emit/__main__.py -> scripts/emit/plan.py (relative)",
@@ -394,6 +427,7 @@
       "scripts/render/textfit.py -> scripts/render/xlsx_model.py (relative)",
       "scripts/render/xlsx_model.py -> scripts/render/__init__.py (package-init)",
       "scripts/render/xlsx_model.py -> scripts/render/textfit.py (relative)",
+      "scripts/verify/dcs_evidence_oracle.py -> scripts/verify/__init__.py (package-init)",
       "scripts/verify/finance_proof.py -> scripts/verify/__init__.py (package-init)",
       "scripts/verify/finance_proof.py -> scripts/verify/xlsx.py (relative)",
       "scripts/verify/invariants.py -> scripts/verify/__init__.py (package-init)",
@@ -450,9 +484,9 @@
           "render"
         ],
         "sites": [
-          "extract_broker_evidence.py:202 (fitz, deferred)",
-          "extract_broker_evidence.py:467 (fitz, deferred)",
-          "extract_broker_evidence.py:678 (fitz, deferred)",
+          "extract_broker_evidence.py:305 (fitz, deferred)",
+          "extract_broker_evidence.py:663 (fitz, deferred)",
+          "extract_broker_evidence.py:923 (fitz, deferred)",
           "render/pdfdoc.py:26 (fitz, deferred)",
           "render/pdfdoc.py:229 (fitz, deferred)",
           "render/soffice.py:199 (fitz, deferred)",
@@ -507,8 +541,8 @@
           "extract_broker_evidence.py"
         ],
         "sites": [
-          "extract_broker_evidence.py:371 (openpyxl, deferred)",
-          "extract_broker_evidence.py:683 (openpyxl, deferred)",
+          "extract_broker_evidence.py:520 (openpyxl, deferred)",
+          "extract_broker_evidence.py:928 (openpyxl, deferred)",
           "emit/render.py:26 (openpyxl, top-level)",
           "emit/render.py:27 (openpyxl.comments, top-level)",
           "emit/render.py:28 (openpyxl.formatting.rule, top-level)",
@@ -600,6 +634,30 @@
         "may_import_third_party": [],
         "reason": "The broker crosswalk compiler is stdlib-only and operates only on already verified evidence artifacts."
       },
+      "compile_broker_candidate_manifest.py": {
+        "may_import_third_party": [],
+        "reason": "The immutable broker candidate-universe compiler is stdlib-only and cannot inherit reviewer-authored semantic classifications."
+      },
+      "compile_broker_canonical_tables.py": {
+        "may_import_third_party": [],
+        "reason": "The canonical broker-table compiler is stdlib-only and reconciles already captured native and vision contributors."
+      },
+      "compile_broker_surface_census.py": {
+        "may_import_third_party": [],
+        "reason": "The independent broker whole-surface census compiler is stdlib-only and recomputes coverage from hash-bound capture artifacts."
+      },
+      "verify_broker_semantics.py": {
+        "may_import_third_party": [],
+        "reason": "The broker semantic oracle is stdlib-only and deliberately shares no compiler implementation with the broker-pack compiler."
+      },
+      "extract_dcs_evidence.py": {
+        "may_import_third_party": [],
+        "reason": "The lossless DCS extractor is stdlib-only and reads CSV, JSON and OOXML directly into a source-owned cell ledger."
+      },
+      "compile_dcs_evidence.py": {
+        "may_import_third_party": [],
+        "reason": "The DCS term-authority compiler is stdlib-only and operates only on sealed source tables, the immutable manifest and a reviewed cell crosswalk."
+      },
       "emit": {
         "may_import_third_party": [
           "openpyxl",
@@ -678,19 +736,22 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 9,
+    "codeFences": 10,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 13,
-    "scriptReferencesScanned": 24,
+    "scriptReferencesScanned": 29,
     "scriptReferences": [
       "build_dynamic_model.mjs",
       "compile_broker_pack.py",
+      "compile_broker_surface_census.py",
       "compile_broker_vision.py",
+      "compile_dcs_evidence.py",
       "compile_evidence_run.mjs",
       "compile_public_test_run.mjs",
       "debt-model-economics.mjs",
       "emit/__main__.py",
       "extract_broker_evidence.py",
+      "extract_dcs_evidence.py",
       "flow_cli.mjs",
       "orchestrate_release.mjs",
       "render/check_render.py",
@@ -702,11 +763,13 @@
       "validate_source_parity.mjs",
       "validate_structure.mjs",
       "validate_style_tokens.mjs",
+      "verify/dcs_evidence_oracle.py",
       "verify/finance_proof.py",
       "verify/run_deterministic_tests.py",
       "verify/run_finance_proof_mutations.py",
       "verify/validate_dynamic_model.py",
-      "verify/workbook_semantic_oracle.py"
+      "verify/workbook_semantic_oracle.py",
+      "verify_broker_semantics.py"
     ],
     "danglingScriptReferences": 0
   },
@@ -788,7 +851,7 @@
       },
       {
         "target": "python closure import probe",
-        "modules": 32,
+        "modules": 39,
         "allResolvedInsideRelease": true
       },
       {
@@ -805,6 +868,36 @@
       },
       {
         "target": "scripts/compile_broker_pack.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/compile_broker_surface_census.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/verify_broker_semantics.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/extract_dcs_evidence.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/compile_dcs_evidence.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/verify/dcs_evidence_oracle.py",
         "status": 0,
         "matchedDeclaredOutput": true,
         "resolved": true
@@ -901,21 +994,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "b07d5125fdd2a0b27d9e7a3e2024b1ece53f9951052365ec1130ef37ba73a1ba",
-      "bytes": 30941,
-      "words": 4113
+      "sha256": "5b7dff11d6d5878d7ca1708af24575eea288d8fa93fe302b520e46c8b37e93f4",
+      "bytes": 32433,
+      "words": 4261
     },
     {
       "path": "SKILL.md",
-      "sha256": "fe8e6375f5931fa44f7967a5ebee30f4c88f1b72be6e759ada13c4317eaa4a42",
-      "bytes": 31428,
-      "words": 4182
+      "sha256": "ccea6122556e72f6ca143b4d4e94af87cfea50dcb0b37e7d159656ae2a69cc73",
+      "bytes": 32920,
+      "words": 4330
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "f62b8176162f9e2625653101ec1d319a5bfb8d57f872a48fb9053b672383a85d",
-      "bytes": 30961,
-      "words": 4115
+      "sha256": "b580b4e60acd85c3bdc0b40f1564c5c95bed138f6eee2f7f4d90fb2065761439",
+      "bytes": 32453,
+      "words": 4263
     },
     {
       "path": "references/model-contract.md",
@@ -955,9 +1048,9 @@
     },
     {
       "path": "references/broker-extraction.md",
-      "sha256": "faa788e0e7e74baf2a683d1c4b746b4b7c1aa3f677ad883f34d67807bd57fcd3",
-      "bytes": 11729,
-      "words": 1640
+      "sha256": "ee203b72d9d3d0cccd65745689bd22bbb0a0256058515db1d44fc0df659f3430",
+      "bytes": 12503,
+      "words": 1717
     },
     {
       "path": "references/validation.md",
@@ -972,15 +1065,33 @@
       "words": null
     },
     {
+      "path": "assets/broker-candidate-manifest.schema.json",
+      "sha256": "5855b9a9d197b9948fda42851b371997ca3330e79786db9d5c7d2d3bedb5ddc3",
+      "bytes": 2426,
+      "words": null
+    },
+    {
+      "path": "assets/broker-canonical-tables.schema.json",
+      "sha256": "9c2e542ffa9e57861a074c291a8bc659447a0fc0e0002fd697bea3ee0b5f46e3",
+      "bytes": 1906,
+      "words": null
+    },
+    {
+      "path": "assets/broker-crosswalk-receipt.schema.json",
+      "sha256": "35202dc3aac7605b01307652e74ec85a164a09d5c95db24931a655902737b297",
+      "bytes": 4267,
+      "words": null
+    },
+    {
       "path": "assets/broker-crosswalk.schema.json",
-      "sha256": "b9e76f3609de1000ab05264f5b6d28d9c12243a4e9c614890d280205d27b7404",
-      "bytes": 9969,
+      "sha256": "86dd580fb2bdd5756cdb01cc95d45daaeedc3f7761df25ce0251d9397b788fca",
+      "bytes": 13476,
       "words": null
     },
     {
       "path": "assets/broker-extraction-bundle.schema.json",
-      "sha256": "9431970b0f842b7de2d000358891bcd25f126375cd3ec0c6c4377dc03a207e99",
-      "bytes": 9048,
+      "sha256": "4e9829e7b39b3833addb2446d90972d313a76bfdc53e3c663df5163bf224abe6",
+      "bytes": 11218,
       "words": null
     },
     {
@@ -996,9 +1107,21 @@
       "words": null
     },
     {
+      "path": "assets/broker-semantic-verification-report.schema.json",
+      "sha256": "0e5b45d3ef677ebda3127bfdaf9ca18ed296348855c92a7c6c1d17f865b9d7ab",
+      "bytes": 1862,
+      "words": null
+    },
+    {
       "path": "assets/broker-source-tables.schema.json",
       "sha256": "16c609845c5d0e24db1e4b1e4c332037a32ce954d716743ce6508c6003df0812",
       "bytes": 2127,
+      "words": null
+    },
+    {
+      "path": "assets/broker-surface-census.schema.json",
+      "sha256": "1c42e55d12a2b25dab22209b0c795f681bef0dcc8c772fa1884ec81f03a9a0ea",
+      "bytes": 2015,
       "words": null
     },
     {
@@ -1008,21 +1131,69 @@
       "words": null
     },
     {
+      "path": "assets/dcs-candidate-manifest-v1.schema.json",
+      "sha256": "76e53b9bc083f2b4b3b6c6f488a3ae1483657248c69bf76753c473f83f5102b3",
+      "bytes": 1879,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-crosswalk-v1.schema.json",
+      "sha256": "db96b74b339fbb45a037f38b93e004f334251a9f86a4534d9cee033c93916a64",
+      "bytes": 5062,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-evidence-receipt-v1.schema.json",
+      "sha256": "8bc9a6018b61ff9b0971ae8172b52e043c5c3c7ed592befbdfee0acc111fe2cc",
+      "bytes": 1805,
+      "words": null
+    },
+    {
       "path": "assets/dcs-export.schema.json",
       "sha256": "fd101c49b697b16517c929c05997b827ffa064009d256d28342ac85f8b1f9d65",
       "bytes": 22035,
       "words": null
     },
     {
+      "path": "assets/dcs-extraction-receipt-v1.schema.json",
+      "sha256": "d39ec5301d087d1abfcbcfa6b9416eefa6394c784078f22f4784b774b7771db2",
+      "bytes": 864,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-extraction-request-v1.schema.json",
+      "sha256": "a65769a33b45e437fceaf329393b9c8a6d89a574a36228ff5fcbde05bc3d3749",
+      "bytes": 435,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-independent-verification-v1.schema.json",
+      "sha256": "fdd81bda6ede1b059ac3e8743dbe25eb032002d7f967f990b37ff2a5daa5c47c",
+      "bytes": 1719,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-projection-v1.schema.json",
+      "sha256": "7c7c4dcd2304c33e137d8b3ffee10956ac8e4ec17dc78bb2eefe33bf13283356",
+      "bytes": 2205,
+      "words": null
+    },
+    {
+      "path": "assets/dcs-source-tables-v1.schema.json",
+      "sha256": "bb66dbdbde2b17731c249a35f065eef81112fed41ec410b8818e63d31f245a89",
+      "bytes": 3286,
+      "words": null
+    },
+    {
       "path": "assets/deployment-profile.json",
-      "sha256": "907d0af2da62e5bb8a830c61c5911e8af758a26cb4278edf81d065f214636de6",
-      "bytes": 38402,
+      "sha256": "6c4071e329cd6da0c0934c9e443bda9143b5ae0d953687f0b9e5be294035f7fe",
+      "bytes": 43299,
       "words": null
     },
     {
       "path": "assets/evidence-run-v1.schema.json",
-      "sha256": "6baff6f6bff271c136823b6ab44174fabf0d51e120b4dcceb604fa9e331ba806",
-      "bytes": 22408,
+      "sha256": "0229225ab7453bdc6f36aa50fa72823de9532e0d61a3f95777b64a71ba9248c8",
+      "bytes": 24144,
       "words": null
     },
     {
@@ -1033,8 +1204,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "dcb6da9fdeb85a6b35df446fec954b7fb6e8917c5a4a75c47655ff56b0490989",
-      "bytes": 56375,
+      "sha256": "49ff90a65fda2f6286bbbf90765566b31f9780404c9689644f9c070d3bff11a8",
+      "bytes": 58541,
       "words": null
     },
     {
@@ -1110,15 +1281,39 @@
       "words": null
     },
     {
+      "path": "scripts/compile_broker_candidate_manifest.py",
+      "sha256": "7b8dd4528fc4f7e54f604e36ce37ed71385d01b3919a5b765f0d8a92b10e39d3",
+      "bytes": 13176,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_broker_canonical_tables.py",
+      "sha256": "c3b058d72b66fb7bf299302a657c6870dc7de331d9fb368150c41a193d246d80",
+      "bytes": 13067,
+      "words": null
+    },
+    {
       "path": "scripts/compile_broker_pack.py",
-      "sha256": "70a944551fd26f7a75f31d2611ea54819d8c219aede4073b734c50914e979b73",
-      "bytes": 44651,
+      "sha256": "d8ad750dc5ee892344be09c455f8e2095d604ba430130be46aa1873b34f33867",
+      "bytes": 60635,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_broker_surface_census.py",
+      "sha256": "b26ce75e3673e623f34b14c98abf1cf3fc2d642c98bc4c401762171ffc14955f",
+      "bytes": 6423,
       "words": null
     },
     {
       "path": "scripts/compile_broker_vision.py",
-      "sha256": "4d374527a6c092c6c1fa9f107b5a68009d6759e9db748112b15549c8752f5fe6",
-      "bytes": 13564,
+      "sha256": "aaab4d82b3600c0394987c2a987848d5608af85d93d4e58a71384c6fef930587",
+      "bytes": 23143,
+      "words": null
+    },
+    {
+      "path": "scripts/compile_dcs_evidence.py",
+      "sha256": "18c02974c5d760d9010adaf5560a3d6b6da0d45a7e3e67ecc9238c985971ce96",
+      "bytes": 35702,
       "words": null
     },
     {
@@ -1183,8 +1378,14 @@
     },
     {
       "path": "scripts/extract_broker_evidence.py",
-      "sha256": "29fa5c114444b48c793bb9c8e853cd58e3b8c78a1f917d89ba9552e857373e4b",
-      "bytes": 32673,
+      "sha256": "b2b79b94beeb6457748caeb1f22e5dd46e2dc805ad95c831687da4bd204a0b03",
+      "bytes": 46651,
+      "words": null
+    },
+    {
+      "path": "scripts/extract_dcs_evidence.py",
+      "sha256": "f2ec90cc576bd440bb8aec47ca16caed3d76898e8ade503b46c8560535cde350",
+      "bytes": 15750,
       "words": null
     },
     {
@@ -1201,8 +1402,8 @@
     },
     {
       "path": "scripts/lib/attachment_ingress.mjs",
-      "sha256": "75fc47a16a68eb6d1f3ca52d85173b738b181bcd16f12aa896fce466e9665e96",
-      "bytes": 19415,
+      "sha256": "46cf2af8c83db294ffcee6a95d6e4abd12f43d2903f43d3fb06de52b5cda7545",
+      "bytes": 43958,
       "words": null
     },
     {
@@ -1225,8 +1426,8 @@
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "c4ee4113c21521b948ad77511fe307c3ff92482b2e0c4349d881cc6d11dda9d1",
-      "bytes": 68200,
+      "sha256": "306279818779850456f908b45f061b1b3d322cb21056034be2069d3b34b7ad8b",
+      "bytes": 83960,
       "words": null
     },
     {
@@ -1237,8 +1438,8 @@
     },
     {
       "path": "scripts/lib/flow.mjs",
-      "sha256": "e1173dc3f3857bce46fc558b8e6fec207b97e0c7cdd99e3416beaad3d9959c73",
-      "bytes": 13115,
+      "sha256": "32f972afe77177a22086c5498cd801dc3e9b92fb8492850db7d5ff41abbc2ec1",
+      "bytes": 13727,
       "words": null
     },
     {
@@ -1255,8 +1456,8 @@
     },
     {
       "path": "scripts/lib/flow_questions.mjs",
-      "sha256": "b0a51d55e5fc41c8a2e348a747e89bb6be7e1ae2acd6fd1967a4cb68b2ad07dd",
-      "bytes": 47266,
+      "sha256": "5840943c878922927c807ca41776fcdeaebb471e9a15d3d6a90440480fcb4cea",
+      "bytes": 48026,
       "words": null
     },
     {
@@ -1578,6 +1779,12 @@
       "words": null
     },
     {
+      "path": "scripts/verify/dcs_evidence_oracle.py",
+      "sha256": "3b60554f4f0dfd22981b07708465c956971056bc7ad801583628ff735523c34b",
+      "bytes": 31022,
+      "words": null
+    },
+    {
       "path": "scripts/verify/finance_proof.py",
       "sha256": "b363da90d51813153787fb48b2a62ec8cad3372af8bfe7685519845b2fac98ff",
       "bytes": 46277,
@@ -1623,6 +1830,12 @@
       "path": "scripts/verify/xlsx.py",
       "sha256": "5ac640ea60b8b93432f6f4702f82ca844130a555c6db4078ab915ab0df9d4fad",
       "bytes": 20330,
+      "words": null
+    },
+    {
+      "path": "scripts/verify_broker_semantics.py",
+      "sha256": "3be944ed50d9bba48c04614f02897b0f33c71a103ce17cec6c2b2ec49bba35db",
+      "bytes": 34935,
       "words": null
     },
     {

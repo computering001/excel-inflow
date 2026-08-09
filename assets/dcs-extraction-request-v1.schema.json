@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-extraction-request-v1.schema.json",
+  "title": "Lossless DCS extraction request",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "source_path"],
+  "properties": {
+    "schema_version": {"const": "dcs-extraction-request/1.0"},
+    "source_path": {"type": "string", "minLength": 1}
+  }
+}

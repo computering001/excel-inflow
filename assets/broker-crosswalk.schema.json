@@ -17,7 +17,7 @@
     "coverage_ledger"
   ],
   "properties": {
-    "schema_version": { "const": "broker-crosswalk/1.1" },
+    "schema_version": { "enum": ["broker-crosswalk/1.1", "broker-crosswalk/1.2"] },
     "run_id": { "type": "string", "minLength": 1 },
     "as_of": { "type": "string", "format": "date" },
     "source_label": { "type": "string", "minLength": 1 },
@@ -34,14 +34,19 @@
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["label", "unit_kind", "definition_id", "semantic_role"],
+        "required": ["label", "unit_kind", "definition_id"],
         "properties": {
           "label": { "type": "string", "minLength": 1 },
           "unit_kind": { "enum": ["currency", "ratio", "percent_decimal"] },
           "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
           "semantic_role": { "$ref": "#/$defs/semanticRole" },
+          "economic_domain": { "$ref": "#/$defs/economicDomain" },
+          "concept_id": { "$ref": "#/$defs/conceptId" },
+          "evidence_kind": { "$ref": "#/$defs/evidenceKind" },
+          "model_use": { "$ref": "#/$defs/modelUse" },
           "consensus_family": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
           "definition_signature": { "$ref": "#/$defs/definitionSignature" },
+          "definition_fingerprint": { "$ref": "#/$defs/definitionFingerprint" },
           "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
           "model_disposition": { "enum": ["reference_only", "rejected", "not_applicable"] },
           "model_disposition_reason": { "type": "string", "minLength": 1 }
@@ -107,7 +112,57 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "schema_version": { "const": "broker-crosswalk/1.1" } } },
+      "then": {
+        "properties": {
+          "metrics": { "additionalProperties": { "required": ["semantic_role"] } },
+          "coverage_ledger": { "items": { "required": ["semantic_role"] } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "schema_version": { "const": "broker-crosswalk/1.2" } } },
+      "then": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": {
+              "required": ["economic_domain", "concept_id", "evidence_kind", "model_use", "definition_fingerprint"]
+            }
+          },
+          "coverage_ledger": {
+            "items": {
+              "required": ["economic_domain", "concept_id", "model_use", "definition_fingerprint", "definition_evidence"]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "economicDomain": {
+      "enum": [
+        "operating",
+        "cash_flow",
+        "debt_liquidity",
+        "leverage_coverage",
+        "interest_finance",
+        "lease",
+        "tax",
+        "guidance",
+        "valuation",
+        "presentation_metadata",
+        "other"
+      ]
+    },
+    "conceptId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "modelUse": {
+      "enum": ["active_input", "reference_only", "exact_duplicate", "derived_input", "unresolved"]
+    },
     "semanticRole": {
       "enum": [
         "operating_forecast",
@@ -133,6 +188,7 @@
         "partial_period",
         "calculated_check",
         "market_data",
+        "historical_observation",
         "non_numeric"
       ]
     },
@@ -149,6 +205,36 @@
         "fiscal_calendar": { "type": ["string", "null"] },
         "cash_flow_basis": { "type": ["string", "null"] },
         "lease_basis": { "type": ["string", "null"] }
+      }
+    },
+    "definitionFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concept_id",
+        "measurement_basis",
+        "restatement_basis",
+        "cash_flow_basis",
+        "lease_basis",
+        "units",
+        "currency",
+        "period_basis",
+        "sign_convention",
+        "accounting_basis",
+        "operating_scope"
+      ],
+      "properties": {
+        "concept_id": { "$ref": "#/$defs/conceptId" },
+        "measurement_basis": { "enum": ["reported", "adjusted", "core", "underlying", "statutory", "mixed", "unspecified"] },
+        "restatement_basis": { "enum": ["restated", "originally_reported", "not_applicable", "unspecified"] },
+        "cash_flow_basis": { "enum": ["cfo", "fcf", "fcfe", "not_applicable", "unspecified"] },
+        "lease_basis": { "enum": ["including_leases", "excluding_leases", "not_applicable", "unspecified"] },
+        "units": { "type": ["string", "null"] },
+        "currency": { "type": ["string", "null"] },
+        "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic", "historical"] },
+        "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
+        "accounting_basis": { "type": "string", "minLength": 1 },
+        "operating_scope": { "type": "string", "minLength": 1 }
       }
     },
     "sourceCell": {
@@ -197,14 +283,14 @@
     "coverageEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["candidate_id", "house_id", "table_id", "row", "period_basis", "source_cells", "semantic_role", "evidence_kind", "definition_id", "disposition", "rationale", "review_status"],
+      "required": ["candidate_id", "house_id", "table_id", "row", "period_basis", "source_cells", "evidence_kind", "definition_id", "disposition", "rationale", "review_status"],
       "properties": {
         "candidate_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
         "house_id": { "type": "string", "minLength": 1 },
         "table_id": { "type": "string", "minLength": 1 },
         "row": { "type": "integer", "minimum": 1 },
         "label": { "type": "string" },
-        "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic"] },
+        "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic", "historical"] },
         "period_indexes": {
           "type": "array",
           "uniqueItems": true,
@@ -216,8 +302,12 @@
           "items": { "$ref": "#/$defs/sourceCell" }
         },
         "semantic_role": { "$ref": "#/$defs/semanticRole" },
+        "economic_domain": { "$ref": "#/$defs/economicDomain" },
+        "concept_id": { "$ref": "#/$defs/conceptId" },
         "evidence_kind": { "$ref": "#/$defs/evidenceKind" },
+        "model_use": { "$ref": "#/$defs/modelUse" },
         "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "definition_fingerprint": { "$ref": "#/$defs/definitionFingerprint" },
         "definition_evidence": { "type": "string", "minLength": 1 },
         "disposition": {
           "enum": ["mapped_metric", "mapped_guidance", "broker_derived_estimate", "partial_period_evidence", "supplemental_check", "duplicate", "not_model_relevant", "unusable"]
@@ -229,6 +319,7 @@
           "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
         },
         "duplicate_of": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "parent_candidate_id": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
         "rationale": { "type": "string", "minLength": 1 },
         "review_status": { "const": "reviewed" }
       }

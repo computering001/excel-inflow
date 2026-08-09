@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 
 import { assessCoverage } from "./coverage.mjs";
@@ -5,7 +6,7 @@ import { matchEntities } from "./flow_entity.mjs";
 import { runIntake } from "./intake.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { validateCaseShape } from "./solver.mjs";
-import { hashValue } from "./run_store.mjs";
+import { canonicalise, hashValue } from "./run_store.mjs";
 import { ensureIllustrativeAcquisitionCase } from "./acquisition_policy.mjs";
 import {
   FACE_STATEMENT_SECTIONS,
@@ -18,6 +19,23 @@ const EVIDENCE_SCHEMA = JSON.parse(
     "utf8",
   ),
 );
+const assetSchema = (name) =>
+  JSON.parse(
+    fs.readFileSync(new URL(`../../assets/${name}`, import.meta.url), "utf8"),
+  );
+const DCS_SOURCE_TABLES_SCHEMA = assetSchema("dcs-source-tables-v1.schema.json");
+const DCS_CANDIDATE_MANIFEST_SCHEMA = assetSchema("dcs-candidate-manifest-v1.schema.json");
+const DCS_CROSSWALK_SCHEMA = assetSchema("dcs-crosswalk-v1.schema.json");
+const DCS_PROJECTION_SCHEMA = assetSchema("dcs-projection-v1.schema.json");
+const DCS_EVIDENCE_RECEIPT_SCHEMA = assetSchema("dcs-evidence-receipt-v1.schema.json");
+const DCS_INDEPENDENT_REPORT_SCHEMA = assetSchema("dcs-independent-verification-v1.schema.json");
+const BROKER_SEMANTIC_REPORT_SCHEMA = assetSchema("broker-semantic-verification-report.schema.json");
+
+function canonicalCompactSha256(value) {
+  return createHash("sha256")
+    .update(`${JSON.stringify(canonicalise(value))}\n`)
+    .digest("hex");
+}
 
 const finite = (value) =>
   typeof value === "number" && Number.isFinite(value);
@@ -229,10 +247,15 @@ function canonicalHistoricalValue(modelCase, canonicalPath, metricId, periodInde
   return { error: `Canonical path ${canonicalPath ?? "<missing>"} is unsupported.` };
 }
 
-function hasSupplement(run, instrumentId, field) {
-  return (run?.decisions?.manual_debt_supplements ?? []).some(
-    (entry) => entry.instrument_id === instrumentId && entry.field === field,
-  );
+function matchingSupplement(run, instrumentId, field, caseValue) {
+  return (run?.decisions?.manual_debt_supplements ?? []).find(
+    (entry) =>
+      entry.instrument_id === instrumentId &&
+      entry.field === field &&
+      (finite(entry.value) && finite(caseValue)
+        ? approximate(entry.value, caseValue)
+        : entry.value === caseValue),
+  ) ?? null;
 }
 
 function compareEntity(findings, id, left, right) {
@@ -994,6 +1017,382 @@ export function validateStatementEvidence(run) {
   return findings;
 }
 
+function validateDcsEvidence(run, findings) {
+  const artifacts = {
+    source: run.dcs_source_tables,
+    manifest: run.dcs_candidate_manifest,
+    crosswalk: run.dcs_crosswalk,
+    projection: run.dcs_projection,
+    receipt: run.dcs_evidence_receipt,
+    independent: run.dcs_independent_verification,
+  };
+  const declared = Boolean(run.ingress?.dcs_evidence) ||
+    Object.values(artifacts).some((value) => value !== undefined);
+  if (!declared) {
+    if ((run.model_case?.execution_profile ?? "production_model") !== "reference_parity") {
+      findings.push(
+        finding(
+          "evidence.dcs.production_authority_missing",
+          "BLOCK",
+          "A production model requires the complete lossless DCS evidence lane; archived reference-parity fixtures are the only exception.",
+        ),
+      );
+    }
+    return;
+  }
+  for (const [name, value] of Object.entries(artifacts)) {
+    if (!value) {
+      findings.push(
+        finding(
+          `evidence.dcs.${name}_missing`,
+          "BLOCK",
+          `Lossless DCS evidence is missing its ${name} artifact.`,
+        ),
+      );
+    }
+  }
+  if (Object.values(artifacts).some((value) => !value)) return;
+
+  for (const [name, value, contract] of [
+    ["source", artifacts.source, DCS_SOURCE_TABLES_SCHEMA],
+    ["manifest", artifacts.manifest, DCS_CANDIDATE_MANIFEST_SCHEMA],
+    ["crosswalk", artifacts.crosswalk, DCS_CROSSWALK_SCHEMA],
+    ["projection", artifacts.projection, DCS_PROJECTION_SCHEMA],
+    ["receipt", artifacts.receipt, DCS_EVIDENCE_RECEIPT_SCHEMA],
+    ["independent", artifacts.independent, DCS_INDEPENDENT_REPORT_SCHEMA],
+  ]) {
+    for (const message of validateJsonSchema(value, contract)) {
+      findings.push(
+        finding(
+          `evidence.dcs.${name}_schema`,
+          "BLOCK",
+          message,
+        ),
+      );
+    }
+  }
+
+  if (
+    artifacts.receipt.status !== "PASS" ||
+    artifacts.receipt.counts?.violations !== 0 ||
+    artifacts.receipt.counts?.unowned_cells !== 0 ||
+    artifacts.receipt.counts?.double_owned_cells !== 0
+  ) {
+    findings.push(
+      finding(
+        "evidence.dcs.compiler_not_clean",
+        "BLOCK",
+        "DCS compiler receipt is not a zero-violation, zero-unowned-cell PASS.",
+        artifacts.receipt.counts ?? null,
+      ),
+    );
+  }
+  if (
+    artifacts.independent.status !== "PASS" ||
+    artifacts.independent.counts?.violations !== 0
+  ) {
+    findings.push(
+      finding(
+        "evidence.dcs.independent_not_clean",
+        "BLOCK",
+        "Independent DCS verification is not a zero-violation PASS.",
+        artifacts.independent.counts ?? null,
+      ),
+    );
+  }
+
+  const canonicalHashes = {
+    source_tables_sha256: canonicalCompactSha256(artifacts.source),
+    candidate_manifest_sha256: canonicalCompactSha256(artifacts.manifest),
+    crosswalk_sha256: canonicalCompactSha256(artifacts.crosswalk),
+    projection_sha256: canonicalCompactSha256(artifacts.projection),
+  };
+  for (const [field, expected] of Object.entries(canonicalHashes)) {
+    if (artifacts.receipt[field] !== expected) {
+      findings.push(
+        finding(
+          `evidence.dcs.${field}_mismatch`,
+          "BLOCK",
+          `DCS receipt is not bound to the embedded ${field.replace("_sha256", "")} artifact.`,
+        ),
+      );
+    }
+  }
+  const ingress = run.ingress?.dcs_evidence;
+  const independentHashes = artifacts.independent.artifact_hashes ?? {};
+  if (!ingress) {
+    findings.push(
+      finding(
+        "evidence.dcs.ingress_missing",
+        "BLOCK",
+        "Lossless DCS artifacts require attachment-ingress byte hashes.",
+      ),
+    );
+  } else {
+    for (const [ingressField, reportField] of [
+      ["source_tables_sha256", "source"],
+      ["candidate_manifest_sha256", "manifest"],
+      ["crosswalk_sha256", "crosswalk"],
+      ["projection_sha256", "projection"],
+      ["evidence_receipt_sha256", "receipt"],
+    ]) {
+      if (ingress[ingressField] !== independentHashes[reportField]) {
+        findings.push(
+          finding(
+            `evidence.dcs.byte_hash_${reportField}`,
+            "BLOCK",
+            `Independent DCS report is not byte-bound to the ingress ${reportField} artifact.`,
+          ),
+        );
+      }
+    }
+    if (
+      ingress.independent_verification_sha256 !==
+      canonicalCompactSha256(artifacts.independent)
+    ) {
+      findings.push(
+        finding(
+          "evidence.dcs.independent_hash_mismatch",
+          "BLOCK",
+          "DCS independent verification bytes do not match the hash preserved in ingress.",
+        ),
+      );
+    }
+  }
+
+  const dcsAttachment = (run.attachment_manifest ?? []).find(
+    (entry) => entry.adapter?.domain === "factset_dcs",
+  );
+  const rawHash = artifacts.source.source?.sha256;
+  if (
+    !dcsAttachment ||
+    dcsAttachment.raw_sha256 !== rawHash ||
+    artifacts.projection.source_sha256 !== rawHash ||
+    artifacts.receipt.source_sha256 !== rawHash ||
+    artifacts.independent.source_sha256 !== rawHash
+  ) {
+    findings.push(
+      finding(
+        "evidence.dcs.raw_binding",
+        "BLOCK",
+        "Every DCS artifact must bind to the same raw export attachment bytes.",
+      ),
+    );
+  }
+  if (hashValue(artifacts.projection.dcs_export) !== hashValue(run.dcs_export)) {
+    findings.push(
+      finding(
+        "evidence.dcs.projection_export_mismatch",
+        "BLOCK",
+        "The lossless DCS projection does not exactly reproduce evidence-run.dcs_export.",
+      ),
+    );
+  }
+  if (
+    run.model_case?.instrument_authority_contract_version !== "dcs_evidence_v1" ||
+    hashValue(run.model_case?.instrument_term_authorities ?? []) !==
+      hashValue(artifacts.projection.term_authorities ?? [])
+  ) {
+    findings.push(
+      finding(
+        "evidence.dcs.model_authority_mismatch",
+        "BLOCK",
+        "The model case does not preserve the exact dcs_evidence_v1 field-authority ledger.",
+      ),
+    );
+  }
+
+  const sourceCells = new Set(
+    (artifacts.source.sheets ?? []).flatMap((sheet) =>
+      (sheet.rows ?? []).flatMap((row) =>
+        (row.cells ?? []).map((cell) => cell.cell_id),
+      ),
+    ),
+  );
+  const authorityByField = new Map();
+  for (const authority of artifacts.projection.term_authorities ?? []) {
+    const key = `${authority.instrument_id}.${authority.model_field}`;
+    if (authorityByField.has(key)) {
+      findings.push(
+        finding(
+          "evidence.dcs.authority_duplicate",
+          "BLOCK",
+          `DCS authority ${key} is declared more than once.`,
+        ),
+      );
+    }
+    authorityByField.set(key, authority);
+    for (const cellId of authority.source_cells ?? []) {
+      if (!sourceCells.has(cellId)) {
+        findings.push(
+          finding(
+            "evidence.dcs.authority_cell_missing",
+            "BLOCK",
+            `DCS authority ${key} cites absent source cell ${cellId}.`,
+          ),
+        );
+      }
+    }
+  }
+
+  const caseById = new Map(
+    (run.model_case?.instruments ?? []).map((instrument) => [
+      instrument.instrument_id,
+      instrument,
+    ]),
+  );
+  const matches = (left, right) =>
+    finite(left) && finite(right)
+      ? approximate(left, right)
+      : left && right && typeof left === "object" && typeof right === "object"
+        ? hashValue(left) === hashValue(right)
+        : left === right;
+  const caseValueFor = (instrument, field) => {
+    if (field === "description") return instrument.name;
+    if (field === "instrument_type") return instrument.class;
+    if (field === "outstanding_amount") return instrument.opening_balance;
+    if (field === "maturity") return instrument.maturity_date ?? null;
+    if (field === "coupon_rate" || field === "all_in_rate") {
+      return instrument.coupon_or_all_in_rate;
+    }
+    if (field === "reference_rate") return instrument.benchmark;
+    if (field === "margin_bps") return instrument.spread_bps;
+    if (field === "facility_limit") return instrument.facility_capacity;
+    if (field === "drawn_amount") return instrument.opening_balance;
+    if (field === "interest_settlement") {
+      return instrument.cash_interest === false ? "non_cash" : "cash";
+    }
+    if (field === "debt_classification") {
+      return {
+        include_in_gross_debt: instrument.include_in_gross_debt,
+        include_in_net_debt: instrument.include_in_net_debt,
+      };
+    }
+    return instrument[field];
+  };
+  for (const exported of run.dcs_export?.instruments ?? []) {
+    const instrument = caseById.get(exported.instrument_id);
+    if (!instrument) continue;
+    const required = [
+      "description",
+      "instrument_type",
+      "currency",
+      "balance_basis",
+      "outstanding_amount",
+      "rate_type",
+      "maturity",
+      ...(exported.rate_type === "fixed" ? ["coupon_rate"] : []),
+      ...(exported.rate_type === "floating"
+        ? ["reference_rate", "margin_bps"]
+        : []),
+      ...(exported.rate_type === "manual_all_in" ? ["all_in_rate"] : []),
+      ...(exported.instrument_type === "rcf"
+        ? [
+            "facility_limit",
+            "drawn_amount",
+            "committed",
+            "commitment_fee_convention",
+            "commitment_fee_value",
+          ]
+        : []),
+      ...[
+        "interest_settlement",
+        "debt_classification",
+        "amortisation_schedule",
+        "refinancing_intent",
+        "next_call_date",
+        "is_backstop_for_paper",
+        "benchmark_curve",
+      ].filter((field) => Object.hasOwn(exported, field)),
+    ];
+    for (const field of required) {
+      const authority = authorityByField.get(`${exported.instrument_id}.${field}`);
+      if (!authority) {
+        findings.push(
+          finding(
+            "evidence.dcs.required_authority_missing",
+            "BLOCK",
+            `${exported.instrument_id}.${field} has no field-level source authority.`,
+          ),
+        );
+        continue;
+      }
+      const expected = field === "maturity"
+        ? exported.maturity_date ?? null
+        : field === "balance_basis"
+          ? instrument.balance_basis
+          : Object.hasOwn(exported, field)
+            ? exported[field]
+            : authority.output_value;
+      if (!matches(authority.output_value, expected)) {
+        findings.push(
+          finding(
+            "evidence.dcs.authority_projection_mismatch",
+            "BLOCK",
+            `${exported.instrument_id}.${field} authority does not equal its projected value.`,
+          ),
+        );
+      }
+      const caseValue = field === "commitment_fee_convention"
+        ? run.model_case?.rcf_policy?.instrument_id === exported.instrument_id
+          ? run.model_case.rcf_policy.commitment_fee_convention
+          : undefined
+        : field === "commitment_fee_value"
+          ? run.model_case?.rcf_policy?.instrument_id === exported.instrument_id
+            ? run.model_case.rcf_policy.commitment_fee_value
+            : undefined
+          : field === "amortisation_schedule"
+            ? (() => {
+                const forecastEnds = (run.model_case?.periods ?? [])
+                  .filter((period) => period.status === "forecast")
+                  .map((period) => period.date);
+                const openingDate = (run.model_case?.periods ?? [])
+                  .filter((period) => period.status === "historical")
+                  .at(-1)?.date;
+                if (!openingDate || forecastEnds.length !== 3) return undefined;
+                return forecastEnds.map((end, index) => {
+                  const start = index === 0 ? openingDate : forecastEnds[index - 1];
+                  return (authority.output_value ?? [])
+                    .filter((entry) => entry.date > start && entry.date <= end)
+                    .reduce((sum, entry) => sum + Number(entry.amount), 0);
+                });
+              })()
+            : caseValueFor(instrument, field);
+      const stageThreeOnly = [
+        "refinancing_intent",
+        "next_call_date",
+        "is_backstop_for_paper",
+      ].includes(field);
+      const caseMatches = stageThreeOnly
+        ? true
+        : field === "benchmark_curve"
+          ? !Array.isArray(authority.output_value?.resolved) ||
+            matches(instrument.benchmark_rate, authority.output_value.resolved)
+          : field === "amortisation_schedule"
+            ? matches(instrument.scheduled_amortisation, caseValue)
+          : field === "debt_classification"
+            ? Object.entries(authority.output_value ?? {}).every(
+                ([key, value]) => caseValue?.[key] === value,
+              )
+            : Array.isArray(caseValue)
+              ? caseValue.length > 0 &&
+                caseValue.every((value) => matches(value, authority.output_value))
+              : field === "committed"
+                ? authority.output_value === true
+                : matches(caseValue, authority.output_value);
+      if (!caseMatches) {
+        findings.push(
+          finding(
+            "evidence.dcs.authority_case_mismatch",
+            "BLOCK",
+            `${exported.instrument_id}.${field} does not flow unchanged into the model-driving case field.`,
+          ),
+        );
+      }
+    }
+  }
+}
+
 function validateDebtMapping(run, findings) {
   const caseById = new Map(
     (run.model_case?.instruments ?? []).map((instrument) => [
@@ -1024,7 +1423,15 @@ function validateDebtMapping(run, findings) {
         ? approximate(actual, expected)
         : actual === expected;
       const supplementField = field === "class" ? "instrument_type" : field;
-      if (!equal && !hasSupplement(run, exported.instrument_id, supplementField)) {
+      if (
+        !equal &&
+        !matchingSupplement(
+          run,
+          exported.instrument_id,
+          supplementField,
+          actual,
+        )
+      ) {
         findings.push(
           finding(
             "evidence.debt.field_mismatch",
@@ -1241,6 +1648,50 @@ function validateBrokerSourceTables(run, findings) {
         "Full-table broker evidence requires a non-empty semantic coverage ledger with every table reviewed and zero unresolved forecast candidates.",
       ),
     );
+  }
+  const semanticReport = run.broker_semantic_verification ?? null;
+  const newSemanticContract =
+    receipt?.schema_version === "broker-crosswalk-receipt/1.2" ||
+    semanticReport !== null;
+  if (newSemanticContract) {
+    if (!semanticReport) {
+      findings.push(
+        finding(
+          "evidence.broker_source_tables.semantic_report_missing",
+          "BLOCK",
+          "Broker crosswalk 1.2 requires its independent semantic verification report.",
+        ),
+      );
+    } else {
+      for (const message of validateJsonSchema(
+        semanticReport,
+        BROKER_SEMANTIC_REPORT_SCHEMA,
+      )) {
+        findings.push(
+          finding(
+            "evidence.broker_source_tables.semantic_report_schema",
+            "BLOCK",
+            message,
+          ),
+        );
+      }
+      if (
+        semanticReport.status !== "PASS" ||
+        semanticReport.total_violation_count !== 0 ||
+        receipt?.candidate_manifest_sha256 !==
+          semanticReport.candidate_manifest_sha256 ||
+        run.ingress?.broker_evidence?.semantic_verification_sha256 !==
+          receipt?.independent_semantic_report_sha256
+      ) {
+        findings.push(
+          finding(
+            "evidence.broker_source_tables.semantic_report_not_proven",
+            "BLOCK",
+            "Broker semantic coverage is not an independently verified, candidate-manifest-bound PASS.",
+          ),
+        );
+      }
+    }
   }
   const sourceIds = new Set();
   const tableIds = new Set();
@@ -1900,6 +2351,7 @@ export function validateEvidenceRun(run) {
   }
 
   validateStatementMapping(run, sourceIds, findings);
+  validateDcsEvidence(run, findings);
   validateDebtMapping(run, findings);
   validateBrokerMapping(run, findings);
   validateBrokerSourceTables(run, findings);

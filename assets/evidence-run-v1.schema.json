@@ -38,9 +38,16 @@
     },
     "filings": { "$ref": "#/$defs/filings" },
     "dcs_export": { "type": "object" },
+    "dcs_source_tables": { "type": "object" },
+    "dcs_candidate_manifest": { "type": "object" },
+    "dcs_crosswalk": { "type": "object" },
+    "dcs_projection": { "type": "object" },
+    "dcs_evidence_receipt": { "type": "object" },
+    "dcs_independent_verification": { "type": "object" },
     "broker_pack": { "type": "object" },
     "broker_source_tables": { "$ref": "#/$defs/brokerSourceTables" },
     "broker_crosswalk_receipt": { "type": "object" },
+    "broker_semantic_verification": { "type": "object" },
     "forecast_context": { "$ref": "#/$defs/forecastContext" },
     "model_case": { "type": "object" },
     "attachment_manifest": {
@@ -64,7 +71,28 @@
             "extraction_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-            "crosswalk_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            "crosswalk_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "semantic_verification_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "dcs_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_tables_sha256",
+            "candidate_manifest_sha256",
+            "crosswalk_sha256",
+            "projection_sha256",
+            "evidence_receipt_sha256",
+            "independent_verification_sha256"
+          ],
+          "properties": {
+            "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "candidate_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "projection_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "evidence_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "independent_verification_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
           }
         }
       }
@@ -282,7 +310,19 @@
             "properties": {
               "path": { "type": "string", "minLength": 1 },
               "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-              "kind": { "enum": ["broker_source_tables", "broker_crosswalk_receipt", "broker_extraction_bundle"] }
+              "kind": {
+                "enum": [
+                  "broker_source_tables",
+                  "broker_crosswalk_receipt",
+                  "broker_extraction_bundle",
+                  "dcs_source_tables",
+                  "dcs_candidate_manifest",
+                  "dcs_crosswalk",
+                  "dcs_projection",
+                  "dcs_evidence_receipt",
+                  "dcs_independent_verification"
+                ]
+              }
             }
           }
         }

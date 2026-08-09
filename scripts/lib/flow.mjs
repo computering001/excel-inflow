@@ -39,6 +39,7 @@ import {
 } from "./flow_reconcile.mjs";
 import { entityStop } from "./flow_entity.mjs";
 import {
+  applyExplicitSourcePolicies,
   planQuestions,
   pruneDecisionGraph,
   QUESTION_LIMIT,
@@ -224,7 +225,7 @@ export function runIntake({
   // disclosed or expressly supplied is represented on the instrument itself;
   // absence of such evidence is not a reason to interrupt the user or ship the
   // workbook with the maturity switch off.
-  const workingCase = structuredClone(draftCase);
+  let workingCase = structuredClone(draftCase);
   if (workingCase.controls) {
     workingCase.controls.debt_maturities_roll = 1;
   }
@@ -238,9 +239,23 @@ export function runIntake({
     }
   }
 
+  // Source-backed policy fields are decisions, not decorations. Apply their
+  // economics before question detection so "settled" means both "do not ask"
+  // and "the model case already reflects the answer".
+  const explicitPolicies = applyExplicitSourcePolicies({
+    modelCase: workingCase,
+    intake,
+  });
+  workingCase = explicitPolicies.modelCase;
+  workingCase.stage_three_answers = {
+    ...(workingCase.stage_three_answers ?? {}),
+    ...Object.fromEntries(explicitPolicies.applied),
+  };
+
   const resolved = priorAnswers instanceof Map
     ? priorAnswers
     : new Map(Object.entries(draftCase?.stage_three_answers ?? {}));
+  for (const [id, answer] of explicitPolicies.applied) resolved.set(id, answer);
   // No announced refinancing means contractual repayment.  Seed that
   // deterministic answer before pruning so the ordinary production journey
   // does not ask the user to choose whether a dated maturity exists.  An
