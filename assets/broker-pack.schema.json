@@ -89,6 +89,34 @@
           "enum": ["currency", "ratio", "percent_decimal"],
           "description": "Which estimates are in the pack's currency and units, and which are not. effective_tax_rate is a ratio expressed as a decimal (0.21), not 21. Declared rather than inferred because a tax rate of 21 and a tax rate of 0.21 are both plausible-looking numbers."
         },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+          "description": "Stable identity for the exact broker definition. Distinct reported, adjusted, restated, lease, cash-flow and scope definitions use distinct ids."
+        },
+        "semantic_role": {
+          "enum": ["operating_forecast", "cash_flow_forecast", "debt_or_liquidity", "leverage_or_coverage", "interest_or_finance", "lease", "tax", "management_guidance", "broker_derived_estimate", "valuation_market_data", "presentation_only", "metadata", "other_model_check"]
+        },
+        "consensus_family": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+          "description": "Optional family used to compare distinct definitions without asserting they are identical."
+        },
+        "definition_signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "metric_id": { "type": "string", "minLength": 1 },
+            "accounting_basis": { "type": ["string", "null"] },
+            "operation_scope": { "type": ["string", "null"] },
+            "adjustment_basis": { "type": ["string", "null"] },
+            "currency": { "type": ["string", "null"] },
+            "units": { "type": ["string", "null"] },
+            "fiscal_calendar": { "type": ["string", "null"] },
+            "cash_flow_basis": { "type": ["string", "null"] },
+            "lease_basis": { "type": ["string", "null"] }
+          }
+        },
         "sign_convention": {
           "enum": ["as_reported", "outflow_negative", "outflow_positive"],
           "description": "Optional but strongly advised for capex, change_in_working_capital and dividends, where houses disagree on sign and a sign error is a silent 2x in the cash bridge."

@@ -245,8 +245,12 @@ When broker data is supplied or available:
   annual and partial-period row before selecting an authority;
 - create a visible selector or consensus choice;
 - preserve metric and period definitions;
+- preserve stable definition ids and never average reported, adjusted, restated,
+  lease-including, lease-excluding, FCFE or broker-defined FCF variants merely
+  because they share a broad consensus family;
 - keep quarterly/half-year evidence outside annual consensus, keep narrative
-  guidance as guidance, and retain supplemental debt/cash/output metrics as
+  guidance as company guidance, keep broker-derived annual points in their own
+  lane, and retain supplemental debt/cash/output metrics as
   explicitly labelled checks rather than silent omissions;
 - link the selected case into the main model;
 - exclude synthetic values unless explicitly instructed;

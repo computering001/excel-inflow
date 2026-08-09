@@ -246,10 +246,14 @@ two independent hash-bound cell transcriptions agree or records an explicit
 reviewed resolution. The third command compiles only reviewed, cell-addressed
 mappings. Before it can pass, every extracted table is reviewed and every
 nonblank annual or partial-period candidate row has one reasoned semantic
-disposition; a missing row or unowned mapping blocks. Full unused source tables,
-guidance, partial-period evidence, distinct metric definitions and supplemental
-checks remain evidence rather than disappearing or being forced into annual
-consensus.
+disposition; a missing row or unowned mapping blocks. Coverage count alone is
+not enough: the semantic-quality gate also rejects numeric rows called unusable,
+model-relevant rows discarded as irrelevant, non-equivalent duplicates,
+broker-derived values described as company guidance, incompatible definition
+collisions and unowned derivations. Full unused source tables, guidance,
+broker-derived and partial-period evidence, distinct metric definitions and
+supplemental checks remain evidence rather than disappearing or being forced
+into annual consensus.
 
 The resumable production shell handles all five user-facing stages. Run the
 same command again after supplying answers or after an interruption; it verifies

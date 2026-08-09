@@ -241,14 +241,15 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     );
   }
   if (
-    crosswalk.json.schema_version !== "broker-crosswalk/1.0" ||
-    receipt.json.schema_version !== "broker-crosswalk-receipt/1.0" ||
+    crosswalk.json.schema_version !== "broker-crosswalk/1.1" ||
+    receipt.json.schema_version !== "broker-crosswalk-receipt/1.1" ||
     receipt.json.status !== "PASS"
   ) {
     throw new Error("Broker crosswalk or its receipt is not a supported PASS artifact.");
   }
   if (
     receipt.json.coverage_summary?.unresolved_candidate_count !== 0 ||
+    receipt.json.coverage_summary?.semantic_quality_violation_count !== 0 ||
     receipt.json.coverage_summary?.table_count !==
       receipt.json.coverage_summary?.table_review_count ||
     !Array.isArray(receipt.json.coverage_ledger) ||

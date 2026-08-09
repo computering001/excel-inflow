@@ -1228,6 +1228,7 @@ function validateBrokerSourceTables(run, findings) {
   }
   if (
     receipt?.coverage_summary?.unresolved_candidate_count !== 0 ||
+    receipt?.coverage_summary?.semantic_quality_violation_count !== 0 ||
     receipt?.coverage_summary?.table_count !==
       receipt?.coverage_summary?.table_review_count ||
     !Array.isArray(receipt?.coverage_ledger) ||

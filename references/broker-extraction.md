@@ -34,7 +34,7 @@ The chain is:
 raw document bytes
 -> broker-extraction-bundle/1.0
 -> broker-source-tables/1.0
--> broker-crosswalk/1.0 + semantic coverage ledger + PASS receipt
+-> broker-crosswalk/1.1 + semantic coverage ledger + PASS receipt
 -> broker-pack/1.0
 -> model-case broker source mappings
 -> values-only broker evidence sheets
@@ -104,7 +104,7 @@ semantic mapping does not cure an incomplete source extraction.
 
 ## Semantic crosswalk
 
-Create one `broker-crosswalk/1.0` only after the extraction bundle is `PASS`.
+Create one `broker-crosswalk/1.1` only after the extraction bundle is `PASS`.
 Map by stable house id, metric id and forecast period. Each mapped value names
 one or more source table cells, a coefficient, optional constant, optional
 multiplier, rationale and review status. This declarative form supports a direct
@@ -128,6 +128,8 @@ nonblank row intersecting those columns in one semantic coverage ledger as:
   `Brokers` but marked `reference_only`;
 - `mapped_guidance` — narrative or range guidance retained without inventing a
   point estimate;
+- `broker_derived_estimate` — a broker calculation or implied annual value kept
+  separate from company guidance and from ordinary annual consensus;
 - `partial_period_evidence` — quarterly, half-year or other partial-period
   evidence kept outside the annual consensus;
 - `duplicate` — an exact or definition-equivalent repeat naming its canonical
@@ -136,12 +138,36 @@ nonblank row intersecting those columns in one semantic coverage ledger as:
 - `unusable` — a dash, ambiguous definition or otherwise unusable estimate.
 
 Every disposition carries an exact source-cell set, a rationale and reviewed
-status. The compiler independently enumerates all rows touched by the declared
+status. It also carries an evidence kind, semantic role, stable definition id
+and definition evidence. The compiler independently enumerates all rows touched by the declared
 period columns. One missing row, shifted period, unowned mapping, cross-house
 reference or unresolved candidate blocks. Quarterly values never enter an
 annual slot. Reported, adjusted and restated definitions; different FCF or net
 debt definitions; and working-capital balances versus changes remain separate
 metrics unless a transparent transformation is declared.
+
+Semantic completeness is stricter than row coverage. A numeric row cannot be
+called unusable. A model-relevant operating, cash-flow, debt, lease, interest,
+leverage or tax row cannot be excluded merely because the normalized vocabulary
+does not yet contain it; retain it as a distinct reference-only metric. A
+duplicate must match the canonical candidate's house, period basis, periods,
+definition, evidence kind, semantic role and exact values. Valuation rows may be
+excluded from the debt-overlay calculation only while remaining preserved as
+market-data evidence.
+
+Never combine source definitions merely because their labels are nearby. Bare,
+reported, adjusted, restated and core profit definitions; aggregate, PPE-only
+and intangible capex; FCFE and broker-defined FCF; and net debt including or
+excluding leases use distinct definition ids. The optional consensus family may
+relate them without asserting equivalence. A normalized metric may combine
+houses only when the exact definition id is common.
+
+Use `derived_mappings` for transparent arithmetic supported by more than one
+candidate, such as D&A from compatible EBITDA less EBIT or PBT from operating
+profit plus identified non-operating components. Each derivation names every
+input candidate and one ordinary coefficient-based mapping. Free-form executable
+formula text is forbidden; the expression field explains the already-declared
+linear components and does not execute.
 
 The compiler must prove:
 
@@ -155,6 +181,10 @@ The compiler must prove:
 - every detected forecast candidate has exactly one reviewed disposition;
 - every mapping is owned by at least one candidate and no candidate is
   unresolved;
+- every disposition passes the independent semantic relevance, provenance,
+  definition and duplicate-equivalence gates;
+- every transparent derived mapping consumes all declared input candidates and
+  remains cell-addressed;
 - guidance and partial-period evidence retain their original basis; and
 - the crosswalk receipt is hash-bound to both bundle and crosswalk and carries
   the zero-unresolved coverage summary.

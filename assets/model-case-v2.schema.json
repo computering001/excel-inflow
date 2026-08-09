@@ -228,6 +228,7 @@
               "mapping_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
               "house_id": { "type": "string", "minLength": 1 },
               "metric_id": { "type": "string", "minLength": 1 },
+              "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
               "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
               "components": {
                 "type": "array",
@@ -1046,6 +1047,11 @@
       "required": ["label", "brokers"],
       "properties": {
         "label": { "type": "string", "minLength": 1 },
+        "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "semantic_role": {
+          "enum": ["operating_forecast", "cash_flow_forecast", "debt_or_liquidity", "leverage_or_coverage", "interest_or_finance", "lease", "tax", "management_guidance", "broker_derived_estimate", "valuation_market_data", "presentation_only", "metadata", "other_model_check"]
+        },
+        "consensus_family": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
         "definition_signature": {
           "type": "object",
           "additionalProperties": false,
@@ -1056,7 +1062,9 @@
             "adjustment_basis": { "type": ["string", "null"] },
             "currency": { "type": ["string", "null"] },
             "units": { "type": ["string", "null"] },
-            "fiscal_calendar": { "type": ["string", "null"] }
+            "fiscal_calendar": { "type": ["string", "null"] },
+            "cash_flow_basis": { "type": ["string", "null"] },
+            "lease_basis": { "type": ["string", "null"] }
           }
         },
         "model_disposition": {
