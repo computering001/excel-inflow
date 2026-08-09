@@ -788,6 +788,32 @@ function addUnique(target, key, values) {
   target[key] = [...new Set([...(target[key] ?? []), ...additions])];
 }
 
+/**
+ * Bind each filed/source disclosure to the semantic row it originally owned
+ * before statement projection starts.  Projection is allowed to remove a
+ * redundant alias or reconciliation row only when that ownership is carried
+ * onto a surviving, economically equivalent row.  Without this binding the
+ * projection can identify the absorbed row ID but cannot prove which source
+ * disclosure moved with it, leaving the strict coverage gate to reject the
+ * compiler's own output.
+ *
+ * This is deliberately keyed by the evidence ledger's mapped row IDs rather
+ * than labels, metric names or physical Excel rows.  It therefore works for
+ * issuer-specific captions and unusual statement structures without adding a
+ * company exception.
+ */
+function bindStatementSourceLineage(modelCase, section, rows) {
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  for (const disclosure of modelCase.source_coverage?.[section] ?? []) {
+    if (!disclosure?.source_line_id) continue;
+    for (const rowId of disclosure.mapped_row_ids ?? []) {
+      const row = byId.get(rowId);
+      if (!row) continue;
+      addUnique(row, "source_line_ids", [disclosure.source_line_id]);
+    }
+  }
+}
+
 function expressionSignature(rowId, byId, visiting = new Set()) {
   if (!rowId || visiting.has(rowId)) return `cycle:${rowId ?? "missing"}`;
   const row = byId.get(rowId);
@@ -1343,8 +1369,11 @@ function consolidateConstituents(rows, spec) {
     if (consolidated) {
       // Preserve the semantic identity of an issuer-reported aggregate even
       // where its detail is not separately disclosed.  It remains a numbered
-      // body line, not a label-only header and not an invented answer.
-      consolidated.display_role = "group_parent";
+      // body line, not a label-only header and not an invented answer. A row
+      // with no visible children is not a collapsible group: presenting it as
+      // one creates the exact empty/peculiar grouping seen in the failed live
+      // workbook.
+      consolidated.display_role = "component";
       consolidated.formula_role = consolidated.calculation
         ? "derived_total"
         : "input";
@@ -2544,6 +2573,7 @@ export function normaliseStatementRows(
       modelCase.statement_structure_compiled_version ===
       "semantic-statements/1.0",
   });
+  bindStatementSourceLineage(modelCase, section, rows);
   if (modelCase.statement_structure_compiled_version === "semantic-statements/1.0") {
     materializeStatementPresentationTree(rows, section);
     assignDisplayAndFormulaRoles(rows);

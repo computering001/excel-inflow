@@ -510,7 +510,11 @@ function dependencyChecks(modelCase) {
   // this column is evaluated. Treating it as a same-period dependency reports
   // every flat carry-forward and every roll-forward as a false cycle.
   const intraPeriodRefs = (calculation) =>
-    !calculation || calculation.operator === "prior_period"
+    !calculation || [
+      "prior_period",
+      "historical_average",
+      "historical_trend",
+    ].includes(calculation.operator)
       ? []
       : calculation.operator === "prior_period_scaled_by"
         ? calculation.refs?.slice(1) ?? []

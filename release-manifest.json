@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v2.1.0",
+  "releaseName": "Excel Inflow v2.1.1",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.1.0",
+  "skillVersion": "2.1.1",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-09T18:34:02.276Z",
-  "centralInstructionsWords": 4361,
+  "generatedAt": "2026-08-09T20:28:51.361Z",
+  "centralInstructionsWords": 4517,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "1595981fda33e3e506d8dc7925b08d97bc9d3fa0361653d4d0f62dd4b0a20224",
-    "closureFileCount": 153,
+    "currentClosureSha256": "9280f9fe4b29bd5e49f1849a98cf3a2fab55ddee88482efd5c94b4c2762e0373",
+    "closureFileCount": 154,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -71,6 +71,7 @@
       "scripts/lib/intake.mjs",
       "scripts/lib/json_schema.mjs",
       "scripts/lib/lease_policy.mjs",
+      "scripts/lib/live_delivery_attestation.mjs",
       "scripts/lib/model_ir_v3.mjs",
       "scripts/lib/plan_builder.mjs",
       "scripts/lib/plan_values.mjs",
@@ -244,6 +245,9 @@
       "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/forecast_observation.mjs",
       "scripts/lib/forecast_observation.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/live_delivery_attestation.mjs -> scripts/lib/design_contract.mjs",
+      "scripts/lib/live_delivery_attestation.mjs -> scripts/lib/flow_runtime.mjs",
+      "scripts/lib/live_delivery_attestation.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/coverage.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/evidence_run.mjs",
@@ -321,6 +325,7 @@
       "scripts/run_user_flow.mjs -> scripts/lib/flow_screens.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/forecast_behavior.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/forecast_candidate_compiler.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/live_delivery_attestation.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/process_tree.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/row_plan.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/run_carrier.mjs",
@@ -790,6 +795,7 @@
       "installPath": "node_modules/jszip/jszip.min.js",
       "importedBy": [
         "scripts/build_dynamic_model.mjs",
+        "scripts/lib/live_delivery_attestation.mjs",
         "scripts/validate_cache_parity.mjs",
         "scripts/validate_source_parity.mjs",
         "scripts/validate_structure.mjs",
@@ -1081,21 +1087,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "21d8611b6a856e1f7b8599370be28ec4d887db5b4b5e4282bc9c0c8bf1740155",
-      "bytes": 33268,
-      "words": 4361
+      "sha256": "69e95165263ff6742c2c67bac32731e24767723e36c4fb1d0bcfdee14b181152",
+      "bytes": 34428,
+      "words": 4517
     },
     {
       "path": "SKILL.md",
-      "sha256": "81a7e5c986aa4541b4301f96cd6c9b01bf005ac5cf63d674b276cb730ace4634",
-      "bytes": 33755,
-      "words": 4430
+      "sha256": "88460e21830cb1d8a70212ccb9072c2e8784800d5d71beb1606c73cb0f98dc04",
+      "bytes": 34915,
+      "words": 4586
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "33faff86a5bc3fbeda2e4fec4a0a4f89648d858ef3cee923fd74be71873ad4f5",
-      "bytes": 33288,
-      "words": 4363
+      "sha256": "10db4b6ea0cb27fba9344098f9a52b548309555394b1dadbc34dd810ed4389e8",
+      "bytes": 34448,
+      "words": 4519
     },
     {
       "path": "references/model-contract.md",
@@ -1291,8 +1297,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "38d518b157d76a110add025ccf903b830dd0ac37b279d3483aee5fb3d6783828",
-      "bytes": 45706,
+      "sha256": "40c067088c2e6af838ee91d90d9940897dc38af93179f77a3d899b04aeb2c1a7",
+      "bytes": 45841,
       "words": null
     },
     {
@@ -1573,8 +1579,8 @@
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "17e2c8e660226d43674ea0d8432773b62bef814cb04220ab4869961aedb9141c",
-      "bytes": 77847,
+      "sha256": "2f5f3f53b6d002883acb082c0c106743fa0ebad1d5ad8c3d04326e790cce77f9",
+      "bytes": 77922,
       "words": null
     },
     {
@@ -1645,20 +1651,20 @@
     },
     {
       "path": "scripts/lib/flow_runtime.mjs",
-      "sha256": "cbfee77e2603850fe89bd907de78724dd1168c80e1677467e6416c0305b37fca",
+      "sha256": "6e06239a7a151b46749dcd2cb295d064154c57456d52b8425a2a08898ecdb165",
       "bytes": 7394,
       "words": null
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "62b2b20762b7212393ebbeb4ab8ece73aaf74296c6809f7d2a75d4bef0db51b5",
-      "bytes": 26527,
+      "sha256": "37135787a09309c46a1f9b3924e09a82ff1ee8ee0f643d7c8e8caf5f62115434",
+      "bytes": 26585,
       "words": null
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "16254bcac1dcd7473b3d3799769c57dca482522271a3817a490093948bb56cb4",
-      "bytes": 30060,
+      "sha256": "6132bdf4262f770f8a65b9ccf1cd20e496ceb6ca3fa537484e15382917c3067a",
+      "bytes": 30884,
       "words": null
     },
     {
@@ -1728,6 +1734,12 @@
       "words": null
     },
     {
+      "path": "scripts/lib/live_delivery_attestation.mjs",
+      "sha256": "46976535005710da4c4ee838ff9216f545be91000decd349a13809edd4ddd965",
+      "bytes": 14551,
+      "words": null
+    },
+    {
       "path": "scripts/lib/model_ir_v3.mjs",
       "sha256": "3a85b7b199c198c51b4ed6f4341e92a1c791f31cf3bb59ba3b506e7a74ef3df2",
       "bytes": 27199,
@@ -1789,8 +1801,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "3b857bac7908ece77fa88aebdea32365ec0f1e9e25ed60664214fdc481879f24",
-      "bytes": 144410,
+      "sha256": "e218770637e02a75548b700f68fca1774c3a684d7dff69bddbd8233a11d9103c",
+      "bytes": 145843,
       "words": null
     },
     {
@@ -1963,8 +1975,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "2aee53823aa984530c6e87daa1c8b4a4e2ef00e1a7f0ba0c5b7e0f277ffa7655",
-      "bytes": 39429,
+      "sha256": "826fd603919cddc9c5f98706be25bcb7dd3991b99bba30f897a3cea4a6cbb3f6",
+      "bytes": 42442,
       "words": null
     },
     {

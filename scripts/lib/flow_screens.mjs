@@ -691,6 +691,7 @@ export function renderDeliveryReport(report, { status = "complete" } = {}) {
     }
     lines.push("");
   };
+  section("BUILD IDENTITY", report.build_identity ?? []);
   section("TIES TO THE FILINGS", report.ties);
   section("BROKER SUBSTITUTIONS", report.broker_substitutions ?? []);
   section("FORECAST AUTHORITY", report.forecast_authority_summary ?? []);

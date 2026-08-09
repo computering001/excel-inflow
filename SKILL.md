@@ -8,6 +8,27 @@ description: Build, populate, repair, review, and validate a formula-driven corp
 ## Outcome
 Build a formula-driven corporate debt-overlay workbook with exactly **three historical and three forecast years**. The output must follow one of two standardised design profiles: maximal for full debt, lease, RCF, interest and optional acquisition topology; net cash only for a simple opening-net-cash issuer with no more than two instruments and acquisition off.
 
+### Non-bypassable end-user route
+
+An end-user company workbook has exactly one producer:
+`scripts/run_user_flow.mjs` and the Stage-4 controller it invokes. After
+attachments are normalised, continue or resume that controller through its
+hash-bound run carrier. Never construct a workbook directly in chat, with
+ad-hoc Python/OpenPyXL, from a compact or generic template, through a
+lower-level emitter command, or by patching cells. If the controlled route
+cannot run, **BLOCK** and preserve the carrier; a smaller substitute is never a
+valid fallback.
+
+Attach only the workbook path returned by a final `user-flow-run/1.0` result
+whose controller is the currently shipped `five-stage` version, stage is
+`delivery`, status is `PASS_PENDING_MANUAL`, total violations are zero, and
+`live_delivery_attestation_sha256` is present. The matching
+`live-delivery-attestation/1.0` artifact must be `PASS` and must bind the
+workbook, Stage-4 receipt, active maximal/net-cash authority, design epoch, A:U
+topology and every required sidecar. The delivery screen must visibly show
+**BUILD IDENTITY**. Absence of any one of these facts means no workbook may be
+delivered.
+
 The package contains the design contract, style tokens and renderer, but no workbook or PNG files. Physical reference workbooks are supplied separately after installation and remain immutable design authorities. An ordinary deployment run never manufactures or depends on a PNG baseline. It proves presentation through authority structure, exact workbook identity where a frozen canary exists, structural rendering of every visible sheet and native Excel review. Pixel baselines remain external local release evidence only; never write them into the skill or repository.
 
 `assets/standardised-design-runtime.v4.json` carries the default portable measured design contract without embedding a physical workbook. Preserve its A:U geometry, section order, control treatment, named expansion zones and profile identity. Company reporting determines rows inside those zones; it never creates a competing layout. `EXCEL_INFLOW_DESIGN_EPOCH=2` and `=3` are explicit rollback routes; any other non-empty value fails closed.

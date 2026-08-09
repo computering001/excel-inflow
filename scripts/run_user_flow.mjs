@@ -51,6 +51,10 @@ import {
   validateForecastBehaviorMap,
 } from "./lib/forecast_behavior.mjs";
 import {
+  assertLiveDeliveryAttestation,
+  compileLiveDeliveryAttestation,
+} from "./lib/live_delivery_attestation.mjs";
+import {
   normaliseStatementRows,
   reconcileStatementProjectionCoverage,
   stripStatementPresentationMetadata,
@@ -158,6 +162,13 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
   delivery: Object.freeze([
     "scripts/lib/flow_read.mjs",
     "scripts/lib/flow_screens.mjs",
+    "scripts/lib/live_delivery_attestation.mjs",
+    "scripts/lib/design_contract.mjs",
+    "scripts/lib/flow_runtime.mjs",
+    "scripts/lib/run_store.mjs",
+    "assets/standardised-design-runtime.v2.json",
+    "assets/standardised-design-runtime.v3.json",
+    "assets/standardised-design-runtime.v4.json",
   ]),
 });
 
@@ -175,8 +186,7 @@ function stageRuntimeDigests(integrity) {
   const controller = runtimeSubsetDigest(integrity, STAGE_RUNTIME_MEMBERS.inputs, "inputs");
   const allRuntimeMembers = Object.keys(integrity.files ?? {});
   const buildMembers = allRuntimeMembers.filter((member) =>
-    !member.startsWith("references/") &&
-    !STAGE_RUNTIME_MEMBERS.delivery.includes(member));
+    !member.startsWith("references/"));
   return Object.freeze({
     inputs: controller,
     evidence_review: runtimeSubsetDigest(integrity, STAGE_RUNTIME_MEMBERS.evidence_review, "evidence review"),
@@ -1024,6 +1034,54 @@ async function main() {
     });
   }
 
+  // The chat host is not an authority. Before Stage 5 can expose any workbook,
+  // independently bind the exact file to this controller, its Stage-4 receipt,
+  // the active design epoch and the physical workbook topology. An ad-hoc
+  // compact workbook can be internally consistent; it still must never leave
+  // this run as an Excel Inflow result.
+  const deliveryAttestationPath = path.join(
+    runDir,
+    "stages",
+    "delivery",
+    "live-delivery-attestation.json",
+  );
+  let deliveryAttestation;
+  try {
+    deliveryAttestation = await compileLiveDeliveryAttestation({
+      runRoot: runDir,
+      runId,
+      workbook,
+      buildResult,
+      stage4Receipt: receipt4,
+      modelCasePath: answeredCasePath,
+    });
+    await writeJsonAtomic(deliveryAttestationPath, deliveryAttestation);
+    assertLiveDeliveryAttestation(deliveryAttestation);
+  } catch (error) {
+    const failureScreen = renderFailure({
+      stage: "delivery",
+      what_failed: "The workbook is not the attested output of the controlled Excel Inflow build path.",
+      why: error.message,
+      what_would_fix_it: [
+        "Resume the hash-bound run carrier and rebuild through scripts/run_user_flow.mjs; do not construct or repair a workbook manually.",
+      ],
+    });
+    return finish({
+      runDir,
+      screen: failureScreen,
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "BLOCKED",
+        stage: "delivery",
+        message: error.message,
+        reused_stages: reusedStages,
+      },
+    });
+  }
+
   // Stage 5 — deliver the workbook and concise read, while keeping the manual
   // native-Excel gate explicit. Delivery succeeds; production certification is
   // still PASS_PENDING_MANUAL until that external evidence is attached.
@@ -1033,11 +1091,13 @@ async function main() {
   const stage5Inputs = {
     stage4_receipt: receipt4.receipt_hash,
     model_case: caseHash,
+    live_delivery_attestation: await hashFile(deliveryAttestationPath),
     runtime: runtimeDigests.delivery,
   };
   const stage5Outputs = {
     delivery_result: deliveryResultPath,
     delivery_screen: deliveryScreenPath,
+    live_delivery_attestation: deliveryAttestationPath,
   };
   const cached5 = await readUsableStage({
     runDir,
@@ -1060,13 +1120,26 @@ async function main() {
     if (delivered.outcome !== "delivered") {
       throw new Error(`Delivery read failed after a successful build: ${delivered.outcome}`);
     }
-    deliveryScreen = renderDeliveryReport(delivered.report, { status: "review required" });
+    const report = {
+      ...delivered.report,
+      build_identity: [
+        `Controller ${deliveryAttestation.controller_version}`,
+        `Authority ${deliveryAttestation.authority_profile} / design epoch ${deliveryAttestation.design_epoch}`,
+        `Attestation ${deliveryAttestation.attestation_sha256}`,
+      ],
+    };
+    deliveryScreen = renderDeliveryReport(report, { status: "review required" });
     deliveryResult = {
       outcome: delivered.outcome,
-      report: delivered.report,
+      report,
       workbook,
       automated_gate_status: buildResult.status,
       manual_gate: "native_excel_restoration_and_visual_review",
+      live_delivery_attestation: deliveryAttestationPath,
+      live_delivery_attestation_sha256: deliveryAttestation.attestation_sha256,
+      controller_version: FLOW_CONTROLLER_VERSION,
+      authority_profile: deliveryAttestation.authority_profile,
+      design_epoch: deliveryAttestation.design_epoch,
     };
     await writeJsonAtomic(deliveryResultPath, deliveryResult);
     await writeTextAtomic(deliveryScreenPath, `${deliveryScreen}\n`);
@@ -1102,6 +1175,10 @@ async function main() {
       model_case: answeredCasePath,
       total_violations: 0,
       manual_gate: "native_excel_restoration_and_visual_review",
+      live_delivery_attestation: deliveryAttestationPath,
+      live_delivery_attestation_sha256: deliveryAttestation.attestation_sha256,
+      authority_profile: deliveryAttestation.authority_profile,
+      design_epoch: deliveryAttestation.design_epoch,
       receipt: receipt5,
       reused_stages: reusedStages,
     },

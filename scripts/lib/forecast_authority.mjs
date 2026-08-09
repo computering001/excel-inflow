@@ -485,10 +485,24 @@ export function selectForecastAuthority(candidates) {
       candidate &&
       Object.hasOwn(FORECAST_AUTHORITY_PRIORITY, candidate.method),
   );
+  const effectivePriority = (candidate) => {
+    if (candidate.method !== "explicit_zero") {
+      return FORECAST_AUTHORITY_PRIORITY[candidate.method];
+    }
+    // A sourced no-recurrence statement is positive evidence, not the weak
+    // last-rung inference represented by an unexplained zero.  Company-backed
+    // zero therefore sits with company indications (but below explicit
+    // guidance), while a user-backed zero sits with visible user assumptions.
+    // Historical/unsourced zeros deliberately remain the weakest resolved
+    // candidate.  This prevents a generic carry-forward from overruling a
+    // cited statement that a programme or commitment has ended.
+    if (candidate.source_kind === "company_reported") return 35;
+    if (candidate.source_kind === "user_supplied") return 60;
+    return FORECAST_AUTHORITY_PRIORITY.explicit_zero;
+  };
   return [...usable].sort(
     (left, right) =>
-      FORECAST_AUTHORITY_PRIORITY[left.method] -
-        FORECAST_AUTHORITY_PRIORITY[right.method] ||
+      effectivePriority(left) - effectivePriority(right) ||
       String(left.source_id ?? "").localeCompare(String(right.source_id ?? "")),
   )[0] ?? null;
 }
