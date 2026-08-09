@@ -272,8 +272,11 @@ disposition ledger, not by full-array equality.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves
-two independent hash-bound cell transcriptions agree or records an explicit
-reviewed resolution. The pack compiler accepts only reviewed, cell-addressed
+two independent hash-bound economic cell transcriptions agree or records one
+conflict-manifest-bound targeted resolution. A `NEEDS_RESOLUTION` result is an
+internal Stage-2 checkpoint: resolve it once before any user-facing stop.
+Structural differences with identical economic observations do not block;
+unresolved economic cells become quarantined evidence. The pack compiler accepts only reviewed, cell-addressed
 mappings. Before it can pass, every extracted table is reviewed and every
 nonblank annual or partial-period candidate row has one reasoned semantic
 disposition; a missing row or unowned mapping blocks. Coverage count alone is
@@ -284,6 +287,14 @@ collisions and unowned derivations. Full unused source tables, guidance,
 broker-derived and partial-period evidence, distinct metric definitions and
 supplemental checks remain evidence rather than disappearing or being forced
 into annual consensus.
+
+Derive broker-house eligibility after the cell ledger closes. A complete
+primary-eligible house may support the model even if other supplied houses are
+partial or contain quarantined cells. Keep the chosen house coherent; another
+house is an alternate authority, never proof that a disputed cell in the first
+house said the same thing. Use the recommended complete house when the user did
+not choose one. Ask only if no complete house or later forecast-waterfall route
+can supply a material concept.
 
 When a raw DCS export is supplied, preserve its entire source-owned row and cell
 universe before projecting instruments. Run the lossless lane outside the

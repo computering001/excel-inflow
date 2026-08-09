@@ -4,7 +4,7 @@
   "title": "Debt Overlay — required shape of a broker research set (stage 1 input, gated by node N0)",
   "description": "THIS IS A REQUIREMENT, NOT A DESCRIPTION OF ANY BROKER'S OUTPUT FORMAT. Broker notes arrive as PDFs, spreadsheets and emails in as many layouts as there are houses; none of them will ever conform to this on its own. What this document states is the shape the model REQUIRES after extraction — the houses, the metrics, the three forecast years and the provenance that must survive the trip. An extractor or an adapter produces this; nothing downstream reads a raw note. Do not edit this contract to match whatever a particular house publishes.",
   "x_contract_notes": {
-    "why_three": "USER-FLOW-20260726.md stage 1: minimum 3 houses, maximum 10. Three is the minimum for a meaningful consensus and lets the model compare period-specific EBIT versus Adjusted EBITDA coverage, then use D&A as the bridge driver; headline ties resolve toward EBIT (scripts/lib/broker_anchor.mjs). A house contributes only in periods where it supplies a finite estimate. Ten is the operating cap because extraction and review cost scale with every additional source.",
+    "why_three": "USER-FLOW-20260726.md stage 1 accepts 3-10 supplied houses so the evidence pack normally supports comparison and fallback. Eligibility is cell-derived after extraction: one complete primary-eligible house is enough to continue while other supplied houses may remain supplemental or reference-only. A quarantined or partial house contributes only finite verified cells and never invalidates another house. Ten is the operating cap because extraction and review cost scale with every additional source.",
     "authority": "The broker set is authoritative for the forecast anchor and consensus lines ONLY. Never for anything historic. Historic figures come from the filings.",
     "accepted_file_types": "A broker note may be supplied as PDF, OOXML spreadsheet, CSV, text/HTML/JSON, PNG or JPEG. Native text/cells are preferred. An image-only PDF or standalone image is accepted only through the hash-bound verified-image lane: two independent cell-addressed transcriptions must agree exactly, or a reviewed resolution must identify every disagreement. A raw OCR guess never satisfies the contract. Legacy binary Office files and message containers remain rejected; unwrap or resave the attachment first.",
     "estimate_date_gap": "Every house carries published_date because a six-month-old estimate and last week's estimate are not equivalent evidence. The v2 case preserves the date, source filename and source id in broker_pack.house_metadata while keeping each numeric broker series unchanged. Evidence-run validation blocks if that metadata is dropped."
@@ -59,7 +59,7 @@
       "type": "array",
       "minItems": 3,
       "maxItems": 10,
-      "description": "One entry per contributing house. Minimum 3, maximum 10. A house appearing twice under different spellings is a duplicate, not a contributor, and inflates the anchor count that resolves disagreements — N0 detects it by normalised name.",
+      "description": "One entry per supplied house. Minimum 3, maximum 10. Eligibility is derived separately: a supplied house may be primary-eligible, supplemental or reference-only. A house appearing twice under different spellings is a duplicate, not a contributor, and N0 detects it by normalised name.",
       "items": { "$ref": "#/$defs/house" }
     },
     "provider_consensus": {
@@ -70,6 +70,18 @@
         "minItems": 3,
         "maxItems": 3,
         "items": { "type": ["number", "null"] }
+      }
+    },
+    "recommended_primary_house_id": { "type": ["string", "null"] },
+    "eligibility_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_eligible_house_count", "supplemental_eligible_house_count", "reference_only_house_count", "run_can_continue_without_broker_question"],
+      "properties": {
+        "primary_eligible_house_count": { "type": "integer", "minimum": 0 },
+        "supplemental_eligible_house_count": { "type": "integer", "minimum": 0 },
+        "reference_only_house_count": { "type": "integer", "minimum": 0 },
+        "run_can_continue_without_broker_question": { "type": "boolean" }
       }
     },
     "notes": { "type": "string" }
@@ -205,7 +217,10 @@
             "maxItems": 3,
             "items": { "type": ["number", "null"] }
           }
-        }
+        },
+        "eligibility": { "enum": ["primary_eligible", "supplemental_eligible", "reference_only", "unusable"] },
+        "verified_forecast_cell_count": { "type": "integer", "minimum": 0 },
+        "missing_primary_metrics": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
       }
     }
   }

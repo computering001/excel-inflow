@@ -147,6 +147,13 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                     }
                     for cell in nonblank
                 ]
+                conflict_ids = sorted({
+                    str(cell.get("conflict_id"))
+                    for cell in nonblank
+                    if cell.get("authority_status") == "quarantined_conflict"
+                    and str(cell.get("conflict_id") or "").strip()
+                })
+                authority_status = "quarantined_conflict" if conflict_ids else "verified"
                 identity = {
                     "document_id": document.get("document_id"),
                     "table_id": table_id,
@@ -200,6 +207,8 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                         "label_indent": label_indent,
                         "label_bold": label_bold,
                     }],
+                    "authority_status": authority_status,
+                    "conflict_ids": conflict_ids,
                 })
                 if row_kind == "header":
                     header_parent_id = candidate_id
@@ -240,6 +249,7 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
             "numeric_candidate_count": sum(1 for item in candidates if item["numeric"]),
             "header_candidate_count": sum(1 for item in candidates if item["row_kind"] == "header"),
             "unresolved_period_header_count": sum(1 for item in candidates if item["period_basis"] == "unresolved_period_header"),
+            "quarantined_candidate_count": sum(1 for item in candidates if item["authority_status"] == "quarantined_conflict"),
             "finding_count": len(findings),
         },
     }

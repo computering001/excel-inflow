@@ -192,6 +192,19 @@ def bounded_native_pair(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return methods == {"native_pdf_lines", "native_pdf_lines_strict"}
 
 
+def rendered_native_authority_pair(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    """A verified rendered table may adjudicate a conflicting native lane.
+
+    The rendered contributor is not a raw OCR guess: it is either two-pass
+    visual consensus or a conflict-ledger-bound reviewed resolution. Native
+    extraction remains discovery/corroboration evidence, but cannot create a
+    second blocking table after the visual conflict has already been resolved.
+    """
+    rendered = [item for item in (left, right) if has_rendered_authority(item)]
+    native = [item for item in (left, right) if not has_rendered_authority(item)]
+    return len(rendered) == 1 and len(native) == 1
+
+
 def segmentation_equivalent(left: dict[str, Any], right: dict[str, Any]) -> bool:
     """Recognise one physical table split differently by extraction lanes.
 
@@ -309,7 +322,11 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
                 exact_same_region = exact and (
                     nested_overlap > 0.0 or explicitly_equivalent_lanes(seed, candidate)
                 )
-                if exact_same_region or ((overlap >= 0.70 or nested_overlap >= 0.85) and contained) or segmentation_equivalent(seed, candidate):
+                verified_rendered_adjudication = (
+                    (overlap >= 0.70 or nested_overlap >= 0.85)
+                    and rendered_native_authority_pair(seed, candidate)
+                )
+                if exact_same_region or verified_rendered_adjudication or ((overlap >= 0.70 or nested_overlap >= 0.85) and contained) or segmentation_equivalent(seed, candidate):
                     group.append(candidate)
                     remaining.remove(candidate)
                 elif overlap >= 0.70 or nested_overlap >= 0.85:

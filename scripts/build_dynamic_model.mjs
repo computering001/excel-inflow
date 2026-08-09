@@ -1390,6 +1390,12 @@ function compileBrokerEvidenceLayout(modelCase) {
       const metaRow = row;
       const dataStartRow = metaRow + 1;
       const maxColumns = Math.max(1, ...(table.rows ?? []).map((values) => values.length));
+      const authorityByCell = new Map(
+        (table.cell_authorities ?? []).map((entry) => [
+          `${Number(entry.row)}|${Number(entry.column)}`,
+          entry,
+        ]),
+      );
       for (let sourceRow = 1; sourceRow <= (table.rows ?? []).length; sourceRow += 1) {
         for (let sourceColumn = 1; sourceColumn <= maxColumns; sourceColumn += 1) {
           const address = `${columnName(sourceColumn + 1)}${dataStartRow + sourceRow - 1}`;
@@ -1397,11 +1403,16 @@ function compileBrokerEvidenceLayout(modelCase) {
           if (cellMap.has(key)) {
             throw new Error(`Broker evidence cell key ${key} is duplicated.`);
           }
-          cellMap.set(key, { sheetName: name, address, house_id: house.house_id });
+          cellMap.set(key, {
+            sheetName: name,
+            address,
+            house_id: house.house_id,
+            authority: authorityByCell.get(`${sourceRow}|${sourceColumn}`) ?? null,
+          });
         }
       }
       row = dataStartRow + (table.rows ?? []).length + 2;
-      return { table, metaRow, dataStartRow, maxColumns };
+      return { table, metaRow, dataStartRow, maxColumns, authorityByCell };
     });
     return { house, name, tableLayouts, visibleEndRow: Math.max(3, row - 1) };
   });
@@ -1419,6 +1430,9 @@ function compileBrokerEvidenceLayout(modelCase) {
         throw new Error(
           `Broker mapping ${key} points to a missing or cross-house source cell.`,
         );
+      }
+      if (physical.authority?.status === "quarantined_conflict") {
+        throw new Error(`Broker mapping ${key} points to quarantined source evidence.`);
       }
     }
     mappingByKey.set(key, mapping);
@@ -1524,7 +1538,7 @@ function buildBrokerEvidenceSheets(workbook, layout) {
     styleFont(sheet, "B2", COLORS.grey);
     let globalMaxColumns = 1;
     const maxWidths = new Map();
-    for (const { table, metaRow, dataStartRow, maxColumns } of sheetLayout.tableLayouts) {
+    for (const { table, metaRow, dataStartRow, maxColumns, authorityByCell } of sheetLayout.tableLayouts) {
       globalMaxColumns = Math.max(globalMaxColumns, maxColumns);
       const lastColumn = columnName(maxColumns + 1);
       setValue(
@@ -1540,6 +1554,7 @@ function buildBrokerEvidenceSheets(workbook, layout) {
           const value = sourceColumn < values.length ? values[sourceColumn] : null;
           const address = `${columnName(sourceColumn + 2)}${dataStartRow + sourceRow}`;
           setValue(sheet, address, value);
+          const authority = authorityByCell.get(`${sourceRow + 1}|${sourceColumn + 1}`);
           const width = Math.min(30, Math.max(9, String(value ?? "").length + 2));
           maxWidths.set(sourceColumn + 2, Math.max(maxWidths.get(sourceColumn + 2) ?? 0, width));
           if (sourceRow === 0) {
@@ -1552,6 +1567,16 @@ function buildBrokerEvidenceSheets(workbook, layout) {
             styleInput(sheet, address);
           } else if (value !== null && value !== undefined && value !== "") {
             styleFont(sheet, address, COLORS.black);
+          }
+          if (authority?.status === "quarantined_conflict") {
+            sheet.getRange(address).format.fill = COLORS.stateAmber;
+            styleFont(sheet, address, COLORS.black);
+            addCommentOnce(
+              workbook,
+              sheet,
+              address,
+              `Source-cell conflict ${authority.conflict_id ?? "unresolved"}. Retained as reference evidence; prohibited from model formulas.`,
+            );
           }
         }
       }

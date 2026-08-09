@@ -137,12 +137,27 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
     const scalarRows = (extracted.table.rows ?? []).map((row) =>
       row.map((cell) => cell?.value ?? null),
     );
+    const extractedAuthorities = (extracted.table.rows ?? []).flatMap((row, rowIndex) =>
+      row.flatMap((cell, columnIndex) =>
+        cell?.authority_status || cell?.conflict_id
+          ? [{
+              row: Number(cell.row ?? rowIndex + 1),
+              column: Number(cell.column ?? columnIndex + 1),
+              status: cell.authority_status ?? "verified_native",
+              ...(cell.conflict_id ? { conflict_id: cell.conflict_id } : {}),
+              ...(cell.authority_basis ? { basis: cell.authority_basis } : {}),
+            }]
+          : [],
+      ),
+    );
     if (
       source.house_id !== extracted.house_id ||
       JSON.stringify(canonicalise(source.table.rows ?? [])) !==
-        JSON.stringify(canonicalise(scalarRows))
+        JSON.stringify(canonicalise(scalarRows)) ||
+      JSON.stringify(canonicalise(source.table.cell_authorities ?? [])) !==
+        JSON.stringify(canonicalise(extractedAuthorities))
     ) {
-      throw new Error(`Broker source table ${tableId} does not reproduce the verified extraction cells.`);
+      throw new Error(`Broker source table ${tableId} does not reproduce the verified extraction cells and authority states.`);
     }
   }
 
@@ -172,6 +187,11 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
       ) {
         throw new Error(
           `Broker mapping ${mapping.mapping_id} component ${componentIndex} is detached from its source table cell.`,
+        );
+      }
+      if (extractedCell.authority_status === "quarantined_conflict") {
+        throw new Error(
+          `Broker mapping ${mapping.mapping_id} consumes quarantined source cell ${component.table_id}!R${row}C${column}.`,
         );
       }
       const rawValue = parseBrokerNumber(
@@ -225,6 +245,9 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
     coveredCandidateIds.add(String(entry.candidate_id ?? ""));
   }
   const manifestCandidates = extraction.candidate_manifest?.candidates ?? [];
+  const manifestById = new Map(
+    manifestCandidates.map((entry) => [String(entry.candidate_id ?? ""), entry]),
+  );
   const manifestCandidateIds = new Set(
     manifestCandidates.map((entry) =>
       String(entry.candidate_id ?? ""),
@@ -239,6 +262,23 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
     const extracted = extractedTables.get(entry.table_id);
     if (!source || !extracted || source.house_id !== entry.house_id) {
       throw new Error(`Broker coverage candidate ${entry.candidate_id} cites an absent or cross-house table.`);
+    }
+    const manifestCandidate = manifestById.get(String(entry.candidate_id ?? ""));
+    if (
+      manifestCandidate?.authority_status === "quarantined_conflict" &&
+      (entry.disposition !== "quarantined_conflict" || entry.model_use !== "unresolved" || (entry.mapping_ids ?? []).length > 0)
+    ) {
+      throw new Error(
+        `Broker coverage candidate ${entry.candidate_id} is quarantined but the crosswalk attempts to activate it.`,
+      );
+    }
+    if (
+      manifestCandidate?.authority_status !== "quarantined_conflict" &&
+      entry.disposition === "quarantined_conflict"
+    ) {
+      throw new Error(
+        `Broker coverage candidate ${entry.candidate_id} is source-verified but the crosswalk invents a quarantine.`,
+      );
     }
     return {
       ...structuredClone(entry),

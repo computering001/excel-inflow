@@ -22,6 +22,7 @@
     "tool_versions": { "type": "object" },
     "canonical_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "candidate_manifest": { "type": "object" },
+    "vision_conflict_manifests": { "type": "array", "items": { "type": "object" } },
     "documents": {
       "type": "array",
       "minItems": 1,
@@ -51,10 +52,12 @@
         "unresolved_surface_count": { "type": "integer", "minimum": 0 },
         "duplicate_cell_count": { "type": "integer", "minimum": 0 },
         "uncovered_numeric_region_count": { "type": "integer", "minimum": 0 },
-        "material_uncovered_region_count": { "type": "integer", "minimum": 0 }
+        "material_uncovered_region_count": { "type": "integer", "minimum": 0 },
+        "vision_conflict_count": { "type": "integer", "minimum": 0 },
+        "quarantined_conflict_count": { "type": "integer", "minimum": 0 }
       }
     },
-    "gate_status": { "enum": ["PASS", "NEEDS_VISION", "BLOCKED"] },
+    "gate_status": { "enum": ["PASS", "NEEDS_VISION", "NEEDS_RESOLUTION", "BLOCKED"] },
     "findings": {
       "type": "array",
       "items": {
@@ -182,7 +185,8 @@
           }
         },
         "uncovered_numeric_regions": { "type": "array", "items": { "type": "object" } },
-        "vision_source_census": { "type": "object" }
+        "vision_source_census": { "type": "object" },
+        "vision_conflict_summary": { "type": "object" }
       }
     },
     "table": {
@@ -267,6 +271,11 @@
         },
         "source_ref": { "type": "string", "minLength": 1 },
         "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "authority_status": {
+          "enum": ["verified_native", "verified_dual_read", "verified_adjudicated", "quarantined_conflict"]
+        },
+        "authority_basis": { "type": "string", "minLength": 1 },
+        "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
         "address": { "type": ["string", "null"] },
         "bold": { "type": ["boolean", "null"] },
         "indent": { "type": ["integer", "number", "null"], "minimum": 0 }

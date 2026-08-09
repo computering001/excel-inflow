@@ -17,7 +17,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["candidate_id", "document_id", "house_id", "table_id", "row", "label", "row_kind", "parent_candidate_id", "period_basis", "period_indexes", "source_cells", "numeric", "numeric_cell_count", "header_context", "units", "definition_hints"],
+        "required": ["candidate_id", "document_id", "house_id", "table_id", "row", "label", "row_kind", "parent_candidate_id", "period_basis", "period_indexes", "source_cells", "numeric", "numeric_cell_count", "header_context", "units", "definition_hints", "authority_status", "conflict_ids"],
         "properties": {
           "candidate_id": {"type": "string", "pattern": "^bc-[a-f0-9]{24}$"},
           "document_id": {"type": "string", "minLength": 1},
@@ -34,7 +34,9 @@
           "numeric_cell_count": {"type": "integer", "minimum": 0},
           "header_context": {"type": "array", "items": {"type": "string"}},
           "units": {"type": ["string", "null"]},
-          "definition_hints": {"type": "array"}
+          "definition_hints": {"type": "array"},
+          "authority_status": {"enum": ["verified", "quarantined_conflict"]},
+          "conflict_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^bvc-[a-f0-9]{24}$"}}
         }
       }
     },

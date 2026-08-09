@@ -310,7 +310,7 @@
         "definition_fingerprint": { "$ref": "#/$defs/definitionFingerprint" },
         "definition_evidence": { "type": "string", "minLength": 1 },
         "disposition": {
-          "enum": ["mapped_metric", "mapped_guidance", "broker_derived_estimate", "partial_period_evidence", "supplemental_check", "duplicate", "not_model_relevant", "unusable"]
+          "enum": ["mapped_metric", "mapped_guidance", "broker_derived_estimate", "partial_period_evidence", "supplemental_check", "duplicate", "not_model_relevant", "unusable", "quarantined_conflict"]
         },
         "metric_id": { "type": "string", "minLength": 1 },
         "mapping_ids": {

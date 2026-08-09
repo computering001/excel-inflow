@@ -41,7 +41,7 @@ EVIDENCE_KINDS = {
 DISPOSITIONS = {
     "mapped_metric", "mapped_guidance", "broker_derived_estimate",
     "partial_period_evidence", "supplemental_check", "duplicate",
-    "not_model_relevant", "unusable",
+    "not_model_relevant", "unusable", "quarantined_conflict",
 }
 MODEL_RELEVANT_LABEL = re.compile(
     r"(?:revenue|sales|profit|ebit|ebitda|income|tax|depreciat|amortis|impair|"
@@ -74,6 +74,7 @@ MODEL_USE_BY_DISPOSITION = {
     "mapped_guidance": "reference_only", "broker_derived_estimate": "reference_only",
     "partial_period_evidence": "reference_only", "duplicate": "exact_duplicate",
     "not_model_relevant": "reference_only", "unusable": "unresolved",
+    "quarantined_conflict": "unresolved",
 }
 
 
@@ -625,6 +626,16 @@ def validate_coverage(
                 raise ValueError(f"coverage_ledger[{index}] unusable evidence must be non_numeric.")
             if any(has_numeric_signal(item.get("raw_value")) for item in resolved_cells):
                 raise ValueError(f"coverage_ledger[{index}] marks numeric evidence unusable.")
+        candidate_authority = (expected_entry or {}).get("authority_status", "verified")
+        if candidate_authority == "quarantined_conflict":
+            if disposition != "quarantined_conflict" or model_use != "unresolved" or mapping_ids:
+                raise ValueError(
+                    f"coverage_ledger[{index}] is source-quarantined and must remain unmapped with model_use=unresolved."
+                )
+        elif disposition == "quarantined_conflict":
+            raise ValueError(
+                f"coverage_ledger[{index}] quarantines a source-verified candidate without conflict evidence."
+            )
         duplicate_of = entry.get("duplicate_of")
         if disposition == "duplicate" and not duplicate_of:
             raise ValueError(f"coverage_ledger[{index}] duplicate has no duplicate_of target.")
@@ -632,7 +643,12 @@ def validate_coverage(
             raise ValueError(f"coverage_ledger[{index}] has duplicate_of without duplicate disposition.")
         if entry.get("review_status") != "reviewed" or not str(entry.get("rationale") or "").strip():
             raise ValueError(f"coverage_ledger[{index}] lacks a reviewed rationale.")
-        if any(has_numeric_signal(item.get("raw_value")) for item in resolved_cells) and concept_id.startswith("custom.") and model_use != "reference_only":
+        if (
+            any(has_numeric_signal(item.get("raw_value")) for item in resolved_cells)
+            and concept_id.startswith("custom.")
+            and model_use != "reference_only"
+            and disposition != "quarantined_conflict"
+        ):
             raise ValueError(f"coverage_ledger[{index}] unknown numeric concept must be custom.* reference_only.")
         resolved = normalized_entry
         resolved["source_cells"] = resolved_cells
@@ -906,6 +922,10 @@ def main() -> int:
                 cell = table["rows"][row - 1][column - 1]
             except (IndexError, TypeError):
                 raise ValueError(f"mappings[{index}] cell {table_id}!R{row}C{column} does not exist.")
+            if cell.get("authority_status") == "quarantined_conflict":
+                raise ValueError(
+                    f"mappings[{index}] attempts to consume quarantined broker cell {table_id}!R{row}C{column}."
+                )
             coefficient = float(component.get("coefficient", 0.0))
             raw_value = parse_number(cell.get("value"), f"{table_id}!R{row}C{column}")
             contribution = raw_value * coefficient
@@ -958,6 +978,8 @@ def main() -> int:
         f"{len(documents_by_house)}-house broker pack extracted and cell-crosswalked from hash-bound source documents"
     )
     houses = []
+    headline_metrics = [metric_id for metric_id in ("ebit", "adjusted_ebitda") if metric_id in metrics]
+    required_house_metrics = sorted(REQUIRED_METRICS)
     for house_id, document in documents_by_house.items():
         has_native = any(
             int(surface.get("native_text_chars", 0)) > 0
@@ -977,6 +999,23 @@ def main() -> int:
             else "verified_image_transcription" if has_verified_image
             else "native"
         )
+        metric_coverage = {
+            metric_id: sum(
+                1 for value in estimates[house_id].get(metric_id, [])
+                if value is not None and math.isfinite(float(value))
+            )
+            for metric_id in metrics
+        }
+        complete_core = all(metric_coverage.get(metric_id, 0) == 3 for metric_id in required_house_metrics)
+        complete_headline = any(metric_coverage.get(metric_id, 0) == 3 for metric_id in headline_metrics)
+        active_value_count = sum(metric_coverage.values())
+        eligibility = (
+            "primary_eligible"
+            if complete_core and complete_headline
+            else "supplemental_eligible"
+            if active_value_count > 0
+            else "reference_only"
+        )
         houses.append({
             "house_id": house_id,
             "house_name": document["house_name"],
@@ -991,7 +1030,26 @@ def main() -> int:
                 "page_reference": "See broker-source-tables.json and broker-crosswalk-receipt.json",
             },
             "estimates": estimates[house_id],
+            "eligibility": eligibility,
+            "verified_forecast_cell_count": active_value_count,
+            "missing_primary_metrics": sorted([
+                metric_id
+                for metric_id in [*required_house_metrics, "ebit_or_adjusted_ebitda"]
+                if (
+                    metric_coverage.get(metric_id, 0) < 3
+                    if metric_id != "ebit_or_adjusted_ebitda"
+                    else not complete_headline
+                )
+            ]),
         })
+    ranked_primary = sorted(
+        (house for house in houses if house["eligibility"] == "primary_eligible"),
+        key=lambda house: (
+            -int(house["verified_forecast_cell_count"]),
+            str(house["published_date"]),
+            str(house["house_id"]),
+        ),
+    )
     broker_pack = {
         "schema_version": "broker-pack/1.0",
         "pack_kind": "broker_forecast_set",
@@ -1002,6 +1060,13 @@ def main() -> int:
         "forecast_periods": crosswalk["forecast_periods"],
         "metrics": metrics,
         "houses": houses,
+        "recommended_primary_house_id": ranked_primary[0]["house_id"] if ranked_primary else None,
+        "eligibility_summary": {
+            "primary_eligible_house_count": sum(house["eligibility"] == "primary_eligible" for house in houses),
+            "supplemental_eligible_house_count": sum(house["eligibility"] == "supplemental_eligible" for house in houses),
+            "reference_only_house_count": sum(house["eligibility"] == "reference_only" for house in houses),
+            "run_can_continue_without_broker_question": bool(ranked_primary),
+        },
         **({"provider_consensus": crosswalk["provider_consensus"]} if crosswalk.get("provider_consensus") else {}),
     }
     broker_sources = {
@@ -1035,6 +1100,18 @@ def main() -> int:
                             else "Reviewed non-forecast legal, disclosure or narrative table retained in the run evidence but omitted from the analyst workbook."
                         ),
                         "rows": scalar_rows(table),
+                        "cell_authorities": [
+                            {
+                                "row": int(cell.get("row", row_index)),
+                                "column": int(cell.get("column", column_index)),
+                                "status": cell.get("authority_status", "verified_native"),
+                                **({"conflict_id": cell["conflict_id"]} if cell.get("conflict_id") else {}),
+                                **({"basis": cell["authority_basis"]} if cell.get("authority_basis") else {}),
+                            }
+                            for row_index, row in enumerate(table.get("rows", []), start=1)
+                            for column_index, cell in enumerate(row, start=1)
+                            if cell.get("authority_status") or cell.get("conflict_id")
+                        ],
                     }
                     for table in document["tables"]
                 ],

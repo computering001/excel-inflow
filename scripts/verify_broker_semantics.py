@@ -41,6 +41,7 @@ MODEL_USE_BY_DISPOSITION = {
     "duplicate": "exact_duplicate",
     "not_model_relevant": "reference_only",
     "unusable": "unresolved",
+    "quarantined_conflict": "unresolved",
 }
 ALLOWED_MODEL_USE = {"active_input", "reference_only", "exact_duplicate", "derived_input", "unresolved"}
 ALLOWED_DOMAINS = {
@@ -266,6 +267,17 @@ def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) 
                     "header": numeric_count == 0 and bool(label),
                     "indent": indent,
                     "row_kind": source_row_kind,
+                    "authority_status": (
+                        "quarantined_conflict"
+                        if any(cell.get("authority_status") == "quarantined_conflict" for cell in row)
+                        else "verified"
+                    ),
+                    "conflict_ids": sorted({
+                        str(cell.get("conflict_id"))
+                        for cell in row
+                        if cell.get("authority_status") == "quarantined_conflict"
+                        and str(cell.get("conflict_id") or "").strip()
+                    }),
                 }
 
     actual: dict[tuple[str, str, int], dict[str, Any]] = {}
@@ -293,6 +305,10 @@ def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) 
             add(findings, "SEM-MANIFEST-NUMERIC", "Candidate numeric flag differs from its canonical source row.", candidate.get("candidate_id"))
         if source["row_kind"] in {"header", "subtotal"} and candidate.get("row_kind") != source["row_kind"]:
             add(findings, "SEM-MANIFEST-ROW-KIND", f"Candidate row_kind does not preserve source {source['row_kind']} evidence.", candidate.get("candidate_id"))
+        if candidate.get("authority_status") != source["authority_status"]:
+            add(findings, "SEM-MANIFEST-AUTHORITY", "Candidate authority status differs from its canonical source row.", candidate.get("candidate_id"))
+        if sorted(candidate.get("conflict_ids") or []) != source["conflict_ids"]:
+            add(findings, "SEM-MANIFEST-CONFLICT-IDS", "Candidate conflict ids differ from its canonical source row.", candidate.get("candidate_id"))
 
     # A bold numeric subtotal becomes a parent only when following rows are
     # visibly more indented.  This is source-geometry evidence, not a guess
@@ -326,6 +342,7 @@ def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) 
         "candidate_count": len(actual),
         "numeric_candidate_count": sum(1 for item in actual.values() if item.get("numeric")),
         "header_candidate_count": sum(1 for item in actual.values() if item.get("row_kind") == "header"),
+        "quarantined_candidate_count": sum(1 for item in actual.values() if item.get("authority_status") == "quarantined_conflict"),
         "finding_count": len(manifest.get("findings") or []),
     }
     for field, value in expected_summary.items():
@@ -458,6 +475,10 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
                 add(findings, "SEM-PERIOD-UNIVERSE", "Reviewer period indexes do not equal the immutable candidate periods.", cid)
             if candidate.get("parent_candidate_id") != raw.get("parent_candidate_id"):
                 add(findings, "SEM-HIERARCHY-DRIFT", "Reviewer parent relationship differs from the immutable manifest.", cid)
+            if candidate.get("authority_status") == "quarantined_conflict" and raw.get("disposition") != "quarantined_conflict":
+                add(findings, "SEM-QUARANTINED-CANDIDATE-ACTIVE", "A quarantined source candidate must remain quarantined and cannot become a model input.", cid)
+            if candidate.get("authority_status") != "quarantined_conflict" and raw.get("disposition") == "quarantined_conflict":
+                add(findings, "SEM-VERIFIED-CANDIDATE-QUARANTINED", "A verified source candidate cannot be quarantined without source conflict evidence.", cid)
 
         domain = entry.get("economic_domain")
         concept = entry.get("concept_id")
@@ -477,7 +498,14 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
             add(findings, "SEM-NUMERIC-UNOWNED", "Numeric candidate has no safe model use.", cid)
         if is_numeric and raw.get("disposition") == "unusable":
             add(findings, "SEM-NUMERIC-UNUSABLE", "Numeric evidence cannot be discarded as unusable.", cid)
-        if is_numeric and concept.startswith("custom.") and model_use != "reference_only":
+        if raw.get("disposition") == "quarantined_conflict" and model_use != "unresolved":
+            add(findings, "SEM-QUARANTINE-MODEL-USE", "Quarantined evidence must use model_use=unresolved.", cid)
+        if (
+            is_numeric
+            and concept.startswith("custom.")
+            and model_use != "reference_only"
+            and raw.get("disposition") != "quarantined_conflict"
+        ):
             add(findings, "SEM-CUSTOM-NOT-REFERENCE", "Unknown numeric concepts must be retained as custom.* reference-only evidence.", cid)
         # Semantic contradictions are tested against the extraction-owned
         # label, never the reviewer-owned copy, so coordinated crosswalk edits

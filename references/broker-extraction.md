@@ -58,7 +58,8 @@ for each page or sheet:
 4. embedded-image extraction;
 5. page or table-crop rendering, grid-line removal and cell-level OCR;
 6. two independent image-table transcriptions; and
-7. an explicit reviewed resolution when the two passes disagree.
+7. one bounded, conflict-manifest-bound targeted adjudication when displayed
+   economic cells disagree.
 
 Do not run raw whole-page OCR on a dense raster table and accept the resulting
 paragraph. Crop the table, identify the grid, remove lines, OCR cells and retain
@@ -80,7 +81,9 @@ do not assume an optional library or one extraction lane is universally best.
 
 ## Completeness gates
 
-The extraction bundle may be `PASS`, `NEEDS_VISION` or `BLOCKED`.
+The extraction bundle may be `PASS`, `NEEDS_VISION`, `NEEDS_RESOLUTION` or
+`BLOCKED`. `NEEDS_RESOLUTION` is an internal resumable state and must not be
+presented to the user as a request for new source files.
 
 Require all of the following before `PASS`:
 
@@ -91,8 +94,8 @@ Require all of the following before `PASS`:
 - every cell retains raw text, typed value, row, column and source reference;
 - native table numeric-token recall is 100%; missing and duplicate tokens are
   empty;
-- every material raster/table page has two agreeing passes or a reviewed
-  resolution bound to the page-image hash;
+- every material raster/table page has two economically agreeing passes or a
+  reviewed resolution bound to the page-image and exact conflict-manifest hash;
 - blanks, dashes, zeros, parentheses, percentages and multiples remain
   distinct;
 - table continuations, landscape pages, units and footnotes are preserved; and
@@ -257,6 +260,15 @@ emitted task and merge them:
 python3 scripts/compile_broker_vision.py <bundle.json> --responses <responses-folder> --out <verified-bundle.json>
 ```
 
+If this returns `NEEDS_RESOLUTION`, do not stop the user flow. For every emitted
+conflict manifest, perform one targeted third read of only the disputed table
+region. Write `<surface-id>.resolution.json` as
+`broker-vision-result/1.1`, bind `conflict_manifest_sha256`, and disposition
+every conflict exactly once as `resolved` or `quarantined`. Rerun the same
+command once. A quarantined cell remains evidence but is ineligible for model
+mapping. A second unresolved iteration is terminal for that cell, not for every
+other broker document.
+
 The vision compiler reconciles native and image contributors into canonical
 tables and compiles the immutable candidate manifest from those tables. Header,
 period and candidate membership cannot come from the reviewer-authored
@@ -282,10 +294,12 @@ run. Do not hand-edit `model_case.broker_pack.raw_tables` or
 
 ## Failure handling
 
-Pause once at Stage 2 only when a material ambiguity survives deterministic
-extraction: an unreadable table, disagreement between image passes, ambiguous
-period/units/sign, or a missing required broker metric across the whole pack.
-Present all surviving broker questions together. Do not stop once per document.
+Pause once at Stage 2 only when a material modelling authority is still absent
+after native extraction, two reads, one targeted adjudication, cell quarantine,
+primary-house selection and the semantic forecast waterfall. A conflict in an
+unused table, a partial broker, or a house that is not selected cannot stop a
+complete eligible house. Present all surviving concept/period questions
+together. Do not expose raw conflict counts or stop once per document.
 
 If extraction fails, request the smallest corrected source: an unprotected PDF,
 the original spreadsheet, a higher-resolution page, or confirmation of one

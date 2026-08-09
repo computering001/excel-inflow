@@ -15,7 +15,7 @@
     "tables"
   ],
   "properties": {
-    "schema_version": { "const": "broker-vision-result/1.0" },
+    "schema_version": { "enum": ["broker-vision-result/1.0", "broker-vision-result/1.1"] },
     "document_id": { "type": "string", "minLength": 1 },
     "surface_id": { "type": "string", "minLength": 1 },
     "image_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
@@ -57,6 +57,21 @@
       }
     },
     "footnotes": { "type": "array", "items": { "type": "string" } },
-    "review_note": { "type": ["string", "null"] }
+    "review_note": { "type": ["string", "null"] },
+    "conflict_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "conflict_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["conflict_id", "status", "rationale"],
+        "properties": {
+          "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
+          "status": { "enum": ["resolved", "quarantined"] },
+          "chosen_source": { "enum": ["pass1", "pass2", "native", "targeted_adjudication"] },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
   }
 }

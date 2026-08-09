@@ -104,6 +104,10 @@ def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def canonical_hash(value: Any) -> str:
+    return hashlib.sha256((canonical(value) + "\n").encode("utf-8")).hexdigest()
+
+
 def normalise_scalar(value: Any) -> Any:
     if value is None or isinstance(value, (bool, int, float)):
         return value
@@ -132,6 +136,180 @@ def comparable_response(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+PERIOD_HEADER_RE = re.compile(
+    r"^(?:(?:fy|cy)?\s*(?:19|20)?\d{2}(?:\s*/\s*(?:19|20)?\d{2})?[eaf]?|"
+    r"(?:q[1-4]|[1-4]q|h[12]|[12]h|[369]m)\s*(?:fy|cy)?\s*(?:19|20)?\d{2}[eaf]?|"
+    r"ltm|ttm|ntm)$",
+    re.IGNORECASE,
+)
+
+
+def normalise_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+
+
+def is_period_header(value: Any) -> bool:
+    return bool(PERIOD_HEADER_RE.fullmatch(re.sub(r"\s+", " ", str(value or "").strip())))
+
+
+def raw_table_observations(tables: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Return a layout-tolerant row-label/period/value inventory.
+
+    This is deliberately narrower than a full-table equality test. Captions,
+    footnotes, whitespace, table order and segmentation are presentation
+    evidence; a displayed value for the same economic row and period is the
+    conflict boundary that can affect the model.
+    """
+    observations: dict[str, list[dict[str, Any]]] = {}
+    for table_index, table in enumerate(tables, start=1):
+        rows = table.get("rows") or []
+        headers: dict[int, str] = {}
+        for row in rows:
+            for column_index, value in enumerate(row, start=1):
+                if is_period_header(value):
+                    headers[column_index] = normalise_text(value)
+        for row_index, row in enumerate(rows, start=1):
+            label = next(
+                (
+                    normalise_text(value)
+                    for value in row
+                    if normalise_text(value)
+                    and numeric_token(value) is None
+                    and not is_period_header(value)
+                ),
+                "",
+            )
+            if not label:
+                continue
+            numeric_ordinal = 0
+            for column_index, value in enumerate(row, start=1):
+                token = numeric_token(value)
+                if token is None:
+                    continue
+                numeric_ordinal += 1
+                period = headers.get(column_index, f"ordinal:{numeric_ordinal}")
+                key = f"{label}|{period}"
+                observations.setdefault(key, []).append({
+                    "table_index": table_index,
+                    "row": row_index,
+                    "column": column_index,
+                    "raw_value": value,
+                    "numeric_token": token,
+                })
+    for values in observations.values():
+        values.sort(key=lambda item: (item["table_index"], item["row"], item["column"], item["numeric_token"]))
+    return observations
+
+
+def captured_table_observations(tables: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    raw_tables = [
+        {
+            "rows": [
+                [cell.get("raw_text") for cell in row]
+                for row in table.get("rows", [])
+            ]
+        }
+        for table in tables
+    ]
+    return raw_table_observations(raw_tables)
+
+
+def observation_tokens(observations: dict[str, list[dict[str, Any]]], key: str) -> list[str]:
+    return sorted(item["numeric_token"] for item in observations.get(key, []))
+
+
+def build_conflict_manifest(
+    *,
+    document: dict[str, Any],
+    surface: dict[str, Any],
+    passes: list[dict[str, Any]],
+) -> dict[str, Any]:
+    first = raw_table_observations(passes[0].get("tables", []))
+    second = raw_table_observations(passes[1].get("tables", []))
+    native = captured_table_observations([
+        table
+        for table in document.get("tables", [])
+        if table.get("surface_id") == surface.get("surface_id")
+        and table.get("authority_role") != "discovery_only"
+    ])
+    conflicts = []
+    for key in sorted(set(first) | set(second)):
+        left = observation_tokens(first, key)
+        right = observation_tokens(second, key)
+        if left == right:
+            continue
+        native_values = observation_tokens(native, key)
+        auto_source = None
+        if native_values and native_values == left and native_values != right:
+            auto_source = "pass1_native_corroborated"
+        elif native_values and native_values == right and native_values != left:
+            auto_source = "pass2_native_corroborated"
+        conflict_id = "bvc-" + hashlib.sha256(
+            f"{document['document_id']}|{surface['surface_id']}|{key}".encode("utf-8")
+        ).hexdigest()[:24]
+        conflicts.append({
+            "conflict_id": conflict_id,
+            "observation_key": key,
+            "pass1_values": left,
+            "pass2_values": right,
+            "native_values": native_values,
+            "auto_resolution_source": auto_source,
+        })
+    payload = {
+        "schema_version": "broker-vision-conflict-manifest/1.0",
+        "document_id": document["document_id"],
+        "surface_id": surface["surface_id"],
+        "pass1_sha256": canonical_hash(passes[0]),
+        "pass2_sha256": canonical_hash(passes[1]),
+        "structural_disagreement": canonical(comparable_response(passes[0])) != canonical(comparable_response(passes[1])),
+        "conflicts": conflicts,
+    }
+    payload["manifest_sha256"] = canonical_hash(payload)
+    return payload
+
+
+def response_richness(result: dict[str, Any]) -> tuple[int, int, int, str]:
+    observations = raw_table_observations(result.get("tables", []))
+    nonblank = sum(
+        1
+        for table in result.get("tables", [])
+        for row in table.get("rows", [])
+        for value in row
+        if str(value or "").strip()
+    )
+    bboxes = sum(1 for table in result.get("tables", []) if table.get("bbox"))
+    return (len(observations), nonblank, bboxes, canonical_hash(result))
+
+
+def validate_resolution(
+    resolution: dict[str, Any],
+    manifest: dict[str, Any],
+) -> tuple[bool, dict[str, dict[str, Any]], str | None]:
+    if resolution.get("conflict_manifest_sha256") != manifest.get("manifest_sha256"):
+        return False, {}, "The reviewed resolution is not bound to the exact conflict manifest."
+    decisions = resolution.get("conflict_decisions")
+    if not isinstance(decisions, list):
+        return False, {}, "The reviewed resolution has no conflict_decisions ledger."
+    by_id: dict[str, dict[str, Any]] = {}
+    for item in decisions:
+        conflict_id = item.get("conflict_id")
+        if not isinstance(conflict_id, str) or conflict_id in by_id:
+            return False, {}, "The reviewed resolution contains an absent or duplicate conflict_id."
+        if item.get("status") not in {"resolved", "quarantined"}:
+            return False, {}, f"Conflict {conflict_id} has no terminal decision."
+        if item.get("status") == "resolved" and item.get("chosen_source") not in {
+            "pass1", "pass2", "native", "targeted_adjudication"
+        }:
+            return False, {}, f"Conflict {conflict_id} has no permitted chosen_source."
+        if not str(item.get("rationale") or "").strip():
+            return False, {}, f"Conflict {conflict_id} has no adjudication rationale."
+        by_id[conflict_id] = item
+    expected = {item["conflict_id"] for item in manifest.get("conflicts", [])}
+    if set(by_id) != expected:
+        return False, {}, "The reviewed resolution does not disposition every conflict exactly once."
+    return True, by_id, None
+
+
 def numeric_token(value: Any) -> str | None:
     if value is None or isinstance(value, bool):
         return None
@@ -151,7 +329,17 @@ def numeric_token(value: Any) -> str | None:
     return base + suffix
 
 
-def make_cell(value: Any, row: int, column: int, source_ref: str, bbox: Any = None) -> dict[str, Any]:
+def make_cell(
+    value: Any,
+    row: int,
+    column: int,
+    source_ref: str,
+    bbox: Any = None,
+    *,
+    authority_status: str | None = None,
+    authority_basis: str | None = None,
+    conflict_id: str | None = None,
+) -> dict[str, Any]:
     if value is None:
         kind = "blank"
     elif isinstance(value, bool):
@@ -171,27 +359,66 @@ def make_cell(value: Any, row: int, column: int, source_ref: str, bbox: Any = No
         "bbox": bbox,
         "source_ref": source_ref,
         "confidence": 1.0,
+        **({"authority_status": authority_status} if authority_status else {}),
+        **({"authority_basis": authority_basis} if authority_basis else {}),
+        **({"conflict_id": conflict_id} if conflict_id else {}),
     }
 
 
-def accepted_tables(result: dict[str, Any], surface_id: str, source_name: str) -> list[dict[str, Any]]:
+def accepted_tables(
+    result: dict[str, Any],
+    surface_id: str,
+    source_name: str,
+    *,
+    default_authority_status: str,
+    default_authority_basis: str,
+    conflict_manifest: dict[str, Any] | None = None,
+    conflict_decisions: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    resolution_observations = raw_table_observations(result.get("tables", []))
+    conflict_by_position: dict[tuple[int, int, int], tuple[str, dict[str, Any]]] = {}
+    if conflict_manifest and conflict_decisions:
+        for conflict in conflict_manifest.get("conflicts", []):
+            conflict_id = conflict["conflict_id"]
+            decision = conflict_decisions[conflict_id]
+            for item in resolution_observations.get(conflict["observation_key"], []):
+                conflict_by_position[(item["table_index"], item["row"], item["column"])] = (
+                    conflict_id,
+                    decision,
+                )
     compiled = []
     for table_index, raw_table in enumerate(result.get("tables", []), start=1):
         table_id = f"{surface_id}.vision-t{table_index}"
         rows = []
         cell_bboxes = raw_table.get("cell_bboxes") or []
         for row_index, raw_row in enumerate(raw_table.get("rows", []), start=1):
-            rows.append([
-                make_cell(
+            cells = []
+            for column_index, value in enumerate(raw_row, start=1):
+                conflict = conflict_by_position.get((table_index, row_index, column_index))
+                if conflict:
+                    conflict_id, decision = conflict
+                    status = (
+                        "quarantined_conflict"
+                        if decision["status"] == "quarantined"
+                        else "verified_adjudicated"
+                    )
+                    basis = decision.get("chosen_source") or "unresolved_after_targeted_adjudication"
+                else:
+                    conflict_id = None
+                    status = default_authority_status
+                    basis = default_authority_basis
+                cells.append(make_cell(
                     value,
                     row_index,
                     column_index,
                     f"{source_name}#{surface_id};vision-table={table_index};r={row_index};c={column_index}",
                     cell_bboxes[row_index - 1][column_index - 1]
                     if row_index <= len(cell_bboxes) and column_index <= len(cell_bboxes[row_index - 1]) else None,
-                )
-                for column_index, value in enumerate(raw_row, start=1)
-            ])
+                    authority_status=status,
+                    authority_basis=basis,
+                    conflict_id=conflict_id,
+                ))
+            rows.append(cells)
         compiled.append({
             "table_id": table_id,
             "surface_id": surface_id,
@@ -276,6 +503,7 @@ def main() -> int:
     }
     findings = [item for item in bundle.get("findings", []) if item.get("id") != "broker_extraction.vision_required"]
     unresolved = 0
+    conflict_manifests: list[dict[str, Any]] = []
     for document in bundle["documents"]:
         for surface in document["surfaces"]:
             if surface["lane_status"]["vision"] != "required":
@@ -339,29 +567,86 @@ def main() -> int:
                 unresolved += 1
                 findings.append({"id": "broker_vision.passes_not_independent", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Pass 1 and pass 2 must have distinct producer IDs and execution fingerprints; renaming one producer is not independence."})
                 continue
+            conflict_manifest = None
+            conflict_decisions = None
             if canonical(comparable_response(passes[0])) == canonical(comparable_response(passes[1])):
                 accepted = passes[0]
-            elif resolution_path.is_file():
-                resolution = json.loads(resolution_path.read_text("utf-8"))
-                if not (
-                    resolution.get("schema_version") == "broker-vision-result/1.0"
-                    and resolution.get("document_id") == document["document_id"]
-                    and resolution.get("surface_id") == surface_id
-                    and resolution.get("image_sha256") == image_artifact["sha256"]
-                    and resolution.get("pass_index") == "resolution"
-                    and str(resolution.get("producer_id") or "").strip()
-                    and resolution.get("method") == "reviewed_resolution"
-                    and str(resolution.get("review_note") or "").strip()
-                ):
-                    unresolved += 1
-                    findings.append({"id": "broker_vision.resolution_invalid", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The discrepancy resolution is missing its image binding or review note."})
-                    continue
-                accepted = resolution
+                default_authority_status = "verified_dual_read"
+                default_authority_basis = "two_pass_visual_consensus"
             else:
-                unresolved += 1
-                findings.append({"id": "broker_vision.pass_disagreement", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Independent image-table transcriptions disagree; a reviewed resolution is required."})
-                continue
-            new_tables = accepted_tables(accepted, surface_id, document["file_name"])
+                conflict_manifest = build_conflict_manifest(
+                    document=document,
+                    surface=surface,
+                    passes=passes,
+                )
+                # Whole-response equality is intentionally not the economic
+                # boundary. If the displayed row/period/value observations are
+                # identical, deterministically retain the richer transcription
+                # and record the structural difference as non-blocking.
+                if not conflict_manifest["conflicts"]:
+                    accepted = max(passes, key=response_richness)
+                    default_authority_status = "verified_dual_read"
+                    default_authority_basis = "economic_consensus_structural_difference"
+                    findings.append({
+                        "id": "broker_vision.structural_disagreement_resolved",
+                        "severity": "warning",
+                        "document_id": document["document_id"],
+                        "surface_id": surface_id,
+                        "message": "Independent reads differed only in layout, caption, footnote or segmentation; displayed economic observations agree.",
+                    })
+                elif resolution_path.is_file():
+                    resolution = json.loads(resolution_path.read_text("utf-8"))
+                    valid_resolution = (
+                        resolution.get("schema_version") in {"broker-vision-result/1.0", "broker-vision-result/1.1"}
+                        and resolution.get("document_id") == document["document_id"]
+                        and resolution.get("surface_id") == surface_id
+                        and resolution.get("image_sha256") == image_artifact["sha256"]
+                        and resolution.get("pass_index") == "resolution"
+                        and str(resolution.get("producer_id") or "").strip()
+                        and resolution.get("method") == "reviewed_resolution"
+                        and str(resolution.get("review_note") or "").strip()
+                    )
+                    decisions_ok, conflict_decisions, decision_error = validate_resolution(
+                        resolution,
+                        conflict_manifest,
+                    )
+                    if not valid_resolution or not decisions_ok:
+                        unresolved += 1
+                        findings.append({
+                            "id": "broker_vision.resolution_invalid",
+                            "severity": "blocker",
+                            "document_id": document["document_id"],
+                            "surface_id": surface_id,
+                            "message": decision_error or "The discrepancy resolution is missing its image binding or review note.",
+                        })
+                        continue
+                    accepted = resolution
+                    default_authority_status = "verified_adjudicated"
+                    default_authority_basis = "targeted_conflict_adjudication"
+                    conflict_manifests.append(conflict_manifest)
+                else:
+                    unresolved += 1
+                    conflict_manifests.append(conflict_manifest)
+                    findings.append({
+                        "id": "broker_vision.pass_disagreement",
+                        "severity": "blocker",
+                        "document_id": document["document_id"],
+                        "surface_id": surface_id,
+                        "message": (
+                            f"{len(conflict_manifest['conflicts'])} displayed economic conflict(s) require one bounded targeted adjudication. "
+                            "This is an internal NEEDS_RESOLUTION state, not a request for replacement source files."
+                        ),
+                    })
+                    continue
+            new_tables = accepted_tables(
+                accepted,
+                surface_id,
+                document["file_name"],
+                default_authority_status=default_authority_status,
+                default_authority_basis=default_authority_basis,
+                conflict_manifest=conflict_manifest,
+                conflict_decisions=conflict_decisions,
+            )
             material_surface = surface.get("kind") == "image_page" or any(
                 region.get("material") for region in surface.get("uncovered_numeric_regions", [])
             )
@@ -374,28 +659,22 @@ def main() -> int:
                 findings.append({"id": "broker_vision.empty_table", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "A vision table is empty and cannot certify source coverage."})
                 continue
             document["tables"].extend(new_tables)
-            vision_tokens = [
-                numeric_token(value)
-                for table in passes[1].get("tables", [])
-                for row in table.get("rows", [])
-                for value in row
-                if numeric_token(value) is not None
-            ]
-            # Pass 2 is the independent physical-table denominator whenever
-            # visual certification runs.  Native text, strict-native and
-            # rendered lanes are alternative observations of the same visible
-            # tables, never additive ownership universes.
+            vision_tokens = table_numeric_tokens(new_tables)
+            # A two-pass consensus or hash-bound reviewed resolution is the
+            # accepted physical-table denominator. Both original pass digests
+            # and every discrepancy remain sealed in the conflict manifest.
             independent_tokens = list(vision_tokens)
             surface["source_table_numeric_tokens"] = list(vision_tokens)
             surface["whole_surface_numeric_token_count"] = len(vision_tokens)
             surface["vision_source_census"] = {
-                "source": "independent_pass_2",
-                "producer_id": passes[1]["producer_id"],
-                "producer_fingerprint": passes[1]["producer_fingerprint"],
+                "source": default_authority_basis,
+                "producer_id": accepted["producer_id"],
+                "producer_fingerprint": accepted.get("producer_fingerprint") or accepted["producer_id"],
                 "image_sha256": image_artifact["sha256"],
                 "source_numeric_tokens": list(vision_tokens),
                 "newly_owned_numeric_tokens": list(independent_tokens),
                 "denominator_scope": "physical_tables_only",
+                **({"conflict_manifest_sha256": conflict_manifest["manifest_sha256"]} if conflict_manifest and conflict_manifest["conflicts"] else {}),
             }
             add_vision_tokens(
                 document,
@@ -405,6 +684,19 @@ def main() -> int:
             surface["table_count"] += len(new_tables)
             surface["lane_status"]["vision"] = "complete"
             surface["vision_reason"] = None
+            surface["vision_conflict_summary"] = {
+                "conflict_count": len((conflict_manifest or {}).get("conflicts", [])),
+                "quarantined_conflict_count": sum(
+                    1
+                    for item in (conflict_decisions or {}).values()
+                    if item.get("status") == "quarantined"
+                ),
+                "resolved_conflict_count": sum(
+                    1
+                    for item in (conflict_decisions or {}).values()
+                    if item.get("status") == "resolved"
+                ),
+            }
             for region in surface.get("uncovered_numeric_regions", []):
                 if region.get("material"):
                     region["disposition"] = "covered_by_vision"
@@ -441,8 +733,32 @@ def main() -> int:
     bundle["summary"]["native_numeric_recall"] = 1.0 if source_count == 0 else (source_count - missing_count) / source_count
     bundle["summary"]["unresolved_surface_count"] = unresolved
     bundle["summary"]["duplicate_cell_count"] = duplicate_count
+    bundle["summary"]["vision_conflict_count"] = sum(
+        len(item.get("conflicts", [])) for item in conflict_manifests
+    )
+    bundle["summary"]["quarantined_conflict_count"] = sum(
+        1
+        for document in bundle["documents"]
+        for table in document.get("tables", [])
+        for row in table.get("rows", [])
+        for cell in row
+        if cell.get("authority_status") == "quarantined_conflict"
+    )
+    bundle["vision_conflict_manifests"] = conflict_manifests
     bundle["findings"] = findings
-    bundle["gate_status"] = "BLOCKED" if any(item["severity"] == "blocker" for item in findings) else ("NEEDS_VISION" if unresolved else "PASS")
+    blockers = [item for item in findings if item["severity"] == "blocker"]
+    only_pending_adjudication = bool(blockers) and all(
+        item.get("id") == "broker_vision.pass_disagreement" for item in blockers
+    )
+    bundle["gate_status"] = (
+        "NEEDS_RESOLUTION"
+        if only_pending_adjudication
+        else "BLOCKED"
+        if blockers
+        else "NEEDS_VISION"
+        if unresolved
+        else "PASS"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(bundle, indent=2, ensure_ascii=False) + "\n", "utf-8")
     print(json.dumps({"status": bundle["gate_status"], "unresolved_surfaces": unresolved, "tables": table_count, "cells": cell_count}, sort_keys=True))

@@ -309,6 +309,21 @@
                         "minItems": 1,
                         "items": { "type": ["string", "number", "boolean", "null"] }
                       }
+                    },
+                    "cell_authorities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["row", "column", "status"],
+                        "properties": {
+                          "row": { "type": "integer", "minimum": 1 },
+                          "column": { "type": "integer", "minimum": 1 },
+                          "status": { "enum": ["verified_native", "verified_dual_read", "verified_adjudicated", "quarantined_conflict"] },
+                          "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
+                          "basis": { "type": "string", "minLength": 1 }
+                        }
+                      }
                     }
                   }
                 }
