@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { validateInstrumentPeriodStateArtifact } from "./instrument_period_state.mjs";
 
 const APPROVED_MAPPING_METHODS = new Set([
   "exact",
@@ -358,6 +359,83 @@ export function validateSemanticArtifacts(manifest, crosswalkRows) {
   const nodes = manifest?.nodes ?? [];
   const edges = manifest?.edges ?? [];
   const sources = manifest?.source_inventory ?? [];
+  const instrumentPeriodState = manifest?.instrument_period_state ?? null;
+  if (Number(manifest?.contract_version) === 2 && !instrumentPeriodState) {
+    errors.push({
+      id: "manifest.instrument_period_state_missing",
+      message: "A v2 semantic manifest requires the compiled instrument-period state.",
+    });
+  }
+  if (instrumentPeriodState) {
+    for (const message of validateInstrumentPeriodStateArtifact(
+      instrumentPeriodState,
+    )) {
+      errors.push({
+        id: "manifest.instrument_period_state_invalid",
+        message,
+      });
+    }
+    const forecastPeriodIds = (manifest?.periods ?? [])
+      .filter((period) => period.status === "forecast")
+      .map((period) => period.date);
+    if (
+      JSON.stringify(instrumentPeriodState.forecast_period_ids) !==
+      JSON.stringify(forecastPeriodIds)
+    ) {
+      errors.push({
+        id: "manifest.instrument_period_state_periods",
+        expected: forecastPeriodIds,
+        actual: instrumentPeriodState.forecast_period_ids,
+      });
+    }
+    if (
+      JSON.stringify(manifest?.definition_basis_graph ?? null) !==
+      JSON.stringify(instrumentPeriodState.definition_basis_graph)
+    ) {
+      errors.push({
+        id: "manifest.definition_basis_graph_binding",
+        message: "The semantic definition-basis graph must be the graph carried by instrument-period state.",
+      });
+    }
+    const stateById = new Map(
+      instrumentPeriodState.states.map((state) => [state.state_id, state]),
+    );
+    for (const node of nodes.filter(
+      (item) => item.node_kind === "debt_instrument",
+    )) {
+      const expectedStates = instrumentPeriodState.states
+        .filter((state) => state.instrument_id === node.instrument_id)
+        .sort((left, right) => left.period_index - right.period_index);
+      const expectedIds = expectedStates.map((state) => state.state_id);
+      if (
+        JSON.stringify(node.instrument_period_state_ids ?? []) !==
+        JSON.stringify(expectedIds)
+      ) {
+        errors.push({
+          id: "manifest.instrument_period_state_node_binding",
+          node_id: node.node_id,
+          expected: expectedIds,
+          actual: node.instrument_period_state_ids ?? [],
+        });
+      }
+      for (const [index, stateId] of (
+        node.instrument_period_state_ids ?? []
+      ).entries()) {
+        const state = stateById.get(stateId);
+        if (
+          !state ||
+          JSON.stringify(node.instrument_period_membership?.[index] ?? null) !==
+            JSON.stringify(state.inclusion)
+        ) {
+          errors.push({
+            id: "manifest.instrument_period_membership_binding",
+            node_id: node.node_id,
+            state_id: stateId,
+          });
+        }
+      }
+    }
+  }
   const nodeIds = new Set();
   const semanticIds = new Set();
   for (const node of nodes) {
@@ -411,10 +489,10 @@ export function validateSemanticArtifacts(manifest, crosswalkRows) {
               company_guidance: "hardcode",
               company_indication: "hardcode",
               user_assumption: "hardcode",
-              seasonal_run_rate: "hardcode",
-              historical_average: "hardcode",
-              historical_trend: "hardcode",
-              carry_forward: "hardcode",
+              seasonal_run_rate: "formula",
+              historical_average: "formula",
+              historical_trend: "formula",
+              carry_forward: "formula",
               explicit_zero: "zero",
               not_separately_forecast: "uncalculated",
               not_applicable: "uncalculated",

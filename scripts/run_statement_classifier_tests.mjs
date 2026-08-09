@@ -70,6 +70,10 @@ const inputPath = process.argv[2];
 if (!inputPath) throw new Error("Usage: run_statement_classifier_tests.mjs <representative-v2-case.json>");
 const base = JSON.parse(await fs.readFile(inputPath, "utf8"));
 const fixture = clone(base);
+// This suite mutates source ordering, aliases and hierarchy, so always exercise
+// the source compiler even when the supplied representative is a Stage-3
+// sealed case from the production user flow.
+delete fixture.statement_structure_compiled_version;
 fixture.execution_profile = "reference_parity";
 fixture.source_coverage.classification_contract_version = "evidence_v1";
 for (const section of ["income_statement", "cash_flow"]) {
@@ -105,6 +109,9 @@ assert(validateCaseShape(fixture).length === 0, "Evidence fixture failed schema 
 assert(assessCoverage(fixture).ready_to_build, "Evidence fixture did not pass baseline coverage.");
 
 const orderInversion = clone(fixture);
+// Exercise the source-order compiler, not the sealed Stage-4 fast path. A
+// sealed statement is deliberately immutable once Stage 3 has accepted it.
+delete orderInversion.statement_structure_compiled_version;
 const orderedIncomeIds = orderInversion.source_coverage.income_statement
   .flatMap((source) => source.mapped_row_ids ?? [])
   .filter((rowId, index, ids) => ids.indexOf(rowId) === index);
@@ -143,6 +150,7 @@ assert(
 
 for (const section of ["income_statement", "cash_flow"]) {
   const reversedCase = clone(fixture);
+  delete reversedCase.statement_structure_compiled_version;
   const rank = new Map();
   reversedCase.source_coverage[section].forEach((source, index) => {
     for (const rowId of source.mapped_row_ids ?? []) {

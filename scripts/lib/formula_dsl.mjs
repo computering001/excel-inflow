@@ -17,6 +17,8 @@ export const FORMULA_OPERATORS = Object.freeze([
   "negated_ratio",
   "growth",
   "average",
+  "historical_average",
+  "historical_trend",
   "negate",
   "negate_sum",
   "tax",
@@ -38,6 +40,8 @@ const ARITY = Object.freeze({
   negated_ratio: [2, 2],
   growth: [1, 1],
   average: [1, Number.POSITIVE_INFINITY],
+  historical_average: [1, 1],
+  historical_trend: [1, 1],
   negate: [1, 1],
   negate_sum: [1, Number.POSITIVE_INFINITY],
   tax: [2, 2],
@@ -176,6 +180,7 @@ export function compileStatementFormula({
   column,
   rowForId,
   previousColumn,
+  historicalColumns = [],
   roundSumDigits = null,
 }) {
   const errors = validateFormulaRule(rule);
@@ -245,6 +250,27 @@ export function compileStatementFormula({
     case "average":
       formula = `=AVERAGE(${refs.join(",")})`;
       break;
+    case "historical_average": {
+      if (historicalColumns.length !== 3) {
+        throw new Error("historical_average requires exactly three historical columns.");
+      }
+      const sourceRow = rowForId(rule.refs[0]);
+      formula = `=AVERAGE(${historicalColumns[0]}${sourceRow}:${historicalColumns[2]}${sourceRow})`;
+      break;
+    }
+    case "historical_trend": {
+      if (historicalColumns.length !== 3) {
+        throw new Error("historical_trend requires exactly three historical columns.");
+      }
+      const sourceRow = rowForId(rule.refs[0]);
+      const forecastIndex = Number(rule.forecast_index ?? 0);
+      if (!Number.isInteger(forecastIndex) || forecastIndex < 0 || forecastIndex > 2) {
+        throw new Error("historical_trend forecast_index must be 0, 1 or 2.");
+      }
+      const [h1, h2, h3] = historicalColumns.map((item) => `${item}${sourceRow}`);
+      formula = `=${h3}+((${h2}-${h1})+(${h3}-${h2}))/2*${forecastIndex + 1}`;
+      break;
+    }
     default:
       throw new Error(
         `${rule.operator} is a declared DSL operator but requires a schedule-specific emitter.`,

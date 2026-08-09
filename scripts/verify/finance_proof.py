@@ -20,6 +20,7 @@ import datetime as dt
 import json
 import math
 import os
+import re
 import sys
 from typing import Dict, List, Optional
 
@@ -60,6 +61,43 @@ def equal(actual, expected) -> bool:
 
 def normalised_formula(value: str) -> str:
     return str(value or "").replace("$", "").replace(" ", "").upper()
+
+
+def column_number(label: str) -> int:
+    value = 0
+    for character in label:
+        value = value * 26 + ord(character) - ord("A") + 1
+    return value
+
+
+def formula_references_cell(formula: str, reference: str) -> bool:
+    """Return true when an A1 reference is explicit or covered by a range.
+
+    The finance proof must understand compact formulas such as
+    ``SUM(J121:J123)`` without importing the renderer's formula parser.  This
+    small independent A1 reader deliberately handles only unqualified cells
+    and rectangular ranges, which is the closed same-sheet surface asserted by
+    this verifier.
+    """
+    target = re.fullmatch(r"([A-Z]{1,3})([0-9]+)", normalised_formula(reference))
+    if not target:
+        return False
+    target_column = column_number(target.group(1))
+    target_row = int(target.group(2))
+    for match in re.finditer(
+        r"(?<![A-Z0-9_])([A-Z]{1,3})([0-9]+)(?::([A-Z]{1,3})([0-9]+))?",
+        normalised_formula(formula),
+    ):
+        first_column = column_number(match.group(1))
+        first_row = int(match.group(2))
+        last_column = column_number(match.group(3) or match.group(1))
+        last_row = int(match.group(4) or match.group(2))
+        if (
+            min(first_column, last_column) <= target_column <= max(first_column, last_column)
+            and min(first_row, last_row) <= target_row <= max(first_row, last_row)
+        ):
+            return True
+    return False
 
 
 def iso_date(value: str) -> dt.date:
@@ -639,6 +677,14 @@ class Proof:
                         number(self.value(column, cash_flow_spine[role]))
                         for role in spine_roles
                     )
+                    if explicit_cash_buckets:
+                        non_balancing_row = cash_flow_spine.get(
+                            "non_balancing_cash_bucket_movement"
+                        )
+                        if non_balancing_row is not None:
+                            statement_flows += number(
+                                self.value(column, non_balancing_row)
+                            )
                     fx_row = cash_flow_spine.get("fx_effect_on_cash")
                     fx_effect = (
                         number(self.value(column, fx_row)) if fx_row is not None else 0.0
@@ -695,10 +741,22 @@ class Proof:
                             )
                         else:
                             if treatment == "balancing":
+                                # The cash-flow statement owns reported ending
+                                # cash.  The balancing liquidity bucket consumes
+                                # that answer net of every non-balancing bucket;
+                                # it must not push the RCF waterfall back up into
+                                # the statement and create a second cash owner.
                                 expected_references = [
-                                    "%s%s" % (column, waterfall["cash_before_rcf"]),
-                                    "%s%s" % (column, waterfall["rcf_draw_waterfall"]),
-                                    "%s%s" % (column, waterfall["rcf_repayment_waterfall"]),
+                                    "%s%s" % (column, rows_by_id["ending_cash"]),
+                                ] + [
+                                    "%s%s" % (column, plan["balance_row"])
+                                    for plan in cash_bucket_plans
+                                    if cash_bucket_definitions[plan["bucket_id"]].get(
+                                        "forecast_treatment"
+                                    ) != "balancing"
+                                    and cash_bucket_definitions[plan["bucket_id"]].get(
+                                        "included_in_cash_flow_cash", True
+                                    ) is not False
                                 ]
                             elif block_name == "pro_forma":
                                 expected_references = [
@@ -713,7 +771,7 @@ class Proof:
                                 "cash-bucket-formulas", block_name, index,
                                 bucket_id + ".balance_reference",
                                 all(
-                                    reference in balance_formula
+                                    formula_references_cell(balance_formula, reference)
                                     for reference in expected_references
                                 ),
                                 balance_formula, expected_references,
@@ -812,7 +870,10 @@ class Proof:
                         self.require(
                             "cash-bucket-formulas", block_name, index,
                             metric + ".references",
-                            all(reference in formula_text for reference in references),
+                            all(
+                                formula_references_cell(formula_text, reference)
+                                for reference in references
+                            ),
                             formula_text, references,
                         )
                 else:

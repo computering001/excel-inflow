@@ -36,6 +36,10 @@
       "enum": ["legacy", "authority_v1"],
       "description": "authority_v1 requires every visible non-header statement row to declare whether its historical cells are sourced inputs, derived formulas, reported totals reconciled to visible components, or links to a schedule authority."
     },
+    "statement_structure_compiled_version": {
+      "const": "semantic-statements/1.0",
+      "description": "When present, Stage 3 has sealed the normalized semantic statement rows. Later row planning may project presentation metadata but may not add, remove, regroup or re-forecast rows."
+    },
     "instrument_authority_contract_version": {
       "const": "dcs_evidence_v1",
       "description": "dcs_evidence_v1 proves every model-driving debt term against the immutable, per-run DCS evidence ledger. It is optional only for archived diagnostic fixtures; a production attachment-ingress run requires it."
@@ -756,12 +760,13 @@
       "required": ["operator", "refs"],
       "properties": {
         "operator": {
-          "enum": ["sum", "link", "subtract", "ratio", "negated_ratio", "growth", "tax", "negate", "negate_sum", "prior_period", "prior_period_scaled_by", "average"]
+          "enum": ["sum", "link", "subtract", "ratio", "negated_ratio", "growth", "tax", "negate", "negate_sum", "prior_period", "prior_period_scaled_by", "average", "historical_average", "historical_trend"]
         },
         "refs": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
-        }
+        },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 }
       }
     },
     "forecastAuthority": {
@@ -1000,6 +1005,24 @@
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_.-]*$"
           }
+        },
+        "projection_origin": {
+          "enum": [
+            "required_economic_output",
+            "downstream_dependency",
+            "dependency_closure",
+            "derived_display",
+            "required_block_header"
+          ]
+        },
+        "projection_required_by": { "type": "string", "minLength": 1 },
+        "projection_absorbed_row_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         }
       }
     },
@@ -1047,6 +1070,7 @@
           ]
         },
         "reason": { "type": "string" }
+        ,"projection_lineage": { "$ref": "#/$defs/sourceProjectionLineage" }
         ,"source_position": { "type": "integer", "minimum": 0 }
         ,"parent_label": { "type": "string" }
         ,"neighbouring_labels": { "type": "array", "items": { "type": "string" } }
@@ -1081,6 +1105,39 @@
         }
         ,"classification_review_status": { "enum": ["not_required", "auto_accepted", "reviewed", "needs_question", "blocked"] }
         ,"classifier_version": { "type": "string" }
+      }
+    },
+    "sourceProjectionLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compiler_version",
+        "source_mapped_row_ids",
+        "absorbed_row_ids",
+        "projected_row_ids",
+        "rule"
+      ],
+      "properties": {
+        "compiler_version": { "const": "semantic-statements/1.0" },
+        "source_mapped_row_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "absorbed_row_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "projected_row_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "rule": { "const": "semantic_dependency_projection" }
       }
     },
     "provenanceEntry": {

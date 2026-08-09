@@ -10,7 +10,7 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 
 The package contains the design contract, style tokens and renderer, but no workbook or PNG files. Physical reference workbooks are supplied separately after installation and remain immutable design authorities. An ordinary deployment run never manufactures or depends on a PNG baseline. It proves presentation through authority structure, exact workbook identity where a frozen canary exists, structural rendering of every visible sheet and native Excel review. Pixel baselines remain external local release evidence only; never write them into the skill or repository.
 
-`assets/standardised-design-runtime.v2.json` carries the portable measured design contract without identifying or embedding a physical workbook. Preserve its A:U geometry, section order, control treatment, named expansion zones and profile identity. Company reporting determines rows inside those zones; it never creates a competing layout.
+`assets/standardised-design-runtime.v4.json` carries the default portable measured design contract without embedding a physical workbook. Preserve its A:U geometry, section order, control treatment, named expansion zones and profile identity. Company reporting determines rows inside those zones; it never creates a competing layout. `EXCEL_INFLOW_DESIGN_EPOCH=2` and `=3` are explicit rollback routes; any other non-empty value fails closed.
 
 Deliver a model, not a populated form. Totals, ratios, roll-forwards, pro forma outputs and cross-sheet values are formulas. Hardcode only sourced or expressly supplied inputs. Use blue font for hardcodes, black for same-sheet formulas, green for links to another sheet and white for section titles. Grey fill means intentionally not calculated, never zero and never forecast generally.
 
@@ -395,7 +395,11 @@ path replay and an independently approved external baseline epoch.
 ```text
 node scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-export <json>] [--broker-pack <json>] [--filings <json>] [--soffice <path>] [--json]
 node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>
+node scripts/run_forecast_observation_tests.mjs
+node scripts/run_forecast_behavior_tests.mjs
+node scripts/run_equation_graph_tests.mjs
 node scripts/test_release_convergence_seam.mjs
+node scripts/run_instrument_period_state_tests.mjs
 node scripts/validate_source_parity.mjs <workbook.xlsx> <row-map.json> <ledger.json> [--json out.json]
 node scripts/validate_cache_parity.mjs <workbook.xlsx> [--json out.json] [--tol 1e-6] [--rel 1e-9]
 node scripts/validate_style_tokens.mjs <workbook.xlsx> [--json out.json]

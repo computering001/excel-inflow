@@ -39,6 +39,10 @@ const FORMULA_METHODS = new Set([
   "accounting_identity",
   "driver_formula",
   "roll_forward",
+  "seasonal_run_rate",
+  "historical_average",
+  "historical_trend",
+  "carry_forward",
 ]);
 
 const HARDCODE_METHODS = new Set([
@@ -47,10 +51,6 @@ const HARDCODE_METHODS = new Set([
   "company_guidance",
   "company_indication",
   "user_assumption",
-  "seasonal_run_rate",
-  "historical_average",
-  "historical_trend",
-  "carry_forward",
 ]);
 
 const UNCALCULATED_METHODS = new Set([

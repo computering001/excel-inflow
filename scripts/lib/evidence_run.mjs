@@ -12,6 +12,7 @@ import {
   FACE_STATEMENT_SECTIONS,
   faceStatementManifestDigest,
 } from "./face_statement_manifest.mjs";
+import { validateForecastObservationLedger } from "./forecast_observation.mjs";
 
 const EVIDENCE_SCHEMA = JSON.parse(
   fs.readFileSync(
@@ -2291,6 +2292,55 @@ function validateForecastEvidence(run, findings) {
   }
 }
 
+function validateForecastObservationEvidence(run, forecastPeriods, findings) {
+  const ledger = run.forecast_observation_ledger;
+  const suppliedReceipt = run.forecast_observation_ledger_receipt;
+  if (ledger === undefined) {
+    if (suppliedReceipt !== undefined) {
+      findings.push(finding(
+        "evidence.forecast_observation.receipt_without_ledger",
+        "BLOCK",
+        "A forecast-observation receipt cannot be supplied without its ledger.",
+      ));
+    }
+    return null;
+  }
+
+  const result = validateForecastObservationLedger(ledger, {
+    sourceInventory: run.source_inventory ?? [],
+    forecastPeriods,
+  });
+  for (const entry of result.findings) {
+    findings.push(finding(
+      `evidence.${entry.id}`,
+      entry.severity,
+      entry.message,
+      entry.observation_id ? { observation_id: entry.observation_id } : null,
+    ));
+  }
+
+  if (suppliedReceipt !== undefined) {
+    const expected = result.receipt;
+    for (const field of [
+      "schema_version",
+      "status",
+      "ledger_sha256",
+      "observation_count",
+      "violation_count",
+    ]) {
+      if (suppliedReceipt?.[field] !== expected?.[field]) {
+        findings.push(finding(
+          "evidence.forecast_observation.receipt_mismatch",
+          "BLOCK",
+          `Forecast-observation receipt ${field} is not bound to the normalized ledger.`,
+          { expected: expected?.[field] ?? null, actual: suppliedReceipt?.[field] ?? null },
+        ));
+      }
+    }
+  }
+  return result;
+}
+
 /**
  * Validate the complete deployment host evidence-to-case handoff. No workbook or solver
  * result is trusted here; this gate only decides whether the deterministic
@@ -2345,6 +2395,11 @@ export function validateEvidenceRun(run) {
       ),
     );
   }
+  const forecastObservationLedger = validateForecastObservationEvidence(
+    run,
+    forecast,
+    findings,
+  );
 
   compareEntity(findings, "evidence.entity.case", run.company_name, modelCase.issuer?.name);
   compareEntity(findings, "evidence.entity.filings", run.company_name, run.filings?.entity_name);
@@ -2404,6 +2459,7 @@ export function validateEvidenceRun(run) {
     errors,
     intake,
     coverage,
+    forecast_observation_ledger: forecastObservationLedger,
     handoff: errors.length === 0
       ? {
           intake: {
@@ -2425,6 +2481,13 @@ export function validateEvidenceRun(run) {
             },
           },
           model_case: modelCase,
+          ...(forecastObservationLedger
+            ? {
+                forecast_observation_ledger: forecastObservationLedger.ledger,
+                forecast_observation_ledger_receipt:
+                  forecastObservationLedger.receipt,
+              }
+            : {}),
         }
       : null,
   };

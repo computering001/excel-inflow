@@ -425,7 +425,56 @@ function forecastAuthorityValue(authority) {
  * reader needs to challenge -- guidance, brokers, run-rate, trend, flatline,
  * explicit zero and parent-captured detail.
  */
-export function renderForecastPlanScreen(modelCase) {
+export function renderForecastPlanScreen(modelCase, sealedPlan = null) {
+  if (sealedPlan?.schema_version === "forecast-plan/2.0") {
+    const independent = sealedPlan.states.filter((state) =>
+      !["formula", "schedule"].includes(state.producer_type) ||
+      state.status === "BLOCKED",
+    );
+    const lines = [
+      ...renderStageHeader(
+        "decisions",
+        sealedPlan.status === "PASS" ? "complete - review before build" : "blocked",
+      ),
+      "",
+      sealedPlan.status === "PASS"
+        ? "   MATERIAL FORECAST PLAN"
+        : "   MATERIAL FORECAST EVIDENCE REQUIRED",
+      "",
+    ];
+    for (const state of independent) {
+      const row = [
+        ...(modelCase?.statement_structure?.income_statement ?? []),
+        ...(modelCase?.statement_structure?.cash_flow ?? []),
+      ].find((candidate) => candidate.row_id === state.row_id);
+      const value = Number.isFinite(Number(state.value))
+        ? ` = ${formatNumber(Number(state.value), { decimals: 1 })}`
+        : "";
+      const detail = `${String(state.period_end).slice(0, 4)}: ${forecastMethodLabel(state)}${value}`;
+      const labelLines = wrap(String(row?.label ?? state.row_id), RULE_WIDTH - 3);
+      lines.push(`   ${labelLines[0]}`);
+      for (const part of labelLines.slice(1)) lines.push(`   ${part}`);
+      for (const part of wrap(detail, RULE_WIDTH - 6)) lines.push(`      ${part}`);
+      if (state.status === "BLOCKED") {
+        for (const part of wrap(state.rationale, RULE_WIDTH - 6)) lines.push(`      ${part}`);
+      }
+    }
+    lines.push("");
+    for (const part of wrap(
+      sealedPlan.status === "PASS"
+        ? `${independent.length} independent/captured state(s); totals and schedules calculate.`
+        : `${sealedPlan.unresolved_material_count} material state(s) must be resolved before build.`,
+      RULE_WIDTH - 3,
+    )) lines.push(`   ${part}`);
+    for (const part of wrap(
+      sealedPlan.status === "PASS"
+        ? "Reply continue to build, or amend an assumption first."
+        : "Supply a compatible source or explicit assumption; no workbook has been built.",
+      RULE_WIDTH - 3,
+    )) lines.push(`   ${part}`);
+    lines.push("", RULE);
+    return finishScreen(lines, { summariseOverflow: true });
+  }
   const rows = [
     ...(modelCase?.statement_structure?.income_statement ?? []),
     ...(modelCase?.statement_structure?.cash_flow ?? []),

@@ -147,6 +147,120 @@ def validate_semantic_artifacts(manifest, crosswalk_rows) -> List[Dict[str, Any]
     nodes = manifest.get("nodes") or []
     edges = manifest.get("edges") or []
     sources = manifest.get("source_inventory") or []
+    instrument_period_state = manifest.get("instrument_period_state")
+    if int(manifest.get("contract_version") or 0) == 2 and not instrument_period_state:
+        errors.append(
+            {
+                "id": "manifest.instrument_period_state_missing",
+                "message": "A v2 semantic manifest requires the compiled instrument-period state.",
+            }
+        )
+    if instrument_period_state:
+        states = instrument_period_state.get("states") or []
+        forecast_period_ids = [
+            period.get("date")
+            for period in manifest.get("periods") or []
+            if period.get("status") == "forecast"
+        ]
+        if instrument_period_state.get("schema_version") != "instrument-period-state/1.0":
+            errors.append(
+                {
+                    "id": "manifest.instrument_period_state_invalid",
+                    "message": "schema_version must be instrument-period-state/1.0.",
+                }
+            )
+        if instrument_period_state.get("forecast_period_ids") != forecast_period_ids:
+            errors.append(
+                {
+                    "id": "manifest.instrument_period_state_periods",
+                    "expected": forecast_period_ids,
+                    "actual": instrument_period_state.get("forecast_period_ids"),
+                }
+            )
+        if manifest.get("definition_basis_graph") != instrument_period_state.get("definition_basis_graph"):
+            errors.append(
+                {
+                    "id": "manifest.definition_basis_graph_binding",
+                    "message": "The semantic definition-basis graph must be the graph carried by instrument-period state.",
+                }
+            )
+        state_by_id = {}
+        periods_by_instrument = {}
+        for state in states:
+            state_id = state.get("state_id")
+            if not state_id or state_id in state_by_id:
+                errors.append(
+                    {
+                        "id": "manifest.instrument_period_state_invalid",
+                        "message": "Instrument-period state IDs must be present and unique.",
+                        "state_id": state_id,
+                    }
+                )
+            state_by_id[state_id] = state
+            periods_by_instrument.setdefault(state.get("instrument_id"), []).append(
+                state.get("period_index")
+            )
+            if state.get("class") == "rcf" and (
+                state.get("repayment_state") != "discretionary_rcf"
+                or (state.get("inclusion") or {}).get("mandatory_repayment") is not False
+                or abs(float((state.get("maturity_repayment") or {}).get("basis_amount") or 0)) > 1e-9
+            ):
+                errors.append(
+                    {
+                        "id": "manifest.instrument_period_state_invalid",
+                        "message": "RCF entered the mandatory repayment pool.",
+                        "state_id": state_id,
+                    }
+                )
+            if state.get("balance_basis") == "reporting_currency_carrying_value":
+                translation = state.get("translation") or {}
+                if (
+                    translation.get("method") != "reporting_currency_carrying_value_no_translation"
+                    or any(abs(float(translation.get(key) or 0) - 1) > 1e-9 for key in ("opening_rate", "flow_rate", "closing_rate"))
+                ):
+                    errors.append(
+                        {
+                            "id": "manifest.instrument_period_state_invalid",
+                            "message": "Reporting-currency carrying value is exposed to double FX translation.",
+                            "state_id": state_id,
+                        }
+                    )
+        for instrument_id, period_indexes in periods_by_instrument.items():
+            if sorted(period_indexes) != [0, 1, 2]:
+                errors.append(
+                    {
+                        "id": "manifest.instrument_period_state_invalid",
+                        "message": "Each instrument requires exactly one state per forecast period.",
+                        "instrument_id": instrument_id,
+                    }
+                )
+        for node in [item for item in nodes if item.get("node_kind") == "debt_instrument"]:
+            expected_states = sorted(
+                [state for state in states if state.get("instrument_id") == node.get("instrument_id")],
+                key=lambda state: state.get("period_index"),
+            )
+            expected_ids = [state.get("state_id") for state in expected_states]
+            if node.get("instrument_period_state_ids") != expected_ids:
+                errors.append(
+                    {
+                        "id": "manifest.instrument_period_state_node_binding",
+                        "node_id": node.get("node_id"),
+                        "expected": expected_ids,
+                        "actual": node.get("instrument_period_state_ids") or [],
+                    }
+                )
+            for index, state_id in enumerate(node.get("instrument_period_state_ids") or []):
+                state = state_by_id.get(state_id)
+                memberships = node.get("instrument_period_membership") or []
+                membership = memberships[index] if index < len(memberships) else None
+                if not state or membership != state.get("inclusion"):
+                    errors.append(
+                        {
+                            "id": "manifest.instrument_period_membership_binding",
+                            "node_id": node.get("node_id"),
+                            "state_id": state_id,
+                        }
+                    )
     node_ids = set()
     semantic_ids = set()
     for node in nodes:

@@ -21,10 +21,15 @@ const gate = (id, checks, outputs = {}) => ({
  * Pure seam used by N8 and its mutation tests.  Missing declarations never
  * degrade to an advisory: both scenarios must state a finite fixed point.
  */
-export function evaluateConvergenceDeclaration(standalone, proForma) {
+export function evaluateConvergenceDeclaration(
+  standalone,
+  proForma,
+  { circularity = null } = {},
+) {
   const required = ["converged", "iterations", "residual", "convergence_tolerance"];
   const scenarios = { standalone, pro_forma: proForma };
   const problems = [];
+  const equationGraphErrors = {};
   for (const [name, solution] of Object.entries(scenarios)) {
     for (const key of required) {
       if (solution?.[key] === undefined || solution?.[key] === null) {
@@ -43,8 +48,16 @@ export function evaluateConvergenceDeclaration(standalone, proForma) {
         Number(solution.residual) > Number(solution.convergence_tolerance)) {
       problems.push(`${name}.residual exceeds convergence_tolerance`);
     }
+    const graphErrors = M.N8.validateSolverEquationGraphEvidence(
+      solution?.equation_graph_evidence,
+      { circularity },
+    );
+    equationGraphErrors[name] = graphErrors;
+    for (const error of graphErrors) {
+      problems.push(`${name}.equation_graph_evidence: ${error}`);
+    }
   }
-  return { ok: problems.length === 0, problems };
+  return { ok: problems.length === 0, problems, equation_graph_errors: equationGraphErrors };
 }
 
 function historicalPeriodEnd(modelCase) {
@@ -192,9 +205,11 @@ export function runReleaseN0N9({ modelCase, dcsExport = null, brokerPack = null,
   if (standaloneCase.acquisition) standaloneCase.acquisition.enabled = 0;
   const standalone = M.N8.solveCase(standaloneCase);
   const invariantErrors = [...M.N8.validateSolutionInvariants(standalone), ...M.N8.validateSolutionInvariants(proForma)];
-  const convergence = evaluateConvergenceDeclaration(standalone, proForma);
+  const convergence = evaluateConvergenceDeclaration(standalone, proForma, {
+    circularity: modelCase.controls?.circularity,
+  });
   const n8ok = convergence.ok && invariantErrors.length === 0 && standalone.all_checks_pass === true && proForma.all_checks_pass === true;
-  gates.push(gate("N8", [n8ok ? passed("solver-convergence", "Both economic scenarios declare a converged finite fixed point within their own tolerance.", { convergence }) : failed("solver-convergence", "Solver convergence evidence is absent, invalid, or outside tolerance.", { convergence, invariant_errors: invariantErrors })], { standalone, pro_forma: proForma }));
+  gates.push(gate("N8", [n8ok ? passed("solver-convergence", "Both economic scenarios declare a converged finite fixed point whose iteration vector, active SCC state and graph/policy hashes match independent compilation.", { convergence }) : failed("solver-convergence", "Solver convergence or equation-graph evidence is absent, mismatched, invalid, or outside tolerance.", { convergence, invariant_errors: invariantErrors })], { standalone, pro_forma: proForma }));
   if (!n8ok) return { status: "STOPPED", gates, outputs, node_order: RELEASE_NODE_ORDER };
   outputs.solution = { standalone, pro_forma: proForma };
 

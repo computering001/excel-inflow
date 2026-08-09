@@ -516,16 +516,16 @@ if (!plan) {
   const malformedNumberedParents = [...numberedParentRows]
     .filter((row) => {
       const label = `B${row}`;
-      if (!cellStyle.has(label) || !styleOf(label).bold) return true;
+      if (!cellStyle.has(label) || styleOf(label).bold) return true;
       return [...BODY_COLUMNS]
         .filter((column) => column !== "B")
         .some((column) => cellStyle.has(`${column}${row}`) && styleOf(`${column}${row}`).bold);
     })
     .sort((a, b) => a - b);
   check(
-    "numbered-parent-uses-bold-label-only",
+    "numbered-parent-uses-indentation-only",
     malformedNumberedParents.length === 0,
-    "Numbered consolidation parents use one bold label over indented children without inheriting a total band.",
+    "Numbered consolidation parents remain ordinary-weight over indented children and do not inherit a total band.",
     malformedNumberedParents.length
       ? { rows: malformedNumberedParents.slice(0, 20) }
       : { rows: [...numberedParentRows].sort((a, b) => a - b) },

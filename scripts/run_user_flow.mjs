@@ -40,6 +40,22 @@ import {
   writeRunCarrier,
 } from "./lib/run_carrier.mjs";
 import {
+  compileForecastPlan,
+  forecastPlanSha256,
+  materializeForecastPlan,
+  validateForecastPlan,
+  validateForecastPlanCaseParity,
+} from "./lib/forecast_candidate_compiler.mjs";
+import {
+  compileForecastBehaviorMap,
+  validateForecastBehaviorMap,
+} from "./lib/forecast_behavior.mjs";
+import {
+  normaliseStatementRows,
+  reconcileStatementProjectionCoverage,
+  stripStatementPresentationMetadata,
+} from "./lib/row_plan.mjs";
+import {
   acquireRunLease,
   assertRunRootOutsideSkill,
   assertRuntimeIntegrityUnchanged,
@@ -105,6 +121,7 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
   inputs: Object.freeze([
     "scripts/run_user_flow.mjs",
     "scripts/lib/evidence_run.mjs",
+    "scripts/lib/forecast_observation.mjs",
     "scripts/lib/json_schema.mjs",
     "scripts/lib/flow_runtime.mjs",
     "scripts/lib/user_flow_controller.mjs",
@@ -113,6 +130,7 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
     "scripts/lib/runtime_isolation.mjs",
     "scripts/lib/run_carrier.mjs",
     "assets/evidence-run-v1.schema.json",
+    "assets/forecast-observation-ledger-v1.schema.json",
     "assets/model-case-v2.schema.json",
   ]),
   evidence_review: Object.freeze([
@@ -130,6 +148,12 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
   decisions: Object.freeze([
     "scripts/lib/flow_questions.mjs",
     "scripts/lib/flow_impact.mjs",
+    "scripts/lib/forecast_behavior.mjs",
+    "scripts/lib/forecast_candidate_compiler.mjs",
+    "scripts/lib/forecast_observation.mjs",
+    "assets/forecast-behavior-map-v1.schema.json",
+    "assets/forecast-plan-v2.schema.json",
+    "assets/forecast-observation-ledger-v1.schema.json",
   ]),
   delivery: Object.freeze([
     "scripts/lib/flow_read.mjs",
@@ -591,6 +615,8 @@ async function main() {
   const stage3Dir = path.join(runDir, "stages", "decisions");
   const answeredCasePath = path.join(stage3Dir, "model-case.json");
   const forecastPlanPath = path.join(stage3Dir, "forecast-plan.txt");
+  const forecastPlanJsonPath = path.join(stage3Dir, "forecast-plan.json");
+  const forecastBehaviorPath = path.join(stage3Dir, "forecast-behavior-map.json");
   let answeredCase;
   let answerHash;
   if (intakeResult.outcome === "questions") {
@@ -685,6 +711,8 @@ async function main() {
   const stage3Outputs = {
     model_case: answeredCasePath,
     forecast_plan: forecastPlanPath,
+    forecast_plan_json: forecastPlanJsonPath,
+    forecast_behavior_map: forecastBehaviorPath,
   };
   const cached3 = await readUsableStage({
     runDir,
@@ -700,10 +728,105 @@ async function main() {
     receipt3 = cached3.receipt;
     reusedStages.push("decisions");
   } else {
+    const planningCase = structuredClone(answeredCase);
+    const normalizedStatements = {
+      income_statement: stripStatementPresentationMetadata(
+        normaliseStatementRows(
+          answeredCase,
+          "income_statement",
+          { forecastDecisionMode: "defer" },
+        ),
+      ),
+      cash_flow: stripStatementPresentationMetadata(
+        normaliseStatementRows(
+          answeredCase,
+          "cash_flow",
+          { forecastDecisionMode: "defer" },
+        ),
+      ),
+    };
+    planningCase.statement_structure = normalizedStatements;
+    planningCase.source_coverage = reconcileStatementProjectionCoverage(
+      planningCase,
+      normalizedStatements,
+    );
+    const behaviorMap = compileForecastBehaviorMap(
+      planningCase,
+      planningCase.statement_structure,
+    );
+    const behaviorValidation = validateForecastBehaviorMap(behaviorMap);
+    if (!behaviorValidation.valid) {
+      throw new Error(
+        `Forecast behavior artifact is invalid: ${behaviorValidation.violations[0]?.message ?? "unknown violation"}`,
+      );
+    }
+    const forecastPlan = compileForecastPlan(
+      planningCase,
+      planningCase.statement_structure,
+      {
+        behaviorMap,
+        observationLedger:
+          validation.handoff?.forecast_observation_ledger ?? null,
+      },
+    );
+    const forecastPlanErrors = validateForecastPlan(
+      forecastPlan,
+      planningCase.statement_structure,
+    );
+    if (forecastPlanErrors.length > 0) {
+      throw new Error(`Forecast plan artifact is invalid: ${forecastPlanErrors[0]}`);
+    }
+    await writeJsonAtomic(forecastBehaviorPath, behaviorMap);
+    await writeJsonAtomic(forecastPlanJsonPath, forecastPlan);
+    if (forecastPlan.status !== "PASS") {
+      await writeTextAtomic(
+        forecastPlanPath,
+        `${renderForecastPlanScreen(planningCase, forecastPlan)}\n`,
+      );
+      const receipt3 = await persistStage({
+        runDir,
+        runId,
+        stageId: "decisions",
+        status: "blocked",
+        inputHashes: stage3Inputs,
+        previousReceiptHash: receipt2.receipt_hash,
+        outputs: {
+          forecast_plan: forecastPlanPath,
+          forecast_plan_json: forecastPlanJsonPath,
+          forecast_behavior_map: forecastBehaviorPath,
+        },
+        detail: {
+          unresolved_material_forecast_states:
+            forecastPlan.unresolved_material_count,
+          forecast_plan_sha256: forecastPlanSha256(forecastPlan),
+        },
+      });
+      return finish({
+        runDir,
+        screen: renderForecastPlanScreen(planningCase, forecastPlan),
+        machine: options.json === true,
+        result: {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          run_id: runId,
+          status: "BLOCKED",
+          stage: "decisions",
+          message: `${forecastPlan.unresolved_material_count} material forecast state(s) are unresolved.`,
+          forecast_plan: forecastPlanJsonPath,
+          receipt: receipt3,
+          reused_stages: reusedStages,
+        },
+      });
+    }
+    answeredCase = materializeForecastPlan(planningCase, forecastPlan);
+    const parityErrors = validateForecastPlanCaseParity(answeredCase, forecastPlan);
+    if (parityErrors.length > 0) {
+      throw new Error(`Materialized forecast plan parity failed: ${parityErrors[0]}`);
+    }
     await writeJsonAtomic(answeredCasePath, answeredCase);
     await writeTextAtomic(
       forecastPlanPath,
-      `${renderForecastPlanScreen(answeredCase)}\n`,
+      `${renderForecastPlanScreen(answeredCase, forecastPlan)}\n`,
     );
     receipt3 = await persistStage({
       runDir,
@@ -715,6 +838,8 @@ async function main() {
       outputs: stage3Outputs,
       detail: {
         question_count: intakeResult.outcome === "questions" ? intakeResult.plan.questions.length : 0,
+        forecast_plan_sha256: forecastPlanSha256(forecastPlan),
+        forecast_state_count: forecastPlan.states.length,
       },
     });
   }
@@ -756,6 +881,7 @@ async function main() {
   const stage4Inputs = {
     stage3_receipt: receipt3.receipt_hash,
     model_case: caseHash,
+    forecast_plan: await hashFile(forecastPlanJsonPath),
     runtime: runtimeDigests.build_checks,
   };
   const stage4Outputs = {

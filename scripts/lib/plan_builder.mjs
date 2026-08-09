@@ -460,6 +460,12 @@ class PlanRange {
           ? `${columnNameOf(this._box.firstColumn)}${this._box.firstRow}`
           : sqrefOf(this._box),
       type: rule.type,
+      // openpyxl emits both flags explicitly as false when callers do not
+      // request prompts. Record that package fact in the production plan so
+      // an independently extracted authority plan is byte-semantically equal
+      // instead of differing only because one side made the default explicit.
+      show_error_message: Boolean(validation?.showErrorMessage ?? false),
+      show_input_message: Boolean(validation?.showInputMessage ?? false),
     };
     if (rule.operator) record.operator = rule.operator;
     if (rule.type === "list") {
@@ -517,7 +523,10 @@ export class PlanWorksheet {
     this._dataValidations = [];
     this._comments = [];
     this._merges = [];
-    this._outline = null;
+    // These are the OOXML defaults openpyxl writes even on a sheet with no
+    // grouped rows. Keeping them in the plan makes the plan a complete account
+    // of the emitted package; sheets that opt out overwrite them explicitly.
+    this._outline = { summary_below: true, summary_right: true };
     this._pageMargins = { ...DEFAULT_PAGE_MARGINS };
     this._defaultRowHeight = DEFAULT_ROW_HEIGHT;
   }

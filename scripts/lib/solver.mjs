@@ -14,6 +14,71 @@ import {
   validateForecastAuthorities,
 } from "./forecast_authority.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
+import { solverIterationOptions } from "./economic_solve_policy.mjs";
+import {
+  compileInstrumentPeriodState,
+  definitionBasisValuesForPeriod,
+  instrumentPeriodStateByKey,
+  mandatoryRepaymentForPeriod,
+} from "./instrument_period_state.mjs";
+import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
+
+const SOLVER_ITERATION_POLICY = solverIterationOptions();
+
+// This declaration intentionally remains solver-owned and literal.  The
+// equation-graph compiler independently derives its expectation from the graph
+// and convergence contract, then rejects any drift before economics runs.
+const SOLVER_ON_ITERATION_VECTOR = Object.freeze([
+  Object.freeze({ node_id: "statement.net_income", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "cash.cfo", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "rcf.draw", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "rcf.repayment", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "rcf.ending_balance", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "cash.ending_balance", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "interest.rcf", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "interest.commitment_fee", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "interest.cash_income", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "interest.gross_expense", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "interest.income", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "interest.net_expense", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.finance", tolerance_class: "currency" }),
+]);
+
+export function solverIterationDeclaration(circularity) {
+  const state = Number(circularity);
+  if (state !== 0 && state !== 1) {
+    throw new Error(`Solver circularity state must be 0 or 1; received ${circularity}.`);
+  }
+  return {
+    active_circularity_state: state,
+    required: state === 1,
+    method: "deterministic_gauss_seidel",
+    state_vector: state === 1
+      ? SOLVER_ON_ITERATION_VECTOR.map((component) => ({ ...component }))
+      : [],
+  };
+}
+
+function solverIterationSnapshot(declaration, values) {
+  const snapshot = [];
+  for (const component of declaration.state_vector) {
+    if (!Object.hasOwn(values, component.node_id)) {
+      throw new Error(`Solver iteration vector node ${component.node_id} has no runtime value.`);
+    }
+    const value = Number(values[component.node_id]);
+    if (!Number.isFinite(value)) {
+      throw new Error(`Solver iteration vector node ${component.node_id} is not finite.`);
+    }
+    snapshot.push(value);
+  }
+  return snapshot;
+}
+
+function iterationResidual(previous, current) {
+  if (current.length === 0) return 0;
+  if (!previous) return Number.POSITIVE_INFINITY;
+  return Math.max(...current.map((value, index) => Math.abs(value - previous[index])));
+}
 
 const NORMALISED_STATEMENT_CACHE = new WeakMap();
 
@@ -1422,9 +1487,10 @@ export function validateCaseShape(modelCase) {
 export function solveCase(
   modelCase,
   {
-    tolerance = 1e-8,
-    maxIterations = 200,
+    tolerance = SOLVER_ITERATION_POLICY.tolerance,
+    maxIterations = SOLVER_ITERATION_POLICY.maxIterations,
     acquisitionBaseSolution = null,
+    instrumentPeriodState = null,
   } = {},
 ) {
   const shapeErrors = validateCaseShape(modelCase);
@@ -1433,7 +1499,22 @@ export function solveCase(
     error.validationErrors = shapeErrors;
     throw error;
   }
+  const solverDeclaration = solverIterationDeclaration(
+    modelCase.controls?.circularity,
+  );
+  const equationGraphEvidence = {
+    ...compileSolverEquationGraphEvidence(solverDeclaration),
+    solver_runtime: {
+      max_iterations: Number(maxIterations),
+      absolute_tolerance: Number(tolerance),
+    },
+  };
   const dynamicV2 = Number(modelCase.contract_version) === 2;
+  const compiledInstrumentPeriodState = instrumentPeriodState ??
+    (dynamicV2 ? compileInstrumentPeriodState(modelCase) : null);
+  const instrumentPeriodStateIndex = compiledInstrumentPeriodState
+    ? instrumentPeriodStateByKey(compiledInstrumentPeriodState)
+    : null;
   // An acquisition overlay is an adjustment to the issuer's standalone graph,
   // not a second opportunity to reinterpret issuer-only forecast chains. Solve
   // the acquisition-off state once and use it as the explicit base for rows
@@ -1449,6 +1530,7 @@ export function solveCase(
     resolvedAcquisitionBaseSolution = solveCase(acquisitionOffCase, {
       tolerance,
       maxIterations,
+      instrumentPeriodState: compiledInstrumentPeriodState,
     });
   }
   // Which single EBIT/EBITDA metric anchors the forecast, with D&A as the
@@ -1798,21 +1880,33 @@ export function solveCase(
     const instrumentResults = [];
 
     for (const instrument of nonRcfInstruments) {
-      const openingNative = instrumentBalances.get(instrument.instrument_id) ?? 0;
-      const issuanceNative = asSeries3(instrument.new_issuance, 0)[forecastIndex];
+      const compiledState = instrumentPeriodStateIndex?.get(
+        `${instrument.instrument_id}\u0000${forecastIndex}`,
+      ) ?? null;
+      const openingNative = compiledState
+        ? Number(compiledState.opening.basis_amount)
+        : instrumentBalances.get(instrument.instrument_id) ?? 0;
+      const issuanceNative = compiledState
+        ? Number(compiledState.issuance.basis_amount)
+        : asSeries3(instrument.new_issuance, 0)[forecastIndex];
       const nonCashComponents = nonCashMovementComponents(
         instrument,
         forecastIndex,
       );
-      const fairValueNative = Number(nonCashComponents.fair_value ?? 0);
-      const otherNonCashNative = Number(nonCashComponents.other ?? 0);
+      const fairValueNative = compiledState
+        ? Number(compiledState.fair_value_movement.basis_amount)
+        : Number(nonCashComponents.fair_value ?? 0);
+      const otherNonCashNative = compiledState
+        ? Number(compiledState.other_non_cash_movement.basis_amount)
+        : Number(nonCashComponents.other ?? 0);
       const nonPikNonCashNative = fairValueNative + otherNonCashNative;
-      const amortisationNative =
-        Math.min(
-          Math.max(0, openingNative + issuanceNative + nonPikNonCashNative),
-          asSeries3(instrument.scheduled_amortisation, 0)[forecastIndex],
-        );
-      const timing = dynamicV2
+      const amortisationNative = compiledState
+        ? Number(compiledState.scheduled_amortisation.basis_amount)
+        : Math.min(
+            Math.max(0, openingNative + issuanceNative + nonPikNonCashNative),
+            asSeries3(instrument.scheduled_amortisation, 0)[forecastIndex],
+          );
+      const timing = dynamicV2 && !compiledState
         ? instrumentTiming(modelCase, periodIndex, instrument, {
             opening: openingNative,
             issuance: issuanceNative,
@@ -1825,7 +1919,9 @@ export function solveCase(
       const maturity = instrument.maturity_date
         ? new Date(instrument.maturity_date).getTime()
         : Number.POSITIVE_INFINITY;
-      const matures = dynamicV2
+      const matures = compiledState
+        ? Number(compiledState.maturity_repayment.basis_amount) > tolerance
+        : dynamicV2
         ? timing.matures
         : modelCase.controls.debt_maturities_roll === 1 && periodEnd >= maturity;
       const baseEndingBeforePik = Math.max(
@@ -1833,8 +1929,9 @@ export function solveCase(
         openingNative + issuanceNative + nonPikNonCashNative - amortisationNative,
       );
       const pikRate = asSeries3(instrument.pik_rate, 0)[forecastIndex];
-      const pikInterestNative =
-        modelCase.controls.circularity === 1
+      const pikInterestNative = compiledState
+        ? Number(compiledState.pik_accretion.basis_amount)
+        : modelCase.controls.circularity === 1
           ? dynamicV2
             ? solvedPikAccretion(
                 timing.weightedBase,
@@ -1849,13 +1946,17 @@ export function solveCase(
                   1,
                 )
           : 0;
-      const preMaturityEnding = Math.max(
-        0,
-        baseEndingBeforePik + pikInterestNative,
-      );
-      const maturityRepaymentNative =
-        matures ? preMaturityEnding : 0;
-      const endingNative = preMaturityEnding - maturityRepaymentNative;
+      const preMaturityEnding = compiledState
+        ? Number(compiledState.ending_pre_repayment.basis_amount)
+        : Math.max(0, baseEndingBeforePik + pikInterestNative);
+      const maturityRepaymentNative = compiledState
+        ? Number(compiledState.maturity_repayment.basis_amount)
+        : matures
+          ? preMaturityEnding
+          : 0;
+      const endingNative = compiledState
+        ? Number(compiledState.ending_post_repayment.basis_amount)
+        : preMaturityEnding - maturityRepaymentNative;
       const sourcedEndingNative = instrument.forecast_ending_balances?.[forecastIndex];
       if (
         sourcedEndingNative !== undefined &&
@@ -1884,23 +1985,37 @@ export function solveCase(
       // items and remain at period-end FX. The difference is isolated in the
       // explicit FX residual below; it must never leak into financing cash.
       const flowFx = averageFx;
-      const issuanceReporting = issuanceNative * flowFx;
-      const repaymentReporting =
-        (amortisationNative + maturityRepaymentNative) * flowFx;
-      const fairValueReporting = fairValueNative * endingFx;
-      const otherNonCashReporting = otherNonCashNative * endingFx;
+      const issuanceReporting = compiledState
+        ? Number(compiledState.issuance.reporting_amount)
+        : issuanceNative * flowFx;
+      const repaymentReporting = compiledState
+        ? Number(compiledState.scheduled_amortisation.reporting_amount) +
+          Number(compiledState.maturity_repayment.reporting_amount)
+        : (amortisationNative + maturityRepaymentNative) * flowFx;
+      const fairValueReporting = compiledState
+        ? Number(compiledState.fair_value_movement.reporting_amount)
+        : fairValueNative * endingFx;
+      const otherNonCashReporting = compiledState
+        ? Number(compiledState.other_non_cash_movement.reporting_amount)
+        : otherNonCashNative * endingFx;
       const pikBalanceMovementReporting = pikInterestNative * endingFx;
       const pikInterestReporting = pikInterestNative * averageFx;
-      const endingReporting = endingNative * endingFx;
-      const openingReporting =
-        openingNative *
-        fxRate(
-          modelCase,
-          balanceCurrency,
-          Math.max(0, periodIndex - 1),
-          "period_end",
-        );
-      const rawCashCouponInterestReporting = dynamicV2
+      const endingReporting = compiledState
+        ? Number(compiledState.ending_post_repayment.reporting_amount)
+        : endingNative * endingFx;
+      const openingReporting = compiledState
+        ? Number(compiledState.opening.reporting_amount)
+        : openingNative *
+          fxRate(
+            modelCase,
+            balanceCurrency,
+            Math.max(0, periodIndex - 1),
+            "period_end",
+          );
+      const rawCashCouponInterestReporting = compiledState
+        ? Number(compiledState.average_interest_balance.reporting_amount) *
+          allInRate(instrument, forecastIndex)
+        : dynamicV2
         ? (timing.weightedBase +
             pikInterestNative * timing.activeFraction / 2) *
           allInRate(instrument, forecastIndex) *
@@ -1922,19 +2037,31 @@ export function solveCase(
         cashCouponInterestReporting + pikInterestReporting;
 
       nonRcfIssuance += issuanceReporting;
-      nonRcfRepayment += repaymentReporting;
-      instrumentInterest += interestReporting;
-      nonCashInstrumentInterest +=
-        pikInterestReporting +
-        (instrument.cash_interest === false ? cashCouponInterestReporting : 0);
-      if (instrument.include_in_gross_debt !== false) {
+      if (!compiledState || compiledState.inclusion.mandatory_repayment) {
+        nonRcfRepayment += repaymentReporting;
+      }
+      if (!compiledState || compiledState.inclusion.interest) {
+        instrumentInterest += interestReporting;
+        nonCashInstrumentInterest +=
+          pikInterestReporting +
+          (instrument.cash_interest === false ? cashCouponInterestReporting : 0);
+      }
+      if (compiledState
+        ? compiledState.inclusion.gross_debt
+        : instrument.include_in_gross_debt !== false) {
         grossDebtReporting += endingReporting;
       }
-      if (instrument.include_in_net_debt !== false) {
+      if (compiledState
+        ? compiledState.inclusion.net_debt
+        : instrument.include_in_net_debt !== false) {
         netDebtReporting += endingReporting;
       }
       instrumentResults.push({
         instrument_id: instrument.instrument_id,
+        instrument_period_state_id: compiledState?.state_id ?? null,
+        instrument_period_inclusion: compiledState
+          ? structuredClone(compiledState.inclusion)
+          : null,
         opening_native: openingNative,
         issuance_native: issuanceNative,
         fair_value_movement_native: fairValueNative,
@@ -1957,13 +2084,7 @@ export function solveCase(
           fairValueReporting + otherNonCashReporting + pikBalanceMovementReporting,
         fx_non_cash_movement:
           endingReporting -
-          openingNative *
-            fxRate(
-              modelCase,
-              balanceCurrency,
-              Math.max(0, periodIndex - 1),
-              "period_end",
-            ) -
+          openingReporting -
           issuanceReporting +
           repaymentReporting -
           fairValueReporting -
@@ -2150,8 +2271,10 @@ export function solveCase(
     let iteration = 0;
     let residual = Number.POSITIVE_INFINITY;
     let lastComputation = null;
+    let previousIterationSnapshot = null;
+    const iterationLimit = solverDeclaration.required ? maxIterations : 1;
 
-    for (iteration = 1; iteration <= maxIterations; iteration += 1) {
+    for (iteration = 1; iteration <= iterationLimit; iteration += 1) {
       // The circularity switch is a KILL SWITCH. `0` suppresses every forecast
       // interest-expense and interest-income line — instrument, RCF, the
       // commitment fee, lease, acquisition, other/unallocated and non-cash —
@@ -2387,8 +2510,12 @@ export function solveCase(
         nonDebtFinancing + nonRcfDebtIssuance;
       const cashBeforeMandatory =
         cashBeforeDebt + nonRcfDebtIssuance;
-      const mandatoryRepayment =
-        nonRcfDebtRepayment + leasePrincipal;
+      const mandatoryRepayment = compiledInstrumentPeriodState
+        ? mandatoryRepaymentForPeriod(
+            compiledInstrumentPeriodState,
+            forecastIndex,
+          )
+        : nonRcfDebtRepayment + leasePrincipal;
       const cashAfterMandatory = cashBeforeMandatory - mandatoryRepayment;
       const preRcfDebtCashFlow =
         nonRcfDebtIssuance - nonRcfDebtRepayment - leasePrincipal;
@@ -2427,10 +2554,29 @@ export function solveCase(
         0,
         effectiveMinimumCash - nextEndingCash,
       );
-      residual = Math.max(
-        Math.abs(nextEndingCash - endingCash),
-        Math.abs(nextEndingRcf - endingRcf),
+      const currentIterationSnapshot = solverIterationSnapshot(
+        solverDeclaration,
+        {
+          "statement.net_income": netIncome,
+          "cash.cfo": cashFromOperations,
+          "rcf.draw": rcfDraw,
+          "rcf.repayment": rcfRepayment,
+          "rcf.ending_balance": nextEndingRcf,
+          "cash.ending_balance": nextEndingCash,
+          "interest.rcf": rcfInterest,
+          "interest.commitment_fee": commitmentFee,
+          "interest.cash_income": interestIncome,
+          "interest.gross_expense": grossInterest,
+          "interest.income": interestIncome,
+          "interest.net_expense": netInterest,
+          "statement.finance": -netInterest,
+        },
       );
+      residual = iterationResidual(
+        previousIterationSnapshot,
+        currentIterationSnapshot,
+      );
+      previousIterationSnapshot = currentIterationSnapshot;
 
       // Finish the declared statement graph with the quantities that only
       // become known after the liquidity solve. This is the complete economic
@@ -2557,9 +2703,8 @@ export function solveCase(
         statement_values: Object.fromEntries(finalStatementValues),
       };
 
-      if (
-        residual <= tolerance
-      ) {
+      if (!solverDeclaration.required || residual <= tolerance) {
+        if (!solverDeclaration.required) residual = 0;
         endingCash = nextEndingCash;
         endingRcf = nextEndingRcf;
         endingRcfNative = nextEndingRcfNative;
@@ -2577,6 +2722,30 @@ export function solveCase(
       );
     }
 
+    const finalCashBucketSnapshot = cashBucketSnapshot(endingCash);
+    const eligibleCash = finalCashBucketSnapshot.net_debt_eligible_cash;
+    const reportedNetDebtAdjustments = (
+      modelCase.historical_supplement?.reported_net_debt_adjustment ?? []
+    ).reduce(
+      (total, component) =>
+        total + Number(component.values?.[forecastIndex + 3] ?? 0),
+      0,
+    );
+    const definitionBasis = compiledInstrumentPeriodState
+      ? definitionBasisValuesForPeriod(
+          compiledInstrumentPeriodState,
+          forecastIndex,
+          {
+            endingReportingOverrides: {
+              [rcfInstrument.instrument_id]: endingRcf,
+            },
+            eligibleCash,
+            liquidityCash: finalCashBucketSnapshot.liquidity_cash,
+            reportedNetDebtAdjustments,
+            additionalDebt: endingAcquisitionDebt,
+          },
+        )
+      : null;
     const leaseIncludedInGrossDebt =
       modelCase.lease_policy.include_in_gross_debt &&
       modelCase.lease_policy.mode !== "exclude";
@@ -2586,25 +2755,26 @@ export function solveCase(
     const leaseIncludedInNetDebt =
       modelCase.lease_policy.include_in_net_debt &&
       modelCase.lease_policy.mode !== "exclude";
-    const grossDebt =
-      grossDebtReporting +
-      endingRcf +
-      endingAcquisitionDebt +
-      (leaseIncludedInGrossDebt ? endingLease : 0);
-    const debtForNetDebt =
-      netDebtReporting +
-      endingRcf +
-      endingAcquisitionDebt +
-      (leaseIncludedInNetDebt ? endingLease : 0);
-    const debtForLeverage =
-      netDebtReporting +
-      endingRcf +
-      endingAcquisitionDebt +
-      (leaseIncludedInLeverage ? endingLease : 0);
-    const finalCashBucketSnapshot = cashBucketSnapshot(endingCash);
-    const eligibleCash = finalCashBucketSnapshot.net_debt_eligible_cash;
-    const netDebt = debtForNetDebt - eligibleCash;
-    const leverageNetDebt = debtForLeverage - eligibleCash;
+    const grossDebt = definitionBasis
+      ? definitionBasis.values.model_gross_debt
+      : grossDebtReporting +
+        endingRcf +
+        endingAcquisitionDebt +
+        (leaseIncludedInGrossDebt ? endingLease : 0);
+    const netDebt = definitionBasis
+      ? definitionBasis.values.model_net_debt
+      : netDebtReporting +
+        endingRcf +
+        endingAcquisitionDebt +
+        (leaseIncludedInNetDebt ? endingLease : 0) -
+        eligibleCash;
+    const leverageNetDebt = definitionBasis
+      ? definitionBasis.values.leverage_numerator
+      : netDebtReporting +
+        endingRcf +
+        endingAcquisitionDebt +
+        (leaseIncludedInLeverage ? endingLease : 0) -
+        eligibleCash;
     const undrawnRcf = foreignRcf
       ? Math.max(0, rcfCapacity - endingRcfNative) * rcfEndingFx
       : Math.max(0, rcfCapacity - endingRcf);
@@ -2612,9 +2782,13 @@ export function solveCase(
     // outstanding CP is funded out of the same backstop, so counting the full
     // undrawn RCF while paper is outstanding double-counts the capacity.
     const commercialPaperIds = new Set(
-      (modelCase.instruments ?? [])
-        .filter((instrument) => instrument.class === "commercial_paper")
-        .map((instrument) => instrument.instrument_id),
+      compiledInstrumentPeriodState
+        ? compiledInstrumentPeriodState.states
+            .filter((state) => state.family === "commercial_paper")
+            .map((state) => state.instrument_id)
+        : (modelCase.instruments ?? [])
+            .filter((instrument) => instrument.class === "commercial_paper")
+            .map((instrument) => instrument.instrument_id),
     );
     const drawnCommercialPaper = (lastComputation.instrument_results ?? [])
       .filter((item) => commercialPaperIds.has(item.instrument_id))
@@ -2636,6 +2810,7 @@ export function solveCase(
         : {}),
       eligible_cash: eligibleCash,
       net_debt: netDebt,
+      definition_basis: definitionBasis,
       net_leverage:
         lastComputation.adjusted_ebitda === 0
           ? null
@@ -2709,6 +2884,11 @@ export function solveCase(
     case_id: modelCase.case_id,
     issuer: modelCase.issuer,
     periods: modelCase.periods,
+    equation_graph_evidence: equationGraphEvidence,
+    instrument_period_state_schema_version:
+      compiledInstrumentPeriodState?.schema_version ?? null,
+    definition_basis_graph:
+      compiledInstrumentPeriodState?.definition_basis_graph ?? null,
     forecast: results,
     converged: results.length === 3 && results.every((result) => result.converged === true),
     iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),

@@ -5,22 +5,36 @@ export const STANDARDISED_DESIGN_CONTRACT_SHA256 =
   "aea5808b7914cd699cdda42c5d3e09091634fbca5934ccd4141b5a3ffa4e84be";
 export const STANDARDISED_DESIGN_RUNTIME_SHA256 =
   "6bba4cb7a5348d8a16d0759596bf56c05ca8db695b334b5b315db00d292c6343";
-// The v3 runtime (presentation epoch 3: tiered statement grammar, badged
-// bridge, 46-character label column) exists as a prepared, digest-pinned
-// successor. It activates only through the explicit epoch switch below —
-// never as a side effect of being present on disk.
+// Epoch 3 introduced the tiered statement grammar, badged bridge and
+// 46-character label column. Its exact digest remains pinned as a rollback;
+// epoch 4 re-founds the current production-emitter surface without inheriting
+// any v2/v3 correction registry.
 export const STANDARDISED_DESIGN_RUNTIME_V3_SHA256 =
   "87e6d132611a1983c758a4b72d4e38f579678154ee18260a06241b4432f34026";
 export const STANDARDISED_DESIGN_CONTRACT_V3_SHA256 =
   "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3";
+export const STANDARDISED_DESIGN_RUNTIME_V4_SHA256 =
+  "ccaced0fe772f279fee4e87ad80b15d101d7ac0e0a52c953c72258ac77719e2d";
+export const STANDARDISED_DESIGN_CONTRACT_V4_SHA256 =
+  "334fc8f1dbd365fb0e1c70d7fc091cc949f2b75456f32b801d7a3a259e81aa62";
 
 // Epoch-aware identities for artifacts that stamp themselves with the
-// active design lattice. Epoch 3 is the production default; epoch 2 remains
-// available only as an explicit rollback switch.
+// active design lattice. Epoch 4 is the source-founded candidate default;
+// epochs 2 and 3 remain available as explicit rollback switches.
+export function selectedDesignEpoch() {
+  const raw = process.env.EXCEL_INFLOW_DESIGN_EPOCH;
+  if (raw === undefined || raw === "" || raw === "4") return 4;
+  if (raw === "2" || raw === "3") return Number(raw);
+  throw new Error(
+    `Unsupported EXCEL_INFLOW_DESIGN_EPOCH ${JSON.stringify(raw)}; expected 2, 3 or 4.`,
+  );
+}
+
 export function activeDesignContractSha256() {
-  return process.env.EXCEL_INFLOW_DESIGN_EPOCH === "2"
-    ? STANDARDISED_DESIGN_CONTRACT_SHA256
-    : STANDARDISED_DESIGN_CONTRACT_V3_SHA256;
+  const epoch = selectedDesignEpoch();
+  if (epoch === 2) return STANDARDISED_DESIGN_CONTRACT_SHA256;
+  if (epoch === 3) return STANDARDISED_DESIGN_CONTRACT_V3_SHA256;
+  return STANDARDISED_DESIGN_CONTRACT_V4_SHA256;
 }
 
 export function activeDesignRuntimeSha256() {
@@ -35,18 +49,26 @@ const CONTRACT_V3_URL = new URL(
   "../../assets/standardised-design-runtime.v3.json",
   import.meta.url
 );
+const CONTRACT_V4_URL = new URL(
+  "../../assets/standardised-design-runtime.v4.json",
+  import.meta.url
+);
 
-// Epoch 3 became the default only after both standardised authorities passed
-// dormant-candidate generation and focused native-Excel review. The explicit
-// epoch-2 branch is retained as a bounded rollback path.
+// Epoch 4 is founded on fresh workbooks generated from the current standard
+// cases through the production plan/emitter path. Epochs 2 and 3 are retained
+// as bounded rollback paths; a typo is never allowed to select a new epoch.
 function activeRuntimeSelection() {
-  if (process.env.EXCEL_INFLOW_DESIGN_EPOCH === "2") {
+  const epoch = selectedDesignEpoch();
+  if (epoch === 2) {
     return { url: CONTRACT_URL, sha256: STANDARDISED_DESIGN_RUNTIME_SHA256 };
   }
-  return {
-    url: CONTRACT_V3_URL,
-    sha256: STANDARDISED_DESIGN_RUNTIME_V3_SHA256,
-  };
+  if (epoch === 3) {
+    return {
+      url: CONTRACT_V3_URL,
+      sha256: STANDARDISED_DESIGN_RUNTIME_V3_SHA256,
+    };
+  }
+  return { url: CONTRACT_V4_URL, sha256: STANDARDISED_DESIGN_RUNTIME_V4_SHA256 };
 }
 
 let cachedContract;
@@ -66,10 +88,7 @@ export function standardisedDesignContract() {
   }
   cachedContractSha = selection.sha256;
   const contract = JSON.parse(bytes);
-  const expectedSourceContractSha =
-    process.env.EXCEL_INFLOW_DESIGN_EPOCH === "2"
-      ? STANDARDISED_DESIGN_CONTRACT_SHA256
-      : STANDARDISED_DESIGN_CONTRACT_V3_SHA256;
+  const expectedSourceContractSha = activeDesignContractSha256();
   if (
     contract.schema_version !== 2 ||
     contract.status !== "RUNTIME_PROJECTION_OF_MEASURED_AUTHORITIES" ||

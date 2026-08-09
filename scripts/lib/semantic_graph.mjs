@@ -6,6 +6,10 @@ import {
 } from "./forecast_authority.mjs";
 import { compileStatementTopology } from "./statement_topology.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
+import {
+  compileInstrumentPeriodState,
+  instrumentPeriodStateByKey,
+} from "./instrument_period_state.mjs";
 
 const MOVEMENT_DEFINITIONS = {
   operating_cash_flow: {
@@ -466,16 +470,22 @@ function mechanicalNodes(rowPlan) {
   return nodes;
 }
 
-function instrumentNodes(modelCase, rowPlan) {
+function instrumentNodes(modelCase, rowPlan, instrumentPeriodState = null) {
   const instrumentsById = new Map(
     (modelCase.instruments ?? []).map((instrument) => [
       instrument.instrument_id,
       instrument,
     ]),
   );
+  const stateIndex = instrumentPeriodState
+    ? instrumentPeriodStateByKey(instrumentPeriodState)
+    : null;
   const nodes = [];
   for (const plan of rowPlan.instruments ?? []) {
     const instrument = instrumentsById.get(plan.instrument_id) ?? {};
+    const periodStates = [0, 1, 2].map((periodIndex) =>
+      stateIndex?.get(`${plan.instrument_id}\u0000${periodIndex}`) ?? null,
+    );
     nodes.push({
       node_id: `instrument.${plan.instrument_id}.balance`,
       node_kind: "debt_instrument",
@@ -488,6 +498,12 @@ function instrumentNodes(modelCase, rowPlan) {
       repayment_state_by_period: [
         ...(plan.repayment_state_by_period ?? ["zero", "zero", "zero"]),
       ],
+      instrument_period_state_ids: periodStates.map(
+        (state) => state?.state_id ?? null,
+      ),
+      instrument_period_membership: periodStates.map((state) =>
+        state ? structuredClone(state.inclusion) : null,
+      ),
       section: "debt_schedule",
       physical_row: plan.debt_row,
       formula_authority: "compiler",
@@ -978,14 +994,22 @@ function sourceInventory(modelCase) {
   );
 }
 
-export function compileSemanticManifest(modelCase, rowPlan) {
+export function compileSemanticManifest(
+  modelCase,
+  rowPlan,
+  { instrumentPeriodState = null } = {},
+) {
+  const compiledInstrumentPeriodState = instrumentPeriodState ??
+    (Number(modelCase.contract_version) === 2
+      ? compileInstrumentPeriodState(modelCase)
+      : null);
   const rcfInstrument = (modelCase.instruments ?? []).find(
     (instrument) =>
       instrument.instrument_id === modelCase.rcf_policy?.instrument_id,
   );
   const nodes = [
     ...statementNodes(modelCase, rowPlan),
-    ...instrumentNodes(modelCase, rowPlan),
+    ...instrumentNodes(modelCase, rowPlan, compiledInstrumentPeriodState),
     ...cashBucketNodes(rowPlan),
     ...mechanicalNodes(rowPlan),
   ].sort(
@@ -1032,6 +1056,9 @@ export function compileSemanticManifest(modelCase, rowPlan) {
       status: period.status,
     })),
     movement_contract: MOVEMENT_DEFINITIONS,
+    instrument_period_state: compiledInstrumentPeriodState,
+    definition_basis_graph:
+      compiledInstrumentPeriodState?.definition_basis_graph ?? null,
     historical_interest_authority: historicalInterestAuthority.present
       ? {
           basis: historicalInterestAuthority.basis,

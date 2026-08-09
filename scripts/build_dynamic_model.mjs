@@ -20,6 +20,7 @@ import { fillCachedValues, planNumericCaches } from "./lib/plan_values.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { instrumentDisplayLabel } from "./lib/instrument_display.mjs";
+import { compileInstrumentPeriodState } from "./lib/instrument_period_state.mjs";
 import { presentationEpoch, sharedHorizontalGrammar } from "./lib/design_contract.mjs";
 // IMPORTED, NOT REIMPLEMENTED. The Brokers sheet states how many named houses
 // supply each metric, and the broker-anchor rule DECIDES on that same number. A
@@ -31,7 +32,7 @@ import {
   compileRowPlan,
   groupSubtotalRank,
   headlineIds,
-  isRankedTotalIdentity,
+  isDeclaredStatementTotal,
   RANK_SECTION,
   TOTAL_RANK,
   totalRank,
@@ -70,11 +71,13 @@ import {
   resolvedLeaseInterestBasis,
 } from "./lib/lease_policy.mjs";
 import { resolveForecastAuthority } from "./lib/forecast_authority.mjs";
+import { explicitPlausibilityAcknowledgements } from "./lib/plausibility_acknowledgements.mjs";
 import { compileStatementFormula } from "./lib/formula_dsl.mjs";
 import {
   historicalInterestBasisLabel,
   resolveHistoricalInterestAuthority,
 } from "./lib/historical_interest_authority.mjs";
+import { workbookCalcProperties } from "./lib/economic_solve_policy.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -1051,20 +1054,10 @@ function styleStatementRow(
   // marks them `style_role: "subsection"` precisely so the costume decision
   // stays separate — a bold label over indented children is the whole
   // treatment, and the band stays reserved for rows that close a section.
-  const numberedParentEpoch3 =
-    presentationEpoch() >= 3 &&
-    definition.style_role === "subsection" &&
-    definition.row_type !== "header";
-  const isTotal =
-    !numberedParentEpoch3 &&
-    (definition.display_role === "answer" ||
-      definition.style_role === "total" ||
-      definition.row_type === "subtotal" ||
-      // Epoch 3: a key subtotal is a total by identity, whatever row_type its
-      // arithmetic was authored with — gross profit typed as a plain
-      // calculation must not dress like the expense lines around it.
-      (presentationEpoch() >= 3 &&
-        isRankedTotalIdentity([definition.row_id, definition.semantic_role])));
+  const isTotal = isDeclaredStatementTotal(
+    definition,
+    presentationEpoch(),
+  );
   // Rank is resolved from the row's OWN identity AND ITS SECTION, never from a
   // row number, and the treatment is applied once at the end of the build by
   // applyTotalHierarchy(). A ratio row can still be an ANSWER — the leverage
@@ -1099,14 +1092,12 @@ function styleStatementRow(
     // fill on the numbered parents made a component family read as a key
     // total — the same costume as the rows that close a section. Only the
     // label-only title bar keeps the fill and the weight; a numbered parent
-    // is marked by a BOLD LABEL alone, and its indented children do the rest.
+    // remains ordinary-weight and its indented children carry the hierarchy.
     const isTitleBar = definition.row_type === "header";
     if (isTitleBar) {
       applyRowFill(sheet, row, COLORS.subsection);
       styleFont(sheet, `B${row}:U${row}`, COLORS.black, { bold: true });
-    } else if (presentationEpoch() >= 3) {
-      sheet.getRange(`B${row}`).format.font = { bold: true };
-    } else {
+    } else if (presentationEpoch() < 3) {
       applyRowFill(sheet, row, COLORS.subsection);
       styleFont(sheet, `B${row}:U${row}`, COLORS.black, { bold: false });
     }
@@ -1194,6 +1185,7 @@ function genericFormula(rowPlan, definition, column, calculationOverride = null)
     column,
     rowForId: (id) => rowPlan.rows_by_id[id] ?? null,
     previousColumn,
+    historicalColumns: HISTORICAL_COLUMNS,
     // Native iterative calculation can leave sub-cent circularity residue in
     // the cash bridge. Snap only the displayed net cash movement.
     roundSumDigits: definition.semantic_role === "net_change_in_cash" ? 6 : null,
@@ -3219,7 +3211,15 @@ function configureOperatingModel(
         : null;
     }
     if (definition.semantic_role === "ending_cash") {
-      return endingCashStatementFormula(column);
+      // Historical explicit cash buckets are the filed closing-cash
+      // decomposition and therefore own the historical total.  Using the
+      // cash-flow identity here would make the first-period residual movement
+      // depend on closing cash while closing cash simultaneously depended on
+      // that residual.  Forecast closing cash remains owned by the cash-flow
+      // identity; the balancing bucket consumes that answer downstream.
+      return explicitCashBuckets
+        ? cashFlowCashFormula(column)
+        : endingCashStatementFormula(column);
     }
     if (definition.semantic_role === "non_balancing_cash_bucket_movement") {
       const index = HISTORICAL_COLUMNS.indexOf(column);
@@ -5476,19 +5476,25 @@ function configureOperatingModel(
           (candidate) => `cash_bucket.${candidate.bucket_id}` === id,
         );
         if (bucket.forecast_treatment === "balancing") {
-          applyFormula(
-            sheet,
-            `${adjustmentColumn}${row}`,
-            `=${adjustmentColumn}${waterfallRows.cash_before_rcf}` +
-              `+${adjustmentColumn}${waterfallRows.rcf_draw_waterfall}` +
-              `-${adjustmentColumn}${waterfallRows.rcf_repayment_waterfall}`,
-          );
+          const proFormaOtherCashFlowBuckets = cashBucketPlans
+            .filter(
+              (candidate) =>
+                candidate !== bucket &&
+                candidate.included_in_cash_flow_cash !== false,
+            )
+            .map((candidate) => `${proFormaColumn}${candidate.balance_row}`);
           applyFormula(
             sheet,
             `${proFormaColumn}${row}`,
-            `=${proFormaColumn}${waterfallRows.cash_before_rcf}` +
-              `+${proFormaColumn}${waterfallRows.rcf_draw_waterfall}` +
-              `-${proFormaColumn}${waterfallRows.rcf_repayment_waterfall}`,
+            `=${proFormaColumn}${statementEndingCashRow}` +
+              (proFormaOtherCashFlowBuckets.length
+                ? `-SUM(${proFormaOtherCashFlowBuckets.join(",")})`
+                : ""),
+          );
+          applyFormula(
+            sheet,
+            `${adjustmentColumn}${row}`,
+            `=${proFormaColumn}${row}-${column}${row}`,
           );
         } else if (bucket.forecast_treatment === "linked_debt_addback") {
           applyFormula(
@@ -8755,15 +8761,7 @@ function isRewritableFaceRow(rowPlan, row) {
 }
 
 function declaredCalcProperties() {
-  return {
-    calc_id: "191029",
-    calc_mode: "auto",
-    full_calc_on_load: true,
-    force_full_calc: true,
-    iterate: true,
-    iterate_count: 100,
-    iterate_delta: 0.001,
-  };
+  return workbookCalcProperties();
 }
 
 async function patchWorkbookProperties(
@@ -9179,6 +9177,20 @@ function genericNumericValue(
     return values.length === 0
       ? 0
       : values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+  if (calculation.operator === "historical_average") {
+    const history = (definition.values ?? []).slice(0, 3).filter(
+      (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+    ).map(Number);
+    return history.length === 0
+      ? 0
+      : history.reduce((sum, value) => sum + value, 0) / history.length;
+  }
+  if (calculation.operator === "historical_trend") {
+    const history = (definition.values ?? []).slice(0, 3).map(Number);
+    if (history.length !== 3 || history.some((value) => !Number.isFinite(value))) return 0;
+    const slope = ((history[1] - history[0]) + (history[2] - history[1])) / 2;
+    return history[2] + slope * (Number(calculation.forecast_index ?? 0) + 1);
   }
   return null;
 }
@@ -10657,7 +10669,7 @@ function applyPlanChrome(workbook, rowPlan, brokerRows) {
  * one and where it came from, and a builder that silently shipped a formula
  * with no cache would be making the reader's first view of the model a blank.
  */
-function synthesisePlan({
+export function synthesisePlan({
   modelCase,
   rowPlan,
   outputPath,
@@ -10858,7 +10870,7 @@ async function writeModelSidecars(
         // finding: a model showing a fictional funding crisis must block,
         // not narrate.
         plausibility_acknowledgements:
-          modelCase.plausibility_acknowledgements ?? [],
+          explicitPlausibilityAcknowledgements(modelCase),
       },
       null,
       2,
@@ -11010,13 +11022,19 @@ async function main(packaging = null) {
   if (standaloneCase.acquisition) {
     standaloneCase.acquisition.enabled = 0;
   }
-  const standaloneSolution = solveCase(standaloneCase);
+  const instrumentPeriodState = compileInstrumentPeriodState(modelCase);
+  const standaloneSolution = solveCase(standaloneCase, {
+    instrumentPeriodState,
+  });
   const proFormaSolution = solveCase(modelCase, {
     acquisitionBaseSolution: standaloneSolution,
+    instrumentPeriodState,
   });
-  const rowPlan = compileRowPlan(modelCase);
+  const rowPlan = compileRowPlan(modelCase, { instrumentPeriodState });
   rowPlan.broker_metric_rows = brokerMetricRowMap(modelCase);
-  const semanticManifest = compileSemanticManifest(modelCase, rowPlan);
+  const semanticManifest = compileSemanticManifest(modelCase, rowPlan, {
+    instrumentPeriodState,
+  });
   const sourceCrosswalk = compileSourceCrosswalk(
     modelCase,
     rowPlan,

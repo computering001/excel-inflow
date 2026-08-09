@@ -5,13 +5,13 @@
   "skillVersion": "2.1.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-09T12:29:21.963Z",
-  "centralInstructionsWords": 4341,
+  "generatedAt": "2026-08-09T18:34:02.276Z",
+  "centralInstructionsWords": 4361,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "498c4e6b6397ac3c5b8b2e04966129404dc6b2cdbd967cd7608b6582ca59779a",
-    "closureFileCount": 130,
+    "currentClosureSha256": "1595981fda33e3e506d8dc7925b08d97bc9d3fa0361653d4d0f62dd4b0a20224",
+    "closureFileCount": 153,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -25,6 +25,10 @@
       "scripts/orchestrate_release.mjs",
       "scripts/run_user_flow.mjs",
       "scripts/run_statement_classifier_tests.mjs",
+      "scripts/run_forecast_observation_tests.mjs",
+      "scripts/run_forecast_behavior_tests.mjs",
+      "scripts/run_instrument_period_state_tests.mjs",
+      "scripts/run_equation_graph_tests.mjs",
       "scripts/debt-model-economics.mjs",
       "scripts/test_release_convergence_seam.mjs",
       "scripts/validate_cache_parity.mjs",
@@ -43,6 +47,8 @@
       "scripts/lib/broker_anchor.mjs",
       "scripts/lib/coverage.mjs",
       "scripts/lib/design_contract.mjs",
+      "scripts/lib/economic_solve_policy.mjs",
+      "scripts/lib/equation_graph.mjs",
       "scripts/lib/evidence_run.mjs",
       "scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/flow.mjs",
@@ -54,16 +60,21 @@
       "scripts/lib/flow_runtime.mjs",
       "scripts/lib/flow_screens.mjs",
       "scripts/lib/forecast_authority.mjs",
+      "scripts/lib/forecast_behavior.mjs",
+      "scripts/lib/forecast_candidate_compiler.mjs",
+      "scripts/lib/forecast_observation.mjs",
       "scripts/lib/formula_dsl.mjs",
       "scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/historical_normalisation.mjs",
       "scripts/lib/instrument_display.mjs",
+      "scripts/lib/instrument_period_state.mjs",
       "scripts/lib/intake.mjs",
       "scripts/lib/json_schema.mjs",
       "scripts/lib/lease_policy.mjs",
       "scripts/lib/model_ir_v3.mjs",
       "scripts/lib/plan_builder.mjs",
       "scripts/lib/plan_values.mjs",
+      "scripts/lib/plausibility_acknowledgements.mjs",
       "scripts/lib/process_tree.mjs",
       "scripts/lib/public_test_run.mjs",
       "scripts/lib/rcf_policy.mjs",
@@ -81,6 +92,10 @@
       "scripts/lib/user_flow_controller.mjs",
       "scripts/lib/validation_invariants.mjs",
       "scripts/orchestrate_release.mjs",
+      "scripts/run_equation_graph_tests.mjs",
+      "scripts/run_forecast_behavior_tests.mjs",
+      "scripts/run_forecast_observation_tests.mjs",
+      "scripts/run_instrument_period_state_tests.mjs",
       "scripts/run_statement_classifier_tests.mjs",
       "scripts/run_user_flow.mjs",
       "scripts/test_release_convergence_seam.mjs",
@@ -91,7 +106,11 @@
     ],
     "assetsLoadedByScripts": [
       "assets/deployment-profile.json",
+      "assets/economic-solve-policy.v1.json",
       "assets/evidence-run-v1.schema.json",
+      "assets/forecast-behavior-map-v1.schema.json",
+      "assets/forecast-observation-ledger-v1.schema.json",
+      "assets/instrument-period-state-v1.schema.json",
       "assets/model-case-v2.schema.json",
       "assets/model-case.schema.json",
       "assets/plan.schema.json",
@@ -99,11 +118,13 @@
       "assets/public-test-run-v1.schema.json",
       "assets/standardised-design-runtime.v2.json",
       "assets/standardised-design-runtime.v3.json",
+      "assets/standardised-design-runtime.v4.json",
       "assets/statement-semantic-taxonomy.v1.json",
       "assets/style-tokens.json"
     ],
     "assetsDeclaredOnly": [
       "assets/authority-projection-overrides.v3.json",
+      "assets/authority-projection-overrides.v4.json",
       "assets/broker-candidate-manifest.schema.json",
       "assets/broker-canonical-tables.schema.json",
       "assets/broker-crosswalk-receipt.schema.json",
@@ -115,6 +136,8 @@
       "assets/broker-source-tables.schema.json",
       "assets/broker-surface-census.schema.json",
       "assets/broker-vision-result.schema.json",
+      "assets/convergence-contract.v1.json",
+      "assets/convergence-contract.v1.schema.json",
       "assets/dcs-candidate-manifest-v1.schema.json",
       "assets/dcs-crosswalk-v1.schema.json",
       "assets/dcs-evidence-receipt-v1.schema.json",
@@ -124,6 +147,10 @@
       "assets/dcs-independent-verification-v1.schema.json",
       "assets/dcs-projection-v1.schema.json",
       "assets/dcs-source-tables-v1.schema.json",
+      "assets/economic-solve-policy.v1.schema.json",
+      "assets/equation-graph.v1.json",
+      "assets/equation-graph.v1.schema.json",
+      "assets/forecast-plan-v2.schema.json",
       "assets/lineage-exceptions.json",
       "assets/model-ir-v3.schema.json",
       "assets/native-excel-evidence-v3.schema.json",
@@ -136,16 +163,19 @@
       "scripts/build_dynamic_model.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/coverage.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/design_contract.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/economic_solve_policy.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/formula_dsl.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_display.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_period_state.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/json_schema.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/model_ir_v3.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/plan_builder.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/plan_values.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/plausibility_acknowledgements.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/rcf_policy.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/row_plan.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/runtime_isolation.mjs",
@@ -169,10 +199,14 @@
       "scripts/lib/coverage.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/statement_topology.mjs",
+      "scripts/lib/economic_solve_policy.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/equation_graph.mjs -> scripts/lib/economic_solve_policy.mjs",
+      "scripts/lib/equation_graph.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/coverage.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/flow_entity.mjs",
+      "scripts/lib/evidence_run.mjs -> scripts/lib/forecast_observation.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/intake.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/evidence_run.mjs -> scripts/lib/run_store.mjs",
@@ -204,6 +238,11 @@
       "scripts/lib/flow_screens.mjs -> scripts/lib/flow_runtime.mjs",
       "scripts/lib/flow_screens.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/forecast_authority.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/forecast_behavior.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/forecast_observation.mjs",
+      "scripts/lib/forecast_observation.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/public_test_run.mjs -> scripts/lib/coverage.mjs",
@@ -214,6 +253,7 @@
       "scripts/lib/release_checkpoint_store.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/release_module_registry.mjs -> scripts/lib/equation_graph.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_entity.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_questions.mjs",
       "scripts/lib/release_module_registry.mjs -> scripts/lib/flow_read.mjs",
@@ -229,6 +269,7 @@
       "scripts/lib/row_plan.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/design_contract.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/instrument_period_state.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/rcf_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/semantic_graph.mjs",
@@ -237,23 +278,37 @@
       "scripts/lib/run_carrier.mjs -> scripts/lib/runtime_isolation.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/historical_interest_authority.mjs",
+      "scripts/lib/semantic_graph.mjs -> scripts/lib/instrument_period_state.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/statement_topology.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/validation_invariants.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/economic_solve_policy.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/equation_graph.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/historical_normalisation.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/instrument_period_state.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/rcf_policy.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/user_flow_controller.mjs -> scripts/lib/flow_runtime.mjs",
       "scripts/lib/user_flow_controller.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/validation_invariants.mjs -> scripts/lib/instrument_period_state.mjs",
       "scripts/orchestrate_release.mjs -> scripts/lib/process_tree.mjs",
       "scripts/orchestrate_release.mjs -> scripts/lib/release_checkpoint_store.mjs",
       "scripts/orchestrate_release.mjs -> scripts/lib/release_nodes.mjs",
       "scripts/orchestrate_release.mjs -> scripts/lib/run_store.mjs",
       "scripts/orchestrate_release.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/run_equation_graph_tests.mjs -> scripts/lib/economic_solve_policy.mjs",
+      "scripts/run_equation_graph_tests.mjs -> scripts/lib/equation_graph.mjs",
+      "scripts/run_equation_graph_tests.mjs -> scripts/lib/solver.mjs",
+      "scripts/run_forecast_behavior_tests.mjs -> scripts/lib/forecast_behavior.mjs",
+      "scripts/run_forecast_observation_tests.mjs -> scripts/lib/evidence_run.mjs",
+      "scripts/run_forecast_observation_tests.mjs -> scripts/lib/forecast_observation.mjs",
+      "scripts/run_instrument_period_state_tests.mjs -> scripts/lib/instrument_period_state.mjs",
+      "scripts/run_instrument_period_state_tests.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/run_instrument_period_state_tests.mjs -> scripts/lib/validation_invariants.mjs",
       "scripts/run_statement_classifier_tests.mjs -> scripts/lib/coverage.mjs",
       "scripts/run_statement_classifier_tests.mjs -> scripts/lib/row_plan.mjs",
       "scripts/run_statement_classifier_tests.mjs -> scripts/lib/semantic_graph.mjs",
@@ -264,12 +319,17 @@
       "scripts/run_user_flow.mjs -> scripts/lib/flow.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/flow_runtime.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/flow_screens.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/forecast_behavior.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/forecast_candidate_compiler.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/process_tree.mjs",
+      "scripts/run_user_flow.mjs -> scripts/lib/row_plan.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/run_carrier.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/run_store.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/runtime_isolation.mjs",
       "scripts/run_user_flow.mjs -> scripts/lib/user_flow_controller.mjs",
-      "scripts/test_release_convergence_seam.mjs -> scripts/lib/release_nodes.mjs"
+      "scripts/test_release_convergence_seam.mjs -> scripts/lib/equation_graph.mjs",
+      "scripts/test_release_convergence_seam.mjs -> scripts/lib/release_nodes.mjs",
+      "scripts/test_release_convergence_seam.mjs -> scripts/lib/solver.mjs"
     ]
   },
   "pythonClosure": {
@@ -445,6 +505,9 @@
       "scripts/verify/xlsx.py -> scripts/verify/__init__.py (package-init)"
     ],
     "assetsLoadedByPythonModules": {
+      "economic-solve-policy.v1.json": [
+        "scripts/verify/validate_dynamic_model.py"
+      ],
       "plan.schema.json": [
         "scripts/emit/plan.py"
       ],
@@ -738,8 +801,8 @@
   "instructionAssertions": {
     "codeFences": 10,
     "emptyCodeFences": 0,
-    "entryPointsNamedInCommands": 13,
-    "scriptReferencesScanned": 29,
+    "entryPointsNamedInCommands": 17,
+    "scriptReferencesScanned": 33,
     "scriptReferences": [
       "build_dynamic_model.mjs",
       "compile_broker_pack.py",
@@ -756,6 +819,10 @@
       "orchestrate_release.mjs",
       "render/check_render.py",
       "render/selftest.py",
+      "run_equation_graph_tests.mjs",
+      "run_forecast_behavior_tests.mjs",
+      "run_forecast_observation_tests.mjs",
+      "run_instrument_period_state_tests.mjs",
       "run_statement_classifier_tests.mjs",
       "run_user_flow.mjs",
       "test_release_convergence_seam.mjs",
@@ -817,6 +884,26 @@
       {
         "target": "scripts/run_statement_classifier_tests.mjs",
         "status": 1,
+        "resolved": true
+      },
+      {
+        "target": "scripts/run_forecast_observation_tests.mjs",
+        "status": 0,
+        "resolved": true
+      },
+      {
+        "target": "scripts/run_forecast_behavior_tests.mjs",
+        "status": 0,
+        "resolved": true
+      },
+      {
+        "target": "scripts/run_instrument_period_state_tests.mjs",
+        "status": 0,
+        "resolved": true
+      },
+      {
+        "target": "scripts/run_equation_graph_tests.mjs",
+        "status": 0,
         "resolved": true
       },
       {
@@ -953,18 +1040,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "8a43027da2a3cbe58a3aab8b0de59fc87619c53b46dc0bce80d4dae990a415c9",
-        "plan_sha256": "b6df7f9816ce2cbf011b209f4abe65b91e23e4b1afb2635675f123f5b3646577",
-        "workbook_sha256": "e7e8a270f92b55e9399a53eb5cd8e3a789aa6befc6ee05db67083e9bae4d2091",
+        "case_sha256": "fcca8a647a8d5d8b2c5d409c62a5dd392ddc78ae717d411ebf21cfa9e6e4a279",
+        "plan_sha256": "1838abbd2e10d2c27147d45fa02eca79081009a4436c5c4c32e56d485e19a5c4",
+        "workbook_sha256": "025c2a44648e407d21f60f6cafe5707d4dcbef91e0ed2feb3252e5cd8d00d593",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "8a43027da2a3cbe58a3aab8b0de59fc87619c53b46dc0bce80d4dae990a415c9",
-      "plan_sha256": "b6df7f9816ce2cbf011b209f4abe65b91e23e4b1afb2635675f123f5b3646577",
-      "workbook_sha256": "e7e8a270f92b55e9399a53eb5cd8e3a789aa6befc6ee05db67083e9bae4d2091",
+      "case_sha256": "fcca8a647a8d5d8b2c5d409c62a5dd392ddc78ae717d411ebf21cfa9e6e4a279",
+      "plan_sha256": "1838abbd2e10d2c27147d45fa02eca79081009a4436c5c4c32e56d485e19a5c4",
+      "workbook_sha256": "025c2a44648e407d21f60f6cafe5707d4dcbef91e0ed2feb3252e5cd8d00d593",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -994,21 +1081,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "e6365e961661f7ef837fb6207d943186ce5ec572caf8dd5b2025fff176bed003",
-      "bytes": 32980,
-      "words": 4341
+      "sha256": "21d8611b6a856e1f7b8599370be28ec4d887db5b4b5e4282bc9c0c8bf1740155",
+      "bytes": 33268,
+      "words": 4361
     },
     {
       "path": "SKILL.md",
-      "sha256": "d5b71fd64d502f3ce02b6b6a512de31186e68f6dd160115d8508fd6efb120da2",
-      "bytes": 33467,
-      "words": 4410
+      "sha256": "81a7e5c986aa4541b4301f96cd6c9b01bf005ac5cf63d674b276cb730ace4634",
+      "bytes": 33755,
+      "words": 4430
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "812a12a77eb486f1f61ddd8aac95f1e4b1720d6a2ecc3803ceb6745335c54652",
-      "bytes": 33000,
-      "words": 4343
+      "sha256": "33faff86a5bc3fbeda2e4fec4a0a4f89648d858ef3cee923fd74be71873ad4f5",
+      "bytes": 33288,
+      "words": 4363
     },
     {
       "path": "references/model-contract.md",
@@ -1042,9 +1129,9 @@
     },
     {
       "path": "references/template-and-formatting.md",
-      "sha256": "e3a255a917e1a1b7a2300cc267e41ae2249bbd5c9d137749eb08bb4471d8333e",
-      "bytes": 26577,
-      "words": 4323
+      "sha256": "25a54bee5052afec6e7ee396c47d50b2950264fd1b83721b21e04463332721c0",
+      "bytes": 26753,
+      "words": 4349
     },
     {
       "path": "references/broker-extraction.md",
@@ -1062,6 +1149,12 @@
       "path": "assets/authority-projection-overrides.v3.json",
       "sha256": "bad4426065836427cf856651a51a44f397c91df266a69c4f39c7407949848f73",
       "bytes": 699,
+      "words": null
+    },
+    {
+      "path": "assets/authority-projection-overrides.v4.json",
+      "sha256": "28d23a48dca4bbe5167514bdafd40d00955fe3b6a72547c53a4adb1999f3c18e",
+      "bytes": 704,
       "words": null
     },
     {
@@ -1131,6 +1224,18 @@
       "words": null
     },
     {
+      "path": "assets/convergence-contract.v1.json",
+      "sha256": "bffe88eae20d3ab460e2827db11d8dbc975ddc5aa4063f64fc06ba65c1e6b71e",
+      "bytes": 5523,
+      "words": null
+    },
+    {
+      "path": "assets/convergence-contract.v1.schema.json",
+      "sha256": "76ddbc65ea42fa3483cd8a2107f449f430b1bf33925edc0bc78242645d3ef53d",
+      "bytes": 5835,
+      "words": null
+    },
+    {
       "path": "assets/dcs-candidate-manifest-v1.schema.json",
       "sha256": "76e53b9bc083f2b4b3b6c6f488a3ae1483657248c69bf76753c473f83f5102b3",
       "bytes": 1879,
@@ -1186,14 +1291,62 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "6c4071e329cd6da0c0934c9e443bda9143b5ae0d953687f0b9e5be294035f7fe",
-      "bytes": 43299,
+      "sha256": "38d518b157d76a110add025ccf903b830dd0ac37b279d3483aee5fb3d6783828",
+      "bytes": 45706,
+      "words": null
+    },
+    {
+      "path": "assets/economic-solve-policy.v1.json",
+      "sha256": "a4e1c1cfd6ab62b01a1accc56a578109c9e44b9eddbaeb2d65f8a16e91cfaa2a",
+      "bytes": 1617,
+      "words": null
+    },
+    {
+      "path": "assets/economic-solve-policy.v1.schema.json",
+      "sha256": "a26f9510b34253971b066bc8896b8cb864d07d29c1dccd200473c99f18e3ebd1",
+      "bytes": 3396,
+      "words": null
+    },
+    {
+      "path": "assets/equation-graph.v1.json",
+      "sha256": "8b4a95a9ed29001c772146178fdf7a7fe6150700fc4ccf797e0b59af3f21a71b",
+      "bytes": 16528,
+      "words": null
+    },
+    {
+      "path": "assets/equation-graph.v1.schema.json",
+      "sha256": "21cf973555d33a5e9df46a15a8314e0d4f38fea1089de557078866e68c5d4043",
+      "bytes": 2258,
       "words": null
     },
     {
       "path": "assets/evidence-run-v1.schema.json",
-      "sha256": "9dc5e1b628702b823e362047334fd7f92f43e27aedcd9f7678a10bce17e4c2c2",
-      "bytes": 24387,
+      "sha256": "9471eea2c6658583aeb78cf27d85741f07dd093b011c3e33e5500df69125097d",
+      "bytes": 25091,
+      "words": null
+    },
+    {
+      "path": "assets/forecast-behavior-map-v1.schema.json",
+      "sha256": "d9f2b1725b81c040cff0cba787ed0170b9c5b701efb1a06c88a2e194f36e0598",
+      "bytes": 4208,
+      "words": null
+    },
+    {
+      "path": "assets/forecast-observation-ledger-v1.schema.json",
+      "sha256": "f6f4529abba8752567fab0b42e1c313eee3d318fcc129ab7502ffe78e081fd5f",
+      "bytes": 2248,
+      "words": null
+    },
+    {
+      "path": "assets/forecast-plan-v2.schema.json",
+      "sha256": "059c9fc3220f6dbca182d053134910fc1c4103f891a0ca9eddfc7b353fa0cae5",
+      "bytes": 2719,
+      "words": null
+    },
+    {
+      "path": "assets/instrument-period-state-v1.schema.json",
+      "sha256": "fa12bde6c72d0bb20a01537e19bfb18dc1834b5b28a695ce63ddbb9b70b8eac0",
+      "bytes": 7148,
       "words": null
     },
     {
@@ -1204,8 +1357,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "e461131ff625802ec84e082b54812d8c1f641ea1f9504861d18775d91148aad2",
-      "bytes": 59788,
+      "sha256": "1b8421bca19c27593aa6d8cd5f6c612e9b56d0f939d047c4208e1afee32e5e12",
+      "bytes": 61859,
       "words": null
     },
     {
@@ -1222,8 +1375,8 @@
     },
     {
       "path": "assets/native-excel-evidence-v3.schema.json",
-      "sha256": "adcf6582bc72d5d51135f6bbc3d8c54bee46d2d535494b4c07a234fb6e47e3f7",
-      "bytes": 12069,
+      "sha256": "13c706575025789b8ef927a1414b51bfeed9ef2c86a8043319127605098bbed6",
+      "bytes": 12281,
       "words": null
     },
     {
@@ -1234,8 +1387,8 @@
     },
     {
       "path": "assets/production-contract-v2.json",
-      "sha256": "591cabc2baaee08cc991da077f906ceb171d5d7a3fdf72111362fa655dbef30f",
-      "bytes": 12867,
+      "sha256": "9278cccd78bf5e3733c0233ea2ea0f50aa62448fb31ad3269bf231a9384953ad",
+      "bytes": 12939,
       "words": null
     },
     {
@@ -1263,6 +1416,12 @@
       "words": null
     },
     {
+      "path": "assets/standardised-design-runtime.v4.json",
+      "sha256": "ccaced0fe772f279fee4e87ad80b15d101d7ac0e0a52c953c72258ac77719e2d",
+      "bytes": 6582,
+      "words": null
+    },
+    {
       "path": "assets/statement-semantic-taxonomy.v1.json",
       "sha256": "74b431d0854aea04934fcde3090612a64f6f669e63494b2f5d4bf77028a966b6",
       "bytes": 4699,
@@ -1270,14 +1429,14 @@
     },
     {
       "path": "assets/style-tokens.json",
-      "sha256": "9cb892e57cd8f43476d6cba2699dba5b217978b0b52509005de48dd6d3f709bd",
-      "bytes": 35441,
+      "sha256": "b5ae5bcaae86e4c9de9421d526cda323626e6be29a344712f232c527062eaa17",
+      "bytes": 35422,
       "words": null
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "40c3e96f842f385f0ea0cb45f30d76c23aade3c8d6a7d8bcdd212b489dce83e5",
-      "bytes": 480324,
+      "sha256": "774edef8b097ce7016c44c9abe086758847fba4529faa34eb3c61bc0bf1f2774",
+      "bytes": 481402,
       "words": null
     },
     {
@@ -1414,20 +1573,32 @@
     },
     {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "b831460fada31a71c5648ab386441faa99596d87f3708fdedcbcccf450715f92",
-      "bytes": 75455,
+      "sha256": "17e2c8e660226d43674ea0d8432773b62bef814cb04220ab4869961aedb9141c",
+      "bytes": 77847,
       "words": null
     },
     {
       "path": "scripts/lib/design_contract.mjs",
-      "sha256": "def74bc02c624fbbd5161cbec49f6e2b71dd4110c520ab2e78acf740add35312",
-      "bytes": 6279,
+      "sha256": "a72dc1408fdb922f1a9ada12ce26ea0f18b8adfbb5294ec7a6e002680098680e",
+      "bytes": 7060,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/economic_solve_policy.mjs",
+      "sha256": "e4560a3586507894681857546711231248920918f6eb3190e432b88fda8e6b60",
+      "bytes": 2868,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/equation_graph.mjs",
+      "sha256": "67ee023671d7a0cd3b97d6b4ee2d1463926da8ab5bba43af68236eccb6ad6e5a",
+      "bytes": 23343,
       "words": null
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "19269467dca78696017678800022ae8d93937e29cb15ec61d704f9592c6d7c69",
-      "bytes": 85481,
+      "sha256": "246054844f195185d53d7d13e2409edc0973828506cafa499d9947ba5b31140a",
+      "bytes": 87506,
       "words": null
     },
     {
@@ -1480,20 +1651,38 @@
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "16e97263acad57016df5f7792d61b9b91f6d0eac31057a1097c061c87bc6e22a",
-      "bytes": 24335,
+      "sha256": "62b2b20762b7212393ebbeb4ab8ece73aaf74296c6809f7d2a75d4bef0db51b5",
+      "bytes": 26527,
       "words": null
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "3ac3dd3e1e680e9684798afc23f26a880fd16aa6a9c0b346938135be92e1da90",
+      "sha256": "16254bcac1dcd7473b3d3799769c57dca482522271a3817a490093948bb56cb4",
       "bytes": 30060,
       "words": null
     },
     {
+      "path": "scripts/lib/forecast_behavior.mjs",
+      "sha256": "0c95949679eee7e63ebfa85e10091da16cca0e93e3f1bfb07e8bd837344a370f",
+      "bytes": 17784,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/forecast_candidate_compiler.mjs",
+      "sha256": "fb8fe26b57842d1bd70ade054f8d679046e26207b872ba08724651e0bd1e6be9",
+      "bytes": 24222,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/forecast_observation.mjs",
+      "sha256": "36f63c9783c38223baf3fef83de95073890ebe9800897278f97d4e0a526e6007",
+      "bytes": 16525,
+      "words": null
+    },
+    {
       "path": "scripts/lib/formula_dsl.mjs",
-      "sha256": "6c9630232283693b54036f563a3d5cfed5779b8c8b9f2985771864efe3036b6e",
-      "bytes": 7872,
+      "sha256": "61ad44a1f07b0db8964a88b542778af380055b7acab7be91c77b9b885fed4cff",
+      "bytes": 8982,
       "words": null
     },
     {
@@ -1512,6 +1701,12 @@
       "path": "scripts/lib/instrument_display.mjs",
       "sha256": "2854007851aeab3183b8f82f7f5378f7a8838dacc47ca056cff74009d3779942",
       "bytes": 8406,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/instrument_period_state.mjs",
+      "sha256": "677a7231a4bed90fc6d501713cdfed91b31fd2769f4ee0bcf3e5c4b1c82b235f",
+      "bytes": 31319,
       "words": null
     },
     {
@@ -1540,14 +1735,20 @@
     },
     {
       "path": "scripts/lib/plan_builder.mjs",
-      "sha256": "24e4293f833c8cc0f391143e569b35fff1c9bc624478bb25814deae82bee0125",
-      "bytes": 33148,
+      "sha256": "c3396104a68b522cc31e0c1d51a661a487d249e2bc2fc23ea0f1947d79f0cabd",
+      "bytes": 33879,
       "words": null
     },
     {
       "path": "scripts/lib/plan_values.mjs",
       "sha256": "9169870517441ab1d56129df5b42e75d355560ae04884bda4a3c6cd5881d19ef",
       "bytes": 21922,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/plausibility_acknowledgements.mjs",
+      "sha256": "d59c2834cc0c25bc262ccef0ebf9621d86c08618583465f7ab248abe30e3b001",
+      "bytes": 1867,
       "words": null
     },
     {
@@ -1576,20 +1777,20 @@
     },
     {
       "path": "scripts/lib/release_module_registry.mjs",
-      "sha256": "2d9313a15cb3631a7c63baf25c80328cd46269f8d424549511ffbacd57380cb0",
-      "bytes": 2085,
+      "sha256": "18834206a980e7ba3fe1cd2a18356b715b46b6202c4599bfb08b6e79a45e5ebc",
+      "bytes": 2336,
       "words": null
     },
     {
       "path": "scripts/lib/release_nodes.mjs",
-      "sha256": "63ad916f12ec378d6530ac6a7972d16771301d22c0fdee05ec023083cb01605c",
-      "bytes": 13226,
+      "sha256": "dfa96bd020efc5c6ec829b3331105afff445b0d04acbaba2af7e7f02fb1eb228",
+      "bytes": 13790,
       "words": null
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "4252a11b1dac0ac20a72555dc44cee96358456ee20d05faf7be512b72dfc263e",
-      "bytes": 133986,
+      "sha256": "3b857bac7908ece77fa88aebdea32365ec0f1e9e25ed60664214fdc481879f24",
+      "bytes": 144410,
       "words": null
     },
     {
@@ -1612,14 +1813,14 @@
     },
     {
       "path": "scripts/lib/semantic_graph.mjs",
-      "sha256": "21f846bb53cb37e0d2383814e3d7d6d76b00a5f89021dae1dcc2ba5c8131dba4",
-      "bytes": 42675,
+      "sha256": "03a806afdd31993361811833d22b9da966daa137a3d116fc33c6eaa0a0e3ddcf",
+      "bytes": 43712,
       "words": null
     },
     {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "4843b3452451aed40780997a0b449f6df7876ff2ed2151a0d9ea81ca3b2a2ee8",
-      "bytes": 111315,
+      "sha256": "9bf508ac645f78eed89c37c08a03c97b29f1b52d036bc782190da8cf14ff319f",
+      "bytes": 119577,
       "words": null
     },
     {
@@ -1630,8 +1831,8 @@
     },
     {
       "path": "scripts/lib/statement_topology.mjs",
-      "sha256": "7bca8665cb29754de319832f9fd710b5a5f322e7e57e0e33192e35654b52c851",
-      "bytes": 25416,
+      "sha256": "359ab17a5e5aff7929e6d741594131016dc295d5836d9d5030667fcd6ed89fbe",
+      "bytes": 27624,
       "words": null
     },
     {
@@ -1642,8 +1843,8 @@
     },
     {
       "path": "scripts/lib/validation_invariants.mjs",
-      "sha256": "eea3df79aca4c609ab0667300137d6d51784bb4f12cb5d8334376fa42e3da7d9",
-      "bytes": 38780,
+      "sha256": "26c7a5c197407b213f8bdcae7c6bdbf00f350a197d0cd7a074928acef8ecbe1a",
+      "bytes": 41604,
       "words": null
     },
     {
@@ -1731,21 +1932,45 @@
       "words": null
     },
     {
+      "path": "scripts/run_equation_graph_tests.mjs",
+      "sha256": "81cc459bcf90c797e2350d5307fba9212fff2cb10a7e6f6e42007b1fa06de408",
+      "bytes": 9578,
+      "words": null
+    },
+    {
+      "path": "scripts/run_forecast_behavior_tests.mjs",
+      "sha256": "528b8ff7a04e491dacebda2d8b1564fbd7be897ad1d9cf0fd476255d8a895c71",
+      "bytes": 7488,
+      "words": null
+    },
+    {
+      "path": "scripts/run_forecast_observation_tests.mjs",
+      "sha256": "2c9d1aa363da5395c6b46087826746e4cb183cc03e507a7bdec8fdf98424852b",
+      "bytes": 9056,
+      "words": null
+    },
+    {
+      "path": "scripts/run_instrument_period_state_tests.mjs",
+      "sha256": "894e6576262ca63bf05d3e16607a21b4b44d78199392e73298a1838b13748115",
+      "bytes": 13608,
+      "words": null
+    },
+    {
       "path": "scripts/run_statement_classifier_tests.mjs",
-      "sha256": "97dc0f2ff589da8a67b3e44f57573e26f95c7bf3d52f6f8c389ecde73f73bcd4",
-      "bytes": 27386,
+      "sha256": "005bce13527ceac8822bf8ec04fa6940af59c7d7a46e4b2bfb75136ac3f8ddf9",
+      "bytes": 27911,
       "words": null
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "d5cefda19cd8e19df925f1648d261d0161a5950a37a321f7cc8b70bcc0462b61",
-      "bytes": 34791,
+      "sha256": "2aee53823aa984530c6e87daa1c8b4a4e2ef00e1a7f0ba0c5b7e0f277ffa7655",
+      "bytes": 39429,
       "words": null
     },
     {
       "path": "scripts/test_release_convergence_seam.mjs",
-      "sha256": "3c4429da187ca66bbcb84ee04c79dc68436c400895e2cdc498b7bbb0ec684509",
-      "bytes": 2183,
+      "sha256": "316feaabb5cd4a806c66b93180b816f282a902983ab6a56661a2e5f38e2fe150",
+      "bytes": 3411,
       "words": null
     },
     {
@@ -1768,8 +1993,8 @@
     },
     {
       "path": "scripts/validate_style_tokens.mjs",
-      "sha256": "67e7b7480cfdb6b72cab01fb1654cc5e48ce1f2e4188f7f3aadca5567c3992e2",
-      "bytes": 32509,
+      "sha256": "3eac2e7495828281411d6086a55e85ebdaecbbf00c51e16ea604b684a81dfe6b",
+      "bytes": 32513,
       "words": null
     },
     {
@@ -1786,14 +2011,14 @@
     },
     {
       "path": "scripts/verify/finance_proof.py",
-      "sha256": "b363da90d51813153787fb48b2a62ec8cad3372af8bfe7685519845b2fac98ff",
-      "bytes": 46277,
+      "sha256": "9a59f0ad1755705f92b6a97c8b34bb0462fd7eaebf802aafa13e40b930157339",
+      "bytes": 49101,
       "words": null
     },
     {
       "path": "scripts/verify/invariants.py",
-      "sha256": "46af8015d451e251afc05afc2dbf210a32f9382e05119d7f57b2fe13eae0d4da",
-      "bytes": 37010,
+      "sha256": "7ff3477a8c9dc599e9fd46b71cd042afabe5b08591386e9a30689620b51ee413",
+      "bytes": 42753,
       "words": null
     },
     {
@@ -1816,8 +2041,8 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "e6695d07a63f2a2af08e24bbebf99270ad3a3fa109eb8467ae06c86d6dc9822e",
-      "bytes": 135079,
+      "sha256": "bb441f0a0eb40b600ce625bfbe2dbb67f190ecba891a98c342d42ab039753728",
+      "bytes": 135353,
       "words": null
     },
     {

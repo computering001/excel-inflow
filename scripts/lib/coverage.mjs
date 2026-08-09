@@ -185,6 +185,46 @@ function statementCoverageChecks(modelCase) {
       if (coverage.classification_contract_version === "evidence_v1") {
         checks.push(...classificationChecks(disclosure, section, allRows));
       }
+      if (disclosure.projection_lineage) {
+        const lineage = disclosure.projection_lineage;
+        const sameMembers = (left, right) =>
+          left.length === right.length &&
+          left.every((value) => right.includes(value));
+        const projectedRows = (lineage.projected_row_ids ?? [])
+          .map((rowId) => allRows.find((row) => row.row_id === rowId))
+          .filter(Boolean);
+        const originalIncludesAbsorbed = (lineage.absorbed_row_ids ?? []).every(
+          (rowId) => (lineage.source_mapped_row_ids ?? []).includes(rowId),
+        );
+        const absorbedAreNotVisible = (lineage.absorbed_row_ids ?? []).every(
+          (rowId) => !rowIds.has(rowId),
+        );
+        const everyAbsorptionProved = (lineage.absorbed_row_ids ?? []).every(
+          (absorbedId) => projectedRows.some(
+            (row) =>
+              (row.projection_absorbed_row_ids ?? []).includes(absorbedId) &&
+              (row.source_line_ids ?? []).includes(disclosure.source_line_id),
+          ),
+        );
+        const valid =
+          lineage.compiler_version === "semantic-statements/1.0" &&
+          lineage.rule === "semantic_dependency_projection" &&
+          sameMembers(mappedIds, lineage.projected_row_ids ?? []) &&
+          projectedRows.length === (lineage.projected_row_ids ?? []).length &&
+          originalIncludesAbsorbed &&
+          absorbedAreNotVisible &&
+          everyAbsorptionProved;
+        checks.push(
+          result(
+            `source_coverage.${id}.projection_lineage`,
+            valid ? "PASS" : "BLOCK",
+            valid
+              ? `${disclosure.label ?? id} preserves its original destination through an explicit semantic projection lineage.`
+              : `${disclosure.label ?? id} has an incomplete or inconsistent semantic projection lineage.`,
+            lineage,
+          ),
+        );
+      }
       const mappedDisposition = ["mapped", "aggregated"].includes(
         disclosure.disposition,
       );
@@ -505,15 +545,26 @@ function dependencyChecks(modelCase) {
 function statementHierarchyChecks(modelCase) {
   const checks = [];
   const suppliedRows = allStatementRows(modelCase);
-  const hierarchyDeclared = suppliedRows.some(
+  // Accounting basis is required where classification depends on operating
+  // scope or accounting taxonomy. A mechanically derived financing family
+  // (for example Change in Debt over schedule-linked movements) needs an
+  // exact parent/child contract, but IFRS-versus-GAAP is not evidence for that
+  // arithmetic and must not become a spurious intake blocker.
+  const accountingBasisSensitiveClasses = new Set([
+    "working_capital",
+    "provision",
+    "pension",
+    "tax",
+    "restructuring",
+    "deferred_revenue",
+    "other_operating",
+  ]);
+  const accountingBasisRequired = suppliedRows.some(
     (row) =>
-      row.parent_row_id ||
-      row.aggregation_authority ||
-      row.aggregation_role ||
-      row.economic_class ||
-      row.operation_scope,
+      row.operation_scope ||
+      accountingBasisSensitiveClasses.has(row.economic_class),
   );
-  if (hierarchyDeclared && !modelCase.issuer?.accounting_basis) {
+  if (accountingBasisRequired && !modelCase.issuer?.accounting_basis) {
     checks.push(
       result(
         "statement_hierarchy.accounting_basis",

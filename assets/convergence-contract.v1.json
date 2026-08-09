@@ -1,0 +1,103 @@
+{
+  "schema_version": "convergence-contract/1.0",
+  "contract_id": "canonical_interest_cash_rcf_convergence",
+  "graph_binding": {
+    "schema_version": "equation-graph/1.0",
+    "graph_id": "canonical_debt_overlay_forecast",
+    "canonical_sha256": "57655d9bd4231d146090d355957e572a73c9e14b4e5986df0a2c7a81606ca26b",
+    "hash_encoding": "sha256_canonical_json"
+  },
+  "policy_binding": {
+    "schema_version": "economic-solve-policy/1.0",
+    "canonical_sha256": "bc67a56327b4670f3790f4a264db7f3946a20f94953fb9e67df46a3a98dc9ee6",
+    "hash_encoding": "sha256_canonical_json",
+    "tolerance_source": "native_tolerances_by_class"
+  },
+  "role_contract": {
+    "zero_when_off": ["instrument_cash_interest", "instrument_pik_interest", "instrument_pik_principal_accretion", "rcf_interest", "rcf_commitment_fee", "lease_interest", "acquisition_interest", "other_interest", "noncash_interest", "cash_interest_income", "gross_interest_expense", "interest_income", "net_interest_expense", "cash_interest_paid", "cash_interest_received", "noncash_interest_addback", "net_finance_addback", "income_statement_finance"],
+    "live_when_off": ["debt_issuance", "scheduled_amortisation", "maturity_repayment", "lease_principal", "mandatory_repayment", "minimum_cash", "rcf_capacity", "rcf_draw", "rcf_repayment", "ending_rcf", "ending_cash", "liquidity_shortfall"]
+  },
+  "required_edges": [
+    { "id": "edge.cash_to_interest_income", "from": "cash.ending_balance", "to": "interest.cash_income", "type": "interest_base", "activation": "circularity_on" },
+    { "id": "edge.cfo_to_cash", "from": "cash.cfo", "to": "cash.ending_balance", "type": "cash_waterfall", "activation": "always" },
+    { "id": "edge.ending_rcf_to_rcf_interest", "from": "rcf.ending_balance", "to": "interest.rcf", "type": "interest_base", "activation": "circularity_on" },
+    { "id": "edge.finance_to_net_income", "from": "statement.finance", "to": "statement.net_income", "type": "statement_dependency", "activation": "circularity_on" },
+    { "id": "edge.net_income_to_cfo", "from": "statement.net_income", "to": "cash.cfo", "type": "cash_flow_bridge", "activation": "always" },
+    { "id": "edge.net_interest_to_finance_statement", "from": "interest.net_expense", "to": "statement.finance", "type": "schedule_to_statement", "activation": "circularity_on" }
+  ],
+  "authority_contract": {
+    "owner_domain": "interest_schedule",
+    "consumer_domain": "income_statement",
+    "edge_type": "schedule_to_statement",
+    "required_direction": "owner_to_consumer",
+    "reverse_direction": "FORBIDDEN"
+  },
+  "rcf_sweep_contract": {
+    "activation": "always",
+    "edge_ids": [
+      "edge.cfo_to_cash",
+      "edge.cfo_to_rcf_draw",
+      "edge.cfo_to_rcf_repayment",
+      "edge.issuance_to_cash",
+      "edge.issuance_to_rcf_draw",
+      "edge.issuance_to_rcf_repayment",
+      "edge.lease_principal_to_mandatory",
+      "edge.mandatory_to_cash",
+      "edge.mandatory_to_rcf_draw",
+      "edge.mandatory_to_rcf_repayment",
+      "edge.maturity_to_mandatory",
+      "edge.minimum_cash_to_rcf_draw",
+      "edge.minimum_cash_to_rcf_repayment",
+      "edge.rcf_capacity_to_draw",
+      "edge.rcf_capacity_to_shortfall",
+      "edge.rcf_draw_to_cash",
+      "edge.rcf_draw_to_ending_rcf",
+      "edge.rcf_draw_to_shortfall",
+      "edge.rcf_repayment_to_cash",
+      "edge.rcf_repayment_to_ending_rcf",
+      "edge.scheduled_amortisation_to_mandatory"
+    ]
+  },
+  "scc_contract": {
+    "structural": [
+      {
+        "id": "interest_cash_rcf_feedback",
+        "nodes": ["cash.cfo", "cash.ending_balance", "interest.cash_income", "interest.commitment_fee", "interest.gross_expense", "interest.income", "interest.net_expense", "interest.rcf", "rcf.draw", "rcf.ending_balance", "rcf.repayment", "statement.finance", "statement.net_income"]
+      }
+    ],
+    "active_by_circularity": {
+      "0": [],
+      "1": [
+        {
+          "id": "interest_cash_rcf_feedback",
+          "nodes": ["cash.cfo", "cash.ending_balance", "interest.cash_income", "interest.commitment_fee", "interest.gross_expense", "interest.income", "interest.net_expense", "interest.rcf", "rcf.draw", "rcf.ending_balance", "rcf.repayment", "statement.finance", "statement.net_income"]
+        }
+      ]
+    }
+  },
+  "solver_iteration": {
+    "method": "deterministic_gauss_seidel",
+    "non_convergence": "BLOCK",
+    "state_by_circularity": {
+      "0": { "required": false, "state_vector": [] },
+      "1": {
+        "required": true,
+        "state_vector": [
+          { "node_id": "statement.net_income", "tolerance_class": "currency" },
+          { "node_id": "cash.cfo", "tolerance_class": "currency" },
+          { "node_id": "rcf.draw", "tolerance_class": "currency" },
+          { "node_id": "rcf.repayment", "tolerance_class": "currency" },
+          { "node_id": "rcf.ending_balance", "tolerance_class": "currency" },
+          { "node_id": "cash.ending_balance", "tolerance_class": "currency" },
+          { "node_id": "interest.rcf", "tolerance_class": "currency" },
+          { "node_id": "interest.commitment_fee", "tolerance_class": "currency" },
+          { "node_id": "interest.cash_income", "tolerance_class": "currency" },
+          { "node_id": "interest.gross_expense", "tolerance_class": "currency" },
+          { "node_id": "interest.income", "tolerance_class": "currency" },
+          { "node_id": "interest.net_expense", "tolerance_class": "currency" },
+          { "node_id": "statement.finance", "tolerance_class": "currency" }
+        ]
+      }
+    }
+  }
+}

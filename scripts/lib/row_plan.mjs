@@ -15,6 +15,10 @@ import {
 } from "./design_contract.mjs";
 import { isBalancingRcf } from "./rcf_policy.mjs";
 import { resolvedLeaseInterestBasis } from "./lease_policy.mjs";
+import {
+  compileInstrumentPeriodState,
+  instrumentPeriodStateByKey,
+} from "./instrument_period_state.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import {
   forecastRowMateriality,
@@ -388,6 +392,31 @@ export function isRankedTotalIdentity(identity) {
   return keys.some((key) => RANKED_TOTAL_ROLES.has(key));
 }
 
+/**
+ * Resolve whether a statement row has declared total presentation rank.
+ *
+ * Semantic identity is deliberately absent from this decision.  An issuer can
+ * present EBIT (or any other familiar headline) as either a filed subtotal or
+ * a bridge component.  Promoting it from a name-based allow-list makes the
+ * emitted formatting disagree with the compiled row map: the workbook gains
+ * bold and horizontal rules that the independent style validator correctly
+ * treats as stray.  Rank therefore comes only from structural presentation
+ * declarations that survive into the row map.
+ */
+export function isDeclaredStatementTotal(definition, epoch = 3) {
+  const numberedParent =
+    Number(epoch) >= 3 &&
+    definition?.style_role === "subsection" &&
+    definition?.row_type !== "header" &&
+    definition?.display_role === "group_parent";
+  return (
+    !numberedParent &&
+    (definition?.display_role === "answer" ||
+      definition?.style_role === "total" ||
+      definition?.row_type === "subtotal")
+  );
+}
+
 export function groupSubtotalRank() {
   return TOTAL_RANK.COMPONENT;
 }
@@ -709,16 +738,204 @@ function cloneRows(rows) {
   return rows.map((row) => structuredClone(row));
 }
 
-function resetCompiledPresentationMetadata(rows) {
+function resetCompiledPresentationMetadata(
+  rows,
+  { preserveSemanticProjection = false } = {},
+) {
   for (const row of rows) {
     row.indent = 0;
     row.outline_level = 0;
-    delete row.projection_origin;
-    delete row.projection_required_by;
+    if (!preserveSemanticProjection) {
+      delete row.projection_origin;
+      delete row.projection_required_by;
+    }
     delete row.presentation_parent_id;
     delete row.presentation_depth;
     delete row.presentation_role;
   }
+}
+
+/**
+ * Return the semantic statement rows that may be sealed into model-case JSON.
+ * Presentation topology is a compiled artifact, not part of the economic case;
+ * it is rebuilt deterministically after the sealed rows are read. Projection
+ * necessity and absorbed-row lineage are semantic evidence, however, so they
+ * deliberately survive sealing and are revalidated by the topology/coverage
+ * gates rather than being recreated from chat or physical row positions.
+ */
+export function stripStatementPresentationMetadata(rows) {
+  return cloneRows(rows).map((row) => {
+    for (const key of [
+      "display_role",
+      "formula_role",
+      "in_section_conclusion_closure",
+      "outline_level",
+      "presentation_depth",
+      "presentation_parent_id",
+      "presentation_rank",
+      "presentation_role",
+      "section_conclusion_id",
+      "section_conclusion_owner",
+      "anchor_note",
+    ]) delete row[key];
+    return row;
+  });
+}
+
+function addUnique(target, key, values) {
+  const additions = (values ?? []).filter(Boolean);
+  if (additions.length === 0) return;
+  target[key] = [...new Set([...(target[key] ?? []), ...additions])];
+}
+
+function expressionSignature(rowId, byId, visiting = new Set()) {
+  if (!rowId || visiting.has(rowId)) return `cycle:${rowId ?? "missing"}`;
+  const row = byId.get(rowId);
+  if (!row) return `external:${rowId}`;
+  const rule = row.calculation;
+  if (!rule || !Array.isArray(rule.refs) || rule.refs.length === 0) {
+    return `row:${rowId}`;
+  }
+  const next = new Set(visiting).add(rowId);
+  const refs = rule.refs.map((ref) => expressionSignature(ref, byId, next));
+  if (rule.operator === "link" && refs.length === 1) return refs[0];
+  if (rule.operator === "sum") refs.sort();
+  return `${rule.operator}(${refs.join(",")})`;
+}
+
+function projectionTargets(row, allRows, retainedRows) {
+  const allById = new Map(
+    allRows.map((candidate) => [candidate.row_id, candidate]),
+  );
+  const retainedById = new Map(
+    retainedRows.map((candidate) => [candidate.row_id, candidate]),
+  );
+  const retainedBySignature = new Map();
+  for (const candidate of retainedRows) {
+    const signature = expressionSignature(candidate.row_id, allById);
+    if (!retainedBySignature.has(signature)) {
+      retainedBySignature.set(signature, []);
+    }
+    retainedBySignature.get(signature).push(candidate.row_id);
+  }
+  const sameRole = row.semantic_role
+    ? retainedRows.filter(
+        (candidate) => candidate.semantic_role === row.semantic_role,
+      )
+    : [];
+  if (sameRole.length === 1) return [sameRole[0].row_id];
+
+  const equivalent =
+    retainedBySignature.get(expressionSignature(row.row_id, allById)) ?? [];
+  if (equivalent.length === 1) return equivalent;
+
+  const resolve = (rowId, visiting = new Set()) => {
+    if (retainedById.has(rowId)) {
+      return new Set([rowId]);
+    }
+    if (visiting.has(rowId)) return null;
+    const candidate = allById.get(rowId);
+    if (!candidate) return null;
+    const signatureMatches =
+      retainedBySignature.get(expressionSignature(rowId, allById)) ?? [];
+    if (signatureMatches.length === 1) {
+      return new Set(signatureMatches);
+    }
+    const refs = candidate.calculation?.refs ?? [];
+    if (refs.length === 0) return null;
+    const next = new Set(visiting).add(rowId);
+    const resolved = new Set();
+    for (const ref of refs) {
+      const targets = resolve(ref, next);
+      if (!targets || targets.size === 0) return null;
+      for (const target of targets) resolved.add(target);
+    }
+    return resolved;
+  };
+  const refs = row.calculation?.refs ?? [];
+  if (refs.length === 0) return [];
+  const resolved = new Set();
+  for (const ref of refs) {
+    const targets = resolve(ref);
+    if (!targets || targets.size === 0) return [];
+    for (const target of targets) resolved.add(target);
+  }
+  return [...resolved];
+}
+
+function absorbProjectedLineage(allRows, retainedRows) {
+  const retainedIds = new Set(retainedRows.map((row) => row.row_id));
+  for (const removed of allRows) {
+    if (retainedIds.has(removed.row_id) || removed.row_type === "header") {
+      continue;
+    }
+    const targetIds = projectionTargets(removed, allRows, retainedRows);
+    if (targetIds.length === 0) continue;
+    for (const targetId of targetIds) {
+      const target = retainedRows.find((row) => row.row_id === targetId);
+      if (!target) continue;
+      addUnique(target, "projection_absorbed_row_ids", [removed.row_id]);
+      addUnique(target, "source_line_ids", removed.source_line_ids);
+    }
+  }
+}
+
+/**
+ * Reconcile source mappings after semantic statement projection. The original
+ * destination row IDs remain in a typed lineage record; mapped_row_ids changes
+ * only when every removed destination was absorbed by a surviving row that
+ * also carries the source-line ID. Unproved removals remain untouched so N6
+ * fails closed.
+ */
+export function reconcileStatementProjectionCoverage(modelCase, rowsBySection) {
+  const coverage = structuredClone(modelCase.source_coverage);
+  for (const section of ["income_statement", "cash_flow"]) {
+    const rows = rowsBySection?.[section] ?? [];
+    const visibleIds = new Set(rows.map((row) => row.row_id));
+    const targetsByAbsorbedId = new Map();
+    for (const row of rows) {
+      for (const absorbedId of row.projection_absorbed_row_ids ?? []) {
+        if (!targetsByAbsorbedId.has(absorbedId)) {
+          targetsByAbsorbedId.set(absorbedId, []);
+        }
+        targetsByAbsorbedId.get(absorbedId).push(row);
+      }
+    }
+    for (const disclosure of coverage?.[section] ?? []) {
+      const originalIds = [...(disclosure.mapped_row_ids ?? [])];
+      const missingIds = originalIds.filter((rowId) => !visibleIds.has(rowId));
+      if (missingIds.length === 0) continue;
+      const targets = [];
+      let proved = true;
+      for (const missingId of missingIds) {
+        const candidates = targetsByAbsorbedId.get(missingId) ?? [];
+        const bound = candidates.filter((row) =>
+          (row.source_line_ids ?? []).includes(disclosure.source_line_id),
+        );
+        if (bound.length === 0) {
+          proved = false;
+          break;
+        }
+        targets.push(...bound.map((row) => row.row_id));
+      }
+      if (!proved) continue;
+      const projectedIds = [
+        ...new Set([
+          ...originalIds.filter((rowId) => visibleIds.has(rowId)),
+          ...targets,
+        ]),
+      ];
+      disclosure.projection_lineage = {
+        compiler_version: "semantic-statements/1.0",
+        source_mapped_row_ids: originalIds,
+        absorbed_row_ids: missingIds,
+        projected_row_ids: projectedIds,
+        rule: "semantic_dependency_projection",
+      };
+      disclosure.mapped_row_ids = projectedIds;
+    }
+  }
+  return coverage;
 }
 
 // ---------------------------------------------------------------------------
@@ -997,6 +1214,12 @@ function foldRevolverIntoChangeInDebt(rows, consolidated) {
   };
   for (const row of revolver) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
+    row.parent_row_id = consolidated.row_id;
+    row.aggregation_role =
+      consolidated.aggregation_authority === "reported_parent"
+        ? "working_child"
+        : "contributing_child";
+    row.economic_class ??= "financing";
   }
   for (const row of rows) {
     if (row === consolidated) continue;
@@ -1235,12 +1458,18 @@ function consolidateConstituents(rows, spec) {
   for (const row of constituents) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
     row.display_role = "component";
+    // Parentage is a presentation and audit relationship, not a forecast-
+    // capture decision. Change in Debt keeps every child live and formula-
+    // driven, but those children still belong beneath its visible aggregate.
+    row.parent_row_id = consolidated.row_id;
+    row.aggregation_role ??=
+      consolidated.aggregation_authority === "reported_parent"
+        ? "working_child"
+        : "contributing_child";
+    if (spec.childEconomicClass) {
+      row.economic_class ??= spec.childEconomicClass;
+    }
     if (spec.captureForecastInParent) {
-      row.parent_row_id = consolidated.row_id;
-      row.aggregation_role =
-        consolidated.aggregation_authority === "reported_parent"
-          ? "working_child"
-          : "contributing_child";
       markForecastCapturedBy(
         row,
         consolidated.row_id,
@@ -1558,6 +1787,7 @@ function badgeAdjustedEbitdaBridge(rows) {
     // The bridge can sit below net income; a block header there is exactly
     // the declared necessity the projection gate demands.
     projection_origin: "required_block_header",
+    projection_required_by: ebitda.row_id,
   });
 }
 
@@ -1858,12 +2088,12 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
     }
     index = end;
   }
-  rows.splice(
-    0,
-    rows.length,
+  const projectedRows = [
     ...beforeAndIncludingNetIncome,
     ...retainedTail,
-  );
+  ];
+  absorbProjectedLineage(rows, projectedRows);
+  rows.splice(0, rows.length, ...projectedRows);
 }
 
 /**
@@ -2297,7 +2527,11 @@ function assignDisplayAndFormulaRoles(rows) {
   }
 }
 
-export function normaliseStatementRows(modelCase, section) {
+export function normaliseStatementRows(
+  modelCase,
+  section,
+  { forecastDecisionMode = "compile" } = {},
+) {
   const supplied = modelCase.statement_structure?.[section];
   const rows =
     Array.isArray(supplied) && supplied.length > 0
@@ -2305,7 +2539,19 @@ export function normaliseStatementRows(modelCase, section) {
       : cloneRows(
     section === "income_statement" ? DEFAULT_INCOME_ROWS : DEFAULT_CASH_FLOW_ROWS,
       );
-  resetCompiledPresentationMetadata(rows);
+  resetCompiledPresentationMetadata(rows, {
+    preserveSemanticProjection:
+      modelCase.statement_structure_compiled_version ===
+      "semantic-statements/1.0",
+  });
+  if (modelCase.statement_structure_compiled_version === "semantic-statements/1.0") {
+    materializeStatementPresentationTree(rows, section);
+    assignDisplayAndFormulaRoles(rows);
+    deriveIndentLevels(rows, section);
+    stripLabelIndentSpaces(rows);
+    assertUniqueStatementDependencies(rows, section);
+    return rows;
+  }
   repairStatementSourceOrder(modelCase, section, rows);
   splitHeterogeneousWorkingCapitalParents(rows);
   applyStatementHierarchy(rows);
@@ -2430,6 +2676,8 @@ export function normaliseStatementRows(modelCase, section) {
       semantic_role: "change_in_debt",
       isConstituent: isDebtMovementConstituent,
       presentation_style_role: "subsection",
+      aggregation_authority: "derived_from_children",
+      childEconomicClass: "financing",
     });
     if (changeInDebt) {
       ensureDebtScheduleLinkage(rows, changeInDebt);
@@ -2452,8 +2700,12 @@ export function normaliseStatementRows(modelCase, section) {
   if (section === "income_statement") {
     badgeAdjustedEbitdaBridge(rows);
   }
-  captureChildrenOfDirectForecastParents(modelCase, rows);
-  applyDefaultForecastWaterfall(modelCase, rows);
+  if (forecastDecisionMode === "compile") {
+    captureChildrenOfDirectForecastParents(modelCase, rows);
+    applyDefaultForecastWaterfall(modelCase, rows);
+  } else if (forecastDecisionMode !== "defer") {
+    throw new Error(`Unknown forecastDecisionMode ${forecastDecisionMode}.`);
+  }
   materializeStatementPresentationTree(rows, section);
   assignDisplayAndFormulaRoles(rows);
   // Later still, so every row the consolidation dynamics added or re-pointed is
@@ -2765,7 +3017,14 @@ export function benchmarkCurvePlan(modelCase) {
   return { curves, keyByInstrumentId };
 }
 
-export function compileRowPlan(modelCase) {
+export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {}) {
+  const compiledInstrumentPeriodState = instrumentPeriodState ??
+    (Number(modelCase.contract_version) === 2
+      ? compileInstrumentPeriodState(modelCase)
+      : null);
+  const instrumentPeriodStateIndex = compiledInstrumentPeriodState
+    ? instrumentPeriodStateByKey(compiledInstrumentPeriodState)
+    : null;
   const authorityProfile = selectStandardisedProfile(modelCase);
   const authority = standardisedProfile(authorityProfile);
   const rowsById = {};
@@ -2962,19 +3221,21 @@ export function compileRowPlan(modelCase) {
       rowsById[`debt.${instrument.instrument_id}.amortisation`] = cursor;
       cursor += 1;
     }
-    const lastHistoricalEnd = new Date(modelCase.periods?.[2]?.date ?? 0);
-    const lastForecastEnd = new Date(modelCase.periods?.[5]?.date ?? 0);
-    const maturity = instrument.maturity_date
-      ? new Date(instrument.maturity_date)
-      : null;
-    const forecastMaturity =
-      instrument.class !== "rcf" &&
-      instrument.maturity_treatment !== "non_maturing_within_forecast" &&
-      maturity &&
-      !Number.isNaN(maturity.getTime()) &&
-      maturity > lastHistoricalEnd &&
-      maturity <= lastForecastEnd;
-    plan.repayment_state_by_period = [0, 1, 2].map((index) => {
+    const compiledStates = [0, 1, 2].map((index) =>
+      instrumentPeriodStateIndex?.get(`${instrument.instrument_id}\u0000${index}`) ?? null,
+    );
+    plan.repayment_state_by_period = compiledInstrumentPeriodState
+      ? compiledStates.map((state) => ({
+          none: "zero",
+          scheduled: "scheduled_amortisation",
+          maturity: "maturity_due",
+          scheduled_and_maturity: "scheduled_and_maturity",
+          discretionary_rcf: "discretionary_rcf",
+        })[state?.repayment_state] ?? "zero")
+      : [0, 1, 2].map((index) => {
+      const maturity = instrument.maturity_date
+        ? new Date(instrument.maturity_date)
+        : null;
       if (instrument.class === "rcf") return "discretionary_rcf";
       const periodEnd = new Date(modelCase.periods?.[index + 3]?.date ?? 0);
       const priorPeriodEnd = new Date(
@@ -2993,12 +3254,12 @@ export function compileRowPlan(modelCase) {
       if (scheduled) return "scheduled_amortisation";
       return "zero";
     });
-    if (
-      instrument.class !== "rcf" &&
-      (forecastMaturity || Number.isInteger(plan.amortisation_row))
-    ) {
-      plan.has_mandatory_repayment = true;
-    }
+    plan.has_mandatory_repayment = compiledInstrumentPeriodState
+      ? compiledStates.some(
+          (state) => state?.inclusion?.mandatory_repayment === true,
+        )
+      : instrument.class !== "rcf" &&
+        plan.repayment_state_by_period.some((state) => state !== "zero");
     if (
       (instrument.pik_rate ?? []).some(
         (value) => Math.abs(Number(value || 0)) > 0,
@@ -3290,7 +3551,13 @@ export function compileRowPlan(modelCase) {
   // from the commitment fee. An instrument row as well only ever mirrored the
   // drawn-interest line, so the same facility appeared twice in one schedule.
   const carriesInterestRow = (instrumentId) =>
-    !isBalancingRcf(modelCase, instrumentById.get(instrumentId));
+    !isBalancingRcf(modelCase, instrumentById.get(instrumentId)) &&
+    (!compiledInstrumentPeriodState ||
+      [0, 1, 2].some(
+        (index) =>
+          instrumentPeriodStateIndex.get(`${instrumentId}\u0000${index}`)
+            ?.inclusion?.interest === true,
+      ));
   if (groupedDebtPresentation) {
     for (const group of debtGroups) {
       group.interest_header_row = cursor;
@@ -3410,6 +3677,10 @@ export function compileRowPlan(modelCase) {
     // `tolerances` block in assets/production-contract-v2.json.
     issuer_units: modelCase.issuer?.units ?? null,
     reporting_currency: modelCase.issuer?.reporting_currency ?? null,
+    instrument_period_state_schema_version:
+      compiledInstrumentPeriodState?.schema_version ?? null,
+    instrument_period_state_ids:
+      compiledInstrumentPeriodState?.states.map((state) => state.state_id) ?? [],
     columns: {
       labels: "B",
       terms: ["C", "D", "E"],

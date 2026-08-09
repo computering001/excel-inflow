@@ -640,6 +640,63 @@ export function compileStatementTopology(modelCase, section, rows) {
           "A post-net-income row is visible without a required economic output, dependency, derived-display or block-header reason.",
       });
     }
+    const allStatementRows = [
+      ...(modelCase.statement_structure?.income_statement ?? []),
+      ...(modelCase.statement_structure?.cash_flow ?? []),
+    ];
+    const allById = new Map(
+      allStatementRows.map((row) => [row.row_id, row]),
+    );
+    const localById = new Map(rows.map((row) => [row.row_id, row]));
+    const rules = (row) => [
+      row?.calculation,
+      row?.forecast_calculation,
+      ...(row?.forecast_period_calculations ?? []),
+    ].filter(Boolean);
+    for (const node of nodes.slice(netIncomeIndex + 1)) {
+      if (!node.projection_origin) continue;
+      const row = localById.get(node.row_id);
+      const requiredBy = node.projection_required_by;
+      let valid = typeof requiredBy === "string" && requiredBy.length > 0;
+      if (node.projection_origin === "required_block_header") {
+        const ownerIndex = rows.findIndex(
+          (candidate) => candidate.row_id === requiredBy,
+        );
+        valid =
+          valid &&
+          row?.row_type === "header" &&
+          ownerIndex > node.visible_index;
+      } else if (node.projection_origin === "required_economic_output") {
+        valid =
+          valid &&
+          row?.row_type !== "header" &&
+          Boolean(row?.semantic_role) &&
+          requiredBy === "debt_overlay_contract";
+      } else if (
+        node.projection_origin === "dependency_closure" ||
+        node.projection_origin === "downstream_dependency"
+      ) {
+        const owner = localById.get(requiredBy) ?? allById.get(requiredBy);
+        valid =
+          valid &&
+          rules(owner).some((rule) => rule.refs?.includes(node.row_id));
+      } else if (node.projection_origin === "derived_display") {
+        valid =
+          valid &&
+          rules(row).some((rule) => rule.refs?.includes(requiredBy));
+      }
+      if (!valid) {
+        errors.push({
+          code: "PROJECTION_NECESSITY_INVALID",
+          row_id: node.row_id,
+          label: node.label,
+          projection_origin: node.projection_origin,
+          projection_required_by: requiredBy ?? null,
+          message:
+            "A post-net-income projection claim is not proved by the declared semantic dependency.",
+        });
+      }
+    }
   }
 
   const indexById = new Map(rows.map((row, index) => [row.row_id, index]));

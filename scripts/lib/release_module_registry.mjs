@@ -14,6 +14,11 @@ import { assessCoverage } from "./coverage.mjs";
 import { planQuestions } from "./flow_questions.mjs";
 import { solveCase, validateCaseShape } from "./solver.mjs";
 import {
+  compileEquationGraphState,
+  validateEquationGraph,
+  validateSolverEquationGraphEvidence,
+} from "./equation_graph.mjs";
+import {
   validateSemanticArtifacts,
   validateSolutionInvariants,
 } from "./validation_invariants.mjs";
@@ -33,7 +38,15 @@ export const RELEASE_MODULE_REGISTRY = Object.freeze({
   N5: Object.freeze({ id: "N5", name: "brokers", selectBrokerAnchor }),
   N6: Object.freeze({ id: "N6", name: "questions", assessCoverage, planQuestions }),
   N7: Object.freeze({ id: "N7", name: "case", validateCaseShape }),
-  N8: Object.freeze({ id: "N8", name: "solve", solveCase, validateSolutionInvariants }),
+  N8: Object.freeze({
+    id: "N8",
+    name: "solve",
+    solveCase,
+    validateSolutionInvariants,
+    compileEquationGraphState,
+    validateEquationGraph,
+    validateSolverEquationGraphEvidence,
+  }),
   N9: Object.freeze({
     id: "N9",
     name: "plan",

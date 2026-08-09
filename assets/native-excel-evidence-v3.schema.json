@@ -16,6 +16,7 @@
     "candidates",
     "certified_closure_sha256",
     "tolerance_policy",
+    "economic_solve_policy_sha256",
     "evidence_sha256"
   ],
   "properties": {
@@ -30,6 +31,7 @@
     "total_violations": { "const": 0 },
     "certified_closure_sha256": { "$ref": "#/$defs/sha256" },
     "tolerance_policy": { "$ref": "#/$defs/tolerancePolicy" },
+    "economic_solve_policy_sha256": { "$ref": "#/$defs/sha256" },
     "release_matrix": {
       "type": "object",
       "additionalProperties": false,
@@ -165,6 +167,7 @@
         "expected_sequence",
         "actual_sequence",
         "tolerance_policy",
+        "economic_solve_policy_sha256",
         "max_observed_drift",
         "files",
         "formula_cells_compared",
@@ -189,6 +192,7 @@
         "expected_sequence": { "$ref": "#/$defs/controlSequence" },
         "actual_sequence": { "$ref": "#/$defs/controlSequence" },
         "tolerance_policy": { "$ref": "#/$defs/tolerancePolicy" },
+        "economic_solve_policy_sha256": { "$ref": "#/$defs/sha256" },
         "max_observed_drift": { "$ref": "#/$defs/drift" },
         "files": {
           "type": "array",

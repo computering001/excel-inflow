@@ -49,6 +49,30 @@
     "broker_crosswalk_receipt": { "type": "object" },
     "broker_semantic_verification": { "type": "object" },
     "forecast_context": { "$ref": "#/$defs/forecastContext" },
+    "forecast_observation_ledger": { "type": "object" },
+    "forecast_observation_ledger_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "ledger_sha256",
+        "observation_count",
+        "violation_count"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "forecast-observation-ledger-receipt/1.0"
+        },
+        "status": { "const": "PASS" },
+        "ledger_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observation_count": { "type": "integer", "minimum": 1 },
+        "violation_count": { "const": 0 }
+      }
+    },
     "model_case": { "type": "object" },
     "attachment_manifest": {
       "type": "array",

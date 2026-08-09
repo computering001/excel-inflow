@@ -250,7 +250,9 @@
       "case_sha256",
       "workbook_sha256",
       "semantic_manifest_sha256",
-      "row_map_sha256"
+      "row_map_sha256",
+      "economic_solve_policy_sha256",
+      "certified_closure_sha256"
     ],
     "native_excel_required_release_profiles": [
       "acquisition",

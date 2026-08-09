@@ -105,6 +105,18 @@ from verify.invariants import (  # noqa: E402
     validate_native_evidence,
     validate_semantic_artifacts,
 )
+
+_ECONOMIC_SOLVE_POLICY_PATH = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "assets",
+        "economic-solve-policy.v1.json",
+    )
+)
+with open(_ECONOMIC_SOLVE_POLICY_PATH, "r", encoding="utf-8") as _policy_file:
+    ECONOMIC_SOLVE_POLICY = json.load(_policy_file)
 from verify.tolerances import (  # noqa: E402
     LegacyTolerancePolicy,
     TolerancePolicy,
@@ -945,32 +957,26 @@ def main(argv: List[str]) -> int:
         re.search(r'\bfullCalcOnLoad="(?:1|true)"', workbook_xml)
     )
     calc_chain_absent = "xl/calcChain.xml" not in workbook.names
+    expected_calculation = ECONOMIC_SOLVE_POLICY["workbook_calculation"]
+    actual_iterate_count = int(iterate_count.group(1)) if iterate_count else None
+    actual_iterate_delta = float(iterate_delta.group(1)) if iterate_delta else None
     checks.append(
         record(
             "iteration-contract",
             bool(re.search(r'\biterate="(?:1|true)"', workbook_xml))
-            and (
-                not re.search(r"\biterateCount=", workbook_xml)
-                or bool(re.search(r'\biterateCount="100"', workbook_xml))
-            )
-            and (
-                not re.search(r"\biterateDelta=", workbook_xml)
-                or bool(re.search(r'\biterateDelta="0\.001"', workbook_xml))
-            )
+            and actual_iterate_count == expected_calculation["iterate_count"]
+            and actual_iterate_delta == expected_calculation["iterate_delta"]
             and full_calc_on_load
             and calc_chain_absent,
-            "Workbook calculation settings use 100 iterations and 0.001 tolerance, "
-            "force a full calculation on load, and ship no calculation chain.",
+            "Workbook calculation settings match the canonical economic solve "
+            "policy, force a full calculation on load, and ship no calculation chain.",
             {
                 "iterate_enabled": bool(re.search(r'\biterate="(?:1|true)"', workbook_xml)),
-                "iterate_count": iterate_count.group(1)
-                if iterate_count
-                else "100 (Excel default)",
-                "iterate_delta": iterate_delta.group(1)
-                if iterate_delta
-                else "0.001 (Excel default)",
+                "iterate_count": actual_iterate_count,
+                "iterate_delta": actual_iterate_delta,
                 "full_calc_on_load": full_calc_on_load,
                 "calc_chain_absent": calc_chain_absent,
+                "expected": expected_calculation,
             },
         )
     )

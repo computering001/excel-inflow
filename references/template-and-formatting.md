@@ -1,6 +1,6 @@
 # Template and formatting contract
 
-`assets/standardised-design-runtime.v2.json` is the production projection of the measured workbook authority.
+`assets/standardised-design-runtime.v4.json` is the default production projection of the measured workbook authority. Epochs 2 and 3 remain available only through the explicit `EXCEL_INFLOW_DESIGN_EPOCH=2` and `=3` rollback switches.
 `assets/style-tokens.json` states the portable token subset. This file explains
 both and states the rules the machine-readable files cannot express. Where this
 prose disagrees with either asset, the applicable asset wins — **but never edit
@@ -8,7 +8,7 @@ an authority asset to make a check pass.**
 
 ## Reference hierarchy
 
-1. Use the v2 dynamic compiler for a new production workbook.
+1. Use the epoch-4 dynamic compiler for a new production workbook; use epoch 2 or 3 only as an explicit rollback.
 2. Select the maximal or net-cash authority profile from the normalised case.
 3. Preserve the authority profile's fixed A:U grammar, block order, controls and
    named expansion-zone boundaries while inserting company-specific semantic rows.
@@ -162,7 +162,7 @@ The compiler and the validator must not trust the same classification.
 
 ```text
 A       narrow left gutter (width 1)
-B       row labels (39)
+B       row labels (46)
 C:E     instrument terms and visible assumptions (10, 10, 12)
 F       gutter (2) — CARRIES FORMATTING THROUGH
 G:I     three historical standalone periods (10)
