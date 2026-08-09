@@ -225,6 +225,7 @@
             "additionalProperties": false,
             "required": ["house_id", "metric_id", "period_index", "components", "constant", "multiplier", "value", "rationale", "review_status"],
             "properties": {
+              "mapping_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
               "house_id": { "type": "string", "minLength": 1 },
               "metric_id": { "type": "string", "minLength": 1 },
               "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
@@ -1058,6 +1059,10 @@
             "fiscal_calendar": { "type": ["string", "null"] }
           }
         },
+        "model_disposition": {
+          "enum": ["reference_only", "rejected", "not_applicable"]
+        },
+        "model_disposition_reason": { "type": "string", "minLength": 1 },
         "provider_consensus": {
           "type": "array",
           "minItems": 3,

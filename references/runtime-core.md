@@ -243,7 +243,12 @@ The first command captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the second command proves
 two independent hash-bound cell transcriptions agree or records an explicit
 reviewed resolution. The third command compiles only reviewed, cell-addressed
-mappings; full unused source tables remain evidence rather than disappearing.
+mappings. Before it can pass, every extracted table is reviewed and every
+nonblank annual or partial-period candidate row has one reasoned semantic
+disposition; a missing row or unowned mapping blocks. Full unused source tables,
+guidance, partial-period evidence, distinct metric definitions and supplemental
+checks remain evidence rather than disappearing or being forced into annual
+consensus.
 
 The resumable production shell handles all five user-facing stages. Run the
 same command again after supplying answers or after an interruption; it verifies

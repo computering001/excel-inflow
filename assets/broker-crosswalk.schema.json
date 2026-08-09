@@ -12,7 +12,9 @@
     "units",
     "forecast_periods",
     "metrics",
-    "mappings"
+    "mappings",
+    "table_reviews",
+    "coverage_ledger"
   ],
   "properties": {
     "schema_version": { "const": "broker-crosswalk/1.0" },
@@ -36,7 +38,9 @@
         "properties": {
           "label": { "type": "string", "minLength": 1 },
           "unit_kind": { "enum": ["currency", "ratio", "percent_decimal"] },
-          "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] }
+          "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
+          "model_disposition": { "enum": ["reference_only", "rejected", "not_applicable"] },
+          "model_disposition_reason": { "type": "string", "minLength": 1 }
         }
       }
     },
@@ -46,8 +50,9 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["house_id", "metric_id", "period_index", "sources", "rationale"],
+        "required": ["mapping_id", "house_id", "metric_id", "period_index", "sources", "rationale"],
         "properties": {
+          "mapping_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
           "house_id": { "type": "string", "minLength": 1 },
           "metric_id": { "type": "string", "minLength": 1 },
           "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
@@ -73,6 +78,16 @@
         }
       }
     },
+    "table_reviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/tableReview" }
+    },
+    "coverage_ledger": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/coverageEntry" }
+    },
     "provider_consensus": {
       "type": "object",
       "additionalProperties": {
@@ -80,6 +95,86 @@
         "minItems": 3,
         "maxItems": 3,
         "items": { "type": ["number", "null"] }
+      }
+    }
+  },
+  "$defs": {
+    "sourceCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "column"],
+      "properties": {
+        "row": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "periodColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["column", "period_basis"],
+      "properties": {
+        "column": { "type": "integer", "minimum": 1 },
+        "period_basis": { "enum": ["annual_forecast", "partial_period"] },
+        "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "period_label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "tableReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["house_id", "table_id", "classification", "header_rows", "period_columns", "rationale", "review_status"],
+      "properties": {
+        "house_id": { "type": "string", "minLength": 1 },
+        "table_id": { "type": "string", "minLength": 1 },
+        "classification": {
+          "enum": ["annual_forecast", "partial_period", "guidance", "mixed", "historical_only", "ratings_or_valuation", "non_forecast"]
+        },
+        "header_rows": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "period_columns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/periodColumn" }
+        },
+        "rationale": { "type": "string", "minLength": 1 },
+        "review_status": { "const": "reviewed" }
+      }
+    },
+    "coverageEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_id", "house_id", "table_id", "row", "period_basis", "source_cells", "disposition", "rationale", "review_status"],
+      "properties": {
+        "candidate_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "house_id": { "type": "string", "minLength": 1 },
+        "table_id": { "type": "string", "minLength": 1 },
+        "row": { "type": "integer", "minimum": 1 },
+        "label": { "type": "string" },
+        "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic"] },
+        "period_indexes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 0, "maximum": 2 }
+        },
+        "source_cells": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceCell" }
+        },
+        "disposition": {
+          "enum": ["mapped_metric", "mapped_guidance", "partial_period_evidence", "supplemental_check", "duplicate", "not_model_relevant", "unusable"]
+        },
+        "metric_id": { "type": "string", "minLength": 1 },
+        "mapping_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "duplicate_of": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "review_status": { "const": "reviewed" }
       }
     }
   }

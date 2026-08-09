@@ -22,6 +22,7 @@ const schema = (name) => JSON.parse(readFileSync(path.join(ASSETS, name), "utf8"
 const DCS_SCHEMA = schema("dcs-export.schema.json");
 const BROKER_SCHEMA = schema("broker-pack.schema.json");
 const BROKER_EXTRACTION_SCHEMA = schema("broker-extraction-bundle.schema.json");
+const BROKER_CROSSWALK_SCHEMA = schema("broker-crosswalk.schema.json");
 const BROKER_SOURCE_TABLES_SCHEMA = schema("broker-source-tables.schema.json");
 
 export const INGRESS_SCHEMA_VERSION = "attachment-ingress/1.0";
@@ -230,12 +231,32 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       `Broker source tables fail their contract: ${sourceTableErrors[0]}`,
     );
   }
+  const crosswalkErrors = validateJsonSchema(
+    crosswalk.json,
+    BROKER_CROSSWALK_SCHEMA,
+  );
+  if (crosswalkErrors.length > 0) {
+    throw new Error(
+      `Broker crosswalk fails its contract: ${crosswalkErrors[0]}`,
+    );
+  }
   if (
     crosswalk.json.schema_version !== "broker-crosswalk/1.0" ||
     receipt.json.schema_version !== "broker-crosswalk-receipt/1.0" ||
     receipt.json.status !== "PASS"
   ) {
     throw new Error("Broker crosswalk or its receipt is not a supported PASS artifact.");
+  }
+  if (
+    receipt.json.coverage_summary?.unresolved_candidate_count !== 0 ||
+    receipt.json.coverage_summary?.table_count !==
+      receipt.json.coverage_summary?.table_review_count ||
+    !Array.isArray(receipt.json.coverage_ledger) ||
+    receipt.json.coverage_ledger.length === 0
+  ) {
+    throw new Error(
+      "Broker crosswalk PASS receipt lacks complete, zero-unresolved semantic coverage evidence.",
+    );
   }
   const runIds = new Set([
     extraction.json.run_id,

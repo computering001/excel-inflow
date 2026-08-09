@@ -5,12 +5,12 @@
   "skillVersion": "2.1.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-08T23:22:03.069Z",
-  "centralInstructionsWords": 4033,
+  "generatedAt": "2026-08-09T01:01:51.425Z",
+  "centralInstructionsWords": 4077,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "f50415aec756b7854b484365e02ccfe76401e979c8138e591123ffa12bee7a0c",
+    "currentClosureSha256": "9a18d5979b668ac2fadebbd66477d1acdd699586137f6308cbaf9a0a9c82be65",
     "closureFileCount": 110,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -901,21 +901,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "0a9ed75b5b77461b07806df2f6de7806efbc2d4cef2b9ab9ab32bd74f9ed1b6b",
-      "bytes": 30314,
-      "words": 4033
+      "sha256": "5a13026b936b62aecb47b8e047d2be9900da4e30f14aaa0297486af6c7b489b2",
+      "bytes": 30632,
+      "words": 4077
     },
     {
       "path": "SKILL.md",
-      "sha256": "19f9d1629ffad4cc025ccc880d88241992013fd86b9b58e1e6e4c5dd494c8155",
-      "bytes": 30801,
-      "words": 4102
+      "sha256": "14788078efbeec6c67847e845d018441e64ff4780f32be164cc98ca42911c79b",
+      "bytes": 31119,
+      "words": 4146
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "60c889745dc0c9264601ce00e706b3c129fe3dc052b7ba68fa43827f0d236b82",
-      "bytes": 30334,
-      "words": 4035
+      "sha256": "a7dbc11cc92182096266d59015eafa43b6c6228e72a1b2c1eba1dd15921d2ead",
+      "bytes": 30652,
+      "words": 4079
     },
     {
       "path": "references/model-contract.md",
@@ -931,9 +931,9 @@
     },
     {
       "path": "references/forecast-and-input-policy.md",
-      "sha256": "88d1984c1389cdefb23ce9ba862df3f3801d4c2db908589f185db8f9409d251d",
-      "bytes": 12669,
-      "words": 1906
+      "sha256": "fb50b7392966e59cddf6cd469e9cb8270a80c70c2b47c30fb815b269349a25e7",
+      "bytes": 13024,
+      "words": 1950
     },
     {
       "path": "references/acquisition.md",
@@ -955,9 +955,9 @@
     },
     {
       "path": "references/broker-extraction.md",
-      "sha256": "4822d2282be9eb9b699bed95b729be87fce40102d990cc9bf5093f451c4ea111",
-      "bytes": 8027,
-      "words": 1138
+      "sha256": "f8a27ae2611beacc53222fb7b527fb44f7aa9899d3b126281887391c4d7ed202",
+      "bytes": 9815,
+      "words": 1381
     },
     {
       "path": "references/validation.md",
@@ -973,8 +973,8 @@
     },
     {
       "path": "assets/broker-crosswalk.schema.json",
-      "sha256": "a7873b6307ee1cbb2debecc0aec640f6b86acbaa78dcc320a1023e684bb2b940",
-      "bytes": 2897,
+      "sha256": "30b20f8c44da8c19407aa4625ec1f32a4697a6d1126d0a6fb8bf4fb39a3585f6",
+      "bytes": 6652,
       "words": null
     },
     {
@@ -991,8 +991,8 @@
     },
     {
       "path": "assets/broker-pack.schema.json",
-      "sha256": "d6e677ba25565bed907fb08f9922330c2c2aac2052c09e9ab809987c33b00e4e",
-      "bytes": 11081,
+      "sha256": "6e11c0b9759a488ef1eb2356fba4b5e757576b1f9742844a03e7d0e1f3f5d578",
+      "bytes": 11656,
       "words": null
     },
     {
@@ -1033,8 +1033,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "eec2c2fd5473f2a5ee29a0c3ef9cd240a0557d04935a701917e3abd4835b2722",
-      "bytes": 55408,
+      "sha256": "8e256ced064197a77b40a0b2757c06a3cf1c99d422ea162c916c0e6e7ad5fed6",
+      "bytes": 55678,
       "words": null
     },
     {
@@ -1111,8 +1111,8 @@
     },
     {
       "path": "scripts/compile_broker_pack.py",
-      "sha256": "99a8ea808af337a1fb1e4dd1ab419c445d11591bf1b80f03a7ebe57553117e0c",
-      "bytes": 11174,
+      "sha256": "156232a195d00e75b094791da57e0ea8c40265071ab81816ceb60e3c1399e20f",
+      "bytes": 30424,
       "words": null
     },
     {
@@ -1201,8 +1201,8 @@
     },
     {
       "path": "scripts/lib/attachment_ingress.mjs",
-      "sha256": "3037ab4687fae70922491b441381b0c28d2c5134d4cd8d4840bba04563bd7fe4",
-      "bytes": 18607,
+      "sha256": "e3e59825c311cc24555ebb43e79b0bd6f662efd0004c41ba86a3a8ca0022673c",
+      "bytes": 19338,
       "words": null
     },
     {
@@ -1225,8 +1225,8 @@
     },
     {
       "path": "scripts/lib/evidence_run.mjs",
-      "sha256": "0989359c77d71842fda649cfdb1417f5ec7b7306c5977bd76c32faebe9631aa2",
-      "bytes": 67564,
+      "sha256": "14ef879064c5bb0a78ea6d8a260f4b721619738db735cd54d2a9a176e2dec787",
+      "bytes": 68127,
       "words": null
     },
     {

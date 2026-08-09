@@ -34,7 +34,7 @@ The chain is:
 raw document bytes
 -> broker-extraction-bundle/1.0
 -> broker-source-tables/1.0
--> broker-crosswalk/1.0 + PASS receipt
+-> broker-crosswalk/1.0 + semantic coverage ledger + PASS receipt
 -> broker-pack/1.0
 -> model-case broker source mappings
 -> values-only broker evidence sheets
@@ -119,6 +119,30 @@ dividends, plus at least one supported headline anchor such as EBIT or Adjusted
 EBITDA. Preserve any additional usable broker metrics; the forecast-authority
 graph decides whether the model consumes them.
 
+Before compilation, review every extracted table once. Declare its class,
+header rows and any annual or partial-period columns. Then disposition every
+nonblank row intersecting those columns in one semantic coverage ledger as:
+
+- `mapped_metric` — an annual forecast candidate with exact mapping IDs;
+- `supplemental_check` — a distinct annual balance or output check retained on
+  `Brokers` but marked `reference_only`;
+- `mapped_guidance` — narrative or range guidance retained without inventing a
+  point estimate;
+- `partial_period_evidence` — quarterly, half-year or other partial-period
+  evidence kept outside the annual consensus;
+- `duplicate` — an exact or definition-equivalent repeat naming its canonical
+  candidate;
+- `not_model_relevant` — preserved source detail outside the debt overlay; or
+- `unusable` — a dash, ambiguous definition or otherwise unusable estimate.
+
+Every disposition carries an exact source-cell set, a rationale and reviewed
+status. The compiler independently enumerates all rows touched by the declared
+period columns. One missing row, shifted period, unowned mapping, cross-house
+reference or unresolved candidate blocks. Quarterly values never enter an
+annual slot. Reported, adjusted and restated definitions; different FCF or net
+debt definitions; and working-capital balances versus changes remain separate
+metrics unless a transparent transformation is declared.
+
 The compiler must prove:
 
 - three to ten distinct houses;
@@ -127,7 +151,13 @@ The compiler must prove:
 - every referenced source cell exists and belongs to the same house;
 - the compiled value equals its declared components, constant and multiplier;
 - every normalized estimate retains publication and document metadata; and
-- the crosswalk receipt is hash-bound to both bundle and crosswalk.
+- every extracted table has exactly one semantic review;
+- every detected forecast candidate has exactly one reviewed disposition;
+- every mapping is owned by at least one candidate and no candidate is
+  unresolved;
+- guidance and partial-period evidence retain their original basis; and
+- the crosswalk receipt is hash-bound to both bundle and crosswalk and carries
+  the zero-unresolved coverage summary.
 
 ## Workbook presentation
 

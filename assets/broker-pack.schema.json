@@ -92,6 +92,15 @@
         "sign_convention": {
           "enum": ["as_reported", "outflow_negative", "outflow_positive"],
           "description": "Optional but strongly advised for capex, change_in_working_capital and dividends, where houses disagree on sign and a sign error is a silent 2x in the cash bridge."
+        },
+        "model_disposition": {
+          "enum": ["reference_only", "rejected", "not_applicable"],
+          "description": "Optional Stage-2 disposition for a preserved broker metric that is not an independent model input. Omit for a metric that remains eligible for Stage-3 mapping."
+        },
+        "model_disposition_reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required in practice whenever model_disposition is supplied; explains why the metric is retained as evidence but not consumed as a model authority."
         }
       }
     },

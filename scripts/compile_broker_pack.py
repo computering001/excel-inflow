@@ -21,6 +21,317 @@ REQUIRED_METRICS = {
     "change_in_working_capital",
     "dividends",
 }
+MAPPED_DISPOSITIONS = {"mapped_metric", "supplemental_check"}
+NON_FORECAST_TABLE_CLASSES = {"historical_only", "ratings_or_valuation", "non_forecast"}
+PERIOD_BASES = {"annual_forecast", "partial_period"}
+
+
+def hash_json(value: Any) -> str:
+    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def nonblank(cell: dict[str, Any]) -> bool:
+    value = cell.get("value")
+    if value is None:
+        return bool(str(cell.get("raw_text") or "").strip())
+    return not (isinstance(value, str) and value.strip() == "")
+
+
+def cell_at(table: dict[str, Any], row: int, column: int, label: str) -> dict[str, Any]:
+    try:
+        cell = table["rows"][row - 1][column - 1]
+    except (IndexError, TypeError):
+        raise ValueError(f"{label} cell R{row}C{column} does not exist.")
+    if int(cell.get("row", row)) != row or int(cell.get("column", column)) != column:
+        raise ValueError(f"{label} cell coordinates disagree with their table position at R{row}C{column}.")
+    return cell
+
+
+def header_year(value: Any, forecast_years: list[int]) -> int | None:
+    text = str(value or "").upper().replace(" ", "")
+    if not text:
+        return None
+    for year in forecast_years:
+        short = str(year)[-2:]
+        patterns = (
+            rf"(?<!\d){year}(?:E|F|EST|FORECAST)?(?!\d)",
+            rf"FY'?{short}(?:E|F|EST)?(?!\d)",
+            rf"(?:DEC|MAR|JUN|SEP)[-']?{short}(?:E|F)?(?!\d)",
+        )
+        if any(re.search(pattern, text) for pattern in patterns):
+            return year
+    return None
+
+
+def is_partial_header(value: Any) -> bool:
+    text = str(value or "").upper().replace(" ", "")
+    return bool(re.search(r"(?:^|[^A-Z0-9])(?:Q[1-4]|H[12]|[1-4]Q|[12]H)(?:[^A-Z0-9]|$)", text))
+
+
+def row_label(table: dict[str, Any], row: int, first_period_column: int) -> str:
+    labels = []
+    for column in range(1, first_period_column):
+        cell = cell_at(table, row, column, table["table_id"])
+        value = cell.get("value")
+        if value is not None and str(value).strip() not in {"", "-"}:
+            labels.append(str(value).strip())
+    return labels[-1] if labels else f"Row {row}"
+
+
+def validate_coverage(
+    crosswalk: dict[str, Any],
+    documents_by_house: dict[str, dict[str, Any]],
+    tables: dict[str, tuple[dict[str, Any], dict[str, Any]]],
+    mapping_receipts: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Prove every declared future-period table row has one reviewed disposition."""
+
+    reviews = crosswalk.get("table_reviews")
+    ledger = crosswalk.get("coverage_ledger")
+    if not isinstance(reviews, list) or not reviews:
+        raise ValueError("The broker crosswalk requires a non-empty table_reviews ledger.")
+    if not isinstance(ledger, list) or not ledger:
+        raise ValueError("The broker crosswalk requires a non-empty coverage_ledger.")
+    forecast_years = [int(str(period)[:4]) for period in crosswalk["forecast_periods"]]
+    review_by_table: dict[str, dict[str, Any]] = {}
+    expected: dict[tuple[str, int, str], dict[str, Any]] = {}
+
+    for index, review in enumerate(reviews):
+        table_id = review.get("table_id")
+        house_id = review.get("house_id")
+        if table_id not in tables:
+            raise ValueError(f"table_reviews[{index}] names unknown table {table_id!r}.")
+        if table_id in review_by_table:
+            raise ValueError(f"Table {table_id!r} has more than one semantic review.")
+        document, table = tables[table_id]
+        if document["house_id"] != house_id:
+            raise ValueError(f"table_reviews[{index}] reaches across houses from {house_id!r} to {document['house_id']!r}.")
+        if review.get("review_status") != "reviewed" or not str(review.get("rationale") or "").strip():
+            raise ValueError(f"table_reviews[{index}] is not a reasoned reviewed disposition.")
+        classification = review.get("classification")
+        header_rows = {int(value) for value in review.get("header_rows") or []}
+        for row in header_rows:
+            if row < 1 or row > len(table["rows"]):
+                raise ValueError(f"table_reviews[{index}] header row {row} is outside {table_id!r}.")
+        period_columns = review.get("period_columns") or []
+        if classification == "annual_forecast" and not any(item.get("period_basis") == "annual_forecast" for item in period_columns):
+            raise ValueError(f"Annual forecast table {table_id!r} declares no annual forecast columns.")
+        if classification == "partial_period" and not any(item.get("period_basis") == "partial_period" for item in period_columns):
+            raise ValueError(f"Partial-period table {table_id!r} declares no partial-period columns.")
+        if classification in NON_FORECAST_TABLE_CLASSES and period_columns:
+            raise ValueError(f"Non-forecast table {table_id!r} must not declare forecast period columns.")
+        declared_columns: set[tuple[int, str]] = set()
+        annual_indexes: set[int] = set()
+        for column_index, declaration in enumerate(period_columns):
+            column = int(declaration.get("column", 0))
+            basis = declaration.get("period_basis")
+            if basis not in PERIOD_BASES or column < 1:
+                raise ValueError(f"table_reviews[{index}].period_columns[{column_index}] is invalid.")
+            key = (column, basis)
+            if key in declared_columns:
+                raise ValueError(f"Table {table_id!r} repeats column {column} for {basis}.")
+            declared_columns.add(key)
+            header_values = [
+                cell_at(table, row, column, table_id).get("value")
+                for row in sorted(header_rows)
+            ]
+            detected_years = {year for year in (header_year(value, forecast_years) for value in header_values) if year is not None}
+            if basis == "annual_forecast":
+                period_index = declaration.get("period_index")
+                if period_index not in {0, 1, 2}:
+                    raise ValueError(f"Annual column {table_id!r}!C{column} requires period_index 0, 1 or 2.")
+                if period_index in annual_indexes:
+                    raise ValueError(f"Table {table_id!r} repeats annual forecast period_index {period_index}.")
+                annual_indexes.add(period_index)
+                expected_year = forecast_years[period_index]
+                if detected_years and detected_years != {expected_year}:
+                    raise ValueError(
+                        f"Annual column {table_id!r}!C{column} is declared for {expected_year} but its reviewed header identifies {sorted(detected_years)}."
+                    )
+            elif not str(declaration.get("period_label") or "").strip():
+                raise ValueError(f"Partial-period column {table_id!r}!C{column} requires period_label.")
+
+        # A reviewed non-forecast classification cannot suppress an obvious
+        # multi-year forecast header. This independent contradiction check is
+        # intentionally conservative: it fires only when one row identifies
+        # at least two of the model's three forecast years.
+        if classification in NON_FORECAST_TABLE_CLASSES:
+            for row in table["rows"][: min(10, len(table["rows"]))]:
+                years = {
+                    year
+                    for year in (header_year(cell.get("value"), forecast_years) for cell in row)
+                    if year is not None
+                }
+                if len(years) >= 2:
+                    raise ValueError(
+                        f"Table {table_id!r} is classified {classification} but contains an apparent forecast header for {sorted(years)}."
+                    )
+
+        for basis in PERIOD_BASES:
+            columns = [item for item in period_columns if item.get("period_basis") == basis]
+            if not columns:
+                continue
+            first_column = min(int(item["column"]) for item in columns)
+            for row_number in range(1, len(table["rows"]) + 1):
+                if row_number in header_rows:
+                    continue
+                source_cells = []
+                period_indexes = []
+                for item in columns:
+                    column = int(item["column"])
+                    cell = cell_at(table, row_number, column, table_id)
+                    if not nonblank(cell):
+                        continue
+                    source_cells.append({"row": row_number, "column": column})
+                    if basis == "annual_forecast":
+                        period_indexes.append(int(item["period_index"]))
+                if source_cells:
+                    expected[(table_id, row_number, basis)] = {
+                        "house_id": house_id,
+                        "table_id": table_id,
+                        "row": row_number,
+                        "period_basis": basis,
+                        "source_cells": sorted(source_cells, key=lambda item: (item["row"], item["column"])),
+                        "period_indexes": sorted(set(period_indexes)),
+                        "label": row_label(table, row_number, first_column),
+                    }
+        review_by_table[table_id] = review
+
+    missing_reviews = sorted(set(tables) - set(review_by_table))
+    if missing_reviews:
+        raise ValueError(f"Every extracted table requires one review; missing: {', '.join(missing_reviews)}.")
+
+    mapping_by_id: dict[str, dict[str, Any]] = {}
+    mapping_cells: dict[str, set[tuple[str, int, int]]] = {}
+    for mapping in mapping_receipts:
+        mapping_id = mapping["mapping_id"]
+        if mapping_id in mapping_by_id:
+            raise ValueError(f"Duplicate mapping_id {mapping_id!r}.")
+        mapping_by_id[mapping_id] = mapping
+        mapping_cells[mapping_id] = {
+            (component["table_id"], int(component["row"]), int(component["column"]))
+            for component in mapping["components"]
+        }
+
+    by_candidate_id: dict[str, dict[str, Any]] = {}
+    by_expected_key: dict[tuple[str, int, str], dict[str, Any]] = {}
+    resolved_ledger = []
+    referenced_mappings: set[str] = set()
+    for index, entry in enumerate(ledger):
+        candidate_id = entry.get("candidate_id")
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise ValueError(f"coverage_ledger[{index}] has no candidate_id.")
+        if candidate_id in by_candidate_id:
+            raise ValueError(f"Duplicate coverage candidate_id {candidate_id!r}.")
+        table_id = entry.get("table_id")
+        house_id = entry.get("house_id")
+        row = int(entry.get("row", 0))
+        basis = entry.get("period_basis")
+        if table_id not in tables:
+            raise ValueError(f"coverage_ledger[{index}] names unknown table {table_id!r}.")
+        document, table = tables[table_id]
+        if document["house_id"] != house_id:
+            raise ValueError(f"coverage_ledger[{index}] reaches across houses.")
+        key = (table_id, row, basis)
+        expected_entry = expected.get(key)
+        if basis in PERIOD_BASES:
+            if expected_entry is None:
+                raise ValueError(f"coverage_ledger[{index}] does not match a declared nonblank {basis} row.")
+            if key in by_expected_key:
+                raise ValueError(f"Forecast candidate {table_id}!R{row} ({basis}) is dispositioned more than once.")
+            by_expected_key[key] = entry
+            expected_cells = {(item["row"], item["column"]) for item in expected_entry["source_cells"]}
+            actual_cells = {(int(item.get("row", 0)), int(item.get("column", 0))) for item in entry.get("source_cells") or []}
+            if actual_cells != expected_cells:
+                raise ValueError(
+                    f"coverage_ledger[{index}] source cells do not equal the nonblank declared period cells for {table_id}!R{row}."
+                )
+            if basis == "annual_forecast" and sorted(entry.get("period_indexes") or []) != expected_entry["period_indexes"]:
+                raise ValueError(f"coverage_ledger[{index}] annual period_indexes are incomplete or shifted.")
+        elif basis not in {"guidance", "non_periodic"}:
+            raise ValueError(f"coverage_ledger[{index}] has unsupported period_basis {basis!r}.")
+
+        resolved_cells = []
+        for cell_ref in entry.get("source_cells") or []:
+            cell = cell_at(table, int(cell_ref.get("row", 0)), int(cell_ref.get("column", 0)), table_id)
+            if not nonblank(cell):
+                raise ValueError(f"coverage_ledger[{index}] cites blank cell {table_id}!R{cell_ref.get('row')}C{cell_ref.get('column')}.")
+            resolved_cells.append({
+                "row": int(cell_ref["row"]),
+                "column": int(cell_ref["column"]),
+                "source_ref": cell["source_ref"],
+                "raw_value": cell.get("value"),
+            })
+        disposition = entry.get("disposition")
+        metric_id = entry.get("metric_id")
+        mapping_ids = entry.get("mapping_ids") or []
+        if disposition in MAPPED_DISPOSITIONS:
+            if metric_id not in (crosswalk.get("metrics") or {}):
+                raise ValueError(f"coverage_ledger[{index}] maps undeclared metric_id {metric_id!r}.")
+            if not mapping_ids:
+                raise ValueError(f"coverage_ledger[{index}] disposition {disposition} requires mapping_ids.")
+            candidate_cells = {(table_id, item["row"], item["column"]) for item in resolved_cells}
+            for mapping_id in mapping_ids:
+                mapping = mapping_by_id.get(mapping_id)
+                if mapping is None:
+                    raise ValueError(f"coverage_ledger[{index}] names unknown mapping_id {mapping_id!r}.")
+                if mapping["house_id"] != house_id or mapping["metric_id"] != metric_id:
+                    raise ValueError(f"coverage_ledger[{index}] mapping {mapping_id!r} has a different house or metric.")
+                if not (mapping_cells[mapping_id] & candidate_cells):
+                    raise ValueError(f"coverage_ledger[{index}] mapping {mapping_id!r} does not consume one of the candidate's source cells.")
+                referenced_mappings.add(mapping_id)
+            if disposition == "supplemental_check" and (crosswalk["metrics"][metric_id].get("model_disposition") != "reference_only"):
+                raise ValueError(f"Supplemental metric {metric_id!r} must declare model_disposition=reference_only.")
+        elif mapping_ids:
+            raise ValueError(f"coverage_ledger[{index}] carries mapping_ids but disposition {disposition!r} is not mapped.")
+        if disposition in {"mapped_guidance", "partial_period_evidence"} and not isinstance(metric_id, str):
+            raise ValueError(f"coverage_ledger[{index}] disposition {disposition} requires metric_id.")
+        if disposition == "partial_period_evidence" and basis != "partial_period":
+            raise ValueError(f"coverage_ledger[{index}] partial-period evidence has basis {basis!r}.")
+        if disposition == "mapped_guidance" and basis not in {"guidance", "non_periodic"}:
+            raise ValueError(f"coverage_ledger[{index}] mapped guidance has basis {basis!r}.")
+        duplicate_of = entry.get("duplicate_of")
+        if disposition == "duplicate" and not duplicate_of:
+            raise ValueError(f"coverage_ledger[{index}] duplicate has no duplicate_of target.")
+        if disposition != "duplicate" and duplicate_of:
+            raise ValueError(f"coverage_ledger[{index}] has duplicate_of without duplicate disposition.")
+        if entry.get("review_status") != "reviewed" or not str(entry.get("rationale") or "").strip():
+            raise ValueError(f"coverage_ledger[{index}] lacks a reviewed rationale.")
+        resolved = dict(entry)
+        resolved["source_cells"] = resolved_cells
+        resolved.setdefault("label", expected_entry["label"] if expected_entry else row_label(table, row, min(item["column"] for item in resolved_cells)))
+        resolved_ledger.append(resolved)
+        by_candidate_id[candidate_id] = resolved
+
+    missing_candidates = sorted(set(expected) - set(by_expected_key))
+    if missing_candidates:
+        preview = ", ".join(f"{table}!R{row}:{basis}" for table, row, basis in missing_candidates[:8])
+        raise ValueError(f"Broker forecast coverage is incomplete; {len(missing_candidates)} candidate rows have no disposition: {preview}.")
+    for candidate_id, entry in by_candidate_id.items():
+        if entry.get("disposition") != "duplicate":
+            continue
+        target = by_candidate_id.get(entry.get("duplicate_of"))
+        if target is None or target["candidate_id"] == candidate_id:
+            raise ValueError(f"Duplicate candidate {candidate_id!r} has an absent or self-referential target.")
+        if target["house_id"] != entry["house_id"]:
+            raise ValueError(f"Duplicate candidate {candidate_id!r} points across houses.")
+    unreferenced_mappings = sorted(set(mapping_by_id) - referenced_mappings)
+    if unreferenced_mappings:
+        raise ValueError(f"Every compiled mapping must be owned by the coverage ledger; unreferenced: {', '.join(unreferenced_mappings[:8])}.")
+    disposition_counts: dict[str, int] = {}
+    for entry in resolved_ledger:
+        disposition_counts[entry["disposition"]] = disposition_counts.get(entry["disposition"], 0) + 1
+    summary = {
+        "table_count": len(tables),
+        "table_review_count": len(review_by_table),
+        "detected_forecast_candidate_count": len(expected),
+        "coverage_entry_count": len(resolved_ledger),
+        "unresolved_candidate_count": 0,
+        "mapping_count": len(mapping_by_id),
+        "disposition_counts": dict(sorted(disposition_counts.items())),
+    }
+    return resolved_ledger, summary
 
 
 def parse_number(value: Any, label: str) -> float:
@@ -90,6 +401,13 @@ def main() -> int:
         raise ValueError("The crosswalk requires at least one headline metric: EBIT or Adjusted EBITDA.")
     if len(crosswalk.get("forecast_periods") or []) != 3:
         raise ValueError("The broker crosswalk must declare exactly three forecast periods.")
+    for metric_id, declaration in metrics.items():
+        disposition = declaration.get("model_disposition")
+        reason = declaration.get("model_disposition_reason")
+        if bool(disposition) != bool(isinstance(reason, str) and reason.strip()):
+            raise ValueError(
+                f"Metric {metric_id!r} must supply model_disposition and model_disposition_reason together."
+            )
 
     estimates: dict[str, dict[str, list[float | None]]] = {
         house_id: {metric_id: [None, None, None] for metric_id in metrics}
@@ -97,7 +415,9 @@ def main() -> int:
     }
     mapping_receipts = []
     occupied: set[tuple[str, str, int]] = set()
+    mapping_ids: set[str] = set()
     for index, mapping in enumerate(crosswalk.get("mappings") or []):
+        mapping_id = mapping.get("mapping_id")
         house_id = mapping.get("house_id")
         metric_id = mapping.get("metric_id")
         period_index = mapping.get("period_index")
@@ -110,6 +430,11 @@ def main() -> int:
             raise ValueError(f"mappings[{index}] has invalid period_index.")
         if key in occupied:
             raise ValueError(f"Duplicate broker mapping for {key}.")
+        if not isinstance(mapping_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", mapping_id):
+            raise ValueError(f"mappings[{index}] has invalid mapping_id.")
+        if mapping_id in mapping_ids:
+            raise ValueError(f"Duplicate mapping_id {mapping_id!r}.")
+        mapping_ids.add(mapping_id)
         occupied.add(key)
         components = []
         total = float(mapping.get("constant", 0.0))
@@ -143,6 +468,7 @@ def main() -> int:
         total *= multiplier
         estimates[house_id][metric_id][period_index] = total
         mapping_receipts.append({
+            "mapping_id": mapping_id,
             "house_id": house_id,
             "metric_id": metric_id,
             "period_index": period_index,
@@ -153,6 +479,13 @@ def main() -> int:
             "rationale": mapping.get("rationale"),
             "review_status": mapping.get("review_status", "reviewed"),
         })
+
+    resolved_coverage, coverage_summary = validate_coverage(
+        crosswalk,
+        documents_by_house,
+        tables,
+        mapping_receipts,
+    )
 
     source_label = crosswalk.get("source_label") or (
         f"{len(documents_by_house)}-house broker pack extracted and cell-crosswalked from hash-bound source documents"
@@ -237,12 +570,23 @@ def main() -> int:
         "crosswalk_sha256": hashlib.sha256(Path(args.crosswalk).read_bytes()).hexdigest(),
         "mapping_count": len(mapping_receipts),
         "mappings": mapping_receipts,
+        "table_reviews_sha256": hash_json(crosswalk["table_reviews"]),
+        "coverage_ledger_sha256": hash_json(crosswalk["coverage_ledger"]),
+        "coverage_summary": coverage_summary,
+        "coverage_ledger": resolved_coverage,
         "status": "PASS",
     }
     (output_root / "broker-pack.json").write_text(json.dumps(broker_pack, indent=2, ensure_ascii=False) + "\n", "utf-8")
     (output_root / "broker-source-tables.json").write_text(json.dumps(broker_sources, indent=2, ensure_ascii=False) + "\n", "utf-8")
     (output_root / "broker-crosswalk-receipt.json").write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + "\n", "utf-8")
-    print(json.dumps({"status": "PASS", "houses": len(houses), "mappings": len(mapping_receipts), "metrics": len(metrics)}, sort_keys=True))
+    print(json.dumps({
+        "status": "PASS",
+        "houses": len(houses),
+        "mappings": len(mapping_receipts),
+        "metrics": len(metrics),
+        "coverage_entries": len(resolved_coverage),
+        "unresolved_candidates": coverage_summary["unresolved_candidate_count"],
+    }, sort_keys=True))
     return 0
 
 

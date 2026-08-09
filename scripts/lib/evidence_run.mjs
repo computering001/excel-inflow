@@ -1226,6 +1226,21 @@ function validateBrokerSourceTables(run, findings) {
       ),
     );
   }
+  if (
+    receipt?.coverage_summary?.unresolved_candidate_count !== 0 ||
+    receipt?.coverage_summary?.table_count !==
+      receipt?.coverage_summary?.table_review_count ||
+    !Array.isArray(receipt?.coverage_ledger) ||
+    receipt.coverage_ledger.length === 0
+  ) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.semantic_coverage_incomplete",
+        "BLOCK",
+        "Full-table broker evidence requires a non-empty semantic coverage ledger with every table reviewed and zero unresolved forecast candidates.",
+      ),
+    );
+  }
   const sourceIds = new Set();
   const tableIds = new Set();
   let cellsVisited = 0;

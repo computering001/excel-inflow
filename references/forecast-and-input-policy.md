@@ -241,8 +241,13 @@ Never for history.** Historic movements come from the filings without exception.
 When broker data is supplied or available:
 
 - retain used values on `Brokers`;
+- require the full-table semantic coverage ledger to disposition every detected
+  annual and partial-period row before selecting an authority;
 - create a visible selector or consensus choice;
 - preserve metric and period definitions;
+- keep quarterly/half-year evidence outside annual consensus, keep narrative
+  guidance as guidance, and retain supplemental debt/cash/output metrics as
+  explicitly labelled checks rather than silent omissions;
 - link the selected case into the main model;
 - exclude synthetic values unless explicitly instructed;
 - derive compatible model metrics visibly when definitions differ.
