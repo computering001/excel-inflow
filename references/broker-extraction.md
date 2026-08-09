@@ -215,6 +215,16 @@ material remain losslessly preserved in the run artifact with
 `workbook_presentation=evidence_only` but are not rendered in the analyst
 workbook. Every table used by a model mapping must be rendered.
 
+These are two deliberately different artifacts. `broker-source-tables/1.0`
+keeps the complete reviewed page inventory. `model_case.broker_pack.raw_tables`
+is the deterministic projection of that inventory containing every house but
+only its `analytical_table` tables. Never require their table counts or hashes
+to be identical, never discard an evidence-only table from the run artifact,
+and never hand-select a narrower workbook subset. Attachment ingress compiles
+the projection and the evidence gate independently recomputes it from the
+per-table disposition ledger. A mapped source cell on an `evidence_only` table
+is a blocker.
+
 The main `Brokers` sheet links mapped house estimates to those evidence cells.
 The Operating Model continues to link only to `Brokers`; it must never reference
 a raw evidence sheet directly. Evidence sheets are optional for legacy or

@@ -74,6 +74,22 @@ function canonicalPayloadSha256(value) {
   return sha256(Buffer.from(JSON.stringify(canonicalise(value)), "utf8"));
 }
 
+/**
+ * Project the lossless broker-page inventory onto the values-only workbook
+ * evidence sheets.  The run artifact retains every reviewed table; the model
+ * case carries only tables explicitly dispositioned `analytical_table`.
+ * House metadata is retained even when a house has no presentable table so the
+ * projection cannot silently remove a supplied broker document.
+ */
+function brokerWorkbookTableProjection(sourceTables) {
+  return (sourceTables?.houses ?? []).map((house) => ({
+    ...structuredClone(house),
+    tables: (house.tables ?? [])
+      .filter((table) => table.workbook_presentation === "analytical_table")
+      .map((table) => structuredClone(table)),
+  }));
+}
+
 function parseBrokerNumber(value, label) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "boolean" || value === null || value === undefined) {
@@ -769,9 +785,22 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   if (semanticReport) {
     evidence.broker_semantic_verification = semanticReport.json;
   }
-  evidence.model_case.broker_pack.raw_tables = structuredClone(
-    sourceTables.json.houses,
+  const workbookTables = brokerWorkbookTableProjection(sourceTables.json);
+  const workbookTableIds = new Set(
+    workbookTables.flatMap((house) =>
+      (house.tables ?? []).map((table) => table.table_id),
+    ),
   );
+  for (const mapping of receipt.json.mappings ?? []) {
+    for (const component of mapping.components ?? []) {
+      if (!workbookTableIds.has(component.table_id)) {
+        throw new Error(
+          `Broker mapping ${mapping.mapping_id ?? `${mapping.house_id}.${mapping.metric_id}.${mapping.period_index}`} uses ${component.table_id}, but that table is not dispositioned analytical_table for workbook presentation.`,
+        );
+      }
+    }
+  }
+  evidence.model_case.broker_pack.raw_tables = workbookTables;
   evidence.model_case.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
   );

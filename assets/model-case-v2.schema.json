@@ -272,7 +272,7 @@
         "raw_tables": {
           "type": "array",
           "maxItems": 10,
-          "description": "Optional immutable full-table broker evidence. Each house is hash-bound to its source and preserves every extracted table separately. It never replaces broker_pack.metrics as the calculation authority.",
+          "description": "Optional deterministic workbook projection of the immutable broker evidence. Each house remains hash-bound to its source, but only tables dispositioned analytical_table are carried here; evidence_only tables remain in the run-level broker_source_tables artifact. It never replaces broker_pack.metrics as the calculation authority.",
           "items": {
             "type": "object",
             "additionalProperties": false,

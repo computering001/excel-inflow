@@ -263,6 +263,14 @@ python3 scripts/verify_broker_semantics.py <verified-bundle.json> <broker-crossw
 python3 scripts/compile_broker_pack.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker
 ```
 
+Do not force the complete broker-page inventory into the workbook carrier.
+`broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
+deterministically projects only tables dispositioned `analytical_table` into
+`model_case.broker_pack.raw_tables`. Evidence-only tables stay hash-bound in the
+run, every supplied house remains represented, and every mapped cell must land
+on an analytical table. The two arrays are therefore related by the reviewed
+disposition ledger, not by full-array equality.
+
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves
 two independent hash-bound cell transcriptions agree or records an explicit

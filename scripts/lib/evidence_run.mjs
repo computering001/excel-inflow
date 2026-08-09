@@ -1632,12 +1632,22 @@ function validateBrokerSourceTables(run, findings) {
     );
     return;
   }
-  if (hashValue(evidenceTables.houses ?? []) !== hashValue(modelTables)) {
+  // The evidence envelope is lossless; the workbook is intentionally not.
+  // Only reviewed analytical/financial tables may enter the values-only Bxx
+  // sheets.  Recompute that projection independently here rather than trusting
+  // the ingress compiler or accepting a caller-selected subset.
+  const expectedWorkbookTables = (evidenceTables.houses ?? []).map((house) => ({
+    ...structuredClone(house),
+    tables: (house.tables ?? [])
+      .filter((table) => table.workbook_presentation === "analytical_table")
+      .map((table) => structuredClone(table)),
+  }));
+  if (hashValue(expectedWorkbookTables) !== hashValue(modelTables)) {
     findings.push(
       finding(
         "evidence.broker_source_tables.model_case_mismatch",
         "BLOCK",
-        "The model case does not preserve the full broker source tables exactly.",
+        "The model case does not equal the deterministic analytical-table projection of the full broker evidence inventory.",
       ),
     );
   }
@@ -1658,9 +1668,14 @@ function validateBrokerSourceTables(run, findings) {
       ),
     );
   }
+  const sourceTableCount = (evidenceTables.houses ?? []).reduce(
+    (count, house) => count + (house.tables ?? []).length,
+    0,
+  );
   if (
     receipt?.coverage_summary?.unresolved_candidate_count !== 0 ||
     receipt?.coverage_summary?.semantic_quality_violation_count !== 0 ||
+    receipt?.coverage_summary?.table_count !== sourceTableCount ||
     receipt?.coverage_summary?.table_count !==
       receipt?.coverage_summary?.table_review_count ||
     !Array.isArray(receipt?.coverage_ledger) ||
@@ -1720,6 +1735,24 @@ function validateBrokerSourceTables(run, findings) {
   }
   const sourceIds = new Set();
   const tableIds = new Set();
+  const workbookTableIds = new Set(
+    expectedWorkbookTables.flatMap((house) =>
+      (house.tables ?? []).map((table) => table.table_id),
+    ),
+  );
+  for (const mapping of receipt?.mappings ?? []) {
+    for (const component of mapping.components ?? []) {
+      if (!workbookTableIds.has(component.table_id)) {
+        findings.push(
+          finding(
+            "evidence.broker_source_tables.mapped_table_not_rendered",
+            "BLOCK",
+            `Broker mapping ${mapping.mapping_id ?? `${mapping.house_id}.${mapping.metric_id}.${mapping.period_index}`} uses ${component.table_id}, which is not an analytical workbook table.`,
+          ),
+        );
+      }
+    }
+  }
   let cellsVisited = 0;
   for (const house of evidenceTables.houses ?? []) {
     if (sourceIds.has(house.source_id)) {
