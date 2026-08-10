@@ -94,13 +94,68 @@ function formatMaturity(maturityDate) {
   return `${MONTHS[month - 1]}-${match[1].slice(-2)}`;
 }
 
+// A SECURITY IDENTIFIER IS NOT A NAME.
+//
+// A FactSet debt export names instruments by CUSIP/ISIN/SEDOL, so the
+// AstraZeneca debt schedule read "G4635SAV0 0.7% 2026" and
+// "FDS8TIAV7 2030" — twenty-eight rows of security codes where an analyst
+// expects instrument types. The code is real evidence and stays in the
+// export lineage; it is simply not the label. A leading identifier is
+// replaced by the instrument's own declared type, and where the case
+// declares no type the class supplies a truthful generic ("Senior notes",
+// "Term loan", "RCF"), so the label always reads TYPE + RATE + MATURITY.
+//
+// Matched conservatively: a leading token of 8-12 characters mixing letters
+// and digits with no lower-case and no spaces. Real instrument names never
+// take that shape; identifiers always do.
+const SECURITY_IDENTIFIER_TOKEN =
+  /^(?=[A-Z0-9]{8,12}(?:\b|_))(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{8,12}[\s,:-]*/;
+
+const CLASS_GENERIC_TYPE = Object.freeze({
+  rcf: "RCF",
+  revolver: "RCF",
+  term_loan: "Term loan",
+  bank_debt: "Bank debt",
+  bond: "Senior notes",
+  senior_notes: "Senior notes",
+  lease: "Lease liability",
+  commercial_paper: "Commercial paper",
+  overdraft: "Overdraft",
+});
+
+function declaredInstrumentType(instrument) {
+  const declared = String(
+    instrument?.instrument_type ?? instrument?.type ?? "",
+  ).trim();
+  if (declared) return declared;
+  const known = CLASS_GENERIC_TYPE[String(instrument?.class ?? "").toLowerCase()];
+  return known ?? "Debt instrument";
+}
+
 export function compactInstrumentName(instrument) {
   const source = String(
     instrument?.name ?? instrument?.instrument_id ?? "",
   ).trim();
   if (!source) return "Debt instrument";
-  if (instrument?.class !== "rcf") return source;
-  return source.replace(/\brevolving\s+credit\s+facilit(?:y|ies)\b/gi, "RCF");
+  let name = source;
+  if (SECURITY_IDENTIFIER_TOKEN.test(name)) {
+    const remainder = name.replace(SECURITY_IDENTIFIER_TOKEN, "").trim();
+    const type = declaredInstrumentType(instrument);
+    // The rate and maturity that followed the code are preserved; only the
+    // identifier itself is replaced by the declared type. When the remainder
+    // already opens with that type — "US03027X1000 term loan" — prefixing it
+    // would stutter, so the remainder's own wording wins.
+    const stutters =
+      remainder.length > 0 &&
+      remainder.slice(0, type.length).toLowerCase() === type.toLowerCase();
+    name = remainder
+      ? stutters
+        ? remainder
+        : `${type} ${remainder}`
+      : type;
+  }
+  if (instrument?.class !== "rcf") return name;
+  return name.replace(/\brevolving\s+credit\s+facilit(?:y|ies)\b/gi, "RCF");
 }
 
 // Debt-schedule label contract: TYPE + RATE + MATURITY, e.g.
@@ -186,6 +241,22 @@ export function instrumentDisplayLabel(instrument, reportingCurrency = null) {
     }
   }
 
+  // The contract is TYPE + RATE + MATURITY, in that order. An appended rate
+  // must therefore land BEFORE a bare trailing year the name already carries,
+  // or an identifier-derived label reads "Senior notes 2030 4.35%".
+  const trailingYear = name.match(/\s(\d{4})$/);
+  if (trailingYear && !RATE_TOKEN.test(name) && !/\d\s*bps/i.test(name)) {
+    name = name.slice(0, trailingYear.index).trim();
+    const rate =
+      instrument?.rate_type === "floating" && instrument?.benchmark
+        ? Number(instrument.spread_bps ?? 0)
+          ? `${instrument.benchmark}+${instrument.spread_bps}bps`
+          : String(instrument.benchmark)
+        : instrument?.rate_type === "unpriced"
+          ? null
+          : formatRatePercent(instrument?.coupon_or_all_in_rate?.[0]);
+    name = [name, rate, trailingYear[1]].filter(Boolean).join(" ");
+  }
   const parts = [name];
   const hasRate = RATE_TOKEN.test(name) || /\d\s*bps/i.test(name);
   if (!hasRate) {

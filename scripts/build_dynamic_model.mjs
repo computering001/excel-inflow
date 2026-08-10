@@ -365,7 +365,13 @@ const FX_RATE = '0.0000;(0.0000);"–"';
 // never a thousands separator, never a decimal. They used to share a bare `0`
 // with nothing to say what they were.
 const YEAR = "0000";
-const MONTH = "00";
+// The close month is a MONTH, so it reads as one. The cell still holds the
+// integer every DATE() formula in the acquisition block consumes — only the
+// display changes, via a twelve-branch positional format. "01" told a reader
+// nothing; "Jan" tells them what they picked.
+const MONTH =
+  '[=1]"Jan";[=2]"Feb";[=3]"Mar";[=4]"Apr";[=5]"May";[=6]"Jun";' +
+  '[=7]"Jul";[=8]"Aug";[=9]"Sep";[=10]"Oct";[=11]"Nov";[=12]"Dec";00';
 const TOGGLE = '[=1]"On";[=0]"Off"';
 // COLUMN C OF THE INTEREST SCHEDULE IS A CLOSED VOCABULARY, AND IT IS COMPILED.
 //
