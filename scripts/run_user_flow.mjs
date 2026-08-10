@@ -1088,6 +1088,18 @@ async function main() {
   const stage5Dir = path.join(runDir, "stages", "delivery");
   const deliveryResultPath = path.join(stage5Dir, "delivery-result.json");
   const deliveryScreenPath = path.join(stage5Dir, "delivery-screen.txt");
+  // THE CONTROLLER NAMES THE DELIVERABLE, NOT THE CHAT. Every run used to
+  // deliver under one reused friendly filename, so a user's Downloads folder
+  // accumulated identically-named workbooks from different eras and a stale
+  // one was eventually opened and mistaken for the delivery. The name is now
+  // minted here, after attestation, and carries the attested workbook hash —
+  // two different workbooks can never share a delivery filename, and the name
+  // itself is checkable against artifact_hashes.workbook in the attestation.
+  // The chat layer attaches this file byte-for-byte and never renames it.
+  const issuerToken = (String(answeredCase?.issuer?.name ?? "Model").match(/[A-Za-z0-9]+/g) ?? ["Model"])[0];
+  const deliveryFileName = `${issuerToken}_Debt_Overlay_${deliveryAttestation.artifact_hashes.workbook.slice(0, 8)}.xlsx`;
+  const deliveryFilePath = path.join(stage5Dir, deliveryFileName);
+  await fs.copyFile(workbook, deliveryFilePath);
   const stage5Inputs = {
     stage4_receipt: receipt4.receipt_hash,
     model_case: caseHash,
@@ -1098,6 +1110,7 @@ async function main() {
     delivery_result: deliveryResultPath,
     delivery_screen: deliveryScreenPath,
     live_delivery_attestation: deliveryAttestationPath,
+    delivery_file: deliveryFilePath,
   };
   const cached5 = await readUsableStage({
     runDir,
@@ -1126,6 +1139,9 @@ async function main() {
         `Controller ${deliveryAttestation.controller_version}`,
         `Authority ${deliveryAttestation.authority_profile} / design epoch ${deliveryAttestation.design_epoch}`,
         `Attestation ${deliveryAttestation.attestation_sha256}`,
+        `Delivery file ${deliveryFileName}`,
+        `Workbook SHA-256 ${deliveryAttestation.artifact_hashes.workbook}`,
+        `Sheets ${(deliveryAttestation.topology.sheet_names ?? []).join(" | ")}`,
       ],
     };
     deliveryScreen = renderDeliveryReport(report, { status: "review required" });
@@ -1133,6 +1149,10 @@ async function main() {
       outcome: delivered.outcome,
       report,
       workbook,
+      delivery_file: deliveryFilePath,
+      delivery_file_name: deliveryFileName,
+      delivery_file_sha256: deliveryAttestation.artifact_hashes.workbook,
+      sheet_names: deliveryAttestation.topology.sheet_names ?? [],
       automated_gate_status: buildResult.status,
       manual_gate: "native_excel_restoration_and_visual_review",
       live_delivery_attestation: deliveryAttestationPath,
@@ -1170,6 +1190,10 @@ async function main() {
       status: "PASS_PENDING_MANUAL",
       stage: "delivery",
       workbook,
+      delivery_file: deliveryFilePath,
+      delivery_file_name: deliveryFileName,
+      delivery_file_sha256: deliveryAttestation.artifact_hashes.workbook,
+      sheet_names: deliveryAttestation.topology.sheet_names ?? [],
       carrier: carrier.path,
       evidence_run: stage1Evidence,
       model_case: answeredCasePath,

@@ -4,7 +4,7 @@
  "central_instruction_source": "compiled",
  "default_reference_policy": "central-only-first",
  "instruction_strip_rules_runtime": [],
- "_note": "This file is the single source of truth for what ships to deployment host. scripts/compile_skill_release.mjs reads every list below; it holds no duplicate hardcoded set. script_allowlist is the transitive import closure of script_entry_points and is verified against a freshly computed closure on every compile — a disagreement fails the build rather than shipping a package that cannot resolve. python_module_allowlist is the same statement for every Python runtime module, computed by the same both-directions rule from an `ast` walk rather than a regex.",
+ "_note": "This file is the single source of truth for what ships to deployment host. scripts/compile_skill_release.mjs reads every list below; it holds no duplicate hardcoded set. script_allowlist is the transitive import closure of script_entry_points and is verified against a freshly computed closure on every compile \u2014 a disagreement fails the build rather than shipping a package that cannot resolve. python_module_allowlist is the same statement for every Python runtime module, computed by the same both-directions rule from an `ast` walk rather than a regex.",
  "reference_allowlist": [
   "runtime-core.md",
   "model-contract.md",
@@ -66,42 +66,42 @@
   "standardised-design-runtime.v4.json",
   "style-tokens.json"
  ],
-  "declared_only_assets": {
+ "declared_only_assets": {
   "authority-projection-overrides.v3.json": "Empty correction registry retained with presentation epoch 3 as an explicit rollback route; it never inherits epoch-2 corrections.",
   "authority-projection-overrides.v4.json": "Empty correction registry for the source-founded presentation epoch 4 candidate. Epoch 4 must validate with zero approved differences; epochs 2 and 3 remain explicit rollback routes.",
   "broker-pack.schema.json": "Stage-1 normalised broker-pack contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
-    "broker-extraction-request.schema.json": "External broker-document extraction request contract; consumed before the extraction entry point runs.",
-    "broker-extraction-bundle.schema.json": "Lossless broker evidence bundle contract; loaded through the attachment-ingress schema helper and retained for independent validation.",
-    "broker-vision-result.schema.json": "Hash-bound independent image-table transcription contract; responses are inputs to the vision consensus compiler.",
-    "broker-crosswalk.schema.json": "Declarative cell-addressed broker crosswalk contract; consumed by the stdlib broker-pack compiler.",
-    "broker-crosswalk-receipt.schema.json": "Hash-bound broker mapping and semantic-gate receipt contract loaded through the attachment-ingress schema helper.",
-    "broker-source-tables.schema.json": "Structured full-table evidence contract loaded through the attachment-ingress schema helper.",
-    "broker-candidate-manifest.schema.json": "Immutable broker candidate-universe contract retained for independent validation.",
-    "broker-canonical-tables.schema.json": "Canonical broker-table contract retained for independent validation.",
-    "broker-semantic-verification-report.schema.json": "Independent broker semantic-verification report contract loaded through the attachment-ingress schema helper.",
-    "broker-surface-census.schema.json": "Whole-surface broker census contract retained for independent validation.",
-    "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
-    "dcs-candidate-manifest-v1.schema.json": "Lossless DCS candidate-universe contract loaded through the attachment-ingress schema helper.",
-    "dcs-crosswalk-v1.schema.json": "Cell-addressed DCS crosswalk contract loaded through the attachment-ingress schema helper.",
-    "dcs-evidence-receipt-v1.schema.json": "DCS compiler receipt contract loaded through the attachment-ingress schema helper.",
-    "dcs-extraction-receipt-v1.schema.json": "Lossless DCS extraction receipt contract retained for independent validation.",
-    "dcs-extraction-request-v1.schema.json": "Lossless DCS extraction request contract consumed before the extractor runs.",
-    "dcs-independent-verification-v1.schema.json": "Independent DCS verification report contract loaded through the attachment-ingress schema helper.",
-    "dcs-projection-v1.schema.json": "DCS model-projection and term-authority contract loaded through the attachment-ingress schema helper.",
-    "dcs-source-tables-v1.schema.json": "Lossless DCS source-cell ledger contract loaded through the attachment-ingress schema helper.",
-    "economic-solve-policy.v1.json": "Canonical solver, workbook-calculation, native-tolerance and circularity-role authority loaded by the economic runtime.",
-    "economic-solve-policy.v1.schema.json": "Strict schema for the canonical economic solve policy, loaded beside that policy by the runtime.",
-    "equation-graph.v1.json": "Canonical machine-readable forecast economic equation graph loaded by the economic graph runtime.",
-    "equation-graph.v1.schema.json": "Strict equation-graph/1.0 schema loaded beside the canonical economic graph.",
-    "convergence-contract.v1.json": "Hash-bound structural and active SCC, iteration-state and tolerance-class contract loaded by the economic graph runtime.",
-    "convergence-contract.v1.schema.json": "Strict convergence-contract/1.0 schema loaded beside the canonical convergence contract.",
-    "forecast-plan-v2.schema.json": "Sealed per-row and per-period forecast-state and candidate-ledger contract retained for independent validation.",
-    "lineage-exceptions.json": "L0 immutable exception registry. Named as immutable-at-runtime; must be present so a runtime exception claim can be checked against it.",
-    "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
-    "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
+  "broker-extraction-request.schema.json": "External broker-document extraction request contract; consumed before the extraction entry point runs.",
+  "broker-extraction-bundle.schema.json": "Lossless broker evidence bundle contract; loaded through the attachment-ingress schema helper and retained for independent validation.",
+  "broker-vision-result.schema.json": "Hash-bound independent image-table transcription contract; responses are inputs to the vision consensus compiler.",
+  "broker-crosswalk.schema.json": "Declarative cell-addressed broker crosswalk contract; consumed by the stdlib broker-pack compiler.",
+  "broker-crosswalk-receipt.schema.json": "Hash-bound broker mapping and semantic-gate receipt contract loaded through the attachment-ingress schema helper.",
+  "broker-source-tables.schema.json": "Structured full-table evidence contract loaded through the attachment-ingress schema helper.",
+  "broker-candidate-manifest.schema.json": "Immutable broker candidate-universe contract retained for independent validation.",
+  "broker-canonical-tables.schema.json": "Canonical broker-table contract retained for independent validation.",
+  "broker-semantic-verification-report.schema.json": "Independent broker semantic-verification report contract loaded through the attachment-ingress schema helper.",
+  "broker-surface-census.schema.json": "Whole-surface broker census contract retained for independent validation.",
+  "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
+  "dcs-candidate-manifest-v1.schema.json": "Lossless DCS candidate-universe contract loaded through the attachment-ingress schema helper.",
+  "dcs-crosswalk-v1.schema.json": "Cell-addressed DCS crosswalk contract loaded through the attachment-ingress schema helper.",
+  "dcs-evidence-receipt-v1.schema.json": "DCS compiler receipt contract loaded through the attachment-ingress schema helper.",
+  "dcs-extraction-receipt-v1.schema.json": "Lossless DCS extraction receipt contract retained for independent validation.",
+  "dcs-extraction-request-v1.schema.json": "Lossless DCS extraction request contract consumed before the extractor runs.",
+  "dcs-independent-verification-v1.schema.json": "Independent DCS verification report contract loaded through the attachment-ingress schema helper.",
+  "dcs-projection-v1.schema.json": "DCS model-projection and term-authority contract loaded through the attachment-ingress schema helper.",
+  "dcs-source-tables-v1.schema.json": "Lossless DCS source-cell ledger contract loaded through the attachment-ingress schema helper.",
+  "economic-solve-policy.v1.json": "Canonical solver, workbook-calculation, native-tolerance and circularity-role authority loaded by the economic runtime.",
+  "economic-solve-policy.v1.schema.json": "Strict schema for the canonical economic solve policy, loaded beside that policy by the runtime.",
+  "equation-graph.v1.json": "Canonical machine-readable forecast economic equation graph loaded by the economic graph runtime.",
+  "equation-graph.v1.schema.json": "Strict equation-graph/1.0 schema loaded beside the canonical economic graph.",
+  "convergence-contract.v1.json": "Hash-bound structural and active SCC, iteration-state and tolerance-class contract loaded by the economic graph runtime.",
+  "convergence-contract.v1.schema.json": "Strict convergence-contract/1.0 schema loaded beside the canonical convergence contract.",
+  "forecast-plan-v2.schema.json": "Sealed per-row and per-period forecast-state and candidate-ledger contract retained for independent validation.",
+  "lineage-exceptions.json": "L0 immutable exception registry. Named as immutable-at-runtime; must be present so a runtime exception claim can be checked against it.",
+  "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
+  "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
   "deployment-profile.json": "Package provenance and exact allowlists. It is compiler input rather than runtime-loaded content, but ships so release-manifest.json never points to an absent profile.",
-    "row-taxonomy-v2.json": "Row taxonomy the agent reads while mapping company rows. Referenced from the instructions, not imported by a shipped script."
-  },
+  "row-taxonomy-v2.json": "Row taxonomy the agent reads while mapping company rows. Referenced from the instructions, not imported by a shipped script."
+ },
  "script_entry_points": [
   "build_dynamic_model.mjs",
   "compile_evidence_run.mjs",
@@ -126,8 +126,8 @@
   "build_dynamic_model.mjs",
   "compile_evidence_run.mjs",
   "compile_public_test_run.mjs",
-    "lib/acquisition_policy.mjs",
-    "lib/attachment_ingress.mjs",
+  "lib/acquisition_policy.mjs",
+  "lib/attachment_ingress.mjs",
   "flow_cli.mjs",
   "lib/broker_anchor.mjs",
   "lib/coverage.mjs",
@@ -145,12 +145,12 @@
   "lib/flow_reconcile.mjs",
   "lib/flow_runtime.mjs",
   "lib/live_delivery_attestation.mjs",
-    "lib/flow_screens.mjs",
-    "lib/forecast_authority.mjs",
-    "lib/forecast_behavior.mjs",
+  "lib/flow_screens.mjs",
+  "lib/forecast_authority.mjs",
+  "lib/forecast_behavior.mjs",
   "lib/forecast_candidate_compiler.mjs",
-    "lib/formula_dsl.mjs",
-    "lib/historical_normalisation.mjs",
+  "lib/formula_dsl.mjs",
+  "lib/historical_normalisation.mjs",
   "lib/historical_interest_authority.mjs",
   "lib/user_flow_controller.mjs",
   "lib/intake.mjs",
@@ -212,7 +212,7 @@
    "note": "Shipped as the pre-built UMD bundle so the vendored copy has no transitive dependencies of its own. It sits at node_modules/jszip because that is where Node resolves a bare specifier; the shipped validators are byte-identical to their local sources and must stay that way for source parity."
   }
  ],
- "_python_note": "The Python runtime modules ship alongside the JavaScript closure. They are held to the same standard: the closure is COMPUTED from python_entry_points by an ast walk (never a regex — this tree has docstring lines beginning `from ...` that a regex reads as imports) and compared with python_module_allowlist in both directions; a disagreement fails the build. Third-party imports are checked against allowed_python_third_party_imports exactly as a bare JS specifier is checked against allowed_bare_imports.",
+ "_python_note": "The Python runtime modules ship alongside the JavaScript closure. They are held to the same standard: the closure is COMPUTED from python_entry_points by an ast walk (never a regex \u2014 this tree has docstring lines beginning `from ...` that a regex reads as imports) and compared with python_module_allowlist in both directions; a disagreement fails the build. Third-party imports are checked against allowed_python_third_party_imports exactly as a bare JS specifier is checked against allowed_bare_imports.",
  "python_entry_points": [
   "extract_broker_evidence.py",
   "compile_broker_vision.py",
@@ -229,50 +229,83 @@
   "verify/run_finance_proof_mutations.py",
   "verify/run_deterministic_tests.py",
   "verify/validate_dynamic_model.py",
-  "verify/workbook_semantic_oracle.py"
+  "verify/workbook_semantic_oracle.py",
+  "verify/verify_delivery.py"
  ],
  "_python_entry_point_note": "Sixteen Python entry points are independently runnable. The broker and DCS entries own lossless evidence capture, independent census/semantic verification and term-authority compilation. emit/__main__.py is the Phase 2 renderer CLI. render/check_render.py and render/selftest.py prove image checks and their injected-defect behavior. verify/finance_proof.py is the independent finance oracle and verify/run_finance_proof_mutations.py proves that oracle detects targeted corruption. verify/run_deterministic_tests.py is the stdlib-only determinism harness. verify/validate_dynamic_model.py is the portable Python model validator.",
  "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship WITHOUT a runnable command naming them. It is empty because none do: the instructions carry a python3 command for all sixteen, and the compiler reports entryPointsUncommandedByInstructions as empty. The former blanket exemptions were deleted rather than kept as description; a note that outlives its condition silently satisfies the assertion for the wrong entry point. Add an entry here only when an entry point actually loses its command.",
  "python_entry_point_notes": {},
  "python_entry_point_smoke": {
   "extract_broker_evidence.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: extract_broker_evidence.py"
   },
   "compile_broker_vision.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: compile_broker_vision.py"
   },
   "compile_broker_pack.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: compile_broker_pack.py"
   },
   "compile_broker_surface_census.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: compile_broker_surface_census.py"
   },
   "verify_broker_semantics.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: verify_broker_semantics.py"
   },
   "extract_dcs_evidence.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: extract_dcs_evidence.py"
   },
   "compile_dcs_evidence.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: compile_dcs_evidence.py"
   },
   "verify/dcs_evidence_oracle.py": {
-   "argv": ["--help"],
-   "expect_exit": [0],
+   "argv": [
+    "--help"
+   ],
+   "expect_exit": [
+    0
+   ],
    "expect_output_contains": "usage: dcs_evidence_oracle.py"
   },
   "_note": "What running each entry point from the clean release root must produce. Exit status alone is not the contract: two of these treat --help as an unrecognised argument and exit 1 with a usage line, and an entry point that had lost its imports would also exit non-zero. The required substring is what separates the two.",
@@ -347,6 +380,13 @@
     0
    ],
    "expect_output_contains": "usage: workbook_semantic_oracle.py"
+  },
+  "verify/verify_delivery.py": {
+   "argv": [],
+   "expect_exit": [
+    2
+   ],
+   "expect_output_contains": "Usage: verify_delivery.py"
   }
  },
  "python_module_allowlist": [
@@ -388,7 +428,8 @@
   "verify/tolerances.py",
   "verify/validate_dynamic_model.py",
   "verify/workbook_semantic_oracle.py",
-  "verify/xlsx.py"
+  "verify/xlsx.py",
+  "verify/verify_delivery.py"
  ],
  "_python_module_allowlist_omissions": {
   "verify/compare_reports.py": "Diffs a Node validation-report.json against the Python port's, check for check. Its whole purpose is to prove the port matches an incumbent that cannot ship; inside the release there is no Node report to diff against. Deliberately not an entry point, therefore deliberately not in the closure."
@@ -415,7 +456,7 @@
     "render"
    ],
    "vendoring": "forbidden",
-   "reason": "PyMuPDF reads the rendered PDF back. Native in deployment host. It is a compiled extension — vendoring it would mean shipping a platform-specific binary wheel, which the release format has no way to pin honestly across architectures."
+   "reason": "PyMuPDF reads the rendered PDF back. Native in deployment host. It is a compiled extension \u2014 vendoring it would mean shipping a platform-specific binary wheel, which the release format has no way to pin honestly across architectures."
   },
   "PIL": {
    "distribution": "Pillow",
@@ -445,7 +486,7 @@
     "emit"
    ],
    "vendoring": "forbidden",
-   "reason": "emit/plan.py prefers jsonschema when importable and falls back to a deliberately small draft-07 subset when it is not, so the renderer still fails closed without it. required_at is runtime_optional and the compiler asserts the import really is guarded — an unguarded jsonschema import would turn a documented fallback into a hard dependency."
+   "reason": "emit/plan.py prefers jsonschema when importable and falls back to a deliberately small draft-07 subset when it is not, so the renderer still fails closed without it. required_at is runtime_optional and the compiler asserts the import really is guarded \u2014 an unguarded jsonschema import would turn a documented fallback into a hard dependency."
   },
   "pdfplumber": {
    "distribution": "pdfplumber",
@@ -481,7 +522,10 @@
  "_python_vendoring_policy": "Every entry above is provision=native and vendoring=forbidden, and the compiler enforces both: it refuses any provision other than native, and refuses to ship a vendored_dependencies entry whose name collides with a Python third-party root. None of these packages is vendored. Vendoring a package the host already provides is how you ship a version conflict.",
  "python_package_dependency_policy": {
   "extract_broker_evidence.py": {
-   "may_import_third_party": ["fitz", "openpyxl"],
+   "may_import_third_party": [
+    "fitz",
+    "openpyxl"
+   ],
    "reason": "Broker evidence extraction prefers native PDF and workbook structure, preserves images, and defers every host-provided compiled dependency until the matching source type is encountered."
   },
   "compile_broker_vision.py": {
@@ -536,7 +580,7 @@
     "emit",
     "render"
    ],
-   "reason": "STDLIB ONLY, and the compiler enforces it rather than trusting the docstring. Two separate claims: (a) a validator with no third-party surface has no version to disagree about, which is the point of the port off private workbook library; (b) the validator is the independent checker of what emit writes, so it must not reach into emit for anything. Both are checked on every compile — an import of openpyxl, or of emit, anywhere under verify/ fails the build."
+   "reason": "STDLIB ONLY, and the compiler enforces it rather than trusting the docstring. Two separate claims: (a) a validator with no third-party surface has no version to disagree about, which is the point of the port off private workbook library; (b) the validator is the independent checker of what emit writes, so it must not reach into emit for anything. Both are checked on every compile \u2014 an import of openpyxl, or of emit, anywhere under verify/ fails the build."
   },
   "render": {
    "may_import_third_party": [
@@ -562,12 +606,12 @@
   "decided_at": "2026-07-26",
   "readers": {
    "verify/xlsx.py": "327 lines. Read-only. Extracts cached values, formulas, sheet names and value matches with semantics matched to private workbook library by probe. stdlib zipfile + ElementTree.",
-   "render/xlsx_model.py": "697 lines. Read plus a page-setup patcher that always writes a separate copy. Carries an Excel LAYOUT model — column-width-to-pixel conversion against the default font's max digit width, row heights, print setup, conditional-format geometry. stdlib zipfile + ElementTree.",
+   "render/xlsx_model.py": "697 lines. Read plus a page-setup patcher that always writes a separate copy. Carries an Excel LAYOUT model \u2014 column-width-to-pixel conversion against the default font's max digit width, row heights, print setup, conditional-format geometry. stdlib zipfile + ElementTree.",
    "emit/patch.py": "456 lines. Not a reader in the same sense: a byte-level rewriter of the .xlsx zip. Uses a hand-written tag scanner rather than ElementTree ON PURPOSE, because ElementTree does not round-trip bytes and this stage must not re-escape a quotation mark that needs no escaping between tags."
   },
   "note_on_the_brief": "The brief describes two independent readers. There are three. emit/patch.py is the third and is the one whose consolidation would cost the most.",
   "reasons_to_keep_separate": [
-   "The validator must not depend on openpyxl OR on emit, so that a bug in a shared reader cannot make the emitter and its own checker agree. verify/ reads back exactly what emit/patch.py writes: a shared misunderstanding of, say, t=\"str\" versus t=\"s\" would be invisible to a comparison performed through the same code. This is now enforced, not merely asserted — python_package_dependency_policy.verify forbids the import and the compiler fails the build on it.",
+   "The validator must not depend on openpyxl OR on emit, so that a bug in a shared reader cannot make the emitter and its own checker agree. verify/ reads back exactly what emit/patch.py writes: a shared misunderstanding of, say, t=\"str\" versus t=\"s\" would be invisible to a comparison performed through the same code. This is now enforced, not merely asserted \u2014 python_package_dependency_policy.verify forbids the import and the compiler fails the build on it.",
    "They read different things. verify/xlsx.py wants values and formulas; render/xlsx_model.py wants geometry. Merging would make the validator carry ~700 lines of layout model it never calls, enlarging the audit surface of the one component whose small surface is the point.",
    "Certification coupling. The closure hash covers every shipped file. A shared module would put a render-geometry tweak inside the validator's certified closure, so every change to column-width handling would invalidate the validator's certification and force a re-run of solver parity that nothing about the change could have affected.",
    "emit/patch.py is byte-exact by requirement and the other two are not. Its escaping behaviour is load-bearing for the determinism and golden-file gates, which compare bytes."
@@ -593,7 +637,7 @@
     ],
     "required_at": "runtime",
     "provision": "host",
-    "reason": "render/soffice.py resolves soffice/libreoffice from SOFFICE_BIN or a fixed candidate list and returns BLOCKED — never a warning — when it is absent. Not required for import, so its absence does not affect the smoke test; render/selftest.py exists precisely so the checks remain provable without it."
+    "reason": "render/soffice.py resolves soffice/libreoffice from SOFFICE_BIN or a fixed candidate list and returns BLOCKED \u2014 never a warning \u2014 when it is absent. Not required for import, so its absence does not affect the smoke test; render/selftest.py exists precisely so the checks remain provable without it."
    }
   ]
  },
@@ -603,16 +647,16 @@
    "reason": "build_dynamic_model.mjs IS now in the shipped closure, but only one of its two modes ships. --plan-only needs no private tooling and no LibreOffice and is the release's build path; --out needs scripts/build_package.mjs, which carries the private workbook library import and the ./extract_plan.mjs import and is excluded from the package. The incumbent bullet describes both modes as available, so it is REPLACED rather than deleted: the emitter must be named, because it is there, and the mode that is not there must not be offered.",
    "kind": "literal",
    "occurrences": "exactly_one",
-   "find": "- `scripts/build_dynamic_model.mjs` — the emitter, and it has two modes that are not interchangeable. `--plan-only` writes the plan and needs no private tooling and no LibreOffice; `--out <workbook.xlsx>` writes the package directly through the private artifact writer and recalculates it through LibreOffice. Both are set out under **Build rules**; say which one produced a file.\n",
-   "replace": "- `scripts/build_dynamic_model.mjs` — the emitter. `--plan-only` writes the plan and needs no private tooling and no LibreOffice; it is the only mode this package carries. The direct-to-workbook mode is a local certification tool and is not present here, so a workbook is always reached through the plan and the renderer. Set out under **Build rules**.\n"
+   "find": "- `scripts/build_dynamic_model.mjs` \u2014 the emitter, and it has two modes that are not interchangeable. `--plan-only` writes the plan and needs no private tooling and no LibreOffice; `--out <workbook.xlsx>` writes the package directly through the private artifact writer and recalculates it through LibreOffice. Both are set out under **Build rules**; say which one produced a file.\n",
+   "replace": "- `scripts/build_dynamic_model.mjs` \u2014 the emitter. `--plan-only` writes the plan and needs no private tooling and no LibreOffice; it is the only mode this package carries. The direct-to-workbook mode is a local certification tool and is not present here, so a workbook is always reached through the plan and the renderer. Set out under **Build rules**.\n"
   },
   {
    "id": "two-build-paths-subsection",
-   "reason": "SKILL.md documents both emitter modes. Only --plan-only ships, so the subsection is REPLACED with the one path the package can actually run, commands included — and it must carry them, because the compiler requires every declared entry point to be named by a runnable fenced command. What the incumbent says that stays true is kept: package-level patch facts arrive as ordinary plan facts, validate precedes build, and neither producer may be named for a file it did not produce. Written as one literal over the whole subsection on purpose — any edit to it fails the compile rather than shipping half a rewritten instruction.",
+   "reason": "SKILL.md documents both emitter modes. Only --plan-only ships, so the subsection is REPLACED with the one path the package can actually run, commands included \u2014 and it must carry them, because the compiler requires every declared entry point to be named by a runnable fenced command. What the incumbent says that stays true is kept: package-level patch facts arrive as ordinary plan facts, validate precedes build, and neither producer may be named for a file it did not produce. Written as one literal over the whole subsection on purpose \u2014 any edit to it fails the compile rather than shipping half a rewritten instruction.",
    "kind": "literal",
    "occurrences": "exactly_one",
-   "find": "### The two build paths\n\nThe emitter now writes `plan.json` directly. There are therefore two paths to a workbook, they produce the same workbook, and they are **not** interchangeable. Choose by what the machine actually has, and never name a path that did not produce the file.\n\n**`--plan-only` is the shipping path.** The emitter writes the plan and nothing else: it reads no workbook, runs no converter, and never loads the private artifact writer. It is therefore the path that runs where that package is absent, which is every machine the release runs on. The renderer turns the plan into the workbook:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>\npython3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json\npython3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>\n```\n\n`--out` is required in both modes and always names the **workbook**. Under `--plan-only` no workbook is written: the plan lands at `<workbook.xlsx>.plan.json`, the five validator sidecars land beside it, and the run prints `status: PLANNED` with its cached-cell counts and `unresolved_caches`. A run reporting any unresolved cache has failed — it means a formula the plan carries has no value a reader would see before recalculating.\n\n**`--out <workbook.xlsx>` on its own is the local certification path.** The emitter writes the package through the private artifact writer, recalculates it through LibreOffice, applies the terminal patches and captures the plan back out of the finished file:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --out <workbook.xlsx> [--soffice <path>]\n```\n\nIt runs only where the private writer and LibreOffice both exist. It is how a model is certified before release, and every certified reference workbook in this package came from it. That same run also synthesises the `--plan-only` plan and asserts the two agree, so certifying here certifies the shipping path rather than merely coexisting with it. Where a plan has to be recovered from a workbook that was already built, that is done by the local `extract_plan.mjs` tool, which is not part of the released package.\n\nThree things bind on both paths:\n\n- Everything the Node pipeline applies as a package-level patch — the adjustment gate rewrite, the frozen pane, the row outlines, the label indents, the `centerContinuous` block titles — reaches the renderer as an ordinary plan fact. On the captured plan because it is read back after the terminal patch; on the synthesised plan because the emitter declares it from the row plan. The renderer must therefore never re-apply any of them as a patch of its own.\n- Always run `validate` before `build`, on either path's plan.\n- Never present the renderer as the producer of a model it did not render, and never present the artifact writer as the producer of a model that was rendered from a plan.\n\n",
-   "replace": "### The build path\n\nThe emitter writes `plan.json` from the case; the renderer turns that plan into the workbook. That is the whole path, and it is the one this package ships:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>\npython3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json\npython3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>\n```\n\n`--out` is required on the emitter and always names the **workbook**, but the emitter writes no workbook: the plan lands at `<workbook.xlsx>.plan.json`, the five validator sidecars land beside it, and the run prints `status: PLANNED` with its cached-cell counts and `unresolved_caches`. A run reporting any unresolved cache has failed — it means a formula the plan carries has no value a reader would see before recalculating.\n\nThe emitter reads no workbook, runs no converter and loads no private writer, which is why it runs wherever this package runs. There is a second path, used to certify a model before release, that writes the package directly through a private artifact writer and recalculates it through LibreOffice. It is **not** part of this package. A workbook that arrived that way was not produced here.\n\nThree things bind:\n\n- Everything the emitting pipeline applies as a package-level patch — the adjustment gate rewrite, the frozen pane, the row outlines, the label indents, the `centerContinuous` block titles — reaches the renderer as an ordinary plan fact, declared by the emitter from the row plan. The renderer must therefore never re-apply any of them as a patch of its own.\n- Always run `validate` before `build`.\n- Never present the renderer as the producer of a model it did not render, and never present the artifact writer as the producer of a model that was rendered from a plan.\n\n"
+   "find": "### The two build paths\n\nThe emitter now writes `plan.json` directly. There are therefore two paths to a workbook, they produce the same workbook, and they are **not** interchangeable. Choose by what the machine actually has, and never name a path that did not produce the file.\n\n**`--plan-only` is the shipping path.** The emitter writes the plan and nothing else: it reads no workbook, runs no converter, and never loads the private artifact writer. It is therefore the path that runs where that package is absent, which is every machine the release runs on. The renderer turns the plan into the workbook:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>\npython3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json\npython3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>\n```\n\n`--out` is required in both modes and always names the **workbook**. Under `--plan-only` no workbook is written: the plan lands at `<workbook.xlsx>.plan.json`, the five validator sidecars land beside it, and the run prints `status: PLANNED` with its cached-cell counts and `unresolved_caches`. A run reporting any unresolved cache has failed \u2014 it means a formula the plan carries has no value a reader would see before recalculating.\n\n**`--out <workbook.xlsx>` on its own is the local certification path.** The emitter writes the package through the private artifact writer, recalculates it through LibreOffice, applies the terminal patches and captures the plan back out of the finished file:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --out <workbook.xlsx> [--soffice <path>]\n```\n\nIt runs only where the private writer and LibreOffice both exist. It is how a model is certified before release, and every certified reference workbook in this package came from it. That same run also synthesises the `--plan-only` plan and asserts the two agree, so certifying here certifies the shipping path rather than merely coexisting with it. Where a plan has to be recovered from a workbook that was already built, that is done by the local `extract_plan.mjs` tool, which is not part of the released package.\n\nThree things bind on both paths:\n\n- Everything the Node pipeline applies as a package-level patch \u2014 the adjustment gate rewrite, the frozen pane, the row outlines, the label indents, the `centerContinuous` block titles \u2014 reaches the renderer as an ordinary plan fact. On the captured plan because it is read back after the terminal patch; on the synthesised plan because the emitter declares it from the row plan. The renderer must therefore never re-apply any of them as a patch of its own.\n- Always run `validate` before `build`, on either path's plan.\n- Never present the renderer as the producer of a model it did not render, and never present the artifact writer as the producer of a model that was rendered from a plan.\n\n",
+   "replace": "### The build path\n\nThe emitter writes `plan.json` from the case; the renderer turns that plan into the workbook. That is the whole path, and it is the one this package ships:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>\npython3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json\npython3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>\n```\n\n`--out` is required on the emitter and always names the **workbook**, but the emitter writes no workbook: the plan lands at `<workbook.xlsx>.plan.json`, the five validator sidecars land beside it, and the run prints `status: PLANNED` with its cached-cell counts and `unresolved_caches`. A run reporting any unresolved cache has failed \u2014 it means a formula the plan carries has no value a reader would see before recalculating.\n\nThe emitter reads no workbook, runs no converter and loads no private writer, which is why it runs wherever this package runs. There is a second path, used to certify a model before release, that writes the package directly through a private artifact writer and recalculates it through LibreOffice. It is **not** part of this package. A workbook that arrived that way was not produced here.\n\nThree things bind:\n\n- Everything the emitting pipeline applies as a package-level patch \u2014 the adjustment gate rewrite, the frozen pane, the row outlines, the label indents, the `centerContinuous` block titles \u2014 reaches the renderer as an ordinary plan fact, declared by the emitter from the row plan. The renderer must therefore never re-apply any of them as a patch of its own.\n- Always run `validate` before `build`.\n- Never present the renderer as the producer of a model it did not render, and never present the artifact writer as the producer of a model that was rendered from a plan.\n\n"
   },
   {
    "id": "local-dynamic-validator-bullet",
@@ -632,7 +676,7 @@
   },
   {
    "id": "dynamic-build-commands",
-   "reason": "solve ships; the local Node build CLI does not. Emission happens through the Python renderer and the workbook writer described under the deployment host workbook compatibility contract, so the block states that rather than leaving an empty fence. The replacement said 'no build CLI' until the instructions started carrying `python3 scripts/emit/__main__.py build`, which is a build CLI — corrected to 'no Node build CLI'.",
+   "reason": "solve ships; the local Node build CLI does not. Emission happens through the Python renderer and the workbook writer described under the deployment host workbook compatibility contract, so the block states that rather than leaving an empty fence. The replacement said 'no build CLI' until the instructions started carrying `python3 scripts/emit/__main__.py build`, which is a build CLI \u2014 corrected to 'no Node build CLI'.",
    "kind": "literal",
    "occurrences": "exactly_one",
    "find": "Build with:\n\n```text\nscripts/debt-overlay.mjs solve <case.json> <solution.json>\nscripts/debt-overlay.mjs build <case.json> --out <workbook.xlsx>\n```\n",
@@ -681,16 +725,16 @@
   }
  ],
  "_removed_strip_rules": {
-  "local-plan-extractor-name": "Removed on 2026-07-27, not weakened. It rewrote the single sentence naming `extract_plan.mjs`; that sentence now sits inside the block two-build-paths-subsection removes wholesale, so the rule would match zero times and fail its own exactly_one declaration. The invariant it protected — no bare `extract_plan.mjs` surviving into the compiled instructions — is asserted independently, and more strongly, by the dangling-script-reference check, which resolves bare filenames against the shipped basenames and fails the build on any that do not resolve. Restore this rule if the extractor is ever named outside that block."
+  "local-plan-extractor-name": "Removed on 2026-07-27, not weakened. It rewrote the single sentence naming `extract_plan.mjs`; that sentence now sits inside the block two-build-paths-subsection removes wholesale, so the rule would match zero times and fail its own exactly_one declaration. The invariant it protected \u2014 no bare `extract_plan.mjs` surviving into the compiled instructions \u2014 is asserted independently, and more strongly, by the dangling-script-reference check, which resolves bare filenames against the shipped basenames and fails the build on any that do not resolve. Restore this rule if the extractor is ever named outside that block."
  },
-  "instruction_required_phrases": [
-    "run excel inflow",
-    "node scripts/run_user_flow.mjs --screen inputs",
-    "Do not replace it with a conversational company/ticker question",
-    "Non-bypassable end-user route",
-    "live-delivery-attestation/1.0",
-    "BUILD IDENTITY",
-    "three historical and three forecast years",
+ "instruction_required_phrases": [
+  "run excel inflow",
+  "node scripts/run_user_flow.mjs --screen inputs",
+  "Do not replace it with a conversational company/ticker question",
+  "Non-bypassable end-user route",
+  "live-delivery-attestation/1.0",
+  "BUILD IDENTITY",
+  "three historical and three forecast years",
   "RCF is the only balancing liquidity source",
   "interest income",
   "Flat replacement",

@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v2.1.4",
+  "releaseName": "Excel Inflow v2.1.5",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.1.4",
+  "skillVersion": "2.1.5",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-10T06:41:33.625Z",
-  "centralInstructionsWords": 4691,
+  "generatedAt": "2026-08-10T10:25:07.054Z",
+  "centralInstructionsWords": 4929,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "86a36d6d9204852c00017a1dac175aa5ce08c9702c91e347b6d13cb1202e904f",
-    "closureFileCount": 154,
+    "currentClosureSha256": "8b3865ba3cddbfedc0ac2dd04f4873214f2ee2b74ad6eb17b32544ad09a5b0b7",
+    "closureFileCount": 155,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -376,7 +376,8 @@
       "scripts/verify/run_finance_proof_mutations.py",
       "scripts/verify/run_deterministic_tests.py",
       "scripts/verify/validate_dynamic_model.py",
-      "scripts/verify/workbook_semantic_oracle.py"
+      "scripts/verify/workbook_semantic_oracle.py",
+      "scripts/verify/verify_delivery.py"
     ],
     "entryPointsUncommandedByInstructions": [],
     "modules": [
@@ -416,6 +417,7 @@
       "scripts/verify/run_finance_proof_mutations.py",
       "scripts/verify/tolerances.py",
       "scripts/verify/validate_dynamic_model.py",
+      "scripts/verify/verify_delivery.py",
       "scripts/verify/workbook_semantic_oracle.py",
       "scripts/verify/xlsx.py",
       "scripts/verify_broker_semantics.py"
@@ -506,6 +508,7 @@
       "scripts/verify/validate_dynamic_model.py -> scripts/verify/invariants.py (absolute-internal)",
       "scripts/verify/validate_dynamic_model.py -> scripts/verify/tolerances.py (absolute-internal)",
       "scripts/verify/validate_dynamic_model.py -> scripts/verify/xlsx.py (absolute-internal)",
+      "scripts/verify/verify_delivery.py -> scripts/verify/__init__.py (package-init)",
       "scripts/verify/workbook_semantic_oracle.py -> scripts/verify/__init__.py (package-init)",
       "scripts/verify/xlsx.py -> scripts/verify/__init__.py (package-init)"
     ],
@@ -805,10 +808,10 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 10,
+    "codeFences": 11,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 17,
-    "scriptReferencesScanned": 33,
+    "scriptReferencesScanned": 34,
     "scriptReferences": [
       "build_dynamic_model.mjs",
       "compile_broker_pack.py",
@@ -841,6 +844,7 @@
       "verify/run_deterministic_tests.py",
       "verify/run_finance_proof_mutations.py",
       "verify/validate_dynamic_model.py",
+      "verify/verify_delivery.py",
       "verify/workbook_semantic_oracle.py",
       "verify_broker_semantics.py"
     ],
@@ -944,7 +948,7 @@
       },
       {
         "target": "python closure import probe",
-        "modules": 39,
+        "modules": 40,
         "allResolvedInsideRelease": true
       },
       {
@@ -1044,6 +1048,12 @@
         "resolved": true
       },
       {
+        "target": "scripts/verify/verify_delivery.py",
+        "status": 2,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
         "target": "real clean-root workbook build",
         "status": "PASS",
         "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
@@ -1087,21 +1097,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "ee6aae52acc536be85cec530380e82393c79f4d933e2e7cb8881ad988bd37724",
-      "bytes": 35710,
-      "words": 4691
+      "sha256": "1bf1100411c55a7514bd9c599f33da07b35b2511d2f33919f72f8cb368f5a216",
+      "bytes": 37354,
+      "words": 4929
     },
     {
       "path": "SKILL.md",
-      "sha256": "e52bb593170dc29b6140e7c1dd81a44e5ca417c8ddde70e0e16f34d92868f380",
-      "bytes": 36197,
-      "words": 4760
+      "sha256": "cbd0de4ea856b9ef6d62a9503165e1ac8205b0e39f85c9e8bd6446209b2a1e93",
+      "bytes": 37841,
+      "words": 4998
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "19e4d1a80474f263f7eef021fb15b051b526173a4335529ef8d265877dd26aa1",
-      "bytes": 35730,
-      "words": 4693
+      "sha256": "d415592efe5096ae945c65506f1fe32da832b244894683e14b22f23535ae3703",
+      "bytes": 37374,
+      "words": 4931
     },
     {
       "path": "references/model-contract.md",
@@ -1297,8 +1307,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "40c067088c2e6af838ee91d90d9940897dc38af93179f77a3d899b04aeb2c1a7",
-      "bytes": 45841,
+      "sha256": "ee36417d7ea6ba6f0aa561f3f0692c2ab0366e86d562911ca256c1a05bb1841a",
+      "bytes": 46176,
       "words": null
     },
     {
@@ -1975,8 +1985,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "826fd603919cddc9c5f98706be25bcb7dd3991b99bba30f897a3cea4a6cbb3f6",
-      "bytes": 42442,
+      "sha256": "261ba0573705624994ba5b248aea5093ae51c8c50e0f2490b1adb019d7ffb8cc",
+      "bytes": 44099,
       "words": null
     },
     {
@@ -2055,6 +2065,12 @@
       "path": "scripts/verify/validate_dynamic_model.py",
       "sha256": "bb441f0a0eb40b600ce625bfbe2dbb67f190ecba891a98c342d42ab039753728",
       "bytes": 135353,
+      "words": null
+    },
+    {
+      "path": "scripts/verify/verify_delivery.py",
+      "sha256": "769e52862aa3cd2519899d7ee84ef81c2af620e8a94358e4d88ee0d1af54e38e",
+      "bytes": 3950,
       "words": null
     },
     {

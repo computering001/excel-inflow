@@ -487,3 +487,35 @@ never assume it persists across deployment host chats. State status plus total v
 count and identify any manual gate still open. Never call the model complete
 while coverage, economics, formulas, native Excel restoration or visual review
 is unproven.
+
+### Delivery integrity
+
+Stage execution runs only through installed entry points. Never author, modify
+or execute a script that is not part of the installed tree to run, resume,
+verify or deliver any stage. If a requested operation has no installed command
+— a partial-stage rerun, a bespoke resume, an ad-hoc verification — state that
+the command does not exist and stop; an improvised execution path can produce
+a receipt-shaped answer that no gate ever certified, which is worse than no
+answer.
+
+The user-visible workbook is `delivery_file` from the controller's
+delivery-result: a controller-named copy whose filename embeds the attested
+workbook hash prefix, so two different workbooks can never share a delivery
+filename and a stale same-named download can never impersonate a delivery.
+Attach that file byte-for-byte under its controller-assigned name. Never
+rename it, never copy the build-area `model.xlsx` under a friendly name, and
+never attach a workbook that the live-delivery attestation does not own.
+
+A delivery message quotes, verbatim from `delivery-result.json` and the
+live-delivery attestation: the attestation SHA-256, the workbook SHA-256, and
+the complete sheet inventory. Never restate these from memory or from earlier
+conversation. Any recipient can re-prove a delivered pair at any time, in any
+chat, with:
+
+```text
+python3 scripts/verify/verify_delivery.py <delivered.xlsx> <live-delivery-attestation.json>
+```
+
+It re-derives the workbook hash and the file's own sheet inventory from the
+bytes and compares them to the attestation; a stale, swapped or regenerated
+file fails in one line without opening Excel.
