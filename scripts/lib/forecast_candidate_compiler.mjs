@@ -7,7 +7,7 @@ import {
   selectForecastAuthority,
 } from "./forecast_authority.mjs";
 import { observationsForConcept } from "./forecast_observation.mjs";
-import { resolveBrokerForecastSelection } from "./broker_anchor.mjs";
+import { resolveBrokerForecastSelection, selectBrokerAnchor } from "./broker_anchor.mjs";
 
 const FORMULA_METHODS = new Set(["accounting_identity", "driver_formula", "roll_forward", "historical_average", "historical_trend", "seasonal_run_rate", "carry_forward"]);
 const OBSERVATION_METHOD = Object.freeze({
@@ -186,6 +186,35 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
   });
   const behaviorRows = Array.isArray(behaviorMap) ? behaviorMap : behaviorMap?.rows ?? [];
   const behaviorByRow = new Map(behaviorRows.map((entry) => [entry.row_id, entry]));
+  // TIER 1 — THE ANCHOR IS ALWAYS CONSUMED, AND IT OUTRANKS ITS OWN IDENTITY.
+  //
+  // The headline anchor row is usually a calculation (Adjusted EBITDA as a
+  // bridge sum, EBIT as its counterpart), so ordinary ownership hands it to
+  // the identity formula and the broker consensus never enters the workbook
+  // as a formula. When every other bridge row is an identity too, the trio is
+  // mutually defined and nothing pins the level: the emitted equations become
+  // a rank-deficient cycle whose solution lives only in cached values. The
+  // fix is one deliberate exception, decided by the same anchor selector the
+  // downstream bridge rule uses: when broker evidence supports a headline
+  // metric with compatible definitions, that ONE row is broker-owned, which
+  // both pins the level and makes resolveAnchorPlanDecision applicable so the
+  // rest of the bridge is rewired deterministically. Incompatible or
+  // unsupported anchors deliberately fall through unchanged — the equation
+  // cycle gates then block the build rather than let a cache-pinned identity
+  // loop ship.
+  const incomeRows = rowsBySection?.income_statement ?? [];
+  const anchorSelection = selectBrokerAnchor(modelCase, incomeRows);
+  const anchorOwnedRoles = new Set(
+    anchorSelection.supported &&
+      anchorSelection.definition_compatibility?.[anchorSelection.headline_anchor]?.compatible
+      ? [anchorSelection.headline_anchor]
+      : [],
+  );
+  for (const row of incomeRows) {
+    if (anchorOwnedRoles.has(row.semantic_role)) {
+      row.broker_metric_id ??= row.semantic_role;
+    }
+  }
   const observationInput = observationLedger ?? observations;
   const states = [];
   const ledger = [];
@@ -231,9 +260,23 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         if (behaviorEntry?.blocking && !hasStrongAuthority) {
           compatible.length = 0;
         }
-        let owner = formula && compatible.includes(formula)
-          ? formula
-          : selectForecastAuthority(compatible);
+        // Tier 1 outranks behaviour-method gating on the anchor row itself:
+        // a behaviour map that permits only identity methods for calculation
+        // rows would otherwise silently hand the anchor back to its identity
+        // formula — which is exactly how an authored broker anchor still
+        // emitted as a mutually-defined bridge and shipped an undeclared
+        // cycle. The anchor candidate exists only when the selector proved
+        // support and definition compatibility, so consuming it here is the
+        // doctrine, not an escape hatch.
+        const anchorOwned =
+          section === "income_statement" &&
+          anchorOwnedRoles.has(row.semantic_role) &&
+          Boolean(broker);
+        let owner = anchorOwned
+          ? broker
+          : formula && compatible.includes(formula)
+            ? formula
+            : selectForecastAuthority(compatible);
         if (!owner) {
           const unresolved = {
             method: "unresolved",
@@ -257,9 +300,11 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
             ? null
             : allowedMethods.size > 0 && !allowedMethods.has(candidate.method)
               ? `Method ${candidate.method} is not permitted for behavior ${behavior}.`
-              : formula
-                ? "Formula or schedule ownership outranks independent-input candidates."
-                : `Stronger compatible candidate ${selected.method} selected.`,
+              : anchorOwned
+                ? "The broker anchor is Tier-1 consumed and outranks the identity formula on the anchor row."
+                : formula
+                  ? "Formula or schedule ownership outranks independent-input candidates."
+                  : `Stronger compatible candidate ${selected.method} selected.`,
         }));
         ledger.push(...candidates);
         const selectedRecord = candidates[selectedIndex];

@@ -227,6 +227,69 @@ export function resolveBrokerForecastSelection(
   };
 }
 
+/**
+ * TIER 1 — THE ANCHOR IS ALWAYS CONSUMED, DECIDED AT CASE LEVEL.
+ *
+ * A case whose broker pack supports a headline metric must AUTHOR that
+ * metric's statement row as broker-driven, because everything downstream
+ * keys off the authored case: the coverage dependency gate treats a
+ * broker-treated row as exogenous (no incoming identity edge, so the bridge
+ * identities cannot form a cycle), and resolveAnchorPlanDecision only
+ * applies when the case declares a broker headline. The AstraZeneca run
+ * proved what happens when this stamp is missing: the anchor rule stood
+ * down as not_applicable, the bridge identities went to the emitter
+ * mutually defined, and the delivered forecast carried a cycle whose level
+ * only cached values pinned. Stamping is deliberately narrow: only the
+ * selected headline role, only when coverage is complete in all three
+ * periods, and only when broker and statement definitions are compatible —
+ * an unsupported or incompatible anchor falls through untouched, and the
+ * cycle gates fail the build closed rather than guess.
+ */
+export function applyTier1AnchorOwnership(modelCase) {
+  const incomeRows = modelCase?.statement_structure?.income_statement ?? [];
+  if (incomeRows.length === 0) return null;
+  // A case that already declares a broker authority at ANY profit level —
+  // headline, PBT-led or net-income-led — has chosen its path, and Tier 1
+  // must not out-vote it. The stamp exists solely for the case that declares
+  // NO profit-level broker authority while its pack supports one, which is
+  // the shape that previously left the bridge identities mutually defined.
+  const PROFIT_AUTHORITY_ROLES = new Set([
+    "ebit",
+    "adjusted_ebitda",
+    "operating_profit",
+    "pre_tax_income",
+    "net_income",
+  ]);
+  const declaredProfitAuthority = incomeRows.some(
+    (row) =>
+      PROFIT_AUTHORITY_ROLES.has(row.semantic_role) &&
+      (row.forecast_treatment === "broker" || row.broker_metric_id),
+  );
+  if (declaredProfitAuthority) return null;
+  const selection = selectBrokerAnchor(modelCase, incomeRows);
+  if (
+    !selection.supported ||
+    !selection.definition_compatibility?.[selection.headline_anchor]?.compatible
+  ) {
+    return null;
+  }
+  const anchorRow = incomeRows.find(
+    (row) => row.semantic_role === selection.headline_anchor && row.row_type !== "header",
+  );
+  if (!anchorRow) return null;
+  const alreadyAuthored =
+    anchorRow.forecast_treatment === "broker" || anchorRow.broker_metric_id;
+  if (!alreadyAuthored) {
+    anchorRow.broker_metric_id = selection.headline_anchor;
+    anchorRow.forecast_treatment = "broker";
+  }
+  return {
+    headline_anchor: selection.headline_anchor,
+    row_id: anchorRow.row_id,
+    stamped: !alreadyAuthored,
+  };
+}
+
 export function selectBrokerAnchor(modelCase, rows = []) {
   const counts = {};
   const countsByPeriod = {};

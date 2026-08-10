@@ -26,7 +26,7 @@ import { presentationEpoch, sharedHorizontalGrammar } from "./lib/design_contrac
 // supply each metric, and the broker-anchor rule DECIDES on that same number. A
 // second count written beside the first is a second definition of "contributes",
 // and the two would part company the first time either moved.
-import { brokerContributorCount } from "./lib/broker_anchor.mjs";
+import { applyTier1AnchorOwnership, brokerContributorCount } from "./lib/broker_anchor.mjs";
 import {
   benchmarkCurvePlan,
   compileRowPlan,
@@ -11030,6 +11030,10 @@ async function main(packaging = null) {
     receipt: historicalNormalisationReceipt,
   } = applyHistoricalNormalisation(rawModelCase);
   assertThreePlusThree(modelCase, "Post-normalisation period gate");
+  // Tier 1 before coverage: the anchor stamp changes the case's dependency
+  // graph (a broker-treated headline is exogenous), so it must exist before
+  // the coverage cycle gate reads that graph.
+  applyTier1AnchorOwnership(modelCase);
   const coverage = assessCoverage(modelCase);
   const coveragePath = `${outputPath}.coverage.json`;
   await fs.mkdir(path.dirname(outputPath), { recursive: true });

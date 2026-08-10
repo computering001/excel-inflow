@@ -152,6 +152,53 @@ Forecast only the detail needed to connect operations to cash, debt, interest, l
 
 Do not force segment, product or detailed working-capital forecasts that do not improve the debt overlay.
 
+## Broker consumption tiers
+
+The lossless broker evidence preserves everything the houses published. What
+the MODEL consumes from it is a separate, deliberately narrow decision. A
+forecast surface that wires hundreds of broker line items into the workbook is
+an evidence dump wearing a model's clothes: cross-house consensus is only
+meaningful for concepts whose definitions genuinely align, every wired link is
+a maintenance and audit liability, and the analyst opened a debt overlay, not
+a broker database. Consumption is therefore tiered, and the wall between the
+tiers is enforced at the crosswalk, in the forecast waterfall, and by the
+independent semantic verifier.
+
+**Tier 1 — the fixed core, always consumed.** Exactly the required normalized
+vocabulary: the headline anchor (EBIT or adjusted EBITDA), revenue, D&A,
+effective tax rate, capex, AGGREGATE change in working capital, and dividends.
+The anchor is consumed as a live consensus link on the anchor row itself —
+whenever the waterfall resolves an anchor from broker evidence, primary or
+supplemental, the anchor row's forecast formula IS that link. An anchor that
+exists only in solver caches leaves the statement identities under-determined,
+which the equation-graph rank gate blocks.
+
+**Tier 2 — declared flex, consumed only by election.** A short whitelist of
+promotable concepts (for example lease payments, buybacks, revenue components,
+a committed restructuring outflow). A flex concept enters the model only when
+ALL of the following hold: it is on the whitelist; it maps to a row the
+issuer's own statements carry; it is supported by at least three houses under
+one common definition id — the same "three is the minimum for a meaningful
+consensus" bar the intake screen states for the pack itself; and the election
+is recorded as a reviewed crosswalk disposition. Fewer than three compatible
+houses means the concept stays evidence, however interesting it looks.
+Silence never promotes.
+
+**Tier 3 — everything else is evidence, full stop.** It remains lossless in
+the run artifact and visible on the B01-B10 sheets, and it never receives a
+consensus row wired into any model formula.
+
+Two consequences are load-bearing. First, the central Brokers sheet renders
+ONLY consumed metrics — the fixed core plus elected flex, one row per house
+per metric with a consensus row — a compact grid an analyst can read whole,
+not the candidate universe. Second, statement detail rows that the model does
+not consume are captured under their anchor with a certificate and show GREY
+forecast cells: history in full, forecast deliberately not calculated. Grey
+capture is the default fate of operating detail between revenue and the
+anchor; a populated forecast cell on a detail row must trace to a Tier 1
+concept, an elected Tier 2 concept, a schedule, or a declared derivation —
+never to "the broker happened to publish a number".
+
 ## Visible drivers
 
 Prefer simple copy-across formulas:

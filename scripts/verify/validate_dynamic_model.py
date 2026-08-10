@@ -2341,6 +2341,231 @@ def main(argv: List[str]) -> int:
         )
     )
 
+    # ------------------------------------------- statement-cycle-containment
+    #
+    # THE ONE SANCTIONED CIRCULARITY IS THE CASH/RCF/INTEREST FIXED POINT.
+    # Every other cycle in the emitted formula graph is a defect, even when it
+    # happens to display the right numbers. The AstraZeneca delivery carried
+    # OP = EBIT, EBIT = EBITDA - D&A, EBITDA = SUM(EBIT, D&A): a tautology
+    # whose level was pinned by nothing but the cached values the solver
+    # seeded - a workbook that is right only because it started right. Every
+    # economic gate passed, because every economic gate reads the caches.
+    # This check reads the FORMULAS: it walks each forecast column's
+    # same-sheet reference graph, finds strongly connected components, and
+    # requires every multi-row cycle to consist purely of rows whose semantic
+    # roles belong to the declared fixed-point loop. Rank-sufficiency is not
+    # the bar - even a fully determined identity cycle outside the declared
+    # loop is a roundabout path the architecture forbids.
+    role_by_row: Dict[int, str] = {}
+    label_by_row: Dict[int, str] = {}
+    for section_rows in (row_plan.get("statement_rows") or {}).values():
+        for item in section_rows:
+            if item.get("row"):
+                role_by_row[int(item["row"])] = item.get("semantic_role") or ""
+                label_by_row[int(item["row"])] = str(item.get("label") or "")
+    for waterfall_id, waterfall_row in (row_plan.get("waterfall_rows") or {}).items():
+        role_by_row.setdefault(int(waterfall_row), waterfall_id)
+        label_by_row.setdefault(int(waterfall_row), waterfall_id)
+    for summary_key in ("debt_summary_rows", "interest_summary_rows"):
+        for summary_id, summary_row in (row_plan.get(summary_key) or {}).items():
+            role_by_row.setdefault(int(summary_row), summary_id)
+            label_by_row.setdefault(int(summary_row), summary_id)
+
+    def column_cycles(column: str) -> List[List[int]]:
+        graph: Dict[int, List[int]] = {}
+        for row in sorted(role_by_row):
+            address = "%s%s" % (column, row)
+            refs = []
+            for reference in same_sheet_references(cell_formula(address)):
+                match = re.match(r"^\$?[A-Z]+\$?(\d+)$", reference)
+                if match:
+                    target = int(match.group(1))
+                    if target != row and target in role_by_row:
+                        refs.append(target)
+            if refs:
+                graph[row] = refs
+        index_counter = [0]
+        stack: List[int] = []
+        on_stack: set = set()
+        indices: Dict[int, int] = {}
+        low: Dict[int, int] = {}
+        cycles: List[List[int]] = []
+
+        def strongconnect(node: int) -> None:
+            indices[node] = low[node] = index_counter[0]
+            index_counter[0] += 1
+            stack.append(node)
+            on_stack.add(node)
+            for neighbour in graph.get(node, []):
+                if neighbour not in indices:
+                    strongconnect(neighbour)
+                    low[node] = min(low[node], low[neighbour])
+                elif neighbour in on_stack:
+                    low[node] = min(low[node], indices[neighbour])
+            if low[node] == indices[node]:
+                component = []
+                while True:
+                    member = stack.pop()
+                    on_stack.discard(member)
+                    component.append(member)
+                    if member == node:
+                        break
+                if len(component) > 1:
+                    cycles.append(sorted(component))
+
+        previous_limit = sys.getrecursionlimit()
+        sys.setrecursionlimit(max(previous_limit, 10000))
+        try:
+            for node in graph:
+                if node not in indices:
+                    strongconnect(node)
+        finally:
+            sys.setrecursionlimit(previous_limit)
+        return cycles
+
+    # The sanctioned loop is identified by its CORE, not by enumerating its
+    # membership: the RCF sweep legs and the balancing cash row are the rows
+    # the doctrine's fixed point is DEFINED by, and the one legal cycle is
+    # whichever strongly connected component contains them. Enumerating legal
+    # member roles is hopeless - the genuine loop threads through dozens of
+    # rows (per-instrument interest, roll-forwards, CF add-backs) that carry
+    # no stable semantic role - but a SECOND, disjoint cycle can never be
+    # legal, whatever its rows are called: a fixed point the doctrine did not
+    # declare is a level that only cached values can pin.
+    loop_core_rows = {
+        int(row)
+        for key, row in (row_plan.get("waterfall_rows") or {}).items()
+        if key in ("rcf_draw_waterfall", "rcf_repayment_waterfall", "cash_before_rcf", "balancing_cash")
+    }
+    cycle_errors = []
+    sanctioned_cycles = 0
+    cycle_rows_visited = 0
+    for column in FORECAST_COLUMNS:
+        for component in column_cycles(column):
+            cycle_rows_visited += len(component)
+            if loop_core_rows and any(row in loop_core_rows for row in component):
+                sanctioned_cycles += 1
+                continue
+            cycle_errors.append(
+                {
+                    "column": column,
+                    "cycle_rows": component,
+                    "members": [
+                        {"row": row, "role": role_by_row.get(row), "label": label_by_row.get(row)}
+                        for row in component[:12]
+                    ],
+                }
+            )
+    checks.append(
+        record(
+            "statement-cycle-containment",
+            len(cycle_errors) == 0 and cycle_rows_visited > 0,
+            (
+                "The only formula cycle in each forecast column is the declared "
+                "cash/RCF/interest fixed point; no disjoint identity cycle "
+                "exists whose level only cached values can pin."
+            )
+            if cycle_rows_visited > 0
+            else (
+                "No formula cycles were visited at all - with circularity "
+                "shipped on, an empty scan means the reference graph was not "
+                "read, and the check cannot pass on an empty visit."
+            ),
+            {
+                "cycle_member_rows_visited": cycle_rows_visited,
+                "sanctioned_cycles": sanctioned_cycles,
+                "errors": cycle_errors[:20],
+            },
+            violations=(len(cycle_errors) or (0 if cycle_rows_visited > 0 else 1)),
+        )
+    )
+
+    # --------------------------------------------- statement-face-additivity
+    #
+    # "Totals calculate from their declared children" is a claim about the
+    # NUMBERS, not about which formula shape the emitter chose. The issuer's
+    # own aggregation is declared by the HISTORICAL formula - a historical
+    # cell that sums a set of statement rows states which children that
+    # parent owns. In every forecast column the parent's cached value must
+    # then equal the sum of those same children's caches, whatever formula
+    # produced it. The AstraZeneca delivery broke exactly this: historical
+    # OP summed the cost lines, forecast OP was an anchor identity, and the
+    # broker-driven cost lines beneath it summed to a visibly different
+    # number - two operating profits on one face, one displayed and one
+    # implied. Children that are ALL deliberately uncalculated (grey capture)
+    # waive the comparison: an anchor-led surface forecasts the parent and
+    # greys the detail, and that is additive by construction.
+    statement_face_rows = {
+        int(item["row"])
+        for section_rows in (row_plan.get("statement_rows") or {}).values()
+        for item in section_rows
+        if item.get("row")
+    }
+
+    def summed_children(address: str) -> List[int]:
+        text = cell_formula(address)
+        if not text or not re.match(r"^=?\s*(?:\+\s*)?SUM\(", text, re.I):
+            return []
+        children: List[int] = []
+        for reference in same_sheet_references(text):
+            range_match = re.match(r"^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$", reference)
+            cell_match = re.match(r"^\$?([A-Z]+)\$?(\d+)$", reference)
+            if range_match and range_match.group(1) == range_match.group(3):
+                children.extend(range(int(range_match.group(2)), int(range_match.group(4)) + 1))
+            elif cell_match:
+                children.append(int(cell_match.group(2)))
+        return sorted({row for row in children if row in statement_face_rows})
+
+    additivity_errors = []
+    additivity_visited = 0
+    additivity_class = policy.class_for("statement-face-additivity", "currency") if mode != "legacy" else None
+    for parent_row in sorted(statement_face_rows):
+        children = summed_children("G%s" % parent_row)
+        if len(children) < 2 or parent_row in children:
+            continue
+        for column in FORECAST_COLUMNS:
+            parent_value = numeric(value("%s%s" % (column, parent_row)))
+            child_values = [numeric(value("%s%s" % (column, child))) for child in children]
+            if parent_value is None and all(item is None for item in child_values):
+                continue
+            if all(item is None for item in child_values):
+                # Grey-captured detail beneath a forecast parent is additive by
+                # construction; the capture certificate is checked elsewhere.
+                continue
+            additivity_visited += 1
+            total = sum(item for item in child_values if item is not None)
+            if not equal(parent_value or 0.0, total):
+                additivity_errors.append(
+                    {
+                        "column": column,
+                        "parent_row": parent_row,
+                        "parent_value": parent_value,
+                        "children_rows": children,
+                        "children_total": total,
+                    }
+                )
+    checks.append(
+        record(
+            "statement-face-additivity",
+            len(additivity_errors) == 0 and additivity_visited > 0,
+            (
+                "Every statement parent whose history declares a sum over its "
+                "children carries forecast caches equal to the sum of those "
+                "children, unless the children are deliberately grey."
+            )
+            if additivity_visited > 0
+            else (
+                "No summed statement family was visited - the additivity scan "
+                "cannot pass on an empty visit."
+            ),
+            {
+                "families_visited": additivity_visited,
+                "errors": additivity_errors[:20],
+            },
+            violations=(len(additivity_errors) or (0 if additivity_visited > 0 else 1)),
+        )
+    )
+
     # ---------------------------------------------------- liquidity-certification
     liquidity_mechanic_errors = []
     permitted_capacity_shortfalls = []
