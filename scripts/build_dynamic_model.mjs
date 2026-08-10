@@ -3093,6 +3093,10 @@ function configureOperatingModel(
   }
 
   const interestRows = rowPlan.interest_summary_rows;
+  // Rows whose historical block is decided at the very end of the build, after
+  // the rank pass has finished repainting fills.
+  const interestScheduleRows = new Set();
+  const waterfallGreyHistoryRows = new Set();
   const waterfallRows = rowPlan.waterfall_rows;
   const debtRows = rowPlan.debt_summary_rows;
   const cashBucketPlans = rowPlan.cash_buckets ?? [];
@@ -5611,6 +5615,23 @@ function configureOperatingModel(
     if (rank) totalRanks.set(row, rank);
     setPeriodNumberFormat(sheet, row, AMOUNT);
     applyFormula(sheet, `R${row}`, `=I${row}`);
+    // THE SWEEP IS A FORECAST MECHANISM, AND ITS HISTORY SAYS SO.
+    //
+    // Nothing writes G:I here, because the liquidity waterfall models future
+    // periods only — an issuer's filed accounts contain no "cash before RCF"
+    // line. Left alone those cells render WHITE and empty, which is the one
+    // thing the provenance layer must never do: white-blank is indistinguishable
+    // from a value the model failed to produce. Grey is the declared mark for
+    // "deliberately not calculated", so the historical block of every waterfall
+    // row carries it, exactly as the statement's own revolver legs already do.
+    if (presentationEpoch() >= 3) {
+      sheet.getRange(`G${row}:I${row}`).format.fill = COLORS.grey;
+      // Three of these rows are ranked subtotals, and the rank pass runs LAST,
+      // repainting their fill across the whole rank block. Recording them here
+      // lets the historical grey be reasserted after that repaint — the same
+      // ordering the statement's own uncalculated rows already rely on.
+      waterfallGreyHistoryRows.add(row);
+    }
   }
   collectHeadlines(RANK_SECTION.RCF_WATERFALL, waterfallRows);
 
@@ -6702,6 +6723,11 @@ function configureOperatingModel(
     if (rank) totalRanks.set(row, rank);
     setPeriodNumberFormat(sheet, row, AMOUNT);
     applyFormula(sheet, `R${row}`, `=I${row}`);
+    // Grey is decided AFTER every interest write, by greyHistoryWhereUnwritten
+    // below: reading the cells here would misread "not yet written" as
+    // "structurally empty" and erase real filed history on most of the
+    // schedule. See the note there.
+    interestScheduleRows.add(row);
   }
   for (const id of [
     "rcf_interest",
@@ -7904,6 +7930,29 @@ function configureOperatingModel(
   // an answer (the RCF waterfall ends on `ending_rcf`, which takes the DOUBLE
   // bottom rule) and over any fill the input pass laid down on a subtotal whose
   // history is hardcoded.
+  // GREY THE HISTORY THE SCHEDULE NEVER MODELLED — DECIDED LAST, ON EVIDENCE.
+  //
+  // A white empty cell and a deliberately-uncalculated cell must never look
+  // alike; grey is the declared mark for the second. Whether an interest row
+  // HAS history is a question about the finished sheet, so it is asked here,
+  // after every interest write: asking earlier misread "not yet written" as
+  // "structurally empty" and greyed eight rows of real filed finance expense
+  // in testing. The rule is evidence-driven rather than a role list, so an
+  // issuer that genuinely drew its revolver or closed a deal in a historical
+  // year keeps its numbers and only the truly unmodelled rows grey.
+  if (presentationEpoch() >= 3) {
+    for (const row of interestScheduleRows) {
+      const written = HISTORICAL_COLUMNS.some((column) => {
+        const cell = sheet.getRange(`${column}${row}`);
+        const value = cell?.values?.[0]?.[0] ?? cell?.value ?? null;
+        return value !== null && value !== undefined && value !== "";
+      });
+      if (!written) {
+        sheet.getRange(`G${row}:I${row}`).format.fill = COLORS.grey;
+      }
+    }
+  }
+
   applyTotalHierarchy(
     sheet,
     totalRanks,
@@ -7911,6 +7960,14 @@ function configureOperatingModel(
     subsectionRows,
     headlineRows,
   );
+
+  // The rank pass has just repainted every ranked row's fill, including the
+  // sweep's own subtotals. Reassert the historical grey over that repaint: the
+  // rank colour states what a row IS, the grey states that its history was
+  // never modelled, and the second must survive the first.
+  for (const row of waterfallGreyHistoryRows) {
+    sheet.getRange(`G${row}:I${row}`).format.fill = COLORS.grey;
+  }
 
   // ...and EVERY BOX after THAT, because a partial border assignment clears the
   // RIGHT edge of the range it is applied to. The rank rule spans C:E, so
