@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.2.1",
+  "releaseName": "Excel Inflow v2.2.2",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.2.1",
+  "skillVersion": "2.2.2",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-10T21:18:48.727Z",
+  "generatedAt": "2026-08-10T22:34:19.796Z",
   "centralInstructionsWords": 4929,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "1adce61bf5687a87c6b646e83e69eeebc0d519589a9ccb77d0dd2761eb316fc8",
+    "currentClosureSha256": "a3634a749838392a733838a738d0a9542df366cf2da918e9d16dccf23f47b2d8",
     "closureFileCount": 155,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -555,9 +555,9 @@
           "render"
         ],
         "sites": [
-          "extract_broker_evidence.py:330 (fitz, deferred)",
-          "extract_broker_evidence.py:754 (fitz, deferred)",
-          "extract_broker_evidence.py:1023 (fitz, deferred)",
+          "extract_broker_evidence.py:507 (fitz, deferred)",
+          "extract_broker_evidence.py:989 (fitz, deferred)",
+          "extract_broker_evidence.py:1258 (fitz, deferred)",
           "render/pdfdoc.py:26 (fitz, deferred)",
           "render/pdfdoc.py:229 (fitz, deferred)",
           "render/soffice.py:199 (fitz, deferred)",
@@ -612,8 +612,8 @@
           "extract_broker_evidence.py"
         ],
         "sites": [
-          "extract_broker_evidence.py:611 (openpyxl, deferred)",
-          "extract_broker_evidence.py:1028 (openpyxl, deferred)",
+          "extract_broker_evidence.py:846 (openpyxl, deferred)",
+          "extract_broker_evidence.py:1263 (openpyxl, deferred)",
           "emit/render.py:26 (openpyxl, top-level)",
           "emit/render.py:27 (openpyxl.comments, top-level)",
           "emit/render.py:28 (openpyxl.formatting.rule, top-level)",
@@ -1553,8 +1553,8 @@
     },
     {
       "path": "scripts/extract_broker_evidence.py",
-      "sha256": "49357fcc1df8b71d821928d3e46bfa872221c1c1e8013ba8e9ac7ba9f4f9423d",
-      "bytes": 52237,
+      "sha256": "3b1dd8abe68c71cf094d9f393c2459053d8afe98f1c05e22515632e7805000d6",
+      "bytes": 62564,
       "words": null
     },
     {

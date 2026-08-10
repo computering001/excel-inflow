@@ -232,6 +232,183 @@ def word_numeric_records(words: list[list[Any]]) -> list[dict[str, Any]]:
     return records
 
 
+STRICT_PERIOD_RE = re.compile(
+    r"^(?:"
+    r"(?:fy|cy)\s*(?:19|20)?\d{2}[eaf]?"
+    r"|(?:19|20)\d{2}(?:\s*/\s*\d{2,4})?[eaf]?"
+    r"|(?:q[1-4]|[1-4]q|h[12]|[12]h)\s*(?:fy|cy)?\s*(?:19|20)?\d{2}[eaf]?"
+    r"|\d{1,2}\s*/\s*\d{2}[eaf]?"
+    r"|[a-z]{3,9}[-\s]\d{2,4}[eaf]?"
+    r"|ltm|ttm|ntm"
+    r")$",
+    re.IGNORECASE,
+)
+
+
+def reconstruct_columnar_tables(words: list[list[Any]],
+                                excluded_bboxes: list[list[float]]) -> list[dict[str, Any]]:
+    """Rebuild unruled financial tables from the text layer's own geometry.
+
+    Broker reports are born-digital: the publisher draws almost no ruling
+    lines, so the ruled discovery lanes find nothing, and a fifty-row Key
+    financials appendix used to fall through to an LLM vision pass - the least
+    deterministic tool in the box doing the most deterministic part of the
+    job. But the text layer carries exact glyph coordinates, and a financial
+    table is the easiest structure-recognition case there is: numbers
+    right-aligned in tidy column bands, period headings across the top, labels
+    flush left. That is x-coordinate clustering, not perception.
+
+    The lane claims the same native, deterministic authority class as the
+    ruled lanes - single-read ownership - because it is the same evidence
+    (the page's own text) read by a different geometry. What EARNS that
+    authority is self-verification: a reconstruction is emitted only when its
+    own structure checks pass, and it demotes itself silently otherwise,
+    leaving the page to the vision path. It never touches regions the ruled
+    lanes already own.
+    """
+    ROW_TOLERANCE = 3.0      # points: words within this y-band share a row
+    COLUMN_GAP = 12.0        # points: a wider gap between right edges opens a new band
+    MIN_DATA_ROWS = 2        # a grid needs a header row AND data
+    MIN_COLUMNS = 2
+
+    def excluded(box: list[float]) -> bool:
+        return any(bbox_iou(box, other) >= 0.25 for other in excluded_bboxes)
+
+    # ------------------------------------------------------------- rows
+    rows: list[dict[str, Any]] = []
+    for word in sorted(words, key=lambda item: ((item[1] + item[3]) / 2.0, item[0])):
+        box = [float(value) for value in word[:4]]
+        if excluded(box):
+            continue
+        centre = (box[1] + box[3]) / 2.0
+        text = str(word[4]).strip()
+        if not text:
+            continue
+        if rows and abs(centre - rows[-1]["centre"]) <= ROW_TOLERANCE:
+            rows[-1]["words"].append((box, text))
+            rows[-1]["centre"] = (rows[-1]["centre"] + centre) / 2.0
+        else:
+            rows.append({"centre": centre, "words": [(box, text)]})
+
+    def is_numeric(text: str) -> bool:
+        return normalise_numeric_token(text) is not None
+
+    def is_period(text: str) -> bool:
+        return bool(STRICT_PERIOD_RE.fullmatch(re.sub(r"\s+", " ", text.strip())))
+
+    # A table row carries at least two numeric or period tokens; a run of them
+    # bounded by non-table rows is one candidate region.
+    def row_kind(row: dict[str, Any]) -> str:
+        values = sum(1 for _, text in row["words"] if is_numeric(text))
+        periods = sum(1 for _, text in row["words"] if is_period(text))
+        if periods >= 2 and periods >= values:
+            return "header"
+        if values >= 2:
+            return "data"
+        return "other"
+
+    regions: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    gap = 0
+    for row in rows:
+        kind = row_kind(row)
+        if kind in ("header", "data"):
+            current.append({**row, "kind": kind})
+            gap = 0
+        elif current:
+            # One quiet row (a section title inside the table) is tolerated;
+            # a second closes the region.
+            gap += 1
+            if gap >= 2:
+                regions.append(current)
+                current = []
+                gap = 0
+    if current:
+        regions.append(current)
+
+    tables: list[dict[str, Any]] = []
+    for region in regions:
+        header_rows = [row for row in region if row["kind"] == "header"]
+        data_rows = [row for row in region if row["kind"] == "data"]
+        if not header_rows or len(data_rows) < MIN_DATA_ROWS:
+            continue
+        header = header_rows[0]
+
+        # -------------------------------------------------------- columns
+        # Column bands from the RIGHT edges of the value/period tokens: a
+        # financial column is right-aligned, so right edges stack. Bands are
+        # built over the whole region, then each token must land in exactly
+        # one band - that is the self-check that earns ownership.
+        edges = sorted(
+            box[2]
+            for row in region
+            for box, text in row["words"]
+            if is_numeric(text) or is_period(text)
+        )
+        if not edges:
+            continue
+        bands: list[list[float]] = [[edges[0], edges[0]]]
+        for edge in edges[1:]:
+            if edge - bands[-1][1] <= COLUMN_GAP:
+                bands[-1][1] = edge
+            else:
+                bands.append([edge, edge])
+        if len(bands) < MIN_COLUMNS:
+            continue
+
+        def band_of(box: list[float]) -> int | None:
+            hits = [
+                index for index, (low, high) in enumerate(bands)
+                if low - COLUMN_GAP / 2 <= box[2] <= high + COLUMN_GAP / 2
+            ]
+            return hits[0] if len(hits) == 1 else None
+
+        # ---------------------------------------------- self-verification
+        assignable = True
+        for row in region:
+            for box, text in row["words"]:
+                if (is_numeric(text) or is_period(text)) and band_of(box) is None:
+                    assignable = False
+        if not assignable:
+            continue
+
+        grid_rows: list[list[str | None]] = []
+        region_box = [
+            min(box[0] for row in region for box, _ in row["words"]),
+            min(box[1] for row in region for box, _ in row["words"]),
+            max(box[2] for row in region for box, _ in row["words"]),
+            max(box[3] for row in region for box, _ in row["words"]),
+        ]
+        for row in region:
+            cells: list[str | None] = [None] * (1 + len(bands))
+            label_parts: list[str] = []
+            collision = False
+            for box, text in sorted(row["words"], key=lambda item: item[0][0]):
+                if is_numeric(text) or is_period(text):
+                    band = band_of(box)
+                    if cells[1 + band] is not None:
+                        collision = True
+                    cells[1 + band] = text
+                else:
+                    label_parts.append(text)
+            if collision:
+                assignable = False
+                break
+            cells[0] = " ".join(label_parts) or None
+            grid_rows.append(cells)
+        if not assignable or len(grid_rows) < 1 + MIN_DATA_ROWS:
+            continue
+        labelled = sum(1 for cells in grid_rows if cells[0] and not is_period(cells[0]))
+        if labelled < MIN_DATA_ROWS:
+            continue
+        tables.append({
+            "region_bbox": region_box,
+            "rows": grid_rows,
+            "column_count": 1 + len(bands),
+        })
+    return tables
+
+
 def record_inside_any_bbox(record: dict[str, Any], bboxes: list[list[float]]) -> bool:
     x0, y0, x1, y1 = map(float, record["bbox"])
     cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
@@ -422,6 +599,61 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             lane_tables[lane_id].append(table)
             writer.write_json(f"tables/{safe_id(table_id)}.json", "table_json", table)
 
+        # LANE 0 — columnar reconstruction of unruled tables from the text
+        # layer's own geometry. Runs after the ruled lanes and only outside
+        # the regions they already bounded, so it can never compete with a
+        # ruled result; where its self-verification fails, it emits nothing
+        # and the page falls to the vision path exactly as before.
+        columnar_grids = reconstruct_columnar_tables(words, table_bboxes)
+        columnar_tokens: list[str] = []
+        for grid_index, grid in enumerate(columnar_grids, start=1):
+            table_id = f"{surface_id}.columnar-t{grid_index}"
+            grid_rows: list[list[dict[str, Any]]] = []
+            for row_index, values in enumerate(grid["rows"], start=1):
+                cells = []
+                for column_index, value in enumerate(values, start=1):
+                    cells.append(cell_record(
+                        row_index,
+                        column_index,
+                        value,
+                        f"{path.name}#page={page_index + 1};lane=columnar;table={grid_index};r={row_index};c={column_index}",
+                        confidence=0.95,
+                    ))
+                grid_rows.append(cells)
+            caption, units, footnotes = table_context(words, grid["region_bbox"])
+            table = {
+                "table_id": table_id,
+                "surface_id": surface_id,
+                "source_location": f"page {page_index + 1}, columnar table {grid_index}",
+                "title": caption,
+                "units": units,
+                "footnotes": footnotes,
+                "bbox": [float(value) for value in grid["region_bbox"]],
+                "extraction_method": "native_pdf_columnar",
+                "discovery_lane": "columnar",
+                "authority_role": "bounded_native",
+                "confidence": 0.95,
+                "rows": grid_rows,
+            }
+            tables.append(table)
+            table_bboxes.append(table["bbox"])
+            # Capture accounting must be census-identical: the ledger's
+            # denominator is the census's tokenisation of the source words
+            # inside the region, so the credited capture is computed the same
+            # way, from the same records — never re-derived from cell text,
+            # whose tokenisation can differ and falsely re-trigger vision.
+            columnar_tokens.extend(
+                record["token"]
+                for record in source_numeric_records
+                if record_inside_any_bbox(record, [table["bbox"]])
+            )
+            writer.write_json(f"tables/{safe_id(table_id)}.json", "table_json", table)
+        lane_summaries.append({
+            "lane_id": "columnar",
+            "status": "pass" if columnar_grids else "empty",
+            "candidate_count": len(columnar_grids),
+        })
+
         uncovered_regions = uncovered_numeric_regions(source_numeric_records, table_bboxes)
         material_uncovered = [region for region in uncovered_regions if region["material"]]
         source_table_numeric_tokens = [
@@ -430,8 +662,11 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         ]
         source_table_tokens.extend(source_table_numeric_tokens)
 
-        # Select the best bounded native lane only for the provisional capture
-        # ledger.  Alternative lanes are corroboration, never additive owners.
+        # Select the best bounded RULED lane for the provisional capture
+        # ledger; the columnar lane owns its own disjoint regions, so its
+        # tokens are additive to whichever ruled lane wins, never a competing
+        # account of the same cells. Alternative ruled lanes remain
+        # corroboration, never additive owners.
         bounded_lane_tokens = {
             lane_id: [token for table in lane_tables[lane_id] for token in table_tokens(table)]
             for lane_id in ("lines", "lines_strict")
@@ -444,7 +679,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 -len(tokens),
             ),
             default=[],
-        )
+        ) + columnar_tokens
         captured_table_tokens.extend(best_native_tokens)
         native_table_missing = bool(Counter(source_table_numeric_tokens) - Counter(best_native_tokens))
 
