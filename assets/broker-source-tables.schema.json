@@ -4,10 +4,19 @@
   "title": "Structured full-table broker evidence for workbook rendering",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "houses"],
+  "required": [
+    "schema_version",
+    "run_id",
+    "houses"
+  ],
   "properties": {
-    "schema_version": { "const": "broker-source-tables/1.0" },
-    "run_id": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "const": "broker-source-tables/1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "houses": {
       "type": "array",
       "minItems": 1,
@@ -15,38 +24,103 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["house_id", "house_name", "source_id", "content_sha256", "tables"],
+        "required": [
+          "house_id",
+          "house_name",
+          "source_id",
+          "content_sha256",
+          "tables"
+        ],
         "properties": {
-          "house_id": { "type": "string", "minLength": 1 },
-          "house_name": { "type": "string", "minLength": 1 },
-          "source_id": { "type": "string", "minLength": 1 },
-          "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "published_date": { "type": "string", "format": "date" },
-          "file_name": { "type": "string", "minLength": 1 },
+          "house_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "house_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "published_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "file_name": {
+            "type": "string",
+            "minLength": 1
+          },
           "tables": {
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["table_id", "title", "source_location", "units", "extraction_method", "workbook_presentation", "workbook_presentation_reason", "rows"],
+              "required": [
+                "table_id",
+                "title",
+                "source_location",
+                "units",
+                "extraction_method",
+                "workbook_presentation",
+                "workbook_presentation_reason",
+                "rows"
+              ],
               "properties": {
-                "table_id": { "type": "string", "minLength": 1 },
-                "title": { "type": ["string", "null"] },
-                "source_location": { "type": "string", "minLength": 1 },
-                "units": { "type": ["string", "null"] },
-                "extraction_method": { "type": "string", "minLength": 1 },
+                "table_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source_location": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "units": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "extraction_method": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "workbook_presentation": {
-                  "enum": ["analytical_table", "evidence_only"],
+                  "enum": [
+                    "analytical_table",
+                    "evidence_only"
+                  ],
                   "description": "Controls only whether the table is rendered on a values-only Bxx sheet. Every table remains in this lossless run artifact."
                 },
-                "workbook_presentation_reason": { "type": "string", "minLength": 1 },
+                "workbook_presentation_reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
                 "rows": {
                   "type": "array",
                   "minItems": 1,
                   "items": {
                     "type": "array",
                     "minItems": 1,
-                    "items": { "type": ["string", "number", "boolean", "null"] }
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    }
                   }
                 },
                 "cell_authorities": {
@@ -54,15 +128,65 @@
                   "items": {
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["row", "column", "status"],
+                    "required": [
+                      "row",
+                      "column",
+                      "status"
+                    ],
                     "properties": {
-                      "row": { "type": "integer", "minimum": 1 },
-                      "column": { "type": "integer", "minimum": 1 },
-                      "status": { "enum": ["verified_native", "verified_dual_read", "verified_adjudicated", "quarantined_conflict"] },
-                      "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
-                      "basis": { "type": "string", "minLength": 1 }
+                      "row": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "column": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "status": {
+                        "enum": [
+                          "verified_native",
+                          "verified_dual_read",
+                          "verified_adjudicated",
+                          "quarantined_conflict"
+                        ]
+                      },
+                      "conflict_id": {
+                        "type": "string",
+                        "pattern": "^bvc-[a-f0-9]{24}$"
+                      },
+                      "basis": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     }
                   }
+                },
+                "transcription_structure": {
+                  "type": "object",
+                  "properties": {
+                    "row_labels": {
+                      "type": "integer"
+                    },
+                    "period_headers": {
+                      "type": "integer"
+                    },
+                    "row_count": {
+                      "type": "integer"
+                    },
+                    "max_columns": {
+                      "type": "integer"
+                    },
+                    "is_grid": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "workbook_presentation_hint": {
+                  "enum": [
+                    "analytical_table",
+                    "evidence_only"
+                  ]
                 }
               }
             }

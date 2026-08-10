@@ -419,12 +419,19 @@ def accepted_tables(
                     conflict_id=conflict_id,
                 ))
             rows.append(cells)
+        structure = transcription_structure({"rows": rows})
         compiled.append({
             "table_id": table_id,
             "surface_id": surface_id,
             "source_location": f"{surface_id}, vision table {table_index}",
             "title": raw_table.get("title"),
             "units": raw_table.get("units"),
+            "transcription_structure": structure,
+            # A structureless transcription is retained as evidence and can
+            # never be an analytical table: it must not reach the analyst
+            # workbook, and a mapped cell on an evidence_only table is already
+            # a blocker downstream.
+            "workbook_presentation_hint": "analytical_table" if structure["is_grid"] else "evidence_only",
             "footnotes": sorted({
                 str(note).strip()
                 for note in [*raw_table.get("footnotes", []), *result.get("footnotes", [])]
@@ -437,6 +444,72 @@ def accepted_tables(
             "rows": rows,
         })
     return compiled
+
+
+def transcription_structure(table: dict[str, Any]) -> dict[str, Any]:
+    """Report whether a transcribed table is a GRID or merely a bag of numbers.
+
+    Numeric recall cannot certify structure. A single row listing every value
+    on a page contains 100% of that page's numbers, and two independent passes
+    produce it identically, so every completeness and consensus test we had
+    passed a transcription with no row labels and no period headings — which is
+    analytically worthless and, worse, indistinguishable in the artifact from a
+    real table. Structure is therefore measured directly: a grid has row labels
+    down its first populated column and period headings across a row.
+    """
+    rows = table.get("rows") or []
+    labelled_rows = 0
+    for row in rows:
+        for cell in row:
+            text = str((cell.get("raw_text") if isinstance(cell, dict) else cell) or "").strip()
+            if not text:
+                continue
+            if numeric_token(text) is None and not is_period_header(text):
+                labelled_rows += 1
+            break
+    # Deliberately STRICTER than is_period_header, which is permissive by
+    # design so it can recognise a heading in a position already known to be a
+    # header. Applied to a bag of numbers it produces false positives: the
+    # values 44 and 20 both satisfy the bare two-digit year branch, so the very
+    # dump this function exists to reject scored as a grid on its first test.
+    # A structural claim has to rest on unambiguous evidence, so only a
+    # genuinely period-shaped token counts here.
+    strict_period = re.compile(
+        r"^(?:"
+        r"(?:fy|cy)\s*(?:19|20)?\d{2}[eaf]?"
+        r"|(?:19|20)\d{2}(?:\s*/\s*\d{2,4})?[eaf]?"
+        r"|(?:q[1-4]|[1-4]q|h[12]|[12]h)\s*(?:fy|cy)?\s*(?:19|20)?\d{2}[eaf]?"
+        r"|\d{1,2}\s*/\s*\d{2}[eaf]?"
+        r"|[a-z]{3,9}[-\s]\d{2,4}[eaf]?"
+        r"|ltm|ttm|ntm"
+        r")$",
+        re.IGNORECASE,
+    )
+    period_headers = sum(
+        1
+        for row in rows
+        for cell in row
+        if strict_period.fullmatch(
+            re.sub(r"\s+", " ", str((cell.get("raw_text") if isinstance(cell, dict) else cell) or "").strip())
+        )
+    )
+    max_columns = max((len(row) for row in rows), default=0)
+    return {
+        "row_labels": labelled_rows,
+        "period_headers": period_headers,
+        "row_count": len(rows),
+        "max_columns": max_columns,
+        # A grid needs a header row AND a data row, labels down the side, and
+        # unambiguous period headings across the top. A single row can never be
+        # a grid however many values it holds. Everything else is retained
+        # evidence: never an analytical table, never mappable.
+        "is_grid": (
+            len(rows) >= 2
+            and labelled_rows >= 1
+            and period_headers >= 1
+            and max_columns >= 2
+        ),
+    }
 
 
 def table_numeric_tokens(tables: list[dict[str, Any]]) -> list[str]:
@@ -658,6 +731,27 @@ def main() -> int:
                 unresolved += 1
                 findings.append({"id": "broker_vision.empty_table", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "A vision table is empty and cannot certify source coverage."})
                 continue
+            # A page whose ONLY output is structureless is an extraction
+            # failure wearing a transcription's clothes: the numbers are all
+            # present and none of them means anything. Say so by name, at the
+            # surface, so the receipt can never present it as broker evidence.
+            structureless = [
+                table for table in new_tables
+                if not (table.get("transcription_structure") or {}).get("is_grid")
+            ]
+            if structureless and len(structureless) == len(new_tables):
+                findings.append({
+                    "id": "broker_vision.structureless_transcription",
+                    "severity": "warning",
+                    "document_id": document["document_id"],
+                    "surface_id": surface_id,
+                    "message": (
+                        f"Every transcription for this surface lacks row labels or period headings "
+                        f"({len(structureless)} table(s)). The values are retained as evidence but the "
+                        "surface yielded no analytical table, so nothing here is model-eligible. A page "
+                        "carrying a real table needs a re-read that preserves its grid."
+                    ),
+                })
             document["tables"].extend(new_tables)
             vision_tokens = table_numeric_tokens(new_tables)
             # A two-pass consensus or hash-bound reviewed resolution is the

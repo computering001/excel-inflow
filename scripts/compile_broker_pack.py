@@ -1165,14 +1165,25 @@ def main() -> int:
                         "source_location": table["source_location"],
                         "units": table.get("units"),
                         "extraction_method": table["extraction_method"],
+                        # A transcription with no row labels and no period
+                        # headings is not an analytical table however the
+                        # reviewer classified it: it cannot be read, so it
+                        # cannot be presented. It stays in the run evidence,
+                        # and because a mapped cell on an evidence_only table
+                        # is a blocker, it cannot feed the model either.
                         "workbook_presentation": (
-                            "analytical_table"
+                            "evidence_only"
+                            if table.get("workbook_presentation_hint") == "evidence_only"
+                            else "analytical_table"
                             if review_by_table[table["table_id"]]["classification"] != "non_forecast"
                             or table["table_id"] in mapped_table_ids
                             else "evidence_only"
                         ),
                         "workbook_presentation_reason": (
-                            "Reviewed analytical/financial table retained on the values-only broker evidence sheet."
+                            "Transcription carries no row labels or period headings, so it is retained as "
+                            "run evidence only and is not readable as an analyst table."
+                            if table.get("workbook_presentation_hint") == "evidence_only"
+                            else "Reviewed analytical/financial table retained on the values-only broker evidence sheet."
                             if review_by_table[table["table_id"]]["classification"] != "non_forecast"
                             or table["table_id"] in mapped_table_ids
                             else "Reviewed non-forecast legal, disclosure or narrative table retained in the run evidence but omitted from the analyst workbook."

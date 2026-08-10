@@ -538,7 +538,35 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                     "required_passes": 2,
                     "source_census_artifact_id": census_ref,
                     "uncovered_region_ids": [region["region_id"] for region in material_uncovered],
-                    "instruction": "Inventory the complete page first, then transcribe every visible table cell, caption, unit and footnote independently. Preserve blanks, dashes, parentheses, percentages, units, period headings, bboxes and continuations. Return all tables, including tables already visible to native extraction; do not normalize metrics.",
+                    # TRANSCRIBE THE TABLE, DO NOT INVENTORY THE PAGE.
+                    #
+                    # This instruction used to open "Inventory the complete
+                    # page first", and that is exactly what came back: tables
+                    # titled "Observed page numeric evidence" whose single row
+                    # listed every numeric token on the page in reading order,
+                    # with no row labels and no period headers. Such a dump
+                    # satisfies every completeness test we had — it trivially
+                    # contains 100% of the page's numbers, and two independent
+                    # passes dump identically, so it certified as a verified
+                    # dual read — while being analytically worthless. A real
+                    # broker Key-financials appendix (fifty rows across ten
+                    # periods) came out as eight orphan numbers. The recall
+                    # census already lives in its own artifact; what vision is
+                    # for is STRUCTURE, so the instruction now demands it and
+                    # forbids the dump.
+                    "instruction": (
+                        "Transcribe each visible table on this page as a grid. For every table: put the "
+                        "row label in the first column of each row exactly as printed, put the period or "
+                        "column headings in a header row exactly as printed, and place each value in the "
+                        "column of its heading. Preserve blanks, dashes, parentheses, negatives, "
+                        "percentages, units, footnote markers, captions, bboxes and table continuations. "
+                        "Return every table, including any already visible to native extraction, and do "
+                        "not normalize, rename or aggregate metrics. Do NOT return a flat list of the "
+                        "page's numbers as a table: a row of values without its labels and period "
+                        "headings is not a transcription and will be rejected. If a region is genuinely "
+                        "not tabular, describe it in a note instead of inventing a table, and if the page "
+                        "carries no table at all return no tables and say so."
+                    ),
                 }
                 task_ref = writer.write_json(
                     f"vision/page-{page_index + 1:04d}.task.json",
@@ -763,7 +791,16 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
         "image_artifact_id": image_ref,
         "source_census_artifact_id": census_ref,
         "uncovered_region_ids": ["full-image"],
-        "instruction": "Inventory the complete image, then transcribe every visible table cell, caption, unit and footnote in reading order. Preserve labels, blanks, signs, units, periods, bboxes and column positions. Do not normalize metrics.",
+        # Same doctrine as the page instruction above: structure, not inventory.
+        "instruction": (
+            "Transcribe each visible table in this image as a grid. For every table: put the row label "
+            "in the first column of each row exactly as printed, put the period or column headings in a "
+            "header row exactly as printed, and place each value in the column of its heading. Preserve "
+            "labels, blanks, signs, units, periods, footnote markers, captions, bboxes and column "
+            "positions, and do not normalize metrics. Do NOT return a flat list of the image's numbers "
+            "as a table: a row of values without its labels and period headings is not a transcription "
+            "and will be rejected."
+        ),
         "required_independent_passes": 2,
     }
     task_ref = writer.write_json("vision/image-0001.task.json", "vision_task", task)

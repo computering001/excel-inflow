@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.2.0",
+  "releaseName": "Excel Inflow v2.2.1",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.2.0",
+  "skillVersion": "2.2.1",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-10T15:42:30.755Z",
+  "generatedAt": "2026-08-10T21:18:48.727Z",
   "centralInstructionsWords": 4929,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "cfe10dabd84b426bbf18e9032ff2d765585e9ef4c1947204df07fb1c380d0a45",
+    "currentClosureSha256": "1adce61bf5687a87c6b646e83e69eeebc0d519589a9ccb77d0dd2761eb316fc8",
     "closureFileCount": 155,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -556,8 +556,8 @@
         ],
         "sites": [
           "extract_broker_evidence.py:330 (fitz, deferred)",
-          "extract_broker_evidence.py:726 (fitz, deferred)",
-          "extract_broker_evidence.py:986 (fitz, deferred)",
+          "extract_broker_evidence.py:754 (fitz, deferred)",
+          "extract_broker_evidence.py:1023 (fitz, deferred)",
           "render/pdfdoc.py:26 (fitz, deferred)",
           "render/pdfdoc.py:229 (fitz, deferred)",
           "render/soffice.py:199 (fitz, deferred)",
@@ -612,8 +612,8 @@
           "extract_broker_evidence.py"
         ],
         "sites": [
-          "extract_broker_evidence.py:583 (openpyxl, deferred)",
-          "extract_broker_evidence.py:991 (openpyxl, deferred)",
+          "extract_broker_evidence.py:611 (openpyxl, deferred)",
+          "extract_broker_evidence.py:1028 (openpyxl, deferred)",
           "emit/render.py:26 (openpyxl, top-level)",
           "emit/render.py:27 (openpyxl.comments, top-level)",
           "emit/render.py:28 (openpyxl.formatting.rule, top-level)",
@@ -1057,8 +1057,8 @@
         "target": "real clean-root workbook build",
         "status": "PASS",
         "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
-        "plan_sha256": "fdb90f513cc6775b76558e4dcc7537a45207b3f34a711d8f7672c70a25b8afeb",
-        "workbook_sha256": "02acdc52c8984d47adb5f7304a8c28147dd6424941140fa790259df4222b8df2",
+        "plan_sha256": "a69facf25b6b6524259978eaba4d97a2039dd1fcf0940df243c0b6ab2c95ef36",
+        "workbook_sha256": "357204f0f1840c4810c529beb43cbe1e92bfcbb5879f731918840f357a1c8221",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
@@ -1066,8 +1066,8 @@
     "workbookBuild": {
       "status": "PASS",
       "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
-      "plan_sha256": "fdb90f513cc6775b76558e4dcc7537a45207b3f34a711d8f7672c70a25b8afeb",
-      "workbook_sha256": "02acdc52c8984d47adb5f7304a8c28147dd6424941140fa790259df4222b8df2",
+      "plan_sha256": "a69facf25b6b6524259978eaba4d97a2039dd1fcf0940df243c0b6ab2c95ef36",
+      "workbook_sha256": "357204f0f1840c4810c529beb43cbe1e92bfcbb5879f731918840f357a1c8221",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1199,8 +1199,8 @@
     },
     {
       "path": "assets/broker-extraction-bundle.schema.json",
-      "sha256": "d3c4214990605dc7e6606a772fc347d2a00ccf7c720224b91589c9e8ffd4fda1",
-      "bytes": 12237,
+      "sha256": "483214d69c8b5b39bee9d1a4b51518df76c8ccfb84fb15d256d6ca458610bb0b",
+      "bytes": 18048,
       "words": null
     },
     {
@@ -1223,8 +1223,8 @@
     },
     {
       "path": "assets/broker-source-tables.schema.json",
-      "sha256": "91aa9c04ffee422ce812b8d835891c53fe0e4335d3ef042d4b9ebf1ea595201b",
-      "bytes": 3334,
+      "sha256": "23e5fa76bb9a88cc9f88a5197cb6ca7f847f7db80cae91e91436abfd543d3203",
+      "bytes": 5833,
       "words": null
     },
     {
@@ -1451,8 +1451,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "1293b8318c33323cf016a9bccf3717e8cefb1c84146096ae84f0913cbb819c22",
-      "bytes": 483803,
+      "sha256": "350f001e2ee84cdd9944915ff288ac81384879bcc5e4b5063578eeb8c9feaaf7",
+      "bytes": 488552,
       "words": null
     },
     {
@@ -1469,8 +1469,8 @@
     },
     {
       "path": "scripts/compile_broker_pack.py",
-      "sha256": "c154fa29632081bea248f44c936b89c423b454d1210a9905ee907b1c9616b37a",
-      "bytes": 70086,
+      "sha256": "657ab05aba209751f48771318ae4b3d95ded50b57cddaea2e88130ff60d7d6ee",
+      "bytes": 70969,
       "words": null
     },
     {
@@ -1481,8 +1481,8 @@
     },
     {
       "path": "scripts/compile_broker_vision.py",
-      "sha256": "9e2a5b9b7e74ae494ba837cfa1dd0840516f4b31a6036d8b06ea75b313f065b5",
-      "bytes": 36468,
+      "sha256": "a124d69ad3e3f913a03c09f66890a2d8ff1fe1f21cfd7e90aea3842840acc7c8",
+      "bytes": 41127,
       "words": null
     },
     {
@@ -1553,8 +1553,8 @@
     },
     {
       "path": "scripts/extract_broker_evidence.py",
-      "sha256": "2f31b8c955f426e809ff7fab822b15f60a7316562bf2abb8e4ad25f2c22fb554",
-      "bytes": 49727,
+      "sha256": "49357fcc1df8b71d821928d3e46bfa872221c1c1e8013ba8e9ac7ba9f4f9423d",
+      "bytes": 52237,
       "words": null
     },
     {
@@ -1715,8 +1715,8 @@
     },
     {
       "path": "scripts/lib/instrument_display.mjs",
-      "sha256": "2854007851aeab3183b8f82f7f5378f7a8838dacc47ca056cff74009d3779942",
-      "bytes": 8406,
+      "sha256": "68eb0abd68da5af4173ccc36975e8e4aaf8c0e233f118f0218dafb0b2503c2bb",
+      "bytes": 11491,
       "words": null
     },
     {
