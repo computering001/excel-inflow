@@ -17,39 +17,113 @@
     "coverage_ledger"
   ],
   "properties": {
-    "schema_version": { "enum": ["broker-crosswalk/1.1", "broker-crosswalk/1.2"] },
-    "run_id": { "type": "string", "minLength": 1 },
-    "as_of": { "type": "string", "format": "date" },
-    "source_label": { "type": "string", "minLength": 1 },
-    "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-    "units": { "enum": ["units", "thousands", "millions"] },
+    "schema_version": {
+      "enum": [
+        "broker-crosswalk/1.1",
+        "broker-crosswalk/1.2"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "source_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reporting_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "units": {
+      "enum": [
+        "units",
+        "thousands",
+        "millions"
+      ]
+    },
     "forecast_periods": {
       "type": "array",
       "minItems": 3,
       "maxItems": 3,
-      "items": { "type": "string", "format": "date" }
+      "items": {
+        "type": "string",
+        "format": "date"
+      }
     },
     "metrics": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["label", "unit_kind", "definition_id"],
+        "required": [
+          "label",
+          "unit_kind",
+          "definition_id"
+        ],
         "properties": {
-          "label": { "type": "string", "minLength": 1 },
-          "unit_kind": { "enum": ["currency", "ratio", "percent_decimal"] },
-          "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-          "semantic_role": { "$ref": "#/$defs/semanticRole" },
-          "economic_domain": { "$ref": "#/$defs/economicDomain" },
-          "concept_id": { "$ref": "#/$defs/conceptId" },
-          "evidence_kind": { "$ref": "#/$defs/evidenceKind" },
-          "model_use": { "$ref": "#/$defs/modelUse" },
-          "consensus_family": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-          "definition_signature": { "$ref": "#/$defs/definitionSignature" },
-          "definition_fingerprint": { "$ref": "#/$defs/definitionFingerprint" },
-          "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
-          "model_disposition": { "enum": ["reference_only", "rejected", "not_applicable"] },
-          "model_disposition_reason": { "type": "string", "minLength": 1 }
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit_kind": {
+            "enum": [
+              "currency",
+              "ratio",
+              "percent_decimal"
+            ]
+          },
+          "definition_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "semantic_role": {
+            "$ref": "#/$defs/semanticRole"
+          },
+          "economic_domain": {
+            "$ref": "#/$defs/economicDomain"
+          },
+          "concept_id": {
+            "$ref": "#/$defs/conceptId"
+          },
+          "evidence_kind": {
+            "$ref": "#/$defs/evidenceKind"
+          },
+          "model_use": {
+            "$ref": "#/$defs/modelUse"
+          },
+          "consensus_family": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "definition_signature": {
+            "$ref": "#/$defs/definitionSignature"
+          },
+          "definition_fingerprint": {
+            "$ref": "#/$defs/definitionFingerprint"
+          },
+          "sign_convention": {
+            "enum": [
+              "as_reported",
+              "outflow_negative",
+              "outflow_positive"
+            ]
+          },
+          "model_disposition": {
+            "enum": [
+              "reference_only",
+              "rejected",
+              "not_applicable"
+            ]
+          },
+          "model_disposition_reason": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -59,48 +133,106 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["mapping_id", "house_id", "metric_id", "definition_id", "period_index", "sources", "rationale"],
+        "required": [
+          "mapping_id",
+          "house_id",
+          "metric_id",
+          "definition_id",
+          "period_index",
+          "sources",
+          "rationale"
+        ],
         "properties": {
-          "mapping_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-          "house_id": { "type": "string", "minLength": 1 },
-          "metric_id": { "type": "string", "minLength": 1 },
-          "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-          "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+          "mapping_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "house_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definition_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "period_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
           "sources": {
             "type": "array",
             "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["table_id", "row", "column", "coefficient"],
+              "required": [
+                "table_id",
+                "row",
+                "column",
+                "coefficient"
+              ],
               "properties": {
-                "table_id": { "type": "string", "minLength": 1 },
-                "row": { "type": "integer", "minimum": 1 },
-                "column": { "type": "integer", "minimum": 1 },
-                "coefficient": { "type": "number" }
+                "table_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "row": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "coefficient": {
+                  "type": "number"
+                }
               }
             }
           },
-          "constant": { "type": "number" },
-          "multiplier": { "type": "number" },
-          "rationale": { "type": "string", "minLength": 1 },
-          "review_status": { "enum": ["auto_exact", "reviewed"] }
+          "constant": {
+            "type": "number"
+          },
+          "multiplier": {
+            "type": "number"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "review_status": {
+            "enum": [
+              "auto_exact",
+              "reviewed"
+            ]
+          }
         }
       }
     },
     "table_reviews": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/tableReview" }
+      "items": {
+        "$ref": "#/$defs/tableReview"
+      }
     },
     "coverage_ledger": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/coverageEntry" }
+      "items": {
+        "$ref": "#/$defs/coverageEntry"
+      }
     },
     "derived_mappings": {
       "type": "array",
-      "items": { "$ref": "#/$defs/derivedMapping" }
+      "items": {
+        "$ref": "#/$defs/derivedMapping"
+      }
     },
     "provider_consensus": {
       "type": "object",
@@ -108,32 +240,104 @@
         "type": "array",
         "minItems": 3,
         "maxItems": 3,
-        "items": { "type": ["number", "null"] }
+        "items": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "flex_elections": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "concept",
+          "rationale"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "concept": {
+            "enum": [
+              "lease_payments",
+              "share_buybacks",
+              "revenue_component",
+              "committed_restructuring",
+              "other_committed_flow"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "schema_version": { "const": "broker-crosswalk/1.1" } } },
-      "then": {
+      "if": {
         "properties": {
-          "metrics": { "additionalProperties": { "required": ["semantic_role"] } },
-          "coverage_ledger": { "items": { "required": ["semantic_role"] } }
+          "schema_version": {
+            "const": "broker-crosswalk/1.1"
+          }
         }
-      }
-    },
-    {
-      "if": { "properties": { "schema_version": { "const": "broker-crosswalk/1.2" } } },
+      },
       "then": {
         "properties": {
           "metrics": {
             "additionalProperties": {
-              "required": ["economic_domain", "concept_id", "evidence_kind", "model_use", "definition_fingerprint"]
+              "required": [
+                "semantic_role"
+              ]
             }
           },
           "coverage_ledger": {
             "items": {
-              "required": ["economic_domain", "concept_id", "model_use", "definition_fingerprint", "definition_evidence"]
+              "required": [
+                "semantic_role"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "broker-crosswalk/1.2"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": {
+              "required": [
+                "economic_domain",
+                "concept_id",
+                "evidence_kind",
+                "model_use",
+                "definition_fingerprint"
+              ]
+            }
+          },
+          "coverage_ledger": {
+            "items": {
+              "required": [
+                "economic_domain",
+                "concept_id",
+                "model_use",
+                "definition_fingerprint",
+                "definition_evidence"
+              ]
             }
           }
         }
@@ -161,7 +365,13 @@
       "pattern": "^[a-z0-9][a-z0-9_.-]*$"
     },
     "modelUse": {
-      "enum": ["active_input", "reference_only", "exact_duplicate", "derived_input", "unresolved"]
+      "enum": [
+        "active_input",
+        "reference_only",
+        "exact_duplicate",
+        "derived_input",
+        "unresolved"
+      ]
     },
     "semanticRole": {
       "enum": [
@@ -196,15 +406,58 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "metric_id": { "type": "string", "minLength": 1 },
-        "accounting_basis": { "type": ["string", "null"] },
-        "operation_scope": { "type": ["string", "null"] },
-        "adjustment_basis": { "type": ["string", "null"] },
-        "currency": { "type": ["string", "null"] },
-        "units": { "type": ["string", "null"] },
-        "fiscal_calendar": { "type": ["string", "null"] },
-        "cash_flow_basis": { "type": ["string", "null"] },
-        "lease_basis": { "type": ["string", "null"] }
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accounting_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adjustment_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fiscal_calendar": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cash_flow_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lease_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "definitionFingerprint": {
@@ -224,126 +477,378 @@
         "operating_scope"
       ],
       "properties": {
-        "concept_id": { "$ref": "#/$defs/conceptId" },
-        "measurement_basis": { "enum": ["reported", "adjusted", "core", "underlying", "statutory", "mixed", "unspecified"] },
-        "restatement_basis": { "enum": ["restated", "originally_reported", "not_applicable", "unspecified"] },
-        "cash_flow_basis": { "enum": ["cfo", "fcf", "fcfe", "not_applicable", "unspecified"] },
-        "lease_basis": { "enum": ["including_leases", "excluding_leases", "not_applicable", "unspecified"] },
-        "units": { "type": ["string", "null"] },
-        "currency": { "type": ["string", "null"] },
-        "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic", "historical"] },
-        "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
-        "accounting_basis": { "type": "string", "minLength": 1 },
-        "operating_scope": { "type": "string", "minLength": 1 }
+        "concept_id": {
+          "$ref": "#/$defs/conceptId"
+        },
+        "measurement_basis": {
+          "enum": [
+            "reported",
+            "adjusted",
+            "core",
+            "underlying",
+            "statutory",
+            "mixed",
+            "unspecified"
+          ]
+        },
+        "restatement_basis": {
+          "enum": [
+            "restated",
+            "originally_reported",
+            "not_applicable",
+            "unspecified"
+          ]
+        },
+        "cash_flow_basis": {
+          "enum": [
+            "cfo",
+            "fcf",
+            "fcfe",
+            "not_applicable",
+            "unspecified"
+          ]
+        },
+        "lease_basis": {
+          "enum": [
+            "including_leases",
+            "excluding_leases",
+            "not_applicable",
+            "unspecified"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_basis": {
+          "enum": [
+            "annual_forecast",
+            "partial_period",
+            "guidance",
+            "non_periodic",
+            "historical"
+          ]
+        },
+        "sign_convention": {
+          "enum": [
+            "as_reported",
+            "outflow_negative",
+            "outflow_positive"
+          ]
+        },
+        "accounting_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_scope": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "sourceCell": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["row", "column"],
+      "required": [
+        "row",
+        "column"
+      ],
       "properties": {
-        "row": { "type": "integer", "minimum": 1 },
-        "column": { "type": "integer", "minimum": 1 }
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "periodColumn": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["column", "period_basis"],
+      "required": [
+        "column",
+        "period_basis"
+      ],
       "properties": {
-        "column": { "type": "integer", "minimum": 1 },
-        "period_basis": { "enum": ["annual_forecast", "partial_period"] },
-        "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
-        "period_label": { "type": "string", "minLength": 1 }
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "period_basis": {
+          "enum": [
+            "annual_forecast",
+            "partial_period"
+          ]
+        },
+        "period_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "period_label": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "tableReview": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["house_id", "table_id", "classification", "header_rows", "period_columns", "rationale", "review_status"],
+      "required": [
+        "house_id",
+        "table_id",
+        "classification",
+        "header_rows",
+        "period_columns",
+        "rationale",
+        "review_status"
+      ],
       "properties": {
-        "house_id": { "type": "string", "minLength": 1 },
-        "table_id": { "type": "string", "minLength": 1 },
+        "house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "table_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "classification": {
-          "enum": ["annual_forecast", "partial_period", "guidance", "mixed", "historical_only", "ratings_or_valuation", "non_forecast"]
+          "enum": [
+            "annual_forecast",
+            "partial_period",
+            "guidance",
+            "mixed",
+            "historical_only",
+            "ratings_or_valuation",
+            "non_forecast"
+          ]
         },
         "header_rows": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "integer", "minimum": 1 }
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "period_columns": {
           "type": "array",
-          "items": { "$ref": "#/$defs/periodColumn" }
+          "items": {
+            "$ref": "#/$defs/periodColumn"
+          }
         },
-        "rationale": { "type": "string", "minLength": 1 },
-        "review_status": { "const": "reviewed" }
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "const": "reviewed"
+        }
       }
     },
     "coverageEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["candidate_id", "house_id", "table_id", "row", "period_basis", "source_cells", "evidence_kind", "definition_id", "disposition", "rationale", "review_status"],
+      "required": [
+        "candidate_id",
+        "house_id",
+        "table_id",
+        "row",
+        "period_basis",
+        "source_cells",
+        "evidence_kind",
+        "definition_id",
+        "disposition",
+        "rationale",
+        "review_status"
+      ],
       "properties": {
-        "candidate_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "house_id": { "type": "string", "minLength": 1 },
-        "table_id": { "type": "string", "minLength": 1 },
-        "row": { "type": "integer", "minimum": 1 },
-        "label": { "type": "string" },
-        "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic", "historical"] },
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "table_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "period_basis": {
+          "enum": [
+            "annual_forecast",
+            "partial_period",
+            "guidance",
+            "non_periodic",
+            "historical"
+          ]
+        },
         "period_indexes": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "integer", "minimum": 0, "maximum": 2 }
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          }
         },
         "source_cells": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/sourceCell" }
+          "items": {
+            "$ref": "#/$defs/sourceCell"
+          }
         },
-        "semantic_role": { "$ref": "#/$defs/semanticRole" },
-        "economic_domain": { "$ref": "#/$defs/economicDomain" },
-        "concept_id": { "$ref": "#/$defs/conceptId" },
-        "evidence_kind": { "$ref": "#/$defs/evidenceKind" },
-        "model_use": { "$ref": "#/$defs/modelUse" },
-        "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "definition_fingerprint": { "$ref": "#/$defs/definitionFingerprint" },
-        "definition_evidence": { "type": "string", "minLength": 1 },
+        "semantic_role": {
+          "$ref": "#/$defs/semanticRole"
+        },
+        "economic_domain": {
+          "$ref": "#/$defs/economicDomain"
+        },
+        "concept_id": {
+          "$ref": "#/$defs/conceptId"
+        },
+        "evidence_kind": {
+          "$ref": "#/$defs/evidenceKind"
+        },
+        "model_use": {
+          "$ref": "#/$defs/modelUse"
+        },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "definition_fingerprint": {
+          "$ref": "#/$defs/definitionFingerprint"
+        },
+        "definition_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
         "disposition": {
-          "enum": ["mapped_metric", "mapped_guidance", "broker_derived_estimate", "partial_period_evidence", "supplemental_check", "duplicate", "not_model_relevant", "unusable", "quarantined_conflict"]
+          "enum": [
+            "mapped_metric",
+            "mapped_guidance",
+            "broker_derived_estimate",
+            "partial_period_evidence",
+            "supplemental_check",
+            "duplicate",
+            "not_model_relevant",
+            "unusable",
+            "quarantined_conflict"
+          ]
         },
-        "metric_id": { "type": "string", "minLength": 1 },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "mapping_ids": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         },
-        "duplicate_of": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "parent_candidate_id": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "rationale": { "type": "string", "minLength": 1 },
-        "review_status": { "const": "reviewed" }
+        "duplicate_of": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "parent_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "const": "reviewed"
+        }
       }
     },
     "derivedMapping": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["derivation_id", "mapping_id", "house_id", "metric_id", "definition_id", "period_index", "input_candidate_ids", "expression", "rationale", "review_status"],
+      "required": [
+        "derivation_id",
+        "mapping_id",
+        "house_id",
+        "metric_id",
+        "definition_id",
+        "period_index",
+        "input_candidate_ids",
+        "expression",
+        "rationale",
+        "review_status"
+      ],
       "properties": {
-        "derivation_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "mapping_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "house_id": { "type": "string", "minLength": 1 },
-        "metric_id": { "type": "string", "minLength": 1 },
-        "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "derivation_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "mapping_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "period_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
         "input_candidate_ids": {
           "type": "array",
           "minItems": 2,
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         },
-        "expression": { "type": "string", "minLength": 1 },
-        "rationale": { "type": "string", "minLength": 1 },
-        "review_status": { "const": "reviewed" }
+        "expression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "const": "reviewed"
+        }
       }
     }
   }

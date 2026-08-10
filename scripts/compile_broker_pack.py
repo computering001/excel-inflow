@@ -956,6 +956,83 @@ def main() -> int:
             "review_status": mapping.get("review_status", "reviewed"),
         })
 
+    # ------------------------------------------------ broker consumption tiers
+    #
+    # The model consumes a deliberately narrow slice of what the houses
+    # published. Tier 1 is the fixed core the debt overlay runs on and is
+    # always admissible. Any other ACTIVE metric is Tier 2 flex and needs all
+    # of: an explicit election recorded in the crosswalk, and at least three
+    # houses supplying it under the single declared definition - the same
+    # "three is the minimum for a meaningful consensus" bar the intake screen
+    # states for the pack itself. Everything else is Tier 3 evidence: it stays
+    # lossless in the source tables and may ride along as reference_only, but
+    # it never becomes an active model input. This is what stops a run from
+    # projecting hundreds of broker line items into the workbook - an evidence
+    # dump wearing a model's clothes.
+    TIER1_METRIC_IDS = REQUIRED_METRICS | {"ebit", "adjusted_ebitda"}
+    FLEX_CONCEPTS = {
+        "lease_payments", "share_buybacks", "revenue_component",
+        "committed_restructuring", "other_committed_flow",
+    }
+    MAX_FLEX_ELECTIONS = 10
+    flex_elections = crosswalk.get("flex_elections") or []
+    if len(flex_elections) > MAX_FLEX_ELECTIONS:
+        raise ValueError(
+            f"{len(flex_elections)} flex elections exceed the {MAX_FLEX_ELECTIONS}-concept ceiling; "
+            "a forecast surface this wide is an evidence dump, not a model."
+        )
+    elected_by_metric = {}
+    for index, election in enumerate(flex_elections):
+        metric_id = election.get("metric_id")
+        concept = election.get("concept")
+        rationale = election.get("rationale")
+        if metric_id not in metrics:
+            raise ValueError(f"flex_elections[{index}] names undeclared metric_id {metric_id!r}.")
+        if metric_id in TIER1_METRIC_IDS:
+            raise ValueError(f"flex_elections[{index}]: {metric_id!r} is Tier 1 and needs no election.")
+        if concept not in FLEX_CONCEPTS:
+            raise ValueError(
+                f"flex_elections[{index}] concept {concept!r} is not a whitelisted flex concept "
+                f"({', '.join(sorted(FLEX_CONCEPTS))})."
+            )
+        if not isinstance(rationale, str) or not rationale.strip():
+            raise ValueError(f"flex_elections[{index}] requires a rationale.")
+        if metric_id in elected_by_metric:
+            raise ValueError(f"flex_elections[{index}] repeats metric_id {metric_id!r}.")
+        elected_by_metric[metric_id] = election
+    for metric_id, declaration in metrics.items():
+        if metric_id in TIER1_METRIC_IDS:
+            continue
+        # model_use is a crosswalk/1.2 field. Earlier schema generations have
+        # no consumption vocabulary at all, so the tier rule cannot be read
+        # into them retroactively; the case-level coverage gate still holds
+        # the model side regardless of pack generation.
+        model_use = declaration.get("model_use")
+        if model_use is None:
+            continue
+        if model_use not in {"active_input", "derived_input"}:
+            continue
+        election = elected_by_metric.get(metric_id)
+        if election is None:
+            raise ValueError(
+                f"Metric {metric_id!r} is active but is neither Tier 1 core nor elected flex. "
+                "Either record a flex election with a whitelisted concept, or reclassify it "
+                "reference_only so it remains evidence."
+            )
+        supporting_houses = sum(
+            1 for house_id in documents_by_house
+            if all(
+                value is not None and math.isfinite(float(value))
+                for value in estimates[house_id].get(metric_id, [None, None, None])
+            )
+        )
+        if supporting_houses < 3:
+            raise ValueError(
+                f"Flex metric {metric_id!r} ({election.get('concept')}) is supported by only "
+                f"{supporting_houses} house(s) across all three forecast periods; three compatible "
+                "houses are the minimum for a consumable consensus. It stays evidence."
+            )
+
     resolved_coverage, coverage_summary, resolved_derivations = validate_coverage(
         crosswalk,
         documents_by_house,
@@ -1059,6 +1136,7 @@ def main() -> int:
         "units": crosswalk["units"],
         "forecast_periods": crosswalk["forecast_periods"],
         "metrics": metrics,
+        "flex_elections": flex_elections,
         "houses": houses,
         "recommended_primary_house_id": ranked_primary[0]["house_id"] if ranked_primary else None,
         "eligibility_summary": {

@@ -928,6 +928,52 @@ export function statementAuthorityChecks(modelCase) {
   return checks;
 }
 
+// THE CASE-LEVEL CHOKE POINT FOR BROKER CONSUMPTION. The pack compiler
+// enforces the tiers on what a pack may CARRY; this check enforces them on
+// what the model may WIRE. A statement row consuming a broker metric outside
+// the fixed Tier-1 core must point at a recorded flex election - otherwise
+// the run that projected hundreds of broker line items into the workbook
+// would still be reachable through a hand-authored case, whatever the pack
+// said. Aggregate working capital is deliberately Tier 1 while its
+// components are not: a row consuming a component-level broker series when
+// the aggregate exists is exactly the granularity the doctrine forbids.
+const TIER1_CONSUMPTION_IDS = new Set([
+  "revenue",
+  "ebit",
+  "adjusted_ebitda",
+  "depreciation_and_amortisation",
+  "effective_tax_rate",
+  "capex",
+  "change_in_working_capital",
+  "dividends",
+]);
+
+function brokerConsumptionTierChecks(modelCase) {
+  const checks = [];
+  const elections = new Set(
+    (modelCase.broker_pack?.flex_elections ?? []).map((item) => item.metric_id),
+  );
+  const packMetrics = modelCase.broker_pack?.metrics ?? {};
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase.statement_structure?.[section] ?? []) {
+      const metricId = row.broker_metric_id;
+      if (!metricId) continue;
+      if (TIER1_CONSUMPTION_IDS.has(metricId) || elections.has(metricId)) continue;
+      // A metric the pack does not even carry is caught by the existing
+      // pack-shape checks; this one is specifically about tier discipline.
+      if (packMetrics[metricId] === undefined && Object.keys(packMetrics).length === 0) continue;
+      checks.push(
+        result(
+          `broker_tier.${section}.${row.row_id}`,
+          "BLOCK",
+          `Row ${row.row_id} consumes broker metric ${metricId}, which is neither Tier-1 core nor a recorded flex election. Unconsumed broker detail stays evidence; record an election or remove the wiring.`,
+        ),
+      );
+    }
+  }
+  return checks;
+}
+
 function historicalProvenanceChecks(modelCase) {
   const checks = [];
   const rows = [
@@ -2120,6 +2166,7 @@ export function assessCoverage(modelCase) {
   checks.push(...statementHierarchyChecks(modelCase));
   checks.push(...statementTopologyChecks(modelCase));
   checks.push(...historicalProvenanceChecks(modelCase));
+  checks.push(...brokerConsumptionTierChecks(modelCase));
   checks.push(...forecastAuthorityChecks(modelCase));
   checks.push(...cashBucketStatementChecks(modelCase));
   checks.push(...instrumentChecks(modelCase));

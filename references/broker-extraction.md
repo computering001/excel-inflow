@@ -122,6 +122,20 @@ dividends, plus at least one supported headline anchor such as EBIT or Adjusted
 EBITDA. Preserve any additional usable broker metrics; the forecast-authority
 graph decides whether the model consumes them.
 
+Consumption is tiered, and the pack compiler enforces it. The eight Tier-1 ids
+above are always consumable. Any OTHER metric declared as an active input
+requires a recorded `flex_elections` entry naming a whitelisted concept
+(`lease_payments`, `share_buybacks`, `revenue_component`,
+`committed_restructuring`, `other_committed_flow`) with a rationale, AND at
+least three houses supplying it in all three forecast periods under the one
+declared definition — the same three-house bar the intake screen states for the
+pack itself. Fewer compatible houses, or no election, means the metric stays
+evidence: reclassify it `reference_only` rather than widening the forecast
+surface. Never elect more than ten concepts, and never map working-capital
+COMPONENTS as active metrics when the aggregate exists. The central Brokers
+sheet renders only consumed metrics — an analyst reads a consensus grid, not
+the candidate universe.
+
 Before compilation, review every extracted table once. Declare its class,
 header rows and any annual or partial-period columns. Then disposition every
 nonblank row intersecting those columns in one semantic coverage ledger as:

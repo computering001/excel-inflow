@@ -23,17 +23,28 @@
     "lease_policy"
   ],
   "properties": {
-    "contract_version": { "const": 2 },
+    "contract_version": {
+      "const": 2
+    },
     "execution_profile": {
-      "enum": ["production_model", "reference_parity"],
+      "enum": [
+        "production_model",
+        "reference_parity"
+      ],
       "default": "production_model"
     },
     "forecast_authority_contract_version": {
-      "enum": ["legacy", "waterfall_v1"],
+      "enum": [
+        "legacy",
+        "waterfall_v1"
+      ],
       "description": "waterfall_v1 requires every independent forecast hardcode to declare its selected authority separately for FY1, FY2 and FY3. Formula, schedule and intentionally uncalculated rows remain graph-derived."
     },
     "statement_authority_contract_version": {
-      "enum": ["legacy", "authority_v1"],
+      "enum": [
+        "legacy",
+        "authority_v1"
+      ],
       "description": "authority_v1 requires every visible non-header statement row to declare whether its historical cells are sourced inputs, derived formulas, reported totals reconciled to visible components, or links to a schedule authority."
     },
     "statement_structure_compiled_version": {
@@ -46,7 +57,9 @@
     },
     "instrument_term_authorities": {
       "type": "array",
-      "items": { "$ref": "#/$defs/instrumentTermAuthority" },
+      "items": {
+        "$ref": "#/$defs/instrumentTermAuthority"
+      },
       "description": "Field-level authorities copied from the validated DCS projection. These records are proof metadata, not an alternative instrument register."
     },
     "presentation_profile": {
@@ -60,29 +73,58 @@
     "stage_three_answers": {
       "type": "object",
       "description": "Canonical settled stage-3 decisions carried by the case across chats and rebuilds. Keys are stable question IDs and values are stable option IDs.",
-      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-      "additionalProperties": { "type": "string", "minLength": 1 }
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "issuer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "reporting_currency", "units", "fiscal_year_end"],
+      "required": [
+        "name",
+        "reporting_currency",
+        "units",
+        "fiscal_year_end"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-        "units": { "enum": ["units", "thousands", "millions"] },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reporting_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "units": {
+          "enum": [
+            "units",
+            "thousands",
+            "millions"
+          ]
+        },
         "fiscal_year_end": {
           "type": "string",
           "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
           "description": "The issuer's own year end as MM-DD. Under fiscal_calendar 'fixed_date' this is the exact month and day of every period end. Under '52_53_week' it is the ANCHOR the moving year end sits nearest."
         },
         "fiscal_calendar": {
-          "enum": ["fixed_date", "52_53_week"],
+          "enum": [
+            "fixed_date",
+            "52_53_week"
+          ],
           "default": "fixed_date",
-          "description": "Which fiscal calendar the issuer keeps. 'fixed_date' closes on the same month and day every year. '52_53_week' closes on one weekday near the anchor, so the year end MOVES — 2025-12-27, 2026-01-02, 2027-01-01 — and consecutive ends are 52 or 53 whole weeks apart. Omitting it means fixed_date, which is why every existing case is unaffected. Never asked of the user: the calendar follows from the filings."
+          "description": "Which fiscal calendar the issuer keeps. 'fixed_date' closes on the same month and day every year. '52_53_week' closes on one weekday near the anchor, so the year end MOVES \u2014 2025-12-27, 2026-01-02, 2027-01-01 \u2014 and consecutive ends are 52 or 53 whole weeks apart. Omitting it means fixed_date, which is why every existing case is unaffected. Never asked of the user: the calendar follows from the filings."
         },
         "accounting_basis": {
-          "enum": ["IFRS", "US_GAAP", "other_disclosed"],
+          "enum": [
+            "IFRS",
+            "US_GAAP",
+            "other_disclosed"
+          ],
           "description": "The issuer's disclosed accounting basis. It informs classification and validation but never replaces issuer-specific statement labels or economics."
         }
       }
@@ -92,46 +134,91 @@
       "minItems": 6,
       "maxItems": 6,
       "prefixItems": [
-        { "$ref": "#/$defs/historicalPeriod" },
-        { "$ref": "#/$defs/historicalPeriod" },
-        { "$ref": "#/$defs/historicalPeriod" },
-        { "$ref": "#/$defs/forecastPeriod" },
-        { "$ref": "#/$defs/forecastPeriod" },
-        { "$ref": "#/$defs/forecastPeriod" }
+        {
+          "$ref": "#/$defs/historicalPeriod"
+        },
+        {
+          "$ref": "#/$defs/historicalPeriod"
+        },
+        {
+          "$ref": "#/$defs/historicalPeriod"
+        },
+        {
+          "$ref": "#/$defs/forecastPeriod"
+        },
+        {
+          "$ref": "#/$defs/forecastPeriod"
+        },
+        {
+          "$ref": "#/$defs/forecastPeriod"
+        }
       ],
       "items": false
     },
     "modules": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["multi_currency", "historical_normalisation", "acquisition"],
+      "required": [
+        "multi_currency",
+        "historical_normalisation",
+        "acquisition"
+      ],
       "properties": {
-        "multi_currency": { "type": "boolean" },
-        "historical_normalisation": { "type": "boolean" },
-        "acquisition": { "type": "boolean" }
+        "multi_currency": {
+          "type": "boolean"
+        },
+        "historical_normalisation": {
+          "type": "boolean"
+        },
+        "acquisition": {
+          "type": "boolean"
+        }
       }
     },
     "controls": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["broker_case", "circularity", "debt_maturities_roll"],
+      "required": [
+        "broker_case",
+        "circularity",
+        "debt_maturities_roll"
+      ],
       "properties": {
-        "broker_case": { "type": "string", "minLength": 1 },
-        "circularity": { "enum": [0, 1] },
-        "debt_maturities_roll": { "enum": [0, 1] }
+        "broker_case": {
+          "type": "string",
+          "minLength": 1
+        },
+        "circularity": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "debt_maturities_roll": {
+          "enum": [
+            0,
+            1
+          ]
+        }
       }
     },
     "coverage_policy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "dividends_not_relevant": { "type": "boolean" },
-        "buybacks_not_relevant": { "type": "boolean" }
+        "dividends_not_relevant": {
+          "type": "boolean"
+        },
+        "buybacks_not_relevant": {
+          "type": "boolean"
+        }
       }
     },
     "operating_metrics": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/metricSeries" },
+      "additionalProperties": {
+        "$ref": "#/$defs/metricSeries"
+      },
       "required": [
         "revenue",
         "adjusted_ebitda",
@@ -147,23 +234,32 @@
         "type": "array",
         "minItems": 3,
         "maxItems": 3,
-        "items": { "type": "number" }
+        "items": {
+          "type": "number"
+        }
       }
     },
     "statement_structure": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["income_statement", "cash_flow"],
+      "required": [
+        "income_statement",
+        "cash_flow"
+      ],
       "properties": {
         "income_statement": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/statementRow" }
+          "items": {
+            "$ref": "#/$defs/statementRow"
+          }
         },
         "cash_flow": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/statementRow" }
+          "items": {
+            "$ref": "#/$defs/statementRow"
+          }
         }
       }
     },
@@ -178,23 +274,41 @@
         "cash_flow"
       ],
       "properties": {
-        "status": { "enum": ["incomplete", "complete"] },
+        "status": {
+          "enum": [
+            "incomplete",
+            "complete"
+          ]
+        },
         "classification_contract_version": {
-          "enum": ["legacy", "evidence_v1"],
+          "enum": [
+            "legacy",
+            "evidence_v1"
+          ],
           "default": "evidence_v1",
           "description": "evidence_v1 makes classification evidence a fail-closed production gate; legacy exists only for pre-v1 archived cases."
         },
-        "reviewed_at": { "type": "string", "format": "date" },
-        "review_evidence": { "type": "string", "minLength": 1 },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "review_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
         "income_statement": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/sourceDisclosureLine" }
+          "items": {
+            "$ref": "#/$defs/sourceDisclosureLine"
+          }
         },
         "cash_flow": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/sourceDisclosureLine" }
+          "items": {
+            "$ref": "#/$defs/sourceDisclosureLine"
+          }
         }
       }
     },
@@ -202,19 +316,32 @@
       "type": "object",
       "additionalProperties": {
         "type": "array",
-        "items": { "$ref": "#/$defs/provenanceEntry" }
+        "items": {
+          "$ref": "#/$defs/provenanceEntry"
+        }
       }
     },
     "broker_pack": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["source_label", "forecast_periods", "metrics"],
+      "required": [
+        "source_label",
+        "forecast_periods",
+        "metrics"
+      ],
       "properties": {
-        "source_label": { "type": "string", "minLength": 1 },
-        "forecast_periods": { "$ref": "#/$defs/series3Dates" },
+        "source_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "forecast_periods": {
+          "$ref": "#/$defs/series3Dates"
+        },
         "metrics": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/brokerMetric" }
+          "additionalProperties": {
+            "$ref": "#/$defs/brokerMetric"
+          }
         },
         "house_metadata": {
           "type": "object",
@@ -222,11 +349,23 @@
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["published_date", "document"],
+            "required": [
+              "published_date",
+              "document"
+            ],
             "properties": {
-              "published_date": { "type": "string", "format": "date" },
-              "document": { "type": "string", "minLength": 1 },
-              "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+              "published_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "document": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+              }
             }
           }
         },
@@ -236,36 +375,102 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["house_id", "metric_id", "period_index", "components", "constant", "multiplier", "value", "rationale", "review_status"],
+            "required": [
+              "house_id",
+              "metric_id",
+              "period_index",
+              "components",
+              "constant",
+              "multiplier",
+              "value",
+              "rationale",
+              "review_status"
+            ],
             "properties": {
-              "mapping_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-              "house_id": { "type": "string", "minLength": 1 },
-              "metric_id": { "type": "string", "minLength": 1 },
-              "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-              "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+              "mapping_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+              },
+              "house_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metric_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "definition_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+              },
+              "period_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
               "components": {
                 "type": "array",
                 "minItems": 1,
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["table_id", "row", "column", "source_ref", "raw_value", "coefficient", "contribution"],
+                  "required": [
+                    "table_id",
+                    "row",
+                    "column",
+                    "source_ref",
+                    "raw_value",
+                    "coefficient",
+                    "contribution"
+                  ],
                   "properties": {
-                    "table_id": { "type": "string", "minLength": 1 },
-                    "row": { "type": "integer", "minimum": 1 },
-                    "column": { "type": "integer", "minimum": 1 },
-                    "source_ref": { "type": "string", "minLength": 1 },
-                    "raw_value": { "type": "number" },
-                    "coefficient": { "type": "number" },
-                    "contribution": { "type": "number" }
+                    "table_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "row": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "column": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "source_ref": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "raw_value": {
+                      "type": "number"
+                    },
+                    "coefficient": {
+                      "type": "number"
+                    },
+                    "contribution": {
+                      "type": "number"
+                    }
                   }
                 }
               },
-              "constant": { "type": "number" },
-              "multiplier": { "type": "number" },
-              "value": { "type": "number" },
-              "rationale": { "type": "string", "minLength": 1 },
-              "review_status": { "enum": ["auto_exact", "reviewed"] }
+              "constant": {
+                "type": "number"
+              },
+              "multiplier": {
+                "type": "number"
+              },
+              "value": {
+                "type": "number"
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1
+              },
+              "review_status": {
+                "enum": [
+                  "auto_exact",
+                  "reviewed"
+                ]
+              }
             }
           }
         },
@@ -276,38 +481,101 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["house_id", "house_name", "source_id", "content_sha256", "tables"],
+            "required": [
+              "house_id",
+              "house_name",
+              "source_id",
+              "content_sha256",
+              "tables"
+            ],
             "properties": {
-              "house_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
-              "house_name": { "type": "string", "minLength": 1 },
-              "source_id": { "type": "string", "minLength": 1 },
-              "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-              "published_date": { "type": "string", "format": "date" },
-              "file_name": { "type": "string", "minLength": 1 },
+              "house_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_]*$"
+              },
+              "house_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "published_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "file_name": {
+                "type": "string",
+                "minLength": 1
+              },
               "tables": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["table_id", "title", "source_location", "units", "extraction_method", "rows"],
+                  "required": [
+                    "table_id",
+                    "title",
+                    "source_location",
+                    "units",
+                    "extraction_method",
+                    "rows"
+                  ],
                   "properties": {
-                    "table_id": { "type": "string", "minLength": 1 },
-                    "title": { "type": ["string", "null"] },
-                    "source_location": { "type": "string", "minLength": 1 },
-                    "units": { "type": ["string", "null"] },
-                    "extraction_method": { "type": "string", "minLength": 1 },
+                    "table_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "source_location": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "units": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "extraction_method": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "workbook_presentation": {
-                      "enum": ["analytical_table", "evidence_only"],
+                      "enum": [
+                        "analytical_table",
+                        "evidence_only"
+                      ],
                       "description": "Optional for legacy cases. evidence_only tables remain hash-bound run evidence and are not rendered in the analyst workbook."
                     },
-                    "workbook_presentation_reason": { "type": "string", "minLength": 1 },
+                    "workbook_presentation_reason": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "rows": {
                       "type": "array",
                       "minItems": 1,
                       "items": {
                         "type": "array",
                         "minItems": 1,
-                        "items": { "type": ["string", "number", "boolean", "null"] }
+                        "items": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "null"
+                          ]
+                        }
                       }
                     },
                     "cell_authorities": {
@@ -315,13 +583,36 @@
                       "items": {
                         "type": "object",
                         "additionalProperties": false,
-                        "required": ["row", "column", "status"],
+                        "required": [
+                          "row",
+                          "column",
+                          "status"
+                        ],
                         "properties": {
-                          "row": { "type": "integer", "minimum": 1 },
-                          "column": { "type": "integer", "minimum": 1 },
-                          "status": { "enum": ["verified_native", "verified_dual_read", "verified_adjudicated", "quarantined_conflict"] },
-                          "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
-                          "basis": { "type": "string", "minLength": 1 }
+                          "row": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "column": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "status": {
+                            "enum": [
+                              "verified_native",
+                              "verified_dual_read",
+                              "verified_adjudicated",
+                              "quarantined_conflict"
+                            ]
+                          },
+                          "conflict_id": {
+                            "type": "string",
+                            "pattern": "^bvc-[a-f0-9]{24}$"
+                          },
+                          "basis": {
+                            "type": "string",
+                            "minLength": 1
+                          }
                         }
                       }
                     }
@@ -330,12 +621,45 @@
               }
             }
           }
+        },
+        "flex_elections": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metric_id",
+              "concept",
+              "rationale"
+            ],
+            "properties": {
+              "metric_id": {
+                "type": "string"
+              },
+              "concept": {
+                "enum": [
+                  "lease_payments",
+                  "share_buybacks",
+                  "revenue_component",
+                  "committed_restructuring",
+                  "other_committed_flow"
+                ]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
     "instruments": {
       "type": "array",
-      "items": { "$ref": "#/$defs/instrument" }
+      "items": {
+        "$ref": "#/$defs/instrument"
+      }
     },
     "debt_reconciliation": {
       "type": "object",
@@ -347,17 +671,24 @@
       "properties": {
         "reported_opening_gross_debt": {
           "oneOf": [
-            { "type": "number", "minimum": 0 },
-            { "$ref": "#/$defs/series3" }
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "$ref": "#/$defs/series3"
+            }
           ],
-          "description": "Reported gross debt excluding leases, IN THE REPORTING CURRENCY. As a scalar it is the last historical year end only, and the stack then ties at exactly one date — which is the defect this field's three-series form exists to close. As a three-series, oldest first, it states every historical year end and each is tied and its residual reported. Where the three-series is supplied it must agree with historical_supplement.prior_gross_debt_excluding_leases at the two earlier ends. It is a translated figure: a sum of native USD, EUR and GBP balances is not a currency amount and cannot be reconciled against anything."
+          "description": "Reported gross debt excluding leases, IN THE REPORTING CURRENCY. As a scalar it is the last historical year end only, and the stack then ties at exactly one date \u2014 which is the defect this field's three-series form exists to close. As a three-series, oldest first, it states every historical year end and each is tied and its residual reported. Where the three-series is supplied it must agree with historical_supplement.prior_gross_debt_excluding_leases at the two earlier ends. It is a translated figure: a sum of native USD, EUR and GBP balances is not a currency amount and cannot be reconciled against anything."
         },
         "maximum_residual_percentage": {
           "type": "number",
           "minimum": 0,
           "maximum": 0.05
         },
-        "note": { "type": "string" }
+        "note": {
+          "type": "string"
+        }
       }
     },
     "historical_interest_reconciliation": {
@@ -394,7 +725,7 @@
     "historical_supplement": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Reported history that completes the two earlier balance snapshots and the three-year interest history. DEFECT 0.4: every field below except reported_net_debt_adjustment was read by build_dynamic_model.mjs and declared ONLY in the superseded v1 schema, and this object carried no additionalProperties:false — so prior_gross_debt_excluding_leases was written into columns G and H and styled as an input with nothing in the v2 contract acknowledging its existence, and a misspelt key was silently ignored rather than rejected.",
+      "description": "Reported history that completes the two earlier balance snapshots and the three-year interest history. DEFECT 0.4: every field below except reported_net_debt_adjustment was read by build_dynamic_model.mjs and declared ONLY in the superseded v1 schema, and this object carried no additionalProperties:false \u2014 so prior_gross_debt_excluding_leases was written into columns G and H and styled as an input with nothing in the v2 contract acknowledging its existence, and a misspelt key was silently ignored rather than rejected.",
       "properties": {
         "prior_cash_and_cash_equivalents": {
           "$ref": "#/$defs/series2",
@@ -408,15 +739,27 @@
           "$ref": "#/$defs/series2",
           "description": "Reported total lease liability at the two EARLIER historical year ends, oldest first. Superseded by lease_policy.historical_liabilities where that is supplied."
         },
-        "debt_interest_expense": { "$ref": "#/$defs/series3" },
-        "lease_interest_expense": { "$ref": "#/$defs/series3" },
-        "rcf_commitment_fee": { "$ref": "#/$defs/series3" },
-        "non_cash_interest": { "$ref": "#/$defs/series3" },
-        "interest_income": { "$ref": "#/$defs/series3" },
+        "debt_interest_expense": {
+          "$ref": "#/$defs/series3"
+        },
+        "lease_interest_expense": {
+          "$ref": "#/$defs/series3"
+        },
+        "rcf_commitment_fee": {
+          "$ref": "#/$defs/series3"
+        },
+        "non_cash_interest": {
+          "$ref": "#/$defs/series3"
+        },
+        "interest_income": {
+          "$ref": "#/$defs/series3"
+        },
         "reported_net_debt_adjustment": {
           "type": "array",
-          "description": "The bridge from the model's standardised net debt to the figure the issuer itself publishes, stated as a list of NAMED reconciling items. Each item is one thing the company's own definition does that the model's does not — an unamortised fair-value adjustment or issue-cost discount, a debt derivative, a class of lease the issuer leaves out of net debt. Supplying this renders a separate 'company reported' sub-block: the model figure is restated, each named item is a visible row beneath it, and the published number and its leverage multiple follow. Omit it entirely when the model basis IS the company basis — a single anonymous 'reported adjustments' row that sits at zero tells the reader a difference exists and nothing about what it is, and the model-basis header already states that the two bases agree. Items that are zero in every period are dropped.",
-          "items": { "$ref": "#/$defs/reportedNetDebtAdjustmentComponent" }
+          "description": "The bridge from the model's standardised net debt to the figure the issuer itself publishes, stated as a list of NAMED reconciling items. Each item is one thing the company's own definition does that the model's does not \u2014 an unamortised fair-value adjustment or issue-cost discount, a debt derivative, a class of lease the issuer leaves out of net debt. Supplying this renders a separate 'company reported' sub-block: the model figure is restated, each named item is a visible row beneath it, and the published number and its leverage multiple follow. Omit it entirely when the model basis IS the company basis \u2014 a single anonymous 'reported adjustments' row that sits at zero tells the reader a difference exists and nothing about what it is, and the model-basis header already states that the two bases agree. Items that are zero in every period are dropped.",
+          "items": {
+            "$ref": "#/$defs/reportedNetDebtAdjustmentComponent"
+          }
         },
         "reported_net_debt_basis_status": {
           "enum": [
@@ -440,7 +783,9 @@
         "commitment_fee_value"
       ],
       "properties": {
-        "instrument_id": { "type": "string" },
+        "instrument_id": {
+          "type": "string"
+        },
         "capacity": {
           "type": "number",
           "minimum": 0,
@@ -452,9 +797,16 @@
           "description": "Opening drawn balance in the matched RCF instrument's native currency. It must equal that instrument's opening_balance before any FX translation."
         },
         "commitment_fee_convention": {
-          "enum": ["none", "bps_on_undrawn", "captured_in_residual"]
+          "enum": [
+            "none",
+            "bps_on_undrawn",
+            "captured_in_residual"
+          ]
         },
-        "commitment_fee_value": { "type": "number", "minimum": 0 }
+        "commitment_fee_value": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "cash_policy": {
@@ -473,34 +825,70 @@
           ]
         },
         {
-          "required": ["buckets"],
+          "required": [
+            "buckets"
+          ],
           "not": {
             "anyOf": [
-              { "required": ["opening_cash"] },
-              { "required": ["historical_year_end_cash"] },
-              { "required": ["eligible_cash_percentage"] },
-              { "required": ["cash_yield"] }
+              {
+                "required": [
+                  "opening_cash"
+                ]
+              },
+              {
+                "required": [
+                  "historical_year_end_cash"
+                ]
+              },
+              {
+                "required": [
+                  "eligible_cash_percentage"
+                ]
+              },
+              {
+                "required": [
+                  "cash_yield"
+                ]
+              }
             ]
           }
         }
       ],
       "properties": {
-        "opening_cash": { "type": "number", "minimum": 0 },
-        "historical_year_end_cash": { "$ref": "#/$defs/series3" },
-        "minimum_cash_override": { "type": ["number", "null"], "minimum": 0 },
+        "opening_cash": {
+          "type": "number",
+          "minimum": 0
+        },
+        "historical_year_end_cash": {
+          "$ref": "#/$defs/series3"
+        },
+        "minimum_cash_override": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
         "eligible_cash_percentage": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
         "interest_income_cash_flow_classification": {
-          "enum": ["operating", "investing"]
+          "enum": [
+            "operating",
+            "investing"
+          ]
         },
-        "cash_yield": { "$ref": "#/$defs/series3" },
+        "cash_yield": {
+          "$ref": "#/$defs/series3"
+        },
         "buckets": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/cashBucket" },
+          "items": {
+            "$ref": "#/$defs/cashBucket"
+          },
           "description": "Optional explicit cash-bucket authority. Exactly one bucket is balancing. When supplied, legacy opening_cash, historical_year_end_cash, eligible_cash_percentage and cash_yield are omitted rather than restated."
         }
       }
@@ -518,8 +906,16 @@
         "include_in_leverage"
       ],
       "anyOf": [
-        { "required": ["historical_liabilities"] },
-        { "required": ["opening_liability"] }
+        {
+          "required": [
+            "historical_liabilities"
+          ]
+        },
+        {
+          "required": [
+            "opening_liability"
+          ]
+        }
       ],
       "properties": {
         "mode": {
@@ -539,15 +935,25 @@
           "minimum": 0,
           "description": "Legacy scalar form of the forecast opening lease liability. Supply historical_liabilities instead where the three reported actuals are known; this field is only consulted when historical_liabilities is absent."
         },
-        "principal_repayment": { "$ref": "#/$defs/series3" },
-        "additions": { "$ref": "#/$defs/series3" },
-        "effective_rate": { "$ref": "#/$defs/series3" },
+        "principal_repayment": {
+          "$ref": "#/$defs/series3"
+        },
+        "additions": {
+          "$ref": "#/$defs/series3"
+        },
+        "effective_rate": {
+          "$ref": "#/$defs/series3"
+        },
         "forecast_liabilities": {
           "$ref": "#/$defs/series3",
           "description": "Explicit total lease-liability forecast used only under sourced_balance. The model retains the sourced closing balances and derives the implied additions bridge from opening + additions - principal = closing."
         },
         "interest_basis": {
-          "enum": ["none", "total_liability", "separately_supplied"],
+          "enum": [
+            "none",
+            "total_liability",
+            "separately_supplied"
+          ],
           "description": "Which liability base earns separately presented lease interest. IFRS cases may use total_liability. US GAAP cases must choose explicitly so operating lease cost already captured above EBIT is not silently duplicated."
         },
         "historical_interest_bearing_liabilities": {
@@ -562,36 +968,70 @@
           "type": "boolean",
           "description": "True only when the issuer or supplied forecast explicitly reclassifies the interest component of US GAAP operating lease cost into interest expense."
         },
-        "include_in_gross_debt": { "type": "boolean" },
-        "include_in_net_debt": { "type": "boolean" },
-        "include_in_leverage": { "type": "boolean" }
+        "include_in_gross_debt": {
+          "type": "boolean"
+        },
+        "include_in_net_debt": {
+          "type": "boolean"
+        },
+        "include_in_leverage": {
+          "type": "boolean"
+        }
       }
     },
-    "other_interest": { "$ref": "#/$defs/series3" },
-    "non_cash_interest": { "$ref": "#/$defs/series3" },
-    "acquisition": { "$ref": "#/$defs/acquisition" },
+    "other_interest": {
+      "$ref": "#/$defs/series3"
+    },
+    "non_cash_interest": {
+      "$ref": "#/$defs/series3"
+    },
+    "acquisition": {
+      "$ref": "#/$defs/acquisition"
+    },
     "fx": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/fxPair" }
+      "additionalProperties": {
+        "$ref": "#/$defs/fxPair"
+      }
     },
     "historical_entities": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/historicalEntity" },
+      "items": {
+        "$ref": "#/$defs/historicalEntity"
+      },
       "description": "Predecessor or calendarised historical contributors expressed in reporting-currency semantic metrics. The production compiler combines these values, less metric-specific eliminations, into the first three periods of the canonical case."
     }
   },
   "allOf": [
     {
-      "if": {"required": ["instrument_authority_contract_version"]},
+      "if": {
+        "required": [
+          "instrument_authority_contract_version"
+        ]
+      },
       "then": {
-        "required": ["instrument_term_authorities"],
-        "properties": {"instrument_term_authorities": {"minItems": 1}}
+        "required": [
+          "instrument_term_authorities"
+        ],
+        "properties": {
+          "instrument_term_authorities": {
+            "minItems": 1
+          }
+        }
       }
     },
     {
-      "if": {"required": ["instrument_term_authorities"]},
-      "then": {"required": ["instrument_authority_contract_version"]}
+      "if": {
+        "required": [
+          "instrument_term_authorities"
+        ]
+      },
+      "then": {
+        "required": [
+          "instrument_authority_contract_version"
+        ]
+      }
     }
   ],
   "$defs": {
@@ -608,51 +1048,110 @@
         "precision"
       ],
       "properties": {
-        "instrument_id": { "type": "string", "minLength": 1 },
-        "model_field": { "type": "string", "minLength": 1 },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_field": {
+          "type": "string",
+          "minLength": 1
+        },
         "output_value": {},
         "source_cells": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "transform": { "type": "object" },
-        "authority_kind": { "enum": ["source_cell", "derived_source_cells", "supplement"] },
-        "precision": { "enum": ["exact", "month", "year", "bucket", "non_maturing"] },
-        "supplement_id": { "type": "string", "minLength": 1 },
-        "basis": { "type": "object" }
+        "transform": {
+          "type": "object"
+        },
+        "authority_kind": {
+          "enum": [
+            "source_cell",
+            "derived_source_cells",
+            "supplement"
+          ]
+        },
+        "precision": {
+          "enum": [
+            "exact",
+            "month",
+            "year",
+            "bucket",
+            "non_maturing"
+          ]
+        },
+        "supplement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object"
+        }
       },
       "allOf": [
         {
           "if": {
-            "properties": { "authority_kind": { "const": "supplement" } },
-            "required": ["authority_kind"]
+            "properties": {
+              "authority_kind": {
+                "const": "supplement"
+              }
+            },
+            "required": [
+              "authority_kind"
+            ]
           },
-          "then": { "required": ["supplement_id"] }
+          "then": {
+            "required": [
+              "supplement_id"
+            ]
+          }
         }
       ]
     },
     "historicalPeriod": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["date", "status"],
+      "required": [
+        "date",
+        "status"
+      ],
       "properties": {
-        "date": { "type": "string", "format": "date" },
-        "status": { "const": "historical" }
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "const": "historical"
+        }
       }
     },
     "forecastPeriod": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["date", "status"],
+      "required": [
+        "date",
+        "status"
+      ],
       "properties": {
-        "date": { "type": "string", "format": "date" },
-        "status": { "const": "forecast" }
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "status": {
+          "const": "forecast"
+        }
       }
     },
     "reportedNetDebtAdjustmentComponent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["label", "values"],
+      "required": [
+        "label",
+        "values"
+      ],
       "properties": {
         "label": {
           "type": "string",
@@ -661,7 +1160,7 @@
         },
         "values": {
           "$ref": "#/$defs/series6",
-          "description": "The item across all six periods, oldest first: three reported actuals then the three forecast periods. Signed as it moves net debt — negative where the company's definition carries less debt than the model's. Every period is a hardcode because every period is a reported or assumed fact, not something the model derives."
+          "description": "The item across all six periods, oldest first: three reported actuals then the three forecast periods. Signed as it moves net debt \u2014 negative where the company's definition carries less debt than the model's. Every period is a hardcode because every period is a reported or assumed fact, not something the model derives."
         },
         "note": {
           "type": "string",
@@ -673,32 +1172,50 @@
       "type": "array",
       "minItems": 2,
       "maxItems": 2,
-      "items": { "type": "number" }
+      "items": {
+        "type": "number"
+      }
     },
     "series3": {
       "type": "array",
       "minItems": 3,
       "maxItems": 3,
-      "items": { "type": "number" }
+      "items": {
+        "type": "number"
+      }
     },
     "series6": {
       "type": "array",
       "minItems": 6,
       "maxItems": 6,
-      "items": { "type": ["number", "null"] }
+      "items": {
+        "type": [
+          "number",
+          "null"
+        ]
+      }
     },
     "series3Dates": {
       "type": "array",
       "minItems": 3,
       "maxItems": 3,
-      "items": { "type": "string", "format": "date" }
+      "items": {
+        "type": "string",
+        "format": "date"
+      }
     },
     "metricSeries": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["values", "forecast_method", "source_kind"],
+      "required": [
+        "values",
+        "forecast_method",
+        "source_kind"
+      ],
       "properties": {
-        "values": { "$ref": "#/$defs/series6" },
+        "values": {
+          "$ref": "#/$defs/series6"
+        },
         "forecast_method": {
           "enum": [
             "supplied_exact",
@@ -720,9 +1237,13 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "$ref": "#/$defs/forecastAuthority" }
+          "items": {
+            "$ref": "#/$defs/forecastAuthority"
+          }
         },
-        "note": { "type": "string" }
+        "note": {
+          "type": "string"
+        }
       }
     },
     "historicalEntity": {
@@ -739,26 +1260,41 @@
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_.-]*$"
         },
-        "name": { "type": "string", "minLength": 1 },
-        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
         "fiscal_year_end": {
           "type": "string",
           "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
         },
-        "metrics_basis": { "const": "reporting_currency_calendarised" },
+        "metrics_basis": {
+          "const": "reporting_currency_calendarised"
+        },
         "calendarisation_notes": {
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "metrics": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/series3" }
+          "additionalProperties": {
+            "$ref": "#/$defs/series3"
+          }
         },
         "metric_specific_eliminations": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/series3" }
+          "additionalProperties": {
+            "$ref": "#/$defs/series3"
+          }
         },
         "source_line_ids": {
           "type": "array",
@@ -772,22 +1308,50 @@
     "formulaRule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operator", "refs"],
+      "required": [
+        "operator",
+        "refs"
+      ],
       "properties": {
         "operator": {
-          "enum": ["sum", "link", "subtract", "ratio", "negated_ratio", "growth", "tax", "negate", "negate_sum", "prior_period", "prior_period_scaled_by", "average", "historical_average", "historical_trend"]
+          "enum": [
+            "sum",
+            "link",
+            "subtract",
+            "ratio",
+            "negated_ratio",
+            "growth",
+            "tax",
+            "negate",
+            "negate_sum",
+            "prior_period",
+            "prior_period_scaled_by",
+            "average",
+            "historical_average",
+            "historical_trend"
+          ]
         },
         "refs": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 }
+        "forecast_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        }
       }
     },
     "forecastAuthority": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["method", "source_kind"],
+      "required": [
+        "method",
+        "source_kind"
+      ],
       "properties": {
         "method": {
           "enum": [
@@ -824,22 +1388,59 @@
             "none"
           ]
         },
-        "value": { "type": ["number", "null"] },
-        "source_id": { "type": "string", "minLength": 1 },
-        "as_of_date": { "type": "string", "format": "date" },
-        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-        "material": { "type": "boolean" },
-        "note": { "type": "string", "minLength": 1 },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "as_of_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "material": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        },
         "guidance_range": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["low", "high", "selected", "selection_policy"],
+          "required": [
+            "low",
+            "high",
+            "selected",
+            "selection_policy"
+          ],
           "properties": {
-            "low": { "type": "number" },
-            "high": { "type": "number" },
-            "selected": { "type": "number" },
+            "low": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            },
+            "selected": {
+              "type": "number"
+            },
             "selection_policy": {
-              "enum": ["company_point", "low", "midpoint", "high", "user_selected"]
+              "enum": [
+                "company_point",
+                "low",
+                "midpoint",
+                "high",
+                "user_selected"
+              ]
             }
           }
         },
@@ -853,11 +1454,24 @@
             "remainder_method"
           ],
           "properties": {
-            "reported_to_date": { "type": "number" },
-            "forecast_remainder": { "type": "number" },
-            "reported_through": { "type": "string", "format": "date" },
-            "reported_source_id": { "type": "string", "minLength": 1 },
-            "remainder_source_id": { "type": "string", "minLength": 1 },
+            "reported_to_date": {
+              "type": "number"
+            },
+            "forecast_remainder": {
+              "type": "number"
+            },
+            "reported_through": {
+              "type": "string",
+              "format": "date"
+            },
+            "reported_source_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "remainder_source_id": {
+              "type": "string",
+              "minLength": 1
+            },
             "remainder_method": {
               "enum": [
                 "contractual_commitment",
@@ -879,32 +1493,65 @@
     "statementRow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["row_id", "label", "row_type"],
+      "required": [
+        "row_id",
+        "label",
+        "row_type"
+      ],
       "properties": {
         "row_id": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_.-]*$"
         },
-        "label": { "type": "string", "minLength": 1 },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
         "row_type": {
-          "enum": ["input", "calculation", "subtotal", "header", "uncalculated"]
+          "enum": [
+            "input",
+            "calculation",
+            "subtotal",
+            "header",
+            "uncalculated"
+          ]
         },
         "historical_authority": {
-          "enum": ["source_input", "derived_formula", "reported_total_reconciled", "schedule_link", "not_applicable"],
+          "enum": [
+            "source_input",
+            "derived_formula",
+            "reported_total_reconciled",
+            "schedule_link",
+            "not_applicable"
+          ],
           "description": "The sole authority for the three historical cells. reported_total_reconciled emits a formula from visible components and retains the filed total separately as reconciliation evidence."
         },
         "reported_historical_values": {
           "$ref": "#/$defs/series3",
           "description": "Filed historical total retained only for a reported_total_reconciled row. The workbook emits the declared formula, and validation proves that formula against these three source totals."
         },
-        "semantic_role": { "type": "string" },
+        "semantic_role": {
+          "type": "string"
+        },
         "operation_scope": {
-          "enum": ["continuing", "discontinued", "combined", "not_applicable"],
+          "enum": [
+            "continuing",
+            "discontinued",
+            "combined",
+            "not_applicable"
+          ],
           "description": "The operating perimeter represented by this row across the three historical years. A combined or mixed-parent presentation requires an explicit reconciliation note."
         },
-        "scope_reconciliation_note": { "type": "string", "minLength": 1 },
+        "scope_reconciliation_note": {
+          "type": "string",
+          "minLength": 1
+        },
         "aggregation_authority": {
-          "enum": ["reported_parent", "derived_from_children", "standalone"],
+          "enum": [
+            "reported_parent",
+            "derived_from_children",
+            "standalone"
+          ],
           "description": "Whether the row is the reported authority, a formula derived from children, or independent of a hierarchy."
         },
         "parent_row_id": {
@@ -917,7 +1564,10 @@
           "description": "Economic parent whose live forecast captures this row when the detail is intentionally not forecast separately. This is distinct from presentation hierarchy."
         },
         "forecast_capture_mode": {
-          "enum": ["formula_membership", "semantic_scope"],
+          "enum": [
+            "formula_membership",
+            "semantic_scope"
+          ],
           "description": "How a deliberately unforecast child is proved captured: exact parent-formula membership, or explicit inclusion within a resolved parent economic scope."
         },
         "forecast_capture_note": {
@@ -926,20 +1576,47 @@
           "description": "Reviewer-facing rationale for capturing this forecast row in its declared economic parent."
         },
         "aggregation_role": {
-          "enum": ["contributing_child", "working_child", "standalone"],
+          "enum": [
+            "contributing_child",
+            "working_child",
+            "standalone"
+          ],
           "description": "A contributing child feeds a derived parent. A working child is shown beneath a reported parent but must not be counted again."
         },
         "economic_class": {
-          "enum": ["working_capital", "provision", "pension", "tax", "restructuring", "deferred_revenue", "other_operating", "investing", "financing", "non_cash_debt"],
+          "enum": [
+            "working_capital",
+            "provision",
+            "pension",
+            "tax",
+            "restructuring",
+            "deferred_revenue",
+            "other_operating",
+            "investing",
+            "financing",
+            "non_cash_debt"
+          ],
           "description": "Economic classification authority used for aggregation and cash-flow treatment. Wording is never the controlling signal when this field is present."
         },
         "classification_status": {
-          "enum": ["accepted", "ambiguous", "unmapped", "manual_reviewed"]
+          "enum": [
+            "accepted",
+            "ambiguous",
+            "unmapped",
+            "manual_reviewed"
+          ]
         },
-        "classification_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "classification_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
         "classification_source_line_ids": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         },
         "acquisition_driver_role": {
           "enum": [
@@ -982,18 +1659,30 @@
             "none"
           ]
         },
-        "movement_note": { "type": "string" },
-        "values": { "$ref": "#/$defs/series6" },
-        "calculation": { "$ref": "#/$defs/formulaRule" },
-        "forecast_calculation": { "$ref": "#/$defs/formulaRule" },
+        "movement_note": {
+          "type": "string"
+        },
+        "values": {
+          "$ref": "#/$defs/series6"
+        },
+        "calculation": {
+          "$ref": "#/$defs/formulaRule"
+        },
+        "forecast_calculation": {
+          "$ref": "#/$defs/formulaRule"
+        },
         "forecast_period_calculations": {
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
           "items": {
             "anyOf": [
-              { "$ref": "#/$defs/formulaRule" },
-              { "type": "null" }
+              {
+                "$ref": "#/$defs/formulaRule"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -1001,18 +1690,43 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "$ref": "#/$defs/forecastAuthority" }
+          "items": {
+            "$ref": "#/$defs/forecastAuthority"
+          }
         },
-        "broker_metric_id": { "type": "string" },
+        "broker_metric_id": {
+          "type": "string"
+        },
         "forecast_treatment": {
-          "enum": ["broker", "hardcode", "formula", "zero", "uncalculated"]
+          "enum": [
+            "broker",
+            "hardcode",
+            "formula",
+            "zero",
+            "uncalculated"
+          ]
         },
-        "indent": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "indent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
         "style_role": {
-          "enum": ["body", "subsection", "total", "header"]
+          "enum": [
+            "body",
+            "subsection",
+            "total",
+            "header"
+          ]
         },
         "number_format": {
-          "enum": ["amount", "percentage", "rate", "multiple", "date"]
+          "enum": [
+            "amount",
+            "percentage",
+            "rate",
+            "multiple",
+            "date"
+          ]
         },
         "source_line_ids": {
           "type": "array",
@@ -1030,7 +1744,10 @@
             "required_block_header"
           ]
         },
-        "projection_required_by": { "type": "string", "minLength": 1 },
+        "projection_required_by": {
+          "type": "string",
+          "minLength": 1
+        },
         "projection_absorbed_row_ids": {
           "type": "array",
           "uniqueItems": true,
@@ -1059,13 +1776,30 @@
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_.-]*$"
         },
-        "label": { "type": "string", "minLength": 1 },
-        "document": { "type": "string", "minLength": 1 },
-        "page_or_note": { "type": "string", "minLength": 1 },
-        "face_statement": { "type": "boolean" },
-        "material": { "type": "boolean" },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_or_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "face_statement": {
+          "type": "boolean"
+        },
+        "material": {
+          "type": "boolean"
+        },
         "disposition": {
-          "enum": ["mapped", "aggregated", "not_applicable"]
+          "enum": [
+            "mapped",
+            "aggregated",
+            "not_applicable"
+          ]
         },
         "mapped_row_ids": {
           "type": "array",
@@ -1084,42 +1818,113 @@
             "not_applicable"
           ]
         },
-        "reason": { "type": "string" }
-        ,"projection_lineage": { "$ref": "#/$defs/sourceProjectionLineage" }
-        ,"source_position": { "type": "integer", "minimum": 0 }
-        ,"parent_label": { "type": "string" }
-        ,"neighbouring_labels": { "type": "array", "items": { "type": "string" } }
-        ,"table_context": { "type": "string" }
-        ,"classification_status": { "enum": ["accepted", "ambiguous", "unmapped", "manual_reviewed"] }
-        ,"classified_role": { "type": ["string", "null"] }
-        ,"classification_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
-        ,"classification_evidence": {
+        "reason": {
+          "type": "string"
+        },
+        "projection_lineage": {
+          "$ref": "#/$defs/sourceProjectionLineage"
+        },
+        "source_position": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parent_label": {
+          "type": "string"
+        },
+        "neighbouring_labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "table_context": {
+          "type": "string"
+        },
+        "classification_status": {
+          "enum": [
+            "accepted",
+            "ambiguous",
+            "unmapped",
+            "manual_reviewed"
+          ]
+        },
+        "classified_role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "classification_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "classification_evidence": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["channel", "detail", "score"],
+            "required": [
+              "channel",
+              "detail",
+              "score"
+            ],
             "properties": {
-              "channel": { "enum": ["label", "context", "hierarchy", "numeric", "negative"] },
-              "detail": { "type": "string", "minLength": 1 },
-              "score": { "type": "number", "minimum": -1, "maximum": 1 }
+              "channel": {
+                "enum": [
+                  "label",
+                  "context",
+                  "hierarchy",
+                  "numeric",
+                  "negative"
+                ]
+              },
+              "detail": {
+                "type": "string",
+                "minLength": 1
+              },
+              "score": {
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              }
             }
           }
-        }
-        ,"classification_candidates": {
+        },
+        "classification_candidates": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["role", "score"],
+            "required": [
+              "role",
+              "score"
+            ],
             "properties": {
-              "role": { "type": "string", "minLength": 1 },
-              "score": { "type": "number", "minimum": 0, "maximum": 1 }
+              "role": {
+                "type": "string",
+                "minLength": 1
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
             }
           }
+        },
+        "classification_review_status": {
+          "enum": [
+            "not_required",
+            "auto_accepted",
+            "reviewed",
+            "needs_question",
+            "blocked"
+          ]
+        },
+        "classifier_version": {
+          "type": "string"
         }
-        ,"classification_review_status": { "enum": ["not_required", "auto_accepted", "reviewed", "needs_question", "blocked"] }
-        ,"classifier_version": { "type": "string" }
       }
     },
     "sourceProjectionLineage": {
@@ -1133,26 +1938,39 @@
         "rule"
       ],
       "properties": {
-        "compiler_version": { "const": "semantic-statements/1.0" },
+        "compiler_version": {
+          "const": "semantic-statements/1.0"
+        },
         "source_mapped_row_ids": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         },
         "absorbed_row_ids": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         },
         "projected_row_ids": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
         },
-        "rule": { "const": "semantic_dependency_projection" }
+        "rule": {
+          "const": "semantic_dependency_projection"
+        }
       }
     },
     "provenanceEntry": {
@@ -1167,50 +1985,152 @@
         "source_label"
       ],
       "properties": {
-        "period_index": { "type": "integer", "minimum": 0, "maximum": 5 },
-        "document": { "type": "string", "minLength": 1 },
-        "publication_date": { "type": "string", "minLength": 1 },
-        "page_or_note": { "type": "string", "minLength": 1 },
-        "units": { "type": "string", "minLength": 1 },
-        "source_label": { "type": "string", "minLength": 1 },
-        "transformation": { "type": "string" }
+        "period_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "document": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_date": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page_or_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transformation": {
+          "type": "string"
+        }
       }
     },
     "brokerMetric": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["label", "brokers"],
+      "required": [
+        "label",
+        "brokers"
+      ],
       "properties": {
-        "label": { "type": "string", "minLength": 1 },
-        "definition_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-        "semantic_role": {
-          "enum": ["operating_forecast", "cash_flow_forecast", "debt_or_liquidity", "leverage_or_coverage", "interest_or_finance", "lease", "tax", "management_guidance", "broker_derived_estimate", "valuation_market_data", "presentation_only", "metadata", "other_model_check"]
+        "label": {
+          "type": "string",
+          "minLength": 1
         },
-        "consensus_family": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "semantic_role": {
+          "enum": [
+            "operating_forecast",
+            "cash_flow_forecast",
+            "debt_or_liquidity",
+            "leverage_or_coverage",
+            "interest_or_finance",
+            "lease",
+            "tax",
+            "management_guidance",
+            "broker_derived_estimate",
+            "valuation_market_data",
+            "presentation_only",
+            "metadata",
+            "other_model_check"
+          ]
+        },
+        "consensus_family": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
         "definition_signature": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "metric_id": { "type": "string", "minLength": 1 },
-            "accounting_basis": { "type": ["string", "null"] },
-            "operation_scope": { "type": ["string", "null"] },
-            "adjustment_basis": { "type": ["string", "null"] },
-            "currency": { "type": ["string", "null"] },
-            "units": { "type": ["string", "null"] },
-            "fiscal_calendar": { "type": ["string", "null"] },
-            "cash_flow_basis": { "type": ["string", "null"] },
-            "lease_basis": { "type": ["string", "null"] }
+            "metric_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accounting_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation_scope": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "adjustment_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "units": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fiscal_calendar": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cash_flow_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lease_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         },
         "model_disposition": {
-          "enum": ["reference_only", "rejected", "not_applicable"]
+          "enum": [
+            "reference_only",
+            "rejected",
+            "not_applicable"
+          ]
         },
-        "model_disposition_reason": { "type": "string", "minLength": 1 },
+        "model_disposition_reason": {
+          "type": "string",
+          "minLength": 1
+        },
         "provider_consensus": {
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": ["number", "null"] }
+          "items": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         },
         "brokers": {
           "type": "object",
@@ -1218,7 +2138,12 @@
             "type": "array",
             "minItems": 3,
             "maxItems": 3,
-            "items": { "type": ["number", "null"] }
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
           }
         }
       }
@@ -1241,10 +2166,20 @@
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_-]*$"
         },
-        "label": { "type": "string", "minLength": 1 },
-        "historical_year_end": { "$ref": "#/$defs/series3" },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "historical_year_end": {
+          "$ref": "#/$defs/series3"
+        },
         "forecast_treatment": {
-          "enum": ["balancing", "hardcode", "flat", "linked_debt_addback"]
+          "enum": [
+            "balancing",
+            "hardcode",
+            "flat",
+            "linked_debt_addback"
+          ]
         },
         "included_in_cash_flow_cash": {
           "type": "boolean",
@@ -1261,11 +2196,17 @@
         },
         "forecast_values": {
           "oneOf": [
-            { "$ref": "#/$defs/series3" },
-            { "type": "null" }
+            {
+              "$ref": "#/$defs/series3"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
-        "available_for_liquidity": { "type": "boolean" },
+        "available_for_liquidity": {
+          "type": "boolean"
+        },
         "net_debt_eligible_percentage": {
           "type": "number",
           "minimum": 0,
@@ -1276,7 +2217,9 @@
           "minimum": 0,
           "maximum": 1
         },
-        "cash_yield": { "$ref": "#/$defs/series3" },
+        "cash_yield": {
+          "$ref": "#/$defs/series3"
+        },
         "source_line_ids": {
           "type": "array",
           "items": {
@@ -1289,57 +2232,94 @@
         {
           "if": {
             "properties": {
-              "forecast_treatment": { "const": "hardcode" }
+              "forecast_treatment": {
+                "const": "hardcode"
+              }
             },
-            "required": ["forecast_treatment"]
+            "required": [
+              "forecast_treatment"
+            ]
           },
           "then": {
-            "required": ["forecast_values"],
+            "required": [
+              "forecast_values"
+            ],
             "properties": {
-              "forecast_values": { "$ref": "#/$defs/series3" }
+              "forecast_values": {
+                "$ref": "#/$defs/series3"
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "forecast_treatment": { "const": "balancing" }
+              "forecast_treatment": {
+                "const": "balancing"
+              }
             },
-            "required": ["forecast_treatment"]
+            "required": [
+              "forecast_treatment"
+            ]
           },
           "then": {
             "properties": {
-              "available_for_liquidity": { "const": true }
+              "available_for_liquidity": {
+                "const": true
+              }
             }
           },
           "else": {
             "properties": {
-              "available_for_liquidity": { "const": false }
+              "available_for_liquidity": {
+                "const": false
+              }
             }
           }
         },
         {
           "if": {
             "properties": {
-              "forecast_treatment": { "const": "linked_debt_addback" }
+              "forecast_treatment": {
+                "const": "linked_debt_addback"
+              }
             },
-            "required": ["forecast_treatment"]
+            "required": [
+              "forecast_treatment"
+            ]
           },
           "then": {
-            "required": ["included_in_cash_flow_cash", "linked_instrument_ids"],
+            "required": [
+              "included_in_cash_flow_cash",
+              "linked_instrument_ids"
+            ],
             "properties": {
-              "included_in_cash_flow_cash": { "const": false },
-              "available_for_liquidity": { "const": false },
-              "net_debt_eligible_percentage": { "const": 1 },
-              "interest_eligible_percentage": { "const": 0 },
+              "included_in_cash_flow_cash": {
+                "const": false
+              },
+              "available_for_liquidity": {
+                "const": false
+              },
+              "net_debt_eligible_percentage": {
+                "const": 1
+              },
+              "interest_eligible_percentage": {
+                "const": 0
+              },
               "cash_yield": {
                 "type": "array",
                 "minItems": 3,
                 "maxItems": 3,
-                "items": { "const": 0 }
+                "items": {
+                  "const": 0
+                }
               }
             },
-            "not": { "required": ["forecast_values"] }
+            "not": {
+              "required": [
+                "forecast_values"
+              ]
+            }
           }
         }
       ]
@@ -1364,9 +2344,18 @@
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_-]*$"
         },
-        "display_order": { "type": "integer", "minimum": 0 },
-        "name": { "type": "string", "minLength": 1 },
-        "display_group": { "type": "string", "minLength": 1 },
+        "display_order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_group": {
+          "type": "string",
+          "minLength": 1
+        },
         "class": {
           "enum": [
             "fixed_bond",
@@ -1377,9 +2366,15 @@
             "other_debt"
           ]
         },
-        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
         "balance_basis": {
-          "enum": ["native_principal", "reporting_currency_carrying_value"],
+          "enum": [
+            "native_principal",
+            "reporting_currency_carrying_value"
+          ],
           "description": "Basis of opening_balance and supplied principal movements. Denomination never implies basis. Native principal is translated through FX; a reporting-currency carrying value must never be translated again."
         },
         "opening_balance": {
@@ -1387,31 +2382,67 @@
           "minimum": 0,
           "description": "Opening balance on balance_basis. The instrument currency remains the legal denomination even when this value is a reporting-currency carrying amount."
         },
-        "maturity_date": { "type": ["string", "null"], "format": "date" },
+        "maturity_date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
         "maturity_precision": {
-          "type": ["string", "null"],
-          "enum": ["day", "month", "year", "derived", null],
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "day",
+            "month",
+            "year",
+            "derived",
+            null
+          ],
           "description": "Precision actually disclosed for maturity_date. The schedule renders only this much: a day where a filing gives one, a month where only a month is disclosed, a year otherwise. Prevents padding a date to a day nobody sourced."
         },
         "maturity_source_value": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Source-owned maturity representation before a deterministic model timing convention is applied."
         },
         "maturity_timing_convention": {
-          "enum": ["source_exact", "month_end", "year_end", "not_applicable"],
+          "enum": [
+            "source_exact",
+            "month_end",
+            "year_end",
+            "not_applicable"
+          ],
           "description": "Makes any derived day explicit. Month-only maturities use month_end; year-only maturities use year_end."
         },
         "maturity_treatment": {
-          "enum": ["contractual", "non_maturing_within_forecast"]
+          "enum": [
+            "contractual",
+            "non_maturing_within_forecast"
+          ]
         },
-        "scheduled_amortisation": { "$ref": "#/$defs/series3" },
+        "scheduled_amortisation": {
+          "$ref": "#/$defs/series3"
+        },
         "scheduled_amortisation_dates": {
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": ["string", "null"], "format": "date" }
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          }
         },
-        "new_issuance": { "$ref": "#/$defs/series3" },
+        "new_issuance": {
+          "$ref": "#/$defs/series3"
+        },
         "forecast_ending_balances": {
           "$ref": "#/$defs/series3",
           "description": "Optional sourced period-end balances on balance_basis. These do not replace formulas: each must reconcile to opening + declared issuance + declared non-cash movements + PIK - amortisation - maturity repayment. A mismatch blocks the solve."
@@ -1429,8 +2460,12 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "fair_value": { "$ref": "#/$defs/series3" },
-            "other": { "$ref": "#/$defs/series3" }
+            "fair_value": {
+              "$ref": "#/$defs/series3"
+            },
+            "other": {
+              "$ref": "#/$defs/series3"
+            }
           },
           "minProperties": 1,
           "description": "Separately visible instrument-currency non-cash principal movements other than PIK and FX. The compiler derives the aggregate; these children never enter financing cash flow."
@@ -1439,36 +2474,83 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": ["string", "null"], "format": "date" }
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          }
         },
-        "rate_type": { "enum": ["fixed", "floating", "manual_all_in", "unpriced"] },
+        "rate_type": {
+          "enum": [
+            "fixed",
+            "floating",
+            "manual_all_in",
+            "unpriced"
+          ]
+        },
         "pricing_treatment": {
-          "enum": ["source_terms", "residual_interest_plug"],
+          "enum": [
+            "source_terms",
+            "residual_interest_plug"
+          ],
           "description": "unpriced instruments keep their debt/liquidity mechanics while forecast interest is captured by the visible Other / unallocated interest bridge."
         },
-        "pricing_treatment_reason": { "type": "string", "minLength": 1 },
-        "coupon_or_all_in_rate": { "$ref": "#/$defs/series3" },
-        "benchmark": { "type": ["string", "null"] },
-        "benchmark_rate": { "$ref": "#/$defs/series3" },
+        "pricing_treatment_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coupon_or_all_in_rate": {
+          "$ref": "#/$defs/series3"
+        },
+        "benchmark": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "benchmark_rate": {
+          "$ref": "#/$defs/series3"
+        },
         "benchmark_floor": {
           "$ref": "#/$defs/series3",
           "description": "Contractual reference-rate floor for a floating instrument. Omission preserves the legacy zero floor."
         },
-        "spread_bps": { "type": ["integer", "null"], "minimum": 0 },
+        "spread_bps": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
         "pik_rate": {
           "$ref": "#/$defs/series3",
           "description": "Additional non-cash capitalised-interest rate. PIK accrues into principal, is included in interest expense and never enters financing cash flow."
         },
         "facility_capacity": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "description": "For an RCF, committed capacity in the instrument's declared native currency; it must equal rcf_policy.capacity on that same native basis."
         },
-        "include_in_gross_debt": { "type": "boolean" },
-        "include_in_net_debt": { "type": "boolean" },
-        "cash_interest": { "type": "boolean" },
-        "is_residual_pool": { "type": "boolean" },
-        "assumption_note": { "type": "string" },
+        "include_in_gross_debt": {
+          "type": "boolean"
+        },
+        "include_in_net_debt": {
+          "type": "boolean"
+        },
+        "cash_interest": {
+          "type": "boolean"
+        },
+        "is_residual_pool": {
+          "type": "boolean"
+        },
+        "assumption_note": {
+          "type": "string"
+        },
         "source_line_ids": {
           "type": "array",
           "items": {
@@ -1491,23 +2573,60 @@
         "close_month"
       ],
       "properties": {
-        "enabled": { "enum": [0, 1] },
-        "transaction_enterprise_value": { "type": "number", "minimum": 0 },
-        "entry_ev_to_ebitda": { "type": "number", "exclusiveMinimum": 0 },
-        "acquisition_debt_amount": { "type": "number", "minimum": 0 },
-        "incremental_rate": { "type": "number", "minimum": 0 },
-        "close_year": { "type": "integer", "minimum": 1900 },
-        "close_month": { "type": "integer", "minimum": 1, "maximum": 12 }
+        "enabled": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "transaction_enterprise_value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "entry_ev_to_ebitda": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acquisition_debt_amount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "incremental_rate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "close_year": {
+          "type": "integer",
+          "minimum": 1900
+        },
+        "close_month": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
       }
     },
     "fxPair": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["quote", "average_rates", "period_end_rates"],
+      "required": [
+        "quote",
+        "average_rates",
+        "period_end_rates"
+      ],
       "properties": {
-        "quote": { "enum": ["reporting_per_native", "native_per_reporting"] },
-        "average_rates": { "$ref": "#/$defs/series6" },
-        "period_end_rates": { "$ref": "#/$defs/series6" }
+        "quote": {
+          "enum": [
+            "reporting_per_native",
+            "native_per_reporting"
+          ]
+        },
+        "average_rates": {
+          "$ref": "#/$defs/series6"
+        },
+        "period_end_rates": {
+          "$ref": "#/$defs/series6"
+        }
       }
     }
   }

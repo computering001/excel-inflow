@@ -1276,11 +1276,37 @@ function brokerNames(modelCase) {
   return [...names].sort();
 }
 
+// THE BROKERS SHEET RENDERS WHAT THE MODEL CONSUMES, NOT WHAT THE PACK
+// CARRIES. Tier 1 core plus recorded flex elections; every other metric the
+// crosswalk preserved stays in the run evidence and on the B01-B10 sheets.
+// Rendering the whole candidate universe put a ten-row block on the central
+// sheet for every broker line item — six thousand rows on a real pack — and
+// an analyst cannot read a consensus grid they cannot see whole.
+const TIER1_BROKER_METRIC_IDS = new Set([
+  "revenue",
+  "ebit",
+  "adjusted_ebitda",
+  "depreciation_and_amortisation",
+  "effective_tax_rate",
+  "capex",
+  "change_in_working_capital",
+  "dividends",
+]);
+
+function consumedBrokerMetricIds(modelCase) {
+  const elected = new Set(
+    (modelCase.broker_pack?.flex_elections ?? []).map((item) => item.metric_id),
+  );
+  return Object.keys(modelCase.broker_pack?.metrics ?? {}).filter(
+    (metricId) => TIER1_BROKER_METRIC_IDS.has(metricId) || elected.has(metricId),
+  );
+}
+
 function brokerMetricRowMap(modelCase) {
   const names = brokerNames(modelCase);
   const rows = {};
   let row = 5;
-  for (const metricId of Object.keys(modelCase.broker_pack?.metrics ?? {})) {
+  for (const metricId of consumedBrokerMetricIds(modelCase)) {
     rows[metricId] = row;
     row += 1 + names.length + 3 + 1;
   }
@@ -1732,9 +1758,10 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   // opened by the same single blank row (see the foot of the loop), so the
   // sheet reads as separated units rather than one unbroken column of names.
   let row = HEADER_ROW + 2;
+  const consumedIds = new Set(consumedBrokerMetricIds(modelCase));
   for (const [metricId, metric] of Object.entries(
     modelCase.broker_pack.metrics ?? {},
-  )) {
+  ).filter(([metricId]) => consumedIds.has(metricId))) {
     const definition = operatingModelRowForMetric(rowPlan, metricId);
     const numberFormat =
       definition?.number_format === "percentage" ? PERCENT : AMOUNT;
