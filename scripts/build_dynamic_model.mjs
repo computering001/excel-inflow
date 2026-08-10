@@ -397,11 +397,18 @@ const TOGGLE = '[=1]"On";[=0]"Off"';
 // commitment. Column B on that row already reads "RCF commitment fee", so the
 // word is not lost — it is the one thing the row does not need to say twice —
 // and `COMMITMENT` would have fitted with 1.6pt to spare, which is not a fit.
+// `RESIDUAL` rather than `PLUG`: the column answers "on what basis is the rate
+// in column D struck", and for an unpriced instrument the honest answer is that
+// no rate is struck at all — its cost is carried by the visible residual
+// interest bridge below. "PLUG" is modelling slang that reads to an analyst as
+// a fudge factor, which is the opposite of what the row is: a declared,
+// reconciled residual. It is the same eight characters as `FLOATING`, so it
+// fits the measured column C width unchanged.
 const RATE_TYPE_LABEL = {
   fixed: "FIXED",
   floating: "FLOATING",
   manual_all_in: "ALL-IN",
-  unpriced: "PLUG",
+  unpriced: "RESIDUAL",
 };
 const rateTypeLabel = (rateType) =>
   RATE_TYPE_LABEL[String(rateType)] ?? String(rateType).toUpperCase();
@@ -6395,6 +6402,11 @@ function configureOperatingModel(
         ? Number(instrument.spread_bps ?? 0) / 10000
         : Number(instrument.coupon_or_all_in_rate?.[0] ?? 0),
     );
+    // A fixed instrument has no benchmark, and SAYING SO beats saying nothing.
+    // Leaving E empty was right to stop it echoing "FIXED" from column C, but
+    // on an all-fixed issuer it left the whole column blank, which reads as an
+    // extraction failure rather than a structural n/a. An en-dash states the
+    // absence; the reader learns the column was considered.
     setValue(
       sheet,
       `E${plan.interest_row}`,
@@ -6402,13 +6414,18 @@ function configureOperatingModel(
         ? null
         : instrument.rate_type === "floating"
         ? (curveLabelForInstrument(instrument) ?? null)
-        : null,
+        : "–",
     );
     if (instrument.rate_type === "unpriced") {
       styleFont(sheet, `C${plan.interest_row}`, COLORS.black);
       sheet.getRange(`D${plan.interest_row}:E${plan.interest_row}`).format.fill = COLORS.grey;
     } else {
       styleInput(sheet, `C${plan.interest_row}:E${plan.interest_row}`);
+      // The en-dash is not an input — it is the model stating that no benchmark
+      // applies — so it never wears the blue hardcode colour.
+      if (instrument.rate_type !== "floating") {
+        styleFont(sheet, `E${plan.interest_row}`, COLORS.grey);
+      }
     }
     // Column D is a coupon on a fixed instrument and a spread on a floating
     // one, so it takes the format of whichever it is holding. One shared rate
