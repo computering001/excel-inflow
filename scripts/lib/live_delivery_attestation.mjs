@@ -131,15 +131,28 @@ async function workbookTopology(workbookPath) {
   return { sheet_names: sheets.map((sheet) => sheet.name), sheets: detail, formula_count: formulaCount };
 }
 
-function expectedSectionRows(profile) {
-  return {
-    income_statement: Number(profile.named_zones.income_statement.first),
-    cash_flow: Number(profile.named_zones.cash_flow.first),
-    debt_schedule: Number(profile.named_zones.debt_schedule.first),
-    rcf_waterfall: Number(profile.named_zones.rcf_cash_sweep.first),
-    interest_schedule: Number(profile.named_zones.interest_schedule.first),
-  };
-}
+// THE ZONES ARE ELASTIC REGIONS, NOT ABSOLUTE ADDRESSES.
+//
+// The runtime's own authority rule says production "may expand
+// company-specific semantic rows only inside the selected standardised
+// profile's named zones" — and an expansion inside one zone necessarily
+// pushes every LATER section's header down the sheet. The first version of
+// this check compared each header against the frozen exemplar's zone-start
+// rows, which is only true of a model exactly the exemplar's size; the first
+// real issuer to reach delivery (an income statement eleven rows longer than
+// the standard case) was blocked for complying with the rule. What the
+// authority actually fixes is the PREAMBLE (title, controls, period rows),
+// the ANCHOR (the first section starts where the authority surface starts),
+// the ORDER of the five sections, and the SECTION GRAMMAR itself — so those
+// are what this check now asserts, against the workbook's own emitted ink
+// rather than against the exemplar's tape measure.
+const SECTION_SEQUENCE = Object.freeze([
+  ["income_statement", "3. INCOME STATEMENT"],
+  ["cash_flow", "4. CASH FLOW"],
+  ["debt_schedule", "5. DEBT SCHEDULE"],
+  ["rcf_waterfall", "6. RCF CASH SWEEP"],
+  ["interest_schedule", "7. INTEREST SCHEDULE"],
+]);
 
 /**
  * Prove that the only workbook being delivered is the exact output of the
@@ -177,7 +190,11 @@ export async function compileLiveDeliveryAttestation({
   const profileName = String(rowMap.authority_profile ?? "");
   const profile = standardisedProfile(profileName);
   const contract = standardisedDesignContract();
-  const expectedSections = expectedSectionRows(profile);
+  const sectionRows = SECTION_SEQUENCE.map(([section, title]) => ({
+    section,
+    title,
+    row: Number(rowMap.section_headers?.[section]),
+  }));
   const topology = await workbookTopology(target);
   const operatingModel = topology.sheets.find((sheet) => sheet.name === "Operating Model");
   const buildReceiptCheck = verifyStageReceipt(stage4Receipt, {
@@ -198,7 +215,24 @@ export async function compileLiveDeliveryAttestation({
   invariant(rowMap.authority_source_sha256 === profile.immutable_authority_sha256, "authority.source_hash", "Row map is not bound to the selected physical authority.", violations);
   invariant(rowMap.authority_profile_fingerprint_sha256 === profile.exact_replay_fingerprint_sha256, "authority.profile_fingerprint", "Row map profile fingerprint differs from the selected authority.", violations);
   invariant(hashValue(rowMap.columns ?? {}) === hashValue(contract.shared_horizontal_grammar.operating_model_columns), "authority.columns", "Operating-model column grammar differs from the active authority.", violations);
-  invariant(hashValue(rowMap.section_headers ?? {}) === hashValue(expectedSections), "authority.section_rows", "Section headers do not occupy the active authority zones.", violations);
+  invariant(
+    sectionRows.every(({ row }) => Number.isInteger(row) && row > 0),
+    "authority.section_rows",
+    "The row map does not place all five section headers.",
+    violations,
+  );
+  invariant(
+    sectionRows[0].row === Number(profile.named_zones.income_statement.first),
+    "authority.section_rows",
+    `The first section opens at row ${sectionRows[0].row}; the authority surface opens at row ${profile.named_zones.income_statement.first}.`,
+    violations,
+  );
+  invariant(
+    sectionRows.every(({ row }, index) => index === 0 || row >= sectionRows[index - 1].row + 2),
+    "authority.section_rows",
+    "Section headers are not in authority order with at least one body row per section.",
+    violations,
+  );
   invariant(Number(rowMap.period_group_row) === Number(profile.authority_rows.period_group), "authority.period_group", "Period-group row differs from authority.", violations);
   invariant(Number(rowMap.period_row) === Number(profile.authority_rows.period), "authority.period_row", "Period row differs from authority.", violations);
   invariant(Number(rowMap.visible_end_row) >= Number(profile.authority_rows.visible_end), "authority.visible_end", "Compiled model ends before the authority surface.", violations);
@@ -216,9 +250,19 @@ export async function compileLiveDeliveryAttestation({
   if (operatingModel) {
     invariant(operatingModel.max_row >= Number(rowMap.visible_end_row), "topology.operating_rows", `Operating Model ends at row ${operatingModel.max_row}, before row-map row ${rowMap.visible_end_row}.`, violations);
     invariant(operatingModel.max_column >= 21, "topology.operating_columns", `Operating Model ends at column ${operatingModel.max_column}, before A:U authority geometry.`, violations);
-    for (const [section, row] of Object.entries(expectedSections)) {
+    // The row map's word is proven against the workbook's own ink: the cell
+    // each header row names must carry that section's exact title. A row map
+    // shifted by even one row lands on a body label (or on nothing) and fails
+    // here, which is what makes the elastic zones above safe to allow.
+    for (const { section, title, row } of sectionRows) {
       const label = String(operatingModel.texts.get(`B${row}`) ?? "").trim();
       invariant(label.length > 0, "topology.section_label", `${section} has no visible label in B${row}.`, violations);
+      invariant(
+        label === title,
+        "authority.section_rows",
+        `Row map places ${section} at row ${row}, but B${row} reads ${JSON.stringify(label)} rather than ${JSON.stringify(title)}.`,
+        violations,
+      );
     }
   }
   invariant(topology.formula_count > 0, "topology.formulas", "Workbook contains no formulas.", violations);
@@ -255,7 +299,7 @@ export async function compileLiveDeliveryAttestation({
         : null,
       formula_count: topology.formula_count,
       periods: { historical, forecast },
-      section_rows: expectedSections,
+      section_rows: Object.fromEntries(sectionRows.map(({ section, row }) => [section, row])),
       broker_source_sheet_count: brokerEvidence?.source_sheets?.length ?? 0,
     },
     violations,

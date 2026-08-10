@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v2.1.3",
+  "releaseName": "Excel Inflow v2.1.4",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.1.3",
+  "skillVersion": "2.1.4",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-09T23:02:18.957Z",
+  "generatedAt": "2026-08-10T06:41:33.625Z",
   "centralInstructionsWords": 4691,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "64034ec28bc11fc186d17078bcd7bbc508eba89fc1c85eaa6d5bb8bc68893fc7",
+    "currentClosureSha256": "86a36d6d9204852c00017a1dac175aa5ce08c9702c91e347b6d13cb1202e904f",
     "closureFileCount": 154,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -344,16 +344,16 @@
       "candidates": [
         {
           "candidate": "python3",
-          "version": "3.9.6",
+          "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": "1.26.5",
-            "PIL": null,
-            "numpy": null,
+            "fitz": null,
+            "PIL": "12.2.0",
+            "numpy": "2.3.5",
             "jsonschema": null,
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
           "usable": true,
           "reason": "selected"
@@ -1046,18 +1046,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "fcca8a647a8d5d8b2c5d409c62a5dd392ddc78ae717d411ebf21cfa9e6e4a279",
-        "plan_sha256": "1838abbd2e10d2c27147d45fa02eca79081009a4436c5c4c32e56d485e19a5c4",
-        "workbook_sha256": "025c2a44648e407d21f60f6cafe5707d4dcbef91e0ed2feb3252e5cd8d00d593",
+        "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
+        "plan_sha256": "fdb90f513cc6775b76558e4dcc7537a45207b3f34a711d8f7672c70a25b8afeb",
+        "workbook_sha256": "02acdc52c8984d47adb5f7304a8c28147dd6424941140fa790259df4222b8df2",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "fcca8a647a8d5d8b2c5d409c62a5dd392ddc78ae717d411ebf21cfa9e6e4a279",
-      "plan_sha256": "1838abbd2e10d2c27147d45fa02eca79081009a4436c5c4c32e56d485e19a5c4",
-      "workbook_sha256": "025c2a44648e407d21f60f6cafe5707d4dcbef91e0ed2feb3252e5cd8d00d593",
+      "case_sha256": "e7fd81f16205a25b1bc152a268981faf17aa3c0177f91bd468d2b8f3efd54b98",
+      "plan_sha256": "fdb90f513cc6775b76558e4dcc7537a45207b3f34a711d8f7672c70a25b8afeb",
+      "workbook_sha256": "02acdc52c8984d47adb5f7304a8c28147dd6424941140fa790259df4222b8df2",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1735,8 +1735,8 @@
     },
     {
       "path": "scripts/lib/live_delivery_attestation.mjs",
-      "sha256": "46976535005710da4c4ee838ff9216f545be91000decd349a13809edd4ddd965",
-      "bytes": 14551,
+      "sha256": "9a089e32786ec046332c07567f7706f130e5a6b9fcd3c5bfe09c3b552a319736",
+      "bytes": 16643,
       "words": null
     },
     {
