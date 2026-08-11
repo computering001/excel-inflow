@@ -164,25 +164,59 @@ a broker database. Consumption is therefore tiered, and the wall between the
 tiers is enforced at the crosswalk, in the forecast waterfall, and by the
 independent semantic verifier.
 
-**Tier 1 — the fixed core, always consumed.** Exactly the required normalized
-vocabulary: the headline anchor (EBIT or adjusted EBITDA), revenue, D&A,
-effective tax rate, capex, AGGREGATE change in working capital, and dividends.
-The anchor is consumed as a live consensus link on the anchor row itself —
-whenever the waterfall resolves an anchor from broker evidence, primary or
-supplemental, the anchor row's forecast formula IS that link. An anchor that
-exists only in solver caches leaves the statement identities under-determined,
-which the equation-graph rank gate blocks.
+Every tier is defined in one place: `assets/broker-metric-dictionary.json`. The
+consumable set, the electable concepts, the banned totals and the overlap groups
+are read from it by the pack compiler, the coverage gate and the renderer, each
+of which refuses if the asset's digest drifts or its own derived set disagrees.
+The dictionary is also what the runtime READS when deciding that a broker's row
+means capex: its definitions, disambiguations and counter-examples are addressed
+to the reader making that judgment. What the machinery enforces is the vocabulary,
+not the judgment — a crosswalk may only emit ids the dictionary declares. One
+concept may occur several times in a house (two reported segments, three
+impairment lines) under an instance qualifier after `__`; a core driver may never
+be instanced, because a component consumed as the driver is exactly the
+granularity error the tiers exist to prevent.
 
-**Tier 2 — declared flex, consumed only by election.** A short whitelist of
-promotable concepts (for example lease payments, buybacks, revenue components,
-a committed restructuring outflow). A flex concept enters the model only when
-ALL of the following hold: it is on the whitelist; it maps to a row the
-issuer's own statements carry; it is supported by at least three houses under
-one common definition id — the same "three is the minimum for a meaningful
-consensus" bar the intake screen states for the pack itself; and the election
-is recorded as a reviewed crosswalk disposition. Fewer than three compatible
-houses means the concept stays evidence, however interesting it looks.
-Silence never promotes.
+**Tier 1 — the fixed core, always consumed.** Nine ids: the headline anchor
+(EBIT or adjusted EBITDA), revenue, D&A, effective tax rate, capex, AGGREGATE
+change in working capital, dividends, and share buybacks. The anchor is consumed
+as a live consensus link on the anchor row itself — whenever the waterfall
+resolves an anchor from broker evidence, primary or supplemental, the anchor
+row's forecast formula IS that link. An anchor that exists only in solver caches
+leaves the statement identities under-determined, which the equation-graph rank
+gate blocks.
+
+Buybacks are consumed but NOT required of a house. A debt overlay that ignores
+the largest discretionary call on cash is missing a real claim, so the row is
+permanent and the waterfall runs broker consensus, then company guidance, then
+nil with a visible note. But plenty of legitimate coverage notes do not forecast
+buybacks, and demoting an otherwise complete house for a metric houses commonly
+omit would be self-harm: house eligibility still turns on the six required
+metrics plus one complete headline anchor.
+
+**Tier 2 — declared flex, consumed only by election.** Tier 2 is a SHAPE, not a
+list of blessed names: an individual cash-flow line item. A concept whitelist
+needed maintaining every time a sector printed something new and still admitted
+the wrong things. An election is legal only when ALL of the following hold: the
+concept sits in the cash-flow statement; it is an individual line, not a
+subtotal — checked against the dictionary's leaf flag AND the banned-totals list,
+so operating, investing and financing cash flow, net change in cash and free cash
+flow can never be elected however they are labelled; it does not share an overlap
+group with a core driver, because consuming a lease payment already inside a
+lease-inclusive capex spends the same cash twice; it is supported by at least
+three houses under one common definition id — the same "three is the minimum for
+a meaningful consensus" bar the intake screen states for the pack itself; and the
+election is recorded as a reviewed crosswalk disposition with a rationale, to a
+ceiling of ten. An elected line renders in the cash-flow section and nowhere
+else; an election can never create an income-statement or balance-sheet row.
+Fewer than three compatible houses means the concept stays evidence, however
+interesting it looks. Silence never promotes.
+
+The rule is deliberately cash-only. The overlay is a cash model, so a flow
+several houses think material enough to print separately — a large recurring
+impairment addback, a restructuring outflow — can change the debt path and costs
+nothing structurally to admit. Re-cutting the income statement would instead
+duplicate lines the model already derives.
 
 **Tier 3 — everything else is evidence, full stop.** It remains lossless in
 the run artifact and visible on the B01-B10 sheets, and it never receives a

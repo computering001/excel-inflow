@@ -15,14 +15,50 @@ from typing import Any
 
 
 NUMBER = re.compile(r"^\s*(\()?\s*[-+]?[$€£¥]?\s*(\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.(\d+))?\s*(%)?\s*\)?\s*$")
-REQUIRED_METRICS = {
-    "revenue",
-    "depreciation_and_amortisation",
-    "effective_tax_rate",
-    "capex",
-    "change_in_working_capital",
-    "dividends",
-}
+# ------------------------------------------------------- the metric vocabulary
+#
+# Every consumable id, every electable concept and every banned total comes from
+# assets/broker-metric-dictionary.json. It used to be written out here, again in
+# scripts/lib/coverage.mjs and again in scripts/build_dynamic_model.mjs - three
+# copies of one rule, agreeing only because someone remembered to edit all
+# three. The digest pin below is the cross-language identity check: the JavaScript
+# loader pins the same bytes, so a dictionary edited for one side and not the
+# other refuses on both rather than quietly disagreeing.
+#
+# The dictionary is model-facing prompt material as well as data: its definitions
+# are what the runtime reads when deciding that a broker's row means `capex`. A
+# new digest here is a behaviour change that owes a certification run.
+BROKER_METRIC_DICTIONARY_SHA256 = (
+    "a53439ffda8259f55b5ff820073c1a553afb4107419cb24e5ee45291ab0da2bb"
+)
+DICTIONARY_PATH = Path(__file__).resolve().parent.parent / "assets" / "broker-metric-dictionary.json"
+
+
+def _load_metric_dictionary() -> dict:
+    raw = DICTIONARY_PATH.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != BROKER_METRIC_DICTIONARY_SHA256:
+        raise ValueError(
+            f"Broker metric dictionary digest drift: expected {BROKER_METRIC_DICTIONARY_SHA256}, "
+            f"got {digest}. The dictionary is model-facing prompt material; update the pin "
+            "deliberately and re-run certification."
+        )
+    dictionary = json.loads(raw.decode("utf-8"))
+    if dictionary.get("schema_version") != "broker-metric-dictionary/1.0":
+        raise ValueError(
+            f"Unsupported broker metric dictionary {dictionary.get('schema_version')!r}."
+        )
+    return dictionary
+
+
+METRIC_DICTIONARY = _load_metric_dictionary()
+METRIC_BY_ID = {metric["id"]: metric for metric in METRIC_DICTIONARY["metrics"]}
+KNOWN_METRIC_IDS = set(METRIC_BY_ID)
+CORE_METRIC_IDS = set(METRIC_DICTIONARY["consumption"]["core"])
+REQUIRED_METRICS = set(METRIC_DICTIONARY["consumption"]["required_for_primary_house"])
+HEADLINE_ANCHOR_IDS = set(METRIC_DICTIONARY["consumption"]["headline_anchors"])
+FLEX_ELIGIBLE_IDS = set(METRIC_DICTIONARY["flex"]["eligible_concepts"])
+BANNED_TOTAL_IDS = set(METRIC_DICTIONARY["banned_totals"])
 MAPPED_DISPOSITIONS = {"mapped_metric", "supplemental_check"}
 NON_FORECAST_TABLE_CLASSES = {"historical_only", "ratings_or_valuation", "non_forecast"}
 PERIOD_BASES = {"annual_forecast", "partial_period"}
@@ -843,6 +879,40 @@ def main() -> int:
     if not 3 <= len(documents_by_house) <= 10:
         raise ValueError("A production broker pack requires 3-10 distinct houses.")
     metrics = crosswalk.get("metrics") or {}
+
+    # ---------------------------------------------- the vocabulary is closed
+    #
+    # Deciding that a row means `capex` is a judgment only a reader can make, and
+    # the dictionary's definitions exist to inform it. What is not negotiable is
+    # the name that judgment is recorded under: an id invented at runtime cannot
+    # be compared across houses, cannot be checked for double-counting, and
+    # cannot be rendered in a standardised digest. So every id resolves to a
+    # dictionary concept or the pack refuses.
+    #
+    # One concept can legitimately occur several times in one house - two
+    # reported segments, three separate impairment lines - so an id may carry an
+    # instance qualifier after `__`. The concept before the qualifier is what
+    # must be known. Core drivers may not be instanced: `capex__maintenance` is
+    # not capex, it is a component, and consuming it as the driver is precisely
+    # the granularity error the tiers exist to prevent.
+    for metric_id in sorted(metrics):
+        concept, _, qualifier = str(metric_id).partition("__")
+        if concept not in KNOWN_METRIC_IDS:
+            raise ValueError(
+                f"Metric {metric_id!r} resolves to concept {concept!r}, which is not in the broker "
+                "metric dictionary. Map it to an existing concept, or extend "
+                "assets/broker-metric-dictionary.json under review; ids may not be invented at runtime."
+            )
+        if qualifier and concept in CORE_METRIC_IDS:
+            raise ValueError(
+                f"Metric {metric_id!r} instances the core driver {concept!r}. A core driver is "
+                "consumed once, in aggregate; publish the parts under a component concept instead."
+            )
+        if qualifier and not re.fullmatch(r"[a-z0-9_]+", qualifier):
+            raise ValueError(
+                f"Metric {metric_id!r} has a malformed instance qualifier {qualifier!r}."
+            )
+
     missing_metrics = sorted(REQUIRED_METRICS - set(metrics))
     if missing_metrics:
         raise ValueError(f"The crosswalk is missing required metrics: {', '.join(missing_metrics)}.")
@@ -969,11 +1039,15 @@ def main() -> int:
     # it never becomes an active model input. This is what stops a run from
     # projecting hundreds of broker line items into the workbook - an evidence
     # dump wearing a model's clothes.
-    TIER1_METRIC_IDS = REQUIRED_METRICS | {"ebit", "adjusted_ebitda"}
-    FLEX_CONCEPTS = {
-        "lease_payments", "share_buybacks", "revenue_component",
-        "committed_restructuring", "other_committed_flow",
-    }
+    # Tier 2 is no longer a list of blessed concept names. It is a SHAPE: an
+    # individual cash-flow line item. A concept whitelist needed maintaining
+    # every time a sector printed something new, and it still admitted the wrong
+    # things - a revenue split is not a cash flow, and `share_buybacks` sat on it
+    # for want of a core slot it has now been given. The shape rule generalises:
+    # if several houses print a distinct cash movement separately and it does not
+    # duplicate a driver the model already has, it can ride; anything else stays
+    # evidence, visible on the house tabs, out of the forecast.
+    TIER1_METRIC_IDS = set(CORE_METRIC_IDS)
     MAX_FLEX_ELECTIONS = 10
     flex_elections = crosswalk.get("flex_elections") or []
     if len(flex_elections) > MAX_FLEX_ELECTIONS:
@@ -981,6 +1055,11 @@ def main() -> int:
             f"{len(flex_elections)} flex elections exceed the {MAX_FLEX_ELECTIONS}-concept ceiling; "
             "a forecast surface this wide is an evidence dump, not a model."
         )
+    core_overlap_groups = {
+        METRIC_BY_ID[metric_id].get("overlap_group")
+        for metric_id in TIER1_METRIC_IDS
+        if METRIC_BY_ID.get(metric_id, {}).get("overlap_group")
+    }
     elected_by_metric = {}
     for index, election in enumerate(flex_elections):
         metric_id = election.get("metric_id")
@@ -990,10 +1069,37 @@ def main() -> int:
             raise ValueError(f"flex_elections[{index}] names undeclared metric_id {metric_id!r}.")
         if metric_id in TIER1_METRIC_IDS:
             raise ValueError(f"flex_elections[{index}]: {metric_id!r} is Tier 1 and needs no election.")
-        if concept not in FLEX_CONCEPTS:
+        entry = METRIC_BY_ID.get(concept)
+        if entry is None:
             raise ValueError(
-                f"flex_elections[{index}] concept {concept!r} is not a whitelisted flex concept "
-                f"({', '.join(sorted(FLEX_CONCEPTS))})."
+                f"flex_elections[{index}] concept {concept!r} is not in the broker metric dictionary."
+            )
+        if concept in BANNED_TOTAL_IDS:
+            raise ValueError(
+                f"flex_elections[{index}] elects {concept!r}, a statement subtotal the model derives "
+                "itself. Elect the individual flows beneath it or leave it as evidence."
+            )
+        if entry["statement_family"] != "cash_flow":
+            raise ValueError(
+                f"flex_elections[{index}] elects {concept!r} from the {entry['statement_family']} "
+                "statement; only cash-flow line items are electable, because the overlay is a cash "
+                "model and an election lands as one more flow."
+            )
+        if entry["leaf"] is not True:
+            raise ValueError(
+                f"flex_elections[{index}] elects {concept!r}, which the dictionary marks a subtotal; "
+                "only individual line items are electable."
+            )
+        if concept not in FLEX_ELIGIBLE_IDS:
+            raise ValueError(
+                f"flex_elections[{index}] concept {concept!r} is not offered for election "
+                f"({', '.join(sorted(FLEX_ELIGIBLE_IDS))})."
+            )
+        overlap = entry.get("overlap_group")
+        if overlap and overlap in core_overlap_groups:
+            raise ValueError(
+                f"flex_elections[{index}] elects {concept!r}, which shares the {overlap!r} overlap "
+                "group with a core driver. Consuming both spends the same cash twice."
             )
         if not isinstance(rationale, str) or not rationale.strip():
             raise ValueError(f"flex_elections[{index}] requires a rationale.")

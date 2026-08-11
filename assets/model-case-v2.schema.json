@@ -640,9 +640,10 @@
               "concept": {
                 "enum": [
                   "lease_payments",
-                  "share_buybacks",
-                  "revenue_component",
                   "committed_restructuring",
+                  "impairment_addback",
+                  "pension_contributions",
+                  "disposal_proceeds",
                   "other_committed_flow"
                 ]
               },

@@ -4,6 +4,7 @@ import { classifyStatementLine, isHighImpactRole } from "./statement_classifier.
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { compileStatementTopology } from "./statement_topology.mjs";
 import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
+import { coreConsumptionIds } from "./broker_metric_dictionary.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
@@ -937,19 +938,14 @@ export function statementAuthorityChecks(modelCase) {
 // said. Aggregate working capital is deliberately Tier 1 while its
 // components are not: a row consuming a component-level broker series when
 // the aggregate exists is exactly the granularity the doctrine forbids.
-const TIER1_CONSUMPTION_IDS = new Set([
-  "revenue",
-  "ebit",
-  "adjusted_ebitda",
-  "depreciation_and_amortisation",
-  "effective_tax_rate",
-  "capex",
-  "change_in_working_capital",
-  "dividends",
-]);
-
+// Derived, never restated: assets/broker-metric-dictionary.json is the single
+// source for what "Tier 1" means, and the loader refuses on digest drift or an
+// internally inconsistent asset. The list used to be written out here, in the
+// pack compiler and in the renderer - three copies of one rule, agreeing only
+// by memory.
 function brokerConsumptionTierChecks(modelCase) {
   const checks = [];
+  const tier1 = coreConsumptionIds();
   const elections = new Set(
     (modelCase.broker_pack?.flex_elections ?? []).map((item) => item.metric_id),
   );
@@ -958,7 +954,7 @@ function brokerConsumptionTierChecks(modelCase) {
     for (const row of modelCase.statement_structure?.[section] ?? []) {
       const metricId = row.broker_metric_id;
       if (!metricId) continue;
-      if (TIER1_CONSUMPTION_IDS.has(metricId) || elections.has(metricId)) continue;
+      if (tier1.has(metricId) || elections.has(metricId)) continue;
       // A metric the pack does not even carry is caught by the existing
       // pack-shape checks; this one is specifically about tier discipline.
       if (packMetrics[metricId] === undefined && Object.keys(packMetrics).length === 0) continue;

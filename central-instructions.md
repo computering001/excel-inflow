@@ -519,3 +519,25 @@ python3 scripts/verify/verify_delivery.py <delivered.xlsx> <live-delivery-attest
 It re-derives the workbook hash and the file's own sheet inventory from the
 bytes and compares them to the attestation; a stale, swapped or regenerated
 file fails in one line without opening Excel.
+
+### Paused runs and side deliverables
+
+A run that is waiting for an answer still owns its case, its evidence and its
+build area. A side request that arrives while it waits — an interim broker
+workbook, an extract of what has been read so far, a look at one statement — is
+served from a scratch copy outside the build area, and never by advancing,
+re-entering or editing the paused run. The pause is a held position, not an
+invitation to work the case by hand: a run whose case changed while it waited
+is a different run wearing the first one's receipts, and `continue` blocks it
+as `run_case_mutated_during_pause` rather than certifying the substitution.
+
+A stalled evidence stage is a blocked run, not a state to be routed around. An
+extraction that reports `NEEDS_VISION` has named the work it still owes: the
+vision passes are executed and the bundle is carried to `PASS`. An extraction
+that reports `NEEDS_RESOLUTION` is resumed and adjudicated. Neither status may
+be answered by composing the missing facts in chat, by narrowing the document
+set until the stage reports clean, or by proceeding with the evidence the
+stage did produce. A pack assembled in conversation is not evidence, and every
+gate downstream of it will certify it faithfully — which is precisely why the
+substitution has to be refused here, at ingress, where the difference between
+a read document and a recalled one is still visible.

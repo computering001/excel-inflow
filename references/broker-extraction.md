@@ -85,6 +85,14 @@ The extraction bundle may be `PASS`, `NEEDS_VISION`, `NEEDS_RESOLUTION` or
 `BLOCKED`. `NEEDS_RESOLUTION` is an internal resumable state and must not be
 presented to the user as a request for new source files.
 
+Only `PASS` may enter a build. `NEEDS_VISION` and `NEEDS_RESOLUTION` are work
+instructions addressed to this run: execute the vision passes, adjudicate the
+conflicts, carry the bundle to `PASS`. A run may not proceed on the portion
+that happened to resolve, and may not substitute values assembled in
+conversation for the surfaces that did not. When broker documents are present,
+ingress requires the passing bundle before Stage 2 opens; there is no path from
+a stalled extraction to a delivered workbook.
+
 Require all of the following before `PASS`:
 
 - every input document is represented once by its computed SHA-256;
@@ -122,19 +130,36 @@ dividends, plus at least one supported headline anchor such as EBIT or Adjusted
 EBITDA. Preserve any additional usable broker metrics; the forecast-authority
 graph decides whether the model consumes them.
 
-Consumption is tiered, and the pack compiler enforces it. The eight Tier-1 ids
-above are always consumable. Any OTHER metric declared as an active input
-requires a recorded `flex_elections` entry naming a whitelisted concept
-(`lease_payments`, `share_buybacks`, `revenue_component`,
-`committed_restructuring`, `other_committed_flow`) with a rationale, AND at
-least three houses supplying it in all three forecast periods under the one
-declared definition — the same three-house bar the intake screen states for the
-pack itself. Fewer compatible houses, or no election, means the metric stays
-evidence: reclassify it `reference_only` rather than widening the forecast
-surface. Never elect more than ten concepts, and never map working-capital
-COMPONENTS as active metrics when the aggregate exists. The central Brokers
-sheet renders only consumed metrics — an analyst reads a consensus grid, not
-the candidate universe.
+The metric vocabulary is closed. `assets/broker-metric-dictionary.json` declares
+every id a crosswalk may emit, with a definition, unit class, statement family,
+leaf/subtotal flag, tier and overlap group. Read the definitions — they exist to
+inform the judgment, and their disambiguation notes name the confusions that
+matter (a margin is not the profit it derives from; an authorisation is not cash
+spent; an impairment addback in the cash-flow bridge is not the income-statement
+charge). Map by meaning, then record the meaning under a dictionary id. An id
+that is not in the dictionary is a blocking offence, not a naming preference: an
+invented id cannot be compared across houses, checked for double-counting or
+rendered in a standardised digest. Where one concept genuinely occurs more than
+once in a house — two reported segments, several impairment lines — add an
+instance qualifier after `__` (`revenue_component__segment_a`). Core drivers may
+never be instanced. Encountering a concept the dictionary lacks is a reason to
+extend the asset under review, never to improvise at runtime.
+
+Consumption is tiered, and the pack compiler enforces it. The nine Tier-1 ids
+(revenue, EBIT, adjusted EBITDA, D&A, effective tax rate, capex, aggregate
+working capital, dividends, share buybacks) are always consumable. Any OTHER
+metric declared as an active input requires a recorded `flex_elections` entry
+whose concept is an individual CASH-FLOW line item — cash-flow statement family,
+leaf, absent from the banned-totals list, and sharing no overlap group with a
+core driver — with a rationale, AND at least three houses supplying it in all
+three forecast periods under the one declared definition, the same three-house
+bar the intake screen states for the pack itself. Fewer compatible houses, a
+subtotal, an income-statement concept, an overlap with a driver already consumed,
+or no election at all means the metric stays evidence: reclassify it
+`reference_only` rather than widening the forecast surface. Never elect more than
+ten concepts, and never map working-capital COMPONENTS as active metrics when the
+aggregate exists. The central Brokers sheet renders only consumed metrics — an
+analyst reads a consensus grid, not the candidate universe.
 
 Before compilation, review every extracted table once. Declare its class,
 header rows and any annual or partial-period columns. Then disposition every

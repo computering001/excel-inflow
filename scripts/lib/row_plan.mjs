@@ -1295,6 +1295,98 @@ export function assertUniqueStatementDependencies(rows, section = "statement") {
 }
 
 /**
+ * One statement family may appear on the face once.
+ *
+ * A case can arrive carrying two complete copies of the same statement - the
+ * issuer's own captions under one row-id prefix and the compiler's default
+ * skeleton under another - and every existing gate will pass it. Each copy is
+ * internally coherent, each row is uniquely identified, each cache ties to its
+ * own formula. The workbook simply says everything twice, and the reader is
+ * left to guess which cash-flow statement is the model's. This is what the
+ * 11 Aug 2026 AstraZeneca delivery did across rows 51-117.
+ *
+ * The signature is narrow on purpose: same normalised label, same reported
+ * history, and neither row wired to the other. Two rows that genuinely share a
+ * caption stay legal as long as one feeds the other (a total and its own
+ * carry-forward) or their histories differ (two segments, one caption). The
+ * collapse passes upstream have already merged everything mergeable, so
+ * anything reaching here is a pair the compiler deliberately refused to merge
+ * and cannot justify keeping apart.
+ *
+ * Rows with no numeric history are exempt: a blank pair is a presentation
+ * artefact, and greyed capture rows legitimately repeat a caption they no
+ * longer own.
+ */
+function assertNoDuplicateStatementFamily(rows, section = "statement") {
+  const normalise = (value) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const history = (row) => (row.values ?? []).slice(0, 3);
+  const numericHistory = (row) =>
+    history(row).some((value) => Number.isFinite(Number(value)) && value !== null);
+  const identicalHistory = (left, right) => {
+    const leftHistory = history(left);
+    const rightHistory = history(right);
+    return leftHistory.every((value, index) => {
+      const other = rightHistory[index];
+      const leftNumber = Number(value);
+      const rightNumber = Number(other);
+      if (!Number.isFinite(leftNumber) || value === null) {
+        return !Number.isFinite(rightNumber) || other === null;
+      }
+      return Number.isFinite(rightNumber) && Math.abs(leftNumber - rightNumber) <= 1e-9;
+    });
+  };
+  const referencesOf = (row) => {
+    const refs = new Set();
+    for (const rule of statementRules(row)) {
+      for (const ref of rule.refs ?? []) refs.add(ref);
+    }
+    if (row.parent_row_id) refs.add(row.parent_row_id);
+    if (row.forecast_capture_parent_id) refs.add(row.forecast_capture_parent_id);
+    for (const absorbed of row.projection_absorbed_row_ids ?? []) refs.add(absorbed);
+    return refs;
+  };
+
+  const candidates = rows.filter(
+    (row) => row.row_type !== "header" && numericHistory(row) && normalise(row.label),
+  );
+  const byLabel = new Map();
+  for (const row of candidates) {
+    const key = normalise(row.label);
+    if (!byLabel.has(key)) byLabel.set(key, []);
+    byLabel.get(key).push(row);
+  }
+  const collisions = [];
+  for (const [label, group] of byLabel) {
+    for (let index = 0; index < group.length; index += 1) {
+      for (let other = index + 1; other < group.length; other += 1) {
+        const left = group[index];
+        const right = group[other];
+        if (!identicalHistory(left, right)) continue;
+        if (
+          referencesOf(left).has(right.row_id) ||
+          referencesOf(right).has(left.row_id)
+        ) {
+          continue;
+        }
+        collisions.push(`${label} (${left.row_id} / ${right.row_id})`);
+      }
+    }
+  }
+  if (collisions.length > 0) {
+    throw new Error(
+      `duplicate_statement_family: ${section} presents ${collisions.length} statement line(s) twice with identical history and no link between the copies: ${collisions
+        .slice(0, 8)
+        .join("; ")}. One face, one statement - resolve which row owns the line before building.`,
+    );
+  }
+}
+
+/**
  * INDENT EVERY CHILD, not just the ones a case author happened to space in.
  *
  * The level a row reads at is a fact about the arithmetic, so it is derived
@@ -2744,6 +2836,7 @@ export function normaliseStatementRows(
   deriveIndentLevels(rows, section);
   stripLabelIndentSpaces(rows);
   assertUniqueStatementDependencies(rows, section);
+  assertNoDuplicateStatementFamily(rows, section);
   return rows;
 }
 

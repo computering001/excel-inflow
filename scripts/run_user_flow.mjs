@@ -321,13 +321,61 @@ async function main() {
   let verifiedCarrier = null;
   let evidencePath;
   if (options.carrier) {
-    verifiedCarrier = await verifyRunCarrier({
-      skillRoot: ROOT,
-      runRoot: runDir,
-      carrierPath: path.resolve(String(options.carrier)),
-      controllerVersion: FLOW_CONTROLLER_VERSION,
-      workspaceToken,
-    });
+    const carrierPath = path.resolve(String(options.carrier));
+    try {
+      verifiedCarrier = await verifyRunCarrier({
+        skillRoot: ROOT,
+        runRoot: runDir,
+        carrierPath,
+        controllerVersion: FLOW_CONTROLLER_VERSION,
+        workspaceToken,
+      });
+    } catch (error) {
+      // One class of carrier failure is not a caller error and should not read
+      // like one: the artifacts the run paused on no longer hash to what the
+      // carrier recorded. Something edited the run while it waited. Until now
+      // that arrived as an unhandled stack trace, which looks like a tooling
+      // fault and invites a retry or a hand-repair, when it is a refusal and
+      // needs to look like one - a named outcome the caller can act on.
+      //
+      // Everything else a carrier can get wrong - the wrong workspace token, a
+      // rebound run identity, an unsupported controller version, a malformed
+      // descriptor - is the caller holding the wrong carrier, and keeps its
+      // existing hard failure.
+      const mutation = /^Carrier file (\S+) hash does not match\.$/.exec(String(error.message));
+      if (!mutation) throw error;
+      const mutatedFile = mutation[1];
+      const carrierRunId = await readJson(carrierPath, "run carrier")
+        .then((carrier) => carrier?.run_id ?? null)
+        .catch(() => null);
+      const message =
+        `run_case_mutated_during_pause: the run's ${mutatedFile} no longer hashes to what the carrier ` +
+        `recorded at pause time. A run whose artifacts changed while it waited is a different run ` +
+        `wearing the first one's receipts.`;
+      const screen = renderFailure({
+        stage: "inputs",
+        what_failed: `The run's ${mutatedFile} changed while this run was paused.`,
+        why: message,
+        what_would_fix_it: [
+          "Start a fresh run for the changed inputs; a paused run may only be continued on the exact artifacts its carrier was minted against.",
+          "Serve side requests that arrive during a pause from a scratch copy, never by editing the run's own artifacts.",
+        ],
+      });
+      return finish({
+        runDir,
+        screen,
+        machine: options.json === true,
+        result: {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          ...(carrierRunId ? { run_id: carrierRunId } : {}),
+          status: "BLOCKED",
+          stage: "inputs",
+          message,
+          reused_stages: [],
+        },
+      });
+    }
     evidencePath = verifiedCarrier.files.evidence_run;
     if (!options.answers && verifiedCarrier.files.answers) options.answers = verifiedCarrier.files.answers;
     if (options["run-id"] && options["run-id"] !== verifiedCarrier.carrier.run_id) {
@@ -878,6 +926,76 @@ async function main() {
   // is content-addressed so a changed case never overwrites prior evidence.
   const stage4Dir = path.join(runDir, "stages", "build_checks");
   const caseHash = await hashFile(answeredCasePath);
+
+  // A paused run holds a position; it does not hand the case over for editing.
+  // Because the build folder is content-addressed, a case that changed while the
+  // run waited does not collide with anything - it quietly opens a second build
+  // under a new name and carries the first run's receipts forward over it. The
+  // stage-3 receipt and the run carrier both recorded what the case hashed to at
+  // pause time, so the substitution is detectable here, before any build folder
+  // is derived from the new bytes.
+  const pauseTimeCaseHashes = [
+    ["stage-3 receipt", receipt3?.output_hashes?.model_case],
+    ["run carrier", verifiedCarrier?.carrier?.files?.model_case?.sha256],
+  ].filter(([, hash]) => /^[a-f0-9]{64}$/.test(String(hash ?? "")));
+  const mutatedAgainst = pauseTimeCaseHashes.filter(([, hash]) => hash !== caseHash);
+  if (mutatedAgainst.length > 0) {
+    const detail = mutatedAgainst
+      .map(([label, hash]) => `${label} recorded ${hash.slice(0, 12)}`)
+      .join("; ");
+    const message =
+      `run_case_mutated_during_pause: the model case on disk hashes to ${caseHash.slice(0, 12)}, ` +
+      `but ${detail}. A run whose case changed while it waited is a different run wearing the ` +
+      `first one's receipts.`;
+    const screen = renderFailure({
+      stage: "build_checks",
+      what_failed: "The model case changed while this run was paused.",
+      why: message,
+      what_would_fix_it: [
+        "Start a fresh run for the changed case; a paused run may only be continued on the exact case its receipts were issued against.",
+        "Serve side requests that arrive during a pause from a scratch copy, never by editing the run's own case.",
+      ],
+    });
+    const mutationPath = path.join(stage4Dir, "case-mutation.json");
+    await writeJsonAtomic(mutationPath, {
+      on_disk_model_case: caseHash,
+      pause_time_model_case: Object.fromEntries(pauseTimeCaseHashes),
+      message,
+    });
+    const blockedReceipt = await persistStage({
+      runDir,
+      runId,
+      stageId: "build_checks",
+      status: "blocked",
+      inputHashes: {
+        stage3_receipt: receipt3.receipt_hash,
+        model_case: caseHash,
+        runtime: runtimeDigests.build_checks,
+      },
+      previousReceiptHash: receipt3.receipt_hash,
+      outputs: { case_mutation: mutationPath },
+      detail: {
+        on_disk_model_case: caseHash,
+        pause_time_model_case: Object.fromEntries(pauseTimeCaseHashes),
+      },
+    });
+    return finish({
+      runDir,
+      screen,
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "BLOCKED",
+        stage: "build_checks",
+        message,
+        receipt: blockedReceipt,
+        reused_stages: reusedStages,
+      },
+    });
+  }
+
   const buildDir = path.join(runDir, `build-${caseHash.slice(0, 12)}`);
   const buildResultPath = path.join(stage4Dir, "build-result.json");
   const workbook = path.join(buildDir, "model.xlsx");

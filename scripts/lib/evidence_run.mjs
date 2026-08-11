@@ -1618,6 +1618,72 @@ function validateBrokerMapping(run, findings) {
   }
 }
 
+// Broker-document ingress coherence.
+//
+// The lane that reads broker documents is not optional equipment. When the
+// attachment manifest carries a broker document, the numbers on the Brokers
+// sheet have exactly one legitimate provenance: an extraction bundle that read
+// those bytes, a crosswalk that mapped them and a receipt that binds the two.
+// A run that attaches broker research and then composes the pack some other
+// way - recalled in conversation, carried over from an earlier chat, assembled
+// from a normalised file nobody proved - produces an evidence run that every
+// downstream gate will certify faithfully, because each of them is measuring
+// fidelity to the input rather than the provenance of the input. This is the
+// one place where the difference between a read document and a remembered one
+// is still visible, so it is the place that has to refuse.
+//
+// The rule keys on the used broker sources rather than on the ingress
+// compiler's own bookkeeping, so it holds for an evidence run assembled by any
+// route, in any raw format, whether or not an ingress spec was ever compiled.
+// Archived and synthetic regression material is exempt on the same terms the
+// DCS lane already uses - and that exemption cannot be borrowed by a real run,
+// because an end-user build must declare execution_profile production_model
+// (see solver.mjs) and is refused if it does not.
+function validateBrokerIngressCoherence(run, findings) {
+  if ((run.model_case?.execution_profile ?? "production_model") === "reference_parity") {
+    return;
+  }
+  const brokerSources = (run.source_inventory ?? []).filter(
+    (source) => source.kind === "user_broker_research" && source.status === "used",
+  );
+  if (brokerSources.length === 0) return;
+  const bundleHash = run.ingress?.broker_evidence?.extraction_bundle_sha256;
+  if (!/^[a-f0-9]{64}$/.test(String(bundleHash ?? ""))) {
+    findings.push(
+      finding(
+        "evidence.broker.ingress_missing",
+        "BLOCK",
+        `${brokerSources.length} broker research source(s) are used, but no hash-bound broker extraction bundle is declared. Broker documents are read by the extraction lane; a pack that arrives any other way is not evidence.`,
+        brokerSources.map((source) => source.source_id),
+      ),
+    );
+    return;
+  }
+  // A declared bundle is not the same as a covering one. Every broker document
+  // the run accepted has to appear as an extracted house; otherwise a five-note
+  // upload can quietly become a two-note model with the other three vanishing
+  // between ingress and the Brokers sheet.
+  const extractedSourceIds = new Set(
+    (run.broker_source_tables?.houses ?? []).map((house) => house.source_id),
+  );
+  const uncovered = (run.source_inventory ?? []).filter(
+    (source) =>
+      source.kind === "user_broker_research" &&
+      source.status === "used" &&
+      !extractedSourceIds.has(source.source_id),
+  );
+  if (uncovered.length > 0) {
+    findings.push(
+      finding(
+        "evidence.broker.ingress_incomplete",
+        "BLOCK",
+        `${uncovered.length} used broker document(s) are attached but absent from the extraction evidence; a partially read upload is not a smaller pack, it is an unproven one.`,
+        uncovered.map((source) => source.source_id),
+      ),
+    );
+  }
+}
+
 function validateBrokerSourceTables(run, findings) {
   const evidenceTables = run.broker_source_tables ?? null;
   const modelTables = run.model_case?.broker_pack?.raw_tables ?? null;
@@ -2466,6 +2532,7 @@ export function validateEvidenceRun(run) {
   validateDcsEvidence(run, findings);
   validateDebtMapping(run, findings);
   validateBrokerMapping(run, findings);
+  validateBrokerIngressCoherence(run, findings);
   validateBrokerSourceTables(run, findings);
   validateRestatements(run, sourceIds, findings);
   validateDecisionSources(run, sourceIds, findings);

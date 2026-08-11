@@ -820,6 +820,27 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   if (extractedByHouse.size !== packHouses.size) {
     throw new Error("Broker extraction bundle does not cover every normalized broker house exactly once.");
   }
+  // Cardinality above is measured against the normalized pack. That leaves the
+  // upload itself unmeasured: five accepted broker notes can become a two-house
+  // pack, with the other three disappearing between ingress and the Brokers
+  // sheet and no gate noticing, because every house that survived is perfectly
+  // bound. Coverage is therefore asserted from the accepted documents inward.
+  const extractedSourceIds = new Set(
+    (sourceTables.json.houses ?? []).map((house) => house.source_id),
+  );
+  const uncoveredBrokerSources = (evidence.source_inventory ?? []).filter(
+    (source) =>
+      source.kind === "user_broker_research" &&
+      source.status === "used" &&
+      !extractedSourceIds.has(source.source_id),
+  );
+  if (uncoveredBrokerSources.length > 0) {
+    throw new Error(
+      `broker_ingress_incomplete: ${uncoveredBrokerSources.length} used broker document(s) are attached but absent from the extraction evidence (${uncoveredBrokerSources
+        .map((source) => source.source_id)
+        .join(", ")}); a partially read upload is not a smaller pack, it is an unproven one.`,
+    );
+  }
   evidence.broker_source_tables = sourceTables.json;
   evidence.broker_crosswalk_receipt = receipt.json;
   if (semanticReport) {
@@ -1096,6 +1117,22 @@ export async function compileAttachmentIngress({ specPath }) {
   if (hasRawDcsAttachment && !spec.dcs_evidence) {
     throw new Error(
       "A raw FactSet DCS attachment requires lossless dcs_evidence; a separately normalized JSON file is not proof of source fidelity.",
+    );
+  }
+  // The broker lane gets the same treatment, and for the same reason. A broker
+  // attachment paired with a normalized pack asserts what the documents say;
+  // only the extraction bundle demonstrates it. Composing the pack by any other
+  // route produces an evidence run that every gate downstream will certify
+  // faithfully, because each of them measures fidelity to the input rather than
+  // the provenance of the input.
+  const hasBrokerAttachment = [...sourceAttachment.values()].some(
+    (entry) => entry.adapter?.domain === "broker_pack",
+  );
+  const referenceParity =
+    (evidence.model_case?.execution_profile ?? "production_model") === "reference_parity";
+  if (hasBrokerAttachment && !spec.broker_evidence && !referenceParity) {
+    throw new Error(
+      "broker_ingress_incoherent: a broker research attachment requires a PASS broker_evidence bundle; a separately normalized broker pack is not proof that the documents were read.",
     );
   }
   const dcsEvidence = await compileDcsEvidence({

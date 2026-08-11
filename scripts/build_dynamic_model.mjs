@@ -78,6 +78,7 @@ import {
   resolveHistoricalInterestAuthority,
 } from "./lib/historical_interest_authority.mjs";
 import { workbookCalcProperties } from "./lib/economic_solve_policy.mjs";
+import { coreConsumptionIds } from "./lib/broker_metric_dictionary.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -1295,23 +1296,15 @@ function brokerNames(modelCase) {
 // Rendering the whole candidate universe put a ten-row block on the central
 // sheet for every broker line item — six thousand rows on a real pack — and
 // an analyst cannot read a consensus grid they cannot see whole.
-const TIER1_BROKER_METRIC_IDS = new Set([
-  "revenue",
-  "ebit",
-  "adjusted_ebitda",
-  "depreciation_and_amortisation",
-  "effective_tax_rate",
-  "capex",
-  "change_in_working_capital",
-  "dividends",
-]);
-
+// The consumable set is read from assets/broker-metric-dictionary.json, the one
+// place it is defined; the loader refuses on digest drift.
 function consumedBrokerMetricIds(modelCase) {
+  const tier1 = coreConsumptionIds();
   const elected = new Set(
     (modelCase.broker_pack?.flex_elections ?? []).map((item) => item.metric_id),
   );
   return Object.keys(modelCase.broker_pack?.metrics ?? {}).filter(
-    (metricId) => TIER1_BROKER_METRIC_IDS.has(metricId) || elected.has(metricId),
+    (metricId) => tier1.has(metricId) || elected.has(metricId),
   );
 }
 

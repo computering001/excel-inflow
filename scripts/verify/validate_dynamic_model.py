@@ -2516,53 +2516,82 @@ def main(argv: List[str]) -> int:
                 children.append(int(cell_match.group(2)))
         return sorted({row for row in children if row in statement_face_rows})
 
+    # The same claim is owed by the reported columns, not only the projected
+    # ones. A filed statement whose totals do not equal the lines beneath them
+    # is a transcription defect - the AstraZeneca delivery of 11 Aug 2026 put
+    # revenue components on the face that did not add to revenue - and it is
+    # exactly the class of error a reader trusts the model to have checked,
+    # because history is the part they assume was merely copied. G is the column
+    # that declares the family, so comparing it proves the cache is live; H and
+    # I are where a hardcode or a differently-shaped formula can hide.
+    #
+    # Emptiness has to be read from the raw cell rather than the coerced one:
+    # numeric() maps None to 0.0, so a waiver written against None never fires
+    # and blank families are silently counted as visited. History has more
+    # legitimately empty families than the forecast does - periods the issuer
+    # never reported, rows the schedules own - so getting this right is what
+    # keeps the extension from manufacturing violations.
     additivity_errors = []
-    additivity_visited = 0
-    additivity_class = policy.class_for("statement-face-additivity", "currency") if mode != "legacy" else None
+    additivity_visited = {"historical": 0, "forecast": 0}
+    additivity_class = (
+        policy.class_for("statement-face-additivity", "currency") if mode != "legacy" else "currency"
+    )
+    historical_columns = (row_plan.get("columns") or {}).get("historical") or ["G", "H", "I"]
+    additivity_scopes = [("historical", historical_columns), ("forecast", FORECAST_COLUMNS)]
     for parent_row in sorted(statement_face_rows):
         children = summed_children("G%s" % parent_row)
         if len(children) < 2 or parent_row in children:
             continue
-        for column in FORECAST_COLUMNS:
-            parent_value = numeric(value("%s%s" % (column, parent_row)))
-            child_values = [numeric(value("%s%s" % (column, child))) for child in children]
-            if parent_value is None and all(item is None for item in child_values):
-                continue
-            if all(item is None for item in child_values):
-                # Grey-captured detail beneath a forecast parent is additive by
-                # construction; the capture certificate is checked elsewhere.
-                continue
-            additivity_visited += 1
-            total = sum(item for item in child_values if item is not None)
-            if not equal(parent_value or 0.0, total):
-                additivity_errors.append(
-                    {
-                        "column": column,
-                        "parent_row": parent_row,
-                        "parent_value": parent_value,
-                        "children_rows": children,
-                        "children_total": total,
-                    }
-                )
+        for scope, columns in additivity_scopes:
+            for column in columns:
+                raw_parent = value("%s%s" % (column, parent_row))
+                raw_children = [value("%s%s" % (column, child)) for child in children]
+                blank = lambda item: item is None or item == ""
+                if blank(raw_parent) and all(blank(item) for item in raw_children):
+                    continue
+                if all(blank(item) for item in raw_children):
+                    # Grey-captured detail beneath a stated parent is additive by
+                    # construction; the capture certificate is checked elsewhere.
+                    continue
+                if blank(raw_parent):
+                    # A parent the issuer did not report cannot be held to the
+                    # sum of lines that happen to sit beneath it.
+                    continue
+                additivity_visited[scope] += 1
+                parent_value = numeric(raw_parent)
+                total = sum(numeric(item) for item in raw_children if not blank(item))
+                if not equal(parent_value or 0.0, total, additivity_class):
+                    additivity_errors.append(
+                        {
+                            "scope": scope,
+                            "column": column,
+                            "parent_row": parent_row,
+                            "parent_value": parent_value,
+                            "children_rows": children,
+                            "children_total": total,
+                        }
+                    )
+    unvisited_scopes = [scope for scope, count in additivity_visited.items() if count == 0]
     checks.append(
         record(
             "statement-face-additivity",
-            len(additivity_errors) == 0 and additivity_visited > 0,
+            len(additivity_errors) == 0 and not unvisited_scopes,
             (
                 "Every statement parent whose history declares a sum over its "
-                "children carries forecast caches equal to the sum of those "
-                "children, unless the children are deliberately grey."
+                "children carries reported and forecast caches equal to the sum "
+                "of those children, unless the children are deliberately grey."
             )
-            if additivity_visited > 0
+            if not unvisited_scopes
             else (
-                "No summed statement family was visited - the additivity scan "
-                "cannot pass on an empty visit."
+                "No summed statement family was visited in %s - the additivity "
+                "scan cannot pass on an empty visit."
+                % " and ".join(unvisited_scopes)
             ),
             {
-                "families_visited": additivity_visited,
+                "families_visited": dict(additivity_visited),
                 "errors": additivity_errors[:20],
             },
-            violations=(len(additivity_errors) or (0 if additivity_visited > 0 else 1)),
+            violations=(len(additivity_errors) or len(unvisited_scopes)),
         )
     )
 
