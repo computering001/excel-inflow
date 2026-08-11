@@ -1996,6 +1996,25 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
       applyFormula(sheet, `${column}${highRow}`, `=MAX(${range})`);
       applyFormula(sheet, `${column}${lowRow}`, `=MIN(${range})`);
     }
+    // HOW MANY HOUSES STAND BEHIND EACH CONSENSUS CELL, per period, as live
+    // COUNT formulas over the contributor rows - so a thin panel announces its
+    // thinness on the row the model actually consumes. Grey and outside the
+    // block fill: this is an annotation about the consensus, not a member of
+    // the panel. (The reviewer struck a "(6 of 7)" from the metric LABEL as a
+    // second, weaker statement of what the block shows; a count beside the
+    // derived row is the first and only statement of how derived it is.)
+    if (brokerRows.length > 0) {
+      setValue(sheet, `G${consensusRow}`, "houses");
+      styleFont(sheet, `G${consensusRow}`, COLORS.grey);
+      ["H", "I", "J"].forEach((column, index) => {
+        const supplying = names.filter((name) => {
+          const value = (metric.brokers?.[name] ?? [])[index];
+          return typeof value === "number" && Number.isFinite(value);
+        }).length;
+        setValue(sheet, `${column}${consensusRow}`, supplying);
+        styleFont(sheet, `${column}${consensusRow}`, COLORS.grey);
+      });
+    }
     row += 2;
 
     // THE ANSWER, WRITTEN AT THE HEAD OF THE BLOCK.
@@ -2060,6 +2079,45 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     // nothing but a change of fill to say a new panel had started. One empty row
     // is the whole separation; it does not go between the contributor rows,
     // which are a list within a block and are held together by being one.
+    row += 1;
+  }
+
+  // THE HOUSE SCOREBOARD - what each house contributed and how it verified,
+  // condensed from the digest coverage the pack proved. The blunt
+  // primary/supplemental impression becomes a graded fact: a house is not
+  // "supplemental", it is "9 of 63 concepts, 21 native, 6 dual-read". The full
+  // digest lives on the house's own tab; this line is the index entry.
+  const houseDigests = modelCase.broker_pack?.house_digests ?? {};
+  if (Object.keys(houseDigests).length > 0) {
+    setValue(sheet, `B${row}`, "HOUSE COVERAGE — STANDARDISED DIGESTS");
+    styleFont(sheet, `B${row}`, COLORS.navy, { bold: true });
+    row += 1;
+    for (const [houseId, record] of Object.entries(houseDigests).sort(
+      ([, left], [, right]) => String(left.house_name).localeCompare(String(right.house_name)),
+    )) {
+      const coverage = record.digest_coverage ?? null;
+      setValue(sheet, `B${row}`, record.house_name);
+      styleFont(sheet, `B${row}`, COLORS.black);
+      if (coverage) {
+        setValue(
+          sheet,
+          `C${row}`,
+          `${coverage.mapped_concepts} of ${coverage.dictionary_concepts} concepts`,
+        );
+        const gradeText = Object.entries(coverage.grade_counts ?? {})
+          .filter(([, count]) => Number(count) > 0)
+          .map(([grade, count]) => `${count} ${grade.replace("_", "-")}`)
+          .join(", ");
+        setValue(sheet, `E${row}`, gradeText || null);
+        styleFont(sheet, `C${row}`, COLORS.grey);
+        styleFont(sheet, `E${row}`, COLORS.grey);
+      }
+      const consumedCount = (record.digest ?? []).filter((entry) => entry.consumed).length;
+      setValue(sheet, `H${row}`, `${consumedCount} consumed`);
+      styleFont(sheet, `H${row}`, COLORS.grey);
+      void houseId;
+      row += 1;
+    }
     row += 1;
   }
 
