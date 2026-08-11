@@ -218,6 +218,35 @@ impairment addback, a restructuring outflow — can change the debt path and cos
 nothing structurally to admit. Re-cutting the income statement would instead
 duplicate lines the model already derives.
 
+**The attributed route — one or two houses, admitted by name.** House-count
+measures whether a consensus exists, not whether a flow matters, and a critical
+line one analyst models is information, not noise. The danger of a single source
+was never that one analyst might be right; it was averaging one voice into
+consensus clothing. Attribution un-launders it: a shape-legal cash-flow line
+supported by fewer than three houses may be elected with `basis: attributed`,
+naming its `source_house_id`, and it is consumed as that house's OWN series —
+the named house must supply all three forecast periods, because an attributed
+row has no pool to substitute from — and rendered wearing the house's name on
+the Brokers sheet, never as a consensus row. The inclusion is the USER'S call:
+the election carries `confirmed_by_user: true`, recorded from one consolidated
+Stage-2 question, and the compiler refuses an attributed election without it.
+Where three or more houses support the concept, attribution is refused the other
+way — a genuine consensus exists and must be consumed as one. The ten-election
+ceiling spans both routes. A disclosed commitment remains better than any
+broker's estimate of it: when the flow is company-confirmed, it enters through
+the company-evidence lane with filing provenance and the attribution drops away.
+
+**The election gauge — nothing silently dropped, nothing silently adopted.** The
+pack compiler weighs every cash-flow leaf concept any house printed and records
+the verdict in `election_gauge`: elected as consensus, included by name,
+candidate for the user's question (one or two houses, at or above five per cent
+of the headline-anchor consensus at peak), or parked — below materiality or
+structurally inadmissible — with house counts and the computed ratio on the
+record. Stage 2 asks about the `candidate_attributed` bin in ONE consolidated
+question per run; no candidates, no question. The parked remainder stays visible
+on the house tabs and in the gauge itself, so the weighing can always be
+audited after the fact.
+
 **Tier 3 — everything else is evidence, full stop.** It remains lossless in
 the run artifact and visible on the B01-B10 sheets, and it never receives a
 consensus row wired into any model formula.

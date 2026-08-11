@@ -276,6 +276,21 @@
           "rationale": {
             "type": "string",
             "minLength": 1
+          },
+          "basis": {
+            "enum": [
+              "consensus",
+              "attributed"
+            ],
+            "description": "consensus: three or more houses under one definition, consumed as a pooled series. attributed: one or two houses; consumed as the named house's own series, rendered wearing the house's name so a single voice is never laundered into consensus clothing."
+          },
+          "source_house_id": {
+            "type": "string",
+            "description": "Required when basis is attributed: the house whose series the line consumes. That house must supply all three forecast periods - an attributed row has no pool to substitute from."
+          },
+          "confirmed_by_user": {
+            "type": "boolean",
+            "description": "Required true when basis is attributed: the inclusion is the user's call, recorded from the single consolidated Stage-2 question, never improvised by the run."
           }
         }
       }

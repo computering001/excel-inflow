@@ -117,7 +117,7 @@
             "52_53_week"
           ],
           "default": "fixed_date",
-          "description": "Which fiscal calendar the issuer keeps. 'fixed_date' closes on the same month and day every year. '52_53_week' closes on one weekday near the anchor, so the year end MOVES \u2014 2025-12-27, 2026-01-02, 2027-01-01 \u2014 and consecutive ends are 52 or 53 whole weeks apart. Omitting it means fixed_date, which is why every existing case is unaffected. Never asked of the user: the calendar follows from the filings."
+          "description": "Which fiscal calendar the issuer keeps. 'fixed_date' closes on the same month and day every year. '52_53_week' closes on one weekday near the anchor, so the year end MOVES — 2025-12-27, 2026-01-02, 2027-01-01 — and consecutive ends are 52 or 53 whole weeks apart. Omitting it means fixed_date, which is why every existing case is unaffected. Never asked of the user: the calendar follows from the filings."
         },
         "accounting_basis": {
           "enum": [
@@ -650,6 +650,161 @@
               "rationale": {
                 "type": "string",
                 "minLength": 1
+              },
+              "basis": {
+                "enum": [
+                  "consensus",
+                  "attributed"
+                ],
+                "description": "consensus: three or more houses under one definition, consumed as a pooled series. attributed: one or two houses; consumed as the named house's own series, rendered wearing the house's name so a single voice is never laundered into consensus clothing."
+              },
+              "source_house_id": {
+                "type": "string",
+                "description": "Required when basis is attributed: the house whose series the line consumes. That house must supply all three forecast periods - an attributed row has no pool to substitute from."
+              },
+              "confirmed_by_user": {
+                "type": "boolean",
+                "description": "Required true when basis is attributed: the inclusion is the user's call, recorded from the single consolidated Stage-2 question, never improvised by the run."
+              }
+            }
+          }
+        },
+        "house_digests": {
+          "type": "object",
+          "description": "Deterministic projection of each evidence-pack house's standardised digest, keyed by house_id. The Bxx tabs render this band verbatim; the evidence-run validator requires it to equal the pack's own digests exactly, the same seam discipline raw_tables carries.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "house_name",
+              "digest"
+            ],
+            "properties": {
+              "house_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "digest": {
+                "type": "array",
+                "description": "The standardised face of everything this house published: every mapped metric in dictionary order, the broker's verbatim caption, per-period values, per-value verification grade and source locations. Derived entirely from proven mapping receipts; carries no number the pack cannot trace.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "metric_id",
+                    "concept",
+                    "display_label",
+                    "verbatim_labels",
+                    "consumed",
+                    "values",
+                    "grades",
+                    "source_locations"
+                  ],
+                  "properties": {
+                    "metric_id": {
+                      "type": "string"
+                    },
+                    "concept": {
+                      "type": "string"
+                    },
+                    "display_label": {
+                      "type": "string"
+                    },
+                    "verbatim_labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "unit_kind": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "definition_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "consumed": {
+                      "type": "boolean"
+                    },
+                    "values": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "items": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "grades": {
+                      "type": "array",
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "items": {
+                        "enum": [
+                          "native",
+                          "dual_read",
+                          "adjudicated",
+                          "derived",
+                          null
+                        ]
+                      }
+                    },
+                    "source_locations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "digest_coverage": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mapped_concepts",
+                  "dictionary_concepts",
+                  "grade_counts"
+                ],
+                "properties": {
+                  "mapped_concepts": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "dictionary_concepts": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "grade_counts": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "native": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "dual_read": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "adjudicated": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "derived": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -680,7 +835,7 @@
               "$ref": "#/$defs/series3"
             }
           ],
-          "description": "Reported gross debt excluding leases, IN THE REPORTING CURRENCY. As a scalar it is the last historical year end only, and the stack then ties at exactly one date \u2014 which is the defect this field's three-series form exists to close. As a three-series, oldest first, it states every historical year end and each is tied and its residual reported. Where the three-series is supplied it must agree with historical_supplement.prior_gross_debt_excluding_leases at the two earlier ends. It is a translated figure: a sum of native USD, EUR and GBP balances is not a currency amount and cannot be reconciled against anything."
+          "description": "Reported gross debt excluding leases, IN THE REPORTING CURRENCY. As a scalar it is the last historical year end only, and the stack then ties at exactly one date — which is the defect this field's three-series form exists to close. As a three-series, oldest first, it states every historical year end and each is tied and its residual reported. Where the three-series is supplied it must agree with historical_supplement.prior_gross_debt_excluding_leases at the two earlier ends. It is a translated figure: a sum of native USD, EUR and GBP balances is not a currency amount and cannot be reconciled against anything."
         },
         "maximum_residual_percentage": {
           "type": "number",
@@ -726,7 +881,7 @@
     "historical_supplement": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Reported history that completes the two earlier balance snapshots and the three-year interest history. DEFECT 0.4: every field below except reported_net_debt_adjustment was read by build_dynamic_model.mjs and declared ONLY in the superseded v1 schema, and this object carried no additionalProperties:false \u2014 so prior_gross_debt_excluding_leases was written into columns G and H and styled as an input with nothing in the v2 contract acknowledging its existence, and a misspelt key was silently ignored rather than rejected.",
+      "description": "Reported history that completes the two earlier balance snapshots and the three-year interest history. DEFECT 0.4: every field below except reported_net_debt_adjustment was read by build_dynamic_model.mjs and declared ONLY in the superseded v1 schema, and this object carried no additionalProperties:false — so prior_gross_debt_excluding_leases was written into columns G and H and styled as an input with nothing in the v2 contract acknowledging its existence, and a misspelt key was silently ignored rather than rejected.",
       "properties": {
         "prior_cash_and_cash_equivalents": {
           "$ref": "#/$defs/series2",
@@ -757,7 +912,7 @@
         },
         "reported_net_debt_adjustment": {
           "type": "array",
-          "description": "The bridge from the model's standardised net debt to the figure the issuer itself publishes, stated as a list of NAMED reconciling items. Each item is one thing the company's own definition does that the model's does not \u2014 an unamortised fair-value adjustment or issue-cost discount, a debt derivative, a class of lease the issuer leaves out of net debt. Supplying this renders a separate 'company reported' sub-block: the model figure is restated, each named item is a visible row beneath it, and the published number and its leverage multiple follow. Omit it entirely when the model basis IS the company basis \u2014 a single anonymous 'reported adjustments' row that sits at zero tells the reader a difference exists and nothing about what it is, and the model-basis header already states that the two bases agree. Items that are zero in every period are dropped.",
+          "description": "The bridge from the model's standardised net debt to the figure the issuer itself publishes, stated as a list of NAMED reconciling items. Each item is one thing the company's own definition does that the model's does not — an unamortised fair-value adjustment or issue-cost discount, a debt derivative, a class of lease the issuer leaves out of net debt. Supplying this renders a separate 'company reported' sub-block: the model figure is restated, each named item is a visible row beneath it, and the published number and its leverage multiple follow. Omit it entirely when the model basis IS the company basis — a single anonymous 'reported adjustments' row that sits at zero tells the reader a difference exists and nothing about what it is, and the model-basis header already states that the two bases agree. Items that are zero in every period are dropped.",
           "items": {
             "$ref": "#/$defs/reportedNetDebtAdjustmentComponent"
           }
@@ -1161,7 +1316,7 @@
         },
         "values": {
           "$ref": "#/$defs/series6",
-          "description": "The item across all six periods, oldest first: three reported actuals then the three forecast periods. Signed as it moves net debt \u2014 negative where the company's definition carries less debt than the model's. Every period is a hardcode because every period is a reported or assumed fact, not something the model derives."
+          "description": "The item across all six periods, oldest first: three reported actuals then the three forecast periods. Signed as it moves net debt — negative where the company's definition carries less debt than the model's. Every period is a hardcode because every period is a reported or assumed fact, not something the model derives."
         },
         "note": {
           "type": "string",

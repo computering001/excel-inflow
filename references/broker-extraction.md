@@ -161,6 +161,28 @@ ten concepts, and never map working-capital COMPONENTS as active metrics when th
 aggregate exists. The central Brokers sheet renders only consumed metrics — an
 analyst reads a consensus grid, not the candidate universe.
 
+Mapping is COMPREHENSIVE, not selective. Walk every analytical table; every row
+whose meaning matches a dictionary definition must be mapped — `reference_only`
+at minimum — and every remaining row still receives a disposition. The narrow
+consumption wall above is exactly what makes this breadth safe: a mapped
+reference metric costs the model nothing, and it is what fills the standardised
+digest that opens each house tab — the display surface a reader audits a broker
+from. Stopping at the consumed core is not caution, it is data loss: an EPS, a
+net-debt path or an FCF bridge left unmapped is a number the digest cannot show
+and the reader cannot compare. The disposition ledger makes under-mapping
+visible — a pile of `not_model_relevant` dispositions over rows that plainly
+match dictionary definitions is a review defect, and the independent semantic
+verifier challenges it. Breadth failures degrade gracefully by design: a
+disputed reference mapping demotes to the raw tables with a note; only the
+consumed core blocks.
+
+Each house's digest is compiled from these mappings automatically — dictionary
+order, the broker's verbatim caption, per-period values, verification grades and
+source locations — and preserved exactly from pack to case to workbook, where
+the independent validator re-reads every rendered cell. Nothing is asked of the
+reviewer beyond mapping honestly and broadly; the digest is derived, never
+authored.
+
 Before compilation, review every extracted table once. Declare its class,
 header rows and any annual or partial-period columns. Then disposition every
 nonblank row intersecting those columns in one semantic coverage ledger as:

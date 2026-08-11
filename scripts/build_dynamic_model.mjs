@@ -1411,10 +1411,36 @@ function compileBrokerEvidenceLayout(modelCase) {
   const usedNames = new Set(["Operating Model", "> Brokers", "Brokers", "Forward Curves"]);
   const cellMap = new Map();
   const houseByName = new Map();
+  const houseDigests = modelCase.broker_pack?.house_digests ?? {};
+  const periodLabels = (modelCase.broker_pack?.forecast_periods ?? []).map(String);
   const sheets = houses.map((house, houseIndex) => {
     const name = brokerEvidenceSheetName(houseIndex, house.house_name, usedNames);
     houseByName.set(house.house_name, house);
     let row = 4;
+    // THE DIGEST BAND OPENS THE TAB. A reader starts at the standardised list -
+    // every mapped metric under its dictionary name, the broker's own caption
+    // beside it, graded values, source locations - and descends into the raw
+    // tables below when they want the evidence itself. The band's geometry is
+    // computed here, deterministically from the case, so the row map can
+    // declare it and the independent validator can re-find every cell.
+    const digestRecord = houseDigests[house.house_id] ?? null;
+    let digestBand = null;
+    if (digestRecord && Array.isArray(digestRecord.digest) && digestRecord.digest.length > 0) {
+      const titleRow = row;
+      const headerRow = titleRow + 1;
+      const entriesStartRow = headerRow + 1;
+      const coverageRow = entriesStartRow + digestRecord.digest.length;
+      digestBand = {
+        titleRow,
+        headerRow,
+        entriesStartRow,
+        coverageRow,
+        periodLabels,
+        entries: digestRecord.digest,
+        coverage: digestRecord.digest_coverage ?? null,
+      };
+      row = coverageRow + 2;
+    }
     const presentationTables = (house.tables ?? []).filter(
       (table) => table.workbook_presentation !== "evidence_only",
     );
@@ -1446,7 +1472,7 @@ function compileBrokerEvidenceLayout(modelCase) {
       row = dataStartRow + (table.rows ?? []).length + 2;
       return { table, metaRow, dataStartRow, maxColumns, authorityByCell };
     });
-    return { house, name, tableLayouts, visibleEndRow: Math.max(3, row - 1) };
+    return { house, name, digestBand, tableLayouts, visibleEndRow: Math.max(3, row - 1) };
   });
   const mappingByKey = new Map();
   for (const mapping of mappings) {
@@ -1570,6 +1596,67 @@ function buildBrokerEvidenceSheets(workbook, layout) {
     styleFont(sheet, "B2", COLORS.grey);
     let globalMaxColumns = 1;
     const maxWidths = new Map();
+    if (sheetLayout.digestBand) {
+      const band = sheetLayout.digestBand;
+      const periodHeaders = [0, 1, 2].map(
+        (index) => band.periodLabels[index] ?? `FY${index + 1}`,
+      );
+      setValue(sheet, `B${band.titleRow}`, "House metrics — standardised");
+      sheet.getRange(`B${band.titleRow}:I${band.titleRow}`).format.fill = COLORS.navy;
+      styleFont(sheet, `B${band.titleRow}:I${band.titleRow}`, COLORS.white, { bold: true });
+      const headers = [
+        "Metric",
+        "Broker caption",
+        ...periodHeaders,
+        "Verification",
+        "Use",
+        "Source",
+      ];
+      headers.forEach((header, index) => {
+        const address = `${columnName(index + 2)}${band.headerRow}`;
+        setValue(sheet, address, header);
+        sheet.getRange(address).format.fill = COLORS.subsection;
+        styleFont(sheet, address, COLORS.black, { bold: true });
+      });
+      band.entries.forEach((entry, index) => {
+        const entryRow = band.entriesStartRow + index;
+        setValue(sheet, `B${entryRow}`, entry.display_label);
+        styleFont(sheet, `B${entryRow}`, COLORS.black, { bold: Boolean(entry.consumed) });
+        setValue(sheet, `C${entryRow}`, (entry.verbatim_labels ?? []).join(" / ") || null);
+        styleFont(sheet, `C${entryRow}`, COLORS.grey);
+        (entry.values ?? []).forEach((value, periodIndex) => {
+          const address = `${columnName(4 + periodIndex)}${entryRow}`;
+          setValue(sheet, address, value);
+          if (typeof value === "number" && Number.isFinite(value)) {
+            styleInput(sheet, address);
+          }
+        });
+        const grades = [...new Set((entry.grades ?? []).filter(Boolean))];
+        setValue(sheet, `G${entryRow}`, grades.join(" / ") || null);
+        styleFont(sheet, `G${entryRow}`, COLORS.grey);
+        setValue(sheet, `H${entryRow}`, entry.consumed ? "consumed" : "evidence");
+        styleFont(sheet, `H${entryRow}`, entry.consumed ? COLORS.black : COLORS.grey, {
+          bold: Boolean(entry.consumed),
+        });
+        setValue(sheet, `I${entryRow}`, (entry.source_locations ?? []).join("; ") || null);
+        styleFont(sheet, `I${entryRow}`, COLORS.grey);
+        maxWidths.set(2, Math.max(maxWidths.get(2) ?? 0, String(entry.display_label ?? "").length + 2));
+        maxWidths.set(3, Math.max(maxWidths.get(3) ?? 0, Math.min(42, ((entry.verbatim_labels ?? []).join(" / ")).length + 2)));
+      });
+      if (band.coverage) {
+        const gradeCounts = Object.entries(band.coverage.grade_counts ?? {})
+          .filter(([, count]) => Number(count) > 0)
+          .map(([grade, count]) => `${count} ${grade.replace("_", "-")}`)
+          .join(", ");
+        setValue(
+          sheet,
+          `B${band.coverageRow}`,
+          `Mapped ${band.coverage.mapped_concepts} of ${band.coverage.dictionary_concepts} dictionary concepts${gradeCounts ? ` | cells: ${gradeCounts}` : ""}`,
+        );
+        styleFont(sheet, `B${band.coverageRow}`, COLORS.grey);
+      }
+      globalMaxColumns = Math.max(globalMaxColumns, 8);
+    }
     for (const { table, metaRow, dataStartRow, maxColumns, authorityByCell } of sheetLayout.tableLayouts) {
       globalMaxColumns = Math.max(globalMaxColumns, maxColumns);
       const lastColumn = columnName(maxColumns + 1);
@@ -1811,7 +1898,27 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     // statement of what the block already shows. `brokerContributorCount`
     // remains the broker-anchor rule's own count; the sheet simply no longer
     // restates it.
-    setValue(sheet, `B${metricRow}`, metric.label);
+    // One exception to the bare label: an ATTRIBUTED line wears its house's
+    // name on the face. A single-source inclusion is legitimate exactly because
+    // it never claims to be consensus - the label is where that claim would
+    // otherwise be implied, so the label is where the attribution lives.
+    const election = (modelCase.broker_pack?.flex_elections ?? []).find(
+      (item) => item.metric_id === metricId,
+    );
+    const attributedHouse =
+      election?.basis === "attributed"
+        ? Object.keys(metric.brokers ?? {}).find(
+            (name) =>
+              (metric.brokers?.[name] ?? []).every(
+                (value) => value !== null && value !== undefined,
+              ),
+          ) ?? election.source_house_id
+        : null;
+    setValue(
+      sheet,
+      `B${metricRow}`,
+      attributedHouse ? `${metric.label} — ${attributedHouse} (attributed)` : metric.label,
+    );
     row += 1;
 
     const brokerRows = [];
@@ -11187,6 +11294,28 @@ async function main(packaging = null) {
     rowPlan,
     { brokerEvidence: brokerEvidenceProofSpec(compileBrokerEvidenceLayout(modelCase)) },
   );
+  // Declare the digest bands in the row map so the independent Python
+  // validator can locate every rendered digest cell and hold it to the case's
+  // own digest - the workbook side of the pack -> case -> workbook chain.
+  {
+    const digestLayout = compileBrokerEvidenceLayout(modelCase);
+    rowPlan.broker_digest_bands = digestLayout
+      ? digestLayout.sheets
+          .filter((sheet) => sheet.digestBand)
+          .map((sheet) => ({
+            sheet: sheet.name,
+            house_id: sheet.house.house_id,
+            house_name: sheet.house.house_name,
+            title_row: sheet.digestBand.titleRow,
+            header_row: sheet.digestBand.headerRow,
+            entries_start_row: sheet.digestBand.entriesStartRow,
+            coverage_row: sheet.digestBand.coverageRow,
+            period_labels: sheet.digestBand.periodLabels,
+            entries: sheet.digestBand.entries,
+            coverage: sheet.digestBand.coverage,
+          }))
+      : [];
+  }
   if (shadowComparison.status !== "PASS") {
     throw new Error(
       `Candidate semantic shadow comparison blocked: ${JSON.stringify(shadowComparison)}`,

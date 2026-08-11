@@ -1105,6 +1105,36 @@ def main() -> int:
             raise ValueError(f"flex_elections[{index}] requires a rationale.")
         if metric_id in elected_by_metric:
             raise ValueError(f"flex_elections[{index}] repeats metric_id {metric_id!r}.")
+        # Two admission routes. Consensus (three or more houses) pools the
+        # market's view; attributed (one or two) consumes a NAMED house's own
+        # series and renders wearing that name, because the danger of a single
+        # source was never that one analyst might be right - it was averaging
+        # one voice into consensus clothing. Attribution un-launders it, and
+        # the inclusion is the user's recorded call, never the run's.
+        basis = election.get("basis") or "consensus"
+        if basis not in {"consensus", "attributed"}:
+            raise ValueError(f"flex_elections[{index}] has unsupported basis {basis!r}.")
+        if basis == "attributed":
+            source_house_id = election.get("source_house_id")
+            if source_house_id not in documents_by_house:
+                raise ValueError(
+                    f"flex_elections[{index}] attributes {metric_id!r} to unknown house "
+                    f"{source_house_id!r}."
+                )
+            if election.get("confirmed_by_user") is not True:
+                raise ValueError(
+                    f"flex_elections[{index}]: an attributed inclusion is the user's call; "
+                    "record confirmed_by_user: true from the consolidated Stage-2 answer."
+                )
+            house_series = estimates[source_house_id].get(metric_id, [None, None, None])
+            if not all(
+                value is not None and math.isfinite(float(value)) for value in house_series
+            ):
+                raise ValueError(
+                    f"flex_elections[{index}]: house {source_house_id!r} does not supply "
+                    f"{metric_id!r} in all three forecast periods; an attributed row has no "
+                    "pool to substitute from."
+                )
         elected_by_metric[metric_id] = election
     for metric_id, declaration in metrics.items():
         if metric_id in TIER1_METRIC_IDS:
@@ -1132,12 +1162,110 @@ def main() -> int:
                 for value in estimates[house_id].get(metric_id, [None, None, None])
             )
         )
+        if (election.get("basis") or "consensus") == "attributed":
+            if supporting_houses >= 3:
+                raise ValueError(
+                    f"Flex metric {metric_id!r} is supported by {supporting_houses} houses; a "
+                    "genuine consensus exists, so elect it as consensus rather than narrowing "
+                    "it to one house's series."
+                )
+            continue
         if supporting_houses < 3:
             raise ValueError(
                 f"Flex metric {metric_id!r} ({election.get('concept')}) is supported by only "
                 f"{supporting_houses} house(s) across all three forecast periods; three compatible "
-                "houses are the minimum for a consumable consensus. It stays evidence."
+                "houses are the minimum for a consumable consensus. Elect it as an attributed "
+                "single-house line with the user's recorded confirmation, or it stays evidence."
             )
+
+    # ---------------------------------------------------------- election gauge
+    #
+    # Nothing important is silently dropped and nothing is silently adopted:
+    # every cash-flow leaf concept any house printed is weighed here, on the
+    # record. Three or more houses -> a consensus election exists (or should).
+    # One or two houses and material against the headline anchor -> a candidate
+    # for the user's single consolidated Stage-2 question, entering only as an
+    # attributed named-house line if confirmed. Small or structurally
+    # inadmissible -> parked, visibly, on the house tabs. The gauge is data in
+    # the pack, so the workbook can print the weighing and the attestation can
+    # hold it.
+    anchor_series = []
+    for anchor_id in ("adjusted_ebitda", "ebit"):
+        if anchor_id in metrics:
+            for period_index in range(3):
+                pooled = [
+                    estimates[house_id][anchor_id][period_index]
+                    for house_id in documents_by_house
+                    if estimates[house_id].get(anchor_id)
+                    and estimates[house_id][anchor_id][period_index] is not None
+                ]
+                if pooled:
+                    anchor_series.append(sum(pooled) / len(pooled))
+            if anchor_series:
+                break
+    anchor_scale = max((abs(value) for value in anchor_series), default=None)
+    MATERIALITY_FLOOR = 0.05
+    election_gauge = []
+    for metric_id in sorted(metrics):
+        election = elected_by_metric.get(metric_id)
+        # An elected metric is weighed under the concept its election declared -
+        # the shape gate already proved that concept legal - while an unelected
+        # metric is weighed under its own dictionary concept.
+        concept = (
+            election["concept"] if election is not None
+            else str(metric_id).partition("__")[0]
+        )
+        entry_meta = METRIC_BY_ID.get(concept) or {}
+        if concept in TIER1_METRIC_IDS or metric_id in TIER1_METRIC_IDS:
+            continue
+        if entry_meta.get("statement_family") != "cash_flow" or entry_meta.get("leaf") is not True:
+            continue
+        if concept in BANNED_TOTAL_IDS:
+            continue
+        supporting = [
+            house_id for house_id in documents_by_house
+            if all(
+                value is not None and math.isfinite(float(value))
+                for value in estimates[house_id].get(metric_id, [None, None, None])
+            )
+        ]
+        if not supporting:
+            continue
+        peak = max(
+            abs(float(value))
+            for house_id in supporting
+            for value in estimates[house_id][metric_id]
+        )
+        materiality = (peak / anchor_scale) if anchor_scale else None
+        overlap = entry_meta.get("overlap_group")
+        overlap_blocked = bool(overlap and overlap in core_overlap_groups)
+        electable = concept in FLEX_ELIGIBLE_IDS and not overlap_blocked
+        if election is not None:
+            bin_name = (
+                "elected_consensus"
+                if (election.get("basis") or "consensus") == "consensus"
+                else "included_attributed"
+            )
+        elif not electable:
+            bin_name = "parked_inadmissible"
+        elif len(supporting) >= 3:
+            bin_name = "eligible_consensus_unelected"
+        elif materiality is not None and materiality >= MATERIALITY_FLOOR:
+            bin_name = "candidate_attributed"
+        else:
+            bin_name = "parked_below_materiality"
+        election_gauge.append({
+            "metric_id": metric_id,
+            "concept": concept,
+            "display_label": entry_meta.get("display_label", metric_id),
+            "supporting_house_ids": sorted(supporting),
+            "supporting_house_count": len(supporting),
+            "peak_abs_value": peak,
+            "materiality_vs_anchor": materiality,
+            "materiality_floor": MATERIALITY_FLOOR,
+            **({"overlap_group": overlap} if overlap else {}),
+            "bin": bin_name,
+        })
 
     resolved_coverage, coverage_summary, resolved_derivations = validate_coverage(
         crosswalk,
@@ -1233,6 +1361,121 @@ def main() -> int:
             str(house["house_id"]),
         ),
     )
+    # ------------------------------------------------------- per-house digest
+    #
+    # The standardised face of everything a house published: every mapped
+    # metric, in dictionary order, with the broker's own row caption verbatim,
+    # the value per forecast period, the verification grade of the cells the
+    # value came from, and where on the page it lives. This is the auditability
+    # surface - a reader of a Bxx tab starts here and descends into the raw
+    # tables below it - so it is derived entirely from mapping receipts the
+    # verifiers already proved, and carries no number the pack cannot trace.
+    dictionary_rank = {
+        metric["id"]: index for index, metric in enumerate(METRIC_DICTIONARY["metrics"])
+    }
+    GRADE_RANK = {"native": 0, "dual_read": 1, "adjudicated": 2, "derived": 3}
+    derived_mapping_ids = {
+        mapping_id
+        for derivation in resolved_derivations
+        for mapping_id in derivation.get("mapping_ids", [])
+    } | {
+        derivation.get("mapping_id")
+        for derivation in resolved_derivations
+        if derivation.get("mapping_id")
+    }
+
+    def digest_order_key(metric_id: str) -> tuple:
+        concept, _, qualifier = str(metric_id).partition("__")
+        return (dictionary_rank.get(concept, len(dictionary_rank)), qualifier, metric_id)
+
+    def cell_grade(status: str | None) -> str:
+        text = str(status or "verified_native")
+        return {
+            "verified_native": "native",
+            "verified_dual_read": "dual_read",
+            "verified_adjudicated": "adjudicated",
+        }.get(text, "adjudicated")
+
+    def verbatim_row_label(table: dict, row_number: int) -> str | None:
+        try:
+            row = table["rows"][row_number - 1]
+        except (IndexError, TypeError):
+            return None
+        for cell in row:
+            value = cell.get("value")
+            if isinstance(value, str) and value.strip() and not NUMBER.match(value):
+                return value.strip()
+        return None
+
+    consumed_metric_ids = TIER1_METRIC_IDS | set(elected_by_metric)
+    house_digest_entries: dict[str, dict[str, dict]] = {house_id: {} for house_id in documents_by_house}
+    for receipt_entry in mapping_receipts:
+        house_id = receipt_entry["house_id"]
+        metric_id = receipt_entry["metric_id"]
+        entry = house_digest_entries[house_id].get(metric_id)
+        if entry is None:
+            concept = str(metric_id).partition("__")[0]
+            declaration = metrics.get(metric_id) or {}
+            entry = {
+                "metric_id": metric_id,
+                "concept": concept,
+                "display_label": METRIC_BY_ID.get(concept, {}).get(
+                    "display_label", declaration.get("label") or metric_id
+                ),
+                "verbatim_labels": [],
+                "unit_kind": declaration.get("unit_kind"),
+                "definition_id": declaration.get("definition_id"),
+                "consumed": concept in consumed_metric_ids or metric_id in consumed_metric_ids,
+                "values": [None, None, None],
+                "grades": [None, None, None],
+                "source_locations": [],
+            }
+            house_digest_entries[house_id][metric_id] = entry
+        period_index = int(receipt_entry["period_index"])
+        entry["values"][period_index] = receipt_entry["value"]
+        worst = "derived" if receipt_entry["mapping_id"] in derived_mapping_ids else "native"
+        for component in receipt_entry["components"]:
+            _, table = tables[component["table_id"]]
+            row_number = int(component["row"])
+            column_number = int(component["column"])
+            try:
+                cited = table["rows"][row_number - 1][column_number - 1]
+            except (IndexError, TypeError):
+                cited = {}
+            grade = cell_grade(cited.get("authority_status"))
+            if GRADE_RANK[grade] > GRADE_RANK[worst]:
+                worst = grade
+            label = verbatim_row_label(table, row_number)
+            if label and label not in entry["verbatim_labels"]:
+                entry["verbatim_labels"].append(label)
+            location = str(component.get("source_ref") or table.get("source_location") or "")
+            if location and location not in entry["source_locations"]:
+                entry["source_locations"].append(location)
+        entry["grades"][period_index] = worst
+    house_digests = {
+        house_id: [
+            entries[metric_id]
+            for metric_id in sorted(entries, key=digest_order_key)
+        ]
+        for house_id, entries in house_digest_entries.items()
+    }
+    for house in houses:
+        digest = house_digests.get(house["house_id"], [])
+        house["digest"] = digest
+        house["digest_coverage"] = {
+            "mapped_concepts": len({item["concept"] for item in digest}),
+            "dictionary_concepts": len(dictionary_rank),
+            "grade_counts": {
+                grade: sum(
+                    1
+                    for item in digest
+                    for cell in item["grades"]
+                    if cell == grade
+                )
+                for grade in GRADE_RANK
+            },
+        }
+
     broker_pack = {
         "schema_version": "broker-pack/1.0",
         "pack_kind": "broker_forecast_set",
@@ -1243,6 +1486,7 @@ def main() -> int:
         "forecast_periods": crosswalk["forecast_periods"],
         "metrics": metrics,
         "flex_elections": flex_elections,
+        "election_gauge": election_gauge,
         "houses": houses,
         "recommended_primary_house_id": ranked_primary[0]["house_id"] if ranked_primary else None,
         "eligibility_summary": {

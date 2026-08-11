@@ -1717,6 +1717,39 @@ function validateBrokerSourceTables(run, findings) {
       ),
     );
   }
+  // The digest is the audit face of each house tab, so it gets the raw-tables
+  // treatment: re-derive the projection from the pack itself and demand exact
+  // equality. A digest row that exists only in the model case is an invented
+  // number; a pack digest missing from the case is a silently narrowed one.
+  const packDigestHouses = (run.broker_pack?.houses ?? []).filter((house) =>
+    Array.isArray(house.digest),
+  );
+  if (packDigestHouses.length > 0) {
+    const expectedDigests = Object.fromEntries(
+      packDigestHouses.map((house) => [
+        house.house_id,
+        {
+          house_name: house.house_name,
+          digest: structuredClone(house.digest),
+          ...(house.digest_coverage
+            ? { digest_coverage: structuredClone(house.digest_coverage) }
+            : {}),
+        },
+      ]),
+    );
+    if (
+      hashValue(expectedDigests) !==
+      hashValue(run.model_case?.broker_pack?.house_digests ?? null)
+    ) {
+      findings.push(
+        finding(
+          "evidence.broker_digest.model_case_mismatch",
+          "BLOCK",
+          "The model case does not preserve the exact per-house standardised digests the broker pack proved.",
+        ),
+      );
+    }
+  }
   const receipt = run.broker_crosswalk_receipt ?? null;
   const modelMappings = run.model_case?.broker_pack?.source_mappings ?? null;
   if (

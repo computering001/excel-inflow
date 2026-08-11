@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.invalid/excel-inflow/broker-pack.schema.json",
-  "title": "Debt Overlay \u2014 required shape of a broker research set (stage 1 input, gated by node N0)",
-  "description": "THIS IS A REQUIREMENT, NOT A DESCRIPTION OF ANY BROKER'S OUTPUT FORMAT. Broker notes arrive as PDFs, spreadsheets and emails in as many layouts as there are houses; none of them will ever conform to this on its own. What this document states is the shape the model REQUIRES after extraction \u2014 the houses, the metrics, the three forecast years and the provenance that must survive the trip. An extractor or an adapter produces this; nothing downstream reads a raw note. Do not edit this contract to match whatever a particular house publishes.",
+  "title": "Debt Overlay — required shape of a broker research set (stage 1 input, gated by node N0)",
+  "description": "THIS IS A REQUIREMENT, NOT A DESCRIPTION OF ANY BROKER'S OUTPUT FORMAT. Broker notes arrive as PDFs, spreadsheets and emails in as many layouts as there are houses; none of them will ever conform to this on its own. What this document states is the shape the model REQUIRES after extraction — the houses, the metrics, the three forecast years and the provenance that must survive the trip. An extractor or an adapter produces this; nothing downstream reads a raw note. Do not edit this contract to match whatever a particular house publishes.",
   "x_contract_notes": {
     "why_three": "USER-FLOW-20260726.md stage 1 accepts 3-10 supplied houses so the evidence pack normally supports comparison and fallback. Eligibility is cell-derived after extraction: one complete primary-eligible house is enough to continue while other supplied houses may remain supplemental or reference-only. A quarantined or partial house contributes only finite verified cells and never invalidates another house. Ten is the operating cap because extraction and review cost scale with every additional source.",
     "authority": "The broker set is authoritative for the forecast anchor and consensus lines ONLY. Never for anything historic. Historic figures come from the filings.",
@@ -31,7 +31,7 @@
     "as_of": {
       "type": "string",
       "format": "date",
-      "description": "When this set was assembled. Unlike the debt export's as_of this is NOT gated against a period end \u2014 a broker set is forward-looking and its collection date is properly recent. It is required so that the stage-5 read can state how current the consensus is, and so that a pack reused on a rebuild months later is visibly stale."
+      "description": "When this set was assembled. Unlike the debt export's as_of this is NOT gated against a period end — a broker set is forward-looking and its collection date is properly recent. It is required so that the stage-5 read can state how current the consensus is, and so that a pack reused on a rebuild months later is visibly stale."
     },
     "source_label": {
       "type": "string",
@@ -41,7 +41,7 @@
     "reporting_currency": {
       "type": "string",
       "pattern": "^[A-Z]{3}$",
-      "description": "Currency of every currency-denominated estimate. Must equal the issuer's reporting currency \u2014 a house publishing in USD for a EUR reporter must be translated by the extractor, because the model has no per-house FX and would otherwise average across currencies."
+      "description": "Currency of every currency-denominated estimate. Must equal the issuer's reporting currency — a house publishing in USD for a EUR reporter must be translated by the extractor, because the model has no per-house FX and would otherwise average across currencies."
     },
     "units": {
       "enum": [
@@ -49,7 +49,7 @@
         "thousands",
         "millions"
       ],
-      "description": "Scale of every currency-denominated estimate. Must equal the case issuer's units. Ratio and percent metrics are unaffected \u2014 see metric.unit_kind."
+      "description": "Scale of every currency-denominated estimate. Must equal the case issuer's units. Ratio and percent metrics are unaffected — see metric.unit_kind."
     },
     "forecast_periods": {
       "type": "array",
@@ -63,7 +63,7 @@
     },
     "metrics": {
       "type": "object",
-      "description": "Catalogue of the metrics this pack carries, keyed by metric id. The key set is the vocabulary; a house's estimates may only use keys declared here. Required ids \u2014 read by scripts/lib/coverage.mjs: revenue, depreciation_and_amortisation, effective_tax_rate, capex, change_in_working_capital, dividends. Plus at least one of ebit / adjusted_ebitda. The rule selects exactly one headline anchor by period-specific broker breadth, uses D&A as the bridge driver and derives the other headline. EBIT and Adjusted EBITDA are never simultaneous independent inputs.",
+      "description": "Catalogue of the metrics this pack carries, keyed by metric id. The key set is the vocabulary; a house's estimates may only use keys declared here. Required ids — read by scripts/lib/coverage.mjs: revenue, depreciation_and_amortisation, effective_tax_rate, capex, change_in_working_capital, dividends. Plus at least one of ebit / adjusted_ebitda. The rule selects exactly one headline anchor by period-specific broker breadth, uses D&A as the bridge driver and derives the other headline. EBIT and Adjusted EBITDA are never simultaneous independent inputs.",
       "additionalProperties": {
         "$ref": "#/$defs/metricDeclaration"
       }
@@ -156,6 +156,85 @@
           "rationale": {
             "type": "string",
             "minLength": 1
+          },
+          "basis": {
+            "enum": [
+              "consensus",
+              "attributed"
+            ],
+            "description": "consensus: three or more houses under one definition, consumed as a pooled series. attributed: one or two houses; consumed as the named house's own series, rendered wearing the house's name so a single voice is never laundered into consensus clothing."
+          },
+          "source_house_id": {
+            "type": "string",
+            "description": "Required when basis is attributed: the house whose series the line consumes. That house must supply all three forecast periods - an attributed row has no pool to substitute from."
+          },
+          "confirmed_by_user": {
+            "type": "boolean",
+            "description": "Required true when basis is attributed: the inclusion is the user's call, recorded from the single consolidated Stage-2 question, never improvised by the run."
+          }
+        }
+      }
+    },
+    "election_gauge": {
+      "type": "array",
+      "description": "The on-the-record weighing of every cash-flow leaf concept any house printed: elected as consensus, included by name, candidate for the user's single question, or parked - with house counts and materiality against the headline anchor. Nothing silently dropped, nothing silently adopted.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "concept",
+          "display_label",
+          "supporting_house_ids",
+          "supporting_house_count",
+          "peak_abs_value",
+          "materiality_floor",
+          "bin"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "concept": {
+            "type": "string"
+          },
+          "display_label": {
+            "type": "string"
+          },
+          "supporting_house_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supporting_house_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "peak_abs_value": {
+            "type": "number"
+          },
+          "materiality_vs_anchor": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "materiality_floor": {
+            "type": "number"
+          },
+          "overlap_group": {
+            "type": "string"
+          },
+          "bin": {
+            "enum": [
+              "elected_consensus",
+              "included_attributed",
+              "candidate_attributed",
+              "eligible_consensus_unelected",
+              "parked_below_materiality",
+              "parked_inadmissible"
+            ]
           }
         }
       }
@@ -173,7 +252,7 @@
         "label": {
           "type": "string",
           "minLength": 1,
-          "description": "Display label \u2014 'Adj. EBITDA'. Required because model-case-v2 $defs/brokerMetric requires label and there is nowhere else to get one."
+          "description": "Display label — 'Adj. EBITDA'. Required because model-case-v2 $defs/brokerMetric requires label and there is nowhere else to get one."
         },
         "unit_kind": {
           "enum": [
@@ -305,12 +384,12 @@
         "house_id": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_]*$",
-          "description": "Normalised, stable key \u2014 'jpmorgan', 'bnp_exane'. Unique within the pack. The display name is what the model prints; this is what it keys on, so that 'J.P. Morgan' and 'JPMorgan' cannot become two contributors."
+          "description": "Normalised, stable key — 'jpmorgan', 'bnp_exane'. Unique within the pack. The display name is what the model prints; this is what it keys on, so that 'J.P. Morgan' and 'JPMorgan' cannot become two contributors."
         },
         "house_name": {
           "type": "string",
           "minLength": 1,
-          "description": "As printed \u2014 'J.P. Morgan'. Maps to the key of model-case-v2 brokerMetric.brokers."
+          "description": "As printed — 'J.P. Morgan'. Maps to the key of model-case-v2 brokerMetric.brokers."
         },
         "published_date": {
           "type": "string",
@@ -382,7 +461,7 @@
         },
         "estimates": {
           "type": "object",
-          "description": "Metric id to a three-element array aligned to forecast_periods. null means the house did not publish that year \u2014 it is NOT zero, and the anchor's contributor count treats a series of all nulls as no contribution. Every key must be declared in the pack's metrics catalogue.",
+          "description": "Metric id to a three-element array aligned to forecast_periods. null means the house did not publish that year — it is NOT zero, and the anchor's contributor count treats a series of all nulls as no contribution. Every key must be declared in the pack's metrics catalogue.",
           "additionalProperties": {
             "type": "array",
             "minItems": 3,
@@ -412,6 +491,128 @@
           "uniqueItems": true,
           "items": {
             "type": "string"
+          }
+        },
+        "digest": {
+          "type": "array",
+          "description": "The standardised face of everything this house published: every mapped metric in dictionary order, the broker's verbatim caption, per-period values, per-value verification grade and source locations. Derived entirely from proven mapping receipts; carries no number the pack cannot trace.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metric_id",
+              "concept",
+              "display_label",
+              "verbatim_labels",
+              "consumed",
+              "values",
+              "grades",
+              "source_locations"
+            ],
+            "properties": {
+              "metric_id": {
+                "type": "string"
+              },
+              "concept": {
+                "type": "string"
+              },
+              "display_label": {
+                "type": "string"
+              },
+              "verbatim_labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unit_kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "definition_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "consumed": {
+                "type": "boolean"
+              },
+              "values": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "grades": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "enum": [
+                    "native",
+                    "dual_read",
+                    "adjudicated",
+                    "derived",
+                    null
+                  ]
+                }
+              },
+              "source_locations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "digest_coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mapped_concepts",
+            "dictionary_concepts",
+            "grade_counts"
+          ],
+          "properties": {
+            "mapped_concepts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "dictionary_concepts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "grade_counts": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "native": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "dual_read": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "adjudicated": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "derived": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
           }
         }
       }

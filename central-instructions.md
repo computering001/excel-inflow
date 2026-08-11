@@ -520,6 +520,18 @@ It re-derives the workbook hash and the file's own sheet inventory from the
 bytes and compares them to the attestation; a stale, swapped or regenerated
 file fails in one line without opening Excel.
 
+### The single-house inclusion question
+
+When the compiled pack's `election_gauge` carries `candidate_attributed`
+entries — cash-flow line items one or two houses model, at or above the
+materiality floor against the headline anchor — Stage 2 asks about ALL of them
+in one consolidated question, naming each concept, its house, and the computed
+ratio. The user's answer is recorded as `flex_elections` entries with
+`basis: attributed`, `source_house_id` and `confirmed_by_user: true`, and the
+pack is recompiled through the normal resume path. No candidates means no
+question. Never include a single-house line without the recorded answer, and
+never ask item by item — one run, one question.
+
 ### Paused runs and side deliverables
 
 A run that is waiting for an answer still owns its case, its evidence and its

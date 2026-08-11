@@ -865,6 +865,23 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   evidence.model_case.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
   );
+  // The standardised digest rides the same seam as the raw tables: projected
+  // deterministically from the pack, preserved exactly, re-derived by the
+  // evidence validator rather than trusted from here.
+  const houseDigests = {};
+  for (const [houseId, house] of packHouses) {
+    if (!Array.isArray(house.digest)) continue;
+    houseDigests[houseId] = {
+      house_name: house.house_name,
+      digest: structuredClone(house.digest),
+      ...(house.digest_coverage
+        ? { digest_coverage: structuredClone(house.digest_coverage) }
+        : {}),
+    };
+  }
+  if (Object.keys(houseDigests).length > 0) {
+    evidence.model_case.broker_pack.house_digests = houseDigests;
+  }
   return {
     extraction_bundle_sha256: extraction.sha256,
     source_tables_sha256: sourceTables.sha256,

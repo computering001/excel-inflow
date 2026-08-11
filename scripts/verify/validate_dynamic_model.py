@@ -2595,6 +2595,124 @@ def main(argv: List[str]) -> int:
         )
     )
 
+    # ------------------------------------------------------ broker-digest-parity
+    #
+    # The digest band is the audit face of each broker tab, so the workbook is
+    # held to it cell by cell, independently of the emitter that wrote it. The
+    # chain is: the evidence-run validator pins the case's house_digests to the
+    # pack's own proven digests; the build derives the band geometry from the
+    # case and declares it in the row map; this check re-reads the rendered
+    # sheet and demands the declared band verbatim - title, headers, every
+    # label, caption, value, grade, use marker, source and the coverage line.
+    # A digest cell nobody declared, or a declared entry nobody rendered, is a
+    # broken chain, not a cosmetic defect.
+    digest_errors = []
+    digest_cells_checked = 0
+    digest_bands = row_plan.get("broker_digest_bands") or []
+    for band in digest_bands:
+        try:
+            band_sheet = workbook.sheet(band["sheet"])
+        except Exception:
+            digest_errors.append({"sheet": band.get("sheet"), "id": "sheet_missing"})
+            continue
+
+        def band_value(address):
+            return band_sheet.value(address)
+
+        def expect(address, expected, kind):
+            nonlocal digest_cells_checked
+            digest_cells_checked += 1
+            actual = band_value(address)
+            if isinstance(expected, float) or isinstance(expected, int):
+                ok = (
+                    actual is not None
+                    and actual != ""
+                    and abs(numeric(actual) - float(expected)) <= 1e-9
+                )
+            else:
+                normalised_actual = None if actual in (None, "") else str(actual)
+                ok = normalised_actual == expected
+            if not ok:
+                digest_errors.append({
+                    "sheet": band["sheet"],
+                    "address": address,
+                    "kind": kind,
+                    "expected": expected,
+                    "actual": actual,
+                })
+
+        expect("B%s" % band["title_row"], "House metrics — standardised", "title")
+        period_labels = [str(label) for label in band.get("period_labels") or []]
+        headers = ["Metric", "Broker caption"] + [
+            period_labels[index] if index < len(period_labels) else "FY%d" % (index + 1)
+            for index in range(3)
+        ] + ["Verification", "Use", "Source"]
+        for offset, header in enumerate(headers):
+            expect("%s%s" % (chr(ord("B") + offset), band["header_row"]), header, "header")
+        for index, entry in enumerate(band.get("entries") or []):
+            entry_row = band["entries_start_row"] + index
+            expect("B%s" % entry_row, entry["display_label"], "label")
+            caption = " / ".join(entry.get("verbatim_labels") or []) or None
+            expect("C%s" % entry_row, caption, "caption")
+            for period_index, cell in enumerate(entry.get("values") or []):
+                address = "%s%s" % (chr(ord("D") + period_index), entry_row)
+                if cell is None:
+                    expect(address, None, "value")
+                else:
+                    expect(address, float(cell), "value")
+            grades = []
+            for grade in entry.get("grades") or []:
+                if grade and grade not in grades:
+                    grades.append(grade)
+            expect("G%s" % entry_row, " / ".join(grades) or None, "grade")
+            expect("H%s" % entry_row, "consumed" if entry.get("consumed") else "evidence", "use")
+            sources = "; ".join(entry.get("source_locations") or []) or None
+            expect("I%s" % entry_row, sources, "source")
+        coverage = band.get("coverage")
+        if coverage:
+            coverage_text = str(band_value("B%s" % band["coverage_row"]) or "")
+            digest_cells_checked += 1
+            if not coverage_text.startswith("Mapped %s of %s" % (
+                coverage.get("mapped_concepts"), coverage.get("dictionary_concepts"),
+            )):
+                digest_errors.append({
+                    "sheet": band["sheet"],
+                    "address": "B%s" % band["coverage_row"],
+                    "kind": "coverage",
+                    "actual": coverage_text[:120],
+                })
+        # Nothing undeclared inside the band: the row above the first table is
+        # the band's own boundary, so an extra digest-looking row would have to
+        # displace the coverage line or the blank after it.
+        digest_cells_checked += 1
+        boundary = band_value("B%s" % (band["coverage_row"] + 1))
+        if boundary not in (None, ""):
+            digest_errors.append({
+                "sheet": band["sheet"],
+                "address": "B%s" % (band["coverage_row"] + 1),
+                "kind": "undeclared_row",
+                "actual": str(boundary)[:120],
+            })
+    checks.append(
+        record(
+            "broker-digest-parity",
+            len(digest_errors) == 0,
+            (
+                "Every declared broker digest band renders verbatim - %d cells held to "
+                "the case's proven digests across %d house tab(s)."
+                % (digest_cells_checked, len(digest_bands))
+            )
+            if digest_bands
+            else "No broker digest bands are declared for this workbook.",
+            {
+                "bands": len(digest_bands),
+                "cells_checked": digest_cells_checked,
+                "errors": digest_errors[:20],
+            },
+            violations=len(digest_errors),
+        )
+    )
+
     # ---------------------------------------------------- liquidity-certification
     liquidity_mechanic_errors = []
     permitted_capacity_shortfalls = []
