@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { cashBucketTreatmentDisplayLabel } from "../lib/row_plan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = path.resolve(HERE, "..");
@@ -97,16 +98,60 @@ run(python, [path.join(HERE, "run_finance_proof_mutations.py"), derivedCase, wor
 const finance = JSON.parse(fs.readFileSync(financeReport, "utf8"));
 const mutation = JSON.parse(fs.readFileSync(path.join(mutations, "finance-proof-mutations.json"), "utf8"));
 const linkedMutation = mutation.mutations.find((item) => item.id === "linked-debt-cash-bucket");
+const rowMap = JSON.parse(fs.readFileSync(`${workbook}.row-map.json`, "utf8"));
+const plan = JSON.parse(fs.readFileSync(`${workbook}.plan.json`, "utf8"));
+const linkedBucket = rowMap.cash_buckets.find(
+  (item) => item.forecast_treatment === "linked_debt_addback",
+);
+const treatmentCell = linkedBucket
+  ? plan.workbook.sheets[0].cells[`C${linkedBucket.balance_row}`]
+  : null;
+const displayLabelStatus =
+  linkedBucket?.forecast_treatment_display_label === "Debt add-back" &&
+  treatmentCell?.v === "Debt add-back"
+    ? "PASS"
+    : "FAIL";
+const displayContract = {
+  balancing: "Balancing",
+  hardcode: "Hardcoded",
+  flat: "Carry forward",
+  linked_debt_addback: "Debt add-back",
+};
+const knownDisplayLabelsPass = Object.entries(displayContract).every(
+  ([treatment, expected]) =>
+    cashBucketTreatmentDisplayLabel(treatment) === expected,
+);
+let unknownDisplayLabelBlocked = false;
+try {
+  cashBucketTreatmentDisplayLabel("future_unregistered_treatment");
+} catch (error) {
+  unknownDisplayLabelBlocked = /no declared display label/.test(
+    String(error?.message ?? error),
+  );
+}
+const displayContractStatus =
+  knownDisplayLabelsPass && unknownDisplayLabelBlocked ? "PASS" : "FAIL";
 const report = {
   schema_version: "linked-debt-addback-proof-test/1.0",
-  status: finance.status === "PASS" && mutation.status === "PASS" && linkedMutation?.status === "PASS"
-    ? "PASS" : "FAIL",
+  status:
+    finance.status === "PASS" &&
+    mutation.status === "PASS" &&
+    linkedMutation?.status === "PASS" &&
+    displayLabelStatus === "PASS" &&
+    displayContractStatus === "PASS"
+      ? "PASS"
+      : "FAIL",
   linked_instrument_id: linked.instrument_id,
   expected_fy1_ending_balance: 0,
   finance_status: finance.status,
   finance_violations: finance.summary?.violations ?? null,
   mutation_status: mutation.status,
   linked_mutation_status: linkedMutation?.status ?? "MISSING",
+  display_label_status: displayLabelStatus,
+  display_contract_status: displayContractStatus,
+  unknown_display_treatment_blocked: unknownDisplayLabelBlocked,
+  semantic_treatment: linkedBucket?.forecast_treatment ?? null,
+  rendered_treatment_label: treatmentCell?.v ?? null,
   work_folder: work,
 };
 console.log(JSON.stringify(report, null, 2));

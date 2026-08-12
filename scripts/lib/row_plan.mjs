@@ -3045,6 +3045,31 @@ export function reportedNetDebtBasisStatus(modelCase) {
   return "not_disclosed";
 }
 
+const CASH_BUCKET_TREATMENT_DISPLAY_LABELS = Object.freeze({
+  balancing: "Balancing",
+  hardcode: "Hardcoded",
+  flat: "Carry forward",
+  linked_debt_addback: "Debt add-back",
+});
+
+/**
+ * Keep machine treatments out of the workbook face.
+ *
+ * The semantic value remains on `forecast_treatment`; this is only the short,
+ * analyst-facing label that the fixed term column can render without clipping.
+ * Deliberately fail closed when a future treatment has no declared display
+ * contract rather than leaking another snake-case enum into Excel.
+ */
+export function cashBucketTreatmentDisplayLabel(treatment) {
+  const label = CASH_BUCKET_TREATMENT_DISPLAY_LABELS[treatment];
+  if (!label) {
+    throw new Error(
+      `Cash-bucket treatment ${JSON.stringify(treatment)} has no declared display label.`,
+    );
+  }
+  return label;
+}
+
 /**
  * THE REFERENCE RATES THE FORECAST ACTUALLY PRICES OFF.
  *
@@ -3560,6 +3585,9 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     bucket_id: bucket.bucket_id,
     label: bucket.label,
     forecast_treatment: bucket.forecast_treatment,
+    forecast_treatment_display_label: cashBucketTreatmentDisplayLabel(
+      bucket.forecast_treatment,
+    ),
     included_in_cash_flow_cash:
       bucket.included_in_cash_flow_cash !== false,
     linked_instrument_ids: [...(bucket.linked_instrument_ids ?? [])],

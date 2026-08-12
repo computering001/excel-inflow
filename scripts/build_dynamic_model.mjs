@@ -4922,7 +4922,11 @@ function configureOperatingModel(
   }
   collectHeadlines(RANK_SECTION.DEBT_SCHEDULE, debtRows);
   for (const bucket of cashBucketPlans) {
-    setValue(sheet, `C${bucket.balance_row}`, bucket.forecast_treatment);
+    setValue(
+      sheet,
+      `C${bucket.balance_row}`,
+      bucket.forecast_treatment_display_label,
+    );
     setValue(
       sheet,
       `D${bucket.balance_row}`,

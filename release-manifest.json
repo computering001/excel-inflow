@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v3.3.0",
+  "releaseName": "Excel Inflow v3.3.1",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "3.3.0",
+  "skillVersion": "3.3.1",
   "templateVersion": "4.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T14:28:12.326Z",
+  "generatedAt": "2026-08-12T16:33:37.532Z",
   "centralInstructionsWords": 6009,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "13558ff19ad573dad33f6271f794e403eee8cb694cdb314a278a79872afc29bb",
+    "currentClosureSha256": "b245adfb763a163c7d1823617ed8cd9275fbc787745465451e12959b1e219e15",
     "closureFileCount": 176,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -391,16 +391,16 @@
       "candidates": [
         {
           "candidate": "python3",
-          "version": "3.9.6",
+          "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": "1.26.5",
-            "PIL": null,
-            "numpy": null,
-            "jsonschema": "IMPORT_FAILED: ModuleNotFoundError",
-            "pdfplumber": null,
-            "pypdf": "6.12.1",
-            "reportlab": null
+            "fitz": null,
+            "PIL": "12.2.0",
+            "numpy": "2.3.5",
+            "jsonschema": null,
+            "pdfplumber": "0.11.9",
+            "pypdf": "6.10.0",
+            "reportlab": "4.4.9"
           },
           "usable": true,
           "reason": "selected"
@@ -1641,8 +1641,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "c5052365a2c036088f8bffd0373c83c85a9dba66a71e6288b6f5b2c8f0dddba6",
-      "bytes": 499047,
+      "sha256": "03b3a9e84f92eae38beb3d7b4759c881ebee88d648ae769a4523174e9463b14c",
+      "bytes": 499086,
       "words": null
     },
     {
@@ -2037,8 +2037,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "1c319130972160dd2d79a05441e31380f953d6745b8a43088b1d24e56af94fb4",
-      "bytes": 150062,
+      "sha256": "3e91410892f4123e6e3cd4139b6ec5505b0cfb17e44bf4049595af49c33f33c3",
+      "bytes": 151006,
       "words": null
     },
     {
