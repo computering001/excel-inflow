@@ -2020,6 +2020,19 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   for (const entry of behaviorMap) {
     const row = rowById.get(entry.row_id);
     if (!row) continue;
+    // A live formula parent that SUMS the row proves the capture by formula
+    // membership — the strongest certificate the contract accepts, and the
+    // only one that holds across sections.
+    const formulaParent = rowById.get(parentOfRow.get(row.row_id));
+    if (
+      formulaParent &&
+      !capturedIds.has(formulaParent.row_id) &&
+      (formulaParent.calculation?.refs ?? []).includes(row.row_id)
+    ) {
+      row.forecast_capture_parent_id = formulaParent.row_id;
+      row.forecast_capture_mode = "formula_membership";
+      continue;
+    }
     let captor = rowById.get(row.forecast_capture_parent_id);
     const seen = new Set();
     while (captor && capturedIds.has(captor.row_id) && !seen.has(captor.row_id)) {
