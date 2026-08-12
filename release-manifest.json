@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v3.3.1",
+  "releaseName": "Excel Inflow v3.3.2",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "3.3.1",
+  "skillVersion": "3.3.2",
   "templateVersion": "4.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T16:33:37.532Z",
+  "generatedAt": "2026-08-12T17:23:26.500Z",
   "centralInstructionsWords": 6009,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "b245adfb763a163c7d1823617ed8cd9275fbc787745465451e12959b1e219e15",
+    "currentClosureSha256": "bb302c0fd561e4c9033a91063e671bb7dedf1873361cf589586d8c28eb21dc51",
     "closureFileCount": 176,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -394,13 +394,13 @@
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": null,
-            "PIL": "12.2.0",
-            "numpy": "2.3.5",
+            "fitz": "1.26.7",
+            "PIL": "11.3.0",
+            "numpy": "2.5.2",
             "jsonschema": null,
-            "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
-            "reportlab": "4.4.9"
+            "pdfplumber": null,
+            "pypdf": null,
+            "reportlab": null
           },
           "usable": true,
           "reason": "selected"
@@ -1188,7 +1188,7 @@
         "status": "PASS",
         "case_sha256": "3139009275afd4bcefc83b4462e5c8ad6e9cd4c2d027faf390b532f0db4301cf",
         "plan_sha256": "0203a5e7b6bf222c8bd2c34fa55f1f0a6aaa29843fced4ba3ec1988eeed8310a",
-        "workbook_sha256": "8fb8dd63fcb1042eece6dffdb097b5ec55307e5b05c0e2a3e9be4e987ed62aa6",
+        "workbook_sha256": "43c24922eff9df571d05c9a54781fa3de30a3ede1216129a1d75747b5d572c2d",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
@@ -1197,7 +1197,7 @@
       "status": "PASS",
       "case_sha256": "3139009275afd4bcefc83b4462e5c8ad6e9cd4c2d027faf390b532f0db4301cf",
       "plan_sha256": "0203a5e7b6bf222c8bd2c34fa55f1f0a6aaa29843fced4ba3ec1988eeed8310a",
-      "workbook_sha256": "8fb8dd63fcb1042eece6dffdb097b5ec55307e5b05c0e2a3e9be4e987ed62aa6",
+      "workbook_sha256": "43c24922eff9df571d05c9a54781fa3de30a3ede1216129a1d75747b5d572c2d",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1971,8 +1971,8 @@
     },
     {
       "path": "scripts/lib/live_delivery_attestation.mjs",
-      "sha256": "4e5d2c265ebbd4ec8fac6021860988b1640b1ac1d0b4fa69b3d6fb64b3713c44",
-      "bytes": 21490,
+      "sha256": "6c2f9f23ff9c6101d7eb5c183b167e946096b2ed67f0fa4cd3f28b4536d71dee",
+      "bytes": 23952,
       "words": null
     },
     {
@@ -2049,8 +2049,8 @@
     },
     {
       "path": "scripts/lib/run_store.mjs",
-      "sha256": "65986e06a24f37c36cec3c32c107433a822f0e58851332d3172cf742ed65ee08",
-      "bytes": 8489,
+      "sha256": "a8e588e030c5183b78b56cabc2e444231ee2ea0943cf66f9b7aea21bbc8d11ba",
+      "bytes": 9239,
       "words": null
     },
     {
@@ -2097,8 +2097,8 @@
     },
     {
       "path": "scripts/orchestrate_release.mjs",
-      "sha256": "7423facc1a13e2630d8689dce6afc08fe379d633fec69bc98d715faf028338dd",
-      "bytes": 44108,
+      "sha256": "064d80265e0dd0d6b27cc488ecdacd6106c47fc1437e577b80f9ac42665bafe5",
+      "bytes": 44140,
       "words": null
     },
     {

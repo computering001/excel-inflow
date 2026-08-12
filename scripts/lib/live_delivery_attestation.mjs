@@ -11,7 +11,13 @@ import {
   standardisedDesignContract,
   standardisedProfile,
 } from "./design_contract.mjs";
-import { canonicalise, hashFile, hashValue } from "./run_store.mjs";
+import {
+  canonicalPortablePaths,
+  canonicalise,
+  comparePortablePaths,
+  hashFile,
+  hashValue,
+} from "./run_store.mjs";
 import { FLOW_CONTROLLER_VERSION, verifyStageReceipt } from "./flow_runtime.mjs";
 
 export const LIVE_DELIVERY_ATTESTATION_SCHEMA = "live-delivery-attestation/1.0";
@@ -54,12 +60,50 @@ function isInside(candidate, root) {
 
 async function relativeFiles(root, current = root) {
   const entries = [];
-  for (const item of (await fs.readdir(current, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const item of (await fs.readdir(current, { withFileTypes: true })).sort((a, b) => comparePortablePaths(a.name, b.name))) {
     const target = path.join(current, item.name);
     if (item.isDirectory()) entries.push(...await relativeFiles(root, target));
     else if (item.isFile()) entries.push(path.relative(root, target).split(path.sep).join("/"));
   }
   return entries;
+}
+
+function isPortableRelativePath(value) {
+  if (typeof value !== "string" || value.length === 0 || value.includes("\0") || value.includes("\\")) return false;
+  if (path.posix.isAbsolute(value) || value === "." || value === "..") return false;
+  return path.posix.normalize(value) === value && !value.startsWith("../");
+}
+
+/** Exact, locale-independent closure between a recursive directory inventory
+ * and the paths declared by its publication manifest. Order is deliberately
+ * non-authoritative; membership, portable spelling and uniqueness are exact. */
+export function publicationInventoryClosure(actualFiles, manifestEntries) {
+  const actual = [...(actualFiles ?? [])];
+  const declared = [...(manifestEntries ?? [])].map((entry) => entry?.path);
+  const invalid_actual_paths = actual.filter((value) => !isPortableRelativePath(value));
+  const invalid_manifest_paths = declared.filter((value) => !isPortableRelativePath(value));
+  const duplicate_actual_paths = canonicalPortablePaths(
+    actual.filter((value, index) => actual.indexOf(value) !== index),
+  ).filter((value, index, values) => index === 0 || value !== values[index - 1]);
+  const duplicate_manifest_paths = canonicalPortablePaths(
+    declared.filter((value, index) => declared.indexOf(value) !== index),
+  ).filter((value, index, values) => index === 0 || value !== values[index - 1]);
+  const actual_paths = canonicalPortablePaths(actual);
+  const manifest_paths = canonicalPortablePaths(declared);
+  const ok = invalid_actual_paths.length === 0
+    && invalid_manifest_paths.length === 0
+    && duplicate_actual_paths.length === 0
+    && duplicate_manifest_paths.length === 0
+    && JSON.stringify(actual_paths) === JSON.stringify(manifest_paths);
+  return {
+    ok,
+    actual_paths,
+    manifest_paths,
+    invalid_actual_paths: canonicalPortablePaths(invalid_actual_paths),
+    invalid_manifest_paths: canonicalPortablePaths(invalid_manifest_paths),
+    duplicate_actual_paths,
+    duplicate_manifest_paths,
+  };
 }
 
 function decodeXml(value) {
@@ -327,10 +371,18 @@ export async function compileLiveDeliveryAttestation({
     } catch (error) {
       violations.push({ code: `publication.${label}_directory`, detail: error.message });
     }
+    const inventory = publicationInventoryClosure(actualFiles, manifestEntries);
     invariant(
-      hashValue(actualFiles) === hashValue((manifestEntries ?? []).map((entry) => entry.path).sort()),
+      inventory.ok,
       `publication.${label}_completeness`,
-      `${label} file manifest does not exactly cover the published directory.`,
+      `${label} file manifest does not exactly cover the published directory: ${JSON.stringify({
+        invalid_actual_paths: inventory.invalid_actual_paths,
+        invalid_manifest_paths: inventory.invalid_manifest_paths,
+        duplicate_actual_paths: inventory.duplicate_actual_paths,
+        duplicate_manifest_paths: inventory.duplicate_manifest_paths,
+        actual_count: inventory.actual_paths.length,
+        manifest_count: inventory.manifest_paths.length,
+      })}.`,
       violations,
     );
     for (const entry of manifestEntries ?? []) {

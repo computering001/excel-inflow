@@ -47,6 +47,26 @@ export function hashValue(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
+/**
+ * Compare portable artifact paths by their UTF-8 bytes.
+ *
+ * `localeCompare()` is intentionally forbidden at persisted inventory
+ * boundaries: its ordering varies with the host locale and ICU version. A
+ * publication manifest and a recursive directory walk must therefore share
+ * this locale-independent order (or compare as canonical sets) rather than
+ * inheriting the order of the machine that happened to create them.
+ */
+export function comparePortablePaths(left, right) {
+  return Buffer.compare(
+    Buffer.from(String(left ?? ""), "utf8"),
+    Buffer.from(String(right ?? ""), "utf8"),
+  );
+}
+
+export function canonicalPortablePaths(values) {
+  return [...(values ?? [])].map((value) => String(value)).sort(comparePortablePaths);
+}
+
 export async function hashFile(filePath) {
   const hash = createHash("sha256");
   await new Promise((resolve, reject) => {

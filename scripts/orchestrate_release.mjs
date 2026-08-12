@@ -22,6 +22,7 @@ import {
 import { runReleaseN0N9 } from "./lib/release_nodes.mjs";
 import {
   canonicalJson,
+  comparePortablePaths,
   hashDirectory,
   hashFile,
   hashFiles,
@@ -354,7 +355,7 @@ async function atomicReplaceDirectory(source, target) {
 
 async function fileManifest(root, base = root) {
   const entries = [];
-  for (const item of (await fs.readdir(root, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const item of (await fs.readdir(root, { withFileTypes: true })).sort((a, b) => comparePortablePaths(a.name, b.name))) {
     const target = path.join(root, item.name);
     if (item.isDirectory()) entries.push(...await fileManifest(target, base));
     else if (item.isFile()) {
