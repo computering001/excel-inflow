@@ -5,7 +5,7 @@
   "skillVersion": "3.3.2",
   "templateVersion": "4.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T20:44:03.031Z",
+  "generatedAt": "2026-08-12T21:02:29.279Z",
   "centralInstructionsWords": 6110,
   "profile": "assets/deployment-profile.json",
   "certification": {
@@ -1300,18 +1300,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "06f3079b7998628955bebdd09acc31a6ca6dccb4af6798f25f66ce12bfc978a0",
-        "plan_sha256": "aa5a8e1fef3dc1eeb1b1d7adf9a435669469162161c53e36e20c51867151aee2",
-        "workbook_sha256": "5fb1e37b7de6251d7e1982947403ba0207af2c3c0ddf3cbcd0afbf6aa9fff469",
+        "case_sha256": "f4bfdd5b8548e6dc955336d193493e76d7bff5e3a8fe349cc5e9d29831dec73a",
+        "plan_sha256": "0d62478d21739ba0dfe9a6e1857c7197b73d7f5ccad701c28fc70b8655cebac5",
+        "workbook_sha256": "4e213cfa0a2be60e5506e0391fde7b3a0884d804524e0b101f85cc92df8a1633",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "06f3079b7998628955bebdd09acc31a6ca6dccb4af6798f25f66ce12bfc978a0",
-      "plan_sha256": "aa5a8e1fef3dc1eeb1b1d7adf9a435669469162161c53e36e20c51867151aee2",
-      "workbook_sha256": "5fb1e37b7de6251d7e1982947403ba0207af2c3c0ddf3cbcd0afbf6aa9fff469",
+      "case_sha256": "f4bfdd5b8548e6dc955336d193493e76d7bff5e3a8fe349cc5e9d29831dec73a",
+      "plan_sha256": "0d62478d21739ba0dfe9a6e1857c7197b73d7f5ccad701c28fc70b8655cebac5",
+      "workbook_sha256": "4e213cfa0a2be60e5506e0391fde7b3a0884d804524e0b101f85cc92df8a1633",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
