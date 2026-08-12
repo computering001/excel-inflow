@@ -132,7 +132,12 @@ ordinary end-user invocation. After Stage 1 is visible, intake and later stages
 may perform their declared checks and persist their normal receipts.
 
 Begin with one compact request for the company name, the FactSet debt export
-taken at the last fiscal year end, and broker research from 3–10 houses. A prior
+taken at the last fiscal year end, and broker research from 3–10 houses. Where
+the runtime carries a filings library or public-filings access, AUTO-PULL the
+last three full-year filings for the resolved issuer and present what was
+pulled on the intake receipt for confirmation; user-supplied filings always
+take precedence, and a company whose filings cannot be pulled or supplied
+blocks at intake rather than proceeding on fragments. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year
 end, reporting currency, units and period range from the filings; never ask the
 user to confirm them. For autonomous testing, use only UK- or Irish-listed
@@ -175,6 +180,20 @@ do not handcraft hashes or treat normalized JSON as proof of the original file.
 
 Restated figures replace superseded comparatives only when the filing clearly states the restated basis. Preserve predecessor history and calendarise only with an explicit bridge. Never splice differently scoped periods without a visible reconciliation.
 
+At the broker checkpoint, render the receipt screen and attach a broker
+preview built from the SEALED pack only — the per-house digest bands and the
+consensus faces, exactly the surface the Brokers tab will print — so the user
+confirms what was read before anything consumes it. The preview is generated
+from the pack artifact; it is never a hand-typed table.
+
+Decisions are collected on native question cards: the ASCII screen is the
+receipt, the cards are the instrument. One checkpoint's cards form one
+contiguous round (batches of at most four, two to six options each, the
+default marked in its label). "Skip" records the marked default as a decision.
+Checkpoint confirmations are cards too. Every card answer lands in
+`case-source.answers` under its stable question id; the compiler refuses a
+declaration pointing at an answer that was never recorded.
+
 Ask at most once and at most five targeted questions after deterministic pruning. Ask only for material facts that change debt, liquidity, interest, leverage or acquisition outputs and cannot be resolved from supplied evidence. Typical questions cover an unreconciled debt residual, unknown fixed/floating terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease mode, refinancing treatment or transaction timing. If more than five survive, say the inputs appear incomplete and request a corrected pack rather than presenting a questionnaire.
 
 The visible run has exactly five labelled stages:
@@ -214,7 +233,11 @@ change restarts rendering and visual checks inside stage 4; delivery wording
 alone restarts stage 5. Internal graph hashes continue to reuse unaffected work
 inside the selected stage.
 
-After answers, rebuild from the normalised case. Do not patch a workbook. Before delivery, give a concise read of the selected profile, broker anchor, opening debt/cash reconciliation, forecast leverage direction, liquidity headroom and any remaining explicit limitation.
+After answers, record them in `case-source.answers` and recompile; the model
+case is regenerated, never edited. Do not patch a workbook. Before delivery,
+give a concise read of the selected profile, broker anchor, opening debt/cash
+reconciliation, forecast leverage direction, liquidity headroom and any
+remaining explicit limitation.
 
 ### Autonomous public-company test route
 
@@ -405,16 +428,24 @@ python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook
 
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
 
-The v3 case compiler ships DORMANT: the five-stage flow above remains the only
-production path and never calls it. It exists so the v3.0.0 cutover lands on an
-already-installed, already-smoked surface. A case-source (declarations only —
-`assets/case-source.schema.json` cannot express values or formula text) plus the
-sealed evidence lanes compile into a model case, or into a complete findings
-report; there is no partial success.
+The model case is COMPILED, never written. Stage 3 authors exactly one
+artifact: `case-source.json` under `assets/case-source.schema.json` —
+declarations only; the schema cannot express economic values or formula text,
+so transcription mistakes are structurally unwritable. The compiler projects
+every fact from the sealed evidence lanes and mints every rule through the
+doctrine libraries, then reports ALL findings at once or emits the case:
 
 ```
 node scripts/compile_case.mjs <case-source.json> <evidence.json> --out <model-case.json>
 ```
+
+There is no partial success and no second repair verb: a finding is fixed by
+amending the named declaration or answering the named question, then
+recompiling. Point-editing `model-case.json` is a doctrine violation and trips
+the stage-carrier hash check — the build refuses a case whose bytes are not
+the compiler's. A clean compile passes silently through the CASE COMPILED
+screen; a dirty one stops once at the COMPILE FINDINGS screen with the
+complete list, nothing serial.
 
 ## Validation and certification
 Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.

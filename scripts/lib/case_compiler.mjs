@@ -2254,6 +2254,64 @@ export function compileCase(caseSource, evidence = {}) {
   }
   Object.assign(modelCase, compilePolicies(caseSource, lanes, report));
 
+  // Answer completeness (the card-round gate's compiler half): every
+  // question id a declaration points at must have a recorded answer, and a
+  // recorded answer nothing points at is flagged — an answer the compiler
+  // silently ignores is a decision the user believes they made.
+  {
+    const answerIds = new Set(
+      (caseSource.answers ?? []).map((answer) => answer?.question_id).filter(Boolean),
+    );
+    const referenced = new Set();
+    const collect = (value, origin) => {
+      if (!value || typeof value !== "object") return;
+      for (const [key, entry] of Object.entries(value)) {
+        if (/question_id$/.test(key) && typeof entry === "string" && entry) {
+          referenced.add(entry);
+          if (!answerIds.has(entry)) {
+            report.add(
+              "answers.missing",
+              "BLOCK",
+              `${origin}.${key} points at answer ${entry}, which the answers lane does not carry.`,
+              "Record the answer under that question id, or drop the reference.",
+              { question_id: entry },
+            );
+          }
+        } else if (entry && typeof entry === "object") {
+          collect(entry, `${origin}.${key}`);
+        }
+      }
+    };
+    collect(caseSource.policies ?? {}, "policies");
+    collect(caseSource.consumption ?? {}, "consumption");
+    for (const declaration of caseSource.derived_rows ?? []) {
+      if (declaration?.question_id) {
+        referenced.add(declaration.question_id);
+        if (!answerIds.has(declaration.question_id)) {
+          report.add(
+            "answers.missing",
+            "BLOCK",
+            `derived_rows.${declaration.row_id} points at answer ${declaration.question_id}, which the answers lane does not carry.`,
+            "Record the answer under that question id, or drop the reference.",
+            { question_id: declaration.question_id },
+          );
+        }
+      }
+    }
+    for (const id of answerIds) {
+      if (referenced.has(id)) continue;
+      // derived.* answers are consumed positionally by the derived stratum.
+      if (/^derived\./.test(id)) continue;
+      report.add(
+        "answers.unconsumed",
+        "WARN",
+        `Answer ${id} is recorded but nothing in the case-source references it.`,
+        "Point a declaration or policy at it, or remove it.",
+        { question_id: id },
+      );
+    }
+  }
+
   // Contract stamps: compiled cases are production cases by construction.
   modelCase.forecast_authority_contract_version = "waterfall_v1";
   modelCase.statement_authority_contract_version = "authority_v1";

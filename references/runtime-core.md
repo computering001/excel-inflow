@@ -136,7 +136,12 @@ ordinary end-user invocation. After Stage 1 is visible, intake and later stages
 may perform their declared checks and persist their normal receipts.
 
 Begin with one compact request for the company name, the FactSet debt export
-taken at the last fiscal year end, and broker research from 3–10 houses. A prior
+taken at the last fiscal year end, and broker research from 3–10 houses. Where
+the runtime carries a filings library or public-filings access, AUTO-PULL the
+last three full-year filings for the resolved issuer and present what was
+pulled on the intake receipt for confirmation; user-supplied filings always
+take precedence, and a company whose filings cannot be pulled or supplied
+blocks at intake rather than proceeding on fragments. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year
 end, reporting currency, units and period range from the filings; never ask the
 user to confirm them. For autonomous testing, use only UK- or Irish-listed
@@ -178,6 +183,20 @@ resulting `<run-folder>/evidence-run.json` to the resumable production shell;
 do not handcraft hashes or treat normalized JSON as proof of the original file.
 
 Restated figures replace superseded comparatives only when the filing clearly states the restated basis. Preserve predecessor history and calendarise only with an explicit bridge. Never splice differently scoped periods without a visible reconciliation.
+
+At the broker checkpoint, render the receipt screen and attach a broker
+preview built from the SEALED pack only — the per-house digest bands and the
+consensus faces, exactly the surface the Brokers tab will print — so the user
+confirms what was read before anything consumes it. The preview is generated
+from the pack artifact; it is never a hand-typed table.
+
+Decisions are collected on native question cards: the ASCII screen is the
+receipt, the cards are the instrument. One checkpoint's cards form one
+contiguous round (batches of at most four, two to six options each, the
+default marked in its label). "Skip" records the marked default as a decision.
+Checkpoint confirmations are cards too. Every card answer lands in
+`case-source.answers` under its stable question id; the compiler refuses a
+declaration pointing at an answer that was never recorded.
 
 Ask at most once and at most five targeted questions after deterministic pruning. Ask only for material facts that change debt, liquidity, interest, leverage or acquisition outputs and cannot be resolved from supplied evidence. Typical questions cover an unreconciled debt residual, unknown fixed/floating terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease mode, refinancing treatment or transaction timing. If more than five survive, say the inputs appear incomplete and request a corrected pack rather than presenting a questionnaire.
 

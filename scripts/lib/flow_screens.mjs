@@ -342,11 +342,11 @@ export function renderQuestionScreen(questions) {
         lines.push(line);
       }
     }
-    lines.push("");
-    const words = question.options.map((option) => option.word);
-    lines.push(`${" ".repeat(11)}${words.join("  /  ")}`);
   });
-  lines.push("", RULE);
+  // The screen is the RECEIPT; the native question cards are the decision
+  // instrument.  Option lists live on the cards (toQuestionCards), not in
+  // ASCII.  Free text remains only for attachments and issue-raising.
+  lines.push("", "   Answer the question cards below.", "", RULE);
   return finishScreen(lines);
 }
 
@@ -806,3 +806,78 @@ export function renderCompileFindingsScreen(report) {
   );
   return finishScreen(lines, { summariseOverflow: true });
 }
+
+/* ------------------------------------------------------------------ *
+ * Native question cards (v3): the ASCII screen is the RECEIPT, the
+ * cards are the DECISION instrument.  Each card is one decision with
+ * 2-6 enumerated options, the default marked in its label, a one-line
+ * evidence context, and a stable question id that maps 1:1 into
+ * case-source.answers.  "Skip" records the marked default as a
+ * decision (`via: "skip"`), never an absence.
+ * ------------------------------------------------------------------ */
+
+export const CARD_CONTRACT = Object.freeze({
+  max_cards_per_batch: 4,
+  min_options: 2,
+  max_options: 6,
+});
+
+export function toQuestionCards(questions, { round = "A" } = {}) {
+  const cards = questions.map((question, index) => {
+    const id = question.question_id ?? `${round}${index + 1}`;
+    const options = (question.options ?? []).map((option, optionIndex) => ({
+      option_id: option.id ?? option.word ?? String(optionIndex + 1),
+      label:
+        (option.label ?? option.word ?? String(optionIndex + 1)) +
+        (option.default || optionIndex === 0 ? " (default)" : ""),
+      is_default: Boolean(option.default) || optionIndex === 0,
+    }));
+    if (options.length < CARD_CONTRACT.min_options || options.length > CARD_CONTRACT.max_options) {
+      throw new Error(
+        `Question ${id} has ${options.length} options; cards carry ${CARD_CONTRACT.min_options}-${CARD_CONTRACT.max_options}.`,
+      );
+    }
+    return {
+      question_id: id,
+      prompt: asciiText(question.prompt),
+      ...(question.consequence ? { context: asciiText(question.consequence) } : {}),
+      options,
+    };
+  });
+  // A round is one checkpoint's cards, contiguous: batches of <=4, asked
+  // back-to-back at the same checkpoint, never deferred.
+  const batches = [];
+  for (let index = 0; index < cards.length; index += CARD_CONTRACT.max_cards_per_batch) {
+    batches.push(cards.slice(index, index + CARD_CONTRACT.max_cards_per_batch));
+  }
+  return { round, cards, batches };
+}
+
+// Every S6-X finding whose remedy is enumerable ships as a card generated
+// from the SAME compile report as the findings screen - one source.
+export function compileFindingsToCards(report) {
+  const blocks = (report?.findings ?? []).filter(
+    (finding) => finding.severity === "BLOCK",
+  );
+  const questions = [];
+  blocks.forEach((finding, index) => {
+    const options = Array.isArray(finding.context?.options)
+      ? finding.context.options
+      : null;
+    if (!options || options.length < CARD_CONTRACT.min_options) return;
+    questions.push({
+      question_id: `X${index + 1}`,
+      prompt: `${finding.id}: ${finding.message}`,
+      consequence: finding.remedy ?? null,
+      options: options.map((label, optionIndex) => ({
+        id: `X${index + 1}-${optionIndex + 1}`,
+        label,
+        default: optionIndex === 0,
+      })),
+    });
+  });
+  return toQuestionCards(questions, { round: "X" });
+}
+
+// The closing band of every checkpoint screen once cards carry decisions.
+export const ANSWER_CARDS_BAND = "   Answer the question cards below.";
