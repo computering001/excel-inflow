@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v3.2.0",
+  "releaseName": "Excel Inflow v3.2.1",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "3.2.0",
+  "skillVersion": "3.2.1",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T10:24:04.204Z",
+  "generatedAt": "2026-08-12T10:48:13.201Z",
   "centralInstructionsWords": 5932,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "fb6dddec361271249d49bde77d59e968afd0252686c7bba1cabdf51bc1923915",
+    "currentClosureSha256": "e2252b57572c3eaa0e51ddc9b8331f27b89070bfbc474a9c48b3308f829dc87f",
     "closureFileCount": 164,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -112,6 +112,7 @@
     "assetsLoadedByScripts": [
       "assets/broker-metric-dictionary.json",
       "assets/broker-runtime-members.json",
+      "assets/broker-vision-result.schema.json",
       "assets/deployment-profile.json",
       "assets/economic-solve-policy.v1.json",
       "assets/evidence-run-v1.schema.json",
@@ -144,7 +145,6 @@
       "assets/broker-semantic-verification-report.schema.json",
       "assets/broker-source-tables.schema.json",
       "assets/broker-surface-census.schema.json",
-      "assets/broker-vision-result.schema.json",
       "assets/case-source.schema.json",
       "assets/convergence-contract.v1.json",
       "assets/convergence-contract.v1.schema.json",
@@ -548,6 +548,9 @@
       ],
       "broker-runtime-members.json": [
         "scripts/run_broker_pipeline.py"
+      ],
+      "broker-vision-result.schema.json": [
+        "scripts/compile_broker_vision.py"
       ],
       "economic-solve-policy.v1.json": [
         "scripts/verify/validate_dynamic_model.py"
@@ -1307,8 +1310,8 @@
     },
     {
       "path": "assets/broker-vision-result.schema.json",
-      "sha256": "5a38baae4e9493396a8bf4049f38f12cc4c9e167cd61e7f1722dc90fb42c31e8",
-      "bytes": 3502,
+      "sha256": "0e2b22f535fec9954a353e9c0cc9e2292e8f1cb00663197284aff480e1ad99d5",
+      "bytes": 3766,
       "words": null
     },
     {
@@ -1559,8 +1562,8 @@
     },
     {
       "path": "scripts/compile_broker_vision.py",
-      "sha256": "43ce0469a1282eb4c407eb0e36e74111ddc3ecf9b165af756be6996517b5b8a1",
-      "bytes": 45530,
+      "sha256": "852827bfa3024f73bcea10b0f969671b490da03c20805afc65bddb6bbfb6f6d1",
+      "bytes": 47695,
       "words": null
     },
     {

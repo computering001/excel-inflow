@@ -19,6 +19,58 @@ from compile_broker_canonical_tables import canonicalise_bundle
 NUMERIC_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?%?\)?|[-+]?\d+(?:\.\d+)?x)(?![A-Za-z])",
 )
+VISION_RESULT_SCHEMA_PATH = Path(__file__).resolve().parent.parent / "assets" / "broker-vision-result.schema.json"
+INDEPENDENT_RESPONSE_BINDING_FIELDS = {
+    "schema_version",
+    "document_id",
+    "surface_id",
+    "image_sha256",
+    "pass_index",
+    "producer_id",
+    "producer_fingerprint",
+    "method",
+    "tables",
+}
+
+
+def vision_schema_contract_errors(schema: dict[str, Any]) -> list[str]:
+    """Prove the published response schema admits every compiler binding.
+
+    This is intentionally a contract-closure check, not another JSON Schema
+    implementation. The deployment host validates response instances against
+    the published schema; the compiler validates their economic bindings. Both
+    layers must agree on the independent-response identity fields.
+    """
+    errors: list[str] = []
+    properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    missing_properties = sorted(INDEPENDENT_RESPONSE_BINDING_FIELDS - set(properties))
+    if missing_properties:
+        errors.append(f"schema forbids compiler binding fields: {missing_properties}")
+    pass_clause = next(
+        (
+            item for item in schema.get("allOf", [])
+            if isinstance(item, dict)
+            and item.get("if", {}).get("properties", {}).get("pass_index", {}).get("enum") == [1, 2]
+        ),
+        None,
+    )
+    required = set((pass_clause or {}).get("then", {}).get("required", []))
+    required_for_pass = {"tables", "producer_fingerprint"}
+    if not required_for_pass.issubset(required):
+        errors.append(
+            "independent pass schema does not require: "
+            f"{sorted(required_for_pass - required)}"
+        )
+    if schema.get("additionalProperties") is not False:
+        errors.append("response schema must remain closed to undeclared fields")
+    return errors
+
+
+def assert_vision_schema_contract() -> None:
+    schema = json.loads(VISION_RESULT_SCHEMA_PATH.read_text("utf-8"))
+    errors = vision_schema_contract_errors(schema)
+    if errors:
+        raise RuntimeError("Broker vision schema/compiler contract drift: " + "; ".join(errors))
 
 
 def sha256_file(path: Path) -> str:
@@ -632,6 +684,7 @@ def recompute_ledger(document: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    assert_vision_schema_contract()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bundle")
     parser.add_argument("--responses", required=True)

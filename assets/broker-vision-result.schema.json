@@ -24,6 +24,11 @@
       "minLength": 1,
       "description": "Stable identifier for the independent run or reviewer. Pass 1 and pass 2 must differ."
     },
+    "producer_fingerprint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Execution-specific fingerprint. Independent pass 1 and pass 2 must carry different fingerprints even when the producer labels differ."
+    },
     "method": {
       "enum": ["ocr_geometry", "vision_model", "manual_transcription", "reviewed_resolution"],
       "description": "The evidence-producing lane. Raw whole-page OCR is diagnostic and must not be represented as a completed table transcription."
@@ -92,7 +97,7 @@
   "allOf": [
     {
       "if": { "properties": { "pass_index": { "enum": [1, 2] } } },
-      "then": { "required": ["tables"] }
+      "then": { "required": ["tables", "producer_fingerprint"] }
     },
     {
       "if": { "properties": { "pass_index": { "const": "resolution" } } },
