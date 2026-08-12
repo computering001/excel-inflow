@@ -410,6 +410,17 @@ python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook
 
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
 
+The v3 case compiler ships DORMANT: the five-stage flow above remains the only
+production path and never calls it. It exists so the v3.0.0 cutover lands on an
+already-installed, already-smoked surface. A case-source (declarations only —
+`assets/case-source.schema.json` cannot express values or formula text) plus the
+sealed evidence lanes compile into a model case, or into a complete findings
+report; there is no partial success.
+
+```
+node scripts/compile_case.mjs <case-source.json> <evidence.json> --out <model-case.json>
+```
+
 ## Validation and certification
 
 Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.

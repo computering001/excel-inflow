@@ -1501,6 +1501,19 @@ def main(argv: List[str]) -> int:
         )
         if intentionally_blank_zero:
             continue
+        # Schedule-owned rows with structurally empty history print greyed
+        # blanks in BOTH actual and pro-forma actual — there is no filed
+        # number for the pro-forma column to reproduce.  Mirrors the same
+        # escape in validate_dynamic_model.mjs.
+        structurally_blank_schedule = (
+            actual_value is None
+            and pro_forma_actual_value is None
+            and not text
+            and declared_actual is None
+            and definition.get("historical_authority") == "schedule_link"
+        )
+        if structurally_blank_schedule:
+            continue
         formula_ties = re.sub(r"^=", "", str(text)) == "I%s" % definition["row"]
         if not formula_ties or not equal(
             actual_value,

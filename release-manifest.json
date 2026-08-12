@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v2.5.1",
+  "releaseName": "Excel Inflow v2.7.0",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "2.5.1",
+  "skillVersion": "2.7.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-11T17:19:30.595Z",
-  "centralInstructionsWords": 5273,
+  "generatedAt": "2026-08-12T01:27:19.532Z",
+  "centralInstructionsWords": 5345,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "36bdea90acf21df3c22bc1cb0c12605b916fd0e67acb7369537a496ee3d75b97",
-    "closureFileCount": 158,
+    "currentClosureSha256": "baaa9379a4d31048aaea8cf6028ce33b761f4073368f4aa37281e84a0f642d54",
+    "closureFileCount": 161,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -34,10 +34,12 @@
       "scripts/validate_cache_parity.mjs",
       "scripts/validate_source_parity.mjs",
       "scripts/validate_structure.mjs",
-      "scripts/validate_style_tokens.mjs"
+      "scripts/validate_style_tokens.mjs",
+      "scripts/compile_case.mjs"
     ],
     "scripts": [
       "scripts/build_dynamic_model.mjs",
+      "scripts/compile_case.mjs",
       "scripts/compile_evidence_run.mjs",
       "scripts/compile_public_test_run.mjs",
       "scripts/debt-model-economics.mjs",
@@ -46,6 +48,7 @@
       "scripts/lib/attachment_ingress.mjs",
       "scripts/lib/broker_anchor.mjs",
       "scripts/lib/broker_metric_dictionary.mjs",
+      "scripts/lib/case_compiler.mjs",
       "scripts/lib/coverage.mjs",
       "scripts/lib/design_contract.mjs",
       "scripts/lib/economic_solve_policy.mjs",
@@ -140,6 +143,7 @@
       "assets/broker-source-tables.schema.json",
       "assets/broker-surface-census.schema.json",
       "assets/broker-vision-result.schema.json",
+      "assets/case-source.schema.json",
       "assets/convergence-contract.v1.json",
       "assets/convergence-contract.v1.schema.json",
       "assets/dcs-candidate-manifest-v1.schema.json",
@@ -186,6 +190,7 @@
       "scripts/build_dynamic_model.mjs -> scripts/lib/runtime_isolation.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/semantic_graph.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/solver.mjs",
+      "scripts/compile_case.mjs -> scripts/lib/case_compiler.mjs",
       "scripts/compile_evidence_run.mjs -> scripts/lib/attachment_ingress.mjs",
       "scripts/compile_evidence_run.mjs -> scripts/lib/evidence_run.mjs",
       "scripts/compile_public_test_run.mjs -> scripts/lib/public_test_run.mjs",
@@ -198,6 +203,15 @@
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/coverage.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/face_statement_manifest.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/forecast_candidate_compiler.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/solver.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/broker_metric_dictionary.mjs",
       "scripts/lib/coverage.mjs -> scripts/lib/forecast_authority.mjs",
@@ -816,15 +830,16 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 11,
+    "codeFences": 12,
     "emptyCodeFences": 0,
-    "entryPointsNamedInCommands": 17,
-    "scriptReferencesScanned": 34,
+    "entryPointsNamedInCommands": 18,
+    "scriptReferencesScanned": 35,
     "scriptReferences": [
       "build_dynamic_model.mjs",
       "compile_broker_pack.py",
       "compile_broker_surface_census.py",
       "compile_broker_vision.py",
+      "compile_case.mjs",
       "compile_dcs_evidence.py",
       "compile_evidence_run.mjs",
       "compile_public_test_run.mjs",
@@ -955,6 +970,11 @@
         "resolved": true
       },
       {
+        "target": "scripts/compile_case.mjs",
+        "status": 2,
+        "resolved": true
+      },
+      {
         "target": "python closure import probe",
         "modules": 40,
         "allResolvedInsideRelease": true
@@ -1064,18 +1084,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "096445d158a8d4ad2393e3744b2ab89311457365ed2ff2465450b5be4d518d5b",
-        "plan_sha256": "051a89388d4a66d1c8fd6dc7ac111df2d01bacfe8ad1cee0ade64f16c6b3e2d7",
-        "workbook_sha256": "c88f9c20c94e0b24ccbf37955d578eb9e5c0cc0fb83df90e2e95c1963b4b99b4",
+        "case_sha256": "457ba3313dbff2439cc008402614ad2d34bf9e7f3afada928bcc666748a68af5",
+        "plan_sha256": "a838c39e6956a7a4f2871c1b94615e8fa1a2f05625ab018674a92472148f8935",
+        "workbook_sha256": "c8acf2f5b895175dfd539576b00ab22a083a923ac505be67babd96b07b8ec7d2",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "096445d158a8d4ad2393e3744b2ab89311457365ed2ff2465450b5be4d518d5b",
-      "plan_sha256": "051a89388d4a66d1c8fd6dc7ac111df2d01bacfe8ad1cee0ade64f16c6b3e2d7",
-      "workbook_sha256": "c88f9c20c94e0b24ccbf37955d578eb9e5c0cc0fb83df90e2e95c1963b4b99b4",
+      "case_sha256": "457ba3313dbff2439cc008402614ad2d34bf9e7f3afada928bcc666748a68af5",
+      "plan_sha256": "a838c39e6956a7a4f2871c1b94615e8fa1a2f05625ab018674a92472148f8935",
+      "workbook_sha256": "c8acf2f5b895175dfd539576b00ab22a083a923ac505be67babd96b07b8ec7d2",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1105,21 +1125,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "9211fedaa2e121fbfc66b8e5b7625dfc8daea6dc62b72743b6f196447ea0d724",
-      "bytes": 39468,
-      "words": 5273
+      "sha256": "ae1760ace5e88d78bdc5e8de1bccae7328b73a2d93b26631d7f78d55c21627d9",
+      "bytes": 40001,
+      "words": 5345
     },
     {
       "path": "SKILL.md",
-      "sha256": "b6edf3c5fdba78e5ad532993cad58a057811bf8bb9f82d4dc821133bb44b232f",
-      "bytes": 39955,
-      "words": 5342
+      "sha256": "6b930be8697b00db49e1b9a9bc4040f1490c78090fa1ae3e7d63411d52a9591f",
+      "bytes": 40488,
+      "words": 5414
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "e1a408208103a66f24b6926ec79530393f0c052da2cd9dcabf4b4b57f0fe4d37",
-      "bytes": 39488,
-      "words": 5275
+      "sha256": "712677869d779137b34da1f21ced3a7baed16361d485d7f0daac638135a80573",
+      "bytes": 40021,
+      "words": 5347
     },
     {
       "path": "references/model-contract.md",
@@ -1260,6 +1280,12 @@
       "words": null
     },
     {
+      "path": "assets/case-source.schema.json",
+      "sha256": "42ddd3eeaf9414cc041d87bdf29ec17e658f1085d0c14ea65f9e10a797416248",
+      "bytes": 15132,
+      "words": null
+    },
+    {
       "path": "assets/convergence-contract.v1.json",
       "sha256": "bffe88eae20d3ab460e2827db11d8dbc975ddc5aa4063f64fc06ba65c1e6b71e",
       "bytes": 5523,
@@ -1327,8 +1353,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "b336398b15bcff4a5b55bea9bc47dab553d01ba0875f6d87baa48396c066fbec",
-      "bytes": 48457,
+      "sha256": "856c6fdda4e8ad2a41b371b9f7805a5a6ebf78c894895e85a850a8fa7776c06b",
+      "bytes": 48861,
       "words": null
     },
     {
@@ -1506,6 +1532,12 @@
       "words": null
     },
     {
+      "path": "scripts/compile_case.mjs",
+      "sha256": "d537402b3601053394025a789dfecde1dc729b69bf56cb6889b56e7a97c6af81",
+      "bytes": 2247,
+      "words": null
+    },
+    {
       "path": "scripts/compile_dcs_evidence.py",
       "sha256": "438675ffdc397f45898a7579add35331eea8d02a9f3aa98aa69d329e1fdbb890",
       "bytes": 39065,
@@ -1614,9 +1646,15 @@
       "words": null
     },
     {
+      "path": "scripts/lib/case_compiler.mjs",
+      "sha256": "8cd2f658793034506b666d6ec95b6749fbeb1cfcd20a134ff3ffc2ec49bfbe2d",
+      "bytes": 104841,
+      "words": null
+    },
+    {
       "path": "scripts/lib/coverage.mjs",
-      "sha256": "f4a6ef023bbd48172219edd22061bff0fffd2db73d770d52ff0303333e233a4e",
-      "bytes": 80219,
+      "sha256": "6d94e3c1b8540e2bf079bbe604b59cc56d21bb31d562006ce0d207944b2ad670",
+      "bytes": 81132,
       "words": null
     },
     {
@@ -1699,8 +1737,8 @@
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "6132bdf4262f770f8a65b9ccf1cd20e496ceb6ca3fa537484e15382917c3067a",
-      "bytes": 30884,
+      "sha256": "89ea8a3cac276927d64aceb165437b8b540a829ae5b4cbe2739b1bc14b77ffd7",
+      "bytes": 32663,
       "words": null
     },
     {
@@ -1711,8 +1749,8 @@
     },
     {
       "path": "scripts/lib/forecast_candidate_compiler.mjs",
-      "sha256": "95d082459cc540b3536d94122c6c9fea5abcafc76194f6f6dfc649f52db311fe",
-      "bytes": 26760,
+      "sha256": "a70852108917bbaca6565451a2e657303d0122ea9d380b6a7e31647562eff382",
+      "bytes": 27389,
       "words": null
     },
     {
@@ -2089,8 +2127,8 @@
     },
     {
       "path": "scripts/verify/validate_dynamic_model.py",
-      "sha256": "e0cc5a13fa62f7f3c4157f7b1d0174c0011507199501fef1e1850ab7f5802052",
-      "bytes": 153699,
+      "sha256": "035e6551d9f0bbe07042c63987a772d0eb9ca8c780b6b9d8cc5e1265e3d26c70",
+      "bytes": 154301,
       "words": null
     },
     {
