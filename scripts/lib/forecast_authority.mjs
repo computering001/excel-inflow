@@ -89,6 +89,9 @@ const SCHEDULE_OWNED_ROLES = new Set([
   "ending_cash",
   "net_change_in_cash",
   "non_balancing_cash_bucket_movement",
+  // Computed by the solver from the debt schedule (PIK, fee amortisation) —
+  // schedule-owned exactly like the RCF legs.
+  "non_cash_interest_addback",
 ]);
 
 export function isScheduleOwnedForecastRole(role) {
@@ -557,6 +560,39 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         errors.push(
           `${label} uses source_kind ${authority.source_kind}, which is incompatible with ${authority.method}.`,
         );
+      }
+      // FR-12. The materialiser mints per-period rules only for the four
+      // historical-inference methods; a formula-method authority depends on
+      // the row's own calculation surviving every later edit, and until now
+      // nothing re-checked that after materialisation - the gap surfaced as a
+      // raw N10 compiler throw. An authority whose method promises a formula
+      // must be able to point at one HERE, where the case is still cheap to
+      // fix and the finding has a name.
+      if (
+        strict &&
+        ["driver_formula", "accounting_identity", "roll_forward"].includes(
+          authority.method,
+        )
+      ) {
+        const periodRule = Array.isArray(row?.forecast_period_calculations)
+          ? row.forecast_period_calculations[index]
+          : undefined;
+        const hasRule = Boolean(
+          (periodRule && Array.isArray(periodRule.refs) && periodRule.refs.length > 0) ||
+            (row?.forecast_calculation &&
+              Array.isArray(row.forecast_calculation.refs) &&
+              row.forecast_calculation.refs.length > 0) ||
+            (row?.calculation &&
+              Array.isArray(row.calculation.refs) &&
+              row.calculation.refs.length > 0),
+        );
+        if (!hasRule) {
+          errors.push(
+            `${label} declares ${authority.method} but the row carries no compilable rule ` +
+              `(no calculation, forecast_calculation or forecast_period_calculations with refs); ` +
+              `an authority without its formula is an invalid case at authorship, not a build-time surprise.`,
+          );
+        }
       }
       if (authority.method === "unresolved") {
         errors.push(`${label} is unresolved: ${authority.reason ?? "no reason supplied"}`);

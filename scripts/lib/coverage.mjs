@@ -820,6 +820,9 @@ export function statementAuthorityChecks(modelCase) {
     "rcf_draw",
     "rcf_repayment",
     "lease_principal",
+    // Computed by the solver from the debt schedule (PIK, fee amortisation),
+    // never from filed history.
+    "non_cash_interest_addback",
   ]);
   for (const section of ["income_statement", "cash_flow"]) {
     for (const row of modelCase.statement_structure?.[section] ?? []) {
@@ -1646,6 +1649,23 @@ function debtReconciliationChecks(modelCase) {
     (item) => item.instrument_id === modelCase.rcf_policy?.instrument_id,
   );
   const rcfRate = openingFxRate(modelCase, rcfInstrument?.currency).rate;
+  // FR-11: a missing FX pair used to default to 1.0 here, which hid a
+  // foreign-currency RCF's absent rate until the builder threw raw at
+  // emission. A default that hides an absence is a mask, not a convenience;
+  // the absence is named here, where the remedy is still an input question.
+  if (
+    rcfInstrument &&
+    number(modelCase.rcf_policy?.opening_draw ?? 0) !== 0 &&
+    !(rcfRate ?? null)
+  ) {
+    return [
+      result(
+        "debt_reconciliation.rcf_fx_missing",
+        "BLOCK",
+        `RCF ${rcfInstrument.instrument_id} draws in ${rcfInstrument.currency} with an opening balance, but no FX pair to the reporting currency is declared. Declare the pair; a defaulted 1.0 rate is a hidden assumption, not a reconciliation.`,
+      ),
+    ];
+  }
   const openingRcf =
     number(modelCase.rcf_policy?.opening_draw ?? 0) * (rcfRate ?? 1);
   const residualInstrument = instruments.find(

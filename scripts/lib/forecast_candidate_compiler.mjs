@@ -276,7 +276,17 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           ? broker
           : formula && compatible.includes(formula)
             ? formula
-            : selectForecastAuthority(compatible);
+            : selectForecastAuthority(compatible) ??
+              // Deliberate absence is a valid owner of last resort: a captured
+              // detail or out-of-scope row resolves to its absence declaration
+              // instead of falling through to `unresolved`.  The waterfall
+              // selector cannot rank these (absence has no evidence priority),
+              // which previously made behavior=captured_detail unreachable —
+              // every captured row compiled to a block.
+              compatible.find((candidate) =>
+                ["not_separately_forecast", "not_applicable"].includes(candidate.method),
+              ) ??
+              null;
         if (!owner) {
           const unresolved = {
             method: "unresolved",
