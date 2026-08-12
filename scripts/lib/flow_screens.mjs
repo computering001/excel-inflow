@@ -149,6 +149,93 @@ export const WELCOME_SCREEN = finishScreen([
   RULE,
 ]);
 
+// ---------------------------------------------------------------------------
+// Constitution frame grammar (v3 SS7): open-right header, six-chip progress
+// rail, dot leaders, REPLY band. Every screen built here passes the same
+// render-time gate (printable ASCII, width cap, line cap) as the rest.
+// ---------------------------------------------------------------------------
+
+export const RAIL_CHIPS = Object.freeze([
+  "Company", "Filings", "Brokers", "Debt", "Build", "Deliver",
+]);
+
+function frameTop(title) {
+  const left = "+=[ EXCEL INFLOW ]";
+  const right = `[ ${asciiText(title).toUpperCase()} ]=+`;
+  const fill = RULE_WIDTH - left.length - right.length;
+  return `${left}${"=".repeat(Math.max(2, fill))}${right}`;
+}
+
+function frameBottom() {
+  return `+${"=".repeat(RULE_WIDTH - 1)}`;
+}
+
+function replyBand() {
+  const label = "+--[ REPLY ]";
+  return `${label}${"-".repeat(Math.max(2, RULE_WIDTH - label.length))}`;
+}
+
+// states: map chip name -> "done" | "active" | "blocked" | pending (absent)
+export function renderRail(states = {}) {
+  const MARK = { done: "x", active: ">", blocked: "!" };
+  const chips = RAIL_CHIPS.map((chip) => {
+    const mark = MARK[states[chip]] ?? " ";
+    return `[${mark}]${chip}`;
+  });
+  // Two lines of three chips each keeps the rail inside the width cap.
+  return [
+    `|  ${chips.slice(0, 3).join("  ")}`,
+    `|  ${chips.slice(3).join("  ")}`,
+  ];
+}
+
+function body(text = "") {
+  return text === "" ? "|" : `|  ${text}`;
+}
+
+export function framedScreen({ title, states, lines, reply = null }) {
+  const out = [frameTop(title), "|", ...renderRail(states), "|"];
+  for (const line of lines) out.push(body(line));
+  if (reply) {
+    out.push(replyBand(), "|");
+    for (const line of reply) out.push(`|     > ${line}`);
+    out.push("|");
+  }
+  out.push(frameBottom());
+  return finishScreen(out);
+}
+
+// S1 - COMPANY. The entry screen asks for the company and NOTHING else: the
+// filings lane auto-pulls where the runtime carries access, broker research
+// is collected at the BROKERS stage and the FactSet export at the DEBT
+// stage. The fast path (everything supplied up front) is stated, not
+// demanded.
+export const COMPANY_SCREEN = framedScreen({
+  title: "COMPANY",
+  states: { Company: "active" },
+  lines: [
+    "DEBT OVERLAY",
+    "Debt, leverage and liquidity - fully formula-driven.",
+    "Three years back, three years forward. Every figure",
+    "traces to its source.",
+    "",
+    "Name the company. Nothing else is needed yet.",
+    "",
+    "Filings ............ pulled for you where the runtime",
+    "                     has access; attach 3 full years",
+    "                     to override",
+    "Broker research .... asked at the BROKERS stage",
+    "FactSet export ..... asked at the DEBT stage",
+    "",
+    "Attach everything now if you prefer - the flow then",
+    "stops only at the two checkpoints and real questions.",
+    "",
+    "Currency, fiscal calendar and periods follow the",
+    "company. You will not be asked to confirm them.",
+  ],
+  reply: ["company name (e.g. AstraZeneca)"],
+});
+
 // The three stage-1 inputs, in the order the welcome screen presents them, so a
 // caller can drive intake off the same declaration the screen is rendered from
 // rather than off a second hand-written list.

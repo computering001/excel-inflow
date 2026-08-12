@@ -17,6 +17,7 @@ import {
   nextStageId,
 } from "./lib/flow_runtime.mjs";
 import {
+  COMPANY_SCREEN,
   renderDeliveryReport,
   renderFailure,
   renderForecastPlanScreen,
@@ -105,11 +106,15 @@ const COMPLETION_SUMMARIES = Object.freeze({
 });
 
 function renderPresentationScreen(stageId) {
+  // "company" is the v3 entry screen (constitution S1): company only, the
+  // rest of the pack is collected at its own stage. "inputs" remains the
+  // fast-path pack screen and the id older transcripts reference.
+  if (stageId === "company") return COMPANY_SCREEN;
   if (stageId === "inputs") return WELCOME_SCREEN;
   const declaration = PRESENTATION_SCREENS[stageId];
   if (!declaration) {
     throw new Error(
-      `--screen must be one of inputs, evidence_review, decisions, build_checks or delivery; got ${stageId}`,
+      `--screen must be one of company, inputs, evidence_review, decisions, build_checks or delivery; got ${stageId}`,
     );
   }
   return renderStageStatus({ stageId, ...declaration });
@@ -305,7 +310,7 @@ async function main() {
         "[--answers <answers.txt|json>] [--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
         "[--stop-after <stage>] [--json], or " +
-        "run_user_flow.mjs --screen <inputs|evidence_review|decisions|build_checks|delivery>",
+        "run_user_flow.mjs --screen <company|inputs|evidence_review|decisions|build_checks|delivery>",
     );
   }
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });

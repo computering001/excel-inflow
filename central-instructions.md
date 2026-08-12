@@ -115,14 +115,59 @@ start a new model, invoke the canonical production controller before asking a
 question:
 
 ```text
-node scripts/run_user_flow.mjs --screen inputs
+node scripts/run_user_flow.mjs --screen company
 ```
 
-Return that command's Stage 1 ASCII stdout verbatim as the first visible
-response. Do not replace it with a conversational company/ticker question or a
-Markdown summary. This rule still applies when the user already names the
-company or supplies attachments; consume those inputs only after displaying
-the canonical Stage 1 screen.
+That command's stdout IS a fenced code block (it begins with ```text and ends
+with ```). Return it verbatim and whole as the first visible response — the
+fence included — so the screen renders in monospace. Never retype it, restyle
+it as Markdown headings, or replace it with a conversational company/ticker
+question. If the command cannot be executed in this runtime, reproduce the
+canonical screen below EXACTLY, fence and all:
+
+```text
++=[ EXCEL INFLOW ]==============================[ COMPANY ]=+
+|
+|  [>]Company  [ ]Filings  [ ]Brokers
+|  [ ]Debt  [ ]Build  [ ]Deliver
+|
+|  DEBT OVERLAY
+|  Debt, leverage and liquidity - fully formula-driven.
+|  Three years back, three years forward. Every figure
+|  traces to its source.
+|
+|  Name the company. Nothing else is needed yet.
+|
+|  Filings ............ pulled for you where the runtime
+|                       has access; attach 3 full years
+|                       to override
+|  Broker research .... asked at the BROKERS stage
+|  FactSet export ..... asked at the DEBT stage
+|
+|  Attach everything now if you prefer - the flow then
+|  stops only at the two checkpoints and real questions.
+|
+|  Currency, fiscal calendar and periods follow the
+|  company. You will not be asked to confirm them.
++--[ REPLY ]-------------------------------------------------
+|
+|     > company name (e.g. AstraZeneca)
+|
++============================================================
+```
+
+This entry rule still applies when the request already names the company or
+includes attachments; the supplied information is consumed after the canonical
+screen is shown.
+
+The entry screen asks for the COMPANY ONLY. Filings are auto-pulled where the
+runtime carries a filings library or public-filings access (user-supplied
+filings always take precedence; a company whose filings cannot be pulled or
+supplied blocks at intake). Broker research (3-10 houses) is requested at the
+BROKERS stage and the FactSet debt export - date toggle at LAST FISCAL YEAR
+END - at the DEBT stage. A user who attaches everything up front takes the
+fast path: the flow then stops only at the two checkpoints and genuine
+questions.
 
 The bare trigger is presentation-only. Do not certify the installed release,
 inspect package bytes, emit progress prose, search for tools, read evidence or
@@ -131,13 +176,13 @@ certification belongs to the versioned installation transaction, never to an
 ordinary end-user invocation. After Stage 1 is visible, intake and later stages
 may perform their declared checks and persist their normal receipts.
 
-Begin with one compact request for the company name, the FactSet debt export
-taken at the last fiscal year end, and broker research from 3–10 houses. Where
-the runtime carries a filings library or public-filings access, AUTO-PULL the
-last three full-year filings for the resolved issuer and present what was
-pulled on the intake receipt for confirmation; user-supplied filings always
-take precedence, and a company whose filings cannot be pulled or supplied
-blocks at intake rather than proceeding on fragments. A prior
+The entry screen collects the company only; the remaining pack arrives at
+its own stage as the screen states. Where the runtime carries a filings
+library or public-filings access, AUTO-PULL the last three full-year filings
+for the resolved issuer and present what was pulled on the intake receipt
+for confirmation; user-supplied filings always take precedence, and a
+company whose filings cannot be pulled or supplied blocks at intake rather
+than proceeding on fragments. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year
 end, reporting currency, units and period range from the filings; never ask the
 user to confirm them. For autonomous testing, use only UK- or Irish-listed

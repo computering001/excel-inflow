@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v3.0.0",
+  "releaseName": "Excel Inflow v3.1.0",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "3.0.0",
+  "skillVersion": "3.1.0",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T01:39:45.743Z",
-  "centralInstructionsWords": 5621,
+  "generatedAt": "2026-08-12T06:51:06.714Z",
+  "centralInstructionsWords": 5898,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "303e840ebcc3653265f7122fcc8a618253dd3d2555e5806b4ef14bf7f477026d",
+    "currentClosureSha256": "47a383e613a12ed77ffecc0cc394552e050cda83b2ebe2a8923badd3c3163ec9",
     "closureFileCount": 161,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -830,7 +830,7 @@
   ],
   "instructionRules": [],
   "instructionAssertions": {
-    "codeFences": 12,
+    "codeFences": 14,
     "emptyCodeFences": 0,
     "entryPointsNamedInCommands": 18,
     "scriptReferencesScanned": 35,
@@ -1125,21 +1125,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "1d08f8a414bae6954ff106a0d6a626447044055d657db0923aefc9fe4dea9c80",
-      "bytes": 41781,
-      "words": 5621
+      "sha256": "64042933f89ce02b4a95e322639d28c0a68c032b087d04ba10c0d2cb265c7e28",
+      "bytes": 43545,
+      "words": 5898
     },
     {
       "path": "SKILL.md",
-      "sha256": "97b34f24474aade028b25a6502e9e992ee27f7d5158babfcb049b2aea87d94ff",
-      "bytes": 42268,
-      "words": 5690
+      "sha256": "74b2d5b6f9c888f95f2e34ce51e10a75cf3791ff1aa8ca64d9d67e3db1e6c86e",
+      "bytes": 44032,
+      "words": 5967
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "6673fb6fb6aa45fbcb6376ec3a2bf8727f02e4e48a2ba8e67299625d900e7f04",
-      "bytes": 41801,
-      "words": 5623
+      "sha256": "6ce85d971db46fa8ef8ed93b5603e4a88d678a44d30ab1e588b5bac8ecfc0e6b",
+      "bytes": 43565,
+      "words": 5900
     },
     {
       "path": "references/model-contract.md",
@@ -1353,8 +1353,8 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "856c6fdda4e8ad2a41b371b9f7805a5a6ebf78c894895e85a850a8fa7776c06b",
-      "bytes": 48861,
+      "sha256": "651080ff4f2608f40a2cac83cba2c589a025b3f118ef5b2703894513c7ae9801",
+      "bytes": 48850,
       "words": null
     },
     {
@@ -1731,8 +1731,8 @@
     },
     {
       "path": "scripts/lib/flow_screens.mjs",
-      "sha256": "8c163759263d018a5a911f46bcd327cc911115e4cda618cd629885387dce2431",
-      "bytes": 32348,
+      "sha256": "c7eb191ad044bb601d8e9264064366b82e0f0b97b702823decb2cbf7814e1f77",
+      "bytes": 35430,
       "words": null
     },
     {
@@ -2049,8 +2049,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "5aafa6268b5d19935f725ced4909154ceddd18c800a6eee6be89b0371f1e86e0",
-      "bytes": 49263,
+      "sha256": "574ac94595120369e85af734382bf99a1c45624938873bc11ed799511452728a",
+      "bytes": 49566,
       "words": null
     },
     {

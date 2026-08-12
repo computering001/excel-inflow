@@ -1,0 +1,282 @@
+#!/usr/bin/env node
+
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import { inspectScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
+
+const exec = promisify(execFile);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const cases = path.resolve(
+  process.argv[2] ??
+    process.env.DEBT_OVERLAY_CASES_DIR ??
+    "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+);
+const out = path.resolve(
+  process.argv[3] ?? await fs.mkdtemp(path.join(os.tmpdir(), "dmu-user-flow-test-")),
+);
+await fs.mkdir(out, { recursive: true });
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function command(script, args, { allowFailure = false } = {}) {
+  try {
+    return await exec(process.execPath, [path.join(HERE, script), ...args], {
+      cwd: path.resolve(HERE, ".."),
+      timeout: 300000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch (error) {
+    if (!allowFailure) throw error;
+    return { stdout: error.stdout ?? "", stderr: error.stderr ?? error.message };
+  }
+}
+
+async function flow(evidence, runDir, extra = [], options = {}) {
+  const result = await command(
+    "run_user_flow.mjs",
+    [evidence, "--out", runDir, ...extra, "--json"],
+    options,
+  );
+  return JSON.parse(result.stdout);
+}
+
+async function visibleFlow(evidence, runDir, extra = [], options = {}) {
+  return command(
+    "run_user_flow.mjs",
+    [evidence, "--out", runDir, ...extra],
+    options,
+  );
+}
+
+const cleanEvidence = path.join(out, "clean-evidence-run.json");
+const acquisitionEvidence = path.join(out, "acquisition-question-evidence-run.json");
+await command("run_evidence_run_tests.mjs", [
+  cases,
+  "--emit-clean", cleanEvidence,
+  "--emit-acquisition-question", acquisitionEvidence,
+]);
+
+const tests = [];
+async function test(name, callback) {
+  try {
+    await callback();
+    tests.push({ name, status: "PASS" });
+    console.log(`  PASS  ${name}`);
+  } catch (error) {
+    tests.push({ name, status: "FAIL", message: error.message });
+    console.log(`  FAIL  ${name}`);
+    console.log(`        ${error.message}`);
+  }
+}
+
+await test("bare chat invocation is routed to the canonical Stage 1 screen", async () => {
+  const skillRoot = path.resolve(HERE, "..");
+  const skillInstructions = await fs.readFile(path.join(skillRoot, "SKILL.md"), "utf8");
+  const runtimeCore = await fs.readFile(
+    path.join(skillRoot, "references", "runtime-core.md"),
+    "utf8",
+  );
+  for (const [name, text] of [
+    ["SKILL.md", skillInstructions],
+    ["runtime-core.md", runtimeCore],
+  ]) {
+    const flatText = text.replace(/\s+/g, " ");
+    assert(text.includes("run excel inflow"), `${name} does not declare the bare trigger`);
+    assert(
+      text.includes("node scripts/run_user_flow.mjs --screen company"),
+      `${name} does not route the bare trigger to the production controller`,
+    );
+    assert(
+      text.includes("+=[ EXCEL INFLOW ]") && text.includes("[ COMPANY ]"),
+      `${name} does not embed the canonical fenced entry screen`,
+    );
+    assert(
+      /restyle|Never retype/.test(text),
+      `${name} permits the failed generic intake response`,
+    );
+    assert(
+      flatText.includes("asks for the COMPANY ONLY") ||
+        flatText.includes("collects the company only"),
+      `${name} still demands the full pack at entry`,
+    );
+    assert(
+      flatText.includes("The bare trigger is presentation-only"),
+      `${name} permits deployment work before the Stage 1 screen`,
+    );
+    assert(
+      flatText.includes("Deployment certification belongs to the versioned installation transaction"),
+      `${name} permits per-invocation release certification`,
+    );
+    assert(
+      flatText.includes("emit progress prose"),
+      `${name} permits visible pre-Stage-1 status text`,
+    );
+  }
+  const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
+  assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "bare trigger target is not canonical Stage 1 bytes");
+});
+
+await test("production controller owns all five canonical presentation screens", async () => {
+  const stages = ["inputs", "evidence_review", "decisions", "build_checks", "delivery"];
+  for (const [index, stage] of stages.entries()) {
+    const result = await command("run_user_flow.mjs", ["--screen", stage]);
+    const screen = result.stdout.replace(/\n$/, "");
+    assert(screen.includes(`STAGE ${index + 1} OF 5`), `${stage} header is missing`);
+    assert(inspectScreen(screen).violations.length === 0, `${stage} screen violates the contract`);
+  }
+  const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
+  assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "production welcome differs from canonical bytes");
+});
+
+await test("successful ordinary transitions emit ASCII while JSON remains pure", async () => {
+  const runDir = path.join(out, "presentation-run");
+  const inputs = await visibleFlow(cleanEvidence, runDir, ["--stop-after", "inputs"]);
+  const evidence = await visibleFlow(cleanEvidence, runDir, ["--stop-after", "evidence_review"]);
+  const decisions = await visibleFlow(cleanEvidence, runDir, ["--stop-after", "decisions"]);
+  const screens = [inputs.stdout, evidence.stdout, decisions.stdout].map((value) => value.replace(/\n$/, ""));
+  assert(screens[0].includes("STAGE 2 OF 5 - EVIDENCE REVIEW"), "stage-2 start screen is missing");
+  assert(screens[1].includes("STATUS: COMPLETE"), "stage-2 completion screen is missing");
+  assert(screens[2].includes("MATERIAL FORECAST PLAN"), "stage-3 forecast plan is missing");
+  assert(screens[2].includes("totals and links calculate"), "forecast/calculation boundary is missing");
+  assert(screens[2].includes("Reply continue to build"), "pre-build review stop is missing");
+  for (const screen of screens) {
+    assert(inspectScreen(screen).violations.length === 0, "transition screen violates the contract");
+    assert(!screen.includes('"schema_version"'), "machine JSON leaked into the visible route");
+  }
+  const machine = await command("run_user_flow.mjs", [
+    cleanEvidence,
+    "--out", runDir,
+    "--stop-after", "decisions",
+    "--json",
+  ]);
+  const parsed = JSON.parse(machine.stdout);
+  assert(parsed.status === "PAUSED" && parsed.stage === "decisions", machine.stdout);
+  assert(!machine.stdout.includes("MATERIAL FORECAST PLAN"), "ASCII leaked into JSON mode");
+});
+
+await test("no-question production path pauses after decisions", async () => {
+  const result = await flow(cleanEvidence, path.join(out, "clean-run"), ["--stop-after", "decisions"]);
+  assert(result.status === "PAUSED" && result.stage === "decisions", JSON.stringify(result));
+  assert(result.reused_stages.length === 0, "first run unexpectedly reused a stage");
+});
+
+await test("identical restart reuses all completed stages", async () => {
+  const result = await flow(cleanEvidence, path.join(out, "clean-run"), ["--stop-after", "decisions"]);
+  assert(
+    JSON.stringify(result.reused_stages) === JSON.stringify(["inputs", "evidence_review", "decisions"]),
+    `unexpected reuse set ${JSON.stringify(result.reused_stages)}`,
+  );
+});
+
+await test("tampered stage output invalidates only that stage", async () => {
+  const modelCase = path.join(out, "clean-run", "stages", "decisions", "model-case.json");
+  const payload = JSON.parse(await fs.readFile(modelCase, "utf8"));
+  payload.issuer.name = "Tampered Issuer";
+  await fs.writeFile(modelCase, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const result = await flow(cleanEvidence, path.join(out, "clean-run"), ["--stop-after", "decisions"]);
+  assert(
+    JSON.stringify(result.reused_stages) === JSON.stringify(["inputs", "evidence_review"]),
+    `tamper did not target decisions: ${JSON.stringify(result.reused_stages)}`,
+  );
+  const restored = JSON.parse(await fs.readFile(modelCase, "utf8"));
+  assert(restored.issuer.name !== "Tampered Issuer", "tampered output was retained");
+});
+
+await test("question path stops once and never treats action-required as success", async () => {
+  const runDir = path.join(out, "question-run");
+  const first = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
+  assert(first.status === "ACTION_REQUIRED" && first.question_count === 1, JSON.stringify(first));
+  const second = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
+  assert(second.status === "ACTION_REQUIRED", JSON.stringify(second));
+  assert(!second.reused_stages.includes("decisions"), "action-required decision stage was reused as success");
+});
+
+await test("supplied answer persists and resumes deterministically", async () => {
+  const answers = path.join(out, "acquisition-answers.json");
+  await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+  const runDir = path.join(out, "question-run");
+  const first = await flow(acquisitionEvidence, runDir, [
+    "--answers", answers,
+    "--stop-after", "decisions",
+  ]);
+  assert(first.status === "PAUSED", JSON.stringify(first));
+  const second = await flow(acquisitionEvidence, runDir, [
+    "--answers", answers,
+    "--stop-after", "decisions",
+  ]);
+  assert(second.reused_stages.includes("decisions"), JSON.stringify(second));
+  const answered = JSON.parse(
+    await fs.readFile(path.join(runDir, "stages", "decisions", "model-case.json"), "utf8"),
+  );
+  assert(answered.acquisition?.enabled === 1, "debt-funded acquisition answer was not applied");
+});
+
+await test("invalid evidence blocks before reconciliation", async () => {
+  const invalid = path.join(out, "invalid-evidence-run.json");
+  const payload = JSON.parse(await fs.readFile(cleanEvidence, "utf8"));
+  payload.dcs_export.entity.name = "Wrong Entity plc";
+  await fs.writeFile(invalid, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const result = await flow(invalid, path.join(out, "invalid-run"), [], { allowFailure: true });
+  assert(result.status === "BLOCKED" && result.stage === "inputs", JSON.stringify(result));
+});
+
+await test("a case edited while the run waited blocks the resume by name", async () => {
+  const answers = path.join(out, "pause-mutation-answers.json");
+  await fs.writeFile(answers, `${JSON.stringify({ answers: { acquisition_funding: "debt" } }, null, 2)}\n`);
+  const runDir = path.join(out, "pause-mutation-run");
+  const workspaceToken = "workspace:pause-mutation-fixture";
+  const paused = await flow(acquisitionEvidence, runDir, [
+    "--answers", answers,
+    "--workspace-token", workspaceToken,
+    "--stop-after", "decisions",
+  ]);
+  assert(paused.status === "PAUSED", `expected a pause to resume from: ${JSON.stringify(paused)}`);
+  const carrierPath = paused.carrier ?? path.join(runDir, "run-carrier.json");
+  const resume = async () => {
+    const result = await command(
+      "run_user_flow.mjs",
+      [
+        "--out", runDir,
+        "--carrier", carrierPath,
+        "--workspace-token", workspaceToken,
+        "--stop-after", "decisions",
+        "--json",
+      ],
+      { allowFailure: true },
+    );
+    return JSON.parse(result.stdout);
+  };
+  const untouched = await resume();
+  assert(
+    untouched.status !== "BLOCKED",
+    `an untouched pause must resume: ${JSON.stringify(untouched)}`,
+  );
+  const casePath = path.join(runDir, "stages", "decisions", "model-case.json");
+  const payload = JSON.parse(await fs.readFile(casePath, "utf8"));
+  payload.issuer.name = "Substituted Issuer plc";
+  await fs.writeFile(casePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const blocked = await resume();
+  assert(
+    blocked.status === "BLOCKED" && /run_case_mutated_during_pause/.test(String(blocked.message)),
+    `a substituted case resumed instead of blocking: ${JSON.stringify(blocked)}`,
+  );
+});
+
+const failures = tests.filter((entry) => entry.status !== "PASS");
+const report = {
+  schema_version: "production-user-flow-test-report/1.0",
+  passed: tests.length - failures.length,
+  failed: failures.length,
+  tests,
+};
+await fs.writeFile(path.join(out, "production-user-flow-test-report.json"), `${JSON.stringify(report, null, 2)}\n`);
+console.log(`\n${report.passed}/${tests.length} production user-flow tests pass`);
+if (failures.length > 0) process.exitCode = 1;

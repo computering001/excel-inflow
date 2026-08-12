@@ -738,8 +738,6 @@
   },
   "instruction_required_phrases": [
     "run excel inflow",
-    "node scripts/run_user_flow.mjs --screen inputs",
-    "Do not replace it with a conversational company/ticker question",
     "Non-bypassable end-user route",
     "live-delivery-attestation/1.0",
     "BUILD IDENTITY",
@@ -748,7 +746,10 @@
     "interest income",
     "Flat replacement",
     "acquisition",
-    "central source register"
+    "central source register",
+    "node scripts/run_user_flow.mjs --screen company",
+    "+=[ EXCEL INFLOW ]",
+    "asks for the COMPANY ONLY"
   ],
   "instruction_prohibited_pattern": "\\btransfer\\b",
   "exclude_patterns": [
