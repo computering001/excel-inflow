@@ -32,6 +32,8 @@ const BROKER_SOURCE_TABLES_SCHEMA = schema("broker-source-tables.schema.json");
 const BROKER_SEMANTIC_REPORT_SCHEMA = schema("broker-semantic-verification-report.schema.json");
 const BROKER_CANDIDATE_MANIFEST_SCHEMA = schema("broker-candidate-manifest.schema.json");
 const BROKER_SURFACE_CENSUS_SCHEMA = schema("broker-surface-census.schema.json");
+const BROKER_RUN_STATE_SCHEMA = schema("broker-run-state.schema.json");
+const BROKER_RUNTIME_MEMBERS = schema("broker-runtime-members.json");
 const DCS_SOURCE_TABLES_SCHEMA = schema("dcs-source-tables-v1.schema.json");
 const DCS_CANDIDATE_MANIFEST_SCHEMA = schema("dcs-candidate-manifest-v1.schema.json");
 const DCS_CROSSWALK_SCHEMA = schema("dcs-crosswalk-v1.schema.json");
@@ -72,6 +74,32 @@ async function rerunPythonVerifier(scriptPath, argv, supplied, label) {
 
 function canonicalPayloadSha256(value) {
   return sha256(Buffer.from(JSON.stringify(canonicalise(value)), "utf8"));
+}
+
+async function brokerRuntimeClosureSha256() {
+  if (
+    BROKER_RUNTIME_MEMBERS.schema_version !== "broker-runtime-members/1.0" ||
+    !Array.isArray(BROKER_RUNTIME_MEMBERS.members) ||
+    BROKER_RUNTIME_MEMBERS.members.length === 0 ||
+    new Set(BROKER_RUNTIME_MEMBERS.members).size !== BROKER_RUNTIME_MEMBERS.members.length
+  ) {
+    throw new Error("The broker runtime-members manifest is malformed.");
+  }
+  const skillRoot = path.resolve(HERE, "..", "..");
+  const members = {};
+  for (const relative of BROKER_RUNTIME_MEMBERS.members) {
+    if (
+      typeof relative !== "string" ||
+      path.isAbsolute(relative) ||
+      relative.split(/[\\/]/).includes("..")
+    ) {
+      throw new Error(`Invalid broker runtime member ${JSON.stringify(relative)}.`);
+    }
+    const target = path.resolve(skillRoot, relative);
+    const bytes = await fs.readFile(target);
+    members[relative] = sha256(bytes);
+  }
+  return canonicalCompactSha256(members);
 }
 
 /**
@@ -496,6 +524,10 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       json: await readJsonFile(artifactPath, label),
     };
   };
+  const runState = await artifact(
+    "run_state_path",
+    "Broker controller run state",
+  );
   const extraction = await artifact(
     "extraction_bundle_path",
     "Broker extraction bundle",
@@ -515,6 +547,112 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
         "Broker independent semantic verification report",
       )
     : null;
+  const runStateErrors = validateJsonSchema(
+    runState.json,
+    BROKER_RUN_STATE_SCHEMA,
+  );
+  if (runStateErrors.length > 0) {
+    throw new Error(
+      `Broker controller run state fails its contract: ${runStateErrors[0]}`,
+    );
+  }
+  if (
+    runState.json.pipeline_status !== "PASS" ||
+    runState.json.user_blocking !== false ||
+    (runState.json.tasks ?? []).length !== 0
+  ) {
+    throw new Error(
+      `Broker controller run is ${runState.json.pipeline_status}, not a terminal PASS.`,
+    );
+  }
+  const currentRuntimeClosure = await brokerRuntimeClosureSha256();
+  if (runState.json.runtime_closure_sha256 !== currentRuntimeClosure) {
+    throw new Error(
+      "Broker controller run state was produced by a different broker runtime closure.",
+    );
+  }
+  const stateExtractionArtifact = runState.json.artifacts?.verified_bundle
+    ? "verified_bundle"
+    : "extraction_bundle";
+  const declaredArtifactPaths = {
+    [stateExtractionArtifact]: extraction.path,
+    source_tables: sourceTables.path,
+    crosswalk: crosswalk.path,
+    broker_crosswalk_receipt: receipt.path,
+    ...(semanticReport ? { semantic_report: semanticReport.path } : {}),
+  };
+  for (const [artifactName, declaredPath] of Object.entries(declaredArtifactPaths)) {
+    const statePath = runState.json.artifacts?.[artifactName];
+    if (!statePath || path.resolve(statePath) !== path.resolve(declaredPath)) {
+      throw new Error(
+        `Broker controller run state does not own the declared ${artifactName} artifact.`,
+      );
+    }
+    const declared = {
+      extraction_bundle: extraction,
+      verified_bundle: extraction,
+      source_tables: sourceTables,
+      crosswalk,
+      broker_crosswalk_receipt: receipt,
+      semantic_report: semanticReport,
+    }[artifactName];
+    if (runState.json.artifact_sha256?.[artifactName] !== declared?.sha256) {
+      throw new Error(
+        `Broker controller run state has a stale hash for ${artifactName}.`,
+      );
+    }
+  }
+  const packPath = runState.json.artifacts?.broker_pack;
+  if (!packPath) {
+    throw new Error("Broker controller PASS state has no compiled broker pack.");
+  }
+  const statePack = await readJsonFile(path.resolve(packPath), "Broker controller pack");
+  const statePackBytes = await fs.readFile(path.resolve(packPath));
+  if (runState.json.artifact_sha256?.broker_pack !== sha256(statePackBytes)) {
+    throw new Error("Broker controller run state has a stale hash for broker_pack.");
+  }
+  if (canonicalJson(statePack) !== canonicalJson(evidence.broker_pack)) {
+    throw new Error(
+      "Broker controller pack does not exactly match evidence-run.broker_pack.",
+    );
+  }
+  const expectedCheckpointStages = new Set([
+    "extract",
+    "surface_census",
+    "semantic_verification",
+    "pack_compilation",
+  ]);
+  const checkpointStages = new Set();
+  const checkpointArtifacts = {
+    extract: "extraction_bundle",
+    surface_census: "surface_census",
+    vision: "verified_bundle",
+    semantic_verification: "semantic_report",
+    pack_compilation: "broker_pack",
+  };
+  for (const checkpoint of runState.json.checkpoints ?? []) {
+    if (checkpointStages.has(checkpoint.stage)) {
+      throw new Error(`Broker controller run repeats checkpoint ${checkpoint.stage}.`);
+    }
+    checkpointStages.add(checkpoint.stage);
+    if (checkpoint.status !== "PASS" || !checkpoint.output_sha256) {
+      throw new Error(`Broker controller checkpoint ${checkpoint.stage} is not PASS and hash-bound.`);
+    }
+    const artifactName = checkpointArtifacts[checkpoint.stage];
+    if (
+      artifactName &&
+      checkpoint.output_sha256 !== runState.json.artifact_sha256?.[artifactName]
+    ) {
+      throw new Error(
+        `Broker controller checkpoint ${checkpoint.stage} is detached from ${artifactName}.`,
+      );
+    }
+  }
+  for (const stage of expectedCheckpointStages) {
+    if (!checkpointStages.has(stage)) {
+      throw new Error(`Broker controller PASS state lacks checkpoint ${stage}.`);
+    }
+  }
   const extractionErrors = validateJsonSchema(
     extraction.json,
     BROKER_EXTRACTION_SCHEMA,
@@ -883,6 +1021,9 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     evidence.model_case.broker_pack.house_digests = houseDigests;
   }
   return {
+    broker_run_state_sha256: runState.sha256,
+    broker_runtime_closure_sha256: runState.json.runtime_closure_sha256,
+    broker_cache_key: runState.json.cache_key,
     extraction_bundle_sha256: extraction.sha256,
     source_tables_sha256: sourceTables.sha256,
     crosswalk_sha256: crosswalk.sha256,

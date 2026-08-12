@@ -11,8 +11,7 @@
     "image_sha256",
     "pass_index",
     "producer_id",
-    "method",
-    "tables"
+    "method"
   ],
   "properties": {
     "schema_version": { "enum": ["broker-vision-result/1.0", "broker-vision-result/1.1"] },
@@ -44,6 +43,18 @@
             "maxItems": 4,
             "items": { "type": "number" }
           },
+          "cell_bboxes": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "array",
+              "items": {
+                "type": ["array", "null"],
+                "minItems": 4,
+                "maxItems": 4,
+                "items": { "type": "number" }
+              }
+            }
+          },
           "rows": {
             "type": "array",
             "minItems": 1,
@@ -69,9 +80,23 @@
           "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
           "status": { "enum": ["resolved", "quarantined"] },
           "chosen_source": { "enum": ["pass1", "pass2", "native", "targeted_adjudication"] },
+          "resolved_values": {
+            "type": "array",
+            "items": { "type": ["string", "number", "boolean", "null"] }
+          },
           "rationale": { "type": "string", "minLength": 1 }
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "pass_index": { "enum": [1, 2] } } },
+      "then": { "required": ["tables"] }
+    },
+    {
+      "if": { "properties": { "pass_index": { "const": "resolution" } } },
+      "then": { "required": ["conflict_manifest_sha256", "conflict_decisions", "review_note"] }
+    }
+  ]
 }

@@ -319,16 +319,19 @@ renderer so the product is exercised end to end. Its receipt can never be used
 as the production evidence-run receipt required for delivery.
 
 When raw broker documents are supplied, preserve the complete extracted tables
-before normalising model metrics. Run the hash-bound broker evidence lane
-outside the immutable skill tree:
+before normalising model metrics. Run the hash-bound resumable broker
+controller outside the immutable skill tree:
 
 ```text
-python3 scripts/extract_broker_evidence.py <broker-extraction-request.json> --out <run-folder>/extract
-python3 scripts/compile_broker_surface_census.py <bundle.json> --out <run-folder>/broker-surface-census.json
-python3 scripts/compile_broker_vision.py <bundle.json> --responses <responses-folder> --out <verified-bundle.json>
-python3 scripts/verify_broker_semantics.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker-semantic-verification-report.json
-python3 scripts/compile_broker_pack.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker
+python3 scripts/run_broker_pipeline.py <broker-extraction-request.json> --out <run-folder>/broker [--responses <responses-folder>] [--crosswalk <broker-crosswalk.json>]
 ```
+
+The controller owns the component sequence, immutable-source/runtime cache key,
+checkpoint validation and resume. Never recreate that sequence in chat logic.
+Its internal `NEEDS_*` states are not user blockers. Ordinary readable PDFs
+must be exhausted through native lanes, 300-DPI-or-better table crops, two
+independent structured reads and one bounded cell adjudication before any cell
+is quarantined.
 
 Do not force the complete broker-page inventory into the workbook carrier.
 `broker-source-tables/1.0` remains the lossless run artifact; attachment ingress

@@ -807,6 +807,7 @@
             "native_text",
             "word_geometry",
             "page_image",
+            "table_crop",
             "embedded_image",
             "table_json",
             "xlsx_grid",

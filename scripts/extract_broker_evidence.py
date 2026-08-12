@@ -705,6 +705,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         image_infos = page.get_image_info(xrefs=True) or []
         page_area = max(float(page.rect.width * page.rect.height), 1.0)
         material_image = False
+        material_image_bboxes: list[list[float]] = []
         image_refs: list[str] = []
         for image_index, info in enumerate(image_infos, start=1):
             bbox = info.get("bbox")
@@ -712,6 +713,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 image_area = max(0.0, float((bbox[2] - bbox[0]) * (bbox[3] - bbox[1])))
                 if image_area / page_area >= 0.08:
                     material_image = True
+                    material_image_bboxes.append([float(value) for value in bbox])
             xref = int(info.get("xref") or 0)
             if xref <= 0 or xref in seen_images:
                 continue
@@ -764,6 +766,50 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             )
             artifact_refs.append(page_image_ref)
             if vision_required:
+                # Give the two independent reads a high-resolution view of
+                # every region that may contain a table.  Whole-page renders
+                # remain useful for labels and continuation context, but are
+                # often too small for dense broker appendices.  Region crops
+                # are evidence aids only: they do not become a second source
+                # or bypass the immutable whole-surface census.
+                candidate_regions = [
+                    *table_bboxes,
+                    *text_discovery_bboxes,
+                    *[region["bbox"] for region in material_uncovered],
+                    *material_image_bboxes,
+                ]
+                unique_regions: list[list[float]] = []
+                for raw_bbox in candidate_regions:
+                    bbox = [float(value) for value in raw_bbox]
+                    if any(bbox_iou(bbox, existing) >= 0.85 for existing in unique_regions):
+                        continue
+                    unique_regions.append(bbox)
+                region_crops: list[dict[str, Any]] = []
+                crop_dpi = max(300, render_dpi * 2)
+                crop_matrix = fitz.Matrix(crop_dpi / 72.0, crop_dpi / 72.0)
+                for region_index, bbox in enumerate(unique_regions, start=1):
+                    padding = 12.0
+                    clip = fitz.Rect(
+                        max(float(page.rect.x0), bbox[0] - padding),
+                        max(float(page.rect.y0), bbox[1] - padding),
+                        min(float(page.rect.x1), bbox[2] + padding),
+                        min(float(page.rect.y1), bbox[3] + padding),
+                    )
+                    if clip.width <= 0 or clip.height <= 0:
+                        continue
+                    crop_pixmap = page.get_pixmap(matrix=crop_matrix, clip=clip, alpha=False)
+                    crop_ref = writer.write(
+                        f"crops/page-{page_index + 1:04d}-region-{region_index:03d}.png",
+                        "table_crop",
+                        crop_pixmap.tobytes("png"),
+                    )
+                    artifact_refs.append(crop_ref)
+                    region_crops.append({
+                        "region_id": f"{surface_id}.crop{region_index}",
+                        "image_artifact_id": crop_ref,
+                        "bbox": [float(clip.x0), float(clip.y0), float(clip.x1), float(clip.y1)],
+                        "dpi": crop_dpi,
+                    })
                 task = {
                     "schema_version": "broker-vision-task/1.0",
                     "document_id": descriptor["document_id"],
@@ -773,6 +819,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                     "required_passes": 2,
                     "source_census_artifact_id": census_ref,
                     "uncovered_region_ids": [region["region_id"] for region in material_uncovered],
+                    "region_crops": region_crops,
                     # TRANSCRIBE THE TABLE, DO NOT INVENTORY THE PAGE.
                     #
                     # This instruction used to open "Inventory the complete

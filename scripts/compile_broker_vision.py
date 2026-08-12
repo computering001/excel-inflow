@@ -195,6 +195,13 @@ def raw_table_observations(tables: list[dict[str, Any]]) -> dict[str, list[dict[
                     "column": column_index,
                     "raw_value": value,
                     "numeric_token": token,
+                    "table_bbox": table.get("bbox"),
+                    "cell_bbox": (
+                        (table.get("cell_bboxes") or [])[row_index - 1][column_index - 1]
+                        if row_index <= len(table.get("cell_bboxes") or [])
+                        and column_index <= len((table.get("cell_bboxes") or [])[row_index - 1])
+                        else None
+                    ),
                 })
     for values in observations.values():
         values.sort(key=lambda item: (item["table_index"], item["row"], item["column"], item["numeric_token"]))
@@ -216,6 +223,26 @@ def captured_table_observations(tables: list[dict[str, Any]]) -> dict[str, list[
 
 def observation_tokens(observations: dict[str, list[dict[str, Any]]], key: str) -> list[str]:
     return sorted(item["numeric_token"] for item in observations.get(key, []))
+
+
+def observation_raw_values(observations: dict[str, list[dict[str, Any]]], key: str) -> list[Any]:
+    return [item["raw_value"] for item in observations.get(key, [])]
+
+
+def observation_bbox(observations: list[dict[str, Any]]) -> list[float] | None:
+    boxes = [
+        item.get("cell_bbox") or item.get("table_bbox")
+        for item in observations
+        if item.get("cell_bbox") or item.get("table_bbox")
+    ]
+    if not boxes:
+        return None
+    return [
+        min(float(box[0]) for box in boxes),
+        min(float(box[1]) for box in boxes),
+        max(float(box[2]) for box in boxes),
+        max(float(box[3]) for box in boxes),
+    ]
 
 
 def build_conflict_manifest(
@@ -253,7 +280,12 @@ def build_conflict_manifest(
             "pass1_values": left,
             "pass2_values": right,
             "native_values": native_values,
+            "pass1_raw_values": observation_raw_values(first, key),
+            "pass2_raw_values": observation_raw_values(second, key),
+            "native_raw_values": observation_raw_values(native, key),
             "auto_resolution_source": auto_source,
+            "requires_targeted_adjudication": auto_source is None,
+            "target_bbox": observation_bbox([*first.get(key, []), *second.get(key, [])]),
         })
     payload = {
         "schema_version": "broker-vision-conflict-manifest/1.0",
@@ -304,10 +336,42 @@ def validate_resolution(
         if not str(item.get("rationale") or "").strip():
             return False, {}, f"Conflict {conflict_id} has no adjudication rationale."
         by_id[conflict_id] = item
-    expected = {item["conflict_id"] for item in manifest.get("conflicts", [])}
+    expected = {
+        item["conflict_id"]
+        for item in manifest.get("conflicts", [])
+        if item.get("requires_targeted_adjudication", True)
+    }
     if set(by_id) != expected:
-        return False, {}, "The reviewed resolution does not disposition every conflict exactly once."
+        return False, {}, "The reviewed resolution does not disposition every targeted conflict exactly once."
+    conflicts = {item["conflict_id"]: item for item in manifest.get("conflicts", [])}
+    for conflict_id, item in by_id.items():
+        if item.get("status") == "resolved":
+            chosen = item.get("chosen_source")
+            if chosen == "targeted_adjudication":
+                values = item.get("resolved_values")
+            else:
+                values = conflicts[conflict_id].get(f"{chosen}_raw_values")
+            if not isinstance(values, list) or not values:
+                return False, {}, f"Conflict {conflict_id} has no resolved economic value."
+            item["resolved_values"] = values
     return True, by_id, None
+
+
+def automatic_conflict_decisions(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    decisions: dict[str, dict[str, Any]] = {}
+    for conflict in manifest.get("conflicts", []):
+        source = conflict.get("auto_resolution_source")
+        if not source:
+            continue
+        chosen = "pass1" if source.startswith("pass1") else "pass2"
+        decisions[conflict["conflict_id"]] = {
+            "conflict_id": conflict["conflict_id"],
+            "status": "resolved",
+            "chosen_source": chosen,
+            "resolved_values": list(conflict.get(f"{chosen}_raw_values") or []),
+            "rationale": "The native extraction independently corroborates this visual read.",
+        }
+    return decisions
 
 
 def numeric_token(value: Any) -> str | None:
@@ -381,10 +445,16 @@ def accepted_tables(
         for conflict in conflict_manifest.get("conflicts", []):
             conflict_id = conflict["conflict_id"]
             decision = conflict_decisions[conflict_id]
-            for item in resolution_observations.get(conflict["observation_key"], []):
+            positions = resolution_observations.get(conflict["observation_key"], [])
+            for ordinal, item in enumerate(positions):
+                decision_for_position = dict(decision)
+                if decision.get("status") == "resolved":
+                    values = decision.get("resolved_values") or []
+                    if ordinal < len(values):
+                        decision_for_position["resolved_value"] = values[ordinal]
                 conflict_by_position[(item["table_index"], item["row"], item["column"])] = (
                     conflict_id,
-                    decision,
+                    decision_for_position,
                 )
     compiled = []
     for table_index, raw_table in enumerate(result.get("tables", []), start=1):
@@ -403,6 +473,8 @@ def accepted_tables(
                         else "verified_adjudicated"
                     )
                     basis = decision.get("chosen_source") or "unresolved_after_targeted_adjudication"
+                    if decision["status"] == "resolved" and "resolved_value" in decision:
+                        value = decision["resolved_value"]
                 else:
                     conflict_id = None
                     status = default_authority_status
@@ -667,50 +739,63 @@ def main() -> int:
                         "surface_id": surface_id,
                         "message": "Independent reads differed only in layout, caption, footnote or segmentation; displayed economic observations agree.",
                     })
-                elif resolution_path.is_file():
-                    resolution = json.loads(resolution_path.read_text("utf-8"))
-                    valid_resolution = (
-                        resolution.get("schema_version") in {"broker-vision-result/1.0", "broker-vision-result/1.1"}
-                        and resolution.get("document_id") == document["document_id"]
-                        and resolution.get("surface_id") == surface_id
-                        and resolution.get("image_sha256") == image_artifact["sha256"]
-                        and resolution.get("pass_index") == "resolution"
-                        and str(resolution.get("producer_id") or "").strip()
-                        and resolution.get("method") == "reviewed_resolution"
-                        and str(resolution.get("review_note") or "").strip()
-                    )
-                    decisions_ok, conflict_decisions, decision_error = validate_resolution(
-                        resolution,
-                        conflict_manifest,
-                    )
-                    if not valid_resolution or not decisions_ok:
+                else:
+                    automatic_decisions = automatic_conflict_decisions(conflict_manifest)
+                    targeted_conflicts = [
+                        item for item in conflict_manifest["conflicts"]
+                        if item.get("requires_targeted_adjudication", True)
+                    ]
+                    if not targeted_conflicts:
+                        accepted = max(passes, key=response_richness)
+                        conflict_decisions = automatic_decisions
+                        default_authority_status = "verified_adjudicated"
+                        default_authority_basis = "native_corroborated_visual_read"
+                        conflict_manifests.append(conflict_manifest)
+                    elif resolution_path.is_file():
+                        resolution = json.loads(resolution_path.read_text("utf-8"))
+                        valid_resolution = (
+                            resolution.get("schema_version") in {"broker-vision-result/1.0", "broker-vision-result/1.1"}
+                            and resolution.get("document_id") == document["document_id"]
+                            and resolution.get("surface_id") == surface_id
+                            and resolution.get("image_sha256") == image_artifact["sha256"]
+                            and resolution.get("pass_index") == "resolution"
+                            and str(resolution.get("producer_id") or "").strip()
+                            and resolution.get("method") == "reviewed_resolution"
+                            and str(resolution.get("review_note") or "").strip()
+                        )
+                        decisions_ok, reviewed_decisions, decision_error = validate_resolution(
+                            resolution,
+                            conflict_manifest,
+                        )
+                        if not valid_resolution or not decisions_ok:
+                            unresolved += 1
+                            findings.append({
+                                "id": "broker_vision.resolution_invalid",
+                                "severity": "blocker",
+                                "document_id": document["document_id"],
+                                "surface_id": surface_id,
+                                "message": decision_error or "The discrepancy resolution is missing its image binding or review note.",
+                            })
+                            continue
+                        accepted = max(passes, key=response_richness)
+                        conflict_decisions = {**automatic_decisions, **reviewed_decisions}
+                        default_authority_status = "verified_adjudicated"
+                        default_authority_basis = "targeted_conflict_adjudication"
+                        conflict_manifests.append(conflict_manifest)
+                    else:
                         unresolved += 1
+                        conflict_manifests.append(conflict_manifest)
                         findings.append({
-                            "id": "broker_vision.resolution_invalid",
+                            "id": "broker_vision.pass_disagreement",
                             "severity": "blocker",
                             "document_id": document["document_id"],
                             "surface_id": surface_id,
-                            "message": decision_error or "The discrepancy resolution is missing its image binding or review note.",
+                            "message": (
+                                f"{len(targeted_conflicts)} displayed economic conflict(s) require one bounded targeted adjudication. "
+                                "This is an internal NEEDS_RESOLUTION state, not a request for replacement source files."
+                            ),
                         })
                         continue
-                    accepted = resolution
-                    default_authority_status = "verified_adjudicated"
-                    default_authority_basis = "targeted_conflict_adjudication"
-                    conflict_manifests.append(conflict_manifest)
-                else:
-                    unresolved += 1
-                    conflict_manifests.append(conflict_manifest)
-                    findings.append({
-                        "id": "broker_vision.pass_disagreement",
-                        "severity": "blocker",
-                        "document_id": document["document_id"],
-                        "surface_id": surface_id,
-                        "message": (
-                            f"{len(conflict_manifest['conflicts'])} displayed economic conflict(s) require one bounded targeted adjudication. "
-                            "This is an internal NEEDS_RESOLUTION state, not a request for replacement source files."
-                        ),
-                    })
-                    continue
             new_tables = accepted_tables(
                 accepted,
                 surface_id,

@@ -1,0 +1,25 @@
+{
+  "schema_version": "broker-runtime-members/1.0",
+  "members": [
+    "scripts/run_broker_pipeline.py",
+    "scripts/extract_broker_evidence.py",
+    "scripts/compile_broker_surface_census.py",
+    "scripts/compile_broker_vision.py",
+    "scripts/compile_broker_candidate_manifest.py",
+    "scripts/compile_broker_canonical_tables.py",
+    "scripts/verify_broker_semantics.py",
+    "scripts/compile_broker_pack.py",
+    "assets/broker-extraction-request.schema.json",
+    "assets/broker-extraction-bundle.schema.json",
+    "assets/broker-surface-census.schema.json",
+    "assets/broker-vision-result.schema.json",
+    "assets/broker-candidate-manifest.schema.json",
+    "assets/broker-crosswalk.schema.json",
+    "assets/broker-crosswalk-receipt.schema.json",
+    "assets/broker-semantic-verification-report.schema.json",
+    "assets/broker-source-tables.schema.json",
+    "assets/broker-pack.schema.json",
+    "assets/broker-metric-dictionary.json",
+    "assets/broker-run-state.schema.json"
+  ]
+}

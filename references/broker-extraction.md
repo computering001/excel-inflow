@@ -301,57 +301,60 @@ that authority direction.
 
 ## Runtime commands
 
-Create the raw extraction bundle outside the immutable skill tree:
+Run one content-addressed, resumable transaction outside the immutable skill
+tree. Re-run this exact command after completing any machine-authored task; the
+controller verifies and reuses every unchanged checkpoint:
+
+```text
+python3 scripts/run_broker_pipeline.py <broker-extraction-request.json> --out <run-folder>/broker [--responses <responses-folder>] [--crosswalk <broker-crosswalk.json>]
+```
+
+The returned `broker-run-state/1.0` is the sole broker-stage status authority.
+`NEEDS_VISION`, `NEEDS_RESOLUTION`, `NEEDS_CROSSWALK` and
+`NEEDS_CROSSWALK_REVIEW` are resumable internal states and must have
+`user_blocking=false`. The controller runs and hash-binds all of these component
+commands; they remain available for diagnosis, not host-side sequencing:
 
 ```text
 python3 scripts/extract_broker_evidence.py <broker-extraction-request.json> --out <run-folder>/extract
-```
-
-Independently recompute the whole-surface census before accepting native table
-coverage. A partial native table never excuses uncovered numeric regions:
-
-```text
 python3 scripts/compile_broker_surface_census.py <bundle.json> --out <run-folder>/broker-surface-census.json
-```
-
-If the result is `NEEDS_VISION`, produce two independent results for every
-emitted task and merge them:
-
-```text
 python3 scripts/compile_broker_vision.py <bundle.json> --responses <responses-folder> --out <verified-bundle.json>
-```
-
-If this returns `NEEDS_RESOLUTION`, do not stop the user flow. For every emitted
-conflict manifest, perform one targeted third read of only the disputed table
-region. Write `<surface-id>.resolution.json` as
-`broker-vision-result/1.1`, bind `conflict_manifest_sha256`, and disposition
-every conflict exactly once as `resolved` or `quarantined`. Rerun the same
-command once. A quarantined cell remains evidence but is ineligible for model
-mapping. A second unresolved iteration is terminal for that cell, not for every
-other broker document.
-
-The vision compiler reconciles native and image contributors into canonical
-tables and compiles the immutable candidate manifest from those tables. Header,
-period and candidate membership cannot come from the reviewer-authored
-crosswalk.
-
-Challenge the reviewed crosswalk with the independent semantic oracle before
-pack compilation:
-
-```text
 python3 scripts/verify_broker_semantics.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker-semantic-verification-report.json
-```
-
-Compile the verified evidence and reviewed crosswalk:
-
-```text
 python3 scripts/compile_broker_pack.py <verified-bundle.json> <broker-crosswalk.json> --out <run-folder>/broker
 ```
+
+Every PDF surface is attempted through native text, word geometry, ruled-table
+discovery, unruled-column reconstruction and embedded-image discovery. A weak
+native result creates high-resolution region crops (minimum 300 DPI) alongside
+the whole-page context image. Two independent reads must transcribe grids with
+labels, period headers, values, units, footnotes and bboxes; a flat OCR number
+list is not a table. Disagreement produces a cell-level conflict manifest. One
+targeted third read resolves or quarantines only those cells and overlays the
+result onto the richer agreed transcription; it never replaces the full table
+surface.
 
 Pass the resulting broker pack, source tables, crosswalk and receipt into the
 attachment ingress `broker_evidence` declaration before compiling the evidence
 run. Do not hand-edit `model_case.broker_pack.raw_tables` or
 `source_mappings`.
+
+### External real-layout regression cohort
+
+Keep public or licensed regression PDFs and their hashes outside the universal
+skill and outside the release package. They are test evidence, never modelling
+authority. Run the optional host-side cohort with:
+
+```text
+python3 scripts/run_broker_public_layout_tests.py --corpus <external-corpus.json> --out <disposable-test-folder>
+```
+
+The test must prove every page enters the source inventory, every raw hash and
+page count matches, any weak surface produces 300-DPI-or-better region crops,
+`NEEDS_VISION` remains an internal state with `user_blocking=false`, and a clean
+restart reuses extraction and census checkpoints. A report can join the corpus
+only after its public or licensed source and exact hash are recorded. Never
+bundle the PDFs, promote their values into a company case, or weaken production
+evidence rules because a layout-only report is difficult.
 
 ## Failure handling
 

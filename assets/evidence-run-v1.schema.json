@@ -90,8 +90,11 @@
         "broker_evidence": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["extraction_bundle_sha256", "source_tables_sha256", "crosswalk_sha256", "crosswalk_receipt_sha256"],
+          "required": ["broker_run_state_sha256", "broker_runtime_closure_sha256", "broker_cache_key", "extraction_bundle_sha256", "source_tables_sha256", "crosswalk_sha256", "crosswalk_receipt_sha256"],
           "properties": {
+            "broker_run_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "broker_runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "broker_cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "extraction_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
