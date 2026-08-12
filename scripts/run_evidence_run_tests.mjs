@@ -155,6 +155,17 @@ function formulaOwned(row) {
 function installProductionAuthorityContracts(modelCase) {
   modelCase.statement_authority_contract_version = "authority_v1";
   modelCase.forecast_authority_contract_version = "waterfall_v1";
+  // Legacy cohort cases predate the explicit historical-interest basis. This
+  // source-owned synthetic adapter must perform that migration before it
+  // emits production evidence; the production validator is intentionally not
+  // allowed to infer the basis downstream.
+  if (
+    modelCase.historical_interest_reconciliation &&
+    !modelCase.historical_interest_reconciliation.reported_interest_basis
+  ) {
+    modelCase.historical_interest_reconciliation.reported_interest_basis =
+      "filed_finance_expense_including_lease_interest";
+  }
   for (const instrument of modelCase.instruments ?? []) {
     instrument.balance_basis ??= "native_principal";
   }
@@ -767,6 +778,12 @@ const baseCase = JSON.parse(
   await fs.readFile(path.join(casesDirectory, fixture.base_case), "utf8"),
 );
 const clean = buildCleanEvidenceRun(buildDraftCase(baseCase, fixture), fixture);
+assert(
+  clean.case_evidence?.lanes?.historical_interest_reconciliation
+    ?.reported_interest_basis ===
+    "filed_finance_expense_including_lease_interest",
+  "Source-owned clean evidence omitted the explicit historical-interest basis.",
+);
 const emitCleanIndex = process.argv.indexOf("--emit-clean");
 if (emitCleanIndex >= 0) {
   const target = process.argv[emitCleanIndex + 1];
