@@ -73,6 +73,24 @@ def assert_vision_schema_contract() -> None:
         raise RuntimeError("Broker vision schema/compiler contract drift: " + "; ".join(errors))
 
 
+def material_uncovered_region_count(bundle: dict[str, Any]) -> int:
+    """Reduce the finalized surface dispositions into the bundle total.
+
+    The extraction-time summary is deliberately stale after vision closes a
+    previously uncovered region. Ingress validates immutable per-surface
+    census artifacts, so the compatibility aggregate must be recomputed from
+    those same final surface dispositions rather than carried forward.
+    """
+    return sum(
+        1
+        for document in bundle.get("documents", [])
+        for surface in document.get("surfaces", [])
+        for region in surface.get("uncovered_numeric_regions", [])
+        if region.get("material")
+        and region.get("disposition") not in {"covered", "covered_by_vision"}
+    )
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -964,6 +982,7 @@ def main() -> int:
     bundle["summary"]["numeric_token_count"] = source_count
     bundle["summary"]["native_numeric_recall"] = 1.0 if source_count == 0 else (source_count - missing_count) / source_count
     bundle["summary"]["unresolved_surface_count"] = unresolved
+    bundle["summary"]["material_uncovered_region_count"] = material_uncovered_region_count(bundle)
     bundle["summary"]["duplicate_cell_count"] = duplicate_count
     bundle["summary"]["vision_conflict_count"] = sum(
         len(item.get("conflicts", [])) for item in conflict_manifests

@@ -1,16 +1,16 @@
 {
-  "releaseName": "Excel Inflow v3.2.1",
+  "releaseName": "Excel Inflow v3.2.2",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "3.2.1",
+  "skillVersion": "3.2.2",
   "templateVersion": "2.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T10:48:13.201Z",
+  "generatedAt": "2026-08-12T11:10:43.240Z",
   "centralInstructionsWords": 5932,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "e2252b57572c3eaa0e51ddc9b8331f27b89070bfbc474a9c48b3308f829dc87f",
+    "currentClosureSha256": "1d148ec26518ab890b4d8798689490ea1d1ef2944ea106ed30ec4ca435dcb589",
     "closureFileCount": 164,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -1562,8 +1562,8 @@
     },
     {
       "path": "scripts/compile_broker_vision.py",
-      "sha256": "852827bfa3024f73bcea10b0f969671b490da03c20805afc65bddb6bbfb6f6d1",
-      "bytes": 47695,
+      "sha256": "368ba40a5dc288c399c8e58e65c87ba0ddbc0ef7086e27a9ae27271c7239730c",
+      "bytes": 48557,
       "words": null
     },
     {
