@@ -42,6 +42,7 @@ const positive = [
   ["Interest paid", "cash_flow", "cash_interest_paid"],
   ["Finance income received", "cash_flow", "cash_interest_received"],
   ["Finance income and expense", "cash_flow", "net_finance_addback"],
+  ["Income tax charge", "cash_flow", "cash_flow_tax_addback"],
   ["Income taxes paid", "cash_flow", "cash_taxes"],
   ["Repayments of borrowings", "cash_flow", "debt_repayment"],
   ["Effect of exchange rate changes on cash", "cash_flow", "fx_effect_on_cash"],

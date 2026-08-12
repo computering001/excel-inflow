@@ -457,6 +457,14 @@
         },
         "vision_conflict_summary": {
           "type": "object"
+        },
+        "vision_disposition": {
+          "enum": ["analytical_tables", "verified_non_tabular"]
+        },
+        "vision_non_tabular_reasons": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },

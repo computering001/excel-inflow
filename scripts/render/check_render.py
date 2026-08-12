@@ -202,6 +202,7 @@ class SheetScope:
     row_map: Optional[rowmap.RowMap]
     baseline_key: str
     geometry_addressing: str
+    evidence_only: bool
 
     @property
     def unavailable_checks(self) -> Dict[str, str]:
@@ -232,6 +233,7 @@ class SheetScope:
             "fit_to_width": self.fit_to_page,
             "baseline_key": self.baseline_key,
             "geometry_addressing": self.geometry_addressing,
+            "evidence_only": self.evidence_only,
             "row_map_covers_this_sheet": self.primary,
             "unavailable_checks": self.unavailable_checks,
         }
@@ -265,6 +267,11 @@ def sheet_scopes(
     scopes: List[SheetScope] = []
     for sheet in wanted:
         primary = sheet.name == primary_sheet
+        evidence_only = sheet.name == "> Brokers" or (
+            len(sheet.name) == 3
+            and sheet.name.startswith("B")
+            and sheet.name[1:].isdigit()
+        )
         if primary:
             fc, lc, fr, lr, numeric, label = _print_area(sheet, row_map)
             addressing = (
@@ -284,6 +291,7 @@ def sheet_scopes(
             row_map=row_map if primary else None,
             baseline_key=case if primary else "%s/%s" % (case, _slug(sheet.name)),
             geometry_addressing=addressing,
+            evidence_only=evidence_only,
         ))
     if not scopes:
         raise RuntimeError(
@@ -424,7 +432,11 @@ def _run_sheet(
                 % (rendered.page_count, expect_pages)
             )
 
-        findings.extend(checks.check_font_set(rendered))
+        findings.extend(
+            checks.check_evidence_font_presence(rendered)
+            if scope.evidence_only
+            else checks.check_font_set(rendered)
+        )
 
         # The conditional-formatting analysis that needs no geometry runs HERE,
         # before calibration can fail.  This is the specific defect class with a
@@ -542,7 +554,7 @@ def _run_sheet(
                 unavailable[name] = support_reason
             evidence["checks_run"] = [
                 "conditional_formatting_declared",
-                "font_set",
+                "font_presence" if scope.evidence_only else "font_set",
                 "visual_regression" if not structural_only else "render_identity",
             ]
             evidence["checks_unavailable"] = unavailable
@@ -656,7 +668,7 @@ def _run_sheet(
 
         sampler = checks.Sampler(rendered, dpi=max(150, dpi))
 
-        ran: List[str] = ["font_set", "presence", "clipping", "overlap",
+        ran: List[str] = ["font_presence" if scope.evidence_only else "font_set", "presence", "clipping", "overlap",
                           "alignment", "conditional_formatting"]
         findings.extend(checks.check_presence(workbook, sheet, grid, assigned, row_ids))
         findings.extend(checks.check_clipping(workbook, sheet, grid, assigned, metrics, row_ids))

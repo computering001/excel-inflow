@@ -134,6 +134,12 @@ export function reconcileExport(intake, { maximumResidualPercentage } = {}) {
 
   return {
     export_total: exportTotal,
+    // DCS export/1.0 requires every amount column to be in the export's
+    // reporting currency. Instrument.currency is legal denomination only;
+    // translating these values again would double-FX a correctly adapted
+    // multi-currency export.
+    amount_basis: "reporting_currency_carrying_value",
+    reporting_currency: intake?.export?.reporting_currency ?? null,
     reported_gross_debt: reported,
     residual,
     residual_percentage: reported === 0 ? null : Math.abs(residual) / Math.abs(reported),

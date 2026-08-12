@@ -51,6 +51,7 @@ import {
   compileForecastBehaviorMap,
   validateForecastBehaviorMap,
 } from "./lib/forecast_behavior.mjs";
+import { compileCase } from "./lib/case_compiler.mjs";
 import {
   assertLiveDeliveryAttestation,
   compileLiveDeliveryAttestation,
@@ -130,6 +131,8 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
   inputs: Object.freeze([
     "scripts/run_user_flow.mjs",
     "scripts/lib/evidence_run.mjs",
+    "scripts/lib/case_compiler.mjs",
+    "scripts/lib/face_statement_manifest.mjs",
     "scripts/lib/forecast_observation.mjs",
     "scripts/lib/json_schema.mjs",
     "scripts/lib/flow_runtime.mjs",
@@ -139,6 +142,7 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
     "scripts/lib/runtime_isolation.mjs",
     "scripts/lib/run_carrier.mjs",
     "assets/evidence-run-v1.schema.json",
+    "assets/case-source.schema.json",
     "assets/forecast-observation-ledger-v1.schema.json",
     "assets/model-case-v2.schema.json",
   ]),
@@ -157,12 +161,15 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
   decisions: Object.freeze([
     "scripts/lib/flow_questions.mjs",
     "scripts/lib/flow_impact.mjs",
+    "scripts/lib/case_compiler.mjs",
+    "scripts/lib/face_statement_manifest.mjs",
     "scripts/lib/forecast_behavior.mjs",
     "scripts/lib/forecast_candidate_compiler.mjs",
     "scripts/lib/forecast_observation.mjs",
     "assets/forecast-behavior-map-v1.schema.json",
     "assets/forecast-plan-v2.schema.json",
     "assets/forecast-observation-ledger-v1.schema.json",
+    "assets/case-source.schema.json",
   ]),
   delivery: Object.freeze([
     "scripts/lib/flow_read.mjs",
@@ -246,6 +253,22 @@ async function runCommand(binary, args, options = {}) {
   });
 }
 
+function stage4OuterTimeout(modelCase, explicit) {
+  if (explicit !== undefined && explicit !== null) return Number(explicit);
+  const statementRows = [
+    ...(modelCase?.statement_structure?.income_statement ?? []),
+    ...(modelCase?.statement_structure?.cash_flow ?? []),
+  ].length;
+  const brokerHouses = Object.keys(modelCase?.broker_pack?.raw_tables ?? {}).length;
+  const instruments = (modelCase?.instruments ?? []).length;
+  // The inner controller owns leaf-level dynamic timeouts and resumable
+  // checkpoints. The outer shell must outlive the worst single inner leaf,
+  // plus enough headroom for plan/emit/publish, without imposing a shorter
+  // fixed ceiling on a larger evidence-backed workbook.
+  const complexityUnits = Math.max(1, Math.ceil(statementRows / 50)) + brokerHouses + Math.ceil(instruments / 10);
+  return Math.min(3_600_000, 1_200_000 + complexityUnits * 90_000);
+}
+
 async function loadAnswers(target, questions) {
   const text = await fs.readFile(path.resolve(target), "utf8");
   if (target.toLowerCase().endsWith(".json")) {
@@ -253,6 +276,33 @@ async function loadAnswers(target, questions) {
     return { answers: new Map(Object.entries(payload.answers ?? payload)), errors: [], complete: true };
   }
   return parseAnswers(text, questions);
+}
+
+function caseSourceWithRecordedAnswers(caseSource, applied) {
+  const next = structuredClone(caseSource ?? {});
+  const byId = new Map(
+    (next.answers ?? []).map((entry) => [entry.question_id, structuredClone(entry)]),
+  );
+  for (const entry of applied ?? []) {
+    byId.set(entry.id, {
+      question_id: entry.id,
+      round: "B",
+      question: entry.text ?? null,
+      answer: entry.answer,
+      answered_at: null,
+    });
+  }
+  next.answers = [...byId.values()].sort((left, right) =>
+    left.question_id.localeCompare(right.question_id));
+  return next;
+}
+
+function recordedDecisionMap(caseSource) {
+  return new Map(
+    (caseSource?.answers ?? [])
+      .filter((entry) => entry?.round !== "derived")
+      .map((entry) => [entry.question_id, entry.answer]),
+  );
 }
 
 function stoppedOutcome(outcome) {
@@ -263,6 +313,8 @@ function stoppedOutcome(outcome) {
     "reconciliation_stop",
     "awaiting_reexport",
     "inputs_look_wrong",
+    "decision_replay_blocked",
+    "decision_graph_blocked",
   ].includes(outcome);
 }
 
@@ -397,7 +449,10 @@ async function main() {
   }
   await fs.mkdir(runDir, { recursive: true });
   const issuerIdentity = {
-    name: evidenceRun.company_name ?? evidenceRun.model_case?.issuer?.name ?? "Unknown issuer",
+    name:
+      evidenceRun.company_name ??
+      evidenceRun.case_source?.identity?.issuer_name ??
+      "Unknown issuer",
   };
   const identity = await initializeOrVerifyRunIdentity({
     skillRoot: ROOT,
@@ -417,7 +472,12 @@ async function main() {
   const stage1Dir = path.join(runDir, "stages", "inputs");
   const stage1Validation = path.join(stage1Dir, "evidence-validation.json");
   const stage1Evidence = path.join(stage1Dir, "evidence-run.json");
+  const stage1CaseSource = path.join(stage1Dir, "case-source.json");
+  const stage1CaseEvidence = path.join(stage1Dir, "case-evidence.json");
+  const stage1CompileReport = path.join(stage1Dir, "case-compile-report.json");
   await writeTextAtomic(stage1Evidence, await fs.readFile(evidencePath, "utf8"));
+  await writeJsonAtomic(stage1CaseSource, evidenceRun.case_source ?? {});
+  await writeJsonAtomic(stage1CaseEvidence, evidenceRun.case_evidence ?? {});
   async function persistCurrentCarrier(status, artifacts = {}) {
     return writeRunCarrier({
       skillRoot: ROOT,
@@ -439,6 +499,9 @@ async function main() {
   const stage1Outputs = {
     evidence_validation: stage1Validation,
     evidence_run: stage1Evidence,
+    case_source: stage1CaseSource,
+    case_evidence: stage1CaseEvidence,
+    case_compile_report: stage1CompileReport,
   };
   const cached1 = await readUsableStage({
     runDir,
@@ -457,6 +520,19 @@ async function main() {
   } else {
     validation = validateEvidenceRun(evidenceRun);
     await writeJsonAtomic(stage1Validation, serialisable(validation));
+    await writeJsonAtomic(
+      stage1CompileReport,
+      validation.case_compile_report ?? {
+        schema_version: "case-compile-report/1.0",
+        status: "findings",
+        counts: { total: 1, block: 1, warn: 0 },
+        findings: [{
+          id: "case_compile.not_run",
+          severity: "BLOCK",
+          message: "The case compiler did not produce a report.",
+        }],
+      },
+    );
     if (!validation.ok) {
       const errors = validation.errors.map((entry) => entry.message);
       const screen = renderFailure({
@@ -677,6 +753,8 @@ async function main() {
   // the complete question set. No default may answer a question that was shown.
   const stage3Dir = path.join(runDir, "stages", "decisions");
   const answeredCasePath = path.join(stage3Dir, "model-case.json");
+  const answeredCaseSourcePath = path.join(stage3Dir, "case-source.json");
+  const answeredCompileReportPath = path.join(stage3Dir, "case-compile-report.json");
   const forecastPlanPath = path.join(stage3Dir, "forecast-plan.txt");
   const forecastPlanJsonPath = path.join(stage3Dir, "forecast-plan.json");
   const forecastBehaviorPath = path.join(stage3Dir, "forecast-behavior-map.json");
@@ -698,7 +776,10 @@ async function main() {
         outputs: { question_result: questionResult, question_screen: questionScreen },
         detail: { question_count: intakeResult.plan.questions.length },
       });
-      const carrier = await persistCurrentCarrier("AWAITING_DECISIONS");
+      const carrier = await persistCurrentCarrier("AWAITING_DECISIONS", {
+        case_source: stage1CaseSource,
+        case_compile_report: stage1CompileReport,
+      });
       return finish({
         runDir,
         screen: intakeResult.screen,
@@ -760,10 +841,87 @@ async function main() {
       plan: intakeResult.plan,
       answers: parsed.answers,
     });
-    answeredCase = applied.modelCase;
+    const answeredCaseSource = caseSourceWithRecordedAnswers(
+      validation.handoff.case_source,
+      applied.applied,
+    );
+    const recompilation = compileCase(
+      answeredCaseSource,
+      validation.handoff.case_evidence,
+    );
+    await writeJsonAtomic(answeredCaseSourcePath, answeredCaseSource);
+    await writeJsonAtomic(answeredCompileReportPath, recompilation.report);
+    if (recompilation.report.status !== "clean") {
+      const blocks = (recompilation.report.findings ?? []).filter(
+        (entry) => entry.severity === "BLOCK",
+      );
+      const failurePath = path.join(stage3Dir, "case-recompile-failure.json");
+      await writeJsonAtomic(failurePath, {
+        blocker_class: "INTERNAL_WORK",
+        findings: blocks,
+      });
+      const receipt3 = await persistStage({
+        runDir,
+        runId,
+        stageId: "decisions",
+        status: "blocked",
+        inputHashes: {
+          stage2_receipt: receipt2.receipt_hash,
+          answers: await hashFile(path.resolve(options.answers)),
+        },
+        previousReceiptHash: receipt2.receipt_hash,
+        outputs: {
+          case_source: answeredCaseSourcePath,
+          case_compile_report: answeredCompileReportPath,
+          compile_failure: failurePath,
+        },
+        detail: { blocker_class: "INTERNAL_WORK", block_count: blocks.length },
+      });
+      return finish({
+        runDir,
+        screen: renderFailure({
+          stage: "decisions",
+          what_failed: "The recorded decisions did not recompile into a clean case.",
+          why: "This is an internal compiler finding, not a request to replace the evidence pack.",
+          what_would_fix_it: blocks.slice(0, 5).map((entry) => entry.message),
+        }),
+        machine: options.json === true,
+        result: {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          run_id: runId,
+          status: "BLOCKED",
+          stage: "decisions",
+          outcome: "case_recompile_blocked",
+          blocker_class: "INTERNAL_WORK",
+          receipt: receipt3,
+          reused_stages: reusedStages,
+        },
+      });
+    }
+    const replayedIntake = runIntake({
+      intake: validation.handoff.intake,
+      draftCase: recompilation.model_case,
+      priorAnswers: recordedDecisionMap(answeredCaseSource),
+    });
+    if (replayedIntake.outcome !== "proceed") {
+      throw new Error(
+        `Decision replay did not settle the freshly compiled case: ${replayedIntake.outcome}`,
+      );
+    }
+    answeredCase = replayedIntake.working_case;
+    answeredCase.stage_three_answers = {
+      ...(answeredCase.stage_three_answers ?? {}),
+      ...Object.fromEntries(recordedDecisionMap(answeredCaseSource)),
+    };
     answerHash = await hashFile(path.resolve(options.answers));
   } else {
     answeredCase = intakeResult.working_case;
+    await writeJsonAtomic(answeredCaseSourcePath, validation.handoff.case_source);
+    await writeJsonAtomic(
+      answeredCompileReportPath,
+      validation.handoff.case_compile_report,
+    );
     answerHash = hashValue({ skipped: true });
   }
   const stage3Inputs = {
@@ -776,6 +934,8 @@ async function main() {
     forecast_plan: forecastPlanPath,
     forecast_plan_json: forecastPlanJsonPath,
     forecast_behavior_map: forecastBehaviorPath,
+    case_source: answeredCaseSourcePath,
+    case_compile_report: answeredCompileReportPath,
   };
   const cached3 = await readUsableStage({
     runDir,
@@ -907,7 +1067,11 @@ async function main() {
     });
   }
   if (options["stop-after"] === "decisions") {
-    const carrier = await persistCurrentCarrier("READY_TO_BUILD", { model_case: answeredCasePath });
+    const carrier = await persistCurrentCarrier("READY_TO_BUILD", {
+      model_case: answeredCasePath,
+      case_source: answeredCaseSourcePath,
+      case_compile_report: answeredCompileReportPath,
+    });
     return finish({
       runDir,
       screen: renderForecastPlanScreen(answeredCase),
@@ -1030,6 +1194,8 @@ async function main() {
     verification: { path: path.join(buildDir, "verify"), kind: "directory" },
     render_evidence: { path: path.join(buildDir, "render"), kind: "directory" },
     skill_integrity: path.join(buildDir, "skill-integrity.json"),
+    publication_manifest: path.join(buildDir, "publication.json"),
+    recalc_receipt: path.join(buildDir, "verify", "libreoffice-recalc-receipt.json"),
   };
   const cached4 = await readUsableStage({
     runDir,
@@ -1068,7 +1234,7 @@ async function main() {
     await fs.mkdir(runtimeTmp, { recursive: true });
     const executed = await runCommand(process.execPath, args, {
       cwd: buildDir,
-      timeout: Number(options.timeout ?? 600000),
+      timeout: stage4OuterTimeout(answeredCase, options.timeout),
       env: {
         ...process.env,
         HOME: runtimeHome,

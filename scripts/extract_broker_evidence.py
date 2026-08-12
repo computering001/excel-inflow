@@ -846,8 +846,10 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                         "not normalize, rename or aggregate metrics. Do NOT return a flat list of the "
                         "page's numbers as a table: a row of values without its labels and period "
                         "headings is not a transcription and will be rejected. If a region is genuinely "
-                        "not tabular, describe it in a note instead of inventing a table, and if the page "
-                        "carries no table at all return no tables and say so."
+                        "not tabular, return no tables, set surface_disposition to verified_non_tabular, "
+                        "and give a specific non_tabular_reason. Otherwise set surface_disposition to "
+                        "analytical_tables. The two independent passes must make this classification "
+                        "separately; never invent a table merely to close the numeric census."
                     ),
                 }
                 task_ref = writer.write_json(

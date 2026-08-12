@@ -1,0 +1,11 @@
+{
+  "schema_version": "attachment-evidence-runtime-members/1.0",
+  "members": [
+    "assets/attachment-evidence-controller.schema.json",
+    "assets/attachment-evidence-run-state.schema.json",
+    "scripts/run_attachment_evidence_pipeline.py",
+    "scripts/compile_declared_evidence_run.mjs",
+    "scripts/lib/attachment_ingress.mjs",
+    "scripts/lib/case_source_proposer.mjs"
+  ]
+}

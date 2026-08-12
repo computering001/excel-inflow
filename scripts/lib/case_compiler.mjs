@@ -57,6 +57,7 @@ export const PASSTHROUGH_LANES = Object.freeze([
   "operating_metrics",
   "forecast_assumptions",
   "instruments",
+  "instrument_authority_contract_version",
   "instrument_term_authorities",
   "debt_reconciliation",
   "historical_interest_reconciliation",
@@ -1391,7 +1392,17 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   {
     const ensure = (rowId, spec) => {
       const target = rowIdIndex.get(rowId) ?? roleIndex.get(rowId);
-      if (!target || target.calculation) return;
+      if (!target) return;
+      // A proposed source row can already carry the canonical row ID without
+      // carrying the semantic role.  Formula identity alone is not enough:
+      // downstream acquisition, forecast and proof graphs resolve economic
+      // authorities by semantic role.  Preserve the identity whenever this
+      // doctrine owns it, even if the row already has its calculation.
+      if (spec.semantic_role && !target.semantic_role) {
+        target.semantic_role = spec.semantic_role;
+        roleIndex.set(spec.semantic_role, target);
+      }
+      if (target.calculation) return;
       if ((spec.refs ?? []).some((ref) => !rowIdIndex.has(ref) && !roleIndex.has(ref))) return;
       target.row_type = "calculation";
       target.calculation = { operator: spec.operator, refs: spec.refs };
@@ -1412,7 +1423,13 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       if (adjRow) ensure("adjusted_ebitda_margin", { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
     }
     if (taxRow && preTaxRow) {
-      ensure("effective_tax_rate", { operator: "negated_ratio", refs: [taxRow.row_id, preTaxRow.row_id], number_format: "percentage", style_role: "subsection" });
+      ensure("effective_tax_rate", {
+        operator: "negated_ratio",
+        refs: [taxRow.row_id, preTaxRow.row_id],
+        semantic_role: "effective_tax_rate",
+        number_format: "percentage",
+        style_role: "subsection",
+      });
     }
     if (opBase) ensure("bridge_operating_profit", { operator: "link", refs: [opBase.row_id] });
     if (ntiRow) ensure("non_trading_addback", { operator: "negate", refs: [ntiRow.row_id] });
@@ -1796,7 +1813,9 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   // CGFO restatement add-backs: the CF tax add-back restates the IS tax
   // charge, the finance add-back restates the net finance result.
   const taxAddback =
-    rowsById.get("cash_flow_tax_addback") ?? rowsById.get("cash_flow_tax_expense");
+    byRole.get("cash_flow_tax_addback") ??
+    rowsById.get("cash_flow_tax_addback") ??
+    rowsById.get("cash_flow_tax_expense");
   const taxExpenseRow = byRole.get("tax_expense");
   if (taxAddback && taxExpenseRow && !taxAddback.forecast_calculation && !taxAddback.calculation) {
     wire(taxAddback, { operator: "negate", refs: [taxExpenseRow.row_id] });
@@ -1949,19 +1968,67 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     row.values = [...historicals, ...answer.answer.map(Number)];
   }
 
-  // 3. Capture: whatever remains without a direct authority is not
-  // separately forecast — captured by its reported parent where one exists,
-  // by the headline anchor otherwise.  The behavior map this returns is the
-  // forecast compiler's instruction to treat these rows as captured detail.
-  const parentOfRow = new Map();
-  for (const row of allRows) {
-    for (const ref of row.calculation?.refs ?? []) {
-      if (!parentOfRow.has(ref)) parentOfRow.set(ref, row.row_id);
+  // 3. Capture: detail may be left unforecast only when the statement graph
+  // proves one local aggregate consumes it.  A generic EBITDA fallback used
+  // to capture unrelated income-statement and cash-flow rows; that hid real
+  // forecast gaps and made duplicate row ids order-dependent.  Capture is now
+  // section-qualified, unique and evidenced by formula or hierarchy
+  // membership.  Rows without that proof stay in the normal waterfall.
+  const sectionRowsById = new Map(
+    Object.entries(sections).map(([section, rows]) => [
+      section,
+      new Map((rows ?? []).map((row) => [row.row_id, row])),
+    ]),
+  );
+  const formulaParentsByRow = new Map();
+  for (const [section, sectionRows] of Object.entries(sections)) {
+    const localIds = new Set((sectionRows ?? []).map((row) => row.row_id));
+    for (const row of sectionRows ?? []) {
+      const referenceCounts = new Map();
+      for (const ref of row.calculation?.refs ?? []) {
+        if (!localIds.has(ref)) continue;
+        referenceCounts.set(ref, (referenceCounts.get(ref) ?? 0) + 1);
+      }
+      for (const [ref, count] of referenceCounts) {
+        const key = `${section}\u0000${ref}`;
+        const parents = formulaParentsByRow.get(key) ?? [];
+        parents.push({ parent_row_id: row.row_id, membership_count: count });
+        formulaParentsByRow.set(key, parents);
+      }
     }
   }
-  const anchorRow = byRole.get("adjusted_ebitda") ?? byRole.get("ebit") ?? null;
   const behaviorMap = [];
+  const independentlyForecastedAggregate = (row) => {
+    if (!row) return false;
+    if (row.broker_metric_id) return true;
+    if (["broker", "hardcode", "zero"].includes(row.forecast_treatment)) {
+      return true;
+    }
+    if (
+      (row.forecast_period_authorities ?? []).some(
+        (authority) =>
+          authority &&
+          ![
+            "accounting_identity",
+            "schedule_link",
+            "driver_formula",
+            "roll_forward",
+            "not_separately_forecast",
+            "not_applicable",
+            "unresolved",
+          ].includes(authority.method),
+      )
+    ) {
+      return true;
+    }
+    // A filed total with no component formula is itself an economic series
+    // and may own a total-only forecast. A formula-summed parent is not an
+    // independent authority: blanking one of its children would remove that
+    // child's economics from the total and then from cash.
+    return !(row.calculation?.refs ?? []).length && !row.forecast_calculation;
+  };
   for (const [section, sectionRows] of Object.entries(sections)) {
+    const localRows = sectionRowsById.get(section) ?? new Map();
     for (const row of sectionRows) {
       if (row.row_type === "header") continue;
       // A member-less declared shell carries no rule of its own; under the
@@ -1991,57 +2058,134 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
       // captured; capture is for filed input detail the anchor absorbs.
       if (row.calculation && !emptyShell) continue;
       if ((row.values ?? []).slice(3).some((value) => value !== null && value !== undefined)) continue;
-      const captor = parentOfRow.get(row.row_id) ?? anchorRow?.row_id ?? null;
-      if (!captor) continue;
+      const formulaParents = formulaParentsByRow.get(
+        `${section}\u0000${row.row_id}`,
+      ) ?? [];
+      const hierarchyParent = row.parent_row_id && localRows.has(row.parent_row_id)
+        ? row.parent_row_id
+        : null;
+      const candidateParentIds = new Set([
+        ...formulaParents
+          .filter(
+            (parent) =>
+              parent.membership_count === 1 &&
+              independentlyForecastedAggregate(localRows.get(parent.parent_row_id)),
+          )
+          .map((parent) => parent.parent_row_id),
+        ...(hierarchyParent && independentlyForecastedAggregate(localRows.get(hierarchyParent))
+          ? [hierarchyParent]
+          : []),
+      ]);
+      // Multiple local aggregates are as unsafe as no aggregate: choosing one
+      // would double count or omit the row depending on source order.
+      if (candidateParentIds.size !== 1) continue;
+      const [captor] = candidateParentIds;
+      if (captor === row.row_id) continue;
+      const formulaMembership = formulaParents.some(
+        (parent) =>
+          parent.parent_row_id === captor && parent.membership_count === 1,
+      );
+      const captureMode = formulaMembership
+        ? "formula_membership"
+        : "semantic_scope";
       row.forecast_treatment = "uncalculated";
       row.forecast_capture_parent_id = captor;
-      row.forecast_capture_mode = "semantic_scope";
+      row.forecast_capture_mode = captureMode;
       behaviorMap.push({
+        section,
         row_id: row.row_id,
         behavior: "captured_detail",
         allowed_methods: ["not_separately_forecast"],
       });
     }
   }
-  // Chain compression: a captured subtotal cannot be a captor — every
-  // captured row points at the nearest ancestor that actually calculates a
-  // forecast, falling back to the headline anchor.
-  const capturedIds = new Set(behaviorMap.map((entry) => entry.row_id));
-  const calculatesForecast = (row) =>
+  // A captured row cannot itself be an endpoint.  Compress only through
+  // unique section-local formula membership.  If the chain is ambiguous or
+  // has no live producer, revoke capture and return the row to the ordinary
+  // waterfall rather than inventing a cross-section economic anchor.
+  const capturedKeys = new Set(
+    behaviorMap.map((entry) => `${entry.section}\u0000${entry.row_id}`),
+  );
+  const calculatesForecast = (section, row) =>
     Boolean(
       row &&
-        !capturedIds.has(row.row_id) &&
-        (row.broker_metric_id ||
-          row.forecast_calculation ||
-          row.forecast_treatment === "broker" ||
-          SPINE_ROLES.has(row.semantic_role)),
+        !capturedKeys.has(`${section}\u0000${row.row_id}`) &&
+        independentlyForecastedAggregate(row),
     );
-  const rowById = new Map(allRows.map((row) => [row.row_id, row]));
   for (const entry of behaviorMap) {
-    const row = rowById.get(entry.row_id);
+    const localRows = sectionRowsById.get(entry.section) ?? new Map();
+    const row = localRows.get(entry.row_id);
     if (!row) continue;
     // A live formula parent that SUMS the row proves the capture by formula
     // membership — the strongest certificate the contract accepts, and the
     // only one that holds across sections.
-    const formulaParent = rowById.get(parentOfRow.get(row.row_id));
+    const uniqueFormulaParents = (
+      formulaParentsByRow.get(`${entry.section}\u0000${row.row_id}`) ?? []
+    ).filter(
+      (parent) =>
+        parent.membership_count === 1 &&
+        independentlyForecastedAggregate(localRows.get(parent.parent_row_id)),
+    );
+    const formulaParent = uniqueFormulaParents.length === 1
+      ? localRows.get(uniqueFormulaParents[0].parent_row_id)
+      : null;
     if (
       formulaParent &&
-      !capturedIds.has(formulaParent.row_id) &&
-      (formulaParent.calculation?.refs ?? []).includes(row.row_id)
+      !capturedKeys.has(`${entry.section}\u0000${formulaParent.row_id}`) &&
+      (formulaParent.calculation?.refs ?? []).filter(
+        (reference) => reference === row.row_id,
+      ).length === 1
     ) {
       row.forecast_capture_parent_id = formulaParent.row_id;
       row.forecast_capture_mode = "formula_membership";
       continue;
     }
-    let captor = rowById.get(row.forecast_capture_parent_id);
+    const declaredCaptorId = row.forecast_capture_parent_id;
+    let captor = localRows.get(declaredCaptorId);
     const seen = new Set();
-    while (captor && capturedIds.has(captor.row_id) && !seen.has(captor.row_id)) {
+    while (
+      captor &&
+      capturedKeys.has(`${entry.section}\u0000${captor.row_id}`) &&
+      !seen.has(captor.row_id)
+    ) {
       seen.add(captor.row_id);
-      captor = rowById.get(parentOfRow.get(captor.row_id));
+      const nextParents = (
+        formulaParentsByRow.get(
+          `${entry.section}\u0000${captor.row_id}`,
+        ) ?? []
+      ).filter((parent) => parent.membership_count === 1);
+      captor = nextParents.length === 1
+        ? localRows.get(nextParents[0].parent_row_id)
+        : null;
     }
-    if (!calculatesForecast(captor)) captor = anchorRow;
-    if (captor && captor.row_id !== row.row_id) {
+    if (
+      captor &&
+      captor.row_id !== row.row_id &&
+      captor.row_id !== declaredCaptorId
+    ) {
       row.forecast_capture_parent_id = captor.row_id;
+      row.forecast_capture_mode = "formula_membership";
+    }
+    if (!calculatesForecast(entry.section, captor)) {
+      // A missing local captor is not replaced by an economic row from the
+      // other statement.  Drop the speculative capture so the ordinary
+      // behavior/evidence waterfall must resolve the row or block it.
+      delete row.forecast_capture_parent_id;
+      delete row.forecast_capture_mode;
+      delete row.forecast_treatment;
+      entry.behavior = "recurring_flow";
+      entry.allowed_methods = [
+        "actual_plus_remainder",
+        "company_guidance",
+        "company_indication",
+        "broker_consensus",
+        "user_assumption",
+        "driver_formula",
+        "historical_average",
+        "historical_trend",
+        "carry_forward",
+        "explicit_zero",
+      ];
     }
   }
   return behaviorMap;
@@ -2450,15 +2594,39 @@ export function compileCase(caseSource, evidence = {}) {
       if (Array.isArray(row.values) && row.values.every((value) => value === null)) {
         delete row.values;
       }
-      // Deliberately uncalculated rows print history and nothing else — any
-      // forecast the waterfall drafted for them is discarded, not sealed.
+      // A source row may arrive with the legacy/presentation row_type
+      // `uncalculated`, but the sealed waterfall is the economic authority.
+      // Preserve a blank only when all three period authorities explicitly
+      // declare absence.  If the waterfall found an executable forecast,
+      // promote the row to an input so neither the solver nor renderer can
+      // silently discard the newly minted formula/value.
       if (row.row_type === "uncalculated") {
-        if (Array.isArray(row.values)) {
-          row.values = [...row.values.slice(0, 3), null, null, null];
+        const periodAuthorities = row.forecast_period_authorities ?? [];
+        const deliberatelyBlank =
+          periodAuthorities.length === 3 &&
+          periodAuthorities.every((authority) =>
+            ["not_separately_forecast", "not_applicable"].includes(
+              authority?.method,
+            ),
+          );
+        if (deliberatelyBlank) {
+          if (Array.isArray(row.values)) {
+            row.values = [...row.values.slice(0, 3), null, null, null];
+          }
+          delete row.forecast_period_calculations;
+          delete row.forecast_calculation;
+          row.forecast_treatment = "uncalculated";
+        } else if (
+          periodAuthorities.some(
+            (authority) =>
+              authority &&
+              !["unresolved", "not_separately_forecast", "not_applicable"].includes(
+                authority.method,
+              ),
+          )
+        ) {
+          row.row_type = "input";
         }
-        delete row.forecast_period_calculations;
-        delete row.forecast_calculation;
-        row.forecast_treatment = "uncalculated";
       }
       // Aggregate members forecast as formula SHARES of their block at
       // solve — cached drafts are not sealed.

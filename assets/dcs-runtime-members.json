@@ -1,0 +1,18 @@
+{
+  "schema_version": "dcs-runtime-members/1.0",
+  "members": [
+    "scripts/run_dcs_pipeline.py",
+    "scripts/extract_dcs_evidence.py",
+    "scripts/compile_dcs_evidence.py",
+    "scripts/verify/dcs_evidence_oracle.py",
+    "assets/dcs-extraction-request-v1.schema.json",
+    "assets/dcs-source-tables-v1.schema.json",
+    "assets/dcs-candidate-manifest-v1.schema.json",
+    "assets/dcs-crosswalk-v1.schema.json",
+    "assets/dcs-projection-v1.schema.json",
+    "assets/dcs-evidence-receipt-v1.schema.json",
+    "assets/dcs-independent-verification-v1.schema.json",
+    "assets/dcs-run-state.schema.json",
+    "assets/dcs-export.schema.json"
+  ]
+}

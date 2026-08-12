@@ -724,6 +724,37 @@ class Proof:
                             expected_balance = balancing_ending_cash
                         elif treatment == "hardcode":
                             expected_balance = series3(definition.get("forecast_values"))[index]
+                        elif treatment == "linked_debt_addback":
+                            linked_ids = definition.get("linked_instrument_ids") or []
+                            linked_entry_by_id = {
+                                entry["instrument_id"]: entry
+                                for entry in mechanics["entries"]
+                            }
+                            missing_linked_ids = [
+                                instrument_id
+                                for instrument_id in linked_ids
+                                if instrument_id not in linked_entry_by_id
+                            ]
+                            self.require(
+                                "cash-buckets",
+                                block_name,
+                                index,
+                                bucket_id + ".linked_instruments_present",
+                                not missing_linked_ids,
+                                actual=missing_linked_ids,
+                                expected=[],
+                            )
+                            # This bucket is the gross-cash add-back for debt
+                            # that the issuer presents net in cash.  It follows
+                            # the CURRENT period's independently recomputed
+                            # instrument endings; carrying the opening bucket
+                            # would leave stale cash after a linked overdraft
+                            # amortises or matures.
+                            expected_balance = sum(
+                                number(linked_entry_by_id[instrument_id]["ending_reporting"])
+                                for instrument_id in linked_ids
+                                if instrument_id in linked_entry_by_id
+                            )
                         else:
                             expected_balance = opening_balance
                         self.compare(
@@ -757,6 +788,18 @@ class Proof:
                                     and cash_bucket_definitions[plan["bucket_id"]].get(
                                         "included_in_cash_flow_cash", True
                                     ) is not False
+                                ]
+                            elif treatment == "linked_debt_addback":
+                                expected_references = [
+                                    "%s%s"
+                                    % (
+                                        column,
+                                        instrument_plans[instrument_id]["debt_row"],
+                                    )
+                                    for instrument_id in (
+                                        definition.get("linked_instrument_ids") or []
+                                    )
+                                    if instrument_id in instrument_plans
                                 ]
                             elif block_name == "pro_forma":
                                 expected_references = [

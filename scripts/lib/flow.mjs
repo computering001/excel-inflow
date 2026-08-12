@@ -40,6 +40,7 @@ import {
 import { entityStop } from "./flow_entity.mjs";
 import {
   applyExplicitSourcePolicies,
+  applyRecordedAnswers,
   planQuestions,
   pruneDecisionGraph,
   QUESTION_LIMIT,
@@ -60,6 +61,7 @@ export {
   planQuestions,
   pruneDecisionGraph,
   settleAnswers,
+  applyRecordedAnswers,
   buildDeliveryReport,
   QUESTION_LIMIT,
   STAGES,
@@ -252,9 +254,39 @@ export function runIntake({
     ...Object.fromEntries(explicitPolicies.applied),
   };
 
-  const resolved = priorAnswers instanceof Map
-    ? priorAnswers
+  const carriedAnswers = priorAnswers instanceof Map
+    ? new Map(priorAnswers)
     : new Map(Object.entries(draftCase?.stage_three_answers ?? {}));
+  // Source-backed policy effects were just applied above. Do not replay the
+  // same mutation a second time when a carried answer records that policy too.
+  for (const id of explicitPolicies.applied.keys()) carriedAnswers.delete(id);
+  const replay = applyRecordedAnswers({
+    modelCase: workingCase,
+    intake,
+    reconciliation: { ...reconciliation, residual_carried: false },
+    answers: carriedAnswers,
+  });
+  if (replay.invalid.length > 0) {
+    return {
+      outcome: "decision_replay_blocked",
+      stage: 3,
+      blocker_class: "INTERNAL_WORK",
+      replay,
+      working_case: workingCase,
+      reconciliation,
+      stage_one: stageOne,
+      screen: renderFailure({
+        stage: "decisions",
+        what_failed: "A carried decision no longer matches its registered options.",
+        why: "The sealed decision can suppress a question only after its economic mutation replays successfully.",
+        what_would_fix_it: replay.invalid.map(
+          (entry) => `${entry.question_id}: expected one of ${entry.allowed_answers.join(", ")}.`,
+        ),
+      }),
+    };
+  }
+  workingCase = replay.modelCase;
+  const resolved = new Map(carriedAnswers);
   for (const [id, answer] of explicitPolicies.applied) resolved.set(id, answer);
   // No announced refinancing means contractual repayment.  Seed that
   // deterministic answer before pruning so the ordinary production journey
@@ -273,6 +305,24 @@ export function runIntake({
     resolved,
     limit,
   });
+
+  if (plan.status === "blocked") {
+    return {
+      outcome: "decision_graph_blocked",
+      stage: 3,
+      blocker_class: "INTERNAL_WORK",
+      plan,
+      working_case: workingCase,
+      reconciliation,
+      stage_one: stageOne,
+      screen: renderFailure({
+        stage: "decisions",
+        what_failed: "The decision impact graph could not evaluate a registered ambiguity.",
+        why: "Both branches are economically infeasible; this is internal preparation work, not a request for replacement evidence.",
+        what_would_fix_it: plan.blocked.map((entry) => `${entry.id}: ${entry.reason}`),
+      }),
+    };
+  }
 
   if (plan.status === "inputs_look_wrong") {
     return {
@@ -355,9 +405,10 @@ export function applyAnswers({ workingCase, plan, answers }) {
       text: entry.text,
     });
   }
-  next.stage_three_answers = Object.fromEntries(
-    applied.map((entry) => [entry.id, entry.answer]),
-  );
+  next.stage_three_answers = {
+    ...(workingCase.stage_three_answers ?? {}),
+    ...Object.fromEntries(applied.map((entry) => [entry.id, entry.answer])),
+  };
   return { modelCase: next, applied, settled };
 }
 

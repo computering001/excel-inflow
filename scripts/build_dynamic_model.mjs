@@ -1193,11 +1193,22 @@ function isSelfCarry(definition, calculation) {
 function genericFormula(rowPlan, definition, column, calculationOverride = null) {
   const calculation = calculationOverride ?? definition.calculation;
   if (!calculation) return null;
+  const statementRowsById = new Map(
+    Object.values(rowPlan.statement_rows ?? {})
+      .flat()
+      .map((row) => [row.row_id, row]),
+  );
   return compileStatementFormula({
     rule: calculation,
     definition,
     column,
-    rowForId: (id) => rowPlan.rows_by_id[id] ?? null,
+    // Statement identities resolve to their visible statement row before the
+    // global physical registry. Interest and waterfall schedules deliberately
+    // reuse semantic IDs such as `cash_interest_paid`; using the global map
+    // first made CFO bypass its visible child and link straight to the
+    // schedule, reversing the intended authority direction and breaking the
+    // face subtotal.
+    rowForId: (id) => statementRowsById.get(id)?.row ?? rowPlan.rows_by_id[id] ?? null,
     previousColumn,
     historicalColumns: HISTORICAL_COLUMNS,
     // Native iterative calculation can leave sub-cent circularity residue in
@@ -4284,6 +4295,12 @@ function configureOperatingModel(
       `B${plan.debt_row}`,
       instrumentDisplayLabel(instrument, modelCase.issuer.reporting_currency),
     );
+    addCommentOnce(
+      workbook,
+      sheet,
+      `B${plan.debt_row}`,
+      `Full sourced instrument name: ${instrument.name}`,
+    );
     setValue(sheet, `C${plan.debt_row}`, instrument.currency);
     // Column C is always legal denomination.  Column D is deliberately called
     // Amount rather than Nominal: it may be native principal, a reporting-
@@ -6541,7 +6558,13 @@ function configureOperatingModel(
     setValue(
       sheet,
       `B${plan.interest_row}`,
-      plan.pik_interest_row ? `${instrument.name} — cash interest` : instrument.name,
+      instrumentDisplayLabel(instrument, modelCase.issuer.reporting_currency),
+    );
+    addCommentOnce(
+      workbook,
+      sheet,
+      `B${plan.interest_row}`,
+      `Full sourced instrument name: ${instrument.name}`,
     );
     // Three columns, three different facts. C is the RATE TYPE — which of the
     // two bases applies. D is the COUPON on a fixed instrument or the SPREAD on
@@ -6592,7 +6615,17 @@ function configureOperatingModel(
       instrument.rate_type === "floating" ? BENCHMARK : COUPON;
     setPeriodNumberFormat(sheet, plan.interest_row, AMOUNT);
     if (plan.pik_interest_row) {
-      setValue(sheet, `B${plan.pik_interest_row}`, `${instrument.name} — PIK interest`);
+      setValue(
+        sheet,
+        `B${plan.pik_interest_row}`,
+        "PIK interest",
+      );
+      addCommentOnce(
+        workbook,
+        sheet,
+        `B${plan.pik_interest_row}`,
+        `Full sourced instrument name: ${instrument.name}`,
+      );
       setValue(sheet, `C${plan.pik_interest_row}`, "PIK");
       setValue(sheet, `E${plan.pik_interest_row}`, "PIK rate");
       styleFont(
@@ -9795,7 +9828,17 @@ function statementSolverValues(
       // prior_period reads the PREVIOUS column, which is already solved.
       // Resolving its ref in this column would recurse into the row itself
       // (flat carry) and report a false cycle.
-      if (calculation.operator !== "prior_period") {
+      // Historical inference operators consume the row's three reported
+      // values, not its current forecast cell.  Their formula-spec carries
+      // the row id as provenance, so resolving that ref here would manufacture
+      // a self-cycle before genericNumericValue can read the history.
+      if (
+        ![
+          "prior_period",
+          "historical_average",
+          "historical_trend",
+        ].includes(calculation.operator)
+      ) {
         const currentPeriodRefs =
           calculation.operator === "prior_period_scaled_by"
             ? calculation.refs.slice(1)

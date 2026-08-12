@@ -49,6 +49,10 @@ const modelCase = {
     instrument("bullet"),
     instrument("amortising", { scheduled_amortisation: [15, 10, 5] }),
     instrument("maturing", { maturity_date: "2026-06-30", maturity_treatment: "contractual" }),
+    instrument("evergreen_dated", {
+      maturity_date: "2026-06-30",
+      maturity_treatment: "non_maturing_within_forecast",
+    }),
     instrument("issuance", {
       opening_balance: 0,
       new_issuance: [120, 0, 0],
@@ -60,6 +64,12 @@ const modelCase = {
       class: "rcf",
       opening_balance: 40,
       maturity_date: "2026-03-31",
+      maturity_treatment: "contractual",
+    }),
+    instrument("bilateral_revolver", {
+      class: "rcf",
+      opening_balance: 30,
+      maturity_date: "2027-06-30",
       maturity_treatment: "contractual",
     }),
     instrument("eur_native", {
@@ -123,6 +133,20 @@ assert.equal(maturity[0].maturity_repayment.basis_amount, 100);
 assert.equal(maturity[0].ending_post_repayment.basis_amount, 0);
 assert.ok(maturity[0].active_fraction > 0.49 && maturity[0].active_fraction < 0.51);
 
+const evergreenDated = statesFor("evergreen_dated");
+assert.deepEqual(
+  evergreenDated.map((state) => state.ending_post_repayment.basis_amount),
+  [100, 100, 100],
+  "A non-maturing declaration was overridden by an in-horizon audit date.",
+);
+assert.ok(
+  evergreenDated.every(
+    (state) =>
+      state.repayment_state === "none" &&
+      state.maturity_repayment.basis_amount === 0,
+  ),
+);
+
 const issuance = statesFor("issuance")[0];
 assert.equal(issuance.issuance.basis_amount, 120);
 assert.equal(issuance.fair_value_movement.basis_amount, 3);
@@ -142,6 +166,14 @@ for (const rcf of statesFor("liquidity_rcf")) {
   assert.equal(rcf.inclusion.mandatory_repayment, false);
   assert.equal(rcf.inclusion.liquidity, true);
 }
+
+const bilateral = statesFor("bilateral_revolver");
+assert.equal(bilateral[0].repayment_state, "none");
+assert.equal(bilateral[0].inclusion.liquidity, false);
+assert.equal(bilateral[1].repayment_state, "maturity");
+assert.equal(bilateral[1].maturity_repayment.basis_amount, 30);
+assert.equal(bilateral[1].inclusion.mandatory_repayment, true);
+assert.equal(bilateral[1].ending_post_repayment.basis_amount, 0);
 
 const eur = statesFor("eur_native")[0];
 assert.equal(eur.translation.method, "native_principal_to_reporting");
@@ -311,6 +343,37 @@ assert.equal(
   "Omitted legacy balance basis did not preserve prior native-principal economics.",
 );
 
+const noRcfCase = structuredClone(modelCase);
+noRcfCase.case_id = "instrument_period_state_no_rcf";
+noRcfCase.instruments = noRcfCase.instruments.filter(
+  (candidate) => candidate.class !== "rcf",
+);
+delete noRcfCase.rcf_policy;
+const noRcfArtifact = compileInstrumentPeriodState(noRcfCase);
+assert.ok(
+  noRcfArtifact.states.every((state) => state.inclusion.liquidity === false),
+  "An instrument-only/no-RCF state graph invented a balancing facility.",
+);
+
+const residualPricingCase = structuredClone(modelCase);
+const residualInstrument = residualPricingCase.instruments.find(
+  (candidate) => candidate.instrument_id === "bullet",
+);
+residualInstrument.rate_type = "unpriced";
+residualInstrument.pricing_treatment = "residual_interest_plug";
+delete residualPricingCase.other_interest;
+assert.throws(
+  () => compileInstrumentPeriodState(residualPricingCase),
+  /require an explicit three-period other_interest authority/,
+);
+residualPricingCase.other_interest = [5, 6, 7];
+assert.equal(
+  compileInstrumentPeriodState(residualPricingCase).states.find(
+    (state) => state.instrument_id === "bullet",
+  ).pricing_state,
+  "residual_interest_plug",
+);
+
 const doubleFxMutation = structuredClone(artifact);
 const carryingMutation = doubleFxMutation.states.find((state) => state.instrument_id === "usd_carrying");
 carryingMutation.ending_post_repayment.reporting_amount *= 10;
@@ -374,5 +437,9 @@ console.log(JSON.stringify({
     "mandatory_membership",
     "semantic_membership_binding",
     "legacy_native_basis_migration",
+    "non_maturing_with_in_horizon_date",
+    "multi_rcf_role_separation",
+    "no_rcf_state_graph",
+    "residual_pricing_authority",
   ],
 }, null, 2));

@@ -29,6 +29,7 @@ INDEPENDENT_RESPONSE_BINDING_FIELDS = {
     "producer_id",
     "producer_fingerprint",
     "method",
+    "surface_disposition",
     "tables",
 }
 
@@ -55,7 +56,7 @@ def vision_schema_contract_errors(schema: dict[str, Any]) -> list[str]:
         None,
     )
     required = set((pass_clause or {}).get("then", {}).get("required", []))
-    required_for_pass = {"tables", "producer_fingerprint"}
+    required_for_pass = {"tables", "producer_fingerprint", "surface_disposition"}
     if not required_for_pass.issubset(required):
         errors.append(
             "independent pass schema does not require: "
@@ -87,7 +88,11 @@ def material_uncovered_region_count(bundle: dict[str, Any]) -> int:
         for surface in document.get("surfaces", [])
         for region in surface.get("uncovered_numeric_regions", [])
         if region.get("material")
-        and region.get("disposition") not in {"covered", "covered_by_vision"}
+        and region.get("disposition") not in {
+            "covered",
+            "covered_by_vision",
+            "verified_non_tabular",
+        }
     )
 
 
@@ -127,7 +132,9 @@ def bind_final_surface_census(
             "whole_surface_numeric_token_count"
         ),
         "source_numeric_tokens": list(
-            surface.get("vision_source_census", {}).get(
+            prior_payload.get("source_numeric_tokens", [])
+            if surface.get("vision_disposition") == "verified_non_tabular"
+            else surface.get("vision_source_census", {}).get(
                 "source_numeric_tokens",
                 surface.get("source_table_numeric_tokens", []),
             )
@@ -145,7 +152,11 @@ def bind_final_surface_census(
             1
             for region in surface.get("uncovered_numeric_regions", [])
             if region.get("material")
-            and region.get("disposition") not in {"covered", "covered_by_vision"}
+            and region.get("disposition") not in {
+                "covered",
+                "covered_by_vision",
+                "verified_non_tabular",
+            }
         ),
     }
     relative = Path("artifacts") / document["document_id"] / "census-final" / f"{surface['surface_id']}.json"
@@ -200,10 +211,38 @@ def comparable_tables(tables: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def comparable_response(result: dict[str, Any]) -> dict[str, Any]:
     return {
+        "surface_disposition": result.get("surface_disposition"),
         "tables": comparable_tables(result.get("tables", [])),
         "footnotes": sorted(normalise_scalar(item) for item in result.get("footnotes", []) if normalise_scalar(item)),
         "surface_numeric_tokens": sorted(str(item) for item in result.get("surface_numeric_tokens", [])),
     }
+
+
+def classify_surface_disposition(passes: list[dict[str, Any]]) -> tuple[str | None, str | None]:
+    """Close the physical capture question independently of model use.
+
+    Capture is complete when both reads independently preserve at least one
+    analytical grid, or when both explicitly verify that the numeric surface is
+    non-tabular.  A mixed answer or an empty analytical answer is unresolved.
+    """
+    dispositions = [item.get("surface_disposition") for item in passes]
+    valid = all(
+        (
+            disposition == "analytical_tables"
+            and bool(result.get("tables"))
+        )
+        or (
+            disposition == "verified_non_tabular"
+            and not result.get("tables")
+            and bool(str(result.get("non_tabular_reason") or "").strip())
+        )
+        for disposition, result in zip(dispositions, passes)
+    )
+    if not valid:
+        return None, "Each pass must carry a non-empty analytical grid or a reasoned verified_non_tabular disposition."
+    if len(set(dispositions)) != 1:
+        return None, "The independent passes disagree on whether the surface contains an analytical table."
+    return dispositions[0], None
 
 
 PERIOD_HEADER_RE = re.compile(
@@ -783,6 +822,53 @@ def main() -> int:
                 unresolved += 1
                 findings.append({"id": "broker_vision.passes_not_independent", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Pass 1 and pass 2 must have distinct producer IDs and execution fingerprints; renaming one producer is not independence."})
                 continue
+            disposition, disposition_error = classify_surface_disposition(passes)
+            if disposition_error:
+                unresolved += 1
+                findings.append({
+                    "id": "broker_vision.surface_disposition_unresolved",
+                    "severity": "blocker",
+                    "document_id": document["document_id"],
+                    "surface_id": surface_id,
+                    "message": (
+                        "The two reads do not agree on whether this surface contains an analytical table. "
+                        "Repeat only this surface once with an explicit analytical_tables or verified_non_tabular disposition."
+                    ),
+                })
+                continue
+            if disposition == "verified_non_tabular":
+                surface["source_table_numeric_tokens"] = []
+                surface["vision_disposition"] = "verified_non_tabular"
+                surface["vision_non_tabular_reasons"] = [
+                    str(result.get("non_tabular_reason")).strip()
+                    for result in passes
+                ]
+                surface["lane_status"]["vision"] = "complete"
+                surface["vision_reason"] = None
+                surface["vision_conflict_summary"] = {
+                    "conflict_count": 0,
+                    "quarantined_conflict_count": 0,
+                    "resolved_conflict_count": 0,
+                }
+                for region in surface.get("uncovered_numeric_regions", []):
+                    if region.get("material"):
+                        region["disposition"] = "verified_non_tabular"
+                bind_final_surface_census(
+                    bundle=bundle,
+                    document=document,
+                    surface=surface,
+                )
+                findings.append({
+                    "id": "broker_vision.verified_non_tabular",
+                    "severity": "warning",
+                    "document_id": document["document_id"],
+                    "surface_id": surface_id,
+                    "message": (
+                        "Two independent reads classified the material numeric surface as non-tabular. "
+                        "Its whole-surface census remains sealed as evidence and contributes no model-eligible table."
+                    ),
+                })
+                continue
             conflict_manifest = None
             conflict_decisions = None
             if canonical(comparable_response(passes[0])) == canonical(comparable_response(passes[1])):
@@ -896,18 +982,20 @@ def main() -> int:
                 if not (table.get("transcription_structure") or {}).get("is_grid")
             ]
             if structureless and len(structureless) == len(new_tables):
+                unresolved += 1
                 findings.append({
                     "id": "broker_vision.structureless_transcription",
-                    "severity": "warning",
+                    "severity": "blocker",
                     "document_id": document["document_id"],
                     "surface_id": surface_id,
                     "message": (
                         f"Every transcription for this surface lacks row labels or period headings "
                         f"({len(structureless)} table(s)). The values are retained as evidence but the "
-                        "surface yielded no analytical table, so nothing here is model-eligible. A page "
-                        "carrying a real table needs a re-read that preserves its grid."
+                        "surface yielded no analytical table. Re-read this surface with its row labels "
+                        "and period headings, or independently classify it as verified_non_tabular."
                     ),
                 })
+                continue
             document["tables"].extend(new_tables)
             vision_tokens = table_numeric_tokens(new_tables)
             # A two-pass consensus or hash-bound reviewed resolution is the
@@ -933,6 +1021,7 @@ def main() -> int:
             )
             surface["table_count"] += len(new_tables)
             surface["lane_status"]["vision"] = "complete"
+            surface["vision_disposition"] = "analytical_tables"
             surface["vision_reason"] = None
             surface["vision_conflict_summary"] = {
                 "conflict_count": len((conflict_manifest or {}).get("conflicts", [])),

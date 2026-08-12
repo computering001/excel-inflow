@@ -287,7 +287,12 @@ def record(check_id, passed, message, evidence=None, status=None, violations=Non
     }
 
 
-def calculation_value(values_by_id, prior_values_by_id, calculation):
+def calculation_value(
+    values_by_id,
+    prior_values_by_id,
+    calculation,
+    historical_values_by_id=None,
+):
     if not calculation:
         return None
     refs = calculation.get("refs") or []
@@ -324,6 +329,22 @@ def calculation_value(values_by_id, prior_values_by_id, calculation):
         return 0 if prior_driver == 0 else prior_value * current_driver / prior_driver
     if operator == "average":
         return 0 if not values else sum(values) / len(values)
+    if operator == "historical_average":
+        history = [
+            numeric(value)
+            for value in (historical_values_by_id or {}).get(refs[0], [])
+            if value is not None and value != ""
+        ]
+        return 0 if not history else sum(history) / len(history)
+    if operator == "historical_trend":
+        history = [
+            numeric(value)
+            for value in (historical_values_by_id or {}).get(refs[0], [])
+        ]
+        if len(history) != 3:
+            return 0
+        slope = ((history[1] - history[0]) + (history[2] - history[1])) / 2
+        return history[2] + slope * (numeric(calculation.get("forecast_index")) + 1)
     return None
 
 
@@ -1297,6 +1318,13 @@ def main(argv: List[str]) -> int:
     link_compiled = []
     # A check that inspected zero rows has not passed, it has failed to run.
     arithmetic_visited = 0
+    historical_values_by_id = {
+        definition["row_id"]: [
+            value("%s%s" % (historical_column, definition["row"]))
+            for historical_column in ["G", "H", "I"]
+        ]
+        for definition in all_statement_rows
+    }
     prior_column_map = {"H": "G", "I": "H", "K": "J", "L": "K", "T": "S", "U": "T"}
     for column in ["G", "H", "I"] + FORECAST_COLUMNS + PRO_FORMA_COLUMNS:
         values_by_id = {
@@ -1394,7 +1422,12 @@ def main(argv: List[str]) -> int:
                     link_compiled.append(entry)
                 continue
 
-            expected = calculation_value(values_by_id, prior_values, active)
+            expected = calculation_value(
+                values_by_id,
+                prior_values,
+                active,
+                historical_values_by_id,
+            )
             actual = values_by_id.get(definition["row_id"])
             if not equal(
                 actual,

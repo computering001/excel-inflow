@@ -56,7 +56,13 @@ def compile_census(bundle: dict[str, Any], bundle_root: Path) -> dict[str, Any]:
             lanes = census.get("table_discovery_lanes") or []
             if surface.get("kind") in {"pdf_page", "workbook_sheet"} and not lanes:
                 findings.append({"id": "broker_census.discovery_lanes_missing", "severity": "blocker", **context, "message": "No table-discovery lane was recorded."})
-            material = [region for region in census.get("uncovered_numeric_regions", []) if region.get("material")]
+            material = [
+                region for region in census.get("uncovered_numeric_regions", [])
+                if region.get("material")
+                and region.get("disposition") not in {
+                    "covered", "covered_by_vision", "verified_non_tabular"
+                }
+            ]
             if material and surface.get("lane_status", {}).get("vision") not in {"required", "complete"}:
                 findings.append({"id": "broker_census.material_region_unresolved", "severity": "blocker", **context, "message": "A material uncovered numeric region has no vision disposition."})
             surfaces.append({

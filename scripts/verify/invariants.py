@@ -324,9 +324,12 @@ def validate_semantic_artifacts(manifest, crosswalk_rows) -> List[Dict[str, Any]
                             "company_indication": "hardcode",
                             "user_assumption": "hardcode",
                             "seasonal_run_rate": "hardcode",
-                            "historical_average": "hardcode",
-                            "historical_trend": "hardcode",
-                            "carry_forward": "hardcode",
+                            # These three are visible, auditable formula
+                            # methods.  The source values remain historical
+                            # hardcodes, but the forecast writer is a formula.
+                            "historical_average": "formula",
+                            "historical_trend": "formula",
+                            "carry_forward": "formula",
                             "explicit_zero": "zero",
                             "not_separately_forecast": "uncalculated",
                             "not_applicable": "uncalculated",

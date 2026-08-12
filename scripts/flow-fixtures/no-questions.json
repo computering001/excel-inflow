@@ -1,0 +1,320 @@
+{
+  "fixture_id": "no-questions",
+  "mode": "flow",
+  "description": "A complete export against complete filings. Every field a detector fires on is stated, so nothing clears the first half of the bar and there is no question screen at all. The user goes from the welcome screen to the model without a stop. This is the case that proves the machinery asks because it must, not because it can.",
+  "base_case": "standard-net-cash-v2.json",
+  "case_patch": {},
+  "instruments_add": [],
+  "intake": {
+    "company_name": "Standard Net Cash Co",
+    "export": {
+      "schema_version": "dcs-export/1.0",
+      "export_kind": "debt_instrument_detail",
+      "as_of": "2025-12-31",
+      "source": {
+        "system": "FactSet DCS",
+        "date_basis": "last_fiscal_year_end",
+        "exported_at": "2025-12-31",
+        "report_name": "Debt Capital Structure — instrument detail"
+      },
+      "entity": {
+        "name": "Standard Net Cash Co",
+        "consolidation_level": "group"
+      },
+      "reporting_currency": "USD",
+      "units": "millions",
+      "columns": [
+        {
+          "field": "outstanding_amount",
+          "currency": "USD",
+          "units": "millions"
+        },
+        {
+          "field": "facility_limit",
+          "currency": "USD",
+          "units": "millions"
+        },
+        {
+          "field": "drawn_amount",
+          "currency": "USD",
+          "units": "millions"
+        }
+      ],
+      "instruments": [
+        {
+          "instrument_id": "sncc_bond_2033",
+          "source_row": "dcs.1",
+          "description": "5.000% senior notes due Jun-2033",
+          "instrument_type": "fixed_bond",
+          "currency": "USD",
+          "outstanding_amount": 80,
+          "maturity_date": "2033-06-30",
+          "maturity_precision": "day",
+          "maturity_treatment": "contractual",
+          "next_call_date": null,
+          "rate_type": "fixed",
+          "coupon_rate": 0.05,
+          "refinancing_intent": null
+        },
+        {
+          "instrument_id": "sncc_rcf",
+          "source_row": "dcs.2",
+          "description": "Committed revolving credit facility",
+          "instrument_type": "rcf",
+          "currency": "USD",
+          "outstanding_amount": 0,
+          "maturity_date": "2030-06-30",
+          "maturity_precision": "day",
+          "maturity_treatment": "contractual",
+          "rate_type": "floating",
+          "reference_rate": "SOFR 3M",
+          "margin_bps": 60,
+          "facility_limit": 100,
+          "drawn_amount": 0,
+          "benchmark_curve": {
+            "resolved": [
+              0,
+              0,
+              0
+            ]
+          },
+          "committed": true,
+          "is_backstop_for_paper": false
+        }
+      ]
+    },
+    "filings": {
+      "entity_name": "Standard Net Cash Co",
+      "fiscal_year_end_date": "2025-12-31",
+      "fiscal_label": "FY25",
+      "reported_gross_debt": 80,
+      "maximum_residual_percentage": 0.01,
+      "restricted_cash": null,
+      "leverage_basis": "includes_leases",
+      "minimum_operating_cash": 100,
+      "announced_acquisition": null
+    },
+    "broker_pack": {
+      "schema_version": "broker-pack/1.0",
+      "pack_kind": "broker_forecast_set",
+      "as_of": "2025-12-31",
+      "source_label": "3-house pack, notes dated within twelve months of 2025-12-31",
+      "reporting_currency": "USD",
+      "units": "millions",
+      "forecast_periods": [
+        "2026-12-31",
+        "2027-12-31",
+        "2028-12-31"
+      ],
+      "metrics": {
+        "revenue": {
+          "label": "Revenue",
+          "unit_kind": "currency"
+        },
+        "adjusted_ebitda": {
+          "label": "Adj. EBITDA",
+          "unit_kind": "currency"
+        },
+        "ebit": {
+          "label": "EBIT",
+          "unit_kind": "currency"
+        },
+        "depreciation_and_amortisation": {
+          "label": "D&A",
+          "unit_kind": "currency"
+        },
+        "effective_tax_rate": {
+          "label": "Effective tax rate",
+          "unit_kind": "percent_decimal"
+        },
+        "capex": {
+          "label": "Capex",
+          "unit_kind": "currency",
+          "sign_convention": "outflow_positive"
+        },
+        "change_in_working_capital": {
+          "label": "Change in working capital",
+          "unit_kind": "currency",
+          "sign_convention": "outflow_negative"
+        },
+        "dividends": {
+          "label": "Dividends",
+          "unit_kind": "currency",
+          "sign_convention": "outflow_positive"
+        }
+      },
+      "houses": [
+        {
+          "house_id": "a",
+          "house_name": "A",
+          "published_date": "2025-12-31",
+          "analyst": null,
+          "document": {
+            "file_name": "a-2025-12-31.pdf",
+            "media_type": "application/pdf",
+            "text_extractable": true,
+            "page_reference": "forecast summary"
+          },
+          "estimates": {
+            "revenue": [
+              1030,
+              1060.9,
+              1092.73
+            ],
+            "adjusted_ebitda": [
+              206,
+              212.18,
+              218.55
+            ],
+            "ebit": [
+              154.5,
+              159.13,
+              163.91
+            ],
+            "depreciation_and_amortisation": [
+              50.5,
+              51.01,
+              51.52
+            ],
+            "effective_tax_rate": [
+              0.21,
+              0.21,
+              0.21
+            ],
+            "capex": [
+              102,
+              104.04,
+              106.12
+            ],
+            "change_in_working_capital": [
+              -10.2,
+              -10.4,
+              -10.61
+            ],
+            "dividends": [
+              20.8,
+              21.63,
+              22.5
+            ]
+          }
+        },
+        {
+          "house_id": "b",
+          "house_name": "B",
+          "published_date": "2025-12-31",
+          "analyst": null,
+          "document": {
+            "file_name": "b-2025-12-31.pdf",
+            "media_type": "application/pdf",
+            "text_extractable": true,
+            "page_reference": "forecast summary"
+          },
+          "estimates": {
+            "revenue": [
+              1034,
+              1069.16,
+              1105.51
+            ],
+            "adjusted_ebitda": [
+              206.8,
+              213.83,
+              221.1
+            ],
+            "ebit": [
+              155.1,
+              160.37,
+              165.83
+            ],
+            "depreciation_and_amortisation": [
+              50.5,
+              51.01,
+              51.52
+            ],
+            "effective_tax_rate": [
+              0.21,
+              0.21,
+              0.21
+            ],
+            "capex": [
+              102,
+              104.04,
+              106.12
+            ],
+            "change_in_working_capital": [
+              -10.2,
+              -10.4,
+              -10.61
+            ],
+            "dividends": [
+              20.8,
+              21.63,
+              22.5
+            ]
+          }
+        },
+        {
+          "house_id": "c",
+          "house_name": "C",
+          "published_date": "2025-12-31",
+          "analyst": null,
+          "document": {
+            "file_name": "c-2025-12-31.pdf",
+            "media_type": "application/pdf",
+            "text_extractable": true,
+            "page_reference": "forecast summary"
+          },
+          "estimates": {
+            "revenue": [
+              1038,
+              1077.44,
+              1118.39
+            ],
+            "adjusted_ebitda": [
+              207.6,
+              215.49,
+              223.68
+            ],
+            "ebit": [
+              155.7,
+              161.62,
+              167.76
+            ],
+            "depreciation_and_amortisation": [
+              50.5,
+              51.01,
+              51.52
+            ],
+            "effective_tax_rate": [
+              0.21,
+              0.21,
+              0.21
+            ],
+            "capex": [
+              102,
+              104.04,
+              106.12
+            ],
+            "change_in_working_capital": [
+              -10.2,
+              -10.4,
+              -10.61
+            ],
+            "dividends": [
+              20.8,
+              21.63,
+              22.5
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "expect": {
+    "outcome": "proceed",
+    "detected_count": 0,
+    "candidate_count": 0,
+    "question_count": 0,
+    "screen_is_null": true,
+    "read_is": "The company is net cash throughout the forecast, holding steady at USD 300m, so leverage never becomes a meaningful measure. Liquidity never drops below USD 500m (2026). The revolver is undrawn throughout."
+  }
+}

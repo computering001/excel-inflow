@@ -61,13 +61,15 @@ function historicalCandidate(row, behavior, forecastIndex) {
   const history = historicalValues(row);
   const observed = history.filter((value) => value !== null);
   if (observed.length === 0) return null;
-  if (observed.every((value) => Math.abs(value) <= 1e-12)) {
-    return { method: "explicit_zero", origin: "historical_inference", source_kind: "historical_inference", value: 0, note: "All three comparable historical observations are zero." };
-  }
   if (!["recurring_flow", "driver_linked_flow", "seasonal_flow"].includes(behavior)) return null;
   const last = observed.at(-1);
   if (behavior === "seasonal_flow") {
-    return { method: "seasonal_run_rate", origin: "historical_inference", source_kind: "historical_inference", value: last, formula_spec: { operator: "seasonal_run_rate", row_id: row.row_id, forecast_index: forecastIndex }, note: "Comparable-period seasonality applied through a visible formula." };
+    // Three annual observations contain no within-year shape.  Calling the
+    // last annual value a seasonal run-rate used to manufacture evidence and
+    // was then silently materialised as a historical average.  A seasonal
+    // candidate is emitted only by a real partial-period/remainder authority;
+    // annual history alone therefore remains unresolved.
+    return null;
   }
   if (observed.length === 3 && Math.sign(observed[0]) === Math.sign(observed[1]) && Math.sign(observed[1]) === Math.sign(observed[2])) {
     const firstDelta = observed[1] - observed[0];
@@ -138,15 +140,34 @@ function observationCandidates(observationInput, row, forecastIndex, windowStart
 }
 
 function formulaCandidate(row, behavior) {
-  if (isScheduleOwnedForecastRole(row.semantic_role)) return { method: "schedule_link", origin: "semantic_schedule", source_kind: "schedule", formula_spec: { operator: "schedule_link", semantic_role: row.semantic_role } };
+  if (isScheduleOwnedForecastRole(row.semantic_role)) return { method: "schedule_link", origin: "semantic_schedule", source_kind: "schedule", ownership: "absolute", formula_spec: { operator: "schedule_link", semantic_role: row.semantic_role } };
   const calculation = row.forecast_calculation ?? row.calculation;
   if (!calculation) return null;
-  const method = ["prior_period", "prior_period_scaled_by"].includes(calculation.operator)
+  // Formula shape, not a broad row label, determines ownership.  A
+  // prior-period rule is a forecast mechanism even when the row was emitted
+  // as a calculation row; treating it as an accounting identity made it
+  // absolute and prevented guidance or stronger evidence from competing.
+  const rollForward = ["prior_period", "prior_period_scaled_by"].includes(
+    calculation.operator,
+  );
+  const method = rollForward
     ? "roll_forward"
-    : behavior === "driver_linked_flow"
-      ? "driver_formula"
-      : "accounting_identity";
-  return { method, origin: "declared_formula", source_kind: "formula", formula_spec: structuredClone(calculation) };
+    : behavior === "accounting_identity"
+      ? "accounting_identity"
+      : "driver_formula";
+  return {
+    method,
+    origin: "declared_formula",
+    source_kind: "formula",
+    ownership: method === "accounting_identity" ? "absolute" : "waterfall",
+    formula_spec: structuredClone(calculation),
+    note:
+      method === "accounting_identity"
+        ? "The row is owned by its declared accounting identity."
+        : method === "roll_forward"
+          ? "The declared per-period roll-forward remains visible and competes at its waterfall rung."
+          : "The declared driver formula remains visible and competes at its waterfall rung.",
+  };
 }
 
 function declaredCandidate(row, forecastIndex) {
@@ -155,20 +176,110 @@ function declaredCandidate(row, forecastIndex) {
 }
 
 function brokerCandidate(modelCase, row, forecastIndex) {
-  const metricId = row?.broker_metric_id ??
-    (row?.forecast_treatment === "broker" ? row?.semantic_role : null);
-  if (!metricId) return null;
-  const selection = resolveBrokerForecastSelection(modelCase, metricId, forecastIndex);
-  if (!finite(selection?.value)) return null;
+  // Broker availability is evidence, not a presentation property.  Testing
+  // the semantic role even when row planning did not pre-label the row keeps
+  // working-capital and other issuer-specific aggregates independent of a
+  // hardwired broker treatment while still requiring an actually resolved
+  // broker selection.
+  const metricIds = [...new Set([
+    row?.broker_metric_id,
+    row?.semantic_role,
+    row?.row_id,
+  ].filter(Boolean))];
+  for (const metricId of metricIds) {
+    const selection = resolveBrokerForecastSelection(modelCase, metricId, forecastIndex);
+    if (!finite(selection?.value)) continue;
+    return {
+      method: "broker_consensus",
+      origin: "row_broker_selection",
+      source_kind: "broker",
+      value: Number(selection.value),
+      source_id: "broker-pack",
+      source_bindings: ["broker-pack"],
+      broker_metric_id: metricId,
+      note: `Selected ${metricId} from the declared broker case.`,
+    };
+  }
+  return null;
+}
+
+const INDEPENDENT_CAPTURE_METHODS = new Set([
+  "actual_plus_remainder",
+  "contractual_commitment",
+  "company_guidance",
+  "company_indication",
+  "broker_consensus",
+  "user_assumption",
+  "historical_average",
+  "historical_trend",
+  "seasonal_run_rate",
+  "carry_forward",
+  "explicit_zero",
+]);
+
+function independentlyForecastedParent(modelCase, parent, forecastIndex) {
+  if (!parent) return false;
+  if (brokerCandidate(modelCase, parent, forecastIndex)) return true;
+  const declared = declaredCandidate(parent, forecastIndex);
+  if (declared && INDEPENDENT_CAPTURE_METHODS.has(declared.method)) return true;
+  if (finite(parent.values?.[forecastIndex + 3])) return true;
+  // A disclosed aggregate with no component or forecast formula is itself an
+  // economic series and will enter the ordinary evidence waterfall. A parent
+  // whose formula consumes the child is not independent unless one of the
+  // direct authorities above replaces that formula for this period.
+  return !(parent.calculation?.refs ?? []).length && !parent.forecast_calculation;
+}
+
+function captureCandidate(modelCase, row, rows, forecastIndex, material) {
+  if (!row.forecast_capture_parent_id) return null;
+  const parentMatches = rows.filter(
+    (candidate) => candidate.row_id === row.forecast_capture_parent_id,
+  );
+  const suppliedCertificates = (row.forecast_capture_certificates ?? []).filter(
+    (certificate) =>
+      certificate?.forecast_index === forecastIndex &&
+      certificate?.parent_row_id === row.forecast_capture_parent_id,
+  );
+  const parent = parentMatches[0] ?? null;
+  const mode = suppliedCertificates[0]?.mode ?? row.forecast_capture_mode;
+  const formulaMembership = (parent?.calculation?.refs ?? []).filter(
+    (reference) => reference === row.row_id,
+  ).length;
+  const hierarchyMembership = row.parent_row_id === row.forecast_capture_parent_id;
+  const membershipProved = mode === "formula_membership"
+    ? formulaMembership === 1
+    : hierarchyMembership || formulaMembership === 1;
+  if (
+    parentMatches.length !== 1 ||
+    suppliedCertificates.length > 1 ||
+    !membershipProved ||
+    !independentlyForecastedParent(modelCase, parent, forecastIndex)
+  ) {
+    return {
+      method: "unresolved",
+      origin: "invalid_capture_candidate",
+      source_kind: "none",
+      material,
+      reason: `Capture ${row.row_id} -> ${row.forecast_capture_parent_id} lacks one unique section-local parent, membership proof and an independently forecasted aggregate parent for this period.`,
+    };
+  }
+  const certificate = suppliedCertificates[0] ?? {
+    forecast_index: forecastIndex,
+    parent_row_id: row.forecast_capture_parent_id,
+    mode,
+    material,
+    proof:
+      mode === "formula_membership"
+        ? "The unique section-local parent formula contains this row exactly once."
+        : "The unique section-local declared hierarchy assigns this row to the parent.",
+  };
   return {
-    method: "broker_consensus",
-    origin: "row_broker_selection",
-    source_kind: "broker",
-    value: Number(selection.value),
-    source_id: "broker-pack",
-    source_bindings: ["broker-pack"],
-    broker_metric_id: metricId,
-    note: `Selected ${metricId} from the declared broker case.`,
+    method: "not_separately_forecast",
+    origin: "capture_candidate",
+    source_kind: "none",
+    material,
+    capture_certificate: structuredClone(certificate),
+    note: row.forecast_capture_note ?? `Captured by ${row.forecast_capture_parent_id}.`,
   };
 }
 
@@ -185,7 +296,26 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
     return start.toISOString().slice(0, 10);
   });
   const behaviorRows = Array.isArray(behaviorMap) ? behaviorMap : behaviorMap?.rows ?? [];
-  const behaviorByRow = new Map(behaviorRows.map((entry) => [entry.row_id, entry]));
+  const sectionsByRowId = new Map();
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of rowsBySection?.[section] ?? []) {
+      const sections = sectionsByRowId.get(row.row_id) ?? [];
+      sections.push(section);
+      sectionsByRowId.set(row.row_id, sections);
+    }
+  }
+  const behaviorByRow = new Map();
+  for (const entry of behaviorRows) {
+    const declaredSection = entry.section;
+    const uniqueSection = (sectionsByRowId.get(entry.row_id) ?? []).length === 1
+      ? sectionsByRowId.get(entry.row_id)[0]
+      : null;
+    const section = declaredSection ?? uniqueSection;
+    // A sectionless behavior instruction is accepted only while its row id is
+    // globally unique.  Duplicate issuer identifiers in two statements must
+    // be section-qualified rather than inheriting whichever entry was last.
+    if (section) behaviorByRow.set(`${section}\u0000${entry.row_id}`, entry);
+  }
   // TIER 1 — THE ANCHOR IS ALWAYS CONSUMED, AND IT OUTRANKS ITS OWN IDENTITY.
   //
   // The headline anchor row is usually a calculation (Adjusted EBITDA as a
@@ -219,10 +349,22 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
   const states = [];
   const ledger = [];
   for (const section of ["income_statement", "cash_flow"]) {
-    for (const row of rowsBySection?.[section] ?? []) {
+    const sectionRows = rowsBySection?.[section] ?? [];
+    for (const row of sectionRows) {
       if (row.row_type === "header") continue;
-      const behaviorEntry = behaviorByRow.get(row.row_id);
-      const behavior = behaviorEntry?.behavior ?? (isScheduleOwnedForecastRole(row.semantic_role) ? "schedule_owned" : row.calculation ? "accounting_identity" : "recurring_flow");
+      const behaviorEntry = behaviorByRow.get(`${section}\u0000${row.row_id}`);
+      const declaredCalculation = row.forecast_calculation ?? row.calculation;
+      const behavior = behaviorEntry?.behavior ?? (
+        isScheduleOwnedForecastRole(row.semantic_role)
+          ? "schedule_owned"
+          : ["prior_period", "prior_period_scaled_by"].includes(
+                declaredCalculation?.operator,
+              )
+            ? "driver_linked_flow"
+            : declaredCalculation
+              ? "accounting_identity"
+              : "recurring_flow"
+      );
       const allowedMethods = new Set(behaviorEntry?.allowed_methods ?? []);
       const evidenceMaterial = forecastRowMateriality(modelCase, row);
       const historyMaterial = historicalValues(row).some((value) => value !== null && Math.abs(value) > 1e-9);
@@ -236,13 +378,17 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         if (broker) candidates.push(broker);
         const formula = formulaCandidate(row, behavior);
         if (formula) candidates.push(formula);
-        if (!formula) {
-          candidates.push(...observationCandidates(observationInput, row, forecastIndex, windowStarts[forecastIndex], forecastPeriods[forecastIndex]));
-          const inferred = historicalCandidate(row, behavior, forecastIndex);
-          if (inferred) candidates.push(inferred);
-        }
+        // Evidence is assembled independently of formula presence.  Only a
+        // genuine accounting identity or schedule link owns the row before
+        // this ladder; driver and roll-forward formulas compete at their
+        // declared waterfall rungs.
+        candidates.push(...observationCandidates(observationInput, row, forecastIndex, windowStarts[forecastIndex], forecastPeriods[forecastIndex]));
+        const inferred = historicalCandidate(row, behavior, forecastIndex);
+        if (inferred) candidates.push(inferred);
         if (behavior === "not_applicable") candidates.push({ method: "not_applicable", origin: "behavior", source_kind: "none", material: false, note: "The row is outside the applicable economic scope." });
-        if (behavior === "captured_detail" && row.forecast_capture_parent_id) candidates.push({ method: "not_separately_forecast", origin: "capture_candidate", source_kind: "none", material, note: row.forecast_capture_note ?? `Captured by ${row.forecast_capture_parent_id}.` });
+        if (behavior === "captured_detail" && row.forecast_capture_parent_id) {
+          candidates.push(captureCandidate(modelCase, row, sectionRows, forecastIndex, material));
+        }
         if (candidates.length === 0) candidates.push({ method: "unresolved", origin: "compiler", source_kind: "none", reason: "No compatible forecast candidate exists." });
 
         const compatible = candidates.filter((candidate) =>
@@ -272,9 +418,24 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           section === "income_statement" &&
           anchorOwnedRoles.has(row.semantic_role) &&
           Boolean(broker);
-        let owner = anchorOwned
+        const absoluteFormula = formula?.ownership === "absolute";
+        const invalidCapture = candidates.find(
+          (candidate) => candidate.origin === "invalid_capture_candidate",
+        );
+        // A declared `not_separately_forecast` authority states the intended
+        // treatment but does not, by itself, prove exclusive parent coverage.
+        // For captured detail, consume the candidate that re-performed that
+        // proof against the current section graph and carries its certificate.
+        const certifiedCapture = behavior === "captured_detail"
+          ? candidates.find(
+              (candidate) =>
+                candidate.origin === "capture_candidate" &&
+                candidate.capture_certificate,
+            )
+          : null;
+        let owner = invalidCapture ?? certifiedCapture ?? (anchorOwned
           ? broker
-          : formula && compatible.includes(formula)
+          : absoluteFormula && compatible.includes(formula)
             ? formula
             : selectForecastAuthority(compatible) ??
               // Deliberate absence is a valid owner of last resort: a captured
@@ -286,7 +447,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               compatible.find((candidate) =>
                 ["not_separately_forecast", "not_applicable"].includes(candidate.method),
               ) ??
-              null;
+              null);
         if (!owner) {
           const unresolved = {
             method: "unresolved",
@@ -312,14 +473,18 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               ? `Method ${candidate.method} is not permitted for behavior ${behavior}.`
               : anchorOwned
                 ? "The broker anchor is Tier-1 consumed and outranks the identity formula on the anchor row."
-                : formula
+                : absoluteFormula
                   ? "Formula or schedule ownership outranks independent-input candidates."
                   : `Stronger compatible candidate ${selected.method} selected.`,
         }));
         ledger.push(...candidates);
         const selectedRecord = candidates[selectedIndex];
         const [producerType, renderState] = producerAndRender(selectedRecord.method);
-        const status = selectedRecord.method === "unresolved" && material ? "BLOCKED" : "RESOLVED";
+        const status =
+          selectedRecord.method === "unresolved" &&
+          (material || selectedRecord.origin === "invalid_capture_candidate")
+            ? "BLOCKED"
+            : "RESOLVED";
         states.push({
           state_id: stateId,
           row_id: row.row_id,
@@ -397,13 +562,18 @@ function authorityFromState(state, candidate) {
 }
 
 function calculationFromState(state) {
+  if (["driver_formula", "roll_forward"].includes(state.method)) {
+    return state.formula_spec ? structuredClone(state.formula_spec) : null;
+  }
   if (!["historical_average", "historical_trend", "seasonal_run_rate", "carry_forward"].includes(state.method)) return null;
   if (state.method === "historical_average") return { operator: "historical_average", refs: [state.row_id] };
   if (state.method === "historical_trend") return { operator: "historical_trend", refs: [state.row_id], forecast_index: state.forecast_index };
   if (state.method === "carry_forward") return { operator: "prior_period", refs: [state.row_id] };
-  return state.formula_spec?.operator === "seasonal_run_rate"
-    ? { operator: "historical_average", refs: [state.row_id] }
-    : null;
+  // Seasonal run-rate is intentionally not approximated by an annual average.
+  // The compiler currently admits the method only through an executable
+  // partial-period authority; if a future producer emits it directly, it must
+  // also teach the formula compiler a real seasonal operator.
+  return null;
 }
 
 /**
@@ -414,13 +584,15 @@ function calculationFromState(state) {
 export function materializeForecastPlan(modelCase, plan) {
   const next = structuredClone(modelCase);
   next.statement_structure_compiled_version = "semantic-statements/1.0";
-  const rowsById = new Map([
-    ...(next.statement_structure?.income_statement ?? []),
-    ...(next.statement_structure?.cash_flow ?? []),
-  ].map((row) => [row.row_id, row]));
+  const rowsByKey = new Map();
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of next.statement_structure?.[section] ?? []) {
+      rowsByKey.set(`${section}\u0000${row.row_id}`, row);
+    }
+  }
   const candidatesById = new Map((plan?.candidate_ledger ?? []).map((candidate) => [candidate.candidate_id, candidate]));
   for (const state of plan?.states ?? []) {
-    const row = rowsById.get(state.row_id);
+    const row = rowsByKey.get(`${state.section}\u0000${state.row_id}`);
     if (!row) throw new Error(`Forecast plan state ${state.state_id} refers to missing row ${state.row_id}.`);
     const candidate = candidatesById.get(state.selected_candidate_id);
     row.forecast_period_authorities ??= [null, null, null];
@@ -449,19 +621,45 @@ export function materializeForecastPlan(modelCase, plan) {
       row.formula_authority = "intentionally_blank";
       row.values ??= [null, null, null, null, null, null];
       row.values[state.forecast_index + 3] = null;
+      if (state.producer_type === "captured" && !candidate?.capture_certificate) {
+        throw new Error(
+          `Forecast plan state ${state.state_id} selected capture without a certificate.`,
+        );
+      }
     }
+  }
+  // `uncalculated` is a legacy source/presentation classification, not an
+  // instruction to discard a subsequently sealed economic forecast.  Promote
+  // the row as soon as the plan gives any period an executable authority;
+  // rows whose three authorities explicitly certify capture/not-applicability
+  // remain deliberately blank.  The case compiler repeats this as a terminal
+  // invariant, but the forecast bridge must also be correct in isolation.
+  for (const row of rowsByKey.values()) {
+    if (row.row_type !== "uncalculated") continue;
+    const authorities = row.forecast_period_authorities ?? [];
+    const executable = authorities.some((authority) =>
+      authority &&
+      ![
+        "unresolved",
+        "not_separately_forecast",
+        "not_applicable",
+      ].includes(authority.method),
+    );
+    if (executable) row.row_type = "input";
   }
   return next;
 }
 
 export function validateForecastPlanCaseParity(modelCase, plan) {
   const errors = [];
-  const rowsById = new Map([
-    ...(modelCase?.statement_structure?.income_statement ?? []),
-    ...(modelCase?.statement_structure?.cash_flow ?? []),
-  ].map((row) => [row.row_id, row]));
+  const rowsByKey = new Map();
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase?.statement_structure?.[section] ?? []) {
+      rowsByKey.set(`${section}\u0000${row.row_id}`, row);
+    }
+  }
   for (const state of plan?.states ?? []) {
-    const row = rowsById.get(state.row_id);
+    const row = rowsByKey.get(`${state.section}\u0000${state.row_id}`);
     if (!row) {
       errors.push(`${state.state_id} row is absent from the materialized case.`);
       continue;

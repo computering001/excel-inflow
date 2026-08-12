@@ -181,6 +181,28 @@ def main(argv=None) -> int:
                 ),
             ]
         )
+        linked_bucket_ids = {
+            item.get("bucket_id")
+            for item in ((case.get("cash_policy") or {}).get("buckets") or [])
+            if item.get("forecast_treatment") == "linked_debt_addback"
+        }
+        linked_bucket = next(
+            (
+                item
+                for item in cash_buckets
+                if item.get("bucket_id") in linked_bucket_ids
+            ),
+            None,
+        )
+        if linked_bucket:
+            mutations.append(
+                (
+                    "linked-debt-cash-bucket",
+                    "cash-buckets",
+                    "J%d" % linked_bucket["balance_row"],
+                    13.0,
+                )
+            )
 
     results = []
     for mutation_id, expected_check, address, delta in mutations:
@@ -214,10 +236,25 @@ def main(argv=None) -> int:
             }
         )
 
+    linked_debt_addback_required = any(
+        item.get("forecast_treatment") == "linked_debt_addback"
+        for item in ((case.get("cash_policy") or {}).get("buckets") or [])
+    )
+    linked_debt_addback_mutation_present = any(
+        item["id"] == "linked-debt-cash-bucket" for item in results
+    )
+    all_mutations_passed = all(item["status"] == "PASS" for item in results)
+    linked_debt_addback_covered = (
+        not linked_debt_addback_required
+        or (
+            baseline.get("status") == "PASS"
+            and linked_debt_addback_mutation_present
+        )
+    )
     report = {
         "schema_version": 1,
         "kind": "independent_finance_proof_mutations",
-        "status": "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL",
+        "status": "PASS" if all_mutations_passed and linked_debt_addback_covered else "FAIL",
         "case": os.path.abspath(args.case),
         "workbook": os.path.abspath(args.workbook),
         "case_sha256": hashlib.sha256(open(args.case, "rb").read()).hexdigest(),
@@ -226,6 +263,12 @@ def main(argv=None) -> int:
             open(args.workbook + ".row-map.json", "rb").read()
         ).hexdigest(),
         "baseline_status": baseline.get("status"),
+        "linked_debt_addback_coverage": {
+            "required": linked_debt_addback_required,
+            "positive_baseline_passed": baseline.get("status") == "PASS",
+            "mutation_present": linked_debt_addback_mutation_present,
+            "status": "PASS" if linked_debt_addback_covered else "FAIL",
+        },
         "summary": {
             "passed": sum(item["status"] == "PASS" for item in results),
             "failed": sum(item["status"] == "FAIL" for item in results),

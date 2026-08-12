@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -48,8 +49,14 @@ const CHECKPOINT_ORDER = Object.freeze([
   "semantic_gates",
   "plan",
   "emit",
-  "recalculate_patch",
-  "verify",
+  "recalculate",
+  "terminal_patch",
+  "verify_dynamic",
+  "verify_style",
+  "verify_cache",
+  "verify_finance",
+  "verify_semantic",
+  "verify_aggregate",
   "render",
   "publish",
 ]);
@@ -103,6 +110,25 @@ async function command(binary, args, options = {}) {
   });
 }
 
+function sizeAwareTimeout(bytes, {
+  baseMs = 180000,
+  perMiBMs = 30000,
+  maximumMs = 900000,
+} = {}) {
+  const mebibytes = Math.max(1, Math.ceil(Number(bytes ?? 0) / (1024 * 1024)));
+  return Math.min(maximumMs, baseMs + mebibytes * perMiBMs);
+}
+
+async function workbookExecutionPolicy(workbook) {
+  const stat = await fs.stat(workbook);
+  const timeoutMs = sizeAwareTimeout(stat.size);
+  return {
+    workbook_bytes: stat.size,
+    timeout_ms: timeoutMs,
+    validator_concurrency: stat.size >= 20 * 1024 * 1024 ? 1 : stat.size >= 8 * 1024 * 1024 ? 2 : 3,
+  };
+}
+
 async function resolveSoffice(explicit) {
   const candidates = [
     explicit,
@@ -115,9 +141,11 @@ async function resolveSoffice(explicit) {
   for (const candidate of candidates) {
     const probe = await command(candidate, ["--version"], { timeout: 30000 });
     if (probe.ok) {
+      const version = probe.stdout.trim() || probe.stderr.trim();
       return {
         path: candidate,
-        identity: hashValue({ path: candidate, version: probe.stdout.trim() || probe.stderr.trim() }),
+        version,
+        identity: hashValue({ path: candidate, version }),
       };
     }
   }
@@ -131,13 +159,20 @@ async function resolvePython(explicit) {
     "import json,platform,sys; import openpyxl; print(json.dumps({'python':platform.python_version(),'implementation':platform.python_implementation(),'openpyxl':openpyxl.__version__},sort_keys=True))",
   ], { timeout: 30000 });
   if (!probe.ok) return null;
+  let runtime;
+  try {
+    runtime = JSON.parse(probe.stdout.trim());
+  } catch {
+    return null;
+  }
   return {
     path: candidate,
-    identity: hashValue({ path: candidate, runtime: probe.stdout.trim() }),
+    runtime,
+    identity: hashValue({ path: candidate, runtime }),
   };
 }
 
-async function recalcWithSoffice(soffice, sourceWorkbook, targetWorkbook, workDir) {
+async function recalcWithSoffice(soffice, sourceWorkbook, targetWorkbook, workDir, timeoutMs) {
   await fs.mkdir(workDir, { recursive: true });
   await fs.copyFile(sourceWorkbook, targetWorkbook);
   const recalcDir = await fs.mkdtemp(path.join(workDir, "recalc-"));
@@ -146,23 +181,131 @@ async function recalcWithSoffice(soffice, sourceWorkbook, targetWorkbook, workDi
     const result = await command(soffice, [
       "--headless",
       `-env:UserInstallation=file://${profile}`,
+      "--norestore",
+      "--invisible",
+      "--nologo",
+      "--nolockcheck",
+      "--nodefault",
+      "--nofirststartwizard",
       "--convert-to",
       "xlsx",
       "--outdir",
       recalcDir,
       targetWorkbook,
-    ]);
+    ], { timeout: timeoutMs });
     const converted = path.join(recalcDir, path.basename(targetWorkbook));
     if (!result.ok) return fail("LibreOffice recalculation failed.", { stderr: result.stderr.slice(-4000) });
     await fs.access(converted);
     await fs.copyFile(converted, targetWorkbook);
-    return { status: "PASS" };
+    return {
+      status: "PASS",
+      detail: {
+        timeout_ms: timeoutMs,
+        stdout: result.stdout.slice(-4000),
+        stderr: result.stderr.slice(-4000),
+      },
+    };
   } catch (error) {
     return fail("LibreOffice did not produce a recalculated workbook.", { error: error.message });
   } finally {
     await fs.rm(recalcDir, { recursive: true, force: true });
     await fs.rm(profile, { recursive: true, force: true });
   }
+}
+
+async function exactEnvironmentProbe({ python, soffice, integrity, runDir }) {
+  const profile = await json(path.join(ASSETS, "deployment-profile.json"));
+  const violations = [];
+  const minimumPython = profile.python_runtime?.minimum_version ?? [3, 9];
+  const actualPython = String(python.runtime?.python ?? "0.0")
+    .split(".")
+    .slice(0, 2)
+    .map(Number);
+  if (
+    actualPython[0] < minimumPython[0]
+    || (actualPython[0] === minimumPython[0] && actualPython[1] < minimumPython[1])
+  ) {
+    violations.push({
+      code: "PYTHON_VERSION_UNSUPPORTED",
+      expected_minimum: minimumPython.join("."),
+      actual: python.runtime?.python ?? null,
+    });
+  }
+  const expectedOpenpyxl = profile.allowed_python_third_party_imports?.openpyxl?.host_version;
+  if (expectedOpenpyxl && python.runtime?.openpyxl !== expectedOpenpyxl) {
+    violations.push({
+      code: "OPENPYXL_VERSION_MISMATCH",
+      expected: expectedOpenpyxl,
+      actual: python.runtime?.openpyxl ?? null,
+    });
+  }
+
+  const dependencyProbe = await command(python.path, [
+    "-c",
+    [
+      "import json,os,sys",
+      `sys.path.insert(0, ${JSON.stringify(HERE)})`,
+      "import fitz,PIL,numpy",
+      "from render.textfit import load_font_set",
+      "fonts=load_font_set()",
+      "print(json.dumps({'fitz':getattr(fitz,'VersionBind',None) or getattr(fitz,'__version__',None),'pillow':PIL.__version__,'numpy':numpy.__version__,'font_regular':fonts.regular_path,'font_bold':fonts.bold_path},sort_keys=True))",
+    ].join(";"),
+  ], {
+    timeout: 30000,
+    env: { ...COMMAND_ENV, SOFFICE_BIN: soffice.path },
+  });
+  let dependencies = null;
+  if (!dependencyProbe.ok) {
+    violations.push({
+      code: "RENDER_DEPENDENCY_PROBE_FAILED",
+      stderr: dependencyProbe.stderr.slice(-4000),
+    });
+  } else {
+    try {
+      dependencies = JSON.parse(dependencyProbe.stdout.trim());
+    } catch (error) {
+      violations.push({ code: "RENDER_DEPENDENCY_PROBE_INVALID", detail: error.message });
+    }
+  }
+  if (!dependencies?.fitz) violations.push({ code: "PYMUPDF_MISSING" });
+  if (!dependencies?.font_regular || !dependencies?.font_bold) {
+    violations.push({ code: "METRIC_COMPATIBLE_FONT_SET_INCOMPLETE", dependencies });
+  }
+
+  const releaseManifestPath = path.join(ROOT, "release-manifest.json");
+  let releaseManifest = null;
+  let releaseManifestSha256 = null;
+  try {
+    releaseManifest = await json(releaseManifestPath);
+    releaseManifestSha256 = await hashFile(releaseManifestPath);
+  } catch {
+    violations.push({ code: "RELEASE_MANIFEST_MISSING" });
+  }
+  const body = {
+    schema_version: "stage4-environment-probe/1.0",
+    status: violations.length ? "BLOCKED" : "PASS",
+    runtime_snapshot_sha256: integrity.digest,
+    release_manifest_sha256: releaseManifestSha256,
+    release_identity: releaseManifest ? {
+      name: releaseManifest.releaseName ?? null,
+      skill_version: releaseManifest.skillVersion ?? null,
+      package_mode: releaseManifest.packageMode ?? null,
+      current_closure_sha256: releaseManifest.certification?.currentClosureSha256 ?? null,
+      certified_closure_sha256: releaseManifest.certification?.certifiedClosureSha256 ?? null,
+    } : null,
+    node: process.version,
+    python: python.runtime,
+    soffice: { path: soffice.path, version: soffice.version, identity: soffice.identity },
+    dependencies,
+    resources: {
+      logical_cpu_count: os.cpus().length,
+      total_memory_bytes: os.totalmem(),
+    },
+    violations,
+  };
+  const target = path.join(runDir, "environment-probe.json");
+  await writeIsolationJson(target, body);
+  return { ...body, artifact: target };
 }
 
 async function copySidecars(sourceWorkbook, targetWorkbook) {
@@ -209,6 +352,22 @@ async function atomicReplaceDirectory(source, target) {
   }
 }
 
+async function fileManifest(root, base = root) {
+  const entries = [];
+  for (const item of (await fs.readdir(root, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+    const target = path.join(root, item.name);
+    if (item.isDirectory()) entries.push(...await fileManifest(target, base));
+    else if (item.isFile()) {
+      entries.push({
+        path: path.relative(base, target).split(path.sep).join("/"),
+        sha256: await hashFile(target),
+        bytes: (await fs.stat(target)).size,
+      });
+    }
+  }
+  return entries;
+}
+
 function sidecarOutputs(workbook) {
   return Object.fromEntries(SIDECAR_SUFFIXES.map((suffix) => [suffix.slice(1), `${workbook}${suffix}`]));
 }
@@ -222,7 +381,7 @@ async function runtimeSourceDigests() {
   const planScripts = scripts.filter((target) =>
     target.endsWith(`${path.sep}build_dynamic_model.mjs`) || target.includes(`${path.sep}lib${path.sep}`));
   const verifyScripts = scripts.filter((target) =>
-    /validate_(cache_parity|style_tokens|source_parity|structure)\.mjs$/.test(target));
+    /(?:validate_(cache_parity|style_tokens|source_parity|structure)|recalc_second_opinion)\.mjs$/.test(target));
   const emitPython = python.filter((target) => target.includes(`${path.sep}emit${path.sep}`));
   const verifyPython = python.filter((target) => target.includes(`${path.sep}verify${path.sep}`));
   const renderPython = python.filter((target) => target.includes(`${path.sep}render${path.sep}`));
@@ -305,6 +464,18 @@ async function main() {
   if (!python) return fail("Python with openpyxl is required for the portable renderer and was not available.");
   const soffice = await resolveSoffice(typeof options.soffice === "string" ? options.soffice : null);
   if (!soffice) return fail("N11 is BLOCKED: LibreOffice is required for recalculation and was not available.");
+  const environment = await exactEnvironmentProbe({
+    python,
+    soffice,
+    integrity,
+    runDir,
+  });
+  if (environment.status !== "PASS") {
+    return fail("Stage 4 environment preflight did not pass.", {
+      environment_probe: environment.artifact,
+      violations: environment.violations,
+    });
+  }
 
   const evidenceHashes = {
     dcs_export: dcsPath ? await hashFile(dcsPath) : "absent",
@@ -320,6 +491,8 @@ async function main() {
   async function checkpoint({ id, recipe, inputs, outputs, action }) {
     const inputHashes = {
       controller: source.controller,
+      runtime_snapshot: integrity.digest,
+      environment_probe: await hashFile(environment.artifact),
       ...inputs,
     };
     const inspected = await store.inspect({ checkpointId: id, recipe, inputHashes, outputs });
@@ -442,121 +615,249 @@ async function main() {
   });
   if (!step.ok) return step.result;
 
-  const recalcDir = store.workDir("recalculate_patch");
-  const patchedWorkbook = path.join(recalcDir, "model.xlsx");
-  const recalcOutputs = { patched_workbook: patchedWorkbook, ...sidecarOutputs(patchedWorkbook) };
+  const recalcDir = store.workDir("recalculate");
+  const rawRecalculatedWorkbook = path.join(recalcDir, "model.raw-after.xlsx");
+  const beforeCacheMap = path.join(recalcDir, "formula-caches.before.json");
+  const rawAfterCacheMap = path.join(recalcDir, "formula-caches.raw-after.json");
+  const recalcSecondOpinion = path.join(recalcDir, "libreoffice-recalc-receipt.json");
   step = await checkpoint({
-    id: "recalculate_patch",
-    recipe: "release-recalculate-patch/1.0",
+    id: "recalculate",
+    recipe: "release-recalculate-second-opinion/2.0",
     inputs: {
       emitted_workbook: await hashFile(emittedWorkbook),
       emit_receipt: checkpointReceipts.emit,
-      plan: await hashFile(planPath),
-      code: source.emit,
-      python: python.identity,
+      verifier_code: source.verify,
       soffice: soffice.identity,
     },
-    outputs: recalcOutputs,
-    action: async (workDir) => {
-      const recalculated = await recalcWithSoffice(soffice.path, emittedWorkbook, patchedWorkbook, workDir);
-      if (recalculated.status !== "PASS") return recalculated;
-      await copySidecars(planWorkbook, patchedWorkbook);
-      const patched = await command(python.path, [path.join(HERE, "emit", "__main__.py"), "patch", planPath, "--out", patchedWorkbook]);
-      if (!patched.ok) return fail("N12 terminal patch after LibreOffice failed.", { stderr: patched.stderr.slice(-4000) });
-      return { status: "PASS", detail: { recalculated: true, terminal_patch: true } };
-    },
-  });
-  if (!step.ok) return step.result;
-
-  const verifyDir = store.workDir("verify");
-  const validationReport = path.join(verifyDir, "validation-report.json");
-  const styleReport = path.join(verifyDir, "style-tokens.json");
-  const cacheReport = path.join(verifyDir, "cache-parity.json");
-  const financeReport = path.join(verifyDir, "finance-proof.json");
-  const semanticOracleReport = path.join(verifyDir, "workbook-semantic-oracle.json");
-  step = await checkpoint({
-    id: "verify",
-    recipe: "release-independent-verify/1.0",
-    inputs: {
-      workbook: await hashFile(patchedWorkbook),
-      recalculate_patch_receipt: checkpointReceipts.recalculate_patch,
-      code: source.verify,
-      python: python.identity,
-      node: hashValue(process.version),
-    },
     outputs: {
-      validation_report: validationReport,
-      style_report: styleReport,
-      cache_report: cacheReport,
-      finance_report: financeReport,
-      semantic_oracle_report: semanticOracleReport,
+      raw_recalculated_workbook: rawRecalculatedWorkbook,
+      before_cache_map: beforeCacheMap,
+      raw_after_cache_map: rawAfterCacheMap,
+      recalc_second_opinion: recalcSecondOpinion,
     },
     action: async (workDir) => {
-      const [verified, styled, cached, financed, semanticOracle] = await Promise.all([
-        command(python.path, [path.join(HERE, "verify", "validate_dynamic_model.py"), patchedWorkbook, "--out", workDir]),
-        command(process.execPath, [path.join(HERE, "validate_style_tokens.mjs"), patchedWorkbook, "--json", styleReport]),
-        command(process.execPath, [path.join(HERE, "validate_cache_parity.mjs"), patchedWorkbook, "--json", cacheReport]),
-        command(python.path, [path.join(HERE, "verify", "finance_proof.py"), casePath, patchedWorkbook, "--out", financeReport]),
-        command(python.path, [
-          path.join(HERE, "verify", "workbook_semantic_oracle.py"),
-          "--xlsx", patchedWorkbook,
-          "--contract", `${patchedWorkbook}.workbook-proof-contract.json`,
-          "--out", semanticOracleReport,
-        ]),
-      ]);
-      if (!verified.ok) return fail("N13 portable independent validation failed.", { stdout: verified.stdout.slice(-4000), stderr: verified.stderr.slice(-4000) });
-      if (!styled.ok) return fail("N13 style-token validation failed.", { stdout: styled.stdout.slice(-4000), stderr: styled.stderr.slice(-4000) });
-      if (!cached.ok) return fail("N13 cache parity failed.", { stdout: cached.stdout.slice(-4000), stderr: cached.stderr.slice(-4000) });
-      if (!financed.ok) return fail("N13 independent finance proof failed.", { stdout: financed.stdout.slice(-4000), stderr: financed.stderr.slice(-4000) });
-      if (!semanticOracle.ok) return fail("N13 independent workbook-semantic oracle failed.", { stdout: semanticOracle.stdout.slice(-4000), stderr: semanticOracle.stderr.slice(-4000) });
-      const [validation, style, cache, finance, semanticOracleResult] = await Promise.all([
-        json(validationReport),
-        json(styleReport),
-        json(cacheReport),
-        json(financeReport),
-        json(semanticOracleReport),
-      ]);
-      if (!["PASS", "PASS_PENDING_MANUAL"].includes(validation.status) || Number(validation.total_violations ?? validation.summary?.total_violations ?? 0) !== 0) {
-        return fail("N13 independent validation report did not clear with zero violations.", { report_status: validation.status, total_violations: validation.total_violations ?? validation.summary?.total_violations ?? null });
-      }
-      const cacheBlindBuckets = Object.fromEntries(
-        ["unsupported", "parse_errors", "eval_errors", "no_cache"].map((key) => [key, (cache[key] ?? []).length]),
+      const execution = await workbookExecutionPolicy(emittedWorkbook);
+      const recalculated = await recalcWithSoffice(
+        soffice.path,
+        emittedWorkbook,
+        rawRecalculatedWorkbook,
+        workDir,
+        execution.timeout_ms,
       );
-      const cacheStrict =
-        cache.status === "PASS" &&
-        Number(cache.disagreements ?? 0) === 0 &&
-        Number(cache.stats?.formula_cells ?? 0) > 0 &&
-        Number(cache.stats?.checked ?? 0) > 0 &&
-        Object.values(cacheBlindBuckets).every((count) => count === 0);
-      const financeViolations = Number(finance.summary?.violations ?? finance.total_violations ?? 0);
-      const financeComparisons = Number(finance.summary?.comparisons ?? finance.comparisons ?? 0);
-      if (style.status !== "PASS" || !cacheStrict || finance.status !== "PASS" || financeViolations !== 0 || financeComparisons <= 0 || semanticOracleResult.status !== "PASS") {
-        return fail("N13 style, strict cache coverage or independent finance proof did not clear.", {
-          style_status: style.status,
-          cache_status: cache.status,
-          cache_disagreements: cache.disagreements ?? null,
-          cache_blind_buckets: cacheBlindBuckets,
-          cache_formula_cells: cache.stats?.formula_cells ?? null,
-          cache_checked: cache.stats?.checked ?? null,
-          finance_status: finance.status,
-          finance_violations: financeViolations,
-          finance_comparisons: financeComparisons,
-          semantic_oracle_status: semanticOracleResult.status,
+      if (recalculated.status !== "PASS") return recalculated;
+      const secondOpinion = await command(process.execPath, [
+        path.join(HERE, "verify", "recalc_second_opinion.mjs"),
+        "--before", emittedWorkbook,
+        "--after", rawRecalculatedWorkbook,
+        "--before-map", beforeCacheMap,
+        "--after-map", rawAfterCacheMap,
+        "--out", recalcSecondOpinion,
+        "--soffice-identity", soffice.identity,
+      ], { timeout: Math.max(60000, Math.floor(execution.timeout_ms / 2)) });
+      if (!secondOpinion.ok) {
+        return fail("N11 LibreOffice second-opinion receipt did not pass.", {
+          stdout: secondOpinion.stdout.slice(-4000),
+          stderr: secondOpinion.stderr.slice(-4000),
+        });
+      }
+      const receipt = await json(recalcSecondOpinion);
+      if (receipt.status !== "PASS" || Number(receipt.violations?.length ?? 0) !== 0) {
+        return fail("N11 LibreOffice second-opinion receipt contains violations.", {
+          receipt_status: receipt.status,
+          violations: receipt.violations ?? [],
         });
       }
       return {
         status: "PASS",
         detail: {
-          validation_status: validation.status,
-          total_violations: validation.total_violations ?? validation.summary?.total_violations ?? 0,
-          style_status: style.status,
-          cache_status: cache.status,
-          cache_blind_buckets: cacheBlindBuckets,
-          finance_status: finance.status,
-          finance_comparisons: financeComparisons,
-          semantic_oracle_status: semanticOracleResult.status,
+          formula_cells: receipt.formula_cells,
+          compared_formula_cells: receipt.compared_formula_cells,
+          package_changed: receipt.package_changed,
+          producer: receipt.producer,
+          maximum_observed_drift: receipt.maximum_observed_drift,
+          execution,
         },
       };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const patchDir = store.workDir("terminal_patch");
+  const patchedWorkbook = path.join(patchDir, "model.xlsx");
+  const patchOutputs = { patched_workbook: patchedWorkbook, ...sidecarOutputs(patchedWorkbook) };
+  step = await checkpoint({
+    id: "terminal_patch",
+    recipe: "release-terminal-patch/2.0",
+    inputs: {
+      raw_recalculated_workbook: await hashFile(rawRecalculatedWorkbook),
+      recalculate_receipt: checkpointReceipts.recalculate,
+      recalc_second_opinion: await hashFile(recalcSecondOpinion),
+      plan: await hashFile(planPath),
+      code: source.emit,
+      python: python.identity,
+    },
+    outputs: patchOutputs,
+    action: async () => {
+      await fs.copyFile(rawRecalculatedWorkbook, patchedWorkbook);
+      await copySidecars(planWorkbook, patchedWorkbook);
+      const patched = await command(python.path, [path.join(HERE, "emit", "__main__.py"), "patch", planPath, "--out", patchedWorkbook]);
+      if (!patched.ok) return fail("N12 terminal patch after LibreOffice failed.", { stderr: patched.stderr.slice(-4000) });
+      return {
+        status: "PASS",
+        detail: {
+          terminal_patch: true,
+          raw_recalc_receipt_sha256: await hashFile(recalcSecondOpinion),
+        },
+      };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const executionPolicy = await workbookExecutionPolicy(patchedWorkbook);
+  const validationDir = store.workDir("verify_dynamic");
+  const validationReport = path.join(validationDir, "validation-report.json");
+  step = await checkpoint({
+    id: "verify_dynamic",
+    recipe: "release-verify-dynamic/2.0",
+    inputs: {
+      workbook: await hashFile(patchedWorkbook),
+      terminal_patch_receipt: checkpointReceipts.terminal_patch,
+      code: source.verify,
+      python: python.identity,
+      execution_policy: hashValue(executionPolicy),
+    },
+    outputs: { validation_report: validationReport },
+    action: async (workDir) => {
+      const result = await command(python.path, [
+        path.join(HERE, "verify", "validate_dynamic_model.py"),
+        patchedWorkbook,
+        "--out", workDir,
+      ], { timeout: executionPolicy.timeout_ms });
+      if (!result.ok) return fail("N13 portable independent validation failed.", { stdout: result.stdout.slice(-4000), stderr: result.stderr.slice(-4000) });
+      const report = await json(validationReport);
+      const violations = Number(report.total_violations ?? report.summary?.total_violations ?? 0);
+      if (!["PASS", "PASS_PENDING_MANUAL"].includes(report.status) || violations !== 0) {
+        return fail("N13 independent validation report did not clear with zero violations.", { report_status: report.status, total_violations: violations });
+      }
+      return { status: "PASS", detail: { report_status: report.status, total_violations: violations, execution: executionPolicy } };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const styleDir = store.workDir("verify_style");
+  const styleReport = path.join(styleDir, "style-tokens.json");
+  step = await checkpoint({
+    id: "verify_style",
+    recipe: "release-verify-style/2.0",
+    inputs: { workbook: await hashFile(patchedWorkbook), terminal_patch_receipt: checkpointReceipts.terminal_patch, code: source.verify, node: hashValue(process.version) },
+    outputs: { style_report: styleReport },
+    action: async () => {
+      const result = await command(process.execPath, [path.join(HERE, "validate_style_tokens.mjs"), patchedWorkbook, "--json", styleReport], { timeout: executionPolicy.timeout_ms });
+      if (!result.ok) return fail("N13 style-token validation failed.", { stdout: result.stdout.slice(-4000), stderr: result.stderr.slice(-4000) });
+      const report = await json(styleReport);
+      if (report.status !== "PASS") return fail("N13 style-token report did not pass.", { report_status: report.status });
+      return { status: "PASS", detail: { report_status: report.status } };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const cacheDir = store.workDir("verify_cache");
+  const cacheReport = path.join(cacheDir, "cache-parity.json");
+  step = await checkpoint({
+    id: "verify_cache",
+    recipe: "release-verify-cache/2.0",
+    inputs: { workbook: await hashFile(patchedWorkbook), terminal_patch_receipt: checkpointReceipts.terminal_patch, code: source.verify, node: hashValue(process.version) },
+    outputs: { cache_report: cacheReport },
+    action: async () => {
+      const result = await command(process.execPath, [path.join(HERE, "validate_cache_parity.mjs"), patchedWorkbook, "--json", cacheReport], { timeout: executionPolicy.timeout_ms });
+      if (!result.ok) return fail("N13 cache parity failed.", { stdout: result.stdout.slice(-4000), stderr: result.stderr.slice(-4000) });
+      const report = await json(cacheReport);
+      const blind = Object.fromEntries(
+        ["unsupported", "parse_errors", "eval_errors", "no_cache"].map((key) => [key, (report[key] ?? []).length]),
+      );
+      const strict = report.status === "PASS"
+        && Number(report.disagreements ?? 0) === 0
+        && Number(report.stats?.formula_cells ?? 0) > 0
+        && Number(report.stats?.checked ?? 0) > 0
+        && Object.values(blind).every((count) => count === 0);
+      if (!strict) return fail("N13 strict cache coverage did not clear.", { report_status: report.status, blind, stats: report.stats ?? null });
+      return { status: "PASS", detail: { report_status: report.status, blind, stats: report.stats } };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const financeDir = store.workDir("verify_finance");
+  const financeReport = path.join(financeDir, "finance-proof.json");
+  step = await checkpoint({
+    id: "verify_finance",
+    recipe: "release-verify-finance/2.0",
+    inputs: { workbook: await hashFile(patchedWorkbook), case: caseHash, terminal_patch_receipt: checkpointReceipts.terminal_patch, code: source.verify, python: python.identity },
+    outputs: { finance_report: financeReport },
+    action: async () => {
+      const result = await command(python.path, [path.join(HERE, "verify", "finance_proof.py"), casePath, patchedWorkbook, "--out", financeReport], { timeout: executionPolicy.timeout_ms });
+      if (!result.ok) return fail("N13 independent finance proof failed.", { stdout: result.stdout.slice(-4000), stderr: result.stderr.slice(-4000) });
+      const report = await json(financeReport);
+      const violations = Number(report.summary?.violations ?? report.total_violations ?? 0);
+      const comparisons = Number(report.summary?.comparisons ?? report.comparisons ?? 0);
+      if (report.status !== "PASS" || violations !== 0 || comparisons <= 0) {
+        return fail("N13 independent finance proof did not clear.", { report_status: report.status, total_violations: violations, comparisons });
+      }
+      return { status: "PASS", detail: { report_status: report.status, total_violations: violations, comparisons } };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const semanticOracleDir = store.workDir("verify_semantic");
+  const semanticOracleReport = path.join(semanticOracleDir, "workbook-semantic-oracle.json");
+  step = await checkpoint({
+    id: "verify_semantic",
+    recipe: "release-verify-semantic/2.0",
+    inputs: { workbook: await hashFile(patchedWorkbook), proof_contract: await hashFile(`${patchedWorkbook}.workbook-proof-contract.json`), terminal_patch_receipt: checkpointReceipts.terminal_patch, code: source.verify, python: python.identity },
+    outputs: { semantic_oracle_report: semanticOracleReport },
+    action: async () => {
+      const result = await command(python.path, [
+        path.join(HERE, "verify", "workbook_semantic_oracle.py"),
+        "--xlsx", patchedWorkbook,
+        "--contract", `${patchedWorkbook}.workbook-proof-contract.json`,
+        "--out", semanticOracleReport,
+      ], { timeout: executionPolicy.timeout_ms });
+      if (!result.ok) return fail("N13 independent workbook-semantic oracle failed.", { stdout: result.stdout.slice(-4000), stderr: result.stderr.slice(-4000) });
+      const report = await json(semanticOracleReport);
+      if (report.status !== "PASS") return fail("N13 workbook-semantic oracle report did not pass.", { report_status: report.status });
+      return { status: "PASS", detail: { report_status: report.status } };
+    },
+  });
+  if (!step.ok) return step.result;
+
+  const verifyAggregateDir = store.workDir("verify_aggregate");
+  const verificationSummary = path.join(verifyAggregateDir, "verification-summary.json");
+  step = await checkpoint({
+    id: "verify_aggregate",
+    recipe: "release-verify-aggregate/2.0",
+    inputs: {
+      dynamic: checkpointReceipts.verify_dynamic,
+      style: checkpointReceipts.verify_style,
+      cache: checkpointReceipts.verify_cache,
+      finance: checkpointReceipts.verify_finance,
+      semantic: checkpointReceipts.verify_semantic,
+    },
+    outputs: { verification_summary: verificationSummary },
+    action: async () => {
+      const report = {
+        schema_version: "stage4-verification-summary/1.0",
+        status: "PASS",
+        total_violations: 0,
+        execution_policy: executionPolicy,
+        reports: {
+          validation: { path: validationReport, sha256: await hashFile(validationReport) },
+          style: { path: styleReport, sha256: await hashFile(styleReport) },
+          cache: { path: cacheReport, sha256: await hashFile(cacheReport) },
+          finance: { path: financeReport, sha256: await hashFile(financeReport) },
+          semantic: { path: semanticOracleReport, sha256: await hashFile(semanticOracleReport) },
+        },
+      };
+      await writeIsolationJson(verificationSummary, report);
+      return { status: "PASS", detail: { report_count: 5, total_violations: 0 } };
     },
   });
   if (!step.ok) return step.result;
@@ -572,7 +873,7 @@ async function main() {
     inputs: {
       workbook: await hashFile(patchedWorkbook),
       row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
-      verify_receipt: checkpointReceipts.verify,
+      verify_receipt: checkpointReceipts.verify_aggregate,
       code: source.render,
       render_mode: hashValue("structural-only-no-pixel-baseline"),
       baseline_case: hashValue(baselineCase),
@@ -588,7 +889,8 @@ async function main() {
         "--baseline-case", baselineCase,
         "--structural-only",
         "--soffice", soffice.path,
-      ]);
+        "--timeout", String(Math.max(60, Math.floor(executionPolicy.timeout_ms / 1000))),
+      ], { timeout: executionPolicy.timeout_ms + 60000 });
       if (!rendered.ok) return fail("N14 render validation failed or was blocked.", { stdout: rendered.stdout.slice(-4000), stderr: rendered.stderr.slice(-4000) });
       const index = await json(renderIndex);
       if ((index.cases ?? []).length === 0 || index.cases.some((entry) => entry.verdict !== "PASS")) {
@@ -600,6 +902,7 @@ async function main() {
           baseline_case: baselineCase,
           mode: "structural-only-no-pixel-baseline",
           cases: index.cases.length,
+          execution: executionPolicy,
         },
       };
     },
@@ -610,7 +913,11 @@ async function main() {
   const finalVerifyDir = path.join(runDir, "verify");
   const finalRenderDir = path.join(runDir, "render");
   const finalSemantic = path.join(runDir, "n0-n9-gates.json");
-  const publicationPath = path.join(store.workDir("publish"), "publication.json");
+  // Publication is a first-class Stage-4 artifact, not checkpoint-private
+  // scratch state. Keep it at a deterministic build-root path so the outer
+  // flow can hash, resume and attest it without knowing the checkpoint store
+  // layout.
+  const publicationPath = path.join(runDir, "publication.json");
   const publishOutputs = {
     workbook: finalWorkbook,
     semantic_gates: finalSemantic,
@@ -621,11 +928,13 @@ async function main() {
   };
   step = await checkpoint({
     id: "publish",
-    recipe: "release-publish-artifacts/1.0",
+    recipe: "release-publish-artifacts/2.0",
     inputs: {
       render_receipt: checkpointReceipts.render,
-      verify_receipt: checkpointReceipts.verify,
-      recalculate_patch_receipt: checkpointReceipts.recalculate_patch,
+      verify_receipt: checkpointReceipts.verify_aggregate,
+      recalculate_receipt: checkpointReceipts.recalculate,
+      terminal_patch_receipt: checkpointReceipts.terminal_patch,
+      environment_probe: await hashFile(environment.artifact),
     },
     outputs: publishOutputs,
     action: async (workDir) => {
@@ -634,16 +943,79 @@ async function main() {
         await atomicCopyFile(`${patchedWorkbook}${suffix}`, `${finalWorkbook}${suffix}`);
       }
       await atomicCopyFile(semanticResultPath, finalSemantic);
-      await atomicReplaceDirectory(verifyDir, finalVerifyDir);
+      const verificationBundle = path.join(workDir, "verification-bundle");
+      await fs.rm(verificationBundle, { recursive: true, force: true });
+      await fs.mkdir(verificationBundle, { recursive: true });
+      for (const [sourcePath, name] of [
+        [validationReport, "validation-report.json"],
+        [styleReport, "style-tokens.json"],
+        [cacheReport, "cache-parity.json"],
+        [financeReport, "finance-proof.json"],
+        [semanticOracleReport, "workbook-semantic-oracle.json"],
+        [verificationSummary, "verification-summary.json"],
+        [recalcSecondOpinion, "libreoffice-recalc-receipt.json"],
+        [beforeCacheMap, "formula-caches.before.json"],
+        [rawAfterCacheMap, "formula-caches.raw-after.json"],
+        [environment.artifact, "environment-probe.json"],
+      ]) {
+        await fs.copyFile(sourcePath, path.join(verificationBundle, name));
+      }
+      await atomicReplaceDirectory(verificationBundle, finalVerifyDir);
       await atomicReplaceDirectory(renderDir, finalRenderDir);
-      await writeIsolationJson(path.join(workDir, "publication.json"), {
-        schema_version: "stage4-publication/1.0",
-        workbook: "model.xlsx",
+      const sidecars = Object.fromEntries(
+        await Promise.all(SIDECAR_SUFFIXES.map(async (suffix) => [
+          suffix.slice(1),
+          {
+            path: `model.xlsx${suffix}`,
+            sha256: await hashFile(`${finalWorkbook}${suffix}`),
+            bytes: (await fs.stat(`${finalWorkbook}${suffix}`)).size,
+          },
+        ])),
+      );
+      const priorCheckpointReceipts = Object.fromEntries(
+        await Promise.all(
+          Object.entries(checkpointReceipts)
+            .filter(([id]) => id !== "publish")
+            .map(async ([id, receiptHash]) => {
+              const receiptPath = store.receiptPath(id);
+              return [id, {
+                receipt_hash: receiptHash,
+                sha256: await hashFile(receiptPath),
+              }];
+            }),
+        ),
+      );
+      await writeIsolationJson(publicationPath, {
+        schema_version: "stage4-publication/2.0",
+        workbook: {
+          path: "model.xlsx",
+          sha256: await hashFile(finalWorkbook),
+          bytes: (await fs.stat(finalWorkbook)).size,
+        },
         authority_profile: rowMap.authority_profile,
         automated_status: "PASS_PENDING_MANUAL",
         total_violations: 0,
+        runtime_snapshot_sha256: integrity.digest,
+        release_manifest_sha256: environment.release_manifest_sha256,
+        sidecars,
+        semantic_gates: {
+          path: "n0-n9-gates.json",
+          sha256: await hashFile(finalSemantic),
+        },
+        verification_files: await fileManifest(finalVerifyDir),
+        render_files: await fileManifest(finalRenderDir),
+        checkpoint_receipts: priorCheckpointReceipts,
       });
-      return { status: "PASS", detail: { workbook: "model.xlsx", total_violations: 0 } };
+      return {
+        status: "PASS",
+        detail: {
+          workbook: "model.xlsx",
+          total_violations: 0,
+          sidecar_count: Object.keys(sidecars).length,
+          verification_file_count: (await fileManifest(finalVerifyDir)).length,
+          render_file_count: (await fileManifest(finalRenderDir)).length,
+        },
+      };
     },
   });
   if (!step.ok) return step.result;

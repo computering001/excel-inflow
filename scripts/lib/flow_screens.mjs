@@ -618,9 +618,14 @@ export function renderForecastPlanScreen(modelCase, sealedPlan = null) {
   if (selected.length === 0) {
     lines.push("   No material independent forecast assumptions resolved.");
   }
+  lines.push("");
+  lines.push(...indented(
+    `${selected.length} material independent row(s).`,
+    3,
+    RULE_WIDTH - 3,
+  ));
   lines.push(
-    "",
-    `   ${selected.length} material independent row(s); totals and links calculate.`,
+    "   Forecast totals and links calculate.",
     "   Reply continue to build, or amend an assumption first.",
     "",
     RULE,

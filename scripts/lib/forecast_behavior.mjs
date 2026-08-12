@@ -33,7 +33,12 @@ export const ALLOWED_METHODS_BY_BEHAVIOR = Object.freeze({
   ]),
   driver_linked_flow: Object.freeze([
     "actual_plus_remainder", "company_guidance", "company_indication",
-    "broker_consensus", "user_assumption", "driver_formula", "roll_forward", "explicit_zero",
+    "broker_consensus", "user_assumption", "driver_formula", "roll_forward",
+    // A semantic relationship (tax, working capital, D&A) identifies the
+    // preferred mechanism; it does not manufacture a driver that the evidence
+    // did not supply. The universal waterfall must still reach its evidenced
+    // historical rungs rather than block an otherwise forecastable line.
+    "historical_average", "historical_trend", "carry_forward", "explicit_zero",
   ]),
   seasonal_flow: Object.freeze([
     "actual_plus_remainder", "company_guidance", "company_indication",

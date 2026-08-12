@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""Focused positive and mutation tests for broker/DCS evidence controllers."""
+
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+HERE = Path(__file__).resolve().parent
+
+
+def load(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot import {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+vision = load("excel_inflow_compile_broker_vision", HERE / "compile_broker_vision.py")
+broker = load("excel_inflow_run_broker_pipeline", HERE / "run_broker_pipeline.py")
+attachment = load(
+    "excel_inflow_run_attachment_evidence_pipeline",
+    HERE / "run_attachment_evidence_pipeline.py",
+)
+
+
+def assert_true(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def main() -> int:
+    checks = 0
+    table_passes = [
+        {
+            "surface_disposition": "analytical_tables",
+            "tables": [{"title": "Forecasts", "units": "GBP m", "rows": [["", "2026E"], ["EBIT", "100"]]}],
+        },
+        {
+            "surface_disposition": "analytical_tables",
+            "tables": [{"title": "Forecasts", "units": "GBP m", "rows": [["", "2026E"], ["EBIT", "100"]]}],
+        },
+    ]
+    disposition, error = vision.classify_surface_disposition(table_passes)
+    assert_true(disposition == "analytical_tables" and error is None, "analytical table consensus did not close")
+    checks += 1
+
+    attempts = {
+        "vision_response_sha256": [],
+        "vision_attempt_count": 0,
+        "vision_attempt_limit": 3,
+    }
+    assert_true(broker.record_vision_attempt(attempts, "a" * 64) is False, "first vision attempt exhausted early")
+    assert_true(broker.record_vision_attempt(attempts, "a" * 64) is False, "second identical vision attempt exhausted early")
+    assert_true(broker.record_vision_attempt(attempts, "a" * 64) is True, "identical bad vision response could retry forever")
+    assert_true(len(attempts["vision_response_sha256"]) == 1, "vision audit ledger duplicated identical response bytes")
+    checks += 1
+
+    internal = {"broker": {"pipeline_status": "NEEDS_VISION", "blocker_class": "INTERNAL_WORK"}}
+    assert_true(
+        attachment.classify(internal) == ("NEEDS_INTERNAL_WORK", "INTERNAL_WORK", False),
+        "top-level controller turned internal broker work into a user stop",
+    )
+    fatal = {"dcs": {"pipeline_status": "BLOCKED_INPUT", "blocker_class": "FATAL_SOURCE"}}
+    assert_true(
+        attachment.classify(fatal) == ("BLOCKED_INPUT", "FATAL_SOURCE", True),
+        "top-level controller did not preserve a genuine fatal source blocker",
+    )
+    passed = {
+        "broker": {"pipeline_status": "PASS", "blocker_class": None},
+        "dcs": {"pipeline_status": "PASS", "blocker_class": None},
+    }
+    assert_true(attachment.classify(passed) == ("PASS", None, False), "two passed lanes did not close")
+    checks += 3
+
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-attachment-controller-") as temporary:
+        root = Path(temporary)
+        missing_request = attachment.run_lane(
+            "broker",
+            {"request_path": "internal-request.json"},
+            root,
+            root / "run",
+        )
+        assert_true(
+            missing_request["blocker_class"] == "INTERNAL_WORK"
+            and missing_request["user_blocking"] is False,
+            "a missing internal controller declaration became a user re-upload request",
+        )
+        checks += 1
+    assert_true(vision.transcription_structure(table_passes[0]["tables"][0])["is_grid"], "labelled period grid was not recognized")
+    checks += 1
+
+    non_tabular_passes = [
+        {"surface_disposition": "verified_non_tabular", "tables": [], "non_tabular_reason": "Narrative paragraph with valuation multiples."},
+        {"surface_disposition": "verified_non_tabular", "tables": [], "non_tabular_reason": "Narrative text, no row/period grid."},
+    ]
+    disposition, error = vision.classify_surface_disposition(non_tabular_passes)
+    assert_true(disposition == "verified_non_tabular" and error is None, "verified non-tabular consensus did not close")
+    checks += 1
+
+    mixed = [table_passes[0], non_tabular_passes[1]]
+    disposition, error = vision.classify_surface_disposition(mixed)
+    assert_true(disposition is None and error, "mixed physical dispositions did not remain unresolved")
+    checks += 1
+
+    try:
+        broker.write_state(
+            Path("unused.json"), run_id="test", status="NEEDS_VISION",
+            request_digest="0" * 64, sources={"doc": "1" * 64},
+            runtime_digest="2" * 64, cache_key="3" * 64,
+            checkpoints=[], artifacts={}, tasks=[], summary={},
+            user_blocking=True, blocker_class="INTERNAL_WORK",
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("internal broker work was allowed to become user-blocking")
+    checks += 1
+
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-dcs-controller-") as temporary:
+        root = Path(temporary)
+        source = root / "dcs.csv"
+        source.write_text("Description,Amount,Maturity\nBond A,100,2028-12-31\n", "utf-8")
+        source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        request = root / "request.json"
+        request.write_text(json.dumps({
+            "schema_version": "dcs-extraction-request/1.0",
+            "run_id": "dcs-controller-test",
+            "source_path": str(source),
+            "expected_sha256": source_hash,
+        }), "utf-8")
+        output = root / "run"
+        command = [sys.executable, str(HERE / "run_dcs_pipeline.py"), str(request), "--out", str(output)]
+        first = subprocess.run(command, text=True, capture_output=True, check=False)
+        assert_true(first.returncode == 2, first.stderr or first.stdout)
+        state = json.loads((output / "dcs-run-state.json").read_text("utf-8"))
+        assert_true(state["pipeline_status"] == "NEEDS_CROSSWALK", "DCS controller did not reach its crosswalk checkpoint")
+        assert_true(state["blocker_class"] == "INTERNAL_WORK" and state["user_blocking"] is False, "DCS internal preparation became a user blocker")
+        checks += 2
+        second = subprocess.run(command, text=True, capture_output=True, check=False)
+        assert_true(second.returncode == 2, second.stderr or second.stdout)
+        resumed = json.loads((output / "dcs-run-state.json").read_text("utf-8"))
+        extract = next(item for item in resumed["checkpoints"] if item["stage"] == "extract")
+        assert_true(extract["reused"] is True, "DCS extraction checkpoint was not reused")
+        checks += 1
+
+        source.write_text("Description,Amount,Maturity\nBond A,101,2028-12-31\n", "utf-8")
+        mutated = subprocess.run(command, text=True, capture_output=True, check=False)
+        assert_true(mutated.returncode != 0 and "expected_sha256" in (mutated.stderr + mutated.stdout), "raw-source mutation escaped the DCS hash gate")
+        checks += 1
+
+    print(json.dumps({"status": "PASS", "checks": checks, "total_violation_count": 0}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

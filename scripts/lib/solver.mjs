@@ -486,6 +486,7 @@ function evaluateStatementCalculation(
   calculation,
   resolve,
   previousValues,
+  definition = null,
 ) {
   const refs = calculation.refs ?? [];
   // Temporal edges are not current-period dependencies. Resolve them before
@@ -503,6 +504,31 @@ function evaluateStatementCalculation(
     return priorDriver === 0
       ? 0
       : (priorValue * currentDriver) / priorDriver;
+  }
+  if (calculation.operator === "historical_average") {
+    const history = (definition?.values ?? [])
+      .slice(0, 3)
+      .filter((value) =>
+        value !== null &&
+        value !== undefined &&
+        Number.isFinite(Number(value)),
+      )
+      .map(Number);
+    return history.length === 0
+      ? 0
+      : history.reduce((sum, value) => sum + value, 0) / history.length;
+  }
+  if (calculation.operator === "historical_trend") {
+    const history = (definition?.values ?? []).slice(0, 3).map(Number);
+    if (history.length !== 3 || history.some((value) => !Number.isFinite(value))) {
+      return 0;
+    }
+    const slope =
+      ((history[1] - history[0]) + (history[2] - history[1])) / 2;
+    return (
+      history[2] +
+      slope * (Number(calculation.forecast_index ?? 0) + 1)
+    );
   }
   const values = refs.map((rowId) => Number(resolve(rowId) ?? 0));
   switch (calculation.operator) {
@@ -628,7 +654,12 @@ function declaredStatementPeriod(
     if (selfCarry && forecastIndex === 0) {
       value = statementRowForecastValue(modelCase, definition, periodIndex);
     } else if (rule) {
-      value = evaluateStatementCalculation(rule, resolve, previousValues);
+      value = evaluateStatementCalculation(
+        rule,
+        resolve,
+        previousValues,
+        definition,
+      );
     } else {
       value = statementRowForecastValue(modelCase, definition, periodIndex);
       if (NEGATIVE_STATEMENT_ROLES.has(definition.semantic_role)) {

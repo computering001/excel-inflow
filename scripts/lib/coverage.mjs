@@ -6,6 +6,7 @@ import { compileStatementTopology } from "./statement_topology.mjs";
 import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
 import { coreConsumptionIds } from "./broker_metric_dictionary.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
+import { compileOpeningInstrumentState } from "./instrument_period_state.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -1425,41 +1426,6 @@ function instrumentChecks(modelCase) {
 }
 
 /**
- * THE RATE A NATIVE BALANCE IS TRANSLATED AT, AND THE STATEMENT OF IT.
- *
- * DEFECT 0.10. `debt_reconciliation` used to add native USD, EUR and GBP
- * opening balances together and compare the total against a reported figure.
- * The sum of three currencies is not a currency, so the comparison was
- * meaningless — and the workbook's own gross-debt row has always been the
- * FX-TRANSLATED total, which is why the two disagreed by 463 on the maximal
- * case, 904 on AstraZeneca and 528 on Smurfit without anything firing.
- *
- * The rate is the LAST HISTORICAL PERIOD-END rate — index 2 of
- * `period_end_rates` — because the balance being translated is a balance at
- * that date. It is the same rate `solver.mjs` uses for the forecast opening
- * balance and the same cell `build_dynamic_model.mjs` points the debt schedule
- * at, so the three now agree by construction rather than by coincidence.
- */
-function openingFxRate(modelCase, currency) {
-  const reporting = modelCase.issuer?.reporting_currency;
-  if (!currency || currency === reporting) {
-    return { rate: 1, statement: `${currency ?? reporting} at par (reporting currency)` };
-  }
-  const pair = modelCase.fx?.[currency];
-  const quoted = number(pair?.period_end_rates?.[2]);
-  if (!pair || !Number.isFinite(quoted) || quoted <= 0) {
-    return { rate: null, statement: null };
-  }
-  const rate = pair.quote === "reporting_per_native" ? quoted : 1 / quoted;
-  return {
-    rate,
-    statement:
-      `${currency}: ${quoted} ${pair.quote} at the last historical period end ` +
-      `(1 ${currency} = ${rate.toPrecision(8)} ${reporting})`,
-  };
-}
-
-/**
  * DEFECT 0.5 — GATE PLACEMENT, NOT A MISSING CAPABILITY.
  *
  * Multi-currency works given an `fx` entry for every non-reporting currency.
@@ -1619,71 +1585,31 @@ function debtReconciliationChecks(modelCase) {
       ),
     );
   }
-  const instruments = modelCase.instruments ?? [];
-  const untranslatable = [];
-  const rateStatements = new Map();
-  const translate = (instrument) => {
-    const balanceCurrency =
-      instrument.balance_basis === "reporting_currency_carrying_value"
-        ? modelCase.issuer.reporting_currency
-        : instrument.currency;
-    const { rate, statement } = openingFxRate(modelCase, balanceCurrency);
-    if (rate === null) {
-      untranslatable.push({
-        instrument_id: instrument.instrument_id ?? "unknown",
-        currency: balanceCurrency ?? null,
-      });
-      return 0;
-    }
-    if (statement) rateStatements.set(balanceCurrency, statement);
-    return number(instrument.opening_balance || 0) * rate;
-  };
-  const included = instruments
-    .filter(
-      (item) =>
-        item.include_in_gross_debt !== false &&
-        item.class !== "rcf",
-    )
-    .reduce((sum, item) => sum + translate(item), 0);
-  const rcfInstrument = instruments.find(
-    (item) => item.instrument_id === modelCase.rcf_policy?.instrument_id,
-  );
-  const rcfRate = openingFxRate(modelCase, rcfInstrument?.currency).rate;
-  // FR-11: a missing FX pair used to default to 1.0 here, which hid a
-  // foreign-currency RCF's absent rate until the builder threw raw at
-  // emission. A default that hides an absence is a mask, not a convenience;
-  // the absence is named here, where the remedy is still an input question.
-  if (
-    rcfInstrument &&
-    number(modelCase.rcf_policy?.opening_draw ?? 0) !== 0 &&
-    !(rcfRate ?? null)
-  ) {
-    return [
-      result(
-        "debt_reconciliation.rcf_fx_missing",
-        "BLOCK",
-        `RCF ${rcfInstrument.instrument_id} draws in ${rcfInstrument.currency} with an opening balance, but no FX pair to the reporting currency is declared. Declare the pair; a defaulted 1.0 rate is a hidden assumption, not a reconciliation.`,
-      ),
-    ];
-  }
-  const openingRcf =
-    number(modelCase.rcf_policy?.opening_draw ?? 0) * (rcfRate ?? 1);
-  const residualInstrument = instruments.find(
-    (item) => item.is_residual_pool === true,
-  );
-  const actualResidual = residualInstrument ? translate(residualInstrument) : 0;
-  if (untranslatable.length > 0) {
+  const openingState = compileOpeningInstrumentState(modelCase);
+  if (openingState.status !== "PASS") {
     // Reported against a figure that could not be built is not a reconciliation.
     return [
       result(
         "debt_reconciliation.untranslatable",
         "BLOCK",
         "Opening debt cannot be reconciled: one or more instruments are in a currency with no usable FX pair, so the identified total is not a currency amount.",
-        { untranslatable },
+        { errors: openingState.errors, opening_instrument_state: openingState },
       ),
     ];
   }
-  const identifiedExcludingResidual = included + openingRcf - actualResidual;
+  const includedRows = openingState.rows.filter(
+    (row) => row.include_in_gross_debt,
+  );
+  const residualRows = includedRows.filter((row) => row.is_residual_pool);
+  const actualResidual = residualRows.reduce(
+    (total, row) => total + row.reporting_amount,
+    0,
+  );
+  const identifiedExcludingResidual = includedRows.reduce(
+    (total, row) =>
+      total + (row.is_residual_pool ? 0 : row.reporting_amount),
+    0,
+  );
   // DEFECT 0.1 — THE RESIDUAL IS SIGNED.
   //
   // `Math.max(0, reported - identified)` cannot represent the case where the
@@ -1704,7 +1630,14 @@ function debtReconciliationChecks(modelCase) {
   const moneyTolerance = Math.max(0.01, Math.abs(reported) * 1e-9);
   const requiredResidual = Math.max(0, signedResidual);
   const residualPercentage = reported === 0 ? 0 : requiredResidual / reported;
-  const fxBasis = [...rateStatements.values()];
+  const fxBasis = [...new Map(
+    openingState.rows.map((row) => [
+      `${row.basis_currency}\u0000${row.translation_rate}`,
+      row.translation_method === "native_principal_to_reporting"
+        ? `${row.basis_currency}: 1 ${row.basis_currency} = ${row.translation_rate.toPrecision(8)} ${openingState.reporting_currency} at ${openingState.as_of}`
+        : `${row.basis_currency}: no translation (${row.balance_basis})`,
+    ]),
+  ).values()];
   const detail = {
     reported,
     reported_series: reportedSeries,
@@ -1714,6 +1647,7 @@ function debtReconciliationChecks(modelCase) {
     actualResidual,
     fx_translation: fxBasis,
     reporting_currency: modelCase.issuer?.reporting_currency ?? null,
+    opening_instrument_state: openingState,
   };
   if (overIdentified > moneyTolerance) {
     checks.push(

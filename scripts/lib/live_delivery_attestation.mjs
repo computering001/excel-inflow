@@ -19,8 +19,15 @@ export const LIVE_DELIVERY_ATTESTATION_SCHEMA = "live-delivery-attestation/1.0";
 const REQUIRED_SIDECARS = Object.freeze([
   ".plan.json",
   ".row-map.json",
-  ".semantic-manifest.json",
   ".solution.json",
+  ".coverage.json",
+  ".semantic-manifest.json",
+  ".source-crosswalk.csv",
+  ".forecast-receipt.json",
+  ".forecast-receipt.csv",
+  ".shadow-comparison.json",
+  ".model-ir-v3.json",
+  ".transformation-receipt.json",
   ".workbook-proof-contract.json",
 ]);
 
@@ -43,6 +50,16 @@ function isInside(candidate, root) {
     !relative.startsWith(`..${path.sep}`) &&
     !path.isAbsolute(relative)
   );
+}
+
+async function relativeFiles(root, current = root) {
+  const entries = [];
+  for (const item of (await fs.readdir(current, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+    const target = path.join(current, item.name);
+    if (item.isDirectory()) entries.push(...await relativeFiles(root, target));
+    else if (item.isFile()) entries.push(path.relative(root, target).split(path.sep).join("/"));
+  }
+  return entries;
 }
 
 function decodeXml(value) {
@@ -180,6 +197,21 @@ export async function compileLiveDeliveryAttestation({
       return [suffix.slice(1), { path: sidecar, sha256: await hashFile(sidecar) }];
     })),
   );
+  const publicationPath = path.resolve(String(buildResult?.evidence?.publication ?? ""));
+  invariant(
+    Boolean(buildResult?.evidence?.publication) && isInside(publicationPath, root),
+    "publication.path",
+    "Stage 4 did not return an in-run publication manifest.",
+    violations,
+  );
+  let publication = null;
+  if (isInside(publicationPath, root)) {
+    try {
+      publication = await readJson(publicationPath, "publication manifest");
+    } catch (error) {
+      violations.push({ code: "publication.unreadable", detail: error.message });
+    }
+  }
   const [rowMap, semanticManifest, proofContract, modelCase, skillIntegrity] = await Promise.all([
     readJson(sidecars["row-map.json"].path, "row map"),
     readJson(sidecars["semantic-manifest.json"].path, "semantic manifest"),
@@ -274,11 +306,60 @@ export async function compileLiveDeliveryAttestation({
     }
   }
 
+  invariant(publication?.schema_version === "stage4-publication/2.0", "publication.schema", `Unexpected publication schema ${publication?.schema_version ?? "missing"}.`, violations);
+  invariant(publication?.automated_status === "PASS_PENDING_MANUAL", "publication.status", `Unexpected publication status ${publication?.automated_status ?? "missing"}.`, violations);
+  invariant(publication?.total_violations === 0, "publication.violations", `Publication reports ${publication?.total_violations ?? "missing"} violations.`, violations);
+  const workbookSha256 = await hashFile(target);
+  invariant(publication?.workbook?.sha256 === workbookSha256, "publication.workbook", "Publication manifest does not bind the delivered workbook bytes.", violations);
+  for (const [name, descriptor] of Object.entries(sidecars)) {
+    const published = publication?.sidecars?.[name];
+    invariant(Boolean(published), "publication.sidecar_missing", `Publication manifest omits ${name}.`, violations);
+    invariant(published?.sha256 === descriptor.sha256, "publication.sidecar_hash", `Publication hash for ${name} does not match the delivered sidecar.`, violations);
+  }
+  for (const [label, directory, manifestEntries] of [
+    ["verification", path.join(root, "verify"), publication?.verification_files],
+    ["render", path.join(root, "render"), publication?.render_files],
+  ]) {
+    invariant(Array.isArray(manifestEntries) && manifestEntries.length > 0, `publication.${label}_manifest`, `Publication has no ${label} file manifest.`, violations);
+    let actualFiles = [];
+    try {
+      actualFiles = await relativeFiles(directory);
+    } catch (error) {
+      violations.push({ code: `publication.${label}_directory`, detail: error.message });
+    }
+    invariant(
+      hashValue(actualFiles) === hashValue((manifestEntries ?? []).map((entry) => entry.path).sort()),
+      `publication.${label}_completeness`,
+      `${label} file manifest does not exactly cover the published directory.`,
+      violations,
+    );
+    for (const entry of manifestEntries ?? []) {
+      const candidate = path.resolve(directory, String(entry.path ?? ""));
+      invariant(isInside(candidate, directory), `publication.${label}_path`, `${label} entry escapes its evidence directory: ${entry.path}.`, violations);
+      if (!isInside(candidate, directory)) continue;
+      try {
+        invariant(await hashFile(candidate) === entry.sha256, `publication.${label}_hash`, `${label} evidence hash differs for ${entry.path}.`, violations);
+      } catch (error) {
+        violations.push({ code: `publication.${label}_missing`, detail: `${entry.path}: ${error.message}` });
+      }
+    }
+  }
+  try {
+    const recalcReceipt = await readJson(path.join(root, "verify", "libreoffice-recalc-receipt.json"), "LibreOffice recalculation receipt");
+    invariant(recalcReceipt.status === "PASS", "publication.recalc_receipt", `LibreOffice receipt status is ${recalcReceipt.status ?? "missing"}.`, violations);
+    invariant(recalcReceipt.package_changed === true, "publication.recalc_noop", "LibreOffice receipt does not prove a non-no-op package conversion.", violations);
+    invariant(Number(recalcReceipt.formula_cells ?? 0) > 0, "publication.recalc_coverage", "LibreOffice receipt visited no formula cells.", violations);
+    invariant(recalcReceipt.compared_formula_cells === recalcReceipt.formula_cells, "publication.recalc_coverage", "LibreOffice receipt did not compare every formula cache.", violations);
+  } catch (error) {
+    violations.push({ code: "publication.recalc_receipt", detail: error.message });
+  }
+
   const artifactHashes = {
-    workbook: await hashFile(target),
+    workbook: workbookSha256,
     model_case: await hashFile(modelCasePath),
     stage4_receipt: hashValue(canonicalise(stage4Receipt)),
     skill_integrity: await hashFile(path.join(path.dirname(target), "skill-integrity.json")),
+    publication: publication ? await hashFile(publicationPath) : null,
     ...Object.fromEntries(Object.entries(sidecars).map(([name, descriptor]) => [name.replace(/\.json$/, ""), descriptor.sha256])),
   };
   const body = canonicalise({

@@ -846,6 +846,49 @@ function applyOption(modelCase, instance, optionId) {
   return option.apply(modelCase) ?? modelCase;
 }
 
+/**
+ * Reapply receipted decisions to a freshly compiled case.
+ *
+ * Answers are not merely question-suppression metadata. A new compile starts
+ * from sealed evidence and doctrine, so every carried answer must replay the
+ * same registered economic mutation before question planning or solving.
+ * Unknown or stale answer IDs are reported, never silently treated as applied.
+ */
+export function applyRecordedAnswers({
+  modelCase,
+  intake,
+  reconciliation = null,
+  answers = new Map(),
+}) {
+  const recorded = answers instanceof Map
+    ? new Map(answers)
+    : new Map(Object.entries(answers ?? {}));
+  const instances = detectAll({ draftCase: modelCase, intake, reconciliation });
+  const byId = new Map(instances.map((instance) => [instance.id, instance]));
+  let next = deepClone(modelCase);
+  const applied = [];
+  const unknown = [];
+  const invalid = [];
+  for (const [questionId, answer] of recorded) {
+    const instance = byId.get(questionId);
+    if (!instance) {
+      unknown.push({ question_id: questionId, answer });
+      continue;
+    }
+    if (!instance.options.some((option) => option.id === answer)) {
+      invalid.push({
+        question_id: questionId,
+        answer,
+        allowed_answers: instance.options.map((option) => option.id),
+      });
+      continue;
+    }
+    next = applyOption(next, instance, answer);
+    applied.push({ question_id: questionId, answer });
+  }
+  return { modelCase: next, applied, unknown, invalid };
+}
+
 // The baseline every candidate is measured against: the draft case with every
 // detected ambiguity taken at its default. Measuring one ambiguity against a
 // baseline that already assumes the others is what keeps the measurement
@@ -1154,8 +1197,33 @@ export function planQuestions({
     },
   };
 
+  if (blocked.length > 0) {
+    return {
+      ...base,
+      status: "blocked",
+      blocker_class: "INTERNAL_WORK",
+      questions: [],
+      survivors: ordered,
+    };
+  }
+
   if (ordered.length > limit) {
-    return { ...base, status: "inputs_look_wrong", questions: [], survivors: ordered };
+    const groups = Object.entries(
+      ordered.reduce((accumulator, question) => {
+        (accumulator[question.kind] ??= []).push(question.id);
+        return accumulator;
+      }, {}),
+    )
+      .map(([kind, question_ids]) => ({ kind, question_ids }))
+      .sort((left, right) => left.kind.localeCompare(right.kind));
+    return {
+      ...base,
+      status: "inputs_look_wrong",
+      blocker_class: "USER_EVIDENCE",
+      questions: [],
+      survivors: ordered,
+      unresolved_groups: groups,
+    };
   }
   if (ordered.length === 0) {
     return { ...base, status: "no_questions", questions: [] };

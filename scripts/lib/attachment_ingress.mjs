@@ -40,6 +40,8 @@ const DCS_CROSSWALK_SCHEMA = schema("dcs-crosswalk-v1.schema.json");
 const DCS_PROJECTION_SCHEMA = schema("dcs-projection-v1.schema.json");
 const DCS_EVIDENCE_RECEIPT_SCHEMA = schema("dcs-evidence-receipt-v1.schema.json");
 const DCS_INDEPENDENT_REPORT_SCHEMA = schema("dcs-independent-verification-v1.schema.json");
+const DCS_RUN_STATE_SCHEMA = schema("dcs-run-state.schema.json");
+const DCS_RUNTIME_MEMBERS = schema("dcs-runtime-members.json");
 
 export const INGRESS_SCHEMA_VERSION = "attachment-ingress/1.0";
 export const INGRESS_COMPILER_VERSION = "attachment-ingress/1.0";
@@ -100,6 +102,29 @@ async function brokerRuntimeClosureSha256() {
     members[relative] = sha256(bytes);
   }
   return canonicalCompactSha256(members);
+}
+
+async function dcsRuntimeClosureSha256() {
+  if (
+    DCS_RUNTIME_MEMBERS.schema_version !== "dcs-runtime-members/1.0" ||
+    !Array.isArray(DCS_RUNTIME_MEMBERS.members) ||
+    DCS_RUNTIME_MEMBERS.members.length === 0
+  ) {
+    throw new Error("DCS runtime-members manifest is invalid.");
+  }
+  const hashes = {};
+  for (const relative of DCS_RUNTIME_MEMBERS.members) {
+    if (
+      typeof relative !== "string" ||
+      path.isAbsolute(relative) ||
+      relative.split(/[\\/]/).includes("..")
+    ) {
+      throw new Error(`Invalid DCS runtime member ${relative}.`);
+    }
+    const target = path.resolve(HERE, "..", "..", relative);
+    hashes[relative] = sha256(await fs.readFile(target));
+  }
+  return sha256(Buffer.from(`${JSON.stringify(canonicalise(hashes))}\n`, "utf8"));
 }
 
 /**
@@ -559,6 +584,7 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   if (
     runState.json.pipeline_status !== "PASS" ||
     runState.json.user_blocking !== false ||
+    runState.json.blocker_class !== null ||
     (runState.json.tasks ?? []).length !== 0
   ) {
     throw new Error(
@@ -999,8 +1025,15 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       }
     }
   }
-  evidence.model_case.broker_pack.raw_tables = workbookTables;
-  evidence.model_case.broker_pack.source_mappings = structuredClone(
+  const compilerLanes = evidence.case_evidence?.lanes;
+  if (!compilerLanes || typeof compilerLanes !== "object") {
+    throw new Error("Broker ingress requires case_evidence.lanes for compiler-owned evidence projection.");
+  }
+  compilerLanes.broker_pack = structuredClone(
+    compilerLanes.broker_pack ?? evidence.broker_pack ?? {},
+  );
+  compilerLanes.broker_pack.raw_tables = workbookTables;
+  compilerLanes.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
   );
   // The standardised digest rides the same seam as the raw tables: projected
@@ -1018,8 +1051,19 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     };
   }
   if (Object.keys(houseDigests).length > 0) {
-    evidence.model_case.broker_pack.house_digests = houseDigests;
+    compilerLanes.broker_pack.house_digests = houseDigests;
   }
+  compilerLanes.broker_evidence = {
+    controller_state: structuredClone(runState.json),
+    extraction_bundle: structuredClone(extraction.json),
+    source_tables: structuredClone(sourceTables.json),
+    crosswalk: structuredClone(crosswalk.json),
+    crosswalk_receipt: structuredClone(receipt.json),
+    ...(semanticReport
+      ? { semantic_verification: structuredClone(semanticReport.json) }
+      : {}),
+    workbook_table_projection: structuredClone(workbookTables),
+  };
   return {
     broker_run_state_sha256: runState.sha256,
     broker_runtime_closure_sha256: runState.json.runtime_closure_sha256,
@@ -1054,6 +1098,7 @@ export async function compileDcsEvidence({
       json: await readJsonFile(artifactPath, label),
     };
   };
+  const runState = await artifact("run_state_path", "DCS controller run state");
   const sourceTables = await artifact("source_tables_path", "DCS source tables");
   const manifest = await artifact("candidate_manifest_path", "DCS candidate manifest");
   const crosswalk = await artifact("crosswalk_path", "DCS crosswalk");
@@ -1063,6 +1108,22 @@ export async function compileDcsEvidence({
     "independent_verification_path",
     "DCS independent verification report",
   );
+
+  const runStateErrors = validateJsonSchema(runState.json, DCS_RUN_STATE_SCHEMA);
+  if (runStateErrors.length > 0) {
+    throw new Error(`DCS controller run state fails its contract: ${runStateErrors[0]}`);
+  }
+  if (
+    runState.json.pipeline_status !== "PASS" ||
+    runState.json.user_blocking !== false ||
+    runState.json.blocker_class !== null ||
+    (runState.json.tasks ?? []).length !== 0
+  ) {
+    throw new Error(`DCS controller run is ${runState.json.pipeline_status}, not a terminal PASS.`);
+  }
+  if (runState.json.runtime_closure_sha256 !== await dcsRuntimeClosureSha256()) {
+    throw new Error("DCS controller run state was produced by a different DCS runtime closure.");
+  }
 
   for (const [label, artifactValue, contract] of [
     ["DCS source tables", sourceTables, DCS_SOURCE_TABLES_SCHEMA],
@@ -1075,6 +1136,51 @@ export async function compileDcsEvidence({
     const errors = validateJsonSchema(artifactValue.json, contract);
     if (errors.length > 0) {
       throw new Error(`${label} fails its contract: ${errors[0]}`);
+    }
+  }
+  const ownedArtifacts = {
+    source_tables: sourceTables,
+    candidate_manifest: manifest,
+    crosswalk,
+    projection,
+    compiler_receipt: receipt,
+    independent_verification: independent,
+  };
+  for (const [name, value] of Object.entries(ownedArtifacts)) {
+    const statePath = runState.json.artifacts?.[name];
+    if (!statePath || path.resolve(statePath) !== path.resolve(value.path)) {
+      throw new Error(`DCS controller run state does not own the declared ${name} artifact.`);
+    }
+    if (runState.json.artifact_sha256?.[name] !== value.sha256) {
+      throw new Error(`DCS controller run state has a stale hash for ${name}.`);
+    }
+  }
+  const expectedCheckpoints = new Set(["extract", "compile", "independent_oracle"]);
+  const checkpointArtifacts = {
+    extract: "source_tables",
+    compile: "projection",
+    independent_oracle: "independent_verification",
+  };
+  const seenCheckpoints = new Set();
+  for (const checkpoint of runState.json.checkpoints ?? []) {
+    if (seenCheckpoints.has(checkpoint.stage)) {
+      throw new Error(`DCS controller run repeats checkpoint ${checkpoint.stage}.`);
+    }
+    seenCheckpoints.add(checkpoint.stage);
+    if (checkpoint.status !== "PASS" || !checkpoint.output_sha256) {
+      throw new Error(`DCS controller checkpoint ${checkpoint.stage} is not PASS and hash-bound.`);
+    }
+    const artifactName = checkpointArtifacts[checkpoint.stage];
+    if (
+      artifactName &&
+      checkpoint.output_sha256 !== runState.json.artifact_sha256?.[artifactName]
+    ) {
+      throw new Error(`DCS controller checkpoint ${checkpoint.stage} is detached from ${artifactName}.`);
+    }
+  }
+  for (const stage of expectedCheckpoints) {
+    if (!seenCheckpoints.has(stage)) {
+      throw new Error(`DCS controller PASS state lacks checkpoint ${stage}.`);
     }
   }
   await rerunPythonVerifier(
@@ -1192,19 +1298,28 @@ export async function compileDcsEvidence({
   evidence.dcs_export = structuredClone(projection.json.dcs_export);
   evidence.dcs_evidence_receipt = receipt.json;
   evidence.dcs_independent_verification = independent.json;
-  evidence.model_case.instrument_authority_contract_version = "dcs_evidence_v1";
-  evidence.model_case.instrument_term_authorities = structuredClone(
+  const compilerLanes = evidence.case_evidence?.lanes;
+  if (!compilerLanes || typeof compilerLanes !== "object") {
+    throw new Error("DCS ingress requires case_evidence.lanes for compiler-owned evidence projection.");
+  }
+  compilerLanes.instrument_authority_contract_version = "dcs_evidence_v1";
+  compilerLanes.instrument_term_authorities = structuredClone(
     projection.json.term_authorities,
   );
   const modelInstruments = new Map(
-    (evidence.model_case.instruments ?? []).map((instrument) => [
+    (compilerLanes.instruments ?? []).map((instrument) => [
       instrument.instrument_id,
       instrument,
     ]),
   );
   for (const projected of projection.json.dcs_export.instruments ?? []) {
     const instrument = modelInstruments.get(projected.instrument_id);
-    if (!instrument) continue;
+    if (!instrument) {
+      throw new Error(
+        `DCS projection instrument ${projected.instrument_id} is absent from sealed case_evidence.lanes.instruments. ` +
+        "Repair the internal case-evidence assembly; do not ask the user to re-upload an unchanged export.",
+      );
+    }
     instrument.maturity_date = projected.maturity_date;
     instrument.maturity_precision = projected.maturity_precision;
     instrument.maturity_source_value = projected.maturity_source_value;
@@ -1218,13 +1333,30 @@ export async function compileDcsEvidence({
       delete instrument.benchmark;
       delete instrument.benchmark_rate;
       delete instrument.spread_bps;
-      if (projected.instrument_type === "rcf" && evidence.model_case.rcf_policy) {
-        evidence.model_case.rcf_policy.commitment_fee_convention = "captured_in_residual";
-        evidence.model_case.rcf_policy.commitment_fee_value = 0;
+      if (projected.instrument_type === "rcf") {
+        compilerLanes.policy_evidence ??= {};
+        compilerLanes.policy_evidence.rcf ??= {};
+        compilerLanes.policy_evidence.rcf.commitment_fee_convention = "captured_in_residual";
+        compilerLanes.policy_evidence.rcf.commitment_fee_value = 0;
       }
     }
   }
+  compilerLanes.dcs = {
+    controller_state: structuredClone(runState.json),
+    source_tables: structuredClone(sourceTables.json),
+    candidate_manifest: structuredClone(manifest.json),
+    crosswalk: structuredClone(crosswalk.json),
+    projection: structuredClone(projection.json),
+    compiler_receipt: structuredClone(receipt.json),
+    independent_verification: structuredClone(independent.json),
+    dcs_export: structuredClone(projection.json.dcs_export),
+    term_authorities: structuredClone(projection.json.term_authorities),
+    instrument_authority_contract_version: "dcs_evidence_v1",
+  };
   return {
+    dcs_run_state_sha256: runState.sha256,
+    dcs_runtime_closure_sha256: runState.json.runtime_closure_sha256,
+    dcs_cache_key: runState.json.cache_key,
     source_tables_sha256: sourceTables.sha256,
     candidate_manifest_sha256: manifest.sha256,
     crosswalk_sha256: crosswalk.sha256,
@@ -1287,7 +1419,7 @@ export async function compileAttachmentIngress({ specPath }) {
     (entry) => entry.adapter?.domain === "broker_pack",
   );
   const referenceParity =
-    (evidence.model_case?.execution_profile ?? "production_model") === "reference_parity";
+    (evidence.case_source?.identity?.execution_profile ?? "production_model") === "reference_parity";
   if (hasBrokerAttachment && !spec.broker_evidence && !referenceParity) {
     throw new Error(
       "broker_ingress_incoherent: a broker research attachment requires a PASS broker_evidence bundle; a separately normalized broker pack is not proof that the documents were read.",
@@ -1313,6 +1445,12 @@ export async function compileAttachmentIngress({ specPath }) {
       statement.rows_sha256 = faceStatementManifestDigest(statement);
     }
   }
+  if (!evidence.case_evidence || typeof evidence.case_evidence !== "object") {
+    throw new Error("Attachment ingress requires case_evidence with sealed compiler lanes.");
+  }
+  evidence.case_evidence.face_statement_manifests = structuredClone(
+    evidence.filings?.face_statement_manifests ?? {},
+  );
 
   // A document extraction artifact is not merely proof that some text was
   // read.  When its source owns a selected face statement, it must contain the

@@ -18,6 +18,7 @@ import { resolvedLeaseInterestBasis } from "./lease_policy.mjs";
 import {
   compileInstrumentPeriodState,
   instrumentPeriodStateByKey,
+  maturityApplies,
 } from "./instrument_period_state.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import {
@@ -2496,6 +2497,11 @@ function removeRedundantDuplicateHeaders(rows) {
  * rows.
  */
 function applyDefaultForecastWaterfall(modelCase, rows) {
+  // Waterfall-v1 decisions are sealed upstream by the forecast candidate
+  // compiler.  Row planning is a presentation compiler and may not invent a
+  // carry or explicit zero after that decision.  Retain this adapter only for
+  // archived legacy cases that have no per-period authority contract.
+  if (modelCase.forecast_authority_contract_version === "waterfall_v1") return;
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   for (const row of rows) {
     if (
@@ -2527,24 +2533,18 @@ function applyDefaultForecastWaterfall(modelCase, rows) {
     if (!history.some((value) => value !== null)) continue;
     const last = history[2] ?? history[1] ?? history[0];
     clearCompiledForecastOverride(row);
-    if (Math.abs(Number(last ?? 0)) <= 1e-12) {
-      row.forecast_treatment = "zero";
-      row.values = [...history, 0, 0, 0];
-      row.forecast_decision = {
-        method: "explicit_zero",
-        reason: "Latest reported value is zero and no stronger forecast evidence exists.",
-      };
-    } else {
-      row.forecast_treatment = "formula";
-      row.forecast_calculation = {
-        operator: "prior_period",
-        refs: [row.row_id],
-      };
-      row.forecast_decision = {
-        method: "carry_forward",
-        reason: "Last-resort formula carry from the latest reported value.",
-      };
-    }
+    row.forecast_treatment = "formula";
+    row.forecast_calculation = {
+      operator: "prior_period",
+      refs: [row.row_id],
+    };
+    row.forecast_decision = {
+      method: "carry_forward",
+      reason:
+        Math.abs(Number(last ?? 0)) <= 1e-12
+          ? "Legacy last-supported-level carry; zero is not treated as evidence of non-recurrence."
+          : "Legacy last-resort formula carry from the latest reported value.",
+    };
   }
 }
 
@@ -2780,8 +2780,6 @@ export function normaliseStatementRows(
       scope: (row) =>
         operatingSubtotal < 0 || rows.indexOf(row) < operatingSubtotal,
       extra: {
-        broker_metric_id: "change_in_working_capital",
-        forecast_treatment: "broker",
         aggregation_authority: "derived_from_children",
       },
       presentation_style_role: "subsection",
@@ -3359,15 +3357,21 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       const maturity = instrument.maturity_date
         ? new Date(instrument.maturity_date)
         : null;
-      if (instrument.class === "rcf") return "discretionary_rcf";
+      const balancingRcf = isBalancingRcf(modelCase, instrument);
+      if (balancingRcf) return "discretionary_rcf";
       const periodEnd = new Date(modelCase.periods?.[index + 3]?.date ?? 0);
       const priorPeriodEnd = new Date(
         modelCase.periods?.[index + 2]?.date ?? 0,
       );
       const maturityDue =
-        instrument.maturity_treatment !== "non_maturing_within_forecast" &&
-        maturity &&
-        !Number.isNaN(maturity.getTime()) &&
+        maturityApplies({
+          instrument,
+          maturityDate:
+            maturity && !Number.isNaN(maturity.getTime()) ? maturity : null,
+          periodEnd,
+          debtMaturitiesRoll: modelCase.controls?.debt_maturities_roll,
+          balancingRcf,
+        }) &&
         maturity > priorPeriodEnd &&
         maturity <= periodEnd;
       const scheduled =
@@ -3381,7 +3385,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       ? compiledStates.some(
           (state) => state?.inclusion?.mandatory_repayment === true,
         )
-      : instrument.class !== "rcf" &&
+      : !isBalancingRcf(modelCase, instrument) &&
         plan.repayment_state_by_period.some((state) => state !== "zero");
     if (
       (instrument.pik_rate ?? []).some(

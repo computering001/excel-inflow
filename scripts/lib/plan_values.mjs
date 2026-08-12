@@ -35,6 +35,8 @@
  * is reported as unresolved and named.
  */
 
+import { compareExcelValues } from "./excel_value_semantics.mjs";
+
 const EMPTY = Symbol("empty");
 
 class FormulaError {
@@ -303,25 +305,7 @@ function truthy(value) {
  * wrong would silently pick the wrong broker's number.
  */
 function compare(left, right) {
-  const leftBlank = left === EMPTY;
-  const rightBlank = right === EMPTY;
-  if (leftBlank && rightBlank) return 0;
-  if (leftBlank) return typeof right === "string" ? ("" < right ? -1 : "" > right ? 1 : 0) : compare(0, right);
-  if (rightBlank) return typeof left === "string" ? (left < "" ? -1 : left > "" ? 1 : 0) : compare(left, 0);
-  const leftIsText = typeof left === "string";
-  const rightIsText = typeof right === "string";
-  if (leftIsText && rightIsText) {
-    const a = left.toUpperCase();
-    const b = right.toUpperCase();
-    return a < b ? -1 : a > b ? 1 : 0;
-  }
-  // Excel orders every number below every text, and every text below every
-  // boolean. Nothing in this model relies on it; it is stated so that a
-  // comparison never silently coerces one to the other.
-  if (leftIsText !== rightIsText) return leftIsText ? 1 : -1;
-  const a = typeof left === "boolean" ? (left ? 1 : 0) : left;
-  const b = typeof right === "boolean" ? (right ? 1 : 0) : right;
-  return a < b ? -1 : a > b ? 1 : 0;
+  return compareExcelValues(left, right, { isBlank: (value) => value === EMPTY });
 }
 
 // ---------------------------------------------------------------------------

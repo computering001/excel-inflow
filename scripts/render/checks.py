@@ -172,6 +172,37 @@ def check_font_set(rendered: pdfdoc.RenderedPdf, expected: Optional[set] = None)
     return findings
 
 
+def check_evidence_font_presence(rendered: pdfdoc.RenderedPdf) -> List[Finding]:
+    """Evidence-only source tabs may preserve the broker's own table font.
+
+    Their rendered geometry is not an authority surface, so an exact Carlito
+    family requirement would reject faithful source evidence for presentation
+    reasons.  The gate remains non-vacuous: a PDF with no readable font
+    identity is BLOCKED.  Core and calculation sheets continue to use
+    :func:`check_font_set` with the exact Carlito set.
+    """
+    observed = set(rendered.font_families())
+    findings = [
+        Finding(
+            "font_presence",
+            INFO,
+            "observed evidence-tab font families: %s" % sorted(observed),
+            detail={"observed": sorted(observed), "policy": "nonempty-evidence-only"},
+        )
+    ]
+    if not observed:
+        findings.append(
+            Finding(
+                "font_presence",
+                BLOCKED,
+                "evidence-only source tab rendered no identifiable font family; "
+                "the source table cannot be visually evidenced.",
+                detail={"observed": []},
+            )
+        )
+    return findings
+
+
 # --------------------------------------------------------------------------
 # Cell text harvesting
 # --------------------------------------------------------------------------

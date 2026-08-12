@@ -132,6 +132,47 @@ function declaredInstrumentType(instrument) {
   return known ?? "Debt instrument";
 }
 
+function truncateAtWord(text, maximum) {
+  if (text.length <= maximum) return text;
+  const available = Math.max(8, maximum - 1);
+  const slice = text.slice(0, available + 1);
+  const boundary = slice.lastIndexOf(" ");
+  return `${slice.slice(0, boundary >= 8 ? boundary : available).trimEnd()}…`;
+}
+
+/**
+ * Bound a visible instrument label without losing the source evidence.
+ *
+ * The full sourced name remains in the case and is attached to the workbook
+ * cell as a comment.  The face label has a finite geometric job: identify the
+ * instrument beside separate currency, amount, maturity and pricing columns.
+ * For an overlong label we therefore remove only the redundant leading amount,
+ * preserve a short distinguishing suffix (for example "tranche 2"), and crop
+ * the remaining prose on a word boundary.  This is presentation-only and is
+ * independent of issuer, instrument family and physical row number.
+ */
+export function fitInstrumentText(text, maximum = 54) {
+  let value = String(text ?? "").trim();
+  if (value.length <= maximum) return value;
+  value = value.replace(CURRENCY_AMOUNT_TOKEN, "").trim();
+  if (value.length <= maximum) return value;
+
+  const delimiter = " — ";
+  const split = value.lastIndexOf(delimiter);
+  if (split > 0) {
+    const suffix = value.slice(split + delimiter.length).trim();
+    if (suffix && suffix.length <= 20) {
+      const suffixText = `${delimiter}${suffix}`;
+      const prefix = truncateAtWord(
+        value.slice(0, split).trim(),
+        Math.max(16, maximum - suffixText.length),
+      );
+      return `${prefix}${suffixText}`.slice(0, maximum);
+    }
+  }
+  return truncateAtWord(value, maximum);
+}
+
 export function compactInstrumentName(instrument) {
   const source = String(
     instrument?.name ?? instrument?.instrument_id ?? "",
@@ -290,5 +331,5 @@ export function instrumentDisplayLabel(instrument, reportingCurrency = null) {
         ),
     );
   if (maturityYear && !hasMaturity) parts.push(maturityYear);
-  return parts.join(" ");
+  return fitInstrumentText(parts.join(" "));
 }

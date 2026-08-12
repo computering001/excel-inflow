@@ -20,6 +20,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { compileCase } from "./lib/case_compiler.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
@@ -397,7 +398,7 @@ function deriveDeclaredRows(modelCase) {
   return declarations;
 }
 
-function deriveCaseSourceAndEvidence(modelCase) {
+export function deriveCaseSourceAndEvidence(modelCase) {
   const manifests = {};
   const statementMap = {};
   const expansions = [];
@@ -626,6 +627,7 @@ function summarize(value) {
   return text.length > 80 ? `${text.slice(0, 77)}…` : text;
 }
 
+async function main() {
 const files = (await fs.readdir(casesDirectory))
   .filter((name) => name.endsWith(".json"))
   .filter((name) => !onlyCase || name.includes(onlyCase))
@@ -1020,3 +1022,8 @@ for (const name of files) {
 }
 console.log(`\nTOTAL path diffs across cohort: ${totalDiffs}`);
 process.exit(0);
+}
+
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  await main();
+}

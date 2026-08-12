@@ -6,6 +6,7 @@
 import { RELEASE_MODULE_REGISTRY as M, RELEASE_NODE_ORDER } from "./release_module_registry.mjs";
 import { planStatementClassificationQuestions } from "./statement_classifier.mjs";
 import { ensureIllustrativeAcquisitionCase } from "./acquisition_policy.mjs";
+import { compileOpeningInstrumentState } from "./instrument_period_state.mjs";
 
 const finite = (value) => Number.isFinite(Number(value));
 const passed = (id, message, evidence = {}) => ({ id, status: "PASS", message, evidence });
@@ -68,11 +69,34 @@ function historicalPeriodEnd(modelCase) {
     .at(-1) ?? null;
 }
 
-function caseOnlyReconciliation(modelCase) {
-  const reported = Number(modelCase.debt_reconciliation?.reported_opening_gross_debt);
-  const footed = (modelCase.instruments ?? [])
-    .filter((instrument) => instrument.include_in_gross_debt !== false)
-    .reduce((total, instrument) => total + Number(instrument.opening_balance ?? 0), 0);
+export function caseOnlyReconciliation(modelCase) {
+  const declared = modelCase.debt_reconciliation?.reported_opening_gross_debt;
+  const reported = Number(Array.isArray(declared) ? declared.at(-1) : declared);
+  const openingState = compileOpeningInstrumentState(modelCase);
+  if (
+    !finite(reported) ||
+    reported < 0 ||
+    openingState.status !== "PASS" ||
+    !finite(openingState.reporting_total)
+  ) {
+    return {
+      reported_gross_debt: finite(reported) ? reported : null,
+      export_total: null,
+      residual: null,
+      residual_percentage: null,
+      stop: true,
+      residual_carried: false,
+      reporting_currency: openingState.reporting_currency,
+      opening_instrument_state: openingState,
+      errors: [
+        ...(!finite(reported) || reported < 0
+          ? ["Reported opening gross debt must be a finite non-negative amount."]
+          : []),
+        ...openingState.errors,
+      ],
+    };
+  }
+  const footed = Number(openingState.reporting_total);
   const residual = reported - footed;
   const threshold = Number(modelCase.debt_reconciliation?.maximum_residual_percentage ?? 0.05);
   const share = reported === 0 ? null : Math.abs(residual) / Math.abs(reported);
@@ -85,6 +109,8 @@ function caseOnlyReconciliation(modelCase) {
     residual_percentage: share,
     stop: !(Math.abs(residual) < 1e-9 || (explicit && share !== null && share <= threshold) || carried),
     residual_carried: carried,
+    reporting_currency: openingState.reporting_currency,
+    opening_instrument_state: openingState,
   };
 }
 

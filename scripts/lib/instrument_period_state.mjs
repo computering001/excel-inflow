@@ -165,6 +165,9 @@ function fxRate(modelCase, currency, absolutePeriodIndex, kind) {
   if (currency === modelCase.issuer.reporting_currency) return 1;
   const pair = modelCase.fx?.[currency];
   if (!pair) throw new Error(`Missing FX assumptions for ${currency}.`);
+  if (!["reporting_per_native", "native_per_reporting"].includes(pair.quote)) {
+    throw new Error(`Unsupported FX quote convention for ${currency}: ${pair.quote}.`);
+  }
   const rates = kind === "average" ? pair.average_rates : pair.period_end_rates;
   if (!Array.isArray(rates) || rates.length <= absolutePeriodIndex) {
     throw new Error(`Missing ${kind} FX rate for ${currency} period ${absolutePeriodIndex}.`);
@@ -174,14 +177,12 @@ function fxRate(modelCase, currency, absolutePeriodIndex, kind) {
   return pair.quote === "reporting_per_native" ? raw : 1 / raw;
 }
 
-function translationFor(modelCase, instrument, bounds) {
+function openingTranslationFor(modelCase, instrument, bounds) {
   const reporting = modelCase.issuer.reporting_currency;
   const carrying = instrument.balance_basis === "reporting_currency_carrying_value";
   const basisCurrency = carrying ? reporting : instrument.currency;
   const openingAbsoluteIndex = Math.max(0, bounds.absoluteIndex - 1);
   const openingRate = fxRate(modelCase, basisCurrency, openingAbsoluteIndex, "period_end");
-  const flowRate = fxRate(modelCase, basisCurrency, bounds.absoluteIndex, "average");
-  const closingRate = fxRate(modelCase, basisCurrency, bounds.absoluteIndex, "period_end");
   return {
     method: carrying
       ? "reporting_currency_carrying_value_no_translation"
@@ -190,8 +191,122 @@ function translationFor(modelCase, instrument, bounds) {
         : "native_principal_to_reporting",
     basis_currency: basisCurrency,
     opening_rate: openingRate,
+  };
+}
+
+function translationFor(modelCase, instrument, bounds) {
+  const opening = openingTranslationFor(modelCase, instrument, bounds);
+  const flowRate = fxRate(
+    modelCase,
+    opening.basis_currency,
+    bounds.absoluteIndex,
+    "average",
+  );
+  const closingRate = fxRate(
+    modelCase,
+    opening.basis_currency,
+    bounds.absoluteIndex,
+    "period_end",
+  );
+  return {
+    ...opening,
     flow_rate: flowRate,
     closing_rate: closingRate,
+  };
+}
+
+/**
+ * Canonical last-historical opening-debt translation.
+ *
+ * The opening balance for forecast year one is the closing balance at the
+ * final historical period end.  Native principal therefore uses the same
+ * period-end FX rate as the first instrument-period state, while a supplied
+ * reporting-currency carrying value remains at 1.0 even when the instrument's
+ * legal denomination is foreign.  Release and coverage gates consume this
+ * artifact instead of independently summing mixed-currency case fields.
+ */
+export function compileOpeningInstrumentState(modelCase) {
+  if (!modelCase || typeof modelCase !== "object") {
+    throw new Error("modelCase is required.");
+  }
+  if (!Array.isArray(modelCase.instruments)) {
+    throw new Error("modelCase.instruments must be an array.");
+  }
+  const reportingCurrency = modelCase.issuer?.reporting_currency;
+  if (!reportingCurrency) {
+    throw new Error("issuer.reporting_currency is required.");
+  }
+  let firstForecastBounds;
+  try {
+    firstForecastBounds = periodBounds(modelCase.periods ?? [], 0);
+  } catch (error) {
+    return {
+      schema_version: "opening-instrument-state/1.0",
+      reporting_currency: reportingCurrency,
+      as_of: null,
+      status: "BLOCKED",
+      rows: [],
+      reporting_total: null,
+      errors: [error.message],
+    };
+  }
+  const asOf = modelCase.periods[firstForecastBounds.absoluteIndex - 1]?.date ?? null;
+  const rows = [];
+  const errors = [];
+  const ids = new Set();
+  for (const instrument of modelCase.instruments) {
+    const id = instrument?.instrument_id ?? "unknown";
+    if (ids.has(id)) {
+      errors.push(`Instrument IDs must be unique; duplicate ${id}.`);
+      continue;
+    }
+    ids.add(id);
+    try {
+      const balanceBasis = instrument.balance_basis ?? "native_principal";
+      if (!["native_principal", "reporting_currency_carrying_value"].includes(balanceBasis)) {
+        throw new Error(`${id}.balance_basis must be explicit.`);
+      }
+      const resolvedInstrument = instrument.balance_basis
+        ? instrument
+        : { ...instrument, balance_basis: balanceBasis };
+      const translation = openingTranslationFor(
+        modelCase,
+        resolvedInstrument,
+        firstForecastBounds,
+      );
+      const basisAmount = number(instrument.opening_balance, `${id}.opening_balance`);
+      if (basisAmount < 0) throw new Error(`${id}.opening_balance must be non-negative.`);
+      rows.push({
+        instrument_id: id,
+        class: instrument.class ?? null,
+        legal_currency: instrument.currency ?? null,
+        balance_basis: balanceBasis,
+        basis_currency: translation.basis_currency,
+        basis_amount: basisAmount,
+        reporting_currency: reportingCurrency,
+        reporting_amount: basisAmount * translation.opening_rate,
+        translation_rate: translation.opening_rate,
+        translation_method: translation.method,
+        include_in_gross_debt: instrument.include_in_gross_debt !== false,
+        is_residual_pool: instrument.is_residual_pool === true,
+      });
+    } catch (error) {
+      errors.push(`${id}: ${error.message}`);
+    }
+  }
+  return {
+    schema_version: "opening-instrument-state/1.0",
+    reporting_currency: reportingCurrency,
+    as_of: asOf,
+    status: errors.length === 0 ? "PASS" : "BLOCKED",
+    rows,
+    reporting_total:
+      errors.length === 0
+        ? rows
+            .filter((row) => row.include_in_gross_debt)
+            .reduce((total, row) => total + row.reporting_amount, 0)
+        : null,
+    errors,
   };
 }
 
@@ -238,12 +353,34 @@ function pricingState(instrument, pik) {
   return "not_interest_bearing";
 }
 
-function repaymentState(instrument, scheduled, maturity, maturityDue = false) {
-  if (instrument.class === "rcf") return "discretionary_rcf";
+function repaymentState(instrument, scheduled, maturity, maturityDue = false, balancingRcf = false) {
+  if (balancingRcf) return "discretionary_rcf";
   if (scheduled > EPSILON && (maturity > EPSILON || maturityDue)) return "scheduled_and_maturity";
   if (maturity > EPSILON || maturityDue) return "maturity";
   if (scheduled > EPSILON) return "scheduled";
   return "none";
+}
+
+/**
+ * One predicate owns contractual maturity throughout the instrument graph.
+ * A non-maturing declaration is economic authority even when a date is kept
+ * as audit evidence, and only the one named balancing RCF is excluded from
+ * contractual repayment. Other revolvers remain ordinary instruments.
+ */
+export function maturityApplies({
+  instrument,
+  maturityDate,
+  periodEnd,
+  debtMaturitiesRoll,
+  balancingRcf = false,
+}) {
+  return Boolean(
+    debtMaturitiesRoll === 1 &&
+      !balancingRcf &&
+      instrument?.maturity_treatment !== "non_maturing_within_forecast" &&
+      maturityDate &&
+      maturityDate <= periodEnd,
+  );
 }
 
 function instrumentStates(modelCase, instrument, forecastPeriods) {
@@ -261,8 +398,11 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
   const amortisation = series3(instrument.scheduled_amortisation, `${instrument.instrument_id}.scheduled_amortisation`);
   const pikRates = series3(instrument.pik_rate, `${instrument.instrument_id}.pik_rate`);
   const nonCash = nonCashComponents(instrument);
-  if (instrument.class === "rcf" && amortisation.some((value) => Math.abs(value) > EPSILON)) {
-    throw new Error(`RCF ${instrument.instrument_id} cannot enter the mandatory repayment pool through scheduled amortisation.`);
+  const balancingRcf =
+    instrument.class === "rcf" &&
+    modelCase.rcf_policy?.instrument_id === instrument.instrument_id;
+  if (balancingRcf && amortisation.some((value) => Math.abs(value) > EPSILON)) {
+    throw new Error(`Balancing RCF ${instrument.instrument_id} cannot enter the mandatory repayment pool through scheduled amortisation.`);
   }
   let opening = number(instrument.opening_balance, `${instrument.instrument_id}.opening_balance`);
   const states = [];
@@ -273,15 +413,16 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       modelCase.periods[bounds.absoluteIndex - 1].date,
       `periods[${bounds.absoluteIndex - 1}].date`,
     );
+    const matures = maturityApplies({
+      instrument,
+      maturityDate,
+      periodEnd: bounds.end,
+      debtMaturitiesRoll: modelCase.controls?.debt_maturities_roll,
+      balancingRcf,
+    });
     const maturityDue = Boolean(
-      instrument.class !== "rcf" &&
-      instrument.maturity_treatment !== "non_maturing_within_forecast" &&
-      maturityDate &&
-      maturityDate > previousPeriodEnd &&
-      maturityDate <= bounds.end
+      matures && maturityDate > previousPeriodEnd && maturityDate <= bounds.end,
     );
-    const maturityEnabled = modelCase.controls?.debt_maturities_roll === 1 && instrument.class !== "rcf";
-    const matures = Boolean(maturityEnabled && maturityDate && maturityDate <= bounds.end);
     const activeEnd = matures && maturityDate < bounds.end ? maturityDate : bounds.end;
     const activeFraction = fractionBetween(bounds.start, activeEnd, bounds);
     const fallbackMovementFraction = activeFraction / 2;
@@ -314,8 +455,8 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       gross_debt: instrument.include_in_gross_debt !== false,
       net_debt: instrument.include_in_net_debt !== false,
       leverage: instrument.include_in_net_debt !== false,
-      liquidity: instrument.class === "rcf" && modelCase.rcf_policy?.instrument_id === instrument.instrument_id,
-      mandatory_repayment: instrument.class !== "rcf" && (periodAmortisation > EPSILON || maturityDue),
+      liquidity: balancingRcf,
+      mandatory_repayment: !balancingRcf && (periodAmortisation > EPSILON || maturityRepayment > EPSILON),
       interest: pricingState(instrument, pik) !== "not_interest_bearing",
     };
     states.push({
@@ -338,7 +479,7 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       ending_post_repayment: amount(endingPost, translation.closing_rate),
       average_interest_balance: amount(averageBalance, translation.flow_rate),
       active_fraction: activeFraction,
-      repayment_state: repaymentState(instrument, periodAmortisation, maturityRepayment, maturityDue),
+      repayment_state: repaymentState(instrument, periodAmortisation, maturityRepayment, maturityDue, balancingRcf),
       pricing_state: pricingState(instrument, pik),
       inclusion,
       translation,
@@ -455,6 +596,21 @@ export function compileInstrumentPeriodState(modelCase) {
   }
   const ids = modelCase.instruments.map((instrument) => instrument.instrument_id);
   if (new Set(ids).size !== ids.length) throw new Error("Instrument IDs must be unique.");
+  const residualPriced = modelCase.instruments.filter(
+    (instrument) =>
+      instrument.rate_type === "unpriced" ||
+      instrument.pricing_treatment === "residual_interest_plug",
+  );
+  if (
+    residualPriced.length > 0 &&
+    (!Array.isArray(modelCase.other_interest) ||
+      modelCase.other_interest.length !== 3 ||
+      modelCase.other_interest.some((value) => !Number.isFinite(Number(value))))
+  ) {
+    throw new Error(
+      `Residual-priced instruments (${residualPriced.map((instrument) => instrument.instrument_id).join(", ")}) require an explicit three-period other_interest authority; an absent series cannot become a zero plug.`,
+    );
+  }
   const states = modelCase.instruments
     .slice()
     .sort((left, right) => left.instrument_id.localeCompare(right.instrument_id))
@@ -484,10 +640,12 @@ export function validateInstrumentPeriodStateArtifact(artifact) {
     stateIds.add(state.state_id);
     const expectedStateId = `${state.instrument_id}:${state.period_id}`;
     if (state.state_id !== expectedStateId) errors.push(`${state.state_id} does not match ${expectedStateId}.`);
-    if (state.class === "rcf") {
+    if (state.class === "rcf" && state.inclusion?.liquidity === true) {
       if (state.repayment_state !== "discretionary_rcf") errors.push(`${state.state_id} RCF is not discretionary.`);
       if (state.inclusion?.mandatory_repayment !== false) errors.push(`${state.state_id} RCF entered the mandatory repayment pool.`);
       if (Math.abs(state.maturity_repayment?.basis_amount ?? 0) > EPSILON) errors.push(`${state.state_id} RCF has a maturity repayment.`);
+    } else if (state.class === "rcf" && state.repayment_state === "discretionary_rcf") {
+      errors.push(`${state.state_id} non-balancing revolver was treated as the liquidity RCF.`);
     }
     if (state.family === "lease" && state.class !== "lease_liability") errors.push(`${state.state_id} lease family is not separately classified.`);
     if (
@@ -497,7 +655,7 @@ export function validateInstrumentPeriodStateArtifact(artifact) {
       errors.push(`${state.state_id} interest membership does not match pricing state.`);
     }
     if (
-      state.class !== "rcf" &&
+      !(state.class === "rcf" && state.inclusion?.liquidity === true) &&
       state.inclusion?.mandatory_repayment !==
         !["none"].includes(state.repayment_state)
     ) {

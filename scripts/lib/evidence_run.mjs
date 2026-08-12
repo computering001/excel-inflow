@@ -13,6 +13,7 @@ import {
   faceStatementManifestDigest,
 } from "./face_statement_manifest.mjs";
 import { validateForecastObservationLedger } from "./forecast_observation.mjs";
+import { compileCase } from "./case_compiler.mjs";
 
 const EVIDENCE_SCHEMA = JSON.parse(
   fs.readFileSync(
@@ -66,7 +67,17 @@ function approximate(left, right, tolerance = 1e-6) {
 
 function resolveHistoricalStatementSeries(modelCase, section) {
   const rows = modelCase?.statement_structure?.[section] ?? [];
-  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  // Cash-flow identities legitimately link to income-statement authorities
+  // (net income, PBT, D&A). Numeric source parity must therefore resolve over
+  // the complete statement graph, even though it returns only the requested
+  // section's series. A section-local map falsely reports every such link as
+  // absent.
+  const byId = new Map(
+    [
+      ...(modelCase?.statement_structure?.income_statement ?? []),
+      ...(modelCase?.statement_structure?.cash_flow ?? []),
+    ].map((row) => [row.row_id, row]),
+  );
   const periodCaches = [new Map(), new Map(), new Map()];
 
   const resolve = (rowId, periodIndex, visiting = new Set()) => {
@@ -2487,6 +2498,84 @@ export function validateEvidenceRun(run) {
     return { ok: false, status: "BLOCK", findings, errors: findings };
   }
 
+  // The production boundary is declarations + sealed evidence.  A caller may
+  // not hand the runtime an already-authored model case and thereby bypass the
+  // compiler's statement, forecast and policy contracts.  `model_case` is
+  // tolerated only on an explicitly labelled rebuild so older run carriers
+  // can prove parity during migration; even there it is comparison-only.
+  if (run.mode === "first_run" && Object.hasOwn(run, "model_case")) {
+    findings.push(
+      finding(
+        "evidence.authorship.caller_model_case",
+        "BLOCK",
+        "A first-run evidence envelope may not supply model_case. Supply declarations in case_source and sealed values in case_evidence; compileCase is the only production case writer.",
+      ),
+    );
+  }
+  let caseCompilation = null;
+  const filingManifestDigest = hashValue(
+    run.filings?.face_statement_manifests ?? null,
+  );
+  const compilerManifestDigest = hashValue(
+    run.case_evidence?.face_statement_manifests ?? null,
+  );
+  if (filingManifestDigest !== compilerManifestDigest) {
+    findings.push(
+      finding(
+        "evidence.authorship.manifest_lane_mismatch",
+        "BLOCK",
+        "The face-statement manifests reviewed by evidence validation differ from the manifests supplied to compileCase.",
+        {
+          filings_sha256: filingManifestDigest,
+          case_evidence_sha256: compilerManifestDigest,
+        },
+      ),
+    );
+  }
+  try {
+    caseCompilation = compileCase(run.case_source ?? {}, run.case_evidence ?? {});
+    for (const entry of caseCompilation.report?.findings ?? []) {
+      findings.push(
+        finding(
+          `evidence.case_compile.${entry.id}`,
+          entry.severity === "BLOCK" ? "BLOCK" : "WARN",
+          entry.message,
+          {
+            remedy: entry.remedy ?? null,
+            context: entry.context ?? null,
+          },
+        ),
+      );
+    }
+  } catch (error) {
+    findings.push(
+      finding(
+        "evidence.case_compile.crash",
+        "BLOCK",
+        `compileCase failed before the user flow could start: ${error.message}`,
+      ),
+    );
+  }
+  const compiledModelCase = caseCompilation?.model_case ?? {};
+  if (run.mode === "rebuild" && run.model_case) {
+    const suppliedHash = hashValue(run.model_case);
+    const compiledHash = hashValue(compiledModelCase);
+    if (suppliedHash !== compiledHash) {
+      findings.push(
+        finding(
+          "evidence.authorship.rebuild_parity",
+          "BLOCK",
+          "The rebuild comparison model_case differs from the case compiled from case_source and case_evidence.",
+          { supplied_sha256: suppliedHash, compiled_sha256: compiledHash },
+        ),
+      );
+    }
+  }
+  // From this line onward every existing evidence, mapping and coverage check
+  // reads the compiler output.  The caller-supplied object, if any, cannot
+  // influence intake, questions, solving or workbook construction.
+  run = { ...run, model_case: compiledModelCase };
+
   const sourceIds = validateSourceInventory(run, findings);
   validateAttachmentIngress(run, findings);
   const modelCase = run.model_case ?? {};
@@ -2593,6 +2682,9 @@ export function validateEvidenceRun(run) {
     intake,
     coverage,
     forecast_observation_ledger: forecastObservationLedger,
+    case_compile_report: caseCompilation?.report ?? null,
+    compiled_model_case_sha256:
+      caseCompilation?.model_case ? hashValue(caseCompilation.model_case) : null,
     handoff: errors.length === 0
       ? {
           intake: {
@@ -2614,6 +2706,9 @@ export function validateEvidenceRun(run) {
             },
           },
           model_case: modelCase,
+          case_source: run.case_source,
+          case_evidence: run.case_evidence,
+          case_compile_report: caseCompilation?.report ?? null,
           ...(forecastObservationLedger
             ? {
                 forecast_observation_ledger: forecastObservationLedger.ledger,

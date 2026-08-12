@@ -266,9 +266,10 @@ status and next stage. Only a verified `success` receipt is resumable. A stale,
 foreign, failed, blocked or tampered receipt never skips work. State travels in
 the receipts and case files, never in chat history.
 
-Stage 4 has seven silent internal checkpoints: semantic gates, plan, emit,
-recalculate and terminal patch, independent verification, structural render,
-and publication. They do not create additional user messages. Each checkpoint
+Stage 4 has thirteen silent leaf checkpoints: semantic gates; plan; emit;
+LibreOffice recalculation; terminal patch; dynamic, style, cache, finance and
+semantic verification; verification aggregation; structural render; and
+publication. They do not create additional user messages. Each checkpoint
 stores a separate atomic success receipt and is reusable only when its recipe,
 named input hashes and exact output hashes still agree. A killed invocation
 therefore restarts at the first incomplete or invalid checkpoint in the same
@@ -650,3 +651,20 @@ stage did produce. A pack assembled in conversation is not evidence, and every
 gate downstream of it will certify it faithfully — which is precisely why the
 substitution has to be refused here, at ingress, where the difference between
 a read document and a recalled one is still visible.
+
+### Controlled evidence and proof commands
+
+The production raw-attachment route is one transaction:
+
+```bash
+python3 scripts/run_attachment_evidence_pipeline.py <controller-spec.json> --out <run-folder>
+```
+
+The commands below are subordinate checkpoints or diagnostics. The production
+controller invokes them; an end user does not sequence them manually:
+
+```bash
+node scripts/compile_declared_evidence_run.mjs <attachment-ingress.json> --declarations <minimal-declarations.json> --out <folder>
+node scripts/propose_case_source.mjs <minimal-declarations.json> <case-evidence.json> --out <case-source.json>
+node scripts/verify/recalc_second_opinion.mjs --before <emitted.xlsx> --after <raw-after.xlsx> --before-map <before.json> --after-map <raw-after.json> --out <receipt.json> [--soffice-identity <sha256>]
+```

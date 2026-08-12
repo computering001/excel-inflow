@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.invalid/excel-inflow/evidence-run-v1.schema.json",
   "title": "Debt Overlay evidence-to-case run envelope",
-  "description": "The machine-checkable boundary between deployment host's source reading and the deterministic debt-model runtime. It does not claim to parse arbitrary files; it proves which sources were read, which facts were selected and which normalized case is proposed.",
+  "description": "The machine-checkable boundary between deployment-host source reading and the deterministic debt-model runtime. It proves which sources were read and carries declarations plus sealed evidence; the normalized model case is compiled inside the runtime and is never accepted as first-run authority.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,8 @@
     "dcs_export",
     "broker_pack",
     "forecast_context",
-    "model_case",
+    "case_source",
+    "case_evidence",
     "decisions"
   ],
   "properties": {
@@ -73,7 +74,24 @@
         "violation_count": { "const": 0 }
       }
     },
-    "model_case": { "type": "object" },
+    "case_source": {
+      "description": "Declarations-only case authorship surface. The runtime compiles this object through compileCase; it never trusts a supplied model case.",
+      "type": "object"
+    },
+    "case_evidence": {
+      "description": "Sealed compiler evidence: face-statement manifests plus typed evidence lanes. Economic values live here, not in case_source.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["face_statement_manifests", "lanes"],
+      "properties": {
+        "face_statement_manifests": { "type": "object" },
+        "lanes": { "type": "object" }
+      }
+    },
+    "model_case": {
+      "description": "Deprecated comparison artifact. It is never authoritative and is rejected on first-run production flows.",
+      "type": "object"
+    },
     "attachment_manifest": {
       "type": "array",
       "minItems": 1,
@@ -106,6 +124,9 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "dcs_run_state_sha256",
+            "dcs_runtime_closure_sha256",
+            "dcs_cache_key",
             "source_tables_sha256",
             "candidate_manifest_sha256",
             "crosswalk_sha256",
@@ -114,6 +135,9 @@
             "independent_verification_sha256"
           ],
           "properties": {
+            "dcs_run_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "dcs_runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "dcs_cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "candidate_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },

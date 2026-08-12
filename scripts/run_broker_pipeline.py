@@ -24,6 +24,8 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "broker-runtime-members.json"
+BLOCKER_CLASSES = {"INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}
+VISION_ATTEMPT_LIMIT = 3
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -101,6 +103,20 @@ def source_hashes(request: dict[str, Any], request_dir: Path) -> dict[str, str]:
     if not hashes:
         raise ValueError("The broker request contains no documents.")
     return dict(sorted(hashes.items()))
+
+
+def record_vision_attempt(attempts: dict[str, Any], response_digest: str) -> bool:
+    """Record an invocation, even when the host resubmits identical bad bytes.
+
+    Unique response hashes remain useful audit evidence, but they are not an
+    attempt counter: otherwise the same unchanged invalid response can keep a
+    run in NEEDS_VISION forever.  The returned boolean is the finite terminal
+    signal for this cache key.
+    """
+    if response_digest not in attempts["vision_response_sha256"]:
+        attempts["vision_response_sha256"].append(response_digest)
+    attempts["vision_attempt_count"] = int(attempts.get("vision_attempt_count", 0)) + 1
+    return attempts["vision_attempt_count"] >= int(attempts["vision_attempt_limit"])
 
 
 def run(command: list[str], allowed: set[int]) -> subprocess.CompletedProcess[str]:
@@ -281,12 +297,19 @@ def write_state(
     tasks: list[dict[str, Any]],
     summary: dict[str, Any],
     user_blocking: bool = False,
+    blocker_class: str | None = None,
+    attempts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if blocker_class not in {None, *BLOCKER_CLASSES}:
+        raise ValueError(f"Unknown blocker class: {blocker_class}")
+    if user_blocking != (blocker_class in {"USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}):
+        raise ValueError("user_blocking disagrees with blocker ownership")
     state = {
         "schema_version": "broker-run-state/1.0",
         "run_id": run_id,
         "pipeline_status": status,
         "user_blocking": user_blocking,
+        "blocker_class": blocker_class,
         "request_sha256": request_digest,
         "source_sha256": sources,
         "runtime_closure_sha256": runtime_digest,
@@ -299,12 +322,18 @@ def write_state(
             if isinstance(value, str) and Path(value).is_file()
         },
         "tasks": tasks,
+        "attempts": attempts or {
+            "vision_response_sha256": [],
+            "vision_attempt_count": 0,
+            "vision_attempt_limit": VISION_ATTEMPT_LIMIT,
+        },
         "summary": summary,
     }
     atomic_json(state_path, state)
     print(json.dumps({
         "status": status,
         "user_blocking": user_blocking,
+        "blocker_class": blocker_class,
         "task_count": len(tasks),
         **summary,
         "state": str(state_path),
@@ -326,18 +355,57 @@ def main() -> int:
     state_path = output_root / "broker-run-state.json"
     checkpoints: list[dict[str, Any]] = []
     artifacts: dict[str, Any] = {}
+    prior_state: dict[str, Any] = {}
+    if state_path.is_file():
+        try:
+            prior_state = read_json(state_path, "prior broker run state")
+        except ValueError:
+            prior_state = {}
     request = read_json(request_path, "broker extraction request")
     if request.get("schema_version") != "broker-extraction-request/1.0":
         raise ValueError("The broker extraction request has the wrong schema version.")
     run_id = str(request.get("run_id") or "")
-    sources = source_hashes(request, request_path.parent)
     request_digest = sha256_file(request_path)
     runtime_digest, _runtime_members = runtime_closure()
+    try:
+        sources = source_hashes(request, request_path.parent)
+    except (FileNotFoundError, ValueError) as error:
+        cache_key = sha256_bytes(canonical_bytes({
+            "request": request_digest,
+            "source_error": str(error),
+            "runtime": runtime_digest,
+        }))
+        write_state(
+            state_path, run_id=run_id, status="BLOCKED_INPUT",
+            request_digest=request_digest, sources={}, runtime_digest=runtime_digest,
+            cache_key=cache_key, checkpoints=checkpoints, artifacts=artifacts,
+            tasks=[], summary={"terminal_reason": "fatal_source", "message": str(error)},
+            user_blocking=True, blocker_class="FATAL_SOURCE",
+        )
+        return 2
     cache_key = sha256_bytes(canonical_bytes({
         "request": request_digest,
         "sources": sources,
         "runtime": runtime_digest,
     }))
+    prior_attempts = (
+        prior_state.get("attempts", {}).get("vision_response_sha256", [])
+        if prior_state.get("cache_key") == cache_key
+        else []
+    )
+    prior_attempt_count = (
+        prior_state.get("attempts", {}).get(
+            "vision_attempt_count",
+            len(prior_attempts),
+        )
+        if prior_state.get("cache_key") == cache_key
+        else 0
+    )
+    attempts = {
+        "vision_response_sha256": list(dict.fromkeys(prior_attempts)),
+        "vision_attempt_count": prior_attempt_count,
+        "vision_attempt_limit": VISION_ATTEMPT_LIMIT,
+    }
     key = cache_key[:16]
 
     extraction_root = output_root / f"extract-{key}"
@@ -357,7 +425,7 @@ def main() -> int:
         write_state(
             state_path,
             run_id=run_id,
-            status="BLOCKED_INPUT",
+            status="BLOCKED_INTERNAL",
             request_digest=request_digest,
             sources=sources,
             runtime_digest=runtime_digest,
@@ -365,8 +433,14 @@ def main() -> int:
             checkpoints=checkpoints,
             artifacts=artifacts,
             tasks=[],
-            summary={"finding_count": len(bundle.get("findings", []))},
-            user_blocking=True,
+            summary={
+                "terminal_reason": "broker_extractor_requires_internal_repair",
+                "finding_count": len(bundle.get("findings", [])),
+                "findings": bundle.get("findings", []),
+            },
+            user_blocking=False,
+            blocker_class="INTERNAL_WORK",
+            attempts=attempts,
         )
         return 2
 
@@ -382,10 +456,11 @@ def main() -> int:
     artifacts["surface_census"] = str(census_path)
     if census.get("gate_status") == "BLOCKED":
         write_state(
-            state_path, run_id=run_id, status="BLOCKED_INPUT", request_digest=request_digest,
+            state_path, run_id=run_id, status="BLOCKED_INTERNAL", request_digest=request_digest,
             sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
             checkpoints=checkpoints, artifacts=artifacts, tasks=[],
-            summary=census.get("summary", {}), user_blocking=True,
+            summary=census.get("summary", {}),
+            blocker_class="INTERNAL_WORK", attempts=attempts,
         )
         return 2
 
@@ -401,6 +476,7 @@ def main() -> int:
                 sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
                 checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
                 summary={"unresolved_surface_count": len(tasks)},
+                blocker_class="INTERNAL_WORK", attempts=attempts,
             )
             return 2
         responses_digest = sha256_bytes(canonical_bytes({
@@ -408,6 +484,7 @@ def main() -> int:
             for target in sorted(responses.glob("*.json"))
             if target.is_file()
         }))
+        attempt_exhausted = record_vision_attempt(attempts, responses_digest)
         verified_path = output_root / f"verified-{key}-{responses_digest[:12]}.json"
         vision_receipt = output_root / f"verified-{key}-{responses_digest[:12]}.receipt.json"
         vision_input = sha256_bytes(canonical_bytes({
@@ -428,15 +505,34 @@ def main() -> int:
                 sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
                 checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
                 summary={"targeted_conflict_count": sum(len(task.get("conflicts", [])) for task in tasks)},
+                blocker_class="INTERNAL_WORK", attempts=attempts,
             )
             return 2
         if active_bundle.get("gate_status") != "PASS":
             tasks = vision_tasks(active_bundle, responses)
+            for task in tasks:
+                task["missing_passes"] = [1, 2]
+                task["instruction"] = (
+                    "Replace both pass files for this surface with a new independent read. "
+                    "Preserve the visible grid or explicitly classify the surface as verified_non_tabular."
+                )
+            exhausted = attempt_exhausted
             write_state(
-                state_path, run_id=run_id, status="NEEDS_VISION", request_digest=request_digest,
+                state_path, run_id=run_id,
+                status="BLOCKED_INTERNAL" if exhausted else "NEEDS_VISION",
+                request_digest=request_digest,
                 sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
                 checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
-                summary={"unresolved_surface_count": len(tasks)},
+                summary={
+                    "unresolved_surface_count": len(tasks),
+                    "vision_attempt_count": attempts["vision_attempt_count"],
+                    "terminal_reason": (
+                        "bounded_vision_retry_exhausted"
+                        if exhausted else None
+                    ),
+                    "findings": active_bundle.get("findings", []),
+                },
+                blocker_class="INTERNAL_WORK", attempts=attempts,
             )
             return 2
 
@@ -454,6 +550,7 @@ def main() -> int:
                 "instruction": "Review every analytical table and disposition every annual and partial-period candidate. Map broadly, consume narrowly, and never map a quarantined cell.",
             }],
             summary={"candidate_count": len(active_bundle.get("candidate_manifest", {}).get("candidates", []))},
+            blocker_class="INTERNAL_WORK", attempts=attempts,
         )
         return 2
 
@@ -484,6 +581,7 @@ def main() -> int:
                 "instruction": "Repair the crosswalk declarations only. Do not alter source evidence, schemas, dictionaries or validators.",
             }],
             summary={"total_violation_count": semantic.get("total_violation_count")},
+            blocker_class="INTERNAL_WORK", attempts=attempts,
         )
         return 2
 
@@ -508,6 +606,7 @@ def main() -> int:
                     "message": (completed.stderr or completed.stdout).strip()[-4000:],
                 }],
                 summary={"total_violation_count": 1},
+                blocker_class="INTERNAL_WORK", attempts=attempts,
             )
             return 2
         seal_checkpoint(pack_path, pack_receipt, pack_input)
@@ -540,6 +639,7 @@ def main() -> int:
         state_path, run_id=run_id, status="PASS", request_digest=request_digest,
         sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
         checkpoints=checkpoints, artifacts=artifacts, tasks=[], summary=summary,
+        blocker_class=None, attempts=attempts,
     )
     return 0
 

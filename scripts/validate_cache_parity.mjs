@@ -52,6 +52,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import JSZip from "jszip";
+import { applyExcelComparison } from "./lib/excel_value_semantics.mjs";
 
 // ---------------------------------------------------------------- args
 
@@ -590,22 +591,12 @@ function xround(x, digits) {
 }
 
 function compare(a, b, op) {
-  const norm = (v) => (v === BLANK ? 0 : v);
-  let x = norm(a);
-  let y = norm(b);
-  if (typeof x === "string" && typeof y === "number") return op === "<>" ? true : op === "=" ? false : null;
-  if (typeof y === "string" && typeof x === "number") return op === "<>" ? true : op === "=" ? false : null;
-  if (typeof x === "string" && typeof y === "string") { x = x.toUpperCase(); y = y.toUpperCase(); }
-  if (typeof x === "boolean") x = x ? 1 : 0;
-  if (typeof y === "boolean") y = y ? 1 : 0;
-  switch (op) {
-    case "=": return x === y;
-    case "<>": return x !== y;
-    case "<": return x < y;
-    case ">": return x > y;
-    case "<=": return x <= y;
-    case ">=": return x >= y;
-    default: return mkErr("#VALUE!");
+  try {
+    return applyExcelComparison(a, b, op, {
+      isBlank: (value) => value === BLANK,
+    });
+  } catch {
+    return mkErr("#VALUE!");
   }
 }
 
@@ -636,7 +627,7 @@ function evalNode(ast, ctxSheet) {
       if (isErr(r)) return r;
       if (["=", "<>", "<", ">", "<=", ">="].includes(ast.op)) {
         const c = compare(Array.isArray(l) ? l[0] : l, Array.isArray(r) ? r[0] : r, ast.op);
-        return c === null ? false : c;
+        return c;
       }
       if (ast.op === "&") {
         const a = toStr(Array.isArray(l) ? l[0] : l);

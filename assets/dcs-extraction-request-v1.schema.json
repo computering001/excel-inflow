@@ -6,6 +6,8 @@
   "required": ["schema_version", "source_path"],
   "properties": {
     "schema_version": {"const": "dcs-extraction-request/1.0"},
-    "source_path": {"type": "string", "minLength": 1}
+    "source_path": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "expected_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
   }
 }

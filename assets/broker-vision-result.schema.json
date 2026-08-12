@@ -33,6 +33,14 @@
       "enum": ["ocr_geometry", "vision_model", "manual_transcription", "reviewed_resolution"],
       "description": "The evidence-producing lane. Raw whole-page OCR is diagnostic and must not be represented as a completed table transcription."
     },
+    "surface_disposition": {
+      "enum": ["analytical_tables", "verified_non_tabular"],
+      "description": "Independent physical classification of the surface. verified_non_tabular closes capture without making narrative numbers model-eligible."
+    },
+    "non_tabular_reason": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
     "tables": {
       "type": "array",
       "items": {
@@ -97,11 +105,31 @@
   "allOf": [
     {
       "if": { "properties": { "pass_index": { "enum": [1, 2] } } },
-      "then": { "required": ["tables", "producer_fingerprint"] }
+      "then": { "required": ["tables", "producer_fingerprint", "surface_disposition"] }
     },
     {
       "if": { "properties": { "pass_index": { "const": "resolution" } } },
       "then": { "required": ["conflict_manifest_sha256", "conflict_decisions", "review_note"] }
+    }
+  ],
+  "anyOf": [
+    {
+      "properties": {
+        "pass_index": { "const": "resolution" }
+      }
+    },
+    {
+      "properties": {
+        "surface_disposition": { "const": "analytical_tables" },
+        "tables": { "minItems": 1 }
+      }
+    },
+    {
+      "properties": {
+        "surface_disposition": { "const": "verified_non_tabular" },
+        "tables": { "maxItems": 0 }
+      },
+      "required": ["non_tabular_reason"]
     }
   ]
 }

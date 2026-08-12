@@ -127,6 +127,18 @@ export async function writeRunCarrier({
     canonicalRunRoot,
     path.join(canonicalRunRoot, "stages", "decisions", "model-case.json"),
   );
+  await addExistingFile(
+    files,
+    "case_source",
+    canonicalRunRoot,
+    path.join(canonicalRunRoot, "stages", "decisions", "case-source.json"),
+  );
+  await addExistingFile(
+    files,
+    "case_compile_report",
+    canonicalRunRoot,
+    path.join(canonicalRunRoot, "stages", "decisions", "case-compile-report.json"),
+  );
   for (const stage of STAGES) {
     await addExistingFile(
       files,
