@@ -706,6 +706,17 @@ const DEFAULT_CASH_FLOW_ROWS = [
     label: "Ending cash",
     row_type: "calculation",
     semantic_role: "ending_cash",
+    // Declare the same cash-roll-forward closure that the workbook emitter
+    // writes.  This base recipe matters for cases that arrive with no issuer-
+    // supplied calculation metadata: without it the physical workbook quite
+    // correctly referenced opening cash, net movement and translation while
+    // the semantic graph advertised an orphan calculation with zero inputs.
+    // Issuer-specific compilation may replace the stable row IDs, but it keeps
+    // this three-role identity.
+    calculation: {
+      operator: "sum",
+      refs: ["opening_cash", "net_change_in_cash", "fx_effect_on_cash"],
+    },
     style_role: "total",
   },
   {
@@ -1029,6 +1040,13 @@ function isWorkingCapitalConstituent(row) {
 // the shipped dead-PBT defect. Pre-anchor subtotals (gross profit, product
 // revenue) remain capturable inside the anchored slim-forecast band.
 const CAPTURE_PROTECTED_SPINE_ROLES = new Set([
+  // Transparent headline bridges are part of the accounting spine too. A
+  // stale compiled case must not be able to grey them merely because capture
+  // metadata was sealed before the current topology compiler protected them.
+  "is_da_expense",
+  "cash_flow_da",
+  "cash_flow_depreciation_amortisation",
+  "cash_flow_profit_before_tax",
   "pre_tax_income",
   "tax_expense",
   "net_income",
@@ -1079,6 +1097,7 @@ function markForecastCapturedBy(
     parent_row_id: parentRowId,
     mode,
     material,
+    membership_path: [row.row_id, parentRowId],
     proof:
       mode === "formula_membership"
         ? "Parent formula contains this row exactly once."
@@ -1095,6 +1114,21 @@ function clearCompiledForecastOverride(row) {
   delete row.forecast_capture_certificates;
   if (row.formula_authority === "intentionally_blank") {
     delete row.formula_authority;
+  }
+}
+
+function restoreProtectedForecastBridges(rows) {
+  for (const row of rows) {
+    if (!CAPTURE_PROTECTED_SPINE_ROLES.has(row.semantic_role)) continue;
+    if (!row.forecast_capture_parent_id && row.formula_authority !== "intentionally_blank") {
+      continue;
+    }
+    clearCompiledForecastOverride(row);
+    if (row.calculation || row.forecast_calculation) {
+      row.forecast_treatment = "formula";
+    } else if (row.forecast_treatment === "uncalculated") {
+      delete row.forecast_treatment;
+    }
   }
 }
 
@@ -2287,7 +2321,33 @@ function applyBrokerAnchorRule(modelCase, rows) {
   delete derivedMetricRow.broker_metric_id;
   derivedMetricRow.forecast_treatment = "formula";
   if (selection.derived === "adjusted_ebitda") {
-    delete derivedMetricRow.forecast_calculation;
+    // A residual bridge plug is algebraically the inverse of Adjusted EBITDA
+    // (EBITDA less every other bridge term).  Leaving that residual inside the
+    // derived EBITDA formula creates a tautology; turning it into a hardcode
+    // merely hides the same problem behind an unverifiable assumption.  The
+    // authoritative forecast bridge therefore contains only independently
+    // forecastable disclosed terms.  The retired residual remains visible in
+    // history and is captured, blank, by the headline in forecast years.
+    const capturedBridgeTerms = new Set(
+      rows
+        .filter(
+          (candidate) =>
+            candidate.forecast_capture_parent_id === derivedMetricRow.row_id ||
+            ((candidate.forecast_period_authorities ?? []).length === 3 &&
+              candidate.forecast_period_authorities.every(
+                (authority) => authority?.method === "not_separately_forecast",
+              )),
+        )
+        .map((candidate) => candidate.row_id),
+    );
+    derivedMetricRow.forecast_calculation = {
+      operator: bridge.ebitdaRow.calculation.operator,
+      refs: bridge.ebitdaRow.calculation.refs.filter(
+        (reference) =>
+          !residualPlugRowIds.includes(reference) &&
+          !capturedBridgeTerms.has(reference),
+      ),
+    };
     delete derivedMetricRow.forecast_period_calculations;
   } else {
     // The statement EBIT row is the canonical economic authority. Solve it
@@ -2335,17 +2395,30 @@ function applyBrokerAnchorRule(modelCase, rows) {
     delete repeatedEbit.forecast_period_calculations;
   }
 
-  // 3. THE PLUG GOES BACK TO BEING AN INPUT. The row keeps its history and its
-  //    declared forecast — on the Smurfit reference those are the source
-  //    workbook's own 13 / 0 / 0 — it simply stops absorbing the broker
-  //    disagreement, which now has nowhere to hide.
+  // 3. THE PLUG STANDS DOWN IN FORECAST YEARS. It keeps the issuer's reported
+  //    history, but an inverse residual is neither evidence nor a forecast
+  //    mechanism.  It is blank-grey and semantically captured by the derived
+  //    headline; this prevents both a circular bridge and a silent hardcode.
   for (const rowId of residualPlugRowIds) {
     const row = rows.find((item) => item.row_id === rowId);
     if (!row) continue;
+    clearCompiledForecastOverride(row);
     delete row.forecast_calculation;
     delete row.forecast_period_calculations;
-    row.forecast_treatment = "hardcode";
+    row.values = [...(row.values ?? []).slice(0, 3), null, null, null];
     row.label = stripResidualNote(row.label);
+    const captured = markForecastCapturedBy(
+      row,
+      derivedMetricRow.row_id,
+      "The inverse bridge residual is represented by the authoritative headline and is not forecast as an independent plug.",
+      "semantic_scope",
+      modelCase,
+    );
+    if (!captured) {
+      throw new Error(
+        `Residual bridge row ${row.row_id} could not enter the certified captured forecast state.`,
+      );
+    }
   }
 
   // 4. SAY WHICH COMBINATION IS LIVE — OFF THE FACE OF THE MODEL.
@@ -2666,6 +2739,10 @@ export function normaliseStatementRows(
       "semantic-statements/1.0",
   });
   bindStatementSourceLineage(modelCase, section, rows);
+  // Repair stale pre-topology compiled cases before the sealed fast path can
+  // return. The row's declared accounting identity is the authority; old
+  // capture metadata may never override a protected bridge.
+  restoreProtectedForecastBridges(rows);
   if (modelCase.statement_structure_compiled_version === "semantic-statements/1.0") {
     materializeStatementPresentationTree(rows, section);
     assignDisplayAndFormulaRoles(rows);

@@ -1570,6 +1570,12 @@
           "type": "string",
           "minLength": 1
         },
+        "zero_basis": {
+          "enum": [
+            "semantic_event_nonrecurrence"
+          ],
+          "description": "Typed deterministic basis for an explicit-zero last rung. It is legal only on a structurally classified event row and is independently revalidated from row semantics."
+        },
         "guidance_range": {
           "type": "object",
           "additionalProperties": false,
@@ -1730,6 +1736,60 @@
           "type": "string",
           "minLength": 1,
           "description": "Reviewer-facing rationale for capturing this forecast row in its declared economic parent."
+        },
+        "forecast_capture_certificates": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "forecast_index",
+              "parent_row_id",
+              "mode",
+              "material",
+              "membership_path",
+              "proof"
+            ],
+            "properties": {
+              "forecast_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "parent_row_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+              },
+              "mode": {
+                "enum": [
+                  "formula_membership",
+                  "semantic_scope"
+                ]
+              },
+              "material": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "membership_path": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+                }
+              },
+              "proof": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "description": "One per-period, section-local membership proof. The path begins at this row and terminates at forecast_capture_parent_id; every formula-membership edge is independently revalidated."
         },
         "aggregation_role": {
           "enum": [

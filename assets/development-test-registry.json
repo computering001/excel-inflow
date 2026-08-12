@@ -1,0 +1,176 @@
+{
+  "schema_version": "development-test-registry/1.0",
+  "doctrine": {
+    "release_actions_performed": false,
+    "native_excel_actions_performed": false,
+    "golden_actions_performed": false,
+    "missing_required_input": "BLOCK",
+    "nonzero_exit": "FAIL"
+  },
+  "tests": [
+    {
+      "id": "workflow-state-contract",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_workflow_state_tests.mjs"
+    },
+    {
+      "id": "layered-graph-constitution",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_layered_graph_constitution_tests.mjs",
+      "arguments": ["$REPRESENTATIVE"],
+      "requires": ["REPRESENTATIVE"]
+    },
+    {
+      "id": "equation-graph-and-scc",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_equation_graph_tests.mjs"
+    },
+    {
+      "id": "fixed-point-multi-archetype",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_fixed_point_constitution_tests.mjs",
+      "arguments": ["--manifest", "$FIXED_POINT_CASES_MANIFEST"],
+      "requires": ["FIXED_POINT_CASES_MANIFEST"]
+    },
+    {
+      "id": "instrument-period-state",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_instrument_period_state_tests.mjs"
+    },
+    {
+      "id": "forecast-behavior",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_behavior_tests.mjs"
+    },
+    {
+      "id": "forecast-observation-ledger",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_observation_tests.mjs"
+    },
+    {
+      "id": "forecast-topology",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_topology_tests.mjs"
+    },
+    {
+      "id": "statement-classifier",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_statement_classifier_tests.mjs",
+      "arguments": ["$REPRESENTATIVE"],
+      "requires": ["REPRESENTATIVE"]
+    },
+    {
+      "id": "case-source-proposer",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_case_source_proposer_tests.mjs"
+    },
+    {
+      "id": "case-authorship-boundary",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_case_authorship_boundary_tests.mjs"
+    },
+    {
+      "id": "attachment-evidence-controller",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_evidence_pipeline_tests.py"
+    },
+    {
+      "id": "internal-evidence-fixed-point",
+      "phase": "workflow",
+      "runtime": "python",
+      "script": "run_internal_fixed_point_tests.py"
+    },
+    {
+      "id": "dcs-lossless-evidence",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_dcs_evidence_tests.py",
+      "arguments": ["--out", "$TEST_OUT"]
+    },
+    {
+      "id": "dcs-controller-fixed-point",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_dcs_pipeline_tests.py",
+      "arguments": ["--out", "$TEST_OUT"]
+    },
+    {
+      "id": "broker-physical-reconciliation",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_physical_reconciliation_tests.py"
+    },
+    {
+      "id": "broker-public-layout-corpus",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_broker_public_layout_tests.py",
+      "arguments": ["--corpus", "$BROKER_CORPUS", "--out", "$TEST_OUT"],
+      "requires": ["BROKER_CORPUS"]
+    },
+    {
+      "id": "filings-controller",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_filings_pipeline_tests.mjs"
+    },
+    {
+      "id": "evidence-orchestration",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_evidence_orchestration_tests.mjs"
+    },
+    {
+      "id": "evidence-run-compiler",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_evidence_run_tests.mjs",
+      "arguments": ["$CASES"],
+      "requires": ["CASES"]
+    },
+    {
+      "id": "production-user-flow",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_user_flow_tests.mjs"
+    },
+    {
+      "id": "case-compiler-equivalence",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_case_compiler_equivalence.mjs",
+      "arguments": ["$CASES"],
+      "requires": ["CASES"]
+    },
+    {
+      "id": "opening-debt-reconciliation",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_debt_reconciliation_tests.mjs"
+    },
+    {
+      "id": "excel-value-semantics",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_excel_value_semantics_tests.mjs"
+    },
+    {
+      "id": "delivery-inventory",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_delivery_inventory_tests.mjs"
+    }
+  ]
+}

@@ -79,6 +79,7 @@ const SCHEDULE_OWNED_ROLES = new Set([
   "interest_expense",
   "cash_interest_paid",
   "cash_interest_received",
+  "net_finance_addback",
   "debt_issuance",
   "debt_repayment",
   "change_in_debt",
@@ -93,6 +94,31 @@ const SCHEDULE_OWNED_ROLES = new Set([
   // schedule-owned exactly like the RCF legs.
   "non_cash_interest_addback",
 ]);
+
+const STRUCTURAL_EVENT_ROLES = new Set([
+  "acquisition_cost",
+  "business_combination",
+  "disposal",
+  "litigation",
+  "legal_settlement",
+  "restructuring",
+  "impairment_loss",
+  "exceptional_item",
+  "discontinued_operation",
+]);
+
+function validSemanticEventZeroBackstop(row, authority) {
+  return (
+    authority?.zero_basis === "semantic_event_nonrecurrence" &&
+    authority?.source_kind === "historical_inference" &&
+    authority?.source_id === `semantic-event-backstop:${row?.row_id}` &&
+    Boolean(authority?.as_of_date) &&
+    (["debt_issuance_cost", "other_cash_debt_movement"].includes(
+      row?.movement_type,
+    ) ||
+      STRUCTURAL_EVENT_ROLES.has(row?.semantic_role))
+  );
+}
 
 export function isScheduleOwnedForecastRole(role) {
   return SCHEDULE_OWNED_ROLES.has(role);
@@ -513,7 +539,22 @@ export function selectForecastAuthority(candidates) {
 export function validateForecastAuthorities(modelCase, rows = []) {
   const errors = [];
   const strict = modelCase?.forecast_authority_contract_version === "waterfall_v1";
-  const rowsById = new Map(rows.map((row) => [row?.row_id, row]));
+  const sectionByObject = new Map();
+  const sectionRowsById = new Map();
+  for (const section of ["income_statement", "cash_flow"]) {
+    const sectionRows = modelCase?.statement_structure?.[section] ?? [];
+    sectionRowsById.set(
+      section,
+      new Map(sectionRows.map((candidate) => [candidate.row_id, candidate])),
+    );
+    for (const candidate of sectionRows) sectionByObject.set(candidate, section);
+  }
+  const globallyUniqueSection = (rowId) => {
+    const matches = [...sectionRowsById.entries()]
+      .filter(([, byId]) => byId.has(rowId))
+      .map(([section]) => section);
+    return matches.length === 1 ? matches[0] : null;
+  };
   const allowedSourceKinds = {
     schedule_link: new Set(["schedule", "formula"]),
     accounting_identity: new Set(["formula"]),
@@ -734,12 +775,87 @@ export function validateForecastAuthorities(modelCase, rows = []) {
           );
         }
         const captureParentId = row.forecast_capture_parent_id ?? row.parent_row_id;
-        const parent = captureParentId ? rowsById.get(captureParentId) : null;
+        const section =
+          sectionByObject.get(row) ?? globallyUniqueSection(row.row_id);
+        const localRows = section ? sectionRowsById.get(section) : null;
+        const parent = captureParentId ? localRows?.get(captureParentId) : null;
         if (!parent || parent.row_id === row.row_id) {
           errors.push(
-            `${label} requires a valid parent_row_id or forecast_capture_parent_id whose forecast captures the unforecast detail.`,
+            `${label} requires a valid section-local parent_row_id or forecast_capture_parent_id whose forecast captures the unforecast detail.`,
           );
         } else {
+          const certificate = row.forecast_capture_certificates?.[index];
+          if (strict && !certificate) {
+            errors.push(`${label} requires a per-period forecast capture certificate.`);
+          } else if (certificate) {
+            const path = certificate.membership_path;
+            const pathShapeValid =
+              certificate.forecast_index === index &&
+              certificate.parent_row_id === captureParentId &&
+              Array.isArray(path) &&
+              path.length >= 2 &&
+              path[0] === row.row_id &&
+              path.at(-1) === captureParentId &&
+              new Set(path).size === path.length;
+            if (!pathShapeValid) {
+              errors.push(
+                `${label} has a capture certificate whose period, endpoints or path shape do not match the row.`,
+              );
+            } else {
+              let formulaPathValid = true;
+              for (let pathIndex = 0; pathIndex < path.length - 1; pathIndex += 1) {
+                const childId = path[pathIndex];
+                const parentId = path[pathIndex + 1];
+                const pathParent = localRows?.get(parentId);
+                const count = (pathParent?.calculation?.refs ?? []).filter(
+                  (reference) => reference === childId,
+                ).length;
+                if (count !== 1) {
+                  formulaPathValid = false;
+                  break;
+                }
+              }
+              if (
+                certificate.mode === "formula_membership" &&
+                !formulaPathValid
+              ) {
+                errors.push(
+                  `${label} certificate is not one exact section-local formula-membership path.`,
+                );
+              } else if (
+                certificate.mode === "semantic_scope" &&
+                !(() => {
+                const sectionRows = section
+                  ? modelCase?.statement_structure?.[section] ?? []
+                  : [];
+                const rowIndex = sectionRows.indexOf(row);
+                const revenueIndex = sectionRows.findIndex(
+                  (candidate) => candidate.semantic_role === "revenue",
+                );
+                const ebitIndex = sectionRows.findIndex(
+                  (candidate) => candidate.semantic_role === "ebit",
+                );
+                const inStatementBand =
+                  section === "income_statement" &&
+                  ((parent.semantic_role === "revenue" && rowIndex < revenueIndex) ||
+                    (parent.semantic_role === "ebit" &&
+                      revenueIndex >= 0 &&
+                      rowIndex > revenueIndex &&
+                      rowIndex < ebitIndex));
+                return formulaPathValid ||
+                row.parent_row_id === captureParentId ||
+                (parent.calculation?.refs ?? []).filter(
+                  (reference) => reference === row.row_id,
+                ).length === 1 ||
+                inStatementBand;
+              })()
+              ) {
+                errors.push(
+                  `${label} semantic-scope certificate has neither a complete additive path, declared hierarchy nor bounded statement scope.`,
+                );
+              }
+            }
+          }
           const parentAuthority = resolveForecastAuthority(modelCase, parent, index);
           if (["block", "uncalculated"].includes(parentAuthority.mechanism)) {
             errors.push(
@@ -773,25 +889,36 @@ export function validateForecastAuthorities(modelCase, rows = []) {
       }
       if (strict && authority.method === "explicit_zero" && authority.material !== false) {
         // A zero is a forecast judgement, not a label. Against a materially
-        // non-zero history it needs genuine no-recurrence evidence: a company
-        // or user source with a checkable citation. "historical_inference"
-        // can only ever infer a zero from a history that actually is zero.
+        // non-zero history it needs either genuine no-recurrence evidence, or
+        // the narrow compiler-owned semantic-event backstop. The latter is
+        // independently re-proved from the row's structured role/movement and
+        // exact source-id convention; a caption alone can never activate it.
         const historical = (row?.values ?? []).slice(0, 3);
         const historyIsZero = !historical.some(
           (value) => finite(value) && Math.abs(Number(value)) > 1e-9,
         );
         if (!historyIsZero) {
           const evidencedKinds = new Set(["company_reported", "user_supplied"]);
-          if (!evidencedKinds.has(authority.source_kind)) {
+          const eventBackstop = validSemanticEventZeroBackstop(row, authority);
+          if (!evidencedKinds.has(authority.source_kind) && !eventBackstop) {
             errors.push(
-              `${label} is explicit_zero against non-zero historical activity; that requires company_reported or user_supplied no-recurrence evidence, not ${authority.source_kind ?? "none"}.`,
+              `${label} is explicit_zero against non-zero historical activity; that requires company/user no-recurrence evidence or a valid structured semantic-event backstop, not ${authority.source_kind ?? "none"}.`,
             );
-          } else if (!authority.source_id || !authority.as_of_date) {
+          } else if (!eventBackstop && (!authority.source_id || !authority.as_of_date)) {
             errors.push(
               `${label} is explicit_zero against non-zero historical activity and must cite source_id and as_of_date for the no-recurrence evidence.`,
             );
           }
         }
+      }
+      if (
+        strict &&
+        authority.zero_basis === "semantic_event_nonrecurrence" &&
+        !validSemanticEventZeroBackstop(row, authority)
+      ) {
+        errors.push(
+          `${label} declares semantic_event_nonrecurrence without the required structured event role, source convention and as-of date.`,
+        );
       }
     }
   }

@@ -315,6 +315,39 @@ The returned `broker-run-state/1.0` is the sole broker-stage status authority.
 `user_blocking=false`. The controller runs and hash-binds all of these component
 commands; they remain available for diagnosis, not host-side sequencing:
 
+The deployment host must own these states as a bounded fixed-point loop. It
+reads and completes every task packet itself, writes the requested hash-bound
+vision response, targeted resolution or semantic crosswalk into the run folder,
+and immediately resumes the same controller command. It must not display an
+internal task as a user question or stop merely because native, table, OCR and
+rendered lanes disagree. A normal readable report reaches the semantic stage;
+only corrupt/encrypted/absent/hash-mismatched bytes may become a user input
+block. At the semantic stage, preserve every captured row broadly, map model
+inputs narrowly, submit the machine-authored proposal to the independent
+semantic verifier, repair all reported crosswalk findings together, and resume.
+Do not ask the user to hand-author a crosswalk. A material conflict in a cell
+actually selected for model use remains blocking until resolved or quarantined;
+an evidence-only/non-tabular surface or an unused-table conflict does not.
+
+Every internal task packet must carry a deterministic task ID, a registered
+remedy, a finite attempt budget, a stage-local progress measure, the exact
+expected response filename(s), the response-schema hash and an instruction to
+reuse valid checkpoints. The response seam is declared by
+`assets/broker-model-host-response-boundary-v1.json`. Python may sequence and
+validate this seam but may not author a visual transcription, targeted economic
+judgment or semantic crosswalk. The model host writes those artifacts; the
+controller re-enters them only after their source, image, manifest and schema
+bindings pass.
+
+Progress is monotonic on one source/runtime cache key: full-surface reads may
+advance to targeted resolution, then to initial crosswalk, verified crosswalk
+and pack. A return to an earlier stage, loss of a passed checkpoint, an
+unchanged frontier beyond its retry limit or an exhausted task budget collapses
+to exactly one `internal_fixed_point_defect`. That defect remains
+`user_blocking=false`; it owns a controller or model-host implementation repair,
+not a request to replace unchanged readable research. A successor run must
+reuse every unaffected hash-bound checkpoint.
+
 ```text
 python3 scripts/extract_broker_evidence.py <broker-extraction-request.json> --out <run-folder>/extract
 python3 scripts/compile_broker_surface_census.py <bundle.json> --out <run-folder>/broker-surface-census.json

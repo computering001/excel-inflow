@@ -22,6 +22,7 @@ import {
   validateSemanticArtifacts,
   validateSolutionInvariants,
 } from "./validation_invariants.mjs";
+import { validateFixedPointSolution } from "./fixed_point_constitution.mjs";
 import { compileRowPlan } from "./row_plan.mjs";
 import {
   compileSemanticManifest,
@@ -46,6 +47,7 @@ export const RELEASE_MODULE_REGISTRY = Object.freeze({
     compileEquationGraphState,
     validateEquationGraph,
     validateSolverEquationGraphEvidence,
+    validateFixedPointSolution,
   }),
   N9: Object.freeze({
     id: "N9",

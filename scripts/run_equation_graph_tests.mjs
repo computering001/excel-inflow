@@ -7,6 +7,7 @@ import {
   CONVERGENCE_CONTRACT,
   EQUATION_GRAPH,
   activeEquationEdges,
+  canonicalJsonSha256,
   compileEquationGraphState,
   compileSolverEquationGraphEvidence,
   deriveStronglyConnectedComponents,
@@ -25,6 +26,20 @@ function mutation(name, mutate, expectedFragment) {
   const contract = clone(CONVERGENCE_CONTRACT);
   mutate(graph, contract);
   const errors = validateEquationGraph(graph, contract);
+  assert.ok(
+    errors.some((error) => error.includes(expectedFragment)),
+    `${name} should fail with ${expectedFragment}; got ${errors.join(" | ")}`,
+  );
+  return { name, status: "PASS", total_violations: errors.length };
+}
+
+function policyMutation(name, mutate, expectedFragment) {
+  const graph = clone(EQUATION_GRAPH);
+  const contract = clone(CONVERGENCE_CONTRACT);
+  const policy = clone(ECONOMIC_SOLVE_POLICY);
+  mutate(policy);
+  contract.policy_binding.canonical_sha256 = canonicalJsonSha256(policy);
+  const errors = validateEquationGraph(graph, contract, policy);
   assert.ok(
     errors.some((error) => error.includes(expectedFragment)),
     `${name} should fail with ${expectedFragment}; got ${errors.join(" | ")}`,
@@ -115,7 +130,7 @@ const offEdgeIds = new Set(offEdges.map((edge) => edge.id));
 for (const edgeId of CONVERGENCE_CONTRACT.rcf_sweep_contract.edge_ids) {
   assert.ok(offEdgeIds.has(edgeId), `${edgeId} must remain active with circularity off`);
 }
-assert.ok(reachable(offEdges, "statement.net_income", "cash.ending_balance"), "net income -> CFO -> cash must remain live with circularity off");
+assert.ok(reachable(offEdges, "statement.cash_flow_start", "cash.ending_balance"), "declared cash-flow start -> CFO -> cash must remain live with circularity off");
 assert.ok(reachable(offEdges, "cash.cfo", "rcf.ending_balance"), "CFO -> RCF sweep -> ending RCF must remain live with circularity off");
 assert.ok(reachable(offEdges, "debt.issuance", "cash.ending_balance"), "debt issuance -> cash must remain live with circularity off");
 assert.ok(reachable(offEdges, "debt.scheduled_amortisation", "cash.ending_balance"), "debt repayment -> mandatory repayment -> cash must remain live with circularity off");
@@ -153,9 +168,9 @@ const mutations = [
     "required economic edge edge.ending_rcf_to_rcf_interest is missing",
   ),
   mutation(
-    "missing net income to CFO",
-    (graph) => withoutEdge(graph, "edge.net_income_to_cfo"),
-    "required economic edge edge.net_income_to_cfo is missing",
+    "missing statement start to CFO",
+    (graph) => withoutEdge(graph, "edge.cash_flow_start_to_cfo"),
+    "required economic edge edge.cash_flow_start_to_cfo is missing",
   ),
   mutation(
     "missing CFO to cash",
@@ -175,10 +190,15 @@ const mutations = [
   mutation(
     "reverse statement schedule direction",
     (graph) => {
-      const edge = graph.edges.find((item) => item.id === "edge.net_interest_to_finance_statement");
+      const edge = graph.edges.find((item) => item.id === "edge.gross_interest_to_finance_statement");
       [edge.from, edge.to] = [edge.to, edge.from];
     },
     "schedule-to-statement authority direction is reversed",
+  ),
+  mutation(
+    "missing circularity gate",
+    (graph) => withoutEdge(graph, "edge.control_to_rcf_interest"),
+    "zero_when_off node interest.rcf must have exactly one always-active circularity control gate",
   ),
   mutation(
     "gate RCF sweep off",
@@ -196,6 +216,11 @@ const mutations = [
     "state tolerance class drift",
     (_graph, contract) => { contract.solver_iteration.state_by_circularity["1"].state_vector[0].tolerance_class = "ratio"; },
     "tolerance class does not match",
+  ),
+  policyMutation(
+    "workbook tolerance drift",
+    (policy) => { policy.workbook_calculation.iterate_delta = 1e-5; },
+    "iterate_delta must exactly equal native_tolerances.currency",
   ),
   mutation(
     "strict schema rejects extension",

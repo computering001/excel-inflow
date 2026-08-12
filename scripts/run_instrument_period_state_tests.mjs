@@ -49,6 +49,18 @@ const modelCase = {
     instrument("bullet"),
     instrument("amortising", { scheduled_amortisation: [15, 10, 5] }),
     instrument("maturing", { maturity_date: "2026-06-30", maturity_treatment: "contractual" }),
+    instrument("zero_balance_maturing", {
+      opening_balance: 0,
+      maturity_date: "2027-09-15",
+      maturity_treatment: "contractual",
+    }),
+    instrument("issued_before_maturity", {
+      opening_balance: 0,
+      new_issuance: [0, 75, 0],
+      new_issuance_dates: [null, "2027-02-01", null],
+      maturity_date: "2027-09-15",
+      maturity_treatment: "contractual",
+    }),
     instrument("evergreen_dated", {
       maturity_date: "2026-06-30",
       maturity_treatment: "non_maturing_within_forecast",
@@ -132,6 +144,29 @@ assert.equal(maturity[0].repayment_state, "maturity");
 assert.equal(maturity[0].maturity_repayment.basis_amount, 100);
 assert.equal(maturity[0].ending_post_repayment.basis_amount, 0);
 assert.ok(maturity[0].active_fraction > 0.49 && maturity[0].active_fraction < 0.51);
+
+const zeroBalanceMaturity = statesFor("zero_balance_maturing");
+assert.deepEqual(
+  zeroBalanceMaturity.map((state) => ({
+    repayment_state: state.repayment_state,
+    mandatory_repayment: state.inclusion.mandatory_repayment,
+    maturity_repayment: state.maturity_repayment.basis_amount,
+  })),
+  [0, 1, 2].map(() => ({
+    repayment_state: "none",
+    mandatory_repayment: false,
+    maturity_repayment: 0,
+  })),
+  "A dated zero-balance instrument invented a mandatory maturity state.",
+);
+
+const issuedBeforeMaturity = statesFor("issued_before_maturity");
+assert.equal(issuedBeforeMaturity[0].repayment_state, "none");
+assert.equal(issuedBeforeMaturity[1].issuance.basis_amount, 75);
+assert.equal(issuedBeforeMaturity[1].maturity_repayment.basis_amount, 75);
+assert.equal(issuedBeforeMaturity[1].repayment_state, "maturity");
+assert.equal(issuedBeforeMaturity[1].inclusion.mandatory_repayment, true);
+assert.equal(issuedBeforeMaturity[1].ending_post_repayment.basis_amount, 0);
 
 const evergreenDated = statesFor("evergreen_dated");
 assert.deepEqual(
@@ -441,5 +476,7 @@ console.log(JSON.stringify({
     "multi_rcf_role_separation",
     "no_rcf_state_graph",
     "residual_pricing_authority",
+    "zero_balance_maturity_exclusion",
+    "issuance_before_maturity_inclusion",
   ],
 }, null, 2));

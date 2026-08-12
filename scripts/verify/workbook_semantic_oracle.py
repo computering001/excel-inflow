@@ -9,6 +9,7 @@ contract and reconstructs workbook facts directly from the XLSX package.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -56,6 +57,128 @@ def split_cell(address: str) -> tuple[str, int]:
 
 def normalise_label(value: object) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def _canonical(value: object) -> object:
+    if isinstance(value, list):
+        return [_canonical(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _canonical(value[key]) for key in sorted(value)}
+    return value
+
+
+def _canonical_sha256(value: object) -> str:
+    payload = json.dumps(
+        _canonical(value), separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _portable_sorted(values, key=lambda value: value):
+    return sorted(values, key=lambda value: str(key(value)).encode("utf-8"))
+
+
+def _formula_graph_from_model_ir(model_ir: dict) -> dict:
+    """Independently re-project the sealed model IR into a physical contract."""
+
+    planes = model_ir.get("planes") or {}
+    statements = {
+        node.get("display_id"): node for node in planes.get("statement") or []
+    }
+    presentation = {
+        node.get("display_id"): node for node in planes.get("presentation") or []
+    }
+    graph_nodes = []
+    for identifier, node in statements.items():
+        physical_row = (presentation.get(identifier) or {}).get("physical_row")
+        if not isinstance(physical_row, int):
+            continue
+        graph_nodes.append(
+            {
+                "display_id": identifier,
+                "semantic_role": node.get("semantic_role"),
+                "section": node.get("section"),
+                "label": node.get("label"),
+                "row": physical_row,
+            }
+        )
+    graph_nodes = _portable_sorted(graph_nodes, key=lambda item: item["display_id"])
+    graph_node_by_id = {item["display_id"]: item for item in graph_nodes}
+
+    dependency_pairs = {}
+    calculation = planes.get("calculation") or {}
+    for edge in calculation.get("edges") or []:
+        if edge.get("edge_type") == "depends_on":
+            consumer_node_id = str(edge.get("from") or "")
+            dependency_node_id = str(edge.get("to") or "")
+        elif edge.get("edge_type") == "contributes_to":
+            consumer_node_id = str(edge.get("to") or "")
+            dependency_node_id = str(edge.get("from") or "")
+        else:
+            continue
+        if not (
+            consumer_node_id.startswith("statement.")
+            and dependency_node_id.startswith("statement.")
+        ):
+            continue
+        consumer = consumer_node_id[len("statement.") :]
+        dependency = dependency_node_id[len("statement.") :]
+        if consumer not in graph_node_by_id or dependency not in graph_node_by_id:
+            continue
+        dependency_pairs[(consumer, dependency)] = {
+            "consumer_display_id": consumer,
+            "dependency_display_id": dependency,
+        }
+    authorised_edges = _portable_sorted(
+        dependency_pairs.values(),
+        key=lambda item: "%s\x00%s"
+        % (item["consumer_display_id"], item["dependency_display_id"]),
+    )
+
+    authority_by_period = {
+        (item.get("display_id"), item.get("forecast_index")): item
+        for item in planes.get("authority") or []
+    }
+    forecast_columns = ("J", "K", "L")
+    prior_columns = ("I", "J", "K")
+    required_paths = []
+    for edge in authorised_edges:
+        consumer_id = edge["consumer_display_id"]
+        dependency_id = edge["dependency_display_id"]
+        consumer = graph_node_by_id[consumer_id]
+        dependency = graph_node_by_id[dependency_id]
+        for forecast_index in range(3):
+            authority = authority_by_period.get((consumer_id, forecast_index)) or {}
+            if authority.get("producer_type") != "Derived":
+                continue
+            self_roll_forward = consumer_id == dependency_id
+            required_paths.append(
+                {
+                    "consumer_display_id": consumer_id,
+                    "dependency_display_id": dependency_id,
+                    "consumer_cell": "%s%s"
+                    % (forecast_columns[forecast_index], consumer["row"]),
+                    "dependency_cell": "%s%s"
+                    % (
+                        (
+                            prior_columns[forecast_index]
+                            if self_roll_forward
+                            else forecast_columns[forecast_index]
+                        ),
+                        dependency["row"],
+                    ),
+                    "period_relation": (
+                        "prior_period" if self_roll_forward else "same_period"
+                    ),
+                }
+            )
+    return {
+        "statement_sheet": "Operating Model",
+        "model_ir_sha256": _canonical_sha256(model_ir),
+        "graph_nodes": graph_nodes,
+        "authorised_dependency_edges": authorised_edges,
+        "required_formula_paths": required_paths,
+    }
 
 
 @dataclass(frozen=True)
@@ -220,6 +343,47 @@ def expand_formula_references(formula: str | None, current_sheet: str) -> set[tu
     return references
 
 
+def strongly_connected_components(adjacency: dict[str, set[str]]) -> list[list[str]]:
+    """Deterministic Tarjan SCCs, excluding singleton non-self-cycles."""
+
+    next_index = 0
+    indices: dict[str, int] = {}
+    low_links: dict[str, int] = {}
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    components: list[list[str]] = []
+
+    def visit(node: str) -> None:
+        nonlocal next_index
+        indices[node] = next_index
+        low_links[node] = next_index
+        next_index += 1
+        stack.append(node)
+        on_stack.add(node)
+        for target in _portable_sorted(adjacency.get(node, set())):
+            if target not in indices:
+                visit(target)
+                low_links[node] = min(low_links[node], low_links[target])
+            elif target in on_stack:
+                low_links[node] = min(low_links[node], indices[target])
+        if low_links[node] != indices[node]:
+            return
+        component = []
+        while stack:
+            candidate = stack.pop()
+            on_stack.remove(candidate)
+            component.append(candidate)
+            if candidate == node:
+                break
+        if len(component) > 1 or node in adjacency.get(node, set()):
+            components.append(_portable_sorted(component))
+
+    for node in _portable_sorted(adjacency):
+        if node not in indices:
+            visit(node)
+    return _portable_sorted(components, key=lambda item: "\x00".join(item))
+
+
 def is_independent_writer(cell: Cell | None) -> bool:
     return cell is not None and cell.formula is None and cell.value not in (None, "")
 
@@ -243,7 +407,7 @@ def _rule_rows(sheet: Sheet, rule: dict, role: str, label_column: str) -> list[i
     return _find_rows(sheet, [rule[f"{role}_label"]], label_column)
 
 
-def verify(facts: WorkbookFacts, contract: dict) -> dict:
+def verify(facts: WorkbookFacts, contract: dict, model_ir: dict | None = None) -> dict:
     findings = []
 
     def block(code: str, message: str, **detail) -> None:
@@ -482,6 +646,512 @@ def verify(facts: WorkbookFacts, contract: dict) -> dict:
             if len(cell.formula) > int(contract.get("max_formula_characters", 8192)):
                 block("OOXML_FORMULA_TOO_LONG", f"Formula at {candidate_sheet.name}!{cell.address} exceeds the length budget.")
 
+    physical_graph = contract.get("physical_formula_graph")
+    graph_path_checks = 0
+    graph_direct_edges = 0
+    if not isinstance(physical_graph, dict):
+        block(
+            "OOXML_FORMULA_GRAPH_CONTRACT_MISSING",
+            "The sealed proof contract contains no physical formula-graph closure.",
+        )
+    else:
+        graph_core = {
+            "statement_sheet": physical_graph.get("statement_sheet"),
+            "model_ir_sha256": physical_graph.get("model_ir_sha256"),
+            "graph_nodes": physical_graph.get("graph_nodes") or [],
+            "authorised_dependency_edges": physical_graph.get("authorised_dependency_edges") or [],
+            "required_formula_paths": physical_graph.get("required_formula_paths") or [],
+        }
+        calculated_graph_hash = _canonical_sha256(graph_core)
+        if physical_graph.get("schema_version") != 1:
+            block(
+                "OOXML_FORMULA_GRAPH_SCHEMA_INVALID",
+                "The physical formula-graph contract schema is absent or invalid.",
+            )
+        if physical_graph.get("closure_sha256") != calculated_graph_hash:
+            block(
+                "OOXML_FORMULA_GRAPH_CLOSURE_HASH_MISMATCH",
+                "The physical formula-graph closure hash does not match its canonical content.",
+                expected=calculated_graph_hash,
+                actual=physical_graph.get("closure_sha256"),
+            )
+        if not isinstance(model_ir, dict):
+            block(
+                "OOXML_FORMULA_GRAPH_MODEL_IR_MISSING",
+                "The physical formula graph cannot be bound because its sealed model IR is absent.",
+            )
+        else:
+            expected_graph_core = _formula_graph_from_model_ir(model_ir)
+            if graph_core != expected_graph_core:
+                block(
+                    "OOXML_FORMULA_GRAPH_MODEL_IR_MISMATCH",
+                    "The physical formula-graph contract is not the exact independent projection of the sealed model IR.",
+                )
+        graph_sheet_name = physical_graph.get("statement_sheet", sheet_name)
+        graph_sheet = facts.sheets.get(graph_sheet_name)
+        if graph_sheet is None:
+            block(
+                "OOXML_FORMULA_GRAPH_SHEET_MISSING",
+                f"Formula-graph sheet {graph_sheet_name} is absent.",
+            )
+        else:
+            graph_nodes = physical_graph.get("graph_nodes") or []
+            node_by_id = {
+                item.get("display_id"): item
+                for item in graph_nodes
+                if isinstance(item, dict) and item.get("display_id")
+            }
+            row_to_node = {}
+            for identifier, node in node_by_id.items():
+                row = node.get("row")
+                if not isinstance(row, int) or row <= 0 or row in row_to_node:
+                    block(
+                        "OOXML_FORMULA_GRAPH_PROJECTION_NOT_UNIQUE",
+                        f"Formula-graph node {identifier} has no unique physical row.",
+                        row=row,
+                    )
+                    continue
+                row_to_node[row] = identifier
+                label_cell = _cell(graph_sheet, label_column, row)
+                if (
+                    label_cell is None
+                    or normalise_label(label_cell.value)
+                    != normalise_label(node.get("label"))
+                ):
+                    block(
+                        "OOXML_FORMULA_GRAPH_PROJECTION_MISMATCH",
+                        f"Formula-graph node {identifier} does not resolve to its sealed physical row.",
+                        row=row,
+                        expected_label=node.get("label"),
+                        actual_label=label_cell.value if label_cell else None,
+                    )
+
+            authorised = {
+                (
+                    edge.get("consumer_display_id"),
+                    edge.get("dependency_display_id"),
+                )
+                for edge in physical_graph.get("authorised_dependency_edges") or []
+            }
+            adjacency = {identifier: set() for identifier in node_by_id}
+            for consumer, dependency in authorised:
+                if consumer not in adjacency or dependency not in adjacency:
+                    block(
+                        "OOXML_FORMULA_GRAPH_ORPHAN_SEMANTIC_EDGE",
+                        "A formula-graph dependency has an unbound endpoint.",
+                        consumer_display_id=consumer,
+                        dependency_display_id=dependency,
+                    )
+                    continue
+                adjacency[consumer].add(dependency)
+
+            semantic_closure = {}
+            for identifier in adjacency:
+                reached = set()
+                pending = list(adjacency[identifier])
+                while pending:
+                    candidate = pending.pop()
+                    if candidate in reached:
+                        continue
+                    reached.add(candidate)
+                    pending.extend(adjacency.get(candidate, ()))
+                semantic_closure[identifier] = reached
+
+            def formula_path_exists(
+                start_sheet: str,
+                start_cell: str,
+                target_sheet: str,
+                target_cell: str,
+            ) -> bool:
+                pending = [(start_sheet, start_cell)]
+                visited = set()
+                while pending:
+                    current_sheet, current_cell = pending.pop()
+                    key = (current_sheet, current_cell)
+                    if key in visited:
+                        continue
+                    visited.add(key)
+                    candidate_sheet = facts.sheets.get(current_sheet)
+                    candidate_cell = (
+                        candidate_sheet.cells.get(current_cell)
+                        if candidate_sheet is not None
+                        else None
+                    )
+                    references = expand_formula_references(
+                        candidate_cell.formula if candidate_cell else None,
+                        current_sheet,
+                    )
+                    if (target_sheet, target_cell) in references:
+                        return True
+                    pending.extend(references - visited)
+                return False
+
+            for requirement in physical_graph.get("required_formula_paths") or []:
+                graph_path_checks += 1
+                consumer_cell = str(requirement.get("consumer_cell") or "")
+                dependency_cell = str(requirement.get("dependency_cell") or "")
+                if not formula_path_exists(
+                    graph_sheet_name,
+                    consumer_cell,
+                    graph_sheet_name,
+                    dependency_cell,
+                ):
+                    block(
+                        "OOXML_FORMULA_GRAPH_PATH_MISSING",
+                        "A required semantic dependency is not reachable through the physical formula graph.",
+                        consumer_display_id=requirement.get("consumer_display_id"),
+                        dependency_display_id=requirement.get("dependency_display_id"),
+                        consumer_cell=consumer_cell,
+                        dependency_cell=dependency_cell,
+                        period_relation=requirement.get("period_relation"),
+                    )
+
+            if graph_path_checks <= 0:
+                block(
+                    "OOXML_FORMULA_GRAPH_VACUOUS",
+                    "The physical formula-graph contract contains no required path checks.",
+                )
+
+            # Closure in the opposite direction: a projected forecast formula
+            # may consume another projected statement node only when the
+            # semantic dependency graph authorises that node transitively.
+            for column in forecast_columns:
+                for row, owner_id in row_to_node.items():
+                    owner_cell = _cell(graph_sheet, column, row)
+                    if owner_cell is None or not owner_cell.formula:
+                        continue
+                    for reference_sheet, reference_cell in expand_formula_references(
+                        owner_cell.formula, graph_sheet_name
+                    ):
+                        if reference_sheet != graph_sheet_name:
+                            continue
+                        _, reference_row = split_cell(reference_cell)
+                        dependency_id = row_to_node.get(reference_row)
+                        if dependency_id is None:
+                            continue
+                        graph_direct_edges += 1
+                        if dependency_id == owner_id:
+                            continue
+                        if dependency_id not in semantic_closure.get(owner_id, set()):
+                            block(
+                                "OOXML_FORMULA_GRAPH_UNAUTHORISED_EDGE",
+                                "A physical statement formula consumes a node outside its semantic dependency closure.",
+                                owner_display_id=owner_id,
+                                dependency_display_id=dependency_id,
+                                owner_cell=owner_cell.address,
+                                dependency_cell=reference_cell,
+                            )
+            if graph_direct_edges <= 0:
+                block(
+                    "OOXML_FORMULA_GRAPH_CLOSURE_VACUOUS",
+                    "No physical statement-to-statement forecast edges were inspected.",
+                )
+
+    fixed_point_graph = contract.get("fixed_point_formula_graph")
+    fixed_point_scc_checks = 0
+    fixed_point_gate_checks = 0
+    if not isinstance(fixed_point_graph, dict):
+        block(
+            "OOXML_FIXED_POINT_CONTRACT_MISSING",
+            "The sealed proof contract contains no physical fixed-point projection.",
+        )
+    else:
+        fixed_point_core = {
+            key: fixed_point_graph.get(key)
+            for key in (
+                "schema_version",
+                "statement_sheet",
+                "forecast_columns",
+                "circularity_control_cell",
+                "equation_graph_sha256",
+                "convergence_contract_sha256",
+                "economic_solve_policy_sha256",
+                "expected_active_scc_nodes",
+                "node_bindings",
+                "zero_when_off_bindings",
+                "live_when_off_bindings",
+            )
+        }
+        if fixed_point_graph.get("closure_sha256") != _canonical_sha256(
+            fixed_point_core
+        ):
+            block(
+                "OOXML_FIXED_POINT_CLOSURE_HASH_MISMATCH",
+                "The physical fixed-point projection hash does not match its canonical content.",
+            )
+
+        assets = Path(__file__).resolve().parents[2] / "assets"
+        try:
+            equation_graph = json.loads(
+                (assets / "equation-graph.v1.json").read_text(encoding="utf-8")
+            )
+            convergence_contract = json.loads(
+                (assets / "convergence-contract.v1.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            solve_policy = json.loads(
+                (assets / "economic-solve-policy.v1.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        except (OSError, json.JSONDecodeError) as error:
+            block(
+                "OOXML_FIXED_POINT_CANONICAL_ASSET_MISSING",
+                f"Canonical fixed-point assets cannot be read: {error}.",
+            )
+            equation_graph = convergence_contract = solve_policy = None
+
+        if equation_graph and convergence_contract and solve_policy:
+            for key, value in (
+                ("equation_graph_sha256", equation_graph),
+                ("convergence_contract_sha256", convergence_contract),
+            ):
+                if fixed_point_graph.get(key) != _canonical_sha256(value):
+                    block(
+                        "OOXML_FIXED_POINT_CANONICAL_BINDING_MISMATCH",
+                        f"The fixed-point projection does not bind the canonical {key}.",
+                    )
+            # The policy contains IEEE-754 values whose JSON rendering differs
+            # between Python and JavaScript at 1e-6.  Bind it through the
+            # canonical hash already sealed into the convergence contract,
+            # then independently compare the workbook semantics below; never
+            # claim a false cross-runtime byte hash from Python's float text.
+            expected_policy_hash = (
+                convergence_contract.get("policy_binding", {}).get(
+                    "canonical_sha256"
+                )
+            )
+            if (
+                fixed_point_graph.get("economic_solve_policy_sha256")
+                != expected_policy_hash
+            ):
+                block(
+                    "OOXML_FIXED_POINT_CANONICAL_BINDING_MISMATCH",
+                    "The fixed-point projection does not bind the policy hash sealed by the convergence contract.",
+                )
+            graph_adjacency = {
+                str(node.get("id")): set()
+                for node in equation_graph.get("nodes") or []
+            }
+            for edge in equation_graph.get("edges") or []:
+                if edge.get("activation") not in ("always", "circularity_on"):
+                    continue
+                if edge.get("from") in graph_adjacency:
+                    graph_adjacency[edge["from"]].add(str(edge.get("to")))
+            derived_graph_sccs = strongly_connected_components(graph_adjacency)
+            declared_graph_sccs = _portable_sorted(
+                [
+                    _portable_sorted(item.get("nodes") or [])
+                    for item in (
+                        convergence_contract.get("scc_contract", {})
+                        .get("active_by_circularity", {})
+                        .get("1", [])
+                    )
+                ],
+                key=lambda item: "\x00".join(item),
+            )
+            if derived_graph_sccs != declared_graph_sccs:
+                block(
+                    "OOXML_FIXED_POINT_CANONICAL_SCC_MISMATCH",
+                    "The canonical equation graph no longer derives its declared convergence SCC.",
+                    derived=derived_graph_sccs,
+                    declared=declared_graph_sccs,
+                )
+            canonical_nodes = _portable_sorted(
+                [node for component in declared_graph_sccs for node in component]
+            )
+            if fixed_point_graph.get("expected_active_scc_nodes") != canonical_nodes:
+                block(
+                    "OOXML_FIXED_POINT_EXPECTATION_MISMATCH",
+                    "The physical fixed-point projection does not name the canonical active SCC.",
+                )
+            zero_roles = _portable_sorted(
+                solve_policy.get("circularity_roles", {}).get("zero_when_off", [])
+            )
+            live_roles = _portable_sorted(
+                solve_policy.get("circularity_roles", {}).get("live_when_off", [])
+            )
+            if _portable_sorted(
+                item.get("role")
+                for item in fixed_point_graph.get("zero_when_off_bindings") or []
+            ) != zero_roles:
+                block(
+                    "OOXML_FIXED_POINT_ZERO_ROLE_BINDING_MISMATCH",
+                    "Physical zero-when-off bindings do not cover the canonical role registry exactly.",
+                )
+            if _portable_sorted(
+                item.get("role")
+                for item in fixed_point_graph.get("live_when_off_bindings") or []
+            ) != live_roles:
+                block(
+                    "OOXML_FIXED_POINT_LIVE_ROLE_BINDING_MISMATCH",
+                    "Physical live-when-off bindings do not cover the canonical role registry exactly.",
+                )
+
+        fixed_sheet_name = fixed_point_graph.get("statement_sheet", sheet_name)
+        fixed_sheet = facts.sheets.get(fixed_sheet_name)
+        if fixed_sheet is None:
+            block(
+                "OOXML_FIXED_POINT_SHEET_MISSING",
+                f"Fixed-point sheet {fixed_sheet_name} is absent.",
+            )
+        else:
+            formula_addresses = {
+                address
+                for address, cell in fixed_sheet.cells.items()
+                if cell.formula
+            }
+            physical_adjacency = {address: set() for address in formula_addresses}
+            for dependent in formula_addresses:
+                cell = fixed_sheet.cells[dependent]
+                for reference_sheet, precedent in expand_formula_references(
+                    cell.formula, fixed_sheet_name
+                ):
+                    if (
+                        reference_sheet == fixed_sheet_name
+                        and precedent in physical_adjacency
+                    ):
+                        physical_adjacency[precedent].add(dependent)
+            physical_sccs = strongly_connected_components(physical_adjacency)
+            component_by_cell = {
+                address: component
+                for component in physical_sccs
+                for address in component
+            }
+            bindings = fixed_point_graph.get("node_bindings") or []
+            for column in fixed_point_graph.get("forecast_columns") or []:
+                binding_cells = {
+                    item.get("node_id"): f"{column}{item.get('row')}"
+                    for item in bindings
+                    if isinstance(item.get("row"), int)
+                }
+                missing_formulas = [
+                    address
+                    for address in binding_cells.values()
+                    if address not in formula_addresses
+                ]
+                if missing_formulas:
+                    block(
+                        "OOXML_FIXED_POINT_BINDING_FORMULA_MISSING",
+                        "A canonical fixed-point node has no emitted formula.",
+                        column=column,
+                        cells=missing_formulas,
+                    )
+                    continue
+                components = {
+                    tuple(component_by_cell.get(address, []))
+                    for address in binding_cells.values()
+                }
+                if len(components) != 1 or not next(iter(components), ()):
+                    block(
+                        "OOXML_FIXED_POINT_SCC_SPLIT",
+                        "Canonical fixed-point bindings do not occupy one physical formula SCC.",
+                        column=column,
+                    )
+                    continue
+                component = set(next(iter(components)))
+                observed_nodes = _portable_sorted(
+                    node_id
+                    for node_id, address in binding_cells.items()
+                    if address in component
+                )
+                expected_nodes = fixed_point_graph.get(
+                    "expected_active_scc_nodes"
+                ) or []
+                fixed_point_scc_checks += 1
+                if observed_nodes != expected_nodes:
+                    block(
+                        "OOXML_FIXED_POINT_SCC_NODE_MISMATCH",
+                        "The emitted formula SCC does not bind exactly the canonical solver state vector.",
+                        column=column,
+                        observed=observed_nodes,
+                        expected=expected_nodes,
+                    )
+                same_column_components = [
+                    item
+                    for item in physical_sccs
+                    if any(split_cell(address)[0] == column for address in item)
+                ]
+                if len(same_column_components) != 1:
+                    block(
+                        "OOXML_FIXED_POINT_UNRELATED_CYCLE",
+                        "The forecast column contains an undeclared formula cycle outside the canonical fixed point.",
+                        column=column,
+                        component_count=len(same_column_components),
+                    )
+
+            control_cell = str(
+                fixed_point_graph.get("circularity_control_cell") or ""
+            ).replace("$", "")
+
+            def reaches_control(address: str) -> bool:
+                pending = [address]
+                visited = set()
+                while pending:
+                    current = pending.pop()
+                    if current in visited:
+                        continue
+                    visited.add(current)
+                    cell = fixed_sheet.cells.get(current)
+                    for reference_sheet, reference in expand_formula_references(
+                        cell.formula if cell else None, fixed_sheet_name
+                    ):
+                        if reference_sheet != fixed_sheet_name:
+                            continue
+                        if reference.replace("$", "") == control_cell:
+                            return True
+                        if reference in formula_addresses:
+                            pending.append(reference)
+                return False
+
+            direct_zero_gate = re.compile(
+                r"^=?IF\(\$?C\$?[0-9]+=0,0,", re.IGNORECASE
+            )
+
+            for binding in fixed_point_graph.get("zero_when_off_bindings") or []:
+                for row in binding.get("rows") or []:
+                    for column in fixed_point_graph.get("forecast_columns") or []:
+                        address = f"{column}{row}"
+                        cell = fixed_sheet.cells.get(address)
+                        compact = re.sub(r"\s+", "", str(cell.formula or ""))
+                        structural_zero = compact in ("0", "=0") or (
+                            not cell.formula and cell.value in (0, 0.0)
+                            if cell is not None
+                            else False
+                        )
+                        fixed_point_gate_checks += 1
+                        gate_present = (
+                            bool(direct_zero_gate.search(compact))
+                            if binding.get("gate_mode") == "direct"
+                            else reaches_control(address)
+                        )
+                        if not structural_zero and not gate_present:
+                            block(
+                                "OOXML_FIXED_POINT_GATE_MISSING",
+                                "A zero-when-off physical role does not reach the circularity control.",
+                                role=binding.get("role"),
+                                cell=address,
+                            )
+
+            direct_gate = re.compile(
+                r"^=?IF\(\$?C\$?[0-9]+=0,0,", re.IGNORECASE
+            )
+            for binding in fixed_point_graph.get("live_when_off_bindings") or []:
+                for row in binding.get("rows") or []:
+                    for column in fixed_point_graph.get("forecast_columns") or []:
+                        address = f"{column}{row}"
+                        cell = fixed_sheet.cells.get(address)
+                        compact = re.sub(r"\s+", "", str(cell.formula or ""))
+                        fixed_point_gate_checks += 1
+                        if direct_gate.search(compact):
+                            block(
+                                "OOXML_FIXED_POINT_LIVE_MECHANIC_GATED",
+                                "A live-when-off mechanic is directly zeroed by the circularity control.",
+                                role=binding.get("role"),
+                                cell=address,
+                            )
+
     broker_evidence = contract.get("broker_evidence")
     if broker_evidence:
         source_sheets = set(broker_evidence.get("source_sheets", []))
@@ -554,6 +1224,10 @@ def verify(facts: WorkbookFacts, contract: dict) -> dict:
             "sheets": len(facts.sheets),
             "cells": sum(len(item.cells) for item in facts.sheets.values()),
             "formula_cells": len(formula_cells),
+            "formula_graph_required_paths": graph_path_checks,
+            "formula_graph_direct_edges": graph_direct_edges,
+            "fixed_point_scc_checks": fixed_point_scc_checks,
+            "fixed_point_gate_checks": fixed_point_gate_checks,
             "defined_names": len(facts.defined_names),
         },
     }
@@ -563,11 +1237,18 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--xlsx", required=True, type=Path)
     parser.add_argument("--contract", required=True, type=Path)
+    parser.add_argument("--model-ir", type=Path)
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     facts = read_workbook(args.xlsx)
     contract = json.loads(args.contract.read_text(encoding="utf-8"))
-    report = verify(facts, contract)
+    model_ir_path = args.model_ir or Path(str(args.xlsx) + ".model-ir-v3.json")
+    model_ir = (
+        json.loads(model_ir_path.read_text(encoding="utf-8"))
+        if model_ir_path.exists()
+        else None
+    )
+    report = verify(facts, contract, model_ir)
     payload = json.dumps(report, indent=2) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

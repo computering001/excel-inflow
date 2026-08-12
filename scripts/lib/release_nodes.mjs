@@ -230,7 +230,16 @@ export function runReleaseN0N9({ modelCase, dcsExport = null, brokerPack = null,
   const standaloneCase = structuredClone(modelCase);
   if (standaloneCase.acquisition) standaloneCase.acquisition.enabled = 0;
   const standalone = M.N8.solveCase(standaloneCase);
-  const invariantErrors = [...M.N8.validateSolutionInvariants(standalone), ...M.N8.validateSolutionInvariants(proForma)];
+  const invariantErrors = [
+    ...M.N8.validateSolutionInvariants(standalone),
+    ...M.N8.validateSolutionInvariants(proForma),
+    ...M.N8.validateFixedPointSolution(standaloneCase, standalone).map(
+      (error) => `standalone fixed-point: ${error}`,
+    ),
+    ...M.N8.validateFixedPointSolution(modelCase, proForma).map(
+      (error) => `pro-forma fixed-point: ${error}`,
+    ),
+  ];
   const convergence = evaluateConvergenceDeclaration(standalone, proForma, {
     circularity: modelCase.controls?.circularity,
   });

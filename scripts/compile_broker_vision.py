@@ -776,8 +776,9 @@ def main() -> int:
                 unresolved += 1
                 findings.append({"id": "broker_vision.task_or_image_missing", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The required hash-bound vision task or page image is missing."})
                 continue
-            image_path = bundle_path.parent / image_artifact["path"]
-            task_path = bundle_path.parent / task_artifact["path"]
+            artifact_root = Path(str(bundle.get("artifact_root") or bundle_path.parent)).resolve()
+            image_path = artifact_root / image_artifact["path"]
+            task_path = artifact_root / task_artifact["path"]
             if (
                 not image_path.is_file()
                 or sha256_file(image_path) != image_artifact["sha256"]
@@ -1087,16 +1088,22 @@ def main() -> int:
     bundle["vision_conflict_manifests"] = conflict_manifests
     bundle["findings"] = findings
     blockers = [item for item in findings if item["severity"] == "blocker"]
+    resolution_findings = [
+        item for item in findings if item.get("severity") == "needs_resolution"
+    ]
+    vision_findings = [
+        item for item in findings if item.get("severity") == "needs_vision"
+    ]
     only_pending_adjudication = bool(blockers) and all(
         item.get("id") == "broker_vision.pass_disagreement" for item in blockers
     )
     bundle["gate_status"] = (
         "NEEDS_RESOLUTION"
-        if only_pending_adjudication
+        if only_pending_adjudication or resolution_findings
         else "BLOCKED"
         if blockers
         else "NEEDS_VISION"
-        if unresolved
+        if unresolved or vision_findings
         else "PASS"
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)

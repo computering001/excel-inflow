@@ -20,11 +20,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from workflow_state import assert_state, assert_transition
+
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "attachment-evidence-runtime-members.json"
-BLOCKER_CLASSES = {"INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}
 USER_BLOCKERS = {"USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}
 
 
@@ -93,6 +94,29 @@ def runtime_closure() -> str:
         if not target.is_file():
             raise FileNotFoundError(f"Attachment evidence runtime member is absent: {relative}")
         hashes[relative] = sha256_file(target)
+    nested_manifests = manifest.get("runtime_manifests", [])
+    if not isinstance(nested_manifests, list) or len(nested_manifests) != len(set(nested_manifests)):
+        raise ValueError("Attachment evidence nested runtime manifest list is malformed")
+    for manifest_relative in nested_manifests:
+        if (
+            not isinstance(manifest_relative, str)
+            or manifest_relative.startswith("/")
+            or ".." in Path(manifest_relative).parts
+        ):
+            raise ValueError(f"Invalid nested runtime manifest: {manifest_relative!r}")
+        nested_path = ROOT / manifest_relative
+        nested = read_json(nested_path, f"nested runtime manifest {manifest_relative}")
+        nested_members = nested.get("members")
+        if not isinstance(nested_members, list) or not nested_members:
+            raise ValueError(f"Nested runtime manifest {manifest_relative} has no members")
+        hashes[manifest_relative] = sha256_file(nested_path)
+        for relative in nested_members:
+            if not isinstance(relative, str) or relative.startswith("/") or ".." in Path(relative).parts:
+                raise ValueError(f"Invalid nested runtime member: {relative!r}")
+            target = ROOT / relative
+            if not target.is_file():
+                raise FileNotFoundError(f"Nested runtime member is absent: {relative}")
+            hashes[relative] = sha256_file(target)
     return sha256_value(hashes)
 
 
@@ -109,6 +133,18 @@ def run(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root: Path) -> list[str]:
     request = resolve(base, declaration.get("request_path"))
+    if kind == "filings":
+        command = [
+            "node",
+            str(HERE / "run_filings_pipeline.mjs"),
+            str(request),
+            "--out",
+            str(output_root / kind),
+        ]
+        response = resolve(base, declaration.get("responses_path"))
+        if response is not None:
+            command.extend(["--responses", str(response)])
+        return command
     command = [
         sys.executable,
         str(HERE / ("run_broker_pipeline.py" if kind == "broker" else "run_dcs_pipeline.py")),
@@ -140,7 +176,31 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
         }
     completed = run(command)
     if state_path.is_file():
-        return read_json(state_path, f"{kind} run state")
+        try:
+            state = read_json(state_path, f"{kind} run state")
+            if not isinstance(state.get("user_blocking"), bool):
+                raise ValueError(f"{kind} lane state omits a boolean user_blocking field")
+            assert_state(
+                kind,
+                str(state.get("pipeline_status") or ""),
+                state.get("blocker_class"),
+                state.get("user_blocking") is True,
+            )
+        except (ValueError, OSError) as error:
+            return {
+                "schema_version": f"{kind}-run-state/1.0",
+                "pipeline_status": "BLOCKED_INTERNAL",
+                "user_blocking": False,
+                "blocker_class": "INTERNAL_WORK",
+                "tasks": [],
+                "artifacts": {},
+                "artifact_sha256": {},
+                "summary": {
+                    "terminal_reason": "invalid_lane_state",
+                    "message": str(error),
+                },
+            }
+        return state
     detail = (completed.stderr or completed.stdout).strip()[-4000:]
     # An absent/corrupt caller-supplied raw file is the one no-state failure
     # that genuinely belongs to the user.  Missing internal declarations and
@@ -195,6 +255,66 @@ def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dic
     return declarations
 
 
+def apply_filings_lane(
+    *,
+    resolved_ingress: dict[str, Any],
+    ingress_base: Path,
+    filings_state: dict[str, Any],
+    output_root: Path,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    artifacts = filings_state.get("artifacts", {})
+    bundle_path = Path(str(artifacts.get("filings_bundle") or ""))
+    registry_path = Path(str(artifacts.get("document_extraction_registry") or ""))
+    if not bundle_path.is_file() or not registry_path.is_file():
+        raise ValueError("PASS filings lane omits its bundle or extraction registry")
+    bundle = read_json(bundle_path, "filings evidence bundle")
+    registry = read_json(registry_path, "document extraction registry")
+    if bundle.get("schema_version") != "filings-evidence-bundle/1.0":
+        raise ValueError("Filings bundle has the wrong schema version")
+    calculated_bundle_hash = sha256_value({
+        key: value for key, value in bundle.items() if key != "bundle_sha256"
+    })
+    if bundle.get("bundle_sha256") != calculated_bundle_hash:
+        raise ValueError("Filings bundle hash does not bind its complete payload")
+    evidence_path = resolve(ingress_base, resolved_ingress.get("evidence_run_path"))
+    if not evidence_path or not evidence_path.is_file():
+        raise FileNotFoundError("Attachment-ingress template evidence_run_path is absent")
+    evidence = read_json(evidence_path, "base evidence-run template")
+    if evidence.get("mode") == "first_run" and "model_case" in evidence:
+        raise ValueError("A first-run evidence template may not carry caller-authored model_case")
+    evidence["filings"] = bundle.get("filings")
+    evidence.setdefault("case_evidence", {})["face_statement_manifests"] = bundle.get("filings", {}).get(
+        "face_statement_manifests", {}
+    )
+    evidence["case_source"] = {}
+    evidence.pop("model_case", None)
+    resolved_evidence_path = output_root / "resolved-evidence-template.json"
+    atomic_json(resolved_evidence_path, evidence)
+    resolved_ingress["evidence_run_path"] = str(resolved_evidence_path)
+    registry_documents = registry.get("documents", {})
+    used: set[str] = set()
+    for descriptor in resolved_ingress.get("attachments", []):
+        if descriptor.get("adapter", {}).get("domain") != "document_extraction":
+            continue
+        attachment_id = str(descriptor.get("attachment_id") or "")
+        registry_entry = registry_documents.get(attachment_id)
+        extraction_path = Path(str((registry_entry or {}).get("path") or ""))
+        if not extraction_path.is_file():
+            raise ValueError(f"Filings lane has no extraction for attachment {attachment_id}")
+        if sha256_file(extraction_path) != registry_entry.get("sha256"):
+            raise ValueError(f"Filings extraction hash does not match for attachment {attachment_id}")
+        descriptor["adapter"]["extraction_path"] = str(extraction_path)
+        used.add(attachment_id)
+    unused = sorted(set(registry_documents) - used)
+    if unused:
+        raise ValueError(f"Filings registry contains unbound attachment(s): {', '.join(unused)}")
+    return resolved_ingress, {
+        "filings_bundle": str(bundle_path),
+        "document_extraction_registry": str(registry_path),
+        "resolved_evidence_template": str(resolved_evidence_path),
+    }
+
+
 def classify(lanes: dict[str, dict[str, Any]]) -> tuple[str, str | None, bool]:
     blockers = [state.get("blocker_class") for state in lanes.values() if state.get("pipeline_status") != "PASS"]
     if not blockers:
@@ -207,14 +327,166 @@ def classify(lanes: dict[str, dict[str, Any]]) -> tuple[str, str | None, bool]:
     return "NEEDS_INTERNAL_WORK", "INTERNAL_WORK", False
 
 
+def task_frontier(
+    lanes: dict[str, dict[str, Any]],
+    *,
+    status: str,
+    transaction_hash: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Project one typed task frontier without leaking internal work as a user ask."""
+    lane_progress = {
+        kind: {
+            "pipeline_status": state.get("pipeline_status"),
+            "blocker_class": state.get("blocker_class"),
+            "user_blocking": state.get("user_blocking"),
+            "progress_sha256": state.get("fixed_point", {}).get("progress_sha256"),
+            "fixed_point_status": state.get("fixed_point", {}).get("status"),
+        }
+        for kind, state in sorted(lanes.items())
+    }
+    progress_sha = sha256_value({
+        "transaction": transaction_hash,
+        "lane_progress": lane_progress,
+    })
+    if status == "PASS":
+        return [], {
+            "schema_version": "attachment-internal-fixed-point/1.0",
+            "status": "CLOSED",
+            "progress_sha256": progress_sha,
+            "lane_progress": lane_progress,
+            "remaining_task_count": 0,
+            "aggregate_terminal_defect_count": 0,
+        }
+    if status == "BLOCKED_INPUT":
+        tasks = [
+            {"lane": kind, **task}
+            for kind, state in lanes.items()
+            if state.get("user_blocking") is True
+            for task in state.get("tasks", [])
+        ]
+        return tasks, {
+            "schema_version": "attachment-internal-fixed-point/1.0",
+            "status": "USER_BOUNDARY",
+            "progress_sha256": progress_sha,
+            "lane_progress": lane_progress,
+            "remaining_task_count": len(tasks),
+            "aggregate_terminal_defect_count": 0,
+        }
+
+    internal_tasks = [
+        {"lane": kind, **task}
+        for kind, state in lanes.items()
+        if state.get("user_blocking") is False
+        for task in state.get("tasks", [])
+    ]
+    if status != "BLOCKED_INTERNAL":
+        return internal_tasks, {
+            "schema_version": "attachment-internal-fixed-point/1.0",
+            "status": "OPEN",
+            "progress_sha256": progress_sha,
+            "lane_progress": lane_progress,
+            "remaining_task_count": len(internal_tasks),
+            "aggregate_terminal_defect_count": 0,
+        }
+
+    underlying = [
+        {
+            "lane": task.get("lane"),
+            "task_id": task.get("task_id"),
+            "task_kind": task.get("task_kind"),
+            "terminal_reasons": task.get("terminal_reasons", []),
+        }
+        for task in internal_tasks
+    ]
+    task_input_sha = sha256_value({
+        "transaction": transaction_hash,
+        "underlying": underlying,
+        "lane_progress": lane_progress,
+    })
+    aggregate = {
+        "lane": "attachment",
+        "task_kind": "internal_fixed_point_defect",
+        "task_id": f"attachment-task-{task_input_sha[:24]}",
+        "user_blocking": False,
+        "underlying_lane_defects": underlying,
+        "remedy": {
+            "remedy_id": "repair_earliest_lane_or_response_boundary",
+            "deterministic_steps": [
+                "Inspect each hash-bound lane state named by this aggregate defect.",
+                "Repair the earliest controller or model-host boundary that exhausted or regressed.",
+                "Do not alter source evidence, schemas or validators to clear the defect.",
+                "Resume the same attachment transaction and require unchanged checkpoints to be reused."
+            ],
+            "resume_protocol": {
+                "controller": "scripts/run_attachment_evidence_pipeline.py",
+                "same_transaction_required": True,
+                "reuse_valid_checkpoints": True,
+            },
+        },
+        "attempt_budget": {
+            "attempts_used": 0,
+            "attempt_limit": 1,
+            "attempts_remaining": 1,
+        },
+        "progress_measure": {
+            "progress_sha256": progress_sha,
+            "task_input_sha256": task_input_sha,
+            "lane_count": len(lanes),
+            "underlying_defect_count": len(underlying),
+        },
+        "model_host_response_boundary": {
+            "producer_kind": "controller_maintainer",
+            "expected_response_files": [],
+            "source_and_validator_mutation_forbidden": True,
+            "python_may_not_author_visual_or_semantic_response": True,
+        },
+    }
+    return [aggregate], {
+        "schema_version": "attachment-internal-fixed-point/1.0",
+        "status": "TERMINAL_DEFECT",
+        "progress_sha256": progress_sha,
+        "lane_progress": lane_progress,
+        "remaining_task_count": 1,
+        "aggregate_terminal_defect_count": 1,
+    }
+
+
 def write_state(
     target: Path, *, spec: dict[str, Any], spec_hash: str, runtime_hash: str,
     status: str, blocker: str | None, user_blocking: bool,
     lanes: dict[str, dict[str, Any]], checkpoints: list[dict[str, Any]],
     artifacts: dict[str, str], tasks: list[dict[str, Any]], summary: dict[str, Any],
 ) -> None:
-    if blocker not in {None, *BLOCKER_CLASSES} or user_blocking != (blocker in USER_BLOCKERS):
-        raise ValueError("Attachment evidence blocker ownership is inconsistent")
+    assert_state("attachment", status, blocker, user_blocking)
+    transaction_hash = sha256_value({
+        "spec": spec_hash,
+        "runtime": runtime_hash,
+        "lanes": {
+            kind: state.get("cache_key") or state.get("source_sha256") or state.get("request_sha256")
+            for kind, state in sorted(lanes.items())
+        },
+    })
+    prior: dict[str, Any] = {}
+    if target.is_file():
+        try:
+            prior = read_json(target, "prior attachment evidence run state")
+        except ValueError:
+            prior = {}
+    assert_transition(
+        "attachment",
+        prior.get("pipeline_status"),
+        status,
+        reset=prior.get("workflow_transaction_sha256") != transaction_hash,
+    )
+    projected_tasks, fixed_point = task_frontier(
+        lanes,
+        status=status,
+        transaction_hash=transaction_hash,
+    )
+    # The caller passes lane tasks for compatibility, but typed ownership and
+    # aggregation are authoritative here. This prevents an internal lane packet
+    # from appearing beside a genuine user-owned evidence request.
+    tasks = projected_tasks
     value = {
         "schema_version": "attachment-evidence-run-state/1.0",
         "run_id": spec["run_id"],
@@ -223,6 +495,7 @@ def write_state(
         "blocker_class": blocker,
         "controller_spec_sha256": spec_hash,
         "runtime_closure_sha256": runtime_hash,
+        "workflow_transaction_sha256": transaction_hash,
         "lane_states": lanes,
         "checkpoints": checkpoints,
         "artifacts": artifacts,
@@ -232,6 +505,7 @@ def write_state(
             if Path(path).is_file()
         },
         "tasks": tasks,
+        "fixed_point": fixed_point,
         "summary": summary,
     }
     atomic_json(target, value)
@@ -262,14 +536,14 @@ def main() -> int:
             "Attachment evidence controller spec lacks run_id, attachment_ingress_path "
             "or case_source_declarations_path"
         )
-    if not any(spec.get(lane) for lane in ("broker", "dcs")):
+    if not any(spec.get(lane) for lane in ("filings", "broker", "dcs")):
         raise ValueError("Attachment evidence controller spec declares no evidence lane")
     spec_hash = sha256_file(spec_path)
     runtime_hash = runtime_closure()
     lanes: dict[str, dict[str, Any]] = {}
     state_paths: dict[str, Path] = {}
     checkpoints: list[dict[str, Any]] = []
-    for kind in ("broker", "dcs"):
+    for kind in ("filings", "broker", "dcs"):
         if not spec.get(kind):
             continue
         lanes[kind] = run_lane(kind, spec[kind], spec_path.parent, output_root)
@@ -300,6 +574,27 @@ def main() -> int:
             raise FileNotFoundError("The internal attachment-ingress template is absent")
         resolved_ingress = read_json(base_ingress_path, "attachment-ingress template")
         resolved_ingress.update(ingress_lane_declarations(lanes, state_paths))
+        filings_artifacts: dict[str, str] = {}
+        if "filings" in lanes:
+            resolved_ingress, filings_artifacts = apply_filings_lane(
+                resolved_ingress=resolved_ingress,
+                ingress_base=base_ingress_path.parent,
+                filings_state=lanes["filings"],
+                output_root=output_root,
+            )
+        else:
+            base_evidence_path = resolve(
+                base_ingress_path.parent,
+                resolved_ingress.get("evidence_run_path"),
+            )
+            base_evidence = read_json(base_evidence_path, "base evidence-run template") if base_evidence_path else {}
+            if base_evidence.get("mode") == "first_run" and any(
+                descriptor.get("adapter", {}).get("domain") == "document_extraction"
+                for descriptor in resolved_ingress.get("attachments", [])
+            ):
+                raise ValueError(
+                    "First-run raw filing attachments require the controller-owned filings lane"
+                )
         resolved_path = output_root / "resolved-attachment-ingress.json"
         atomic_json(resolved_path, resolved_ingress)
         declarations_path = resolve(
@@ -321,6 +616,7 @@ def main() -> int:
             "attachment_manifest": str(compiled_root / "attachment-manifest.json"),
             "evidence_run": str(compiled_root / "evidence-run.json"),
             "validation": str(compiled_root / "validation.json"),
+            **filings_artifacts,
         }
         checkpoints.append({
             "stage": "case_source_proposal",

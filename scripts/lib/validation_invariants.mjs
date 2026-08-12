@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { validateInstrumentPeriodStateArtifact } from "./instrument_period_state.mjs";
+import { validateLayeredGraphConstitution } from "./layered_graph_constitution.mjs";
 
 const APPROVED_MAPPING_METHODS = new Set([
   "exact",
@@ -360,6 +361,31 @@ export function validateSemanticArtifacts(manifest, crosswalkRows) {
   const edges = manifest?.edges ?? [];
   const sources = manifest?.source_inventory ?? [];
   const instrumentPeriodState = manifest?.instrument_period_state ?? null;
+  const fullSemanticManifest = Boolean(
+    manifest?.case_sha256 && manifest?.statement_topology,
+  );
+  if (fullSemanticManifest && !manifest?.layered_graph_constitution) {
+    errors.push({
+      id: "manifest.layered_graph_constitution_missing",
+      message: "The semantic manifest requires the canonical layered graph closure proof.",
+    });
+  } else if (manifest?.layered_graph_constitution) {
+    for (const message of validateLayeredGraphConstitution(
+      manifest.layered_graph_constitution,
+    )) {
+      errors.push({
+        id: "manifest.layered_graph_constitution_invalid",
+        message,
+      });
+    }
+    for (const violation of manifest.layered_graph_constitution.violations ?? []) {
+      errors.push({
+        id: `manifest.layered_graph_constitution.${violation.code}`,
+        message: violation.message,
+        context: violation,
+      });
+    }
+  }
   if (Number(manifest?.contract_version) === 2 && !instrumentPeriodState) {
     errors.push({
       id: "manifest.instrument_period_state_missing",

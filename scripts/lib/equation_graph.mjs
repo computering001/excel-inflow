@@ -269,6 +269,31 @@ export function validateEquationGraph(
     }
   }
 
+  const circularityControlNodes = graph.nodes.filter(
+    (node) => node.role === "circularity_control" && node.kind === "control",
+  );
+  if (circularityControlNodes.length !== 1) {
+    errors.push("equation graph must contain exactly one circularity control node.");
+  } else {
+    const controlNodeId = circularityControlNodes[0].id;
+    for (const node of graph.nodes.filter(
+      (item) => item.circularity_behavior === "zero_when_off",
+    )) {
+      const gates = graph.edges.filter(
+        (edge) =>
+          edge.type === "control_gate" &&
+          edge.from === controlNodeId &&
+          edge.to === node.id &&
+          edge.activation === "always",
+      );
+      if (gates.length !== 1) {
+        errors.push(
+          `zero_when_off node ${node.id} must have exactly one always-active circularity control gate.`,
+        );
+      }
+    }
+  }
+
   for (const declaration of contract.required_edges) {
     const edge = edgesById.get(declaration.id);
     if (!edge) {

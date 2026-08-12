@@ -194,6 +194,10 @@ await test("question path stops once and never treats action-required as success
   const runDir = path.join(out, "question-run");
   const first = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
   assert(first.status === "ACTION_REQUIRED" && first.question_count === 1, JSON.stringify(first));
+  assert(
+    first.blocker_class === "USER_DECISION" && first.user_blocking === true,
+    "action-required result lacks typed user-decision ownership",
+  );
   const second = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
   assert(second.status === "ACTION_REQUIRED", JSON.stringify(second));
   assert(!second.reused_stages.includes("decisions"), "action-required decision stage was reused as success");
@@ -226,6 +230,10 @@ await test("invalid evidence blocks before reconciliation", async () => {
   await fs.writeFile(invalid, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   const result = await flow(invalid, path.join(out, "invalid-run"), [], { allowFailure: true });
   assert(result.status === "BLOCKED" && result.stage === "inputs", JSON.stringify(result));
+  assert(
+    result.blocker_class === "INTERNAL_WORK" && result.user_blocking === false,
+    "controller-produced invalid evidence leaked as a user re-upload request",
+  );
 });
 
 await test("a case edited while the run waited blocks the resume by name", async () => {
@@ -267,6 +275,10 @@ await test("a case edited while the run waited blocks the resume by name", async
   assert(
     blocked.status === "BLOCKED" && /run_case_mutated_during_pause/.test(String(blocked.message)),
     `a substituted case resumed instead of blocking: ${JSON.stringify(blocked)}`,
+  );
+  assert(
+    blocked.blocker_class === "INTERNAL_WORK" && blocked.user_blocking === false,
+    "run mutation leaked as a user evidence blocker",
   );
 });
 

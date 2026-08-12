@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
 
+import {
+  CONVERGENCE_CONTRACT,
+  EQUATION_GRAPH,
+  canonicalJsonSha256,
+} from "./equation_graph.mjs";
+import { ECONOMIC_SOLVE_POLICY } from "./economic_solve_policy.mjs";
+
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") {
@@ -20,6 +27,10 @@ function sha256(value) {
 
 function unique(values) {
   return [...new Set((values ?? []).filter(Boolean))];
+}
+
+function portableCompare(left, right) {
+  return Buffer.compare(Buffer.from(String(left)), Buffer.from(String(right)));
 }
 
 function conceptId(manifest, node) {
@@ -729,6 +740,211 @@ export function workbookSemanticProofContract(
     },
   );
 
+  // Bind the semantic dependency graph to its physical forecast projection.
+  // This contract is compiled from the sealed IR, before the workbook exists;
+  // the standard-library oracle later reconstructs the formula graph from raw
+  // OOXML and proves both directions: every required dependency is reachable,
+  // and every direct statement-to-statement formula edge is authorised by the
+  // semantic graph's transitive closure.
+  const graphNodes = modelIr.planes.statement
+    .filter((node) => Number.isInteger(physicalRow(node.display_id)))
+    .map((node) => ({
+      display_id: node.display_id,
+      semantic_role: node.semantic_role ?? null,
+      section: node.section,
+      label: node.label,
+      row: physicalRow(node.display_id),
+    }))
+    .sort((left, right) => portableCompare(left.display_id, right.display_id));
+  const graphNodeIds = new Set(graphNodes.map((node) => node.display_id));
+  const dependencyPairs = new Map();
+  for (const edge of modelIr.planes.calculation.edges) {
+    let consumerNodeId;
+    let dependencyNodeId;
+    if (edge.edge_type === "depends_on") {
+      consumerNodeId = edge.from;
+      dependencyNodeId = edge.to;
+    } else if (edge.edge_type === "contributes_to") {
+      // The graph states component -> aggregate. The physical formula points
+      // the other way: the aggregate consumes the component.
+      consumerNodeId = edge.to;
+      dependencyNodeId = edge.from;
+    } else {
+      continue;
+    }
+    if (
+      !consumerNodeId.startsWith("statement.") ||
+      !dependencyNodeId.startsWith("statement.")
+    ) continue;
+    const consumer = consumerNodeId.slice("statement.".length);
+    const dependency = dependencyNodeId.slice("statement.".length);
+    if (!graphNodeIds.has(consumer) || !graphNodeIds.has(dependency)) continue;
+    dependencyPairs.set(`${consumer}\u0000${dependency}`, {
+      consumer_display_id: consumer,
+      dependency_display_id: dependency,
+    });
+  }
+  const authorisedDependencyEdges = [...dependencyPairs.values()].sort(
+    (left, right) =>
+      portableCompare(left.consumer_display_id, right.consumer_display_id) ||
+      portableCompare(left.dependency_display_id, right.dependency_display_id),
+  );
+  const authorityByDisplayPeriod = new Map(
+    modelIr.planes.authority.map((item) => [
+      `${item.display_id}\u0000${item.forecast_index}`,
+      item,
+    ]),
+  );
+  const graphNodeById = new Map(graphNodes.map((node) => [node.display_id, node]));
+  const requiredFormulaPaths = [];
+  const forecastColumns = ["J", "K", "L"];
+  const priorColumns = ["I", "J", "K"];
+  for (const edge of authorisedDependencyEdges) {
+    const consumer = graphNodeById.get(edge.consumer_display_id);
+    const dependency = graphNodeById.get(edge.dependency_display_id);
+    for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+      const authority = authorityByDisplayPeriod.get(
+        `${edge.consumer_display_id}\u0000${forecastIndex}`,
+      );
+      if (authority?.producer_type !== "Derived") continue;
+      const selfRollForward = edge.consumer_display_id === edge.dependency_display_id;
+      requiredFormulaPaths.push({
+        consumer_display_id: edge.consumer_display_id,
+        dependency_display_id: edge.dependency_display_id,
+        consumer_cell: `${forecastColumns[forecastIndex]}${consumer.row}`,
+        dependency_cell: `${selfRollForward ? priorColumns[forecastIndex] : forecastColumns[forecastIndex]}${dependency.row}`,
+        period_relation: selfRollForward ? "prior_period" : "same_period",
+      });
+    }
+  }
+  const formulaGraphCore = {
+    statement_sheet: "Operating Model",
+    model_ir_sha256: sha256(modelIr),
+    graph_nodes: graphNodes,
+    authorised_dependency_edges: authorisedDependencyEdges,
+    required_formula_paths: requiredFormulaPaths,
+  };
+  const physicalFormulaGraph = {
+    schema_version: 1,
+    ...formulaGraphCore,
+    closure_sha256: sha256(formulaGraphCore),
+  };
+
+  // The fixed-point SCC has a deliberately separate physical projection from
+  // the general statement graph.  The canonical graph models finance expense
+  // and finance income as distinct consumers because that is what the emitted
+  // workbook actually contains; the independent OOXML oracle will derive the
+  // formula-cell SCC and require these exact semantic nodes in every forecast
+  // period.  No cached value or solver assertion is used here.
+  const statementRowFor = (...identifiers) => {
+    const node = modelIr.planes.statement.find(
+      (item) =>
+        identifiers.includes(item.semantic_role) ||
+        identifiers.includes(item.display_id),
+    );
+    return node ? physicalRow(node.display_id) : null;
+  };
+  const fixedPointRowByNode = {
+    "statement.cash_flow_start": statementRowFor("cash_flow_net_income"),
+    "cash.cfo": statementRowFor("cash_from_operations"),
+    "rcf.draw": rowPlan.waterfall_rows?.rcf_draw_waterfall,
+    "rcf.repayment": rowPlan.waterfall_rows?.rcf_repayment_waterfall,
+    "rcf.ending_balance": rowPlan.waterfall_rows?.ending_rcf,
+    "cash.ending_balance": statementRowFor("ending_cash"),
+    "interest.rcf": rowPlan.interest_summary_rows?.rcf_interest,
+    "interest.commitment_fee":
+      rowPlan.interest_summary_rows?.rcf_commitment_fee,
+    "interest.cash_income":
+      rowPlan.interest_summary_rows?.interest_income_schedule,
+    "interest.gross_expense":
+      rowPlan.interest_summary_rows?.gross_interest_expense,
+    "interest.income":
+      rowPlan.interest_summary_rows?.interest_income_schedule,
+    "statement.finance_expense": statementRowFor("interest_expense"),
+    "statement.finance_income": statementRowFor("interest_income"),
+  };
+  const expectedFixedPointNodes =
+    CONVERGENCE_CONTRACT.scc_contract.active_by_circularity["1"][0].nodes;
+  const missingFixedPointRows = expectedFixedPointNodes.filter(
+    (nodeId) => !Number.isInteger(fixedPointRowByNode[nodeId]),
+  );
+  if (missingFixedPointRows.length > 0) {
+    throw new Error(
+      `Cannot bind canonical fixed-point nodes to workbook rows: ${missingFixedPointRows.join(", ")}`,
+    );
+  }
+  const fixedPointFormulaGraph = {
+    schema_version: 1,
+    statement_sheet: "Operating Model",
+    forecast_columns: ["J", "K", "L"],
+    circularity_control_cell: `C${rowPlan.controls?.circularity}`,
+    equation_graph_sha256: canonicalJsonSha256(EQUATION_GRAPH),
+    convergence_contract_sha256: canonicalJsonSha256(CONVERGENCE_CONTRACT),
+    economic_solve_policy_sha256: canonicalJsonSha256(ECONOMIC_SOLVE_POLICY),
+    expected_active_scc_nodes: [...expectedFixedPointNodes].sort(portableCompare),
+    node_bindings: expectedFixedPointNodes
+      .map((nodeId) => ({ node_id: nodeId, row: fixedPointRowByNode[nodeId] }))
+      .sort((left, right) => portableCompare(left.node_id, right.node_id)),
+    zero_when_off_bindings: [
+      {
+        role: "instrument_cash_interest",
+        rows: (rowPlan.instruments ?? [])
+          .map((item) => item.interest_row)
+          .filter(Number.isInteger),
+      },
+      {
+        role: "instrument_pik_interest",
+        rows: (rowPlan.instruments ?? [])
+          .map((item) => item.pik_interest_row)
+          .filter(Number.isInteger),
+      },
+      {
+        role: "instrument_pik_principal_accretion",
+        rows: (rowPlan.instruments ?? [])
+          .map((item) => item.pik_row)
+          .filter(Number.isInteger),
+      },
+      { role: "rcf_interest", rows: [rowPlan.interest_summary_rows?.rcf_interest] },
+      { role: "rcf_commitment_fee", rows: [rowPlan.interest_summary_rows?.rcf_commitment_fee] },
+      { role: "lease_interest", rows: [rowPlan.interest_summary_rows?.lease_interest] },
+      { role: "acquisition_interest", rows: [rowPlan.interest_summary_rows?.acquisition_interest] },
+      { role: "other_interest", rows: [rowPlan.interest_summary_rows?.other_unallocated_interest] },
+      { role: "noncash_interest", rows: [rowPlan.interest_summary_rows?.non_cash_interest] },
+      { role: "cash_interest_income", rows: [rowPlan.interest_summary_rows?.interest_income_schedule] },
+      { role: "gross_interest_expense", gate_mode: "closure", rows: [rowPlan.interest_summary_rows?.gross_interest_expense] },
+      { role: "interest_income", rows: [rowPlan.interest_summary_rows?.interest_income_schedule] },
+      { role: "net_interest_expense", gate_mode: "closure", rows: [rowPlan.interest_summary_rows?.net_interest_expense] },
+      { role: "cash_interest_paid", gate_mode: "closure", rows: [rowPlan.interest_summary_rows?.cash_interest_paid] },
+      { role: "cash_interest_received", gate_mode: "closure", rows: [rowPlan.interest_summary_rows?.cash_interest_received] },
+      { role: "noncash_interest_addback", gate_mode: "closure", rows: [statementRowFor("non_cash_interest_addback")] },
+      { role: "net_finance_addback", gate_mode: "closure", rows: [statementRowFor("net_finance_addback", "finance_costs_net_addback")] },
+      { role: "income_statement_finance_expense", gate_mode: "closure", rows: [statementRowFor("interest_expense")] },
+      { role: "income_statement_finance_income", gate_mode: "closure", rows: [statementRowFor("interest_income")] },
+    ].map((item) => ({
+      ...item,
+      gate_mode: item.gate_mode ?? "direct",
+      rows: [...new Set(item.rows.filter(Number.isInteger))].sort((a, b) => a - b),
+    })),
+    live_when_off_bindings: [
+      { role: "debt_issuance", rows: [statementRowFor("debt_issuance"), rowPlan.waterfall_rows?.non_rcf_debt_proceeds] },
+      { role: "scheduled_amortisation", rows: (rowPlan.instruments ?? []).map((item) => item.amortisation_row) },
+      { role: "maturity_repayment", rows: (rowPlan.instruments ?? []).map((item) => item.repayment_row) },
+      { role: "lease_principal", rows: [statementRowFor("lease_principal"), rowPlan.waterfall_rows?.lease_principal_waterfall] },
+      { role: "mandatory_repayment", rows: [rowPlan.debt_summary_rows?.mandatory_debt_repayments] },
+      { role: "minimum_cash", rows: [rowPlan.waterfall_rows?.minimum_cash] },
+      { role: "rcf_capacity", rows: [] },
+      { role: "rcf_draw", rows: [rowPlan.waterfall_rows?.rcf_draw_waterfall] },
+      { role: "rcf_repayment", rows: [rowPlan.waterfall_rows?.rcf_repayment_waterfall] },
+      { role: "ending_rcf", rows: [rowPlan.waterfall_rows?.ending_rcf] },
+      { role: "ending_cash", rows: [statementRowFor("ending_cash")] },
+      { role: "liquidity_shortfall", rows: [rowPlan.waterfall_rows?.liquidity_shortfall] },
+    ].map((item) => ({
+      ...item,
+      rows: [...new Set(item.rows.filter(Number.isInteger))].sort((a, b) => a - b),
+    })),
+  };
+  fixedPointFormulaGraph.closure_sha256 = sha256(fixedPointFormulaGraph);
+
   return {
     schema_version: 1,
     kind: "workbook_semantic_proof_contract",
@@ -744,6 +960,8 @@ export function workbookSemanticProofContract(
     semantic_scope_captures: semanticScopeCaptures,
     hierarchies,
     schedule_links: scheduleLinks,
+    physical_formula_graph: physicalFormulaGraph,
+    fixed_point_formula_graph: fixedPointFormulaGraph,
     broker_evidence: brokerEvidence,
     max_formula_characters: 8192,
   };

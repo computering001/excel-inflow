@@ -468,8 +468,28 @@ This standard-library-only verifier reads raw OOXML rather than compiler or
 renderer objects. It proves unique answer ownership, independent-writer limits,
 forecast capture membership, parent-before-child hierarchy and statement-to-
 schedule authority direction against the hash-bound proof contract emitted from
-the sealed model IR. A physical mutation to any of those relationships blocks
-publication even when formula caches and headline values still agree.
+the sealed model IR. It also reconstructs the physical forecast formula graph:
+every Derived semantic dependency must be reachable at the declared period,
+and every direct statement-to-statement formula reference must remain inside
+the semantic graph's transitive closure. The graph contract has its own
+canonical closure hash and must contain non-vacuous path and closure coverage.
+A physical mutation to any of those relationships blocks publication even when
+formula caches and headline values still agree.
+
+`verify/validate_dynamic_model.py` separately ports the five-layer graph
+constitution into Python. It recomputes every layer and closure hash; rebuilds
+evidence, statement, forecast-writer, economic-equation and row-plan
+inventories from the semantic manifest, canonical equation-graph asset and row
+map; and closes shared economic roles through their unique statement and
+physical projections. It does not accept the Node compiler's PASS label as
+proof. The authoring-only
+`verify/run_layered_graph_python_tests.py` reseals deliberately corrupted
+forecast-writer, statement-edge, economic-role and row-projection layers and
+proves that the independent source reconstruction still rejects them. The
+authoring-only
+`verify/run_workbook_semantic_oracle_mutations.py` proves sensitivity to a
+corrupted closure, a missing required formula path and an unauthorised physical
+edge before release work proceeds.
 
 The architecture repair gate additionally proves: exact 3H/3F rejection before
 and after normalisation; direct forecast authority cannot be overwritten by
@@ -698,6 +718,18 @@ The convergence set is **declared before solving**, not discovered afterwards.
 Assert that the set the graph computes matches the set the solver declared, and
 treat non-convergence as a gate failure with `converged`, `iterations` and
 `residual` all reported. An undeclared cycle is a defect even when it converges.
+
+The statement member of that set is the issuer's declared **cash-flow start**,
+not a hard-coded net-income row. A net-income-led reconciliation and a
+profit-before-tax-led reconciliation therefore share one economic contract
+without pretending their physical graphs are identical. The sealed workbook
+proof contract binds the canonical equation-graph, convergence-contract and
+solve-policy hashes to the actual forecast rows. The independent OOXML oracle
+must derive one and only one formula SCC in each forecast column, and its bound
+semantic nodes must equal the solver vector exactly. It must also prove direct
+kill-switch gates on interest leaves, gated closure on interest aggregates and
+the absence of a direct circularity kill gate on debt, maturity, RCF and cash
+mechanics.
 
 Confirm the circularity breaker produces stable, coherent results in both
 states, and that off/on/off/on restores values identically. Nothing may latch.

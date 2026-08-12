@@ -335,6 +335,17 @@ must be exhausted through native lanes, 300-DPI-or-better table crops, two
 independent structured reads and one bounded cell adjudication before any cell
 is quarantined.
 
+Treat the broker state as a sealed internal fixed-point frontier. Every task
+names its deterministic remedy, response contract, exact output filename,
+attempt budget and monotonic progress measure. The model host authors the
+visual or semantic response; Python only sequences and verifies it. Resume the
+same controller after each response and reuse every valid checkpoint. If the
+frontier regresses, remains byte-identical beyond the finite retry limit or
+exhausts a task budget, emit one aggregate `internal_fixed_point_defect` with
+`user_blocking=false`. Never present the underlying `NEEDS_VISION`,
+`NEEDS_RESOLUTION`, `NEEDS_CROSSWALK` or `NEEDS_CROSSWALK_REVIEW` packet as an
+end-user question.
+
 Do not force the complete broker-page inventory into the workbook carrier.
 `broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
 deterministically projects only tables dispositioned `analytical_table` into
@@ -529,6 +540,7 @@ node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>
 node scripts/run_forecast_observation_tests.mjs
 node scripts/run_forecast_behavior_tests.mjs
 node scripts/run_equation_graph_tests.mjs
+node scripts/run_fixed_point_constitution_tests.mjs --manifest <fixed-point-cases.json>
 node scripts/test_release_convergence_seam.mjs
 node scripts/run_instrument_period_state_tests.mjs
 node scripts/validate_source_parity.mjs <workbook.xlsx> <row-map.json> <ledger.json> [--json out.json]
@@ -662,6 +674,7 @@ The commands below are subordinate checkpoints or diagnostics. The production
 controller invokes them; an end user does not sequence them manually:
 
 ```bash
+node scripts/run_filings_pipeline.mjs <filings-extraction-request.json> --out <run-folder>/filings [--responses <response.json>]
 node scripts/compile_declared_evidence_run.mjs <attachment-ingress.json> --declarations <minimal-declarations.json> --out <folder>
 node scripts/propose_case_source.mjs <minimal-declarations.json> <case-evidence.json> --out <case-source.json>
 node scripts/verify/recalc_second_opinion.mjs --before <emitted.xlsx> --after <raw-after.xlsx> --before-map <before.json> --after-map <raw-after.json> --out <receipt.json> [--soffice-identity <sha256>]

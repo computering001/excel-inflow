@@ -32,9 +32,15 @@
     "broker-surface-census.schema.json",
     "broker-run-state.schema.json",
     "broker-runtime-members.json",
+    "broker-model-host-response-boundary-v1.json",
     "attachment-evidence-controller.schema.json",
     "attachment-evidence-run-state.schema.json",
     "attachment-evidence-runtime-members.json",
+    "filings-extraction-request-v1.schema.json",
+    "filings-extraction-response-v1.schema.json",
+    "filings-run-state.schema.json",
+    "filings-runtime-members.json",
+    "workflow-state-contract-v1.json",
     "authority-projection-overrides.v3.json",
     "authority-projection-overrides.v4.json",
     "dcs-export.schema.json",
@@ -92,9 +98,15 @@
     "broker-surface-census.schema.json": "Whole-surface broker census contract retained for independent validation.",
     "broker-run-state.schema.json": "Hash-bound resumable broker-controller state. It distinguishes internal extraction work from the narrow source conditions that may legitimately block the user.",
     "broker-runtime-members.json": "Single source of truth for the broker controller's hash-bound runtime closure; read independently by the controller and attachment ingress.",
+    "broker-model-host-response-boundary-v1.json": "Closed model-host response seam for broker vision, targeted adjudication and semantic crosswalk tasks, including deterministic remedies and finite attempt budgets.",
     "attachment-evidence-controller.schema.json": "Strict input contract for the single raw-attachment evidence owner.",
     "attachment-evidence-run-state.schema.json": "Typed resumable state contract separating internal work from genuine user evidence blockers.",
     "attachment-evidence-runtime-members.json": "Hash-bound runtime closure for the broker/DCS/case-source evidence transaction.",
+    "filings-extraction-request-v1.schema.json": "Strict raw-filing extraction request contract consumed by the resumable filings controller.",
+    "filings-extraction-response-v1.schema.json": "Strict source-owned statement extraction response contract emitted from raw filing bytes.",
+    "filings-run-state.schema.json": "Typed, resumable filings-controller state that separates internal extraction work from genuine source defects.",
+    "filings-runtime-members.json": "Hash-bound runtime closure for the filings extraction and evidence-sealing lane.",
+    "workflow-state-contract-v1.json": "Canonical cross-language workflow-state and blocker-ownership contract shared by all resumable controllers.",
     "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
     "dcs-candidate-manifest-v1.schema.json": "Lossless DCS candidate-universe contract loaded through the attachment-ingress schema helper.",
     "dcs-crosswalk-v1.schema.json": "Cell-addressed DCS crosswalk contract loaded through the attachment-ingress schema helper.",
@@ -129,11 +141,13 @@
     "flow_cli.mjs",
     "orchestrate_release.mjs",
     "run_user_flow.mjs",
+    "run_filings_pipeline.mjs",
     "run_statement_classifier_tests.mjs",
     "run_forecast_observation_tests.mjs",
     "run_forecast_behavior_tests.mjs",
     "run_instrument_period_state_tests.mjs",
     "run_equation_graph_tests.mjs",
+    "run_fixed_point_constitution_tests.mjs",
     "debt-model-economics.mjs",
     "test_release_convergence_seam.mjs",
     "validate_cache_parity.mjs",
@@ -144,7 +158,7 @@
     "compile_case.mjs",
     "propose_case_source.mjs"
   ],
-  "_entry_point_note": "Twenty-one JavaScript entry points, none assumed discoverable from all the others. The declared-evidence and case-source entry points own the declarations-to-compiled-case boundary; the forecast, debt-state and convergence canaries remain independently runnable. run_user_flow.mjs is the resumable five-stage production shell; orchestrate_release.mjs is its portable fail-closed workbook controller. verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
+  "_entry_point_note": "Twenty-three JavaScript entry points, none assumed discoverable from all the others. The declared-evidence, filings and case-source entry points own the raw-evidence-to-compiled-case boundary; the forecast, debt-state, fixed-point and convergence canaries remain independently runnable. run_user_flow.mjs is the resumable five-stage production shell; orchestrate_release.mjs is its portable fail-closed workbook controller. verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
   "script_allowlist": [
     "build_dynamic_model.mjs",
     "compile_case.mjs",
@@ -178,6 +192,7 @@
     "lib/forecast_behavior.mjs",
     "lib/forecast_candidate_compiler.mjs",
     "lib/forecast_observation.mjs",
+    "lib/fixed_point_constitution.mjs",
     "lib/formula_dsl.mjs",
     "lib/historical_interest_authority.mjs",
     "lib/historical_normalisation.mjs",
@@ -187,6 +202,7 @@
     "lib/json_schema.mjs",
     "lib/lease_policy.mjs",
     "lib/live_delivery_attestation.mjs",
+    "lib/layered_graph_constitution.mjs",
     "lib/model_ir_v3.mjs",
     "lib/plan_builder.mjs",
     "lib/plan_values.mjs",
@@ -207,9 +223,12 @@
     "lib/statement_topology.mjs",
     "lib/user_flow_controller.mjs",
     "lib/validation_invariants.mjs",
+    "lib/workflow_state.mjs",
     "orchestrate_release.mjs",
     "propose_case_source.mjs",
+    "run_filings_pipeline.mjs",
     "run_equation_graph_tests.mjs",
+    "run_fixed_point_constitution_tests.mjs",
     "run_forecast_behavior_tests.mjs",
     "run_forecast_observation_tests.mjs",
     "run_instrument_period_state_tests.mjs",
@@ -248,6 +267,8 @@
     "run_broker_pipeline.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
+    "extract_filing_statements.py",
+    "propose_dcs_crosswalk.py",
     "extract_broker_evidence.py",
     "compile_broker_vision.py",
     "compile_broker_pack.py",
@@ -266,11 +287,13 @@
     "verify/workbook_semantic_oracle.py",
     "verify/verify_delivery.py"
   ],
-  "_python_entry_point_note": "Twenty Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; the broker and DCS controllers are resumable subordinate lanes, with their compilers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
+  "_python_entry_point_note": "Twenty-two Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
   "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The five broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
   "python_entry_point_notes": {
     "run_attachment_evidence_pipeline.py": "The sole raw-attachment evidence transaction owner; it sequences the broker and DCS controllers, case-source proposal and sealed ingress compilation.",
     "run_dcs_pipeline.py": "Invoked by run_attachment_evidence_pipeline.py as the resumable DCS checkpoint; independently runnable for diagnostics.",
+    "extract_filing_statements.py": "Invoked by run_filings_pipeline.mjs as the native raw-filing extraction checkpoint; independently runnable for diagnostics.",
+    "propose_dcs_crosswalk.py": "Invoked by run_dcs_pipeline.py to author a deterministic source-cell crosswalk after export basis is known; independently runnable for diagnostics.",
     "extract_broker_evidence.py": "Invoked by run_broker_pipeline.py as the raw evidence checkpoint; retained independently runnable for diagnostics, never as an alternate user route.",
     "compile_broker_surface_census.py": "Invoked by run_broker_pipeline.py as the independent coverage checkpoint; retained independently runnable for diagnostics.",
     "compile_broker_vision.py": "Invoked by run_broker_pipeline.py for two-read reconciliation and bounded cell adjudication; retained independently runnable for diagnostics.",
@@ -287,6 +310,16 @@
       "argv": ["--help"],
       "expect_exit": [0],
       "expect_output_contains": "usage: run_dcs_pipeline.py"
+    },
+    "extract_filing_statements.py": {
+      "argv": ["--help"],
+      "expect_exit": [0],
+      "expect_output_contains": "usage: extract_filing_statements.py"
+    },
+    "propose_dcs_crosswalk.py": {
+      "argv": ["--help"],
+      "expect_exit": [0],
+      "expect_output_contains": "usage: propose_dcs_crosswalk.py"
     },
     "run_broker_pipeline.py": {
       "argv": [
@@ -454,6 +487,9 @@
     "run_broker_pipeline.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
+    "extract_filing_statements.py",
+    "propose_dcs_crosswalk.py",
+    "workflow_state.py",
     "extract_broker_evidence.py",
     "compile_broker_vision.py",
     "compile_broker_pack.py",
@@ -517,6 +553,7 @@
       "required_at": "runtime",
       "used_by_packages": [
         "extract_broker_evidence.py",
+        "extract_filing_statements.py",
         "render"
       ],
       "vendoring": "forbidden",
@@ -585,6 +622,20 @@
   },
   "_python_vendoring_policy": "Every entry above is provision=native and vendoring=forbidden, and the compiler enforces both: it refuses any provision other than native, and refuses to ship a vendored_dependencies entry whose name collides with a Python third-party root. None of these packages is vendored. Vendoring a package the host already provides is how you ship a version conflict.",
   "python_package_dependency_policy": {
+    "extract_filing_statements.py": {
+      "may_import_third_party": [
+        "fitz"
+      ],
+      "reason": "The raw-filings extractor is a subordinate runtime module that uses native PyMuPDF only for readable PDF text geometry and emits deterministic source-owned statement facts for the sealed filings lane."
+    },
+    "propose_dcs_crosswalk.py": {
+      "may_import_third_party": [],
+      "reason": "The deterministic DCS crosswalk proposer is stdlib-only and maps sealed source cells under an explicit export-basis declaration before independent compilation and verification."
+    },
+    "workflow_state.py": {
+      "may_import_third_party": [],
+      "reason": "The Python workflow-state helper is stdlib-only and enforces the same typed transition and blocker-ownership contract as the JavaScript controller layer."
+    },
     "run_attachment_evidence_pipeline.py": {
       "may_import_third_party": [],
       "reason": "The top-level evidence controller is stdlib-only and sequences sealed subordinate lanes without sharing their extraction implementation."
@@ -702,6 +753,7 @@
     ],
     "minimum_version_reason": "verify/ declares 3.9+. The packages use `from __future__ import annotations` throughout, so PEP 585/604 spellings in annotations are strings and do not raise on 3.9.",
     "smoke_interpreter_candidates": [
+      "python3.12",
       "python3"
     ],
     "smoke_interpreter_requirement": "The chosen interpreter must satisfy every third-party package declared required_at=import, otherwise the smoke test cannot prove the package imports and the build fails rather than reporting a pass it did not earn. Candidates are tried in order and the rejection reason for each is recorded in the release manifest.",

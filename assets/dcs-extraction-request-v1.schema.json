@@ -8,6 +8,19 @@
     "schema_version": {"const": "dcs-extraction-request/1.0"},
     "source_path": {"type": "string", "minLength": 1},
     "run_id": {"type": "string", "minLength": 1},
-    "expected_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    "expected_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "adapter_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as_of", "entity_name", "reporting_currency", "units"],
+      "properties": {
+        "as_of": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "entity_name": {"type": "string", "minLength": 1},
+        "reporting_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "units": {"enum": ["units", "thousands", "millions"]},
+        "system": {"type": "string", "minLength": 1},
+        "date_basis": {"enum": ["last_fiscal_year_end", "as_at_export_date", "other"]}
+      }
+    }
   }
 }

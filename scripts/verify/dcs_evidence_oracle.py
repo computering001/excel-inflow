@@ -236,6 +236,12 @@ def compute(authority: dict[str, Any], cells: dict[str, dict[str, Any]], supplem
         if text in {"false", "no", "0"}:
             return False
         raise ValueError("invalid boolean")
+    if kind == "classified_constant":
+        if len(values) != 1:
+            raise ValueError("classified_constant needs one source evidence cell")
+        if values[0] is None or str(values[0]).strip() == "":
+            raise ValueError("classified_constant source evidence cell is blank")
+        return transform.get("value")
     if kind == "json":
         if len(values) != 1:
             raise ValueError("json needs one cell")
@@ -423,6 +429,43 @@ def main() -> int:
             continue
         if not same(result, item.get("output_value")):
             violation(failures, "DCS-ORACLE-VALUE", "authority %r outputs %r but source computes %r" % (key, item.get("output_value"), result))
+        if item.get("model_field") == "instrument_type" and item.get("transform", {}).get("kind") == "classified_constant":
+            source_text = " ".join(
+                str(cells[cell_id].get("display_value") or "")
+                for cell_id in item.get("source_cells") or []
+            ).lower()
+            normalized = re.sub(r"[^a-z0-9]+", " ", source_text).strip()
+            declared_type = item.get("output_value")
+            independent_matches = {
+                "rcf": bool("revolv" in normalized or re.search(r"\brcf\b", normalized)),
+                "commercial_paper": bool("commercial paper" in normalized or re.search(r"\bcp\b", normalized)),
+                "securitisation": "securiti" in normalized,
+                "floating_loan": bool("floating" in normalized or "loan" in normalized or "term facility" in normalized),
+                "fixed_bond": any(token in normalized for token in ("bond", "note", "debenture", "fixed")),
+                "other_debt": not any(
+                    (
+                        "revolv" in normalized,
+                        bool(re.search(r"\brcf\b", normalized)),
+                        "commercial paper" in normalized,
+                        bool(re.search(r"\bcp\b", normalized)),
+                        "securiti" in normalized,
+                        "floating" in normalized,
+                        "loan" in normalized,
+                        "term facility" in normalized,
+                        "bond" in normalized,
+                        "note" in normalized,
+                        "debenture" in normalized,
+                        "fixed" in normalized,
+                    )
+                ),
+            }
+            if not independent_matches.get(declared_type, False):
+                violation(
+                    failures,
+                    "DCS-ORACLE-INSTRUMENT-TYPE-SEMANTICS",
+                    "authority %r classifies source text %r as unsupported type %r" %
+                    (key, source_text, declared_type),
+                )
         if item.get("model_field") == "maturity":
             precision, output = item.get("precision"), item.get("output_value")
             exact_text = isinstance(output, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", output)

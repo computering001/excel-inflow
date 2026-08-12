@@ -101,10 +101,6 @@ function inferExactContiguousTotalDependencies(modelCase) {
         }
         if (refs.length >= 2 && closeSeries(running, filed)) {
           total.calculation = { operator: "sum", refs: [...refs] };
-          total.calculation_inference = {
-            policy: "exact_contiguous_historical_total_v1",
-            dependency_row_ids: [...refs],
-          };
           inferred.push({
             section,
             row_id: total.row_id,
@@ -211,6 +207,13 @@ function promoteExactReportedTotals(modelCase) {
       if (!calculated || !closeSeries(calculated, filed)) continue;
       row.reported_historical_values = filed;
       row.values = [null, null, null, ...row.values.slice(3)];
+      // The filed number remains preserved as reconciliation evidence, but
+      // after exact promotion the visible historical cells are formula-owned.
+      // Keeping `row_type: input` beside the newly certified calculation is a
+      // contradictory graph declaration and the dependency gate correctly
+      // rejects it.  Preserve genuine subtotal presentation; otherwise make
+      // the promoted row an ordinary calculation row.
+      if (row.row_type !== "subtotal") row.row_type = "calculation";
       row.historical_authority = "reported_total_reconciled";
       memo.set(row.row_id, calculated);
       promotions.push({

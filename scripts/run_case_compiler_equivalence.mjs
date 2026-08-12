@@ -634,6 +634,10 @@ const files = (await fs.readdir(casesDirectory))
   .sort();
 
 let totalDiffs = 0;
+let totalBlocks = 0;
+let failedSolveCount = 0;
+let hardPlanDiffCount = 0;
+let failedPlanCompileCount = 0;
 for (const name of files) {
   const certified = JSON.parse(await fs.readFile(path.join(casesDirectory, name), "utf8"));
   const { caseSource, evidence } = deriveCaseSourceAndEvidence(certified);
@@ -864,6 +868,7 @@ for (const name of files) {
   );
   totalDiffs += diffs.length;
   const blocks = report.findings.filter((f) => f.severity === "BLOCK");
+  totalBlocks += blocks.length;
   console.log(`\n=== ${name}: ${diffs.length} economic diffs (+${presentation.length} presentation, +${inert.length} inert-ft, +${justified.length} justified), ${blocks.length} compile blocks (${report.status})`);
   if (process.env.KEEL_DUMP_PRESENTATION) {
     for (const d of presentation.slice(0, 20)) console.log(`    pres· ${d.path}: ${d.expected} -> ${d.actual}`);
@@ -897,6 +902,7 @@ for (const name of files) {
       const solved = solveCase(compiled);
       console.log(`  SOLVE(compiled): OK (${solved.forecast?.length ?? 0} periods)`);
     } catch (error) {
+      failedSolveCount += 1;
       console.log(`  SOLVE(compiled): FAILED — ${error.message.slice(0, 160)}`);
     }
     try {
@@ -1003,8 +1009,10 @@ for (const name of files) {
           }
         }
       }
+      hardPlanDiffCount += hard;
       console.log(`  PLAN: ${hard === 0 ? "EQUAL" : `${hard} hard diffs`} (+${named} named capture-vs-legacy-default rows)`);
     } catch (error) {
+      failedPlanCompileCount += 1;
       console.log(`  PLAN: failed to compile (${error.message.slice(0, 140)})`);
     }
   }
@@ -1015,13 +1023,27 @@ for (const name of files) {
     for (const f of blocks) {
       console.log(`  · [${f.id}] ${f.message}`);
       if (f.context && process.env.KEEL_DUMP_CONTEXT) {
-        console.log(`      ${JSON.stringify(f.context).slice(0, 1500)}`);
+        const diagnosticContext = Array.isArray(f.context?.errors)
+          ? { errors: f.context.errors }
+          : f.context;
+        console.log(`      ${JSON.stringify(diagnosticContext).slice(0, 1500)}`);
       }
     }
   }
 }
 console.log(`\nTOTAL path diffs across cohort: ${totalDiffs}`);
-process.exit(0);
+console.log(`TOTAL compile blocks across cohort: ${totalBlocks}`);
+console.log(`TOTAL failed compiled solves: ${failedSolveCount}`);
+console.log(`TOTAL hard plan diffs: ${hardPlanDiffCount}`);
+console.log(`TOTAL failed plan compiles: ${failedPlanCompileCount}`);
+if (
+  totalBlocks > 0 ||
+  failedSolveCount > 0 ||
+  hardPlanDiffCount > 0 ||
+  failedPlanCompileCount > 0
+) {
+  process.exitCode = 1;
+}
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {

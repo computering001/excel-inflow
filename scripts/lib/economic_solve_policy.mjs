@@ -26,7 +26,7 @@ export function validateEconomicSolvePolicy(policy) {
     if (JSON.stringify(control.native_sequence) !== expectedSequence) errors.push(`controls.${controlId}.native_sequence must be exactly [1,0,1,0,1].`);
   }
   if (policy.workbook_calculation.iterate_count !== policy.solver.max_iterations) errors.push("workbook_calculation.iterate_count must equal solver.max_iterations.");
-  if (policy.workbook_calculation.iterate_delta > policy.native_tolerances.currency) errors.push("workbook_calculation.iterate_delta must not exceed native_tolerances.currency.");
+  if (policy.workbook_calculation.iterate_delta !== policy.native_tolerances.currency) errors.push("workbook_calculation.iterate_delta must exactly equal native_tolerances.currency.");
   if (policy.native_tolerances.relative !== policy.solver.relative_tolerance) errors.push("native_tolerances.relative must equal solver.relative_tolerance.");
   for (const role of duplicates(policy.circularity_roles.zero_when_off)) errors.push(`circularity_roles.zero_when_off duplicates ${role}.`);
   for (const role of duplicates(policy.circularity_roles.live_when_off)) errors.push(`circularity_roles.live_when_off duplicates ${role}.`);

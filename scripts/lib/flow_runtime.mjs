@@ -1,4 +1,5 @@
 import { canonicalise, hashValue } from "./run_store.mjs";
+import { assertWorkflowState } from "./workflow_state.mjs";
 
 export const FLOW_SCHEMA_VERSION = "debt-user-flow/1.0";
 export const FLOW_CONTROLLER_VERSION = "five-stage/2.2";
@@ -134,6 +135,7 @@ export function createStageReceipt({
   if (!RECEIPT_STATUSES.includes(status)) {
     throw new Error(`Unsupported stage receipt status: ${status}`);
   }
+  assertWorkflowState("stage_receipt", { status, stage: stage.id });
   assertHashMap("input_hashes", inputHashes);
   assertHashMap("output_hashes", outputHashes);
   if (previousReceiptHash !== null && !SHA256.test(previousReceiptHash)) {
@@ -195,6 +197,15 @@ export function verifyStageReceipt(
   }
   if (!RECEIPT_STATUSES.includes(receipt.status)) {
     errors.push("receipt status is invalid");
+  } else {
+    try {
+      assertWorkflowState("stage_receipt", {
+        status: receipt.status,
+        stage: receipt.stage_id,
+      });
+    } catch (error) {
+      errors.push(error.message);
+    }
   }
   try {
     assertHashMap("input_hashes", receipt.input_hashes);

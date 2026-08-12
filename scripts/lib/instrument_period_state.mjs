@@ -353,10 +353,17 @@ function pricingState(instrument, pik) {
   return "not_interest_bearing";
 }
 
-function repaymentState(instrument, scheduled, maturity, maturityDue = false, balancingRcf = false) {
+function repaymentState(instrument, scheduled, maturity, balancingRcf = false) {
   if (balancingRcf) return "discretionary_rcf";
-  if (scheduled > EPSILON && (maturity > EPSILON || maturityDue)) return "scheduled_and_maturity";
-  if (maturity > EPSILON || maturityDue) return "maturity";
+  // A contractual date is evidence of *when* a balance repays, not evidence
+  // that a repayment exists.  Zero-balance legacy instruments often retain a
+  // maturity date in the source export; labelling them "maturity" would put a
+  // zero cash flow inside the mandatory-repayment population and contradict
+  // the amount-based membership gate below.  Conversely, an issuance before
+  // that date produces a positive maturity amount and therefore still enters
+  // the pool without any special case.
+  if (scheduled > EPSILON && maturity > EPSILON) return "scheduled_and_maturity";
+  if (maturity > EPSILON) return "maturity";
   if (scheduled > EPSILON) return "scheduled";
   return "none";
 }
@@ -409,10 +416,6 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
   for (let index = 0; index < 3; index += 1) {
     const bounds = periodBounds(modelCase.periods, index);
     const maturityDate = instrument.maturity_date ? date(instrument.maturity_date, `${instrument.instrument_id}.maturity_date`) : null;
-    const previousPeriodEnd = date(
-      modelCase.periods[bounds.absoluteIndex - 1].date,
-      `periods[${bounds.absoluteIndex - 1}].date`,
-    );
     const matures = maturityApplies({
       instrument,
       maturityDate,
@@ -420,9 +423,6 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       debtMaturitiesRoll: modelCase.controls?.debt_maturities_roll,
       balancingRcf,
     });
-    const maturityDue = Boolean(
-      matures && maturityDate > previousPeriodEnd && maturityDate <= bounds.end,
-    );
     const activeEnd = matures && maturityDate < bounds.end ? maturityDate : bounds.end;
     const activeFraction = fractionBetween(bounds.start, activeEnd, bounds);
     const fallbackMovementFraction = activeFraction / 2;
@@ -479,7 +479,12 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       ending_post_repayment: amount(endingPost, translation.closing_rate),
       average_interest_balance: amount(averageBalance, translation.flow_rate),
       active_fraction: activeFraction,
-      repayment_state: repaymentState(instrument, periodAmortisation, maturityRepayment, maturityDue, balancingRcf),
+      repayment_state: repaymentState(
+        instrument,
+        periodAmortisation,
+        maturityRepayment,
+        balancingRcf,
+      ),
       pricing_state: pricingState(instrument, pik),
       inclusion,
       translation,

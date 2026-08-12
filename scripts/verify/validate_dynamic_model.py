@@ -612,8 +612,18 @@ def main(argv: List[str]) -> int:
     )
 
     # ------------------------------------------ semantic-artifact-completeness
+    equation_graph_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "assets",
+        "equation-graph.v1.json",
+    )
+    with open(equation_graph_path, "r", encoding="utf-8") as handle:
+        canonical_equation_graph = json.load(handle)
     semantic_artifact_errors = validate_semantic_artifacts(
-        semantic_manifest, source_crosswalk
+        semantic_manifest,
+        source_crosswalk,
+        row_plan=row_plan,
+        equation_graph=canonical_equation_graph,
     )
     checks.append(
         record(
@@ -968,6 +978,8 @@ def main(argv: List[str]) -> int:
 
     iterate_count = re.search(r'\biterateCount="([^"]+)"', workbook_xml)
     iterate_delta = re.search(r'\biterateDelta="([^"]+)"', workbook_xml)
+    calc_id = re.search(r'\bcalcId="([^"]+)"', workbook_xml)
+    calc_mode = re.search(r'\bcalcMode="([^"]+)"', workbook_xml)
     # fullCalcOnLoad and the absence of a foreign calcChain are load-bearing:
     # the shipped package carries the recalculation engine's caches, and a
     # native reader that trusts them without a forced full calculation cannot
@@ -977,6 +989,9 @@ def main(argv: List[str]) -> int:
     full_calc_on_load = bool(
         re.search(r'\bfullCalcOnLoad="(?:1|true)"', workbook_xml)
     )
+    force_full_calc = bool(
+        re.search(r'\bforceFullCalc="(?:1|true)"', workbook_xml)
+    )
     calc_chain_absent = "xl/calcChain.xml" not in workbook.names
     expected_calculation = ECONOMIC_SOLVE_POLICY["workbook_calculation"]
     actual_iterate_count = int(iterate_count.group(1)) if iterate_count else None
@@ -985,17 +1000,28 @@ def main(argv: List[str]) -> int:
         record(
             "iteration-contract",
             bool(re.search(r'\biterate="(?:1|true)"', workbook_xml))
+            == bool(expected_calculation["iterate"])
+            and (calc_id.group(1) if calc_id else None)
+            == str(expected_calculation["calc_id"])
+            and (calc_mode.group(1) if calc_mode else None)
+            == expected_calculation["calc_mode"]
             and actual_iterate_count == expected_calculation["iterate_count"]
             and actual_iterate_delta == expected_calculation["iterate_delta"]
             and full_calc_on_load
+            == bool(expected_calculation["full_calc_on_load"])
+            and force_full_calc
+            == bool(expected_calculation["force_full_calc"])
             and calc_chain_absent,
             "Workbook calculation settings match the canonical economic solve "
             "policy, force a full calculation on load, and ship no calculation chain.",
             {
                 "iterate_enabled": bool(re.search(r'\biterate="(?:1|true)"', workbook_xml)),
+                "calc_id": calc_id.group(1) if calc_id else None,
+                "calc_mode": calc_mode.group(1) if calc_mode else None,
                 "iterate_count": actual_iterate_count,
                 "iterate_delta": actual_iterate_delta,
                 "full_calc_on_load": full_calc_on_load,
+                "force_full_calc": force_full_calc,
                 "calc_chain_absent": calc_chain_absent,
                 "expected": expected_calculation,
             },

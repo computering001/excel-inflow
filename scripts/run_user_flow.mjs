@@ -17,6 +17,10 @@ import {
   nextStageId,
 } from "./lib/flow_runtime.mjs";
 import {
+  assertWorkflowTransition,
+  normaliseUserFlowResult,
+} from "./lib/workflow_state.mjs";
+import {
   COMPANY_SCREEN,
   renderDeliveryReport,
   renderFailure,
@@ -26,6 +30,7 @@ import {
 } from "./lib/flow_screens.mjs";
 import {
   persistStage,
+  readJsonIfPresent,
   readUsableStage,
   writeJsonAtomic,
   writeRunResult,
@@ -326,6 +331,12 @@ function stageForOutcome(outcome) {
   return "decisions";
 }
 
+function blockerForStoppedOutcome(outcome) {
+  return ["decision_replay_blocked", "decision_graph_blocked"].includes(outcome)
+    ? "INTERNAL_WORK"
+    : "USER_EVIDENCE";
+}
+
 async function finish({ runDir, result, screen = null, machine = false }) {
   if (ACTIVE_RUN_GUARD) {
     const closing = await assertRuntimeIntegrityUnchanged(ACTIVE_RUN_GUARD.integrity, ROOT);
@@ -337,7 +348,14 @@ async function finish({ runDir, result, screen = null, machine = false }) {
       file_count: closing.file_count,
     });
   }
-  const clean = serialisable(result);
+  const clean = serialisable(normaliseUserFlowResult(result));
+  const priorResult = await readJsonIfPresent(path.join(runDir, "user-flow-result.json"));
+  assertWorkflowTransition(
+    "user_flow",
+    priorResult?.status,
+    clean.status,
+    { reset: priorResult?.run_id !== clean.run_id },
+  );
   await writeRunResult(runDir, clean);
   if (machine) process.stdout.write(`${JSON.stringify(clean, null, 2)}\n`);
   else if (screen) process.stdout.write(`${screen}\n`);
@@ -353,7 +371,7 @@ async function main() {
     }
     const stage = String(options.screen);
     process.stdout.write(`${renderPresentationScreen(stage)}\n`);
-    return { status: "SCREEN", stage };
+    return normaliseUserFlowResult({ status: "SCREEN", stage });
   }
   if ((!positional[0] && !options.carrier) || !options.out) {
     throw new Error(
@@ -428,6 +446,8 @@ async function main() {
           ...(carrierRunId ? { run_id: carrierRunId } : {}),
           status: "BLOCKED",
           stage: "inputs",
+          outcome: "run_case_mutated_during_pause",
+          blocker_class: "INTERNAL_WORK",
           message,
           reused_stages: [],
         },
@@ -562,6 +582,7 @@ async function main() {
           status: "BLOCKED",
           stage: "inputs",
           outcome: "bad_evidence",
+          blocker_class: "INTERNAL_WORK",
           message: errors[0] ?? "Evidence validation failed.",
           receipt: receipt1,
           reused_stages: reusedStages,
@@ -660,6 +681,7 @@ async function main() {
         status: "BLOCKED",
         stage: stoppedStage,
         outcome: intakeResult.outcome,
+        blocker_class: blockerForStoppedOutcome(intakeResult.outcome),
         receipt: receipt1,
         reused_stages: reusedStages,
       };
@@ -700,6 +722,7 @@ async function main() {
           status: "BLOCKED",
           stage: "decisions",
           outcome: intakeResult.outcome,
+          blocker_class: blockerForStoppedOutcome(intakeResult.outcome),
           receipt: receipt3,
           reused_stages: reusedStages,
         },
@@ -716,6 +739,7 @@ async function main() {
         status: "BLOCKED",
         stage: "evidence_review",
         outcome: intakeResult.outcome,
+        blocker_class: blockerForStoppedOutcome(intakeResult.outcome),
         receipt: receipt2,
         reused_stages: reusedStages,
       },
@@ -831,6 +855,8 @@ async function main() {
           run_id: runId,
           status: "BLOCKED",
           stage: "decisions",
+          outcome: "answers_incomplete",
+          blocker_class: "USER_DECISION",
           receipt: receipt3,
           reused_stages: reusedStages,
         },
@@ -1034,6 +1060,8 @@ async function main() {
           run_id: runId,
           status: "BLOCKED",
           stage: "decisions",
+          outcome: "forecast_authority_unresolved",
+          blocker_class: "USER_DECISION",
           message: `${forecastPlan.unresolved_material_count} material forecast state(s) are unresolved.`,
           forecast_plan: forecastPlanJsonPath,
           receipt: receipt3,
@@ -1158,6 +1186,8 @@ async function main() {
         run_id: runId,
         status: "BLOCKED",
         stage: "build_checks",
+        outcome: "run_case_mutated_during_pause",
+        blocker_class: "INTERNAL_WORK",
         message,
         receipt: blockedReceipt,
         reused_stages: reusedStages,
@@ -1279,8 +1309,11 @@ async function main() {
           schema_version: "user-flow-run/1.0",
           controller_version: FLOW_CONTROLLER_VERSION,
           run_id: runId,
-          status: buildResult.status ?? "BLOCKED",
+          status: "BLOCKED",
           stage: "build_checks",
+          outcome: "workbook_build_blocked",
+          blocker_class: "INTERNAL_WORK",
+          controller_status: buildResult.status ?? "BLOCKED",
           message: buildResult.message,
           receipt: receipt4,
           reused_stages: reusedStages,
@@ -1365,6 +1398,8 @@ async function main() {
         run_id: runId,
         status: "BLOCKED",
         stage: "delivery",
+        outcome: "delivery_attestation_blocked",
+        blocker_class: "INTERNAL_WORK",
         message: error.message,
         reused_stages: reusedStages,
       },

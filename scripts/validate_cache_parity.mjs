@@ -53,6 +53,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import JSZip from "jszip";
 import { applyExcelComparison } from "./lib/excel_value_semantics.mjs";
+import { ECONOMIC_SOLVE_POLICY } from "./lib/economic_solve_policy.mjs";
+import { canonicalJsonSha256 } from "./lib/equation_graph.mjs";
 
 // ---------------------------------------------------------------- args
 
@@ -71,14 +73,14 @@ const opt = (name, dflt) => {
 };
 const flag = (name) => argv.includes(`--${name}`);
 const jsonOut = opt("json", null);
-const ABS_TOL = Number(opt("tol", 1e-6));
-const REL_TOL = Number(opt("rel", 1e-9));
+const ABS_TOL = Number(opt("tol", ECONOMIC_SOLVE_POLICY.native_tolerances.currency));
+const REL_TOL = Number(opt("rel", ECONOMIC_SOLVE_POLICY.native_tolerances.default));
 const PRINT_LIMIT = Number(opt("limit", 40));
 const ONLY_SHEET = opt("sheet", null);
 const ONLY_CELL = opt("only", null);
 const SHOW_NOISE = flag("show-noise");
 const CIRC_TOL_ARG = argv.includes("--circ-tol") ? Number(opt("circ-tol")) : null;
-const CIRC_REL = Number(opt("circ-rel", 1e-6));
+const CIRC_REL = Number(opt("circ-rel", ECONOMIC_SOLVE_POLICY.native_tolerances.relative));
 
 // ---------------------------------------------------------------- OOXML helpers
 // Every regex carries an optional `prefix:` — this builder emits <x:c>, <x:f>,
@@ -169,7 +171,24 @@ if (!sheetOrder.length) throw new Error("no sheets found in workbook.xml");
 
 const calcPr = /<[A-Za-z_:\w.-]*calcPr\b([^>]*)>/.exec(wbXml)?.[1] ?? "";
 const iterationEnabled = /\biterate="(1|true)"/.test(calcPr);
-const iterateDelta = Number(/\biterateDelta="([^"]+)"/.exec(calcPr)?.[1] ?? 1e-3);
+const iterateDelta = Number(
+  /\biterateDelta="([^"]+)"/.exec(calcPr)?.[1] ??
+    ECONOMIC_SOLVE_POLICY.workbook_calculation.iterate_delta,
+);
+const calcAttribute = (name) => new RegExp(`\\b${name}="([^"]+)"`).exec(calcPr)?.[1] ?? null;
+const expectedCalc = ECONOMIC_SOLVE_POLICY.workbook_calculation;
+const calcContractErrors = [];
+for (const [name, actual, expected] of [
+  ["calcId", calcAttribute("calcId"), String(expectedCalc.calc_id)],
+  ["calcMode", calcAttribute("calcMode"), expectedCalc.calc_mode],
+  ["fullCalcOnLoad", /^(1|true)$/.test(calcAttribute("fullCalcOnLoad") ?? ""), expectedCalc.full_calc_on_load],
+  ["forceFullCalc", /^(1|true)$/.test(calcAttribute("forceFullCalc") ?? ""), expectedCalc.force_full_calc],
+  ["iterate", iterationEnabled, expectedCalc.iterate],
+  ["iterateCount", Number(calcAttribute("iterateCount")), expectedCalc.iterate_count],
+  ["iterateDelta", Number(calcAttribute("iterateDelta")), expectedCalc.iterate_delta],
+]) {
+  if (actual !== expected) calcContractErrors.push({ attribute: name, actual, expected });
+}
 // The workbook states its own convergence band. Honour it rather than inventing
 // one: anything inside it is iteration slop, anything outside it is a defect.
 const CIRC_TOL = CIRC_TOL_ARG ?? Math.max(iterateDelta, ABS_TOL);
@@ -1035,7 +1054,7 @@ results.circular_noise.sort(sortKey);
 
 const total = results.mismatches.length + results.circular_mismatches.length;
 const primary = [...results.mismatches, ...results.circular_mismatches].filter((m) => !m.cascaded).length;
-const status = total ? "FAIL" : "PASS";
+const status = total || calcContractErrors.length ? "FAIL" : "PASS";
 
 console.log(`\ncache-parity: ${status}   ${workbookPath}`);
 console.log(
@@ -1054,6 +1073,9 @@ console.log(
   `iterative calc ${iterationEnabled ? "ENABLED" : "off"}; cells in a dependency cycle ${stats.circular_cells}; ` +
     `convergence band +/-${CIRC_TOL} (${results.circular_noise.length} residuals inside it, treated as noise)`,
 );
+if (calcContractErrors.length) {
+  console.log(`calculation policy mismatches ${JSON.stringify(calcContractErrors)}`);
+}
 
 if (ONLY_CELL) {
   const all = [...results.mismatches, ...results.circular_mismatches, ...results.circular_noise];
@@ -1119,6 +1141,8 @@ if (jsonOut) {
         stats,
         iterationEnabled,
         iterateDelta,
+        calc_contract_errors: calcContractErrors,
+        economic_solve_policy_sha256: canonicalJsonSha256(ECONOMIC_SOLVE_POLICY),
         ...results,
       },
       null,

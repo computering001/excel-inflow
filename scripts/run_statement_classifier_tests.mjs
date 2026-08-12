@@ -530,7 +530,21 @@ function hierarchyFixture(authority) {
             note: "Synthetic hierarchy mutation input.",
           })),
         }
-      : {}),
+      : {
+          forecast_capture_parent_id: parent.row_id,
+          forecast_capture_mode: "semantic_scope",
+          forecast_capture_note:
+            "Synthetic reported-parent working detail is captured by the visible working-capital authority.",
+          forecast_capture_certificates: [0, 1, 2].map((forecastIndex) => ({
+            forecast_index: forecastIndex,
+            parent_row_id: parent.row_id,
+            mode: "semantic_scope",
+            material: false,
+            membership_path: [`working_capital.${suffix}`, parent.row_id],
+            proof:
+              "The unique section-local declared hierarchy assigns this working row to the reported parent.",
+          })),
+        }),
     parent_row_id: parent.row_id,
     aggregation_role:
       authority === "reported_parent" ? "working_child" : "contributing_child",

@@ -18,6 +18,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from compile_broker_candidate_manifest import compile_manifest
+
 
 def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
@@ -332,9 +334,16 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
                 elif overlap >= 0.70 or nested_overlap >= 0.85:
                     conflicts.append(candidate)
             if conflicts:
+                rendered_conflict = any(
+                    has_rendered_authority(item)
+                    for item in [seed, *conflicts]
+                )
                 findings.append({
                     "id": "broker_canonical.overlap_conflict",
-                    "severity": "blocker",
+                    "severity": "needs_resolution" if rendered_conflict else "needs_vision",
+                    "scope": "physical_capture",
+                    "model_linked": False,
+                    "remedy": "targeted_cell_adjudication" if rendered_conflict else "independent_rendered_grid",
                     "surface_id": surface_id,
                     "table_ids": [seed["table_id"], *[item["table_id"] for item in conflicts]],
                     "conflicts": [
@@ -342,7 +351,10 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
                         for candidate in conflicts
                         for conflict in observation_conflicts(seed, candidate)
                     ],
-                    "message": "Overlapping extraction lanes contain a displayed economic conflict or cannot be reconciled to an independently rendered table.",
+                    "message": (
+                        "Overlapping lanes have not yet been reconciled to one physical table. "
+                        "This is bounded internal capture work, not evidence that the readable source is unusable."
+                    ),
                 })
             ranked = sorted(
                 group,
@@ -372,6 +384,98 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
     return ordered, findings
 
 
+def physical_capture_receipt(
+    *,
+    document_id: str | None,
+    surface: dict[str, Any],
+    tables: list[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Seal physical preservation without pretending it is semantic authority.
+
+    Native coordinates, table extractors, OCR and rendered vision are
+    corroborating observations of one visible surface. Their raw token
+    multiplicities need not agree: segmentation can repeat a year header or
+    split one visible number across lanes. A dual-read/adjudicated rendered
+    grid is the physical authority for that surface; native-only disagreement
+    instead requests the next bounded internal lane. Whether any captured cell
+    may drive the model remains a later crosswalk/semantic decision.
+    """
+    surface_id = str(surface.get("surface_id") or "")
+    source = Counter(surface.get("source_table_numeric_tokens") or [])
+    captured = Counter(
+        token for table in tables for token in table_numeric_tokens(table)
+    )
+    missing = sorted((source - captured).elements())
+    unowned = sorted((captured - source).elements())
+    rendered = any(has_rendered_authority(table) for table in tables)
+    verified_non_tabular = surface.get("vision_disposition") == "verified_non_tabular"
+    findings: list[dict[str, Any]] = []
+
+    if verified_non_tabular:
+        status = "PASS_EVIDENCE_ONLY"
+        basis = "two_pass_verified_non_tabular"
+    elif tables and not missing and not unowned:
+        status = "PASS_ANALYTICAL"
+        basis = "rendered_grid" if rendered else "bounded_native_geometry"
+    elif tables and rendered:
+        # The rendered table is already bound to two independent reads or a
+        # conflict-ledger resolution. Preserve native disagreement in the
+        # receipt, but do not allow it to erase a visibly complete grid.
+        status = "PASS_ANALYTICAL"
+        basis = "rendered_grid_resolves_native_lane_disagreement"
+        findings.append({
+            "id": "broker_canonical.native_lane_disagreement_resolved",
+            "severity": "warning",
+            "scope": "physical_capture",
+            "model_linked": False,
+            "document_id": document_id,
+            "surface_id": surface_id,
+            "missing_native_tokens": missing,
+            "unowned_native_tokens": unowned,
+            "message": (
+                "A hash-bound independently verified rendered grid preserves the visible table; "
+                "native-lane token multiplicity differs and remains recorded as corroboration evidence."
+            ),
+        })
+    elif tables or source:
+        status = "NEEDS_VISION"
+        basis = "native_lane_reconciliation_pending"
+        findings.append({
+            "id": "broker_canonical.physical_capture_reconciliation_required",
+            "severity": "needs_vision",
+            "scope": "physical_capture",
+            "model_linked": False,
+            "remedy": "independent_rendered_grid",
+            "document_id": document_id,
+            "surface_id": surface_id,
+            "missing_native_tokens": missing,
+            "unowned_native_tokens": unowned,
+            "message": (
+                "Native extraction lanes do not yet reconcile to one complete visible grid. "
+                "Run the bounded rendered/OCR recovery lane; do not request a replacement readable report."
+            ),
+        })
+    else:
+        # A native-readable page with no table-region numbers is retained in
+        # the source inventory but cannot manufacture a model table.
+        status = "PASS_EVIDENCE_ONLY"
+        basis = "native_surface_has_no_tabular_numeric_region"
+
+    receipt = {
+        "surface_id": surface_id,
+        "status": status,
+        "verification_basis": basis,
+        "physical_capture_complete": status.startswith("PASS_"),
+        "analytical_table_count": len(tables),
+        "source_table_numeric_token_count": sum(source.values()),
+        "captured_numeric_token_count": sum(captured.values()),
+        "missing_native_tokens": missing,
+        "unowned_native_tokens": unowned,
+        "model_linked_accuracy_status": "PENDING_SEMANTIC_CROSSWALK",
+    }
+    return receipt, findings
+
+
 def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     output = copy.deepcopy(bundle)
     all_findings: list[dict[str, Any]] = []
@@ -383,33 +487,25 @@ def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[di
         all_findings.extend(findings)
         document["canonical_tables"] = tables
         canonical_documents.extend(tables)
+        capture_receipts = []
         for surface in document.get("surfaces", []):
-            source = Counter(surface.get("source_table_numeric_tokens") or [])
-            captured = Counter(
-                token
-                for table in tables if table.get("surface_id") == surface.get("surface_id")
-                for token in table_numeric_tokens(table)
+            receipt, receipt_findings = physical_capture_receipt(
+                document_id=document.get("document_id"),
+                surface=surface,
+                tables=[
+                    table for table in tables
+                    if table.get("surface_id") == surface.get("surface_id")
+                ],
             )
-            missing = source - captured
-            extra = captured - source
-            if missing:
-                all_findings.append({
-                    "id": "broker_canonical.source_table_tokens_missing",
-                    "severity": "blocker",
-                    "document_id": document.get("document_id"),
-                    "surface_id": surface.get("surface_id"),
-                    "tokens": sorted(token for token, count in missing.items() for _ in range(count)),
-                    "message": "Canonical tables omit numeric tokens present inside independently discovered source table regions.",
-                })
-            if extra:
-                all_findings.append({
-                    "id": "broker_canonical.captured_tokens_unowned",
-                    "severity": "blocker",
-                    "document_id": document.get("document_id"),
-                    "surface_id": surface.get("surface_id"),
-                    "tokens": sorted(token for token, count in extra.items() for _ in range(count)),
-                    "message": "Canonical tables contain duplicate or unowned numeric tokens beyond the source-region census.",
-                })
+            capture_receipts.append(receipt)
+            all_findings.extend(receipt_findings)
+            if receipt["status"] == "NEEDS_VISION":
+                surface.setdefault("lane_status", {})["vision"] = "required"
+                surface["vision_reason"] = (
+                    "native physical-table lanes require one independently rendered grid"
+                )
+                document["extraction_status"] = "needs_vision"
+        document["physical_capture_receipts"] = capture_receipts
     canonical_documents = [
         table
         for document in sorted(output.get("documents", []), key=lambda item: str(item.get("document_id")))
@@ -419,6 +515,36 @@ def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[di
         )
     ]
     output["canonical_tables_sha256"] = hashlib.sha256(canonical_bytes(canonical_documents)).hexdigest()
+    all_receipts = [
+        receipt
+        for document in output.get("documents", [])
+        for receipt in document.get("physical_capture_receipts", [])
+    ]
+    output["physical_capture_receipt"] = {
+        "schema_version": "broker-physical-capture-receipt/1.0",
+        "status": (
+            "NEEDS_RESOLUTION"
+            if any(item.get("severity") == "needs_resolution" for item in all_findings)
+            else "NEEDS_VISION"
+            if any(item.get("severity") == "needs_vision" for item in all_findings)
+            else "PASS"
+        ),
+        "surface_count": len(all_receipts),
+        "complete_surface_count": sum(
+            1 for item in all_receipts if item.get("physical_capture_complete") is True
+        ),
+        "analytical_surface_count": sum(
+            1 for item in all_receipts if item.get("status") == "PASS_ANALYTICAL"
+        ),
+        "evidence_only_surface_count": sum(
+            1 for item in all_receipts if item.get("status") == "PASS_EVIDENCE_ONLY"
+        ),
+        "pending_surface_ids": sorted(
+            item.get("surface_id") for item in all_receipts
+            if not item.get("physical_capture_complete")
+        ),
+        "model_linked_accuracy_status": "PENDING_SEMANTIC_CROSSWALK",
+    }
     return output, all_findings
 
 
@@ -431,10 +557,18 @@ def main() -> int:
     output_path = Path(args.out).resolve()
     bundle = json.loads(input_path.read_text("utf-8"))
     compiled, findings = canonicalise_bundle(bundle)
+    for document in compiled.get("documents", []):
+        document["tables"] = copy.deepcopy(document.get("canonical_tables", []))
     compiled["schema_version"] = "broker-canonical-tables/1.0"
     compiled["source_bundle_sha256"] = hashlib.sha256(input_path.read_bytes()).hexdigest()
     compiled["canonical_findings"] = findings
-    compiled["gate_status"] = "BLOCKED" if findings else compiled.get("gate_status", "PASS")
+    compiled["gate_status"] = compiled["physical_capture_receipt"]["status"]
+    compiled["candidate_manifest"] = compile_manifest(
+        compiled,
+        source_bundle_sha256=compiled["source_bundle_sha256"],
+    )
+    if compiled["candidate_manifest"].get("gate_status") == "BLOCKED":
+        compiled["gate_status"] = "BLOCKED"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(canonical_bytes(compiled))
     print(json.dumps({"status": compiled["gate_status"], "findings": len(findings), "sha256": compiled["canonical_tables_sha256"]}, sort_keys=True))

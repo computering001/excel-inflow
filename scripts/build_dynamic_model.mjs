@@ -2876,6 +2876,11 @@ function configureOperatingModel(
   // Rows whose forecast is intentionally uncalculated, so the rank pass can put
   // their grey back after it repaints the row.
   const uncalculatedRows = new Set();
+  // Mixed per-period rows need cell-level custody: an FY1 guidance value may
+  // coexist with FY2/FY3 capture. A row-wide grey flag would erase the live
+  // period, so record only the three basis cells for each captured period and
+  // reapply them after the total-rank pass.
+  const uncalculatedForecastCells = new Set();
   // Establish the workbook-wide presentation baseline before applying
   // section-, input- and formula-specific styles.
   styleFont(sheet, `A1:U${maxRow}`, COLORS.black);
@@ -4044,6 +4049,16 @@ function configureOperatingModel(
           `${proFormaColumn}${definition.row}`,
           `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
         );
+      }
+      if (forecastUncalculated) {
+        for (const address of [
+          `${column}${definition.row}`,
+          `${adjustmentColumn}${definition.row}`,
+          `${proFormaColumn}${definition.row}`,
+        ]) {
+          sheet.getRange(address).format.fill = COLORS.grey;
+          uncalculatedForecastCells.add(address);
+        }
       }
     }
     if (structurallyEmptyHistory) {
@@ -5881,6 +5896,15 @@ function configureOperatingModel(
       movementType === "maturity_repayment"
     );
   });
+  // Every non-issuance, non-RCF debt cash movement belongs in the pre-RCF
+  // bridge exactly once.  Restricting this row to maturities orphaned visible
+  // issuance costs and other debt transactions from ending cash even though
+  // they sat inside the face-statement Net Change in Debt subtotal.
+  const preRcfDebtStatementRows = debtMovementRows.filter((definition) => {
+    const role = definition.semantic_role;
+    const movementType = inferMovementType(definition);
+    return role !== "debt_issuance" && movementType !== "debt_issuance";
+  });
   // The issuance leg mirrors the repayment leg: the sweep consumes the
   // visible statement issuance child (which itself links to the waterfall
   // proceeds row), so every live financing component enters ending cash
@@ -6106,8 +6130,8 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}`,
-        mandatoryRepaymentStatementRows.length
-          ? `=${sumCells(blockColumn, mandatoryRepaymentStatementRows)}`
+        preRcfDebtStatementRows.length
+          ? `=${sumCells(blockColumn, preRcfDebtStatementRows)}`
           : `=-${blockColumn}${mandatoryDebtRow}`,
       );
       applyFormula(
@@ -8172,6 +8196,9 @@ function configureOperatingModel(
     subsectionRows,
     headlineRows,
   );
+  for (const address of uncalculatedForecastCells) {
+    sheet.getRange(address).format.fill = COLORS.grey;
+  }
 
   // The rank pass has just repainted every ranked row's fill, including the
   // sweep's own subtotals. Reassert the historical grey over that repaint: the
@@ -9596,6 +9623,11 @@ function statementSolverValues(
     ["ebit", result.ebit],
     ["interest_income", result.interest_income],
     ["interest_expense", -result.gross_interest],
+    // Direct Interest Schedule consumer, identical to the solver and emitted
+    // formula direction.  Do not fall through to forecastInput: schedule links
+    // have no case hardcode by design, so a duplicate generic resolver cannot
+    // infer this value from row.values.
+    ["net_finance_addback", result.net_interest],
     ["pre_tax_income", result.pre_tax_income],
     [
       "effective_tax_rate",
@@ -10297,7 +10329,9 @@ function solverFormulaCaches(
       non_rcf_debt_proceeds: result.non_rcf_issuance,
       // Gross proceeds, mandatory repayments and lease principal are separate
       // visible rows. Never net one into another in the cache.
-      pre_rcf_debt_cash_flow: -result.non_rcf_repayment,
+      pre_rcf_debt_cash_flow:
+        -result.non_rcf_repayment +
+        Number(result.other_cash_debt_movement ?? 0),
       lease_principal_waterfall: -result.lease_principal,
       cash_before_rcf: result.cash_before_rcf,
       minimum_cash: result.minimum_cash,

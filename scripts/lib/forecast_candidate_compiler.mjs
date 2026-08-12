@@ -61,7 +61,14 @@ function historicalCandidate(row, behavior, forecastIndex) {
   const history = historicalValues(row);
   const observed = history.filter((value) => value !== null);
   if (observed.length === 0) return null;
-  if (!["recurring_flow", "driver_linked_flow", "seasonal_flow"].includes(behavior)) return null;
+  if (
+    ![
+      "recurring_flow",
+      "driver_linked_flow",
+      "seasonal_flow",
+      "lumpy_discretionary_flow",
+    ].includes(behavior)
+  ) return null;
   const last = observed.at(-1);
   if (behavior === "seasonal_flow") {
     // Three annual observations contain no within-year shape.  Calling the
@@ -70,6 +77,25 @@ function historicalCandidate(row, behavior, forecastIndex) {
     // candidate is emitted only by a real partial-period/remainder authority;
     // annual history alone therefore remains unresolved.
     return null;
+  }
+  if (behavior === "lumpy_discretionary_flow") {
+    if (observed.length !== 3) return null;
+    const average = observed.reduce((total, value) => total + value, 0) / 3;
+    return {
+      method: "historical_average",
+      origin: "historical_inference",
+      source_kind: "historical_inference",
+      value: average,
+      formula_spec: {
+        operator: "historical_average",
+        row_id: row.row_id,
+        historical_period_count: 3,
+      },
+      note:
+        `${row.row_id}: three-year historical average used for a lumpy ` +
+        "discretionary cash flow after no commitment, guidance, indication, " +
+        "broker value or user assumption resolved. It is not represented as a stable trend.",
+    };
   }
   if (observed.length === 3 && Math.sign(observed[0]) === Math.sign(observed[1]) && Math.sign(observed[1]) === Math.sign(observed[2])) {
     const firstDelta = observed[1] - observed[0];
@@ -85,7 +111,45 @@ function historicalCandidate(row, behavior, forecastIndex) {
       return { method: "historical_average", origin: "historical_inference", source_kind: "historical_inference", value: average, formula_spec: { operator: "historical_average", row_id: row.row_id, historical_period_count: 3 }, note: "Three-year comparable-basis average applied through a visible formula." };
     }
   }
-  return { method: "carry_forward", origin: "historical_inference", source_kind: "historical_inference", value: last, formula_spec: { operator: "prior_period", refs: [row.row_id] }, note: "Latest comparable reported value carried through a visible formula because no stronger stable inference exists." };
+  const comparableHistory = history
+    .map((value, index) =>
+      value === null ? null : `H${index + 1}=${Number(value)}`,
+    )
+    .filter(Boolean)
+    .join(", ");
+  return {
+    method: "carry_forward",
+    origin: "historical_inference",
+    source_kind: "historical_inference",
+    value: last,
+    formula_spec: { operator: "prior_period", refs: [row.row_id] },
+    note:
+      `${row.row_id}: latest comparable reported value ${Number(last)} carried ` +
+      `through a visible prior-period formula after reviewing ${comparableHistory}; ` +
+      "the three-period history did not support the stricter stable-trend or stable-average tests and no stronger authority resolved.",
+  };
+}
+
+function eventZeroCandidate(modelCase, row, behavior) {
+  if (behavior !== "non_recurring_event") return null;
+  const lastHistoricalDate = (modelCase.periods ?? [])
+    .filter((period) => period.status === "historical")
+    .map((period) => period.date)
+    .at(-1);
+  return {
+    method: "explicit_zero",
+    origin: "semantic_event_backstop",
+    source_kind: "historical_inference",
+    source_id: `semantic-event-backstop:${row.row_id}`,
+    as_of_date: lastHistoricalDate,
+    zero_basis: "semantic_event_nonrecurrence",
+    value: 0,
+    note:
+      `${row.row_id}: no declared commitment, schedule, company indication ` +
+      "or user assumption supports recurrence in this period; the discrete " +
+      "event is therefore shown as a visible formula-driven zero at the last " +
+      "waterfall rung, not carried forward from history.",
+  };
 }
 
 function observationMatches(observationInput, row, forecastIndex, windowStart, periodEnd) {
@@ -139,9 +203,33 @@ function observationCandidates(observationInput, row, forecastIndex, windowStart
   return candidates;
 }
 
-function formulaCandidate(row, behavior) {
+function formulaCandidate(row, behavior, forecastIndex) {
   if (isScheduleOwnedForecastRole(row.semantic_role)) return { method: "schedule_link", origin: "semantic_schedule", source_kind: "schedule", ownership: "absolute", formula_spec: { operator: "schedule_link", semantic_role: row.semantic_role } };
-  const calculation = row.forecast_calculation ?? row.calculation;
+  // A historical aggregate formula is evidence of membership, not a stronger
+  // line-level forecast. Once the topology compiler has certified the row as
+  // captured detail, reusing that historical sum would keep the intermediate
+  // aggregate live while its children are blank and recreate the very
+  // top-down inconsistency capture is meant to remove. Explicit forecast
+  // formulas remain eligible; only the implicit fallback to `calculation` is
+  // suppressed.
+  if (
+    behavior === "captured_detail" &&
+    !row.forecast_calculation &&
+    !(row.forecast_period_calculations ?? []).some(Boolean)
+  ) {
+    return null;
+  }
+  // A period-specific rule vector is a complete three-period direction
+  // declaration.  A null slot means "this period is supplied by its own
+  // waterfall authority", not "fall back to the historical identity".  The
+  // solver and renderer already obey this rule; enforcing it here prevents a
+  // candidate selected as accounting_identity from reaching a cell for which
+  // no formula exists (and prevents cross-statement direction reversals from
+  // turning into circularity).
+  const periodRulesDeclared = Array.isArray(row.forecast_period_calculations);
+  const calculation = periodRulesDeclared
+    ? row.forecast_period_calculations[forecastIndex] ?? null
+    : row.forecast_calculation ?? row.calculation;
   if (!calculation) return null;
   // Formula shape, not a broad row label, determines ownership.  A
   // prior-period rule is a forecast mechanism even when the row was emitted
@@ -223,6 +311,21 @@ function independentlyForecastedParent(modelCase, parent, forecastIndex) {
   const declared = declaredCandidate(parent, forecastIndex);
   if (declared && INDEPENDENT_CAPTURE_METHODS.has(declared.method)) return true;
   if (finite(parent.values?.[forecastIndex + 3])) return true;
+  if (
+    [
+      "revenue",
+      "ebit",
+      "ebitda",
+      "adjusted_ebitda",
+      "depreciation_and_amortisation",
+    ].includes(parent.semantic_role) &&
+    Boolean(
+      parent.forecast_period_calculations?.[forecastIndex]?.refs?.length ??
+      parent.forecast_calculation?.refs?.length,
+    )
+  ) {
+    return true;
+  }
   // A disclosed aggregate with no component or forecast formula is itself an
   // economic series and will enter the ordinary evidence waterfall. A parent
   // whose formula consumes the child is not independent unless one of the
@@ -230,7 +333,89 @@ function independentlyForecastedParent(modelCase, parent, forecastIndex) {
   return !(parent.calculation?.refs ?? []).length && !parent.forecast_calculation;
 }
 
-function captureCandidate(modelCase, row, rows, forecastIndex, material) {
+const CAPTURE_MEMBERSHIP_OPERATORS = new Set([
+  "sum",
+  "subtract",
+  "negate_sum",
+  "negate",
+  "link",
+]);
+
+function certifiedMembershipPath(row, targetId, rows) {
+  const rowsById = new Map(rows.map((candidate) => [candidate.row_id, candidate]));
+  const localIds = new Set(rowsById.keys());
+  const parentsByChild = new Map();
+  for (const parent of rows) {
+    if (!CAPTURE_MEMBERSHIP_OPERATORS.has(parent.calculation?.operator)) continue;
+    const counts = new Map();
+    for (const ref of parent.calculation?.refs ?? []) {
+      if (!localIds.has(ref)) continue;
+      counts.set(ref, (counts.get(ref) ?? 0) + 1);
+    }
+    for (const [childId, count] of counts) {
+      const parents = parentsByChild.get(childId) ?? [];
+      parents.push({ parent_id: parent.row_id, count });
+      parentsByChild.set(childId, parents);
+    }
+  }
+  const paths = [];
+  const queue = [[row.row_id]];
+  let shortest = null;
+  let cycle = false;
+  while (queue.length > 0) {
+    const path = queue.shift();
+    const childId = path.at(-1);
+    const edges = path.length - 1;
+    if (shortest !== null && edges >= shortest) continue;
+    for (const parent of parentsByChild.get(childId) ?? []) {
+      if (parent.count !== 1) continue;
+      if (path.includes(parent.parent_id)) {
+        cycle = true;
+        continue;
+      }
+      const next = [...path, parent.parent_id];
+      if (parent.parent_id === targetId) {
+        const nextEdges = next.length - 1;
+        if (shortest === null) shortest = nextEdges;
+        if (nextEdges === shortest) paths.push(next);
+      } else {
+        queue.push(next);
+      }
+    }
+  }
+  return {
+    status: cycle ? "cycle" : paths.length === 1 ? "exact" : paths.length > 1 ? "ambiguous" : "missing",
+    path: paths.length === 1 ? paths[0] : null,
+    paths,
+  };
+}
+
+function semanticStatementBandPath(row, targetId, rows, section) {
+  if (section !== "income_statement") return null;
+  const rowIndex = rows.indexOf(row);
+  const revenueIndex = rows.findIndex(
+    (candidate) => candidate.semantic_role === "revenue",
+  );
+  const ebitIndex = rows.findIndex(
+    (candidate) => candidate.semantic_role === "ebit",
+  );
+  const target = rows.find((candidate) => candidate.row_id === targetId);
+  if (!target || rowIndex < 0) return null;
+  if (target.semantic_role === "revenue" && rowIndex < revenueIndex) {
+    return [row.row_id, targetId];
+  }
+  if (
+    target.semantic_role === "ebit" &&
+    revenueIndex >= 0 &&
+    rowIndex > revenueIndex &&
+    rowIndex < ebitIndex
+  ) {
+    return [row.row_id, targetId];
+  }
+  return null;
+}
+
+function captureCandidate(modelCase, row, rows, forecastIndex, material, section) {
   if (!row.forecast_capture_parent_id) return null;
   const parentMatches = rows.filter(
     (candidate) => candidate.row_id === row.forecast_capture_parent_id,
@@ -242,17 +427,36 @@ function captureCandidate(modelCase, row, rows, forecastIndex, material) {
   );
   const parent = parentMatches[0] ?? null;
   const mode = suppliedCertificates[0]?.mode ?? row.forecast_capture_mode;
-  const formulaMembership = (parent?.calculation?.refs ?? []).filter(
-    (reference) => reference === row.row_id,
-  ).length;
+  const pathProof = certifiedMembershipPath(
+    row,
+    row.forecast_capture_parent_id,
+    rows,
+  );
+  const formulaMembership = pathProof.status === "exact";
   const hierarchyMembership = row.parent_row_id === row.forecast_capture_parent_id;
+  const statementBandPath = semanticStatementBandPath(
+    row,
+    row.forecast_capture_parent_id,
+    rows,
+    section,
+  );
+  const certifiedPath = pathProof.path ?? (
+    hierarchyMembership
+      ? [row.row_id, row.forecast_capture_parent_id]
+      : statementBandPath
+  );
   const membershipProved = mode === "formula_membership"
-    ? formulaMembership === 1
-    : hierarchyMembership || formulaMembership === 1;
+    ? formulaMembership
+    : hierarchyMembership || formulaMembership || Boolean(statementBandPath);
+  const suppliedPath = suppliedCertificates[0]?.membership_path;
+  const suppliedPathMatches =
+    suppliedPath === undefined ||
+    (certifiedPath && JSON.stringify(suppliedPath) === JSON.stringify(certifiedPath));
   if (
     parentMatches.length !== 1 ||
     suppliedCertificates.length > 1 ||
     !membershipProved ||
+    !suppliedPathMatches ||
     !independentlyForecastedParent(modelCase, parent, forecastIndex)
   ) {
     return {
@@ -260,18 +464,28 @@ function captureCandidate(modelCase, row, rows, forecastIndex, material) {
       origin: "invalid_capture_candidate",
       source_kind: "none",
       material,
-      reason: `Capture ${row.row_id} -> ${row.forecast_capture_parent_id} lacks one unique section-local parent, membership proof and an independently forecasted aggregate parent for this period.`,
+      reason:
+        `Capture ${section}.${row.row_id} -> ${row.forecast_capture_parent_id} ` +
+        "lacks one unique section-local additive membership path, a matching " +
+        "certificate and an independently forecasted aggregate parent for this period.",
     };
   }
-  const certificate = suppliedCertificates[0] ?? {
+  const certificate = {
+    ...(suppliedCertificates[0] ?? {}),
     forecast_index: forecastIndex,
     parent_row_id: row.forecast_capture_parent_id,
     mode,
     material,
+    membership_path:
+      suppliedCertificates[0]?.membership_path ?? structuredClone(certifiedPath),
     proof:
-      mode === "formula_membership"
-        ? "The unique section-local parent formula contains this row exactly once."
-        : "The unique section-local declared hierarchy assigns this row to the parent.",
+      suppliedCertificates[0]?.proof ?? (
+        mode === "formula_membership"
+          ? `The unique section-local additive path is ${pathProof.path.join(" -> ")}.`
+          : statementBandPath
+            ? "The section-local visible-successor band places this row inside the directly forecast headline scope."
+            : "The unique section-local declared hierarchy assigns this row to the parent."
+      ),
   };
   return {
     method: "not_separately_forecast",
@@ -376,7 +590,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         if (declared) candidates.push(declared);
         const broker = brokerCandidate(modelCase, row, forecastIndex);
         if (broker) candidates.push(broker);
-        const formula = formulaCandidate(row, behavior);
+        const formula = formulaCandidate(row, behavior, forecastIndex);
         if (formula) candidates.push(formula);
         // Evidence is assembled independently of formula presence.  Only a
         // genuine accounting identity or schedule link owns the row before
@@ -385,9 +599,11 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         candidates.push(...observationCandidates(observationInput, row, forecastIndex, windowStarts[forecastIndex], forecastPeriods[forecastIndex]));
         const inferred = historicalCandidate(row, behavior, forecastIndex);
         if (inferred) candidates.push(inferred);
+        const eventZero = eventZeroCandidate(modelCase, row, behavior);
+        if (eventZero) candidates.push(eventZero);
         if (behavior === "not_applicable") candidates.push({ method: "not_applicable", origin: "behavior", source_kind: "none", material: false, note: "The row is outside the applicable economic scope." });
         if (behavior === "captured_detail" && row.forecast_capture_parent_id) {
-          candidates.push(captureCandidate(modelCase, row, sectionRows, forecastIndex, material));
+          candidates.push(captureCandidate(modelCase, row, sectionRows, forecastIndex, material, section));
         }
         if (candidates.length === 0) candidates.push({ method: "unresolved", origin: "compiler", source_kind: "none", reason: "No compatible forecast candidate exists." });
 
@@ -433,11 +649,18 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
                 candidate.capture_certificate,
             )
           : null;
-        let owner = invalidCapture ?? certifiedCapture ?? (anchorOwned
+        // A capture certificate is a fallback for THIS period. It may never
+        // erase a stronger line-level observation/commitment/driver in a mixed
+        // FY1/FY2/FY3 row. Historical inference is excluded by the captured
+        // behavior's allowed-method set, so in an unevidenced period the
+        // certificate still wins over a generic trend/carry.
+        const rankedIndependent = selectForecastAuthority(compatible);
+        let owner = invalidCapture ?? (anchorOwned
           ? broker
           : absoluteFormula && compatible.includes(formula)
             ? formula
-            : selectForecastAuthority(compatible) ??
+            : rankedIndependent ??
+              certifiedCapture ??
               // Deliberate absence is a valid owner of last resort: a captured
               // detail or out-of-scope row resolves to its absence declaration
               // instead of falling through to `unresolved`.  The waterfall
@@ -558,6 +781,7 @@ function authorityFromState(state, candidate) {
   if (finite(state.value) && ["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "user_assumption", "explicit_zero"].includes(state.method)) authority.value = Number(state.value);
   if (candidate?.partial_period) authority.partial_period = structuredClone(candidate.partial_period);
   if (candidate?.guidance_range) authority.guidance_range = structuredClone(candidate.guidance_range);
+  if (candidate?.zero_basis) authority.zero_basis = candidate.zero_basis;
   return authority;
 }
 
@@ -626,6 +850,11 @@ export function materializeForecastPlan(modelCase, plan) {
           `Forecast plan state ${state.state_id} selected capture without a certificate.`,
         );
       }
+      if (state.producer_type === "captured") {
+        row.forecast_capture_certificates ??= [null, null, null];
+        row.forecast_capture_certificates[state.forecast_index] =
+          structuredClone(candidate.capture_certificate);
+      }
     }
   }
   // `uncalculated` is a legacy source/presentation classification, not an
@@ -635,7 +864,6 @@ export function materializeForecastPlan(modelCase, plan) {
   // remain deliberately blank.  The case compiler repeats this as a terminal
   // invariant, but the forecast bridge must also be correct in isolation.
   for (const row of rowsByKey.values()) {
-    if (row.row_type !== "uncalculated") continue;
     const authorities = row.forecast_period_authorities ?? [];
     const executable = authorities.some((authority) =>
       authority &&
@@ -645,7 +873,35 @@ export function materializeForecastPlan(modelCase, plan) {
         "not_applicable",
       ].includes(authority.method),
     );
-    if (executable) row.row_type = "input";
+    const allAbsent =
+      authorities.length === 3 &&
+      authorities.every((authority) =>
+        ["not_separately_forecast", "not_applicable"].includes(
+          authority?.method,
+        ),
+      );
+    if (allAbsent) {
+      row.forecast_treatment = "uncalculated";
+      row.formula_authority = "intentionally_blank";
+      if (Array.isArray(row.values)) {
+        row.values = [...row.values.slice(0, 3), null, null, null];
+      }
+      delete row.forecast_calculation;
+      delete row.forecast_period_calculations;
+      continue;
+    }
+    // Global row treatment is only a compatibility hint. Mixed-period rows
+    // are controlled by their explicit authorities cell by cell; leaving a
+    // global `uncalculated` flag would grey and suppress all three periods.
+    if (executable) {
+      if (row.row_type === "uncalculated") row.row_type = "input";
+      if (row.forecast_treatment === "uncalculated") {
+        delete row.forecast_treatment;
+      }
+      if (row.formula_authority === "intentionally_blank") {
+        delete row.formula_authority;
+      }
+    }
   }
   return next;
 }

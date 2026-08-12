@@ -13,11 +13,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from workflow_state import assert_state, assert_transition
+
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "dcs-runtime-members.json"
-BLOCKER_CLASSES = {"INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -130,10 +131,19 @@ def write_state(
     runtime_digest: str, cache_key: str, checkpoints: list[dict[str, Any]],
     artifacts: dict[str, str], tasks: list[dict[str, Any]], summary: dict[str, Any],
 ) -> None:
-    if blocker_class not in {None, *BLOCKER_CLASSES}:
-        raise ValueError(f"Unknown blocker class: {blocker_class}")
-    if user_blocking != (blocker_class in {"USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}):
-        raise ValueError("user_blocking disagrees with blocker ownership")
+    assert_state("dcs", status, blocker_class, user_blocking)
+    prior: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            prior = read_json(path, "prior DCS run state")
+        except ValueError:
+            prior = {}
+    assert_transition(
+        "dcs",
+        prior.get("pipeline_status"),
+        status,
+        reset=prior.get("cache_key") != cache_key,
+    )
     value = {
         "schema_version": "dcs-run-state/1.0",
         "run_id": run_id,
@@ -231,12 +241,31 @@ def main() -> int:
             str(request_path), "--out", str(extract_root),
         ], {0, 2})
         if completed.returncode != 0 or not all(path.is_file() for path in (source_tables, candidate_manifest, extraction_receipt)):
+            detail = (completed.stderr or completed.stdout).strip()[-4000:]
+            source_fault = (
+                source.stat().st_size == 0
+                or source.suffix.lower() not in {".csv", ".xlsx", ".xlsm", ".json"}
+                or any(token in detail.lower() for token in (
+                    "file is not a zip file",
+                    "supported dcs source types",
+                    "not a valid json",
+                    "jsondecodeerror",
+                ))
+            )
             write_state(
-                state_path, run_id=run_id, status="BLOCKED_INPUT", user_blocking=True,
-                blocker_class="FATAL_SOURCE", request_digest=request_digest,
+                state_path, run_id=run_id,
+                status="BLOCKED_INPUT" if source_fault else "BLOCKED_INTERNAL",
+                user_blocking=source_fault,
+                blocker_class="FATAL_SOURCE" if source_fault else "INTERNAL_WORK",
+                request_digest=request_digest,
                 source_digest=source_digest, runtime_digest=runtime_digest,
                 cache_key=cache_key, checkpoints=checkpoints, artifacts=artifacts,
-                tasks=[], summary={"message": (completed.stderr or completed.stdout).strip()[-4000:]},
+                tasks=[], summary={
+                    "terminal_reason": (
+                        "fatal_source" if source_fault else "dcs_extractor_requires_internal_repair"
+                    ),
+                    "message": detail,
+                },
             )
             return 2
         seal(source_tables, checkpoint_receipt, extract_input)
@@ -262,27 +291,62 @@ def main() -> int:
 
     crosswalk = Path(args.crosswalk).resolve() if args.crosswalk else None
     if not crosswalk or not crosswalk.is_file():
-        add_checkpoint(checkpoints, "crosswalk", "NEEDS_WORK", sha256_file(candidate_manifest), None, False)
-        write_state(
-            state_path, run_id=run_id, status="NEEDS_CROSSWALK", user_blocking=False,
-            blocker_class="INTERNAL_WORK", request_digest=request_digest,
-            source_digest=source_digest, runtime_digest=runtime_digest,
-            cache_key=cache_key, checkpoints=checkpoints, artifacts=artifacts,
-            tasks=[{
-                "task_kind": "dcs_crosswalk_review",
-                "source_tables": str(source_tables),
-                "candidate_manifest": str(candidate_manifest),
-                "instruction": (
-                    "Disposition every captured row and cell exactly once; declare each model instrument, "
-                    "field-level term authority, maturity precision and any reviewed supplement."
-                ),
-            }],
-            summary={
-                "source_rows": extract_report.get("counts", {}).get("rows", 0),
-                "source_cells": extract_report.get("counts", {}).get("nonblank_cells", 0),
-            },
-        )
-        return 2
+        if not request.get("adapter_metadata"):
+            write_state(
+                state_path, run_id=run_id, status="BLOCKED_INPUT", user_blocking=True,
+                blocker_class="USER_EVIDENCE", request_digest=request_digest,
+                source_digest=source_digest, runtime_digest=runtime_digest,
+                cache_key=cache_key, checkpoints=checkpoints, artifacts=artifacts,
+                tasks=[{
+                    "task_kind": "dcs_adapter_metadata",
+                    "required_fields": ["as_of", "entity_name", "reporting_currency", "units"],
+                    "instruction": "Provide the export basis once; the controller will author and verify the cell-level crosswalk internally.",
+                }],
+                summary={"terminal_reason": "missing_export_basis"},
+            )
+            return 2
+        proposed = output_root / f"proposed-crosswalk-{key}.json"
+        proposal_receipt = output_root / f"proposed-crosswalk-{key}.receipt.json"
+        proposal_input = sha256_bytes(canonical_bytes({
+            "source_tables": sha256_file(source_tables),
+            "candidate_manifest": sha256_file(candidate_manifest),
+            "adapter_metadata": request.get("adapter_metadata"),
+            "runtime": runtime_digest,
+        }))
+        proposal_reused = reusable(proposed, proposal_receipt, proposal_input)
+        if not proposal_reused:
+            completed = run([
+                sys.executable, str(HERE / "propose_dcs_crosswalk.py"),
+                str(source_tables), str(candidate_manifest),
+                "--metadata", str(request_path), "--out", str(proposed),
+            ], {0, 2})
+            if not proposed.is_file():
+                raise RuntimeError("DCS adapter did not emit a crosswalk proposal")
+            seal(proposed, proposal_receipt, proposal_input)
+            proposal_status_path = proposed.with_name("dcs-crosswalk-proposal-receipt.json")
+            proposal = read_json(proposal_status_path, "DCS proposal receipt")
+            artifacts["crosswalk_proposal_receipt"] = str(proposal_status_path)
+            if completed.returncode != 0:
+                unresolved = proposal.get("unresolved", [])
+                status = "BLOCKED_INPUT" if unresolved else "BLOCKED_INTERNAL"
+                blocker_class = "USER_EVIDENCE" if unresolved else "INTERNAL_WORK"
+                write_state(
+                    state_path, run_id=run_id, status=status,
+                    user_blocking=bool(unresolved), blocker_class=blocker_class,
+                    request_digest=request_digest, source_digest=source_digest,
+                    runtime_digest=runtime_digest, cache_key=cache_key,
+                    checkpoints=checkpoints, artifacts=artifacts,
+                    tasks=[{
+                        "task_kind": "dcs_required_term_evidence" if unresolved else "dcs_adapter_repair",
+                        "unresolved": unresolved,
+                        "instruction": "Supply only the named missing factual terms; no debt row or captured cell was discarded."
+                            if unresolved else "Repair the structured-header adapter internally.",
+                    }],
+                    summary={"terminal_reason": "unresolved_required_terms" if unresolved else "unrecognized_dcs_layout"},
+                )
+                return 2
+        add_checkpoint(checkpoints, "crosswalk_proposal", "PASS", proposal_input, proposed, proposal_reused)
+        crosswalk = proposed
 
     crosswalk_digest = sha256_file(crosswalk)
     artifacts["crosswalk"] = str(crosswalk)

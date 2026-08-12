@@ -1,0 +1,106 @@
+{
+  "schema_version": "workflow-state-contract/1.0",
+  "blocker_classes": [
+    "INTERNAL_WORK",
+    "USER_EVIDENCE",
+    "USER_DECISION",
+    "FATAL_SOURCE"
+  ],
+  "user_blocking_classes": [
+    "USER_EVIDENCE",
+    "USER_DECISION",
+    "FATAL_SOURCE"
+  ],
+  "layers": {
+    "broker": {
+      "states": {
+        "NEEDS_VISION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_RESOLUTION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_CROSSWALK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_CROSSWALK_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_VISION": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_RESOLUTION": ["NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_CROSSWALK": ["NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_CROSSWALK_REVIEW": ["NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "BLOCKED_INTERNAL"]
+      }
+    },
+    "dcs": {
+      "states": {
+        "NEEDS_CROSSWALK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_CROSSWALK_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_CROSSWALK": ["NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_CROSSWALK_REVIEW": ["NEEDS_CROSSWALK_REVIEW", "NEEDS_CROSSWALK", "BLOCKED_INTERNAL", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL"]
+      }
+    },
+    "attachment": {
+      "states": {
+        "NEEDS_INTERNAL_WORK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_INTERNAL_WORK": ["NEEDS_INTERNAL_WORK", "BLOCKED_INTERNAL", "BLOCKED_INPUT", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_INTERNAL_WORK", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "NEEDS_INTERNAL_WORK", "BLOCKED_INTERNAL"]
+      }
+    },
+    "filings": {
+      "states": {
+        "NEEDS_EXTRACTION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "NEEDS_EXTRACTION_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
+        "PASS": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_EXTRACTION": ["NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "BLOCKED_INTERNAL", "PASS"],
+        "NEEDS_EXTRACTION_REVIEW": ["NEEDS_EXTRACTION_REVIEW", "NEEDS_EXTRACTION", "BLOCKED_INTERNAL", "PASS"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "PASS"],
+        "BLOCKED_INPUT": ["BLOCKED_INPUT"],
+        "PASS": ["PASS", "NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "BLOCKED_INTERNAL"]
+      }
+    },
+    "user_flow": {
+      "states": {
+        "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "PAUSED": { "blocker_classes": [null], "user_blocking": false, "stages": ["inputs", "evidence_review", "decisions", "build_checks"] },
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["decisions"] },
+        "BLOCKED": { "blocker_classes": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false, "stages": ["delivery"] }
+      },
+      "transitions": {
+        "SCREEN": ["SCREEN"],
+        "PAUSED": ["PAUSED", "ACTION_REQUIRED", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "ACTION_REQUIRED": ["ACTION_REQUIRED", "PAUSED", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "BLOCKED": ["BLOCKED", "PAUSED", "ACTION_REQUIRED", "PASS_PENDING_MANUAL"],
+        "PASS_PENDING_MANUAL": ["PASS_PENDING_MANUAL"]
+      }
+    },
+    "stage_receipt": {
+      "states": {
+        "success": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "action_required": { "stages": ["decisions"] },
+        "blocked": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "failed": { "stages": ["build_checks", "delivery"] }
+      }
+    }
+  }
+}

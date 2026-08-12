@@ -9,7 +9,7 @@
   "workbook_calculation": { "calc_id": "191029", "calc_mode": "auto", "full_calc_on_load": true, "force_full_calc": true, "iterate": true, "iterate_count": 200, "iterate_delta": 1e-6 },
   "native_tolerances": { "currency": 1e-6, "ratio": 1e-9, "percentage": 1e-10, "control": 0, "default": 1e-9, "relative": 1e-12 },
   "circularity_roles": {
-    "zero_when_off": ["instrument_cash_interest", "instrument_pik_interest", "instrument_pik_principal_accretion", "rcf_interest", "rcf_commitment_fee", "lease_interest", "acquisition_interest", "other_interest", "noncash_interest", "cash_interest_income", "gross_interest_expense", "interest_income", "net_interest_expense", "cash_interest_paid", "cash_interest_received", "noncash_interest_addback", "net_finance_addback", "income_statement_finance"],
+    "zero_when_off": ["instrument_cash_interest", "instrument_pik_interest", "instrument_pik_principal_accretion", "rcf_interest", "rcf_commitment_fee", "lease_interest", "acquisition_interest", "other_interest", "noncash_interest", "cash_interest_income", "gross_interest_expense", "interest_income", "net_interest_expense", "cash_interest_paid", "cash_interest_received", "noncash_interest_addback", "net_finance_addback", "income_statement_finance_expense", "income_statement_finance_income"],
     "live_when_off": ["debt_issuance", "scheduled_amortisation", "maturity_repayment", "lease_principal", "mandatory_repayment", "minimum_cash", "rcf_capacity", "rcf_draw", "rcf_repayment", "ending_rcf", "ending_cash", "liquidity_shortfall"]
   }
 }

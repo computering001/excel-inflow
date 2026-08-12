@@ -30,6 +30,10 @@ import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { isRankedTotalIdentity } from "./row_plan.mjs";
 import { applyTier1AnchorOwnership } from "./broker_anchor.mjs";
 import {
+  ALLOWED_METHODS_BY_BEHAVIOR,
+  classifyForecastBehavior,
+} from "./forecast_behavior.mjs";
+import {
   compileForecastPlan,
   materializeForecastPlan,
   validateForecastPlan,
@@ -1667,6 +1671,7 @@ const SCHEDULE_ROLES = new Set([
   "interest_expense",
   "cash_interest_paid",
   "cash_interest_received",
+  "net_finance_addback",
   "debt_issuance",
   "debt_repayment",
   "rcf_draw",
@@ -1679,6 +1684,487 @@ const SCHEDULE_ROLES = new Set([
   // like the RCF legs, whichever channel declares it.
   "non_cash_interest_addback",
 ]);
+
+// Forecast capture follows only additive statement membership. A ratio or tax
+// formula consumes an input, but it does not economically contain it; using
+// those edges to grey a row would remove the input from its real statement
+// owner. `link`/`negate` are retained because they are transparent restatements
+// of one amount, while sum/subtract/negate_sum are the additive identities that
+// form a face statement.
+const CAPTURE_MEMBERSHIP_OPERATORS = new Set([
+  "sum",
+  "subtract",
+  "negate_sum",
+  "negate",
+  "link",
+]);
+
+const CAPTURE_HEADLINE_ROLES = new Set([
+  "revenue",
+  "ebit",
+  "ebitda",
+  "adjusted_ebitda",
+  "depreciation_and_amortisation",
+]);
+
+// These rows are economic spine or bridge inputs, never expendable detail.
+// The list is semantic rather than issuer- or row-position-specific.
+const CAPTURE_REQUIRED_ROLES = new Set([
+  ...SPINE_ROLES,
+  ...SCHEDULE_ROLES,
+  ...CAPTURE_HEADLINE_ROLES,
+  // These are transparent accounting bridges, not company-specific detail.
+  // Capturing them breaks the visible EBIT/EBITDA and cash-flow D&A
+  // identities even when their headline is independently forecast.
+  "is_da_expense",
+  "cash_flow_da",
+  "cash_flow_depreciation_amortisation",
+  "cash_flow_profit_before_tax",
+  "recurring_disclosed_adjustments",
+  "effective_tax_rate",
+]);
+
+const DIRECT_FORECAST_METHODS = new Set([
+  "actual_plus_remainder",
+  "contractual_commitment",
+  "company_guidance",
+  "company_indication",
+  "broker_consensus",
+  "user_assumption",
+  "historical_average",
+  "historical_trend",
+  "seasonal_run_rate",
+  "carry_forward",
+  "explicit_zero",
+]);
+
+const STRUCTURAL_EVENT_ROLES = new Set([
+  "acquisition_cost",
+  "business_combination",
+  "disposal",
+  "litigation",
+  "legal_settlement",
+  "restructuring",
+  "impairment_loss",
+  "exceptional_item",
+  "discontinued_operation",
+]);
+
+function carriesStructuralEventSemantics(row) {
+  return (
+    ["debt_issuance_cost", "other_cash_debt_movement"].includes(
+      row.movement_type,
+    ) ||
+    STRUCTURAL_EVENT_ROLES.has(row.semantic_role)
+  );
+}
+
+function hasDirectForecastAuthority(row) {
+  if (!row) return false;
+  if (row.broker_metric_id) return true;
+  if (["broker", "hardcode", "zero"].includes(row.forecast_treatment)) {
+    return true;
+  }
+  if (
+    (row.values ?? []).slice(3, 6).some(
+      (value) =>
+        value !== null &&
+        value !== undefined &&
+        Number.isFinite(Number(value)),
+    )
+  ) {
+    return true;
+  }
+  return (row.forecast_period_authorities ?? []).some(
+    (authority) => authority && DIRECT_FORECAST_METHODS.has(authority.method),
+  );
+}
+
+function hasLiveHeadlineForecastAuthority(row) {
+  return (
+    hasDirectForecastAuthority(row) ||
+    (CAPTURE_HEADLINE_ROLES.has(row?.semantic_role) &&
+      (Boolean(row.forecast_calculation?.refs?.length) ||
+        (row.forecast_period_calculations ?? []).some(
+          (calculation) => Boolean(calculation?.refs?.length),
+        )))
+  );
+}
+
+function mayResolveAsAggregate(row) {
+  if (!row) return false;
+  if (hasDirectForecastAuthority(row)) return true;
+  // A filed total with no formula is a single economic series and may resolve
+  // through the ordinary evidence waterfall. This remains useful for direct
+  // reported-parent captures (especially working capital), but it is NOT a
+  // terminal for the multi-hop slim-income-statement rule below.
+  return !(row.calculation?.refs ?? []).length && !row.forecast_calculation;
+}
+
+function captureCertificates(row, targetId, mode, path, modelCase) {
+  const material = (() => {
+    const mapped = ["income_statement", "cash_flow"]
+      .flatMap((section) => modelCase.source_coverage?.[section] ?? [])
+      .filter((entry) =>
+        (entry.mapped_row_ids ?? []).includes(row.row_id) ||
+        (row.source_line_ids ?? []).includes(entry.source_line_id),
+      );
+    if (mapped.some((entry) => entry.material === true)) return true;
+    if (mapped.length > 0 && mapped.every((entry) => entry.material === false)) {
+      return false;
+    }
+    return null;
+  })();
+  return [0, 1, 2].map((forecastIndex) => ({
+    forecast_index: forecastIndex,
+    parent_row_id: targetId,
+    mode,
+    material,
+    membership_path: [...path],
+    proof:
+      mode === "formula_membership"
+        ? `Unique section-local additive membership path: ${path.join(" -> ")}.`
+        : `Unique section-local declared semantic scope: ${path.join(" -> ")}.`,
+  }));
+}
+
+function markCompilerCapture(modelCase, row, targetId, mode, path) {
+  row.forecast_treatment = "uncalculated";
+  row.formula_authority = "intentionally_blank";
+  row.forecast_capture_parent_id = targetId;
+  row.forecast_capture_mode = mode;
+  row.forecast_capture_note =
+    `Forecast detail is captured by ${targetId} through the certified ` +
+    `${path.length - 1}-edge section-local membership path.`;
+  row.forecast_capture_certificates = captureCertificates(
+    row,
+    targetId,
+    mode,
+    path,
+    modelCase,
+  );
+}
+
+function formulaMembershipIndex(sectionRows) {
+  const localIds = new Set(sectionRows.map((row) => row.row_id));
+  const byChild = new Map();
+  for (const parent of sectionRows) {
+    if (!CAPTURE_MEMBERSHIP_OPERATORS.has(parent.calculation?.operator)) {
+      continue;
+    }
+    const counts = new Map();
+    for (const ref of parent.calculation?.refs ?? []) {
+      if (!localIds.has(ref)) continue;
+      counts.set(ref, (counts.get(ref) ?? 0) + 1);
+    }
+    for (const [childId, membershipCount] of counts) {
+      const parents = byChild.get(childId) ?? [];
+      parents.push({ parent_row_id: parent.row_id, membership_count: membershipCount });
+      byChild.set(childId, parents);
+    }
+  }
+  return byChild;
+}
+
+/**
+ * Find every shortest additive path from `startId` to a directly forecast
+ * terminal. Stopping at the first terminal prevents a product row from being
+ * claimed by both Revenue and the EBIT that consumes Revenue. More than one
+ * shortest path is still double ownership and blocks rather than selecting by
+ * source order.
+ */
+function shortestCapturePaths(startId, rowsById, parentsByChild, isTerminal) {
+  const queue = [[startId]];
+  const matches = [];
+  let shortestEdges = null;
+  let cycleDetected = false;
+  while (queue.length > 0) {
+    const path = queue.shift();
+    const childId = path.at(-1);
+    const edgeCount = path.length - 1;
+    if (shortestEdges !== null && edgeCount >= shortestEdges) continue;
+    for (const parentMembership of parentsByChild.get(childId) ?? []) {
+      if (parentMembership.membership_count !== 1) continue;
+      const parentId = parentMembership.parent_row_id;
+      if (path.includes(parentId)) {
+        cycleDetected = true;
+        continue;
+      }
+      const parent = rowsById.get(parentId);
+      if (!parent) continue;
+      const nextPath = [...path, parentId];
+      if (isTerminal(parent)) {
+        const nextEdges = nextPath.length - 1;
+        if (shortestEdges === null) shortestEdges = nextEdges;
+        if (nextEdges === shortestEdges) matches.push(nextPath);
+      } else {
+        queue.push(nextPath);
+      }
+    }
+  }
+  return { paths: matches, cycle_detected: cycleDetected };
+}
+
+/**
+ * Compile the forecast-capture subgraph. This is deliberately exported for
+ * graph mutation tests: a valid capture is a unique, additive, section-local
+ * path to one live forecast terminal; ambiguity is evidence of double
+ * ownership, not permission to pick a convenient parent.
+ */
+export function compileForecastCaptureTopology(
+  modelCase,
+  { derivedRowIds = new Set() } = {},
+) {
+  const sections = modelCase.statement_structure ?? {};
+  const findings = [];
+  const behaviorByKey = new Map();
+  const addBehavior = (section, rowId, behavior, allowedMethods) => {
+    behaviorByKey.set(`${section}\u0000${rowId}`, {
+      section,
+      row_id: rowId,
+      behavior,
+      allowed_methods: [...allowedMethods],
+    });
+  };
+  const rowSections = new Map();
+  for (const [section, sectionRows] of Object.entries(sections)) {
+    for (const row of sectionRows ?? []) {
+      const locations = rowSections.get(row.row_id) ?? [];
+      locations.push(section);
+      rowSections.set(row.row_id, locations);
+    }
+  }
+
+  for (const [section, sectionRows] of Object.entries(sections)) {
+    const rows = sectionRows ?? [];
+    const rowsById = new Map(rows.map((row) => [row.row_id, row]));
+    const parentsByChild = formulaMembershipIndex(rows);
+
+    // Compiler-authored capture may never point outside its own statement.
+    for (const row of rows) {
+      if (!row.forecast_capture_parent_id) continue;
+      if (!rowsById.has(row.forecast_capture_parent_id)) {
+        findings.push({
+          id: "forecast_capture.cross_section",
+          severity: "BLOCK",
+          message:
+            `${section}.${row.row_id} points to capture parent ` +
+            `${row.forecast_capture_parent_id} outside its statement section.`,
+          context: {
+            section,
+            row_id: row.row_id,
+            parent_row_id: row.forecast_capture_parent_id,
+            parent_sections: rowSections.get(row.forecast_capture_parent_id) ?? [],
+          },
+        });
+      }
+    }
+
+    for (const row of rows) {
+      if (row.row_type === "header") continue;
+      if (derivedRowIds.has(row.row_id)) continue;
+      if (CAPTURE_REQUIRED_ROLES.has(row.semantic_role)) continue;
+      if (row.broker_metric_id || row.forecast_calculation) continue;
+      if ((row.forecast_period_calculations ?? []).some(Boolean)) continue;
+      if (
+        ["broker", "hardcode", "zero"].includes(row.forecast_treatment)
+      ) continue;
+      const explicitAuthorities = (row.forecast_period_authorities ?? []).filter(
+        (authority) => authority && DIRECT_FORECAST_METHODS.has(authority.method),
+      );
+      if (explicitAuthorities.length === 3) continue;
+      const hasUnreceiptedForecastValue = (row.values ?? [])
+        .slice(3, 6)
+        .some((value, index) =>
+          value !== null &&
+          value !== undefined &&
+          Number.isFinite(Number(value)) &&
+          !DIRECT_FORECAST_METHODS.has(
+            row.forecast_period_authorities?.[index]?.method,
+          ),
+        );
+      if (hasUnreceiptedForecastValue) continue;
+
+      let selectedPath = null;
+      if (section === "income_statement") {
+        const result = shortestCapturePaths(
+          row.row_id,
+          rowsById,
+          parentsByChild,
+          (candidate) =>
+            candidate.row_id !== row.row_id &&
+            hasLiveHeadlineForecastAuthority(candidate) &&
+            (CAPTURE_HEADLINE_ROLES.has(candidate.semantic_role) ||
+              !candidate.calculation?.refs?.length ||
+              candidate.broker_metric_id ||
+              (candidate.forecast_period_authorities ?? []).some(Boolean)),
+        );
+        if (result.cycle_detected) {
+          findings.push({
+            id: "forecast_capture.cycle",
+            severity: "BLOCK",
+            message: `${section}.${row.row_id} reaches a cycle in the additive capture graph.`,
+            context: { section, row_id: row.row_id },
+          });
+          continue;
+        }
+        if (result.paths.length > 1) {
+          const targets = new Set(result.paths.map((path) => path.at(-1)));
+          findings.push({
+            id:
+              targets.size > 1
+                ? "forecast_capture.ambiguous_path"
+                : "forecast_capture.double_ownership",
+            severity: "BLOCK",
+            message:
+              `${section}.${row.row_id} has ${result.paths.length} equally short ` +
+              "additive paths to directly forecast authority; capture cannot choose one.",
+            context: { section, row_id: row.row_id, paths: result.paths },
+          });
+          continue;
+        }
+        selectedPath = result.paths[0] ?? null;
+      }
+
+      // Cash flow deliberately does not get multi-hop slim-statement capture.
+      // It may only use a direct, independently forecast aggregate (for
+      // example broker working capital or capex); every other cash-flow line
+      // stays in the full evidence/inference waterfall.
+      if (!selectedPath) {
+        const directFormulaParents = (parentsByChild.get(row.row_id) ?? [])
+          .filter(
+            (parent) =>
+              parent.membership_count === 1 &&
+              (section === "income_statement"
+                ? mayResolveAsAggregate(rowsById.get(parent.parent_row_id))
+                : hasDirectForecastAuthority(rowsById.get(parent.parent_row_id))),
+          )
+          .map((parent) => parent.parent_row_id);
+        const hierarchyParent = row.parent_row_id && rowsById.has(row.parent_row_id)
+          ? rowsById.get(row.parent_row_id)
+          : null;
+        const hierarchyEligible =
+          hierarchyParent &&
+          (section === "income_statement"
+            ? mayResolveAsAggregate(hierarchyParent)
+            : hasDirectForecastAuthority(hierarchyParent));
+        const directTargets = new Set([
+          ...directFormulaParents,
+          ...(hierarchyEligible ? [hierarchyParent.row_id] : []),
+        ]);
+        if (directTargets.size > 1) {
+          findings.push({
+            id: "forecast_capture.double_ownership",
+            severity: "BLOCK",
+            message:
+              `${section}.${row.row_id} belongs directly to more than one live ` +
+              "forecast aggregate.",
+            context: { section, row_id: row.row_id, parents: [...directTargets] },
+          });
+          continue;
+        }
+        if (directTargets.size === 1) {
+          selectedPath = [row.row_id, [...directTargets][0]];
+        }
+      }
+
+      // Some face statements disclose intermediate operating lines without a
+      // subtotal formula tying each one to EBIT. When Revenue and EBIT are
+      // directly forecast, the ordered section band is itself a bounded
+      // semantic scope: pre-Revenue detail belongs to Revenue; detail strictly
+      // between Revenue and EBIT belongs to EBIT. This is the same graph rule
+      // as the visible-successor statement topology, not a caption or issuer
+      // exception. It never applies after EBIT and never applies to cash flow.
+      let statementBandCapture = false;
+      if (!selectedPath && section === "income_statement") {
+        const revenueIndex = rows.findIndex(
+          (candidate) => candidate.semantic_role === "revenue",
+        );
+        const ebitIndex = rows.findIndex(
+          (candidate) => candidate.semantic_role === "ebit",
+        );
+        const rowIndex = rows.indexOf(row);
+        const revenue = revenueIndex >= 0 ? rows[revenueIndex] : null;
+        const ebit = ebitIndex >= 0 ? rows[ebitIndex] : null;
+        if (
+          revenue &&
+          hasLiveHeadlineForecastAuthority(revenue) &&
+          rowIndex >= 0 &&
+          rowIndex < revenueIndex
+        ) {
+          selectedPath = [row.row_id, revenue.row_id];
+          statementBandCapture = true;
+        } else if (
+          ebit &&
+          hasLiveHeadlineForecastAuthority(ebit) &&
+          rowIndex > revenueIndex &&
+          rowIndex < ebitIndex
+        ) {
+          selectedPath = [row.row_id, ebit.row_id];
+          statementBandCapture = true;
+        }
+      }
+
+      if (!selectedPath || selectedPath.at(-1) === row.row_id) continue;
+      const targetId = selectedPath.at(-1);
+      // Captured rows are intentionally blank in forecast. Their membership
+      // path is certified from the statement graph, but it is not a physical
+      // forecast formula path: the direct headline owns the forecast and the
+      // whole detail/intermediate chain stands down. Mark it semantic-scope so
+      // the OOXML proof asks for exactly that physical consequence (live
+      // parent, blank child) while `membership_path` retains the full graph
+      // proof for independent validation.
+      const mode = "semantic_scope";
+      markCompilerCapture(modelCase, row, targetId, mode, selectedPath);
+      addBehavior(
+        section,
+        row.row_id,
+        "captured_detail",
+        ALLOWED_METHODS_BY_BEHAVIOR.captured_detail,
+      );
+    }
+
+    // Specialized cash-flow/event semantics must reach their own waterfall.
+    // The generic candidate compiler defaults formula-less rows to recurring;
+    // carrying a transaction cost forever is therefore prevented here using
+    // the same semantic classifier that the standalone behavior gate tests.
+    for (const row of rows) {
+      const key = `${section}\u0000${row.row_id}`;
+      if (behaviorByKey.has(key) || row.row_type === "header") continue;
+      const classified = classifyForecastBehavior(modelCase, row, {
+        section,
+        rows,
+      });
+      if (
+        [
+          "contractual_flow",
+          "lumpy_discretionary_flow",
+          "seasonal_flow",
+          ...(carriesStructuralEventSemantics(row)
+            ? ["non_recurring_event"]
+            : []),
+        ].includes(classified.behavior) &&
+        !classified.blocking
+      ) {
+        addBehavior(
+          section,
+          row.row_id,
+          classified.behavior,
+          ALLOWED_METHODS_BY_BEHAVIOR[classified.behavior],
+        );
+      }
+    }
+  }
+
+  return {
+    behavior_map: [...behaviorByKey.values()].sort(
+      (left, right) =>
+        left.section.localeCompare(right.section) ||
+        left.row_id.localeCompare(right.row_id),
+    ),
+    findings,
+  };
+}
 
 /**
  * The consumption doctrine as a compiler pass.  Broker consumables get their
@@ -1867,14 +2353,26 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     cfDaAggregate.forecast_treatment = "formula";
     delete cfDaAggregate.values;
   }
-  // The CGFO finance add-back restates the net finance result: minted as a
-  // negate of the identity whenever both rows exist.
+  // The CGFO finance add-back and the income-statement finance lines are
+  // independent consumers of the Interest Schedule.  They must not be linked
+  // through one another merely because their values are arithmetically
+  // related: that would invert the schedule authority and publish a false
+  // statement-to-statement dependency.
   const netFinanceRow = rowsById.get("net_finance_result");
   const financeAddback =
     rowsById.get("finance_costs_net_addback") ??
     allRows.find((row) => /finance costs \(net\)|net finance costs/i.test(row.label ?? ""));
-  if (netFinanceRow && financeAddback && !financeAddback.forecast_calculation && !financeAddback.calculation) {
-    wire(financeAddback, { operator: "negate", refs: [netFinanceRow.row_id] });
+  if (netFinanceRow && financeAddback) {
+    // The cash-flow add-back and the income-statement finance lines are all
+    // consumers of the Interest Schedule. Linking the add-back through another
+    // statement row is arithmetically equivalent but creates a false semantic
+    // dependency and a roundabout audit trail. Stamp the schedule-owned role
+    // and remove the legacy intermediate forecast rule; the emitter and
+    // independent graph now agree on the direct schedule path.
+    financeAddback.semantic_role = "net_finance_addback";
+    financeAddback.forecast_treatment = "formula";
+    delete financeAddback.forecast_calculation;
+    delete financeAddback.forecast_period_calculations;
   }
   const fx = byRole.get("fx_effect_on_cash");
   if (
@@ -1968,227 +2466,21 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     row.values = [...historicals, ...answer.answer.map(Number)];
   }
 
-  // 3. Capture: detail may be left unforecast only when the statement graph
-  // proves one local aggregate consumes it.  A generic EBITDA fallback used
-  // to capture unrelated income-statement and cash-flow rows; that hid real
-  // forecast gaps and made duplicate row ids order-dependent.  Capture is now
-  // section-qualified, unique and evidenced by formula or hierarchy
-  // membership.  Rows without that proof stay in the normal waterfall.
-  const sectionRowsById = new Map(
-    Object.entries(sections).map(([section, rows]) => [
-      section,
-      new Map((rows ?? []).map((row) => [row.row_id, row])),
-    ]),
-  );
-  const formulaParentsByRow = new Map();
-  for (const [section, sectionRows] of Object.entries(sections)) {
-    const localIds = new Set((sectionRows ?? []).map((row) => row.row_id));
-    for (const row of sectionRows ?? []) {
-      const referenceCounts = new Map();
-      for (const ref of row.calculation?.refs ?? []) {
-        if (!localIds.has(ref)) continue;
-        referenceCounts.set(ref, (referenceCounts.get(ref) ?? 0) + 1);
-      }
-      for (const [ref, count] of referenceCounts) {
-        const key = `${section}\u0000${ref}`;
-        const parents = formulaParentsByRow.get(key) ?? [];
-        parents.push({ parent_row_id: row.row_id, membership_count: count });
-        formulaParentsByRow.set(key, parents);
-      }
-    }
-  }
-  const behaviorMap = [];
-  const independentlyForecastedAggregate = (row) => {
-    if (!row) return false;
-    if (row.broker_metric_id) return true;
-    if (["broker", "hardcode", "zero"].includes(row.forecast_treatment)) {
-      return true;
-    }
-    if (
-      (row.forecast_period_authorities ?? []).some(
-        (authority) =>
-          authority &&
-          ![
-            "accounting_identity",
-            "schedule_link",
-            "driver_formula",
-            "roll_forward",
-            "not_separately_forecast",
-            "not_applicable",
-            "unresolved",
-          ].includes(authority.method),
-      )
-    ) {
-      return true;
-    }
-    // A filed total with no component formula is itself an economic series
-    // and may own a total-only forecast. A formula-summed parent is not an
-    // independent authority: blanking one of its children would remove that
-    // child's economics from the total and then from cash.
-    return !(row.calculation?.refs ?? []).length && !row.forecast_calculation;
-  };
-  for (const [section, sectionRows] of Object.entries(sections)) {
-    const localRows = sectionRowsById.get(section) ?? new Map();
-    for (const row of sectionRows) {
-      if (row.row_type === "header") continue;
-      // A member-less declared shell carries no rule of its own; under the
-      // strict waterfall it must state deliberate absence like any other
-      // uncalculated detail, so it passes through to capture.
-      const emptyShell =
-        row.calculation &&
-        (row.calculation.refs ?? []).length === 0 &&
-        !SCHEDULE_ROLES.has(row.semantic_role ?? "");
-      if (derivedRowIds.has(row.row_id) && !emptyShell) continue;
-      // Deliberately uncalculated rows still owe the strict waterfall a
-      // deliberate-absence declaration with a live captor.
-      if (
-        (row.forecast_treatment && row.forecast_treatment !== "uncalculated") ||
-        row.forecast_calculation
-      ) continue;
-      if (
-        (row.forecast_period_authorities ?? []).some(
-          (authority) =>
-            authority &&
-            !["not_separately_forecast", "not_applicable", "unresolved"].includes(authority.method),
-        )
-      ) continue;
-      if (SPINE_ROLES.has(row.semantic_role) || SCHEDULE_ROLES.has(row.semantic_role)) continue;
-      if (row.broker_metric_id) continue;
-      // A calculation row's authority IS its formula — identities are never
-      // captured; capture is for filed input detail the anchor absorbs.
-      if (row.calculation && !emptyShell) continue;
-      if ((row.values ?? []).slice(3).some((value) => value !== null && value !== undefined)) continue;
-      const formulaParents = formulaParentsByRow.get(
-        `${section}\u0000${row.row_id}`,
-      ) ?? [];
-      const hierarchyParent = row.parent_row_id && localRows.has(row.parent_row_id)
-        ? row.parent_row_id
-        : null;
-      const candidateParentIds = new Set([
-        ...formulaParents
-          .filter(
-            (parent) =>
-              parent.membership_count === 1 &&
-              independentlyForecastedAggregate(localRows.get(parent.parent_row_id)),
-          )
-          .map((parent) => parent.parent_row_id),
-        ...(hierarchyParent && independentlyForecastedAggregate(localRows.get(hierarchyParent))
-          ? [hierarchyParent]
-          : []),
-      ]);
-      // Multiple local aggregates are as unsafe as no aggregate: choosing one
-      // would double count or omit the row depending on source order.
-      if (candidateParentIds.size !== 1) continue;
-      const [captor] = candidateParentIds;
-      if (captor === row.row_id) continue;
-      const formulaMembership = formulaParents.some(
-        (parent) =>
-          parent.parent_row_id === captor && parent.membership_count === 1,
-      );
-      const captureMode = formulaMembership
-        ? "formula_membership"
-        : "semantic_scope";
-      row.forecast_treatment = "uncalculated";
-      row.forecast_capture_parent_id = captor;
-      row.forecast_capture_mode = captureMode;
-      behaviorMap.push({
-        section,
-        row_id: row.row_id,
-        behavior: "captured_detail",
-        allowed_methods: ["not_separately_forecast"],
-      });
-    }
-  }
-  // A captured row cannot itself be an endpoint.  Compress only through
-  // unique section-local formula membership.  If the chain is ambiguous or
-  // has no live producer, revoke capture and return the row to the ordinary
-  // waterfall rather than inventing a cross-section economic anchor.
-  const capturedKeys = new Set(
-    behaviorMap.map((entry) => `${entry.section}\u0000${entry.row_id}`),
-  );
-  const calculatesForecast = (section, row) =>
-    Boolean(
-      row &&
-        !capturedKeys.has(`${section}\u0000${row.row_id}`) &&
-        independentlyForecastedAggregate(row),
+  // 3. Forecast topology: capture is compiled as a graph certificate, never
+  // inferred from source order or a generic EBITDA fallback.
+  const captureTopology = compileForecastCaptureTopology(modelCase, {
+    derivedRowIds,
+  });
+  for (const finding of captureTopology.findings) {
+    report.add(
+      finding.id,
+      finding.severity,
+      finding.message,
+      "Repair the section-local statement membership graph; never select a capture path by row order.",
+      finding.context,
     );
-  for (const entry of behaviorMap) {
-    const localRows = sectionRowsById.get(entry.section) ?? new Map();
-    const row = localRows.get(entry.row_id);
-    if (!row) continue;
-    // A live formula parent that SUMS the row proves the capture by formula
-    // membership — the strongest certificate the contract accepts, and the
-    // only one that holds across sections.
-    const uniqueFormulaParents = (
-      formulaParentsByRow.get(`${entry.section}\u0000${row.row_id}`) ?? []
-    ).filter(
-      (parent) =>
-        parent.membership_count === 1 &&
-        independentlyForecastedAggregate(localRows.get(parent.parent_row_id)),
-    );
-    const formulaParent = uniqueFormulaParents.length === 1
-      ? localRows.get(uniqueFormulaParents[0].parent_row_id)
-      : null;
-    if (
-      formulaParent &&
-      !capturedKeys.has(`${entry.section}\u0000${formulaParent.row_id}`) &&
-      (formulaParent.calculation?.refs ?? []).filter(
-        (reference) => reference === row.row_id,
-      ).length === 1
-    ) {
-      row.forecast_capture_parent_id = formulaParent.row_id;
-      row.forecast_capture_mode = "formula_membership";
-      continue;
-    }
-    const declaredCaptorId = row.forecast_capture_parent_id;
-    let captor = localRows.get(declaredCaptorId);
-    const seen = new Set();
-    while (
-      captor &&
-      capturedKeys.has(`${entry.section}\u0000${captor.row_id}`) &&
-      !seen.has(captor.row_id)
-    ) {
-      seen.add(captor.row_id);
-      const nextParents = (
-        formulaParentsByRow.get(
-          `${entry.section}\u0000${captor.row_id}`,
-        ) ?? []
-      ).filter((parent) => parent.membership_count === 1);
-      captor = nextParents.length === 1
-        ? localRows.get(nextParents[0].parent_row_id)
-        : null;
-    }
-    if (
-      captor &&
-      captor.row_id !== row.row_id &&
-      captor.row_id !== declaredCaptorId
-    ) {
-      row.forecast_capture_parent_id = captor.row_id;
-      row.forecast_capture_mode = "formula_membership";
-    }
-    if (!calculatesForecast(entry.section, captor)) {
-      // A missing local captor is not replaced by an economic row from the
-      // other statement.  Drop the speculative capture so the ordinary
-      // behavior/evidence waterfall must resolve the row or block it.
-      delete row.forecast_capture_parent_id;
-      delete row.forecast_capture_mode;
-      delete row.forecast_treatment;
-      entry.behavior = "recurring_flow";
-      entry.allowed_methods = [
-        "actual_plus_remainder",
-        "company_guidance",
-        "company_indication",
-        "broker_consensus",
-        "user_assumption",
-        "driver_formula",
-        "historical_average",
-        "historical_trend",
-        "carry_forward",
-        "explicit_zero",
-      ];
-    }
   }
-  return behaviorMap;
+  return captureTopology.behavior_map;
 }
 
 function verifyManifestSeals(caseSource, manifestsBySection, report) {
@@ -2507,6 +2799,55 @@ export function compileCase(caseSource, evidence = {}) {
   }
   Object.assign(modelCase, materialized);
 
+  // Cross-statement restatements have one legal direction: the cash-flow
+  // bridge may consume an income-statement row.  If an authored mixed-period
+  // rule points the income statement back down to that same CF restatement,
+  // remove only that reverse-period rule (its independently receipted period
+  // authority remains live) and complete the CF link across all periods.
+  // This is graph-shaped, not caption-shaped: it applies to any transparent
+  // CF link paired with the same IS row and prevents both an illegal authority
+  // direction and the FY1-null-rule renderer failure.
+  const incomeRows = modelCase.statement_structure?.income_statement ?? [];
+  const cashFlowRows = modelCase.statement_structure?.cash_flow ?? [];
+  const cashFlowIds = new Set(cashFlowRows.map((row) => row.row_id));
+  for (const cfRow of cashFlowRows) {
+    if (cfRow.calculation?.operator !== "link" || cfRow.calculation.refs?.length !== 1) {
+      continue;
+    }
+    const incomeRow = incomeRows.find(
+      (row) => row.row_id === cfRow.calculation.refs[0],
+    );
+    if (!incomeRow) continue;
+    const periodRules = incomeRow.forecast_period_calculations;
+    if (!Array.isArray(periodRules)) continue;
+    const reversePeriods = periodRules
+      .map((rule, index) =>
+        rule?.refs?.some((reference) => cashFlowIds.has(reference)) ? index : -1,
+      )
+      .filter((index) => index >= 0);
+    if (reversePeriods.length === 0) continue;
+    for (const index of reversePeriods) {
+      const authority = incomeRow.forecast_period_authorities?.[index];
+      if (!authority || ["accounting_identity", "driver_formula", "roll_forward"].includes(authority.method)) {
+        report.add(
+          "forecast_direction.reverse_cross_statement_without_authority",
+          "BLOCK",
+          `${incomeRow.row_id} forecast period ${index + 1} points down to cash flow without an independent replacement authority.`,
+          "Provide a period-level income-statement authority; the cash-flow restatement must link from income statement, never vice versa.",
+          { row_id: incomeRow.row_id, cash_flow_row_id: cfRow.row_id, forecast_index: index },
+        );
+        continue;
+      }
+      periodRules[index] = null;
+    }
+    cfRow.forecast_treatment = "formula";
+    cfRow.forecast_period_calculations = [0, 1, 2].map((forecastIndex) => ({
+      operator: "link",
+      refs: [incomeRow.row_id],
+      forecast_index: forecastIndex,
+    }));
+  }
+
   // Normalisation: the sealed case records links and treatments, never a
   // cached copy of broker numbers — the build resolves those live.  An input
   // row's broker treatment is implied by its link.
@@ -2691,7 +3032,13 @@ export function compileCase(caseSource, evidence = {}) {
     const coverage = assessCoverage(modelCase);
     for (const check of coverage?.checks ?? []) {
       if (check.status === "BLOCK") {
-        report.add(`coverage.${check.id}`, "BLOCK", check.message ?? check.id, "Resolve at the declaration or evidence lane named by the check id, then recompile.", check.context);
+        report.add(
+          `coverage.${check.id}`,
+          "BLOCK",
+          check.message ?? check.id,
+          "Resolve at the declaration or evidence lane named by the check id, then recompile.",
+          check.detail ?? check.context,
+        );
       }
     }
   } catch (error) {

@@ -10,6 +10,11 @@ import {
   compileInstrumentPeriodState,
   instrumentPeriodStateByKey,
 } from "./instrument_period_state.mjs";
+import {
+  canonicalStatementDependencies,
+  canonicalForecastStatementDependencies,
+  compileLayeredGraphConstitution,
+} from "./layered_graph_constitution.mjs";
 
 const MOVEMENT_DEFINITIONS = {
   operating_cash_flow: {
@@ -192,13 +197,7 @@ function normaliseGroupKey(label) {
 }
 
 function dependencies(definition) {
-  return uniqueSorted([
-    ...(definition.calculation?.refs ?? []),
-    ...(definition.forecast_calculation?.refs ?? []),
-    ...(definition.forecast_period_calculations ?? []).flatMap(
-      (calculation) => calculation?.refs ?? [],
-    ),
-  ]);
+  return canonicalForecastStatementDependencies(definition);
 }
 
 function declaredSources(modelCase, rowId) {
@@ -215,6 +214,15 @@ function declaredSources(modelCase, rowId) {
 
 function formulaAuthority(definition) {
   if (definition.formula_authority) return definition.formula_authority;
+  if (
+    definition.forecast_capture_parent_id ||
+    definition.forecast_treatment === "uncalculated"
+  ) {
+    return "intentionally_blank";
+  }
+  if (["broker", "hardcode", "zero"].includes(definition.forecast_treatment)) {
+    return "case_input";
+  }
   if (definition.row_type === "input") return "case_input";
   if (COMPILER_CALCULATED_ROLES.has(definition.semantic_role)) {
     return "compiler";
@@ -255,6 +263,11 @@ export function describeStatementRow(definition, section) {
   return {
     semantic_id: definition.semantic_id ?? definition.row_id,
     section,
+    // Keep the source identity and the emitted forecast graph separate.  The
+    // former proves the filed statement; the latter is what J:L must
+    // physically reference after a direct forecast writer or capture stands
+    // the historical identity down.
+    historical_dependency_refs: canonicalStatementDependencies(definition),
     dependency_refs: dependencies(definition),
     movement_type: movementType,
     cash_flow_classification:
@@ -337,6 +350,7 @@ function statementNodes(modelCase, rowPlan) {
       display_role: row.display_role ?? null,
       formula_role: row.formula_role ?? null,
       formula_authority: description.formula_authority,
+      historical_dependencies: description.historical_dependency_refs,
       dependencies: description.dependency_refs,
       forecast_authorities: semanticForecastAuthorities(modelCase, row),
       source_line_ids: uniqueSorted([
@@ -1025,6 +1039,10 @@ export function compileSemanticManifest(
       `Cannot seal semantic graph with invalid historical interest authority: ${historicalInterestAuthority.errors.join(" ")}`,
     );
   }
+  const layeredGraphConstitution = compileLayeredGraphConstitution(
+    modelCase,
+    rowPlan,
+  );
   return {
     schema_version: 1,
     contract_version: Number(modelCase.contract_version),
@@ -1088,6 +1106,7 @@ export function compileSemanticManifest(
         ),
       ]),
     ),
+    layered_graph_constitution: layeredGraphConstitution,
     source_inventory: sourceInventory(modelCase),
     nodes,
     edges: graphEdges(nodes, rowPlan),

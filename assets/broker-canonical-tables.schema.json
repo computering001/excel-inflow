@@ -3,7 +3,7 @@
   "$id": "https://local.invalid/excel-inflow/broker-canonical-tables.schema.json",
   "title": "Canonical reconciled broker tables",
   "type": "object",
-  "required": ["schema_version", "source_bundle_sha256", "canonical_tables_sha256", "documents", "canonical_findings", "gate_status"],
+  "required": ["schema_version", "source_bundle_sha256", "canonical_tables_sha256", "physical_capture_receipt", "documents", "canonical_findings", "gate_status"],
   "properties": {
     "schema_version": {"const": "broker-canonical-tables/1.0"},
     "source_bundle_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
@@ -15,6 +15,7 @@
         "required": ["document_id", "canonical_tables"],
         "properties": {
           "document_id": {"type": "string", "minLength": 1},
+          "physical_capture_receipts": {"type": "array", "items": {"type": "object"}},
           "canonical_tables": {
             "type": "array",
             "items": {
@@ -39,7 +40,21 @@
         }
       }
     },
+    "physical_capture_receipt": {
+      "type": "object",
+      "required": ["schema_version", "status", "surface_count", "complete_surface_count", "analytical_surface_count", "evidence_only_surface_count", "pending_surface_ids", "model_linked_accuracy_status"],
+      "properties": {
+        "schema_version": {"const": "broker-physical-capture-receipt/1.0"},
+        "status": {"enum": ["PASS", "NEEDS_VISION", "NEEDS_RESOLUTION"]},
+        "surface_count": {"type": "integer", "minimum": 0},
+        "complete_surface_count": {"type": "integer", "minimum": 0},
+        "analytical_surface_count": {"type": "integer", "minimum": 0},
+        "evidence_only_surface_count": {"type": "integer", "minimum": 0},
+        "pending_surface_ids": {"type": "array", "items": {"type": "string"}},
+        "model_linked_accuracy_status": {"const": "PENDING_SEMANTIC_CROSSWALK"}
+      }
+    },
     "canonical_findings": {"type": "array"},
-    "gate_status": {"enum": ["PASS", "NEEDS_VISION", "BLOCKED"]}
+    "gate_status": {"enum": ["PASS", "NEEDS_VISION", "NEEDS_RESOLUTION", "BLOCKED"]}
   }
 }

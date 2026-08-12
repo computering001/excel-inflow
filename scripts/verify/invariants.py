@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from urllib.parse import quote
 from typing import Any, Dict, List, Optional
 
 APPROVED_MAPPING_METHODS = {
@@ -46,6 +47,622 @@ def sha256(value) -> str:
     if isinstance(value, (bytes, bytearray)):
         return hashlib.sha256(value).hexdigest()
     return hashlib.sha256(str(value).encode("utf-8")).hexdigest()
+
+
+_LAYERED_GRAPH_VERSION = "layered-graph-constitution/1.1"
+_ROW_PLAN_PROJECTION_SCOPE = "statement-row-projection/1.0"
+_LAYER_IDS = ("evidence", "statement", "forecast", "economic", "row_plan")
+
+
+def _hash_value(value: Any) -> str:
+    """Python port of run_store.mjs `hashValue`.
+
+    The two-space JSON representation is part of that persisted hash contract;
+    `canonical_json` above intentionally uses the compact representation for
+    older sidecars, so this helper must remain separate.
+    """
+
+    payload = json.dumps(canonical(value), indent=2, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _stable_layer_node_id(layer: str, *parts: Any) -> str:
+    safe = "-_.!~*'()"  # JavaScript encodeURIComponent's unescaped set.
+    encoded = [quote(str("" if part is None else part), safe=safe) for part in parts]
+    return ":".join([layer, *encoded])
+
+
+def _portable_sorted(values, key=lambda value: value):
+    return sorted(values, key=lambda value: str(key(value)).encode("utf-8"))
+
+
+def _layer_index(constitution: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {
+        item.get("layer_id"): item
+        for item in constitution.get("layers") or []
+        if isinstance(item, dict) and item.get("layer_id")
+    }
+
+
+def _error(errors: List[Dict[str, Any]], identifier: str, **detail: Any) -> None:
+    errors.append({"id": identifier, **detail})
+
+
+def _node_map(layer: Dict[str, Any]) -> Dict[Any, Dict[str, Any]]:
+    return {
+        node.get("id"): node
+        for node in layer.get("nodes") or []
+        if isinstance(node, dict) and node.get("id")
+    }
+
+
+def _compare_exact_inventory(
+    errors: List[Dict[str, Any]],
+    *,
+    layer_id: str,
+    item_kind: str,
+    expected: List[Dict[str, Any]],
+    actual: List[Dict[str, Any]],
+) -> None:
+    expected_by_id = {item.get("id"): item for item in expected}
+    actual_by_id = {item.get("id"): item for item in actual}
+    if len(expected_by_id) != len(expected) or len(actual_by_id) != len(actual):
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.duplicate_%s" % item_kind,
+            layer=layer_id,
+        )
+    for identifier in _portable_sorted(set(expected_by_id) | set(actual_by_id)):
+        wanted = expected_by_id.get(identifier)
+        observed = actual_by_id.get(identifier)
+        if wanted != observed:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.%s_mismatch" % item_kind,
+                layer=layer_id,
+                stable_id=identifier,
+                expected=wanted,
+                actual=observed,
+            )
+
+
+def validate_layered_graph_constitution(
+    constitution: Any,
+    *,
+    manifest: Optional[Dict[str, Any]] = None,
+    row_plan: Optional[Dict[str, Any]] = None,
+    equation_graph: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """Independently validate and re-project the five graph layers.
+
+    This is deliberately not a trust check on the Node-produced PASS label.
+    Python recomputes every persisted graph/closure hash and, when its source
+    artefacts are supplied, reconstructs the evidence, statement dependency,
+    forecast writer, canonical economic and physical row-plan inventories.
+    """
+
+    errors: List[Dict[str, Any]] = []
+    artifact = constitution if isinstance(constitution, dict) else {}
+    if artifact.get("schema_version") != _LAYERED_GRAPH_VERSION:
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.schema_version",
+            expected=_LAYERED_GRAPH_VERSION,
+            actual=artifact.get("schema_version"),
+        )
+        return errors
+
+    layers = artifact.get("layers") or []
+    actual_layer_ids = [item.get("layer_id") for item in layers if isinstance(item, dict)]
+    if actual_layer_ids != list(_LAYER_IDS):
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.layer_order",
+            expected=list(_LAYER_IDS),
+            actual=actual_layer_ids,
+        )
+    layer_by_id = _layer_index(artifact)
+    all_node_ids: List[Any] = []
+    expected_layer_hashes: Dict[str, Any] = {}
+    for layer_id in _LAYER_IDS:
+        layer = layer_by_id.get(layer_id)
+        if not isinstance(layer, dict):
+            _error(errors, "manifest.layered_graph_constitution.layer_missing", layer=layer_id)
+            continue
+        nodes = layer.get("nodes") or []
+        edges = layer.get("edges") or []
+        all_node_ids.extend(
+            node.get("id") for node in nodes if isinstance(node, dict)
+        )
+        core = {"layer_id": layer_id, "nodes": nodes, "edges": edges}
+        calculated = _hash_value(core)
+        expected_layer_hashes[layer_id] = calculated
+        if layer.get("graph_sha256") != calculated:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.layer_hash",
+                layer=layer_id,
+                expected=calculated,
+                actual=layer.get("graph_sha256"),
+            )
+
+    duplicate_node_ids = _portable_sorted(
+        {node_id for node_id in all_node_ids if all_node_ids.count(node_id) > 1}
+    )
+    if duplicate_node_ids:
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.duplicate_node_id",
+            stable_ids=duplicate_node_ids,
+        )
+    node_id_set = set(all_node_ids)
+    for layer_id, layer in layer_by_id.items():
+        for edge in layer.get("edges") or []:
+            if edge.get("from") not in node_id_set or edge.get("to") not in node_id_set:
+                _error(
+                    errors,
+                    "manifest.layered_graph_constitution.orphan_edge",
+                    layer=layer_id,
+                    edge_id=edge.get("id"),
+                    source=edge.get("from"),
+                    target=edge.get("to"),
+                )
+
+    if artifact.get("layer_hashes") != expected_layer_hashes:
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.layer_hash_inventory",
+            expected=expected_layer_hashes,
+            actual=artifact.get("layer_hashes"),
+        )
+    sorted_violations = _portable_sorted(
+        artifact.get("violations") or [],
+        key=lambda item: "%s\x00%s" % (item.get("code"), item.get("message")),
+    )
+    expected_violation_sha256 = _hash_value(sorted_violations)
+    if artifact.get("violation_sha256") != expected_violation_sha256:
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.violation_hash",
+            expected=expected_violation_sha256,
+            actual=artifact.get("violation_sha256"),
+        )
+    closure_core = {
+        "schema_version": artifact.get("schema_version"),
+        "case_id": artifact.get("case_id"),
+        "case_sha256": artifact.get("case_sha256"),
+        "row_plan_projection_scope": artifact.get("row_plan_projection_scope"),
+        "row_plan_projection_sha256": artifact.get("row_plan_projection_sha256"),
+        "layer_hashes": artifact.get("layer_hashes"),
+        "violation_sha256": artifact.get("violation_sha256"),
+    }
+    expected_closure_sha256 = _hash_value(closure_core)
+    if artifact.get("closure_sha256") != expected_closure_sha256:
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.closure_hash",
+            expected=expected_closure_sha256,
+            actual=artifact.get("closure_sha256"),
+        )
+    if sorted_violations or artifact.get("status") != "PASS":
+        _error(
+            errors,
+            "manifest.layered_graph_constitution.status",
+            status=artifact.get("status"),
+            violations=sorted_violations,
+        )
+
+    manifest = manifest if isinstance(manifest, dict) else None
+    statement_nodes: List[Dict[str, Any]] = []
+    statement_by_key: Dict[tuple, Dict[str, Any]] = {}
+    if manifest is not None:
+        if artifact.get("case_id") != manifest.get("case_id"):
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.case_id_binding",
+                expected=manifest.get("case_id"),
+                actual=artifact.get("case_id"),
+            )
+        if artifact.get("case_sha256") != manifest.get("case_sha256"):
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.case_hash_binding",
+                expected=manifest.get("case_sha256"),
+                actual=artifact.get("case_sha256"),
+            )
+        statement_nodes = [
+            node
+            for node in manifest.get("nodes") or []
+            if isinstance(node, dict) and node.get("node_kind") == "statement_row"
+        ]
+        statement_by_key = {
+            (node.get("section"), node.get("row_id")): node
+            for node in statement_nodes
+        }
+        actual_statement = _node_map(layer_by_id.get("statement") or {})
+        expected_statement_ids = {
+            _stable_layer_node_id(
+                "statement", node.get("section"), node.get("row_id"), 0
+            )
+            for node in statement_nodes
+        }
+        if set(actual_statement) != expected_statement_ids:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.statement_inventory",
+                missing=_portable_sorted(expected_statement_ids - set(actual_statement)),
+                unexpected=_portable_sorted(set(actual_statement) - expected_statement_ids),
+            )
+        for node in statement_nodes:
+            identifier = _stable_layer_node_id(
+                "statement", node.get("section"), node.get("row_id"), 0
+            )
+            actual = actual_statement.get(identifier) or {}
+            # Evidence-only rows are reconstructed from a different source
+            # object than rendered row-plan rows, so their source IDs are
+            # already proved through the evidence layer rather than duplicated
+            # here.
+            source_ids = (
+                actual.get("source_line_ids")
+                if node.get("projection_status") != "rendered"
+                else _portable_sorted(set(node.get("source_line_ids") or []))
+            )
+            expected_fields = {
+                "section": node.get("section"),
+                "row_id": node.get("row_id"),
+                "semantic_role": node.get("semantic_role"),
+                "row_type": node.get("row_type"),
+                "source_line_ids": source_ids,
+            }
+            for field, expected in expected_fields.items():
+                if actual.get(field) != expected:
+                    _error(
+                        errors,
+                        "manifest.layered_graph_constitution.statement_binding",
+                        stable_id=identifier,
+                        field=field,
+                        expected=expected,
+                        actual=actual.get(field),
+                    )
+
+        expected_statement_edges: List[Dict[str, Any]] = []
+        for node in statement_nodes:
+            section = node.get("section")
+            row_id = node.get("row_id")
+            source_id = _stable_layer_node_id("statement", section, row_id, 0)
+            for reference in node.get("dependencies") or []:
+                target = statement_by_key.get((section, reference))
+                if target is None:
+                    global_targets = [
+                        candidate
+                        for candidate in statement_nodes
+                        if candidate.get("row_id") == reference
+                    ]
+                    target = global_targets[0] if len(global_targets) == 1 else None
+                if target is None:
+                    continue
+                target_section = target.get("section")
+                expected_statement_edges.append(
+                    {
+                        "id": _stable_layer_node_id(
+                            "edge",
+                            "statement_dependency",
+                            section,
+                            row_id,
+                            target_section,
+                            reference,
+                        ),
+                        "type": (
+                            "cross_section_dependency"
+                            if target_section != section
+                            else "depends_on"
+                        ),
+                        "from": source_id,
+                        "to": _stable_layer_node_id(
+                            "statement", target_section, reference, 0
+                        ),
+                    }
+                )
+            for edge_type, parent_field in (
+                ("presentation_parent", "parent_row_id"),
+                ("forecast_capture", "forecast_capture_parent_id"),
+            ):
+                parent_id = node.get(parent_field)
+                if not parent_id:
+                    continue
+                expected_statement_edges.append(
+                    {
+                        "id": _stable_layer_node_id(
+                            "edge", edge_type, section, row_id, parent_id
+                        ),
+                        "type": edge_type,
+                        "from": source_id,
+                        "to": _stable_layer_node_id(
+                            "statement", section, parent_id, 0
+                        ),
+                    }
+                )
+        _compare_exact_inventory(
+            errors,
+            layer_id="statement",
+            item_kind="edge",
+            expected=expected_statement_edges,
+            actual=(layer_by_id.get("statement") or {}).get("edges") or [],
+        )
+
+        expected_forecast_nodes: List[Dict[str, Any]] = []
+        expected_forecast_edges: List[Dict[str, Any]] = []
+        for node in statement_nodes:
+            if node.get("row_type") == "header":
+                continue
+            for forecast_index, authority in enumerate(
+                node.get("forecast_authorities") or []
+            ):
+                identifier = _stable_layer_node_id(
+                    "forecast",
+                    node.get("section"),
+                    node.get("row_id"),
+                    forecast_index,
+                )
+                writer = "%s:%s" % (
+                    authority.get("mechanism"), authority.get("method")
+                )
+                expected_forecast_nodes.append(
+                    {
+                        "id": identifier,
+                        "section": node.get("section"),
+                        "row_id": node.get("row_id"),
+                        "forecast_index": forecast_index,
+                        "method": authority.get("method"),
+                        "mechanism": authority.get("mechanism"),
+                        "writer": writer,
+                    }
+                )
+                expected_forecast_edges.append(
+                    {
+                        "id": _stable_layer_node_id(
+                            "edge",
+                            "forecast_writes",
+                            node.get("section"),
+                            node.get("row_id"),
+                            forecast_index,
+                        ),
+                        "type": "writes_period",
+                        "from": identifier,
+                        "to": _stable_layer_node_id(
+                            "statement",
+                            node.get("section"),
+                            node.get("row_id"),
+                            0,
+                        ),
+                    }
+                )
+        _compare_exact_inventory(
+            errors,
+            layer_id="forecast",
+            item_kind="node",
+            expected=expected_forecast_nodes,
+            actual=(layer_by_id.get("forecast") or {}).get("nodes") or [],
+        )
+        _compare_exact_inventory(
+            errors,
+            layer_id="forecast",
+            item_kind="edge",
+            expected=expected_forecast_edges,
+            actual=(layer_by_id.get("forecast") or {}).get("edges") or [],
+        )
+
+        expected_evidence_nodes: List[Dict[str, Any]] = []
+        expected_evidence_edges: List[Dict[str, Any]] = []
+        occurrences: Dict[tuple, int] = {}
+        for source in manifest.get("source_inventory") or []:
+            section = source.get("section")
+            source_line_id = source.get("source_line_id")
+            key = (section, source_line_id)
+            ordinal = occurrences.get(key, 0)
+            occurrences[key] = ordinal + 1
+            identifier = _stable_layer_node_id(
+                "evidence", section, source_line_id, ordinal
+            )
+            expected_evidence_nodes.append(
+                {
+                    "id": identifier,
+                    "section": section,
+                    "source_line_id": source_line_id,
+                    "material": source.get("material") is True,
+                    "disposition": source.get("disposition"),
+                    "writer": "sealed_source",
+                }
+            )
+            for row_id in source.get("mapped_row_ids") or []:
+                expected_evidence_edges.append(
+                    {
+                        "id": _stable_layer_node_id(
+                            "edge",
+                            "evidence_supplies",
+                            section,
+                            source_line_id,
+                            ordinal,
+                            row_id,
+                        ),
+                        "type": "supplies",
+                        "from": identifier,
+                        "to": _stable_layer_node_id(
+                            "statement", section, row_id, 0
+                        ),
+                    }
+                )
+        _compare_exact_inventory(
+            errors,
+            layer_id="evidence",
+            item_kind="node",
+            expected=expected_evidence_nodes,
+            actual=(layer_by_id.get("evidence") or {}).get("nodes") or [],
+        )
+        _compare_exact_inventory(
+            errors,
+            layer_id="evidence",
+            item_kind="edge",
+            expected=expected_evidence_edges,
+            actual=(layer_by_id.get("evidence") or {}).get("edges") or [],
+        )
+
+    if row_plan is not None:
+        projection = {
+            "scope": _ROW_PLAN_PROJECTION_SCOPE,
+            "statement_rows": row_plan.get("statement_rows") or {},
+        }
+        expected_row_plan_sha256 = _hash_value(projection)
+        if artifact.get("row_plan_projection_scope") != _ROW_PLAN_PROJECTION_SCOPE:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.row_plan_projection_scope",
+                expected=_ROW_PLAN_PROJECTION_SCOPE,
+                actual=artifact.get("row_plan_projection_scope"),
+            )
+        if artifact.get("row_plan_projection_sha256") != expected_row_plan_sha256:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.row_plan_hash_binding",
+                expected=expected_row_plan_sha256,
+                actual=artifact.get("row_plan_projection_sha256"),
+            )
+        expected_projection_nodes: List[Dict[str, Any]] = []
+        expected_projection_edges: List[Dict[str, Any]] = []
+        for section in ("income_statement", "cash_flow"):
+            for row in (row_plan.get("statement_rows") or {}).get(section) or []:
+                identifier = _stable_layer_node_id(
+                    "row_plan", section, row.get("row_id"), 0
+                )
+                expected_projection_nodes.append(
+                    {
+                        "id": identifier,
+                        "section": section,
+                        "row_id": row.get("row_id"),
+                        "sheet": "Operating Model",
+                        "physical_row": row.get("row"),
+                        "writer": "row_plan",
+                    }
+                )
+                expected_projection_edges.append(
+                    {
+                        "id": _stable_layer_node_id(
+                            "edge", "projects", section, row.get("row_id"), 0
+                        ),
+                        "type": "projects",
+                        "from": identifier,
+                        "to": _stable_layer_node_id(
+                            "statement", section, row.get("row_id"), 0
+                        ),
+                    }
+                )
+        _compare_exact_inventory(
+            errors,
+            layer_id="row_plan",
+            item_kind="node",
+            expected=expected_projection_nodes,
+            actual=(layer_by_id.get("row_plan") or {}).get("nodes") or [],
+        )
+        _compare_exact_inventory(
+            errors,
+            layer_id="row_plan",
+            item_kind="edge",
+            expected=expected_projection_edges,
+            actual=(layer_by_id.get("row_plan") or {}).get("edges") or [],
+        )
+
+    if equation_graph is not None:
+        expected_economic_nodes = [
+            {
+                "id": _stable_layer_node_id("economic", node.get("id")),
+                "equation_node_id": node.get("id"),
+                "role": node.get("role"),
+                "domain": node.get("domain"),
+                "writer": "canonical_solver_equation",
+            }
+            for node in equation_graph.get("nodes") or []
+        ]
+        expected_economic_edges = [
+            {
+                "id": _stable_layer_node_id("edge", "economic", edge.get("id")),
+                "type": edge.get("type"),
+                "from": _stable_layer_node_id("economic", edge.get("from")),
+                "to": _stable_layer_node_id("economic", edge.get("to")),
+                "activation": edge.get("activation"),
+            }
+            for edge in equation_graph.get("edges") or []
+        ]
+        _compare_exact_inventory(
+            errors,
+            layer_id="economic",
+            item_kind="node",
+            expected=expected_economic_nodes,
+            actual=(layer_by_id.get("economic") or {}).get("nodes") or [],
+        )
+        _compare_exact_inventory(
+            errors,
+            layer_id="economic",
+            item_kind="edge",
+            expected=expected_economic_edges,
+            actual=(layer_by_id.get("economic") or {}).get("edges") or [],
+        )
+        # The layer artifact intentionally keeps graph domains separate. The
+        # deployed Python proof closes the boundary independently through the
+        # shared semantic role: one canonical economic writer -> one statement
+        # meaning -> one physical projection when that statement is rendered.
+        statement_by_role: Dict[Any, List[Dict[str, Any]]] = {}
+        for node in (layer_by_id.get("statement") or {}).get("nodes") or []:
+            role = node.get("semantic_role")
+            if role:
+                statement_by_role.setdefault(role, []).append(node)
+        economic_by_role: Dict[Any, List[Dict[str, Any]]] = {}
+        for node in (layer_by_id.get("economic") or {}).get("nodes") or []:
+            role = node.get("role")
+            if role:
+                economic_by_role.setdefault(role, []).append(node)
+        projected_statement_targets = {
+            edge.get("to")
+            for edge in (layer_by_id.get("row_plan") or {}).get("edges") or []
+            if edge.get("type") == "projects"
+        }
+        overlapping_roles = _portable_sorted(
+            set(statement_by_role) & set(economic_by_role)
+        )
+        if len(overlapping_roles) < 5:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_statement_binding_vacuous",
+                roles=overlapping_roles,
+            )
+        for role in overlapping_roles:
+            statement_claims = statement_by_role[role]
+            economic_claims = economic_by_role[role]
+            if len(statement_claims) != 1 or len(economic_claims) != 1:
+                _error(
+                    errors,
+                    "manifest.layered_graph_constitution.economic_statement_writer_conflict",
+                    semantic_role=role,
+                    statement_claims=[item.get("id") for item in statement_claims],
+                    economic_claims=[item.get("id") for item in economic_claims],
+                )
+                continue
+            statement_claim = statement_claims[0]
+            manifest_statement = statement_by_key.get(
+                (statement_claim.get("section"), statement_claim.get("row_id"))
+            )
+            if (
+                manifest_statement is not None
+                and manifest_statement.get("projection_status") == "rendered"
+                and statement_claim.get("id") not in projected_statement_targets
+            ):
+                _error(
+                    errors,
+                    "manifest.layered_graph_constitution.economic_statement_projection_missing",
+                    semantic_role=role,
+                    statement_id=statement_claim.get("id"),
+                    economic_id=economic_claims[0].get("id"),
+                )
+    return errors
 
 
 def build_native_evidence_bindings(
@@ -141,12 +758,38 @@ def validate_fiscal_periods(model_case: Dict[str, Any]) -> List[Dict[str, Any]]:
     return errors
 
 
-def validate_semantic_artifacts(manifest, crosswalk_rows) -> List[Dict[str, Any]]:
+def validate_semantic_artifacts(
+    manifest,
+    crosswalk_rows,
+    *,
+    row_plan=None,
+    equation_graph=None,
+) -> List[Dict[str, Any]]:
     errors: List[Dict[str, Any]] = []
     manifest = manifest or {}
     nodes = manifest.get("nodes") or []
     edges = manifest.get("edges") or []
     sources = manifest.get("source_inventory") or []
+    full_semantic_manifest = any(
+        node.get("node_kind") == "statement_row" for node in nodes
+    ) or bool(sources)
+    constitution = manifest.get("layered_graph_constitution")
+    if full_semantic_manifest and not constitution:
+        errors.append(
+            {
+                "id": "manifest.layered_graph_constitution_missing",
+                "message": "A full semantic manifest requires the sealed five-layer graph constitution.",
+            }
+        )
+    elif constitution:
+        errors.extend(
+            validate_layered_graph_constitution(
+                constitution,
+                manifest=manifest,
+                row_plan=row_plan,
+                equation_graph=equation_graph,
+            )
+        )
     instrument_period_state = manifest.get("instrument_period_state")
     if int(manifest.get("contract_version") or 0) == 2 and not instrument_period_state:
         errors.append(

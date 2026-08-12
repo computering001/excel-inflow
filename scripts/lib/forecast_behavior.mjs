@@ -53,16 +53,25 @@ export const ALLOWED_METHODS_BY_BEHAVIOR = Object.freeze({
     "broker_consensus", "user_assumption", "historical_average", "explicit_zero",
   ]),
   non_recurring_event: Object.freeze([
-    "company_guidance", "company_indication", "user_assumption",
-    "explicit_zero", "not_separately_forecast",
+    "actual_plus_remainder", "contractual_commitment", "company_guidance",
+    "company_indication", "user_assumption", "explicit_zero",
+    "not_separately_forecast",
   ]),
-  captured_detail: Object.freeze(["not_separately_forecast"]),
+  // Capture is a per-period fallback, not a global eraser. A detail line may
+  // have a stronger FY1 observation and still be captured by its headline in
+  // FY2/FY3. Historical inference is deliberately excluded: a generic trend
+  // is not stronger than a certified top-down authority.
+  captured_detail: Object.freeze([
+    "actual_plus_remainder", "contractual_commitment", "company_guidance",
+    "company_indication", "broker_consensus", "user_assumption",
+    "driver_formula", "roll_forward", "not_separately_forecast",
+  ]),
   not_applicable: Object.freeze(["not_applicable"]),
 });
 
 const SCHEDULE_ROLES = new Set([
   "interest_income", "interest_expense", "cash_interest_paid",
-  "cash_interest_received", "debt_issuance", "debt_repayment",
+  "cash_interest_received", "net_finance_addback", "debt_issuance", "debt_repayment",
   "change_in_debt", "opening_debt", "ending_debt", "gross_debt",
   "net_debt", "rcf_draw", "rcf_repayment", "ending_rcf",
   "lease_principal", "lease_interest", "lease_liability",
@@ -222,10 +231,22 @@ function classifySignals(modelCase, row, section, rows) {
   if (NON_RECURRING_ROLES.has(role)) {
     add("row_semantics", "non_recurring_semantic_role", "non_recurring_event", 0.96);
   }
+  if (
+    ["debt issuance cost", "other cash debt movement"].includes(
+      normalise(row?.movement_type),
+    )
+  ) {
+    // Financing transaction movements are discrete events, not a recurring
+    // run-rate.  Debt principal issuance/repayment roles are intercepted by
+    // schedule ownership above; this signal is for the residual transaction
+    // rows that otherwise used to repeat the latest filed cash flow forever.
+    add("movement_type", "discrete_financing_transaction", "non_recurring_event", 0.97);
+  }
   if (includesAny(descriptor, [
     "acquisition", "business combination", "merger", "litigation", "legal settlement",
     "restructuring", "impairment", "exceptional", "one off", "one time",
-    "non recurring", "discontinued operation",
+    "non recurring", "discontinued operation", "debt issuance cost",
+    "financing transaction cost", "transaction fee",
   ])) {
     add("source_evidence", "event_or_one_off_descriptor", "non_recurring_event", 0.9);
   }

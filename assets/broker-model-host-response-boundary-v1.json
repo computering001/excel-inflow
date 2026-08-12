@@ -1,0 +1,90 @@
+{
+  "schema_version": "broker-model-host-response-boundary/1.0",
+  "stall_attempt_limit": 3,
+  "tasks": {
+    "independent_table_transcription": {
+      "remedy_id": "two_independent_grid_reads",
+      "attempt_limit": 3,
+      "response_schema_path": "assets/broker-vision-result.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read the hash-bound page image and every supplied region crop.",
+        "Write two independent grid-preserving responses with different producer fingerprints.",
+        "Bind each response to the exact document, surface, image hash and pass index.",
+        "Resume the same broker controller transaction without changing source bytes."
+      ]
+    },
+    "targeted_cell_adjudication": {
+      "remedy_id": "conflict_manifest_bound_cell_adjudication",
+      "attempt_limit": 3,
+      "response_schema_path": "assets/broker-vision-result.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read only the conflict-manifest-bound cells and their row, period, unit and adjacent-cell context.",
+        "Resolve each conflict to a declared source or quarantine it; disposition every conflict exactly once.",
+        "Write one reviewed-resolution response bound to the exact manifest and source image.",
+        "Resume the same broker controller transaction without replacing the full surface."
+      ]
+    },
+    "bounded_capture_adjudication": {
+      "remedy_id": "bounded_remaining_region_adjudication",
+      "attempt_limit": 2,
+      "response_schema_path": "assets/broker-vision-result.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read only the remaining unresolved regions after the full-surface attempt budget is exhausted.",
+        "Preserve resolved cells and either resolve or quarantine each remaining cell.",
+        "Write the exact hash-bound response artifact named by the task packet.",
+        "Resume the same broker controller transaction."
+      ]
+    },
+    "semantic_crosswalk_review": {
+      "remedy_id": "complete_lossless_semantic_disposition",
+      "attempt_limit": 3,
+      "response_schema_path": "assets/broker-crosswalk.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Review every captured analytical table and every annual or partial-period candidate.",
+        "Author cell-addressed dispositions broadly while selecting model mappings narrowly.",
+        "Preserve guidance, duplicates, supplemental evidence and unlike definitions in separate declared lanes.",
+        "Write the crosswalk named by the task packet and resume the same controller transaction."
+      ]
+    },
+    "semantic_crosswalk_repair": {
+      "remedy_id": "repair_all_semantic_findings_together",
+      "attempt_limit": 3,
+      "response_schema_path": "assets/broker-crosswalk.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read the complete immutable semantic finding set.",
+        "Repair crosswalk declarations only; do not alter evidence, schemas, dictionaries or validators.",
+        "Disposition all findings in one successor crosswalk bound to the same candidate manifest.",
+        "Resume the same controller transaction."
+      ]
+    },
+    "broker_pack_repair": {
+      "remedy_id": "repair_pack_crosswalk_declarations",
+      "attempt_limit": 3,
+      "response_schema_path": "assets/broker-crosswalk.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read the complete pack-compiler finding.",
+        "Repair only the crosswalk declaration responsible for the finding.",
+        "Preserve the verified bundle and all validator contracts unchanged.",
+        "Resume the same controller transaction."
+      ]
+    },
+    "internal_fixed_point_defect": {
+      "remedy_id": "repair_controller_or_model_host_boundary",
+      "attempt_limit": 1,
+      "response_schema_path": null,
+      "producer_kind": "controller_maintainer",
+      "steps": [
+        "Inspect the single aggregate defect and its bound prior task packets.",
+        "Repair the earliest responsible controller, response-boundary or deployment-host implementation.",
+        "Add a positive regression and a targeted non-vacuous mutation.",
+        "Restart from the unchanged source transaction and require checkpoint reuse."
+      ]
+    }
+  }
+}

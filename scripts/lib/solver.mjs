@@ -29,7 +29,7 @@ const SOLVER_ITERATION_POLICY = solverIterationOptions();
 // equation-graph compiler independently derives its expectation from the graph
 // and convergence contract, then rejects any drift before economics runs.
 const SOLVER_ON_ITERATION_VECTOR = Object.freeze([
-  Object.freeze({ node_id: "statement.net_income", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.cash_flow_start", tolerance_class: "currency" }),
   Object.freeze({ node_id: "cash.cfo", tolerance_class: "currency" }),
   Object.freeze({ node_id: "rcf.draw", tolerance_class: "currency" }),
   Object.freeze({ node_id: "rcf.repayment", tolerance_class: "currency" }),
@@ -40,8 +40,8 @@ const SOLVER_ON_ITERATION_VECTOR = Object.freeze([
   Object.freeze({ node_id: "interest.cash_income", tolerance_class: "currency" }),
   Object.freeze({ node_id: "interest.gross_expense", tolerance_class: "currency" }),
   Object.freeze({ node_id: "interest.income", tolerance_class: "currency" }),
-  Object.freeze({ node_id: "interest.net_expense", tolerance_class: "currency" }),
-  Object.freeze({ node_id: "statement.finance", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.finance_expense", tolerance_class: "currency" }),
+  Object.freeze({ node_id: "statement.finance_income", tolerance_class: "currency" }),
 ]);
 
 export function solverIterationDeclaration(circularity) {
@@ -2461,6 +2461,14 @@ export function solveCase(
         ["ebit", totalEbit],
         ["interest_income", interestIncome],
         ["interest_expense", -grossInterest],
+        // The cash-flow finance add-back is a direct consumer of the Interest
+        // Schedule, just like the statement finance-income/expense rows.  It
+        // must be seeded from the solved net-interest quantity rather than
+        // reading a stale row hardcode or routing through net_finance_result.
+        // This is also the exact physical workbook direction: the emitted
+        // cell links to the Interest Schedule and never to another statement
+        // row.
+        ["net_finance_addback", netInterest],
         ["pre_tax_income", preTaxIncome],
         ["effective_tax_rate", preTaxIncome > 0 ? taxCharge / preTaxIncome : 0],
         ["tax_expense", -taxCharge],
@@ -2508,6 +2516,13 @@ export function solveCase(
         previousStatementValues,
         acquisitionBaseValues,
       );
+      // The statement entry point is case-semantic, not universally net
+      // income. Some issuers reconcile CFO from profit before tax (and reverse
+      // finance separately); others start from net income. Track the declared
+      // cash-flow start row so the solver vector matches either physical graph
+      // without encoding an issuer-specific presentation.
+      const cashFlowStart =
+        cashFlowGraph.resolveRole("cash_flow_net_income") ?? netIncome;
       const declaredCashFromOperations =
         cashFlowGraph.resolveRole("cash_from_operations");
       const declaredCashFromInvesting =
@@ -2531,6 +2546,16 @@ export function solveCase(
         statementNonDebtFinancing ?? dividendsAndBuybacks;
       const nonRcfDebtIssuance = nonRcfIssuance;
       const nonRcfDebtRepayment = nonRcfRepayment;
+      const otherCashDebtMovement = normaliseStatementRows(modelCase, "cash_flow")
+        .filter((row) =>
+          ["debt_issuance_cost", "other_cash_debt_movement"].includes(
+            inferMovementType(row),
+          ),
+        )
+        .reduce(
+          (total, row) => total + Number(cashFlowGraph.resolve(row.row_id) ?? 0),
+          0,
+        );
       const cashBeforeDebt =
         openingCash +
         cashFromOperations +
@@ -2549,7 +2574,7 @@ export function solveCase(
         : nonRcfDebtRepayment + leasePrincipal;
       const cashAfterMandatory = cashBeforeMandatory - mandatoryRepayment;
       const preRcfDebtCashFlow =
-        nonRcfDebtIssuance - nonRcfDebtRepayment - leasePrincipal;
+        nonRcfDebtIssuance - nonRcfDebtRepayment - leasePrincipal + otherCashDebtMovement;
       const cashBeforeRcf = cashBeforeDebt + preRcfDebtCashFlow;
       const deficit = Math.max(0, effectiveMinimumCash - cashAfterMandatory);
       const surplus = Math.max(0, cashAfterMandatory - effectiveMinimumCash);
@@ -2588,7 +2613,7 @@ export function solveCase(
       const currentIterationSnapshot = solverIterationSnapshot(
         solverDeclaration,
         {
-          "statement.net_income": netIncome,
+          "statement.cash_flow_start": cashFlowStart,
           "cash.cfo": cashFromOperations,
           "rcf.draw": rcfDraw,
           "rcf.repayment": rcfRepayment,
@@ -2599,8 +2624,8 @@ export function solveCase(
           "interest.cash_income": interestIncome,
           "interest.gross_expense": grossInterest,
           "interest.income": interestIncome,
-          "interest.net_expense": netInterest,
-          "statement.finance": -netInterest,
+          "statement.finance_expense": -grossInterest,
+          "statement.finance_income": interestIncome,
         },
       );
       residual = iterationResidual(
@@ -2685,6 +2710,7 @@ export function solveCase(
         non_rcf_repayment: nonRcfRepayment,
         non_rcf_debt_issuance: nonRcfDebtIssuance,
         non_rcf_debt_repayment: nonRcfDebtRepayment,
+        other_cash_debt_movement: otherCashDebtMovement,
         cash_before_debt: cashBeforeDebt,
         pre_rcf_debt_cash_flow: preRcfDebtCashFlow,
         cash_before_rcf: cashBeforeRcf,

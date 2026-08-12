@@ -142,9 +142,17 @@ def main() -> int:
         first = subprocess.run(command, text=True, capture_output=True, check=False)
         assert_true(first.returncode == 2, first.stderr or first.stdout)
         state = json.loads((output / "dcs-run-state.json").read_text("utf-8"))
-        assert_true(state["pipeline_status"] == "NEEDS_CROSSWALK", "DCS controller did not reach its crosswalk checkpoint")
-        assert_true(state["blocker_class"] == "INTERNAL_WORK" and state["user_blocking"] is False, "DCS internal preparation became a user blocker")
-        checks += 2
+        assert_true(state["pipeline_status"] == "BLOCKED_INPUT", "DCS controller did not stop at the missing export-basis boundary")
+        assert_true(state["blocker_class"] == "USER_EVIDENCE" and state["user_blocking"] is True, "Missing DCS export basis was not owned as precise user evidence")
+        assert_true(
+            state["tasks"] == [{
+                "task_kind": "dcs_adapter_metadata",
+                "instruction": "Provide the export basis once; the controller will author and verify the cell-level crosswalk internally.",
+                "required_fields": ["as_of", "entity_name", "reporting_currency", "units"],
+            }],
+            "DCS controller exposed an internal crosswalk task instead of one finite export-basis request",
+        )
+        checks += 3
         second = subprocess.run(command, text=True, capture_output=True, check=False)
         assert_true(second.returncode == 2, second.stderr or second.stdout)
         resumed = json.loads((output / "dcs-run-state.json").read_text("utf-8"))

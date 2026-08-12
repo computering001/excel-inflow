@@ -559,17 +559,23 @@ export function compileStatementTopology(modelCase, section, rows) {
 
   const sourceOrderExemptRows = new Set();
   for (const row of rows) {
-    if (!SOURCE_ORDER_CONSOLIDATIONS.has(row.semantic_role)) continue;
-    for (const ref of row.calculation?.refs ?? []) {
-      sourceOrderExemptRows.add(ref);
-    }
-    for (const child of rows) {
-      if (child.parent_row_id === row.row_id) {
-        sourceOrderExemptRows.add(child.row_id);
-      }
-    }
-    for (const index of descendantIndexes(rows, row.row_id)) {
+    // A declared hierarchy is a semantic consolidation: its parent is allowed
+    // to move ahead of its complete, contiguous child family even when the
+    // filing printed the subtotal last. Exempt only that family's descendants;
+    // the parent and every unrelated issuer row remain source ordered.
+    const descendants = descendantIndexes(rows, row.row_id);
+    for (const index of descendants) {
       sourceOrderExemptRows.add(rows[index].row_id);
+    }
+    if (SOURCE_ORDER_CONSOLIDATIONS.has(row.semantic_role)) {
+      for (const ref of row.calculation?.refs ?? []) {
+        sourceOrderExemptRows.add(ref);
+      }
+      for (const child of rows) {
+        if (child.parent_row_id === row.row_id) {
+          sourceOrderExemptRows.add(child.row_id);
+        }
+      }
     }
   }
 

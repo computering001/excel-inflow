@@ -17,13 +17,17 @@ import json
 import math
 import os
 import re
+import signal
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
 
 VERSION = "broker-evidence-extractor/1.1"
+PDF_LANE_TIMEOUT_SECONDS = float(os.environ.get("BROKER_PDF_LANE_TIMEOUT_SECONDS", "0.5"))
+MAX_REGION_CROPS_PER_PAGE = int(os.environ.get("BROKER_MAX_REGION_CROPS_PER_PAGE", "12"))
 NUMERIC_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?%?\)?|[-+]?\d+(?:\.\d+)?x)(?![A-Za-z])",
 )
@@ -39,6 +43,29 @@ SUPPORTED = {
     "image/png",
     "image/jpeg",
 }
+
+
+def normalise_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
+
+
+def bounded_table_find(page: Any, kwargs: dict[str, Any]) -> Any:
+    """Bound pathological PDF table discovery and fall through to rendering."""
+    if not hasattr(signal, "setitimer") or PDF_LANE_TIMEOUT_SECONDS <= 0:
+        return page.find_tables(**kwargs)
+
+    def timed_out(_signum: int, _frame: Any) -> None:
+        raise TimeoutError(
+            f"PDF table lane exceeded {PDF_LANE_TIMEOUT_SECONDS:g}s budget"
+        )
+
+    previous = signal.signal(signal.SIGALRM, timed_out)
+    try:
+        signal.setitimer(signal.ITIMER_REAL, PDF_LANE_TIMEOUT_SECONDS)
+        return page.find_tables(**kwargs)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -520,6 +547,11 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
     captured_table_tokens: list[str] = []
     unresolved = False
     seen_images: set[int] = set()
+    table_budget_seconds = min(
+        45.0,
+        max(8.0, float(document.page_count) * 0.35),
+    )
+    table_budget_started = time.monotonic()
 
     for page_index in range(document.page_count):
         page = document.load_page(page_index)
@@ -547,7 +579,11 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         lane_summaries: list[dict[str, Any]] = []
         for lane_id, kwargs in discovery_specs:
             try:
-                finder = page.find_tables(**kwargs)
+                if time.monotonic() - table_budget_started > table_budget_seconds:
+                    raise TimeoutError(
+                        f"document table-discovery budget {table_budget_seconds:g}s exhausted"
+                    )
+                finder = bounded_table_find(page, kwargs)
                 found = list(getattr(finder, "tables", []) or [])
                 lane_summaries.append({"lane_id": lane_id, "status": "pass" if found else "empty", "candidate_count": len(found)})
                 page_tables.extend((lane_id, item) for item in found)
@@ -709,35 +745,61 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         image_refs: list[str] = []
         for image_index, info in enumerate(image_infos, start=1):
             bbox = info.get("bbox")
+            image_ratio = 0.0
             if bbox:
                 image_area = max(0.0, float((bbox[2] - bbox[0]) * (bbox[3] - bbox[1])))
-                if image_area / page_area >= 0.08:
+                image_ratio = image_area / page_area
+                if image_ratio >= 0.08:
                     material_image = True
                     material_image_bboxes.append([float(value) for value in bbox])
+            # Small logos, icons and repeated disclosure ornaments remain in
+            # the immutable PDF and whole-page render; extracting each xref as
+            # a second binary artifact creates no table evidence and can make a
+            # long research note hundreds of megabytes larger.
+            if image_ratio < 0.02:
+                continue
             xref = int(info.get("xref") or 0)
-            if xref <= 0 or xref in seen_images:
-                continue
-            seen_images.add(xref)
-            try:
-                extracted_image = document.extract_image(xref)
-                extension = extracted_image.get("ext") or "bin"
-                ref = writer.write(
-                    f"images/xref-{xref}.{extension}",
-                    "embedded_image",
-                    extracted_image["image"],
-                )
-                image_refs.append(ref)
-            except Exception:
-                continue
+            if xref > 0:
+                # Discovery is retained below as compact metadata. The raw PDF
+                # and page render already preserve the pixels, so a duplicate
+                # embedded-image binary is not another source of evidence.
+                seen_images.add(xref)
 
         page_numeric_count = len(source_numeric_records)
         sparse = len(text.strip()) < 40
         undetected_numeric_grid = bool(material_uncovered)
+        # Two structured lanes can each look locally complete while describing
+        # different segmentations of the same visible table.  Detect that
+        # physical ambiguity here, while the source PDF is still open, so the
+        # controller can create high-resolution crops and resolve it through
+        # the bounded rendered lane.  Canonicalisation must not discover this
+        # only after the source context needed for a useful remedy is gone.
+        bounded_page_tables = [
+            table for table in tables
+            if table.get("surface_id") == surface_id
+            if table.get("authority_role") != "discovery_only"
+            and table.get("bbox")
+        ]
+        overlapping_native_lanes = any(
+            bbox_iou(left.get("bbox"), right.get("bbox")) >= 0.70
+            and left.get("extraction_method") != right.get("extraction_method")
+            and [
+                [normalise_text(cell.get("raw_text")) for cell in row]
+                for row in left.get("rows", [])
+            ]
+            != [
+                [normalise_text(cell.get("raw_text")) for cell in row]
+                for row in right.get("rows", [])
+            ]
+            for index, left in enumerate(bounded_page_tables)
+            for right in bounded_page_tables[index + 1 :]
+        )
         vision_required = (
             (material_image and (page_numeric_count >= 2 or sparse))
             or undetected_numeric_grid
             or text_only_discovery
             or native_table_missing
+            or overlapping_native_lanes
         )
         vision_reason = None
         if vision_required:
@@ -753,6 +815,8 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 reasons.append("unruled table candidate discovered only by native text geometry")
             if native_table_missing:
                 reasons.append("bounded native lane omits source words inside a table region")
+            if overlapping_native_lanes:
+                reasons.append("overlapping native table lanes require one rendered physical-grid authority")
             vision_reason = "; ".join(reasons)
 
         artifact_refs = [text_ref, words_ref, census_ref, *image_refs]
@@ -784,6 +848,17 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                     if any(bbox_iou(bbox, existing) >= 0.85 for existing in unique_regions):
                         continue
                     unique_regions.append(bbox)
+                if not unique_regions:
+                    unique_regions.append([
+                        float(page.rect.x0), float(page.rect.y0),
+                        float(page.rect.x1), float(page.rect.y1),
+                    ])
+                if len(unique_regions) > MAX_REGION_CROPS_PER_PAGE:
+                    unique_regions = sorted(
+                        unique_regions,
+                        key=lambda box: max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1]),
+                        reverse=True,
+                    )[:MAX_REGION_CROPS_PER_PAGE]
                 region_crops: list[dict[str, Any]] = []
                 crop_dpi = max(300, render_dpi * 2)
                 crop_matrix = fitz.Matrix(crop_dpi / 72.0, crop_dpi / 72.0)
@@ -884,6 +959,14 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             "source_table_numeric_tokens": source_table_numeric_tokens,
             "uncovered_numeric_regions": uncovered_regions,
             "table_discovery_lanes": lane_summaries,
+            "embedded_image_inventory": [
+                {
+                    "xref": int(info.get("xref") or 0),
+                    "bbox": [float(value) for value in info.get("bbox")]
+                    if info.get("bbox") else None,
+                }
+                for info in image_infos
+            ],
             "vision_reason": vision_reason,
         })
 
@@ -1282,6 +1365,146 @@ def extract_document(root: Path, request_dir: Path, descriptor: dict[str, Any], 
     }
 
 
+def extract_readable_pdf_fallback(
+    root: Path,
+    request_dir: Path,
+    descriptor: dict[str, Any],
+    render_dpi: int,
+    primary_error: Exception,
+) -> dict[str, Any]:
+    """Preserve every readable PDF page when structured extraction crashes.
+
+    A table-lane implementation failure is not evidence that the user's PDF is
+    unusable. Re-open the bytes independently, render every page, and emit the
+    same two-pass grid tasks the normal image lane uses. Only an unreadable,
+    corrupt or unauthenticated PDF may escape this fallback as a source block.
+    """
+    import fitz  # type: ignore
+
+    source_path = Path(descriptor["path"])
+    if not source_path.is_absolute():
+        source_path = (request_dir / source_path).resolve()
+    document = fitz.open(source_path)
+    if document.needs_pass:
+        password = descriptor.get("password") or ""
+        if not document.authenticate(password):
+            raise RuntimeError(
+                "PDF is encrypted and the supplied password did not authenticate."
+            )
+    writer = ArtifactWriter(root, descriptor["document_id"])
+    surfaces = []
+    for page_index in range(document.page_count):
+        page = document.load_page(page_index)
+        surface_id = f"{descriptor['document_id']}.p{page_index + 1}"
+        dpi = max(300, int(render_dpi))
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(dpi / 72.0, dpi / 72.0), alpha=False)
+        image_ref = writer.write(
+            f"pages/page-{page_index + 1:04d}.png",
+            "page_image",
+            pixmap.tobytes("png"),
+        )
+        census = {
+            "schema_version": "broker-surface-census/1.0",
+            "document_id": descriptor["document_id"],
+            "surface_id": surface_id,
+            "kind": "pdf_page",
+            "source_numeric_tokens": [],
+            "whole_surface_numeric_token_count": 0,
+            "source_table_numeric_tokens": [],
+            "table_discovery_lanes": [{
+                "lane_id": "rendered_page_fallback",
+                "status": "pass",
+                "candidate_count": 1,
+            }],
+            "uncovered_numeric_regions": [{
+                "region_id": f"{surface_id}.whole-page",
+                "bbox": [
+                    float(page.rect.x0), float(page.rect.y0),
+                    float(page.rect.x1), float(page.rect.y1),
+                ],
+                "material": True,
+                "disposition": "requires_vision",
+            }],
+            "material_uncovered_region_count": 1,
+            "fallback_reason": str(primary_error),
+        }
+        census_ref = writer.write_json(
+            f"census/page-{page_index + 1:04d}.json", "surface_census", census
+        )
+        task = {
+            "schema_version": "broker-vision-task/1.0",
+            "document_id": descriptor["document_id"],
+            "surface_id": surface_id,
+            "image_artifact_id": image_ref,
+            "reason": "structured extraction failed; readable rendered-page fallback",
+            "required_passes": 2,
+            "source_census_artifact_id": census_ref,
+            "uncovered_region_ids": [f"{surface_id}.whole-page"],
+            "region_crops": [{
+                "region_id": f"{surface_id}.whole-page",
+                "image_artifact_id": image_ref,
+                "bbox": census["uncovered_numeric_regions"][0]["bbox"],
+                "dpi": dpi,
+            }],
+            "instruction": (
+                "Transcribe every visible table as a hardcoded grid with exact row labels and period headers. "
+                "Preserve blanks, signs, units and footnotes. If no analytical table is visible, independently "
+                "certify verified_non_tabular. This is an internal recovery pass; do not request a replacement PDF."
+            ),
+        }
+        task_ref = writer.write_json(
+            f"vision/page-{page_index + 1:04d}.task.json", "vision_task", task
+        )
+        surfaces.append({
+            "surface_id": surface_id,
+            "kind": "pdf_page",
+            "ordinal": page_index + 1,
+            "label": f"Page {page_index + 1}",
+            "width": float(page.rect.width),
+            "height": float(page.rect.height),
+            "native_text_chars": 0,
+            "native_word_count": 0,
+            "numeric_token_count": 0,
+            "table_count": 0,
+            "image_count": 1,
+            "artifact_refs": [image_ref, census_ref, task_ref],
+            "lane_status": {
+                "native_text": "error",
+                "geometry": "error",
+                "tables": "error",
+                "images": "pass",
+                "vision": "required",
+            },
+            "surface_census_artifact_id": census_ref,
+            "whole_surface_numeric_token_count": 0,
+            "source_table_numeric_tokens": [],
+            "uncovered_numeric_regions": census["uncovered_numeric_regions"],
+            "table_discovery_lanes": census["table_discovery_lanes"],
+            "vision_reason": task["reason"],
+        })
+    raw_hash = sha256_file(source_path)
+    return {
+        "document_id": descriptor["document_id"],
+        "house_id": descriptor["house_id"],
+        "house_name": descriptor["house_name"],
+        "source_id": descriptor["source_id"],
+        "file_name": source_path.name,
+        "media_type": descriptor["media_type"],
+        "published_date": descriptor["published_date"],
+        "raw_sha256": raw_hash,
+        "byte_length": source_path.stat().st_size,
+        "surfaces": surfaces,
+        "tables": [],
+        "numeric_ledger": build_ledger([], []),
+        "artifacts": writer.records,
+        "extraction_status": "needs_vision",
+        "internal_recovery": {
+            "strategy": "rendered_page_fallback",
+            "primary_error": str(primary_error),
+        },
+    }
+
+
 def validate_request(request: dict[str, Any]) -> None:
     if request.get("schema_version") != "broker-extraction-request/1.0":
         raise ValueError("Unsupported broker extraction request schema_version.")
@@ -1334,13 +1557,31 @@ def main() -> int:
         try:
             documents.append(extract_document(output_root, request_path.parent, descriptor, args.render_dpi))
         except Exception as error:
-            findings.append({
-                "id": "broker_extraction.document_failed",
-                "severity": "blocker",
-                "document_id": descriptor.get("document_id"),
-                "surface_id": None,
-                "message": str(error),
-            })
+            try:
+                if descriptor.get("media_type") != "application/pdf":
+                    raise
+                recovered = extract_readable_pdf_fallback(
+                    output_root, request_path.parent, descriptor, args.render_dpi, error
+                )
+                documents.append(recovered)
+                findings.append({
+                    "id": "broker_extraction.rendered_fallback_activated",
+                    "severity": "warning",
+                    "document_id": descriptor.get("document_id"),
+                    "surface_id": None,
+                    "message": (
+                        "Structured extraction failed, but the readable PDF was preserved page-for-page and "
+                        "routed to bounded rendered-grid recovery. No replacement source is required."
+                    ),
+                })
+            except Exception as fallback_error:
+                findings.append({
+                    "id": "broker_extraction.document_failed",
+                    "severity": "blocker",
+                    "document_id": descriptor.get("document_id"),
+                    "surface_id": None,
+                    "message": f"primary: {error}; rendered fallback: {fallback_error}",
+                })
 
     unresolved = sum(
         1
