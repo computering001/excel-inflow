@@ -5,12 +5,12 @@
   "skillVersion": "3.3.2",
   "templateVersion": "4.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-12T20:12:19.221Z",
+  "generatedAt": "2026-08-12T20:44:03.031Z",
   "centralInstructionsWords": 6110,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "6e78bc4cff630dca12aa9086bf9bbf71b46a9d9b28144d2e100e9fdb3e786d42",
+    "currentClosureSha256": "739db4c6f82bb931c661166aa1ded620c92dded051d9293d0caf8f5d96f514bb",
     "closureFileCount": 190,
     "recordedAt": null,
     "recertifiedByThisRun": false,
@@ -428,8 +428,8 @@
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": "1.26.5",
-            "PIL": "12.2.0",
+            "fitz": null,
+            "PIL": "12.3.0",
             "numpy": "2.3.5",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
@@ -444,8 +444,8 @@
           "version": "3.12.13",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": "1.26.5",
-            "PIL": "12.2.0",
+            "fitz": null,
+            "PIL": "12.3.0",
             "numpy": "2.3.5",
             "jsonschema": null,
             "pdfplumber": "0.11.9",
@@ -1300,18 +1300,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "f4bfdd5b8548e6dc955336d193493e76d7bff5e3a8fe349cc5e9d29831dec73a",
-        "plan_sha256": "0d62478d21739ba0dfe9a6e1857c7197b73d7f5ccad701c28fc70b8655cebac5",
-        "workbook_sha256": "4e213cfa0a2be60e5506e0391fde7b3a0884d804524e0b101f85cc92df8a1633",
+        "case_sha256": "06f3079b7998628955bebdd09acc31a6ca6dccb4af6798f25f66ce12bfc978a0",
+        "plan_sha256": "aa5a8e1fef3dc1eeb1b1d7adf9a435669469162161c53e36e20c51867151aee2",
+        "workbook_sha256": "5fb1e37b7de6251d7e1982947403ba0207af2c3c0ddf3cbcd0afbf6aa9fff469",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "f4bfdd5b8548e6dc955336d193493e76d7bff5e3a8fe349cc5e9d29831dec73a",
-      "plan_sha256": "0d62478d21739ba0dfe9a6e1857c7197b73d7f5ccad701c28fc70b8655cebac5",
-      "workbook_sha256": "4e213cfa0a2be60e5506e0391fde7b3a0884d804524e0b101f85cc92df8a1633",
+      "case_sha256": "06f3079b7998628955bebdd09acc31a6ca6dccb4af6798f25f66ce12bfc978a0",
+      "plan_sha256": "aa5a8e1fef3dc1eeb1b1d7adf9a435669469162161c53e36e20c51867151aee2",
+      "workbook_sha256": "5fb1e37b7de6251d7e1982947403ba0207af2c3c0ddf3cbcd0afbf6aa9fff469",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -2073,8 +2073,8 @@
     },
     {
       "path": "scripts/lib/forecast_candidate_compiler.mjs",
-      "sha256": "fe3fd2115aa044941a0069767899aaa8b062ba4b10302ab214262ae160afb05b",
-      "bytes": 44579,
+      "sha256": "9266d52ea2a5272b1b57d7e7dcb93560d23dd65825b23f1c6bf543d36752ff29",
+      "bytes": 45020,
       "words": null
     },
     {
@@ -2205,8 +2205,8 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "1b296d7a4b23e71f3d345ad36024558f6ff44151edda2cefbdc000c37b4850c0",
-      "bytes": 154555,
+      "sha256": "3a0d90f99b439ad2003967e7a51e3488c62698b646359a735b64498b3d40e381",
+      "bytes": 156244,
       "words": null
     },
     {
@@ -2541,8 +2541,8 @@
     },
     {
       "path": "scripts/workflow_state.py",
-      "sha256": "ca24cd5263641d4928c7aecacbb59e49c5f09a1f731443b98f08e480b4c919c0",
-      "bytes": 2869,
+      "sha256": "afa9bc0d16b04adbaa5e3262014a9b09f8286251a55df2d76f24475a712ff3c3",
+      "bytes": 2926,
       "words": null
     },
     {

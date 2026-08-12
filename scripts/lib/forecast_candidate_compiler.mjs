@@ -888,6 +888,9 @@ export function materializeForecastPlan(modelCase, plan) {
       }
       delete row.forecast_calculation;
       delete row.forecast_period_calculations;
+      // Suppression is fully described by the sealed treatment and capture
+      // certificates; do not leak the compiler-only marker into model-case.
+      delete row.formula_authority;
       continue;
     }
     // Global row treatment is only a compatibility hint. Mixed-period rows
@@ -902,6 +905,10 @@ export function materializeForecastPlan(modelCase, plan) {
         delete row.formula_authority;
       }
     }
+    // This marker is compilation scratch state, not a model-case field. The
+    // sealed authority is represented by forecast_treatment, period
+    // authorities and (for captured rows) the per-period certificates.
+    delete row.formula_authority;
   }
   return next;
 }

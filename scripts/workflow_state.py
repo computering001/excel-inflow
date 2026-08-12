@@ -75,3 +75,6 @@ def assert_transition(
         raise ValueError(
             f"Illegal {layer} workflow transition: {previous_status} -> {next_status}"
         )
+
+
+# End of the shared workflow-state transition contract.

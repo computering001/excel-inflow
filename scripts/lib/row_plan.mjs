@@ -780,6 +780,10 @@ export function stripStatementPresentationMetadata(rows) {
     for (const key of [
       "display_role",
       "formula_role",
+      // Forecast-planning scratch authority. The capture certificate and
+      // period authorities are the sealed proof; this marker exists only to
+      // suppress formula emission while the plan is being materialised.
+      "formula_authority",
       "in_section_conclusion_closure",
       "outline_level",
       "presentation_depth",
@@ -863,6 +867,31 @@ function projectionTargets(row, allRows, retainedRows) {
     : [];
   if (sameRole.length === 1) return [sameRole[0].row_id];
 
+  // A source-backed zero reconciliation is evidence that the retained
+  // headline bridge already contains the disclosure. Preserve that source
+  // ownership on the unique retained bridge total instead of leaving a
+  // dangling mapping to a deliberately omitted zero row.
+  const historical = (row.values ?? []).slice(0, 3);
+  if (
+    historical.length === 3 &&
+    historical.every((value) => Number(value ?? 0) === 0)
+  ) {
+    const bridgeTotals = allRows.filter(
+      (candidate) =>
+        candidate.calculation?.operator === "sum" &&
+        (candidate.calculation?.refs ?? []).length >= 2 &&
+        (candidate.row_id.includes("bridge") || candidate.label === row.label),
+    );
+    if (bridgeTotals.length === 1) {
+      const bridgeTargets = projectionTargets(
+        bridgeTotals[0],
+        allRows,
+        retainedRows,
+      );
+      if (bridgeTargets.length > 0) return bridgeTargets;
+    }
+  }
+
   const equivalent =
     retainedBySignature.get(expressionSignature(row.row_id, allById)) ?? [];
   if (equivalent.length === 1) return equivalent;
@@ -891,6 +920,18 @@ function projectionTargets(row, allRows, retainedRows) {
     return resolved;
   };
   const refs = row.calculation?.refs ?? [];
+  // A reconciliation row that proves two retained economic answers agree is
+  // itself absorbed by those retained answers when the compact debt-overlay
+  // face omits the zero bridge line. This is auditable source-line lineage,
+  // not a caption-specific forecast shortcut: both calculation operands must
+  // survive the projection.
+  if (
+    ["subtract", "sum"].includes(row.calculation?.operator) &&
+    refs.length >= 2 &&
+    refs.every((ref) => retainedById.has(ref))
+  ) {
+    return [...new Set(refs)];
+  }
   if (refs.length === 0) return [];
   const resolved = new Set();
   for (const ref of refs) {
