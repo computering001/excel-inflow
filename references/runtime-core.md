@@ -218,7 +218,11 @@ change restarts rendering and visual checks inside stage 4; delivery wording
 alone restarts stage 5. Internal graph hashes continue to reuse unaffected work
 inside the selected stage.
 
-After answers, rebuild from the normalised case. Do not patch a workbook. Before delivery, give a concise read of the selected profile, broker anchor, opening debt/cash reconciliation, forecast leverage direction, liquidity headroom and any remaining explicit limitation.
+After answers, record them in `case-source.answers` and recompile; the model
+case is regenerated, never edited. Do not patch a workbook. Before delivery,
+give a concise read of the selected profile, broker anchor, opening debt/cash
+reconciliation, forecast leverage direction, liquidity headroom and any
+remaining explicit limitation.
 
 ### Autonomous public-company test route
 
@@ -410,16 +414,24 @@ python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook
 
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
 
-The v3 case compiler ships DORMANT: the five-stage flow above remains the only
-production path and never calls it. It exists so the v3.0.0 cutover lands on an
-already-installed, already-smoked surface. A case-source (declarations only —
-`assets/case-source.schema.json` cannot express values or formula text) plus the
-sealed evidence lanes compile into a model case, or into a complete findings
-report; there is no partial success.
+The model case is COMPILED, never written. Stage 3 authors exactly one
+artifact: `case-source.json` under `assets/case-source.schema.json` —
+declarations only; the schema cannot express economic values or formula text,
+so transcription mistakes are structurally unwritable. The compiler projects
+every fact from the sealed evidence lanes and mints every rule through the
+doctrine libraries, then reports ALL findings at once or emits the case:
 
 ```
 node scripts/compile_case.mjs <case-source.json> <evidence.json> --out <model-case.json>
 ```
+
+There is no partial success and no second repair verb: a finding is fixed by
+amending the named declaration or answering the named question, then
+recompiling. Point-editing `model-case.json` is a doctrine violation and trips
+the stage-carrier hash check — the build refuses a case whose bytes are not
+the compiler's. A clean compile passes silently through the CASE COMPILED
+screen; a dirty one stops once at the COMPILE FINDINGS screen with the
+complete list, nothing serial.
 
 ## Validation and certification
 

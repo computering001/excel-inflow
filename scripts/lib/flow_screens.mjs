@@ -742,3 +742,67 @@ export function renderFailure({ stage, what_failed, why, what_would_fix_it }) {
 }
 
 export const SCREEN_WIDTH = RULE_WIDTH;
+
+/* ------------------------------------------------------------------ *
+ * Case-compile screens (v3): the compile step is the ONLY producer of
+ * the model case.  A clean compile passes silently through S6-C; a
+ * dirty one stops at S6-X with the COMPLETE findings list — the
+ * anti-serial screen.  Facts and compiled rules are not the author's
+ * to edit and cannot be wrong independently of the declarations.
+ * ------------------------------------------------------------------ */
+
+export function renderCaseCompiledScreen({
+  declarations,
+  factsProjected,
+  rulesMinted,
+  caseSourceDigest = null,
+  sealedLanes = 3,
+}) {
+  const digest = caseSourceDigest ? String(caseSourceDigest).slice(0, 8) : null;
+  const lines = [
+    ...renderStageHeader("delivery", "case compiled"),
+    "",
+    `   Declarations ........... ${formatNumber(declarations)}${digest ? ` (source ${digest})` : ""}`,
+    `   Facts projected ........ ${formatNumber(factsProjected)} from ${formatNumber(sealedLanes)} sealed lanes`,
+    `   Compiled rules minted .. ${formatNumber(rulesMinted)} (formula authorities)`,
+    "   Findings ............... NONE",
+    "",
+    "   model-case regenerated deterministically -",
+    "   nothing hand-written.",
+    "",
+    RULE,
+  ];
+  return finishScreen(lines);
+}
+
+export function renderCompileFindingsScreen(report) {
+  const blocks = (report?.findings ?? []).filter(
+    (finding) => finding.severity === "BLOCK",
+  );
+  const lines = [
+    ...renderStageHeader("delivery", "compile findings"),
+    "",
+    `   ${blocks.length} finding${blocks.length === 1 ? "" : "s"} - the COMPLETE list, nothing serial:`,
+    "",
+  ];
+  blocks.slice(0, SCREEN_CONTRACT.max_failure_remedies * 2).forEach((finding, index) => {
+    const label = `${index + 1}. ${finding.id} `;
+    const leader = `   ${label}${".".repeat(Math.max(2, 28 - label.length))}`;
+    lines.push(leader.slice(0, RULE_WIDTH - 2));
+    for (const line of wrap(finding.message, RULE_WIDTH - 9)) lines.push(`      ${line}`);
+    if (finding.remedy) {
+      for (const line of wrap(`(${finding.remedy})`, RULE_WIDTH - 9)) lines.push(`      ${line}`);
+    }
+  });
+  if (blocks.length > SCREEN_CONTRACT.max_failure_remedies * 2) {
+    lines.push(`   - ${blocks.length - SCREEN_CONTRACT.max_failure_remedies * 2} more in the compile report`);
+  }
+  lines.push(
+    "",
+    "   Fix the declarations above; facts and compiled rules",
+    "   are not yours to edit and cannot be wrong on their own.",
+    "",
+    RULE,
+  );
+  return finishScreen(lines, { summariseOverflow: true });
+}

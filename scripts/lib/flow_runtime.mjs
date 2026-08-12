@@ -17,14 +17,14 @@ export const STAGES = Object.freeze([
     id: "evidence_review",
     title: "EVIDENCE REVIEW",
     contact: "none unless the pack is defective",
-    artifact: "evidence-run.json and model-case.json",
+    artifact: "evidence-run.json and case-source.json",
   }),
   Object.freeze({
     number: 3,
     id: "decisions",
     title: "DECISIONS",
     contact: "the only normal stop",
-    artifact: "answered-case.json",
+    artifact: "case-source.json answers and compiled model-case.json",
   }),
   Object.freeze({
     number: 4,
