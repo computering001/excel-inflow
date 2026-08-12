@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from run_dcs_pipeline import classify_extract_receipt
+
 
 HERE = Path(__file__).resolve().parent
 
@@ -106,7 +108,26 @@ def main() -> int:
     unresolved = blocked["tasks"][0]["unresolved"]
     assert len(unresolved) == 1 and "maturity" in unresolved[0]["missing_fields"]
 
-    summary = {"schema_version": "dcs-pipeline-tests/1.0", "status": "PASS", "positive_checks": 8, "mutation_checks": 4, "resume_reused_all": True}
+    # Receipt failures are owned by the user only when the receipt proves the
+    # source has no usable cells.  An unfamiliar/internal extractor finding may
+    # not be relabelled as a request for a replacement FactSet export.
+    assert classify_extract_receipt({
+        "status": "BLOCKED",
+        "violations": [{"code": "DCS-EXTRACT-EMPTY"}],
+    }) == ("BLOCKED_INPUT", True, "FATAL_SOURCE")
+    assert classify_extract_receipt({
+        "status": "BLOCKED",
+        "violations": [{"code": "DCS-EXTRACT-UNRECOGNISED-LAYOUT"}],
+    }) == ("BLOCKED_INTERNAL", False, "INTERNAL_WORK")
+    assert classify_extract_receipt({
+        "status": "BLOCKED",
+        "violations": [
+            {"code": "DCS-EXTRACT-EMPTY"},
+            {"code": "DCS-EXTRACT-INTERNAL-INVARIANT"},
+        ],
+    }) == ("BLOCKED_INTERNAL", False, "INTERNAL_WORK")
+
+    summary = {"schema_version": "dcs-pipeline-tests/1.0", "status": "PASS", "positive_checks": 9, "mutation_checks": 6, "resume_reused_all": True}
     write_json(root / "summary.json", summary)
     print(json.dumps(summary, sort_keys=True))
     return 0

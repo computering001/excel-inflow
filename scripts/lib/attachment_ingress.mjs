@@ -1333,7 +1333,11 @@ export async function compileDcsEvidence({
       delete instrument.benchmark;
       delete instrument.benchmark_rate;
       delete instrument.spread_bps;
-      if (projected.instrument_type === "rcf") {
+      if (
+        projected.instrument_type === "rcf" &&
+        compilerLanes.policy_evidence?.rcf?.instrument_id ===
+          projected.instrument_id
+      ) {
         compilerLanes.policy_evidence ??= {};
         compilerLanes.policy_evidence.rcf ??= {};
         compilerLanes.policy_evidence.rcf.commitment_fee_convention = "captured_in_residual";

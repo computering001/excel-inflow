@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 
 import { EQUATION_GRAPH } from "./lib/equation_graph.mjs";
 import {
+  canonicalForecastStatementDependencies,
   compileLayeredGraphConstitution,
   rowPlanConstitutionProjection,
   validateLayeredGraphConstitution,
@@ -30,6 +31,34 @@ const endingCash = plan.statement_rows.cash_flow.find(
 );
 const openingCash = plan.statement_rows.cash_flow.find(
   (row) => row.semantic_role === "opening_cash" || row.row_id === "opening_cash",
+);
+assert.deepEqual(
+  canonicalForecastStatementDependencies({
+    row_id: "effective_tax_rate",
+    forecast_treatment: "broker",
+    calculation: {
+      operator: "negated_ratio",
+      refs: ["tax_expense", "pre_tax_income"],
+    },
+    forecast_period_authorities: [0, 1, 2].map(() => ({
+      method: "accounting_identity",
+      source_kind: "formula",
+    })),
+  }),
+  ["pre_tax_income", "tax_expense"],
+  "A formula-authoritative ETR lost its physical forecast dependencies because its legacy scalar treatment says broker.",
+);
+assert.deepEqual(
+  canonicalForecastStatementDependencies({
+    row_id: "cash_taxes",
+    forecast_period_calculations: [0, 1, 2].map((forecast_index) => ({
+      operator: "historical_trend",
+      refs: ["cash_taxes"],
+      forecast_index,
+    })),
+  }),
+  [],
+  "A historical G:I inference was misdeclared as a prior-forecast self edge.",
 );
 assert(openingCash, "The cash-flow graph has no opening-cash node.");
 assert.deepEqual(
@@ -138,7 +167,7 @@ console.log(JSON.stringify({
   status: "PASS",
   baseline_closure_sha256: baseline.closure_sha256,
   layers: baseline.layer_hashes,
-  positive_checks: 9,
+  positive_checks: 11,
   adversarial_mutations_caught: mutations.length + 1,
   total_violations: 0,
 }, null, 2));

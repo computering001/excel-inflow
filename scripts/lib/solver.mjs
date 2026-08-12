@@ -5,6 +5,7 @@ import {
 export { combineHistoricalEntities } from "./historical_normalisation.mjs";
 import {
   balancingRcfInstrument,
+  hasBalancingRcf,
   validateBalancingRcf,
 } from "./rcf_policy.mjs";
 import { leaseForecast, validateLeasePolicy } from "./lease_policy.mjs";
@@ -1583,16 +1584,19 @@ export function solveCase(
     ...modelCase,
     instruments,
   });
-  if (!rcfInstrument) {
+  const balancingRcfEnabled = hasBalancingRcf(modelCase);
+  if (balancingRcfEnabled && !rcfInstrument) {
     throw new Error(
       `Balancing RCF ${modelCase.rcf_policy?.instrument_id ?? "[missing]"} is absent.`,
     );
   }
-  const foreignRcf =
-    rcfInstrument.currency !== modelCase.issuer.reporting_currency;
+  const foreignRcf = Boolean(
+    rcfInstrument &&
+      rcfInstrument.currency !== modelCase.issuer.reporting_currency,
+  );
   const nonRcfInstruments = instruments.filter(
     (item) =>
-      item.instrument_id !== rcfInstrument.instrument_id &&
+      (!rcfInstrument || item.instrument_id !== rcfInstrument.instrument_id) &&
       item.class !== "lease",
   );
   const instrumentBalances = new Map(
@@ -1618,7 +1622,9 @@ export function solveCase(
     cashBucketBalances.get(balancingBucket.bucket_id) ?? 0,
   );
   let openingRcfNative = Number(
-    modelCase.rcf_policy?.opening_draw ?? rcfInstrument?.opening_balance ?? 0,
+    balancingRcfEnabled
+      ? modelCase.rcf_policy?.opening_draw ?? rcfInstrument?.opening_balance ?? 0
+      : 0,
   );
   let openingRcf = foreignRcf
     ? openingRcfNative *
@@ -2722,7 +2728,7 @@ export function solveCase(
         rcf_draw: rcfDraw,
         rcf_repayment: rcfRepayment,
         ending_rcf: nextEndingRcf,
-        rcf_currency: rcfInstrument.currency,
+        rcf_currency: rcfInstrument?.currency ?? null,
         rcf_opening_native: openingRcfNative,
         rcf_capacity_native: rcfCapacity,
         rcf_draw_native: rcfDrawNative,
@@ -2793,9 +2799,9 @@ export function solveCase(
           compiledInstrumentPeriodState,
           forecastIndex,
           {
-            endingReportingOverrides: {
-              [rcfInstrument.instrument_id]: endingRcf,
-            },
+            endingReportingOverrides: rcfInstrument
+              ? { [rcfInstrument.instrument_id]: endingRcf }
+              : {},
             eligibleCash,
             liquidityCash: finalCashBucketSnapshot.liquidity_cash,
             reportedNetDebtAdjustments,
@@ -2877,7 +2883,7 @@ export function solveCase(
       total_liquidity:
         finalCashBucketSnapshot.liquidity_cash +
         undrawnRcf -
-        drawnCommercialPaper,
+        (balancingRcfEnabled ? drawnCommercialPaper : 0),
       iterations: iteration,
       converged,
       residual,

@@ -243,8 +243,12 @@ The compiler must prove:
 - every normalized estimate retains publication and document metadata; and
 - every extracted table has exactly one semantic review;
 - every detected forecast candidate has exactly one reviewed disposition;
-- every mapping is owned by at least one candidate and no candidate is
-  unresolved;
+- every mapping is owned by at least one candidate and no model-selected
+  candidate is unresolved;
+- a bounded-review terminal quarantine may close only immutable candidates
+  independently proven to have no mapping, no mapped-cell overlap and no
+  potential core-driver identity; it remains evidence, permits no model
+  consumption and is counted separately in the receipt;
 - every disposition passes the independent semantic relevance, provenance,
   definition and duplicate-equivalence gates;
 - every transparent derived mapping consumes all declared input candidates and
@@ -329,6 +333,26 @@ Do not ask the user to hand-author a crosswalk. A material conflict in a cell
 actually selected for model use remains blocking until resolved or quarantined;
 an evidence-only/non-tabular surface or an unused-table conflict does not.
 
+After the ordinary semantic-repair budget is consumed, the controller may
+enter `terminal_materiality_recovery`. This is not an evidence-dropping path.
+The model host must write `broker-terminal-materiality-review.json`, bound to
+the exact bundle bytes, candidate manifest, source crosswalk and semantic
+report. Every reviewed candidate is then preserved with its exact source cells
+under `preserve_unconsumed_quarantine` and `model_consumption=prohibited`.
+The compiler independently reconstructs selected cells and potential core
+drivers from mappings, immutable labels, forecast-period context and the
+canonical broker metric dictionary. A Revenue, EBIT/EBITDA, D&A, tax, capex,
+working-capital, dividend or buyback candidate therefore remains blocking even
+if a defective crosswalk calls it reference-only. Global source-integrity
+findings also remain blocking. Only genuinely unused evidence can close this
+way; no value may be inferred or invented.
+
+Source authority is cell- and period-granular. When one visible row contains
+both verified and conflicted cells, the immutable candidate manifest partitions
+that row by authority while retaining the same source row and label. The clean
+periods remain eligible for review and mapping; the conflicted period alone is
+quarantined. A single bad cell must never contaminate clean sibling periods.
+
 Every internal task packet must carry a deterministic task ID, a registered
 remedy, a finite attempt budget, a stage-local progress measure, the exact
 expected response filename(s), the response-schema hash and an instruction to
@@ -391,12 +415,16 @@ evidence rules because a layout-only report is difficult.
 
 ## Failure handling
 
-Pause once at Stage 2 only when a material modelling authority is still absent
-after native extraction, two reads, one targeted adjudication, cell quarantine,
-primary-house selection and the semantic forecast waterfall. A conflict in an
-unused table, a partial broker, or a house that is not selected cannot stop a
-complete eligible house. Present all surviving concept/period questions
-together. Do not expose raw conflict counts or stop once per document.
+Stage 2 always pauses once on the sealed broker preview so the user confirms
+the recommended primary-eligible coherent house (or selects one eligible
+alternate) before consumption. This is a selection checkpoint, not a waiver:
+a stale preview hash, mixed-house period series, or selected quarantined cell
+is refused. Separately, block only when a material modelling authority is
+still absent after native extraction, two reads, targeted adjudication,
+cell-granular quarantine, primary-house selection and the semantic forecast
+waterfall. A conflict in an unused cell/table, a partial broker, or an
+unselected house cannot stop a complete eligible house. Present all surviving
+concept/period questions together; never stop once per document.
 
 If extraction fails, request the smallest corrected source: an unprotected PDF,
 the original spreadsheet, a higher-resolution page, or confirmation of one

@@ -166,7 +166,14 @@ function consensusSelection(metric, forecastIndex) {
   };
 }
 
-/** Resolve one visible broker selection and disclose any named-house fallback. */
+/** Resolve one visible broker selection.
+ *
+ * A named primary house is one coherent authority across all periods. Missing
+ * cells do not borrow a different house or a period-specific mean: they return
+ * unavailable so the row's ordinary forecast waterfall can select company
+ * guidance, commitments, run-rate, trend or an explicit zero. This prevents a
+ * model labelled as one house from silently becoming three houses by year.
+ */
 export function resolveBrokerForecastSelection(
   modelCase,
   metricId,
@@ -218,12 +225,15 @@ export function resolveBrokerForecastSelection(
       substituted: false,
     };
   }
-  const fallback = consensus();
   return {
-    ...fallback,
-    substituted: true,
+    value: null,
+    source_kind: "named_house_unavailable",
+    source_name: selected,
+    substituted: false,
     substituted_from: selected,
-    substitution_reason: `${selected} does not supply forecast period ${forecastIndex + 1}; consensus is used visibly for that period.`,
+    substitution_reason:
+      `${selected} does not supply forecast period ${forecastIndex + 1}; ` +
+      "the ordinary forecast waterfall must resolve the period without another broker house.",
   };
 }
 
@@ -291,11 +301,23 @@ export function applyTier1AnchorOwnership(modelCase) {
 }
 
 export function selectBrokerAnchor(modelCase, rows = []) {
+  const selectedBrokerCase = modelCase?.controls?.broker_case ?? "Consensus";
+  const namedPrimary = !["Consensus", "High", "Low"].includes(selectedBrokerCase)
+    ? selectedBrokerCase
+    : null;
   const counts = {};
   const countsByPeriod = {};
   const totals = {};
   for (const metricId of ANCHOR_METRIC_IDS) {
-    countsByPeriod[metricId] = brokerContributorCounts(modelCase, metricId);
+    countsByPeriod[metricId] = namedPrimary
+      ? [0, 1, 2].map((periodIndex) => {
+          const value = modelCase?.broker_pack?.metrics?.[metricId]
+            ?.brokers?.[namedPrimary]?.[periodIndex];
+          return value !== null && value !== undefined && Number.isFinite(Number(value))
+            ? 1
+            : 0;
+        })
+      : brokerContributorCounts(modelCase, metricId);
     counts[metricId] = Math.min(...countsByPeriod[metricId]);
     totals[metricId] = countsByPeriod[metricId].reduce(
       (total, value) => total + value,
@@ -318,8 +340,10 @@ export function selectBrokerAnchor(modelCase, rows = []) {
   );
   const label =
     `Broker headline anchor: ${METRIC_SHORT_LABEL[headlineAnchor]} ` +
-    `(${countsByPeriod[headlineAnchor].join("/")} brokers); ${METRIC_SHORT_LABEL[da]} bridge driver ` +
-    `(${countsByPeriod[da].join("/")} brokers) — ${METRIC_SHORT_LABEL[derived]} derived` +
+    `(${countsByPeriod[headlineAnchor].join("/")} ${namedPrimary ? `from ${namedPrimary}` : "brokers"}); ` +
+    `${METRIC_SHORT_LABEL[da]} bridge driver ` +
+    `(${countsByPeriod[da].join("/")} ${namedPrimary ? `from ${namedPrimary}` : "brokers"}) — ` +
+    `${METRIC_SHORT_LABEL[derived]} derived` +
     (totals[derived] > 0
       ? `, broker ${METRIC_SHORT_LABEL[derived]} (${countsByPeriod[derived].join("/")} brokers) shown as memo`
       : " (no broker series)");

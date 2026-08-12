@@ -82,7 +82,7 @@
       "states": {
         "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PAUSED": { "blocker_classes": [null], "user_blocking": false, "stages": ["inputs", "evidence_review", "decisions", "build_checks"] },
-        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["decisions"] },
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["evidence_review", "decisions"] },
         "BLOCKED": { "blocker_classes": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false, "stages": ["delivery"] }
       },
@@ -97,7 +97,7 @@
     "stage_receipt": {
       "states": {
         "success": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
-        "action_required": { "stages": ["decisions"] },
+        "action_required": { "stages": ["evidence_review", "decisions"] },
         "blocked": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "failed": { "stages": ["build_checks", "delivery"] }
       }

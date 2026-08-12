@@ -21,6 +21,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from broker_terminal_recovery import analyse_terminal_recovery, apply_terminal_review
 from workflow_state import assert_state, assert_transition
 
 
@@ -148,6 +149,8 @@ def task_response_files(task: dict[str, Any]) -> list[str]:
         "broker_pack_repair",
     }:
         return ["broker-crosswalk.json"]
+    if kind == "terminal_materiality_recovery":
+        return ["broker-terminal-materiality-review.json"]
     return []
 
 
@@ -1114,21 +1117,113 @@ def main() -> int:
     artifacts["semantic_report"] = str(semantic_path)
     checkpoint(checkpoints, stage="semantic_verification", status="PASS" if semantic.get("status") == "PASS" else "NEEDS_WORK", input_digest=semantic_input, output=semantic_path, reused=semantic_reused)
     if semantic.get("status") != "PASS":
-        write_state(
-            state_path, run_id=run_id, status="NEEDS_CROSSWALK_REVIEW", request_digest=request_digest,
-            sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
-            checkpoints=checkpoints, artifacts=artifacts,
-            tasks=[{
-                "task_kind": "semantic_crosswalk_repair",
+        source_crosswalk = read_json(crosswalk, "broker crosswalk")
+        recovery_analysis = analyse_terminal_recovery(active_bundle, source_crosswalk, semantic)
+        terminal_review_path = responses / "broker-terminal-materiality-review.json" if responses else None
+        prior_terminal = any(
+            task.get("task_kind") == "terminal_materiality_recovery"
+            for task in prior_state.get("tasks", [])
+        )
+        if (
+            recovery_analysis["can_recover"]
+            and prior_terminal
+            and terminal_review_path
+            and terminal_review_path.is_file()
+        ):
+            try:
+                recovered_crosswalk, recovery_receipt = apply_terminal_review(
+                    bundle=active_bundle,
+                    crosswalk=source_crosswalk,
+                    semantic_report=semantic,
+                    review=read_json(terminal_review_path, "terminal broker materiality review"),
+                    bundle_sha256=sha256_file(active_bundle_path),
+                    crosswalk_sha256=crosswalk_digest,
+                    semantic_report_sha256=sha256_file(semantic_path),
+                )
+            except ValueError as error:
+                recovery_analysis = {
+                    **recovery_analysis,
+                    "review_validation_error": str(error),
+                }
+            else:
+                recovered_path = output_root / f"terminal-crosswalk-{key}-{crosswalk_digest[:12]}.json"
+                recovery_receipt_path = output_root / f"terminal-crosswalk-{key}-{crosswalk_digest[:12]}.receipt.json"
+                atomic_json(recovered_path, recovered_crosswalk)
+                atomic_json(recovery_receipt_path, recovery_receipt)
+                crosswalk = recovered_path
+                crosswalk_digest = sha256_file(crosswalk)
+                artifacts["crosswalk"] = str(crosswalk)
+                artifacts["terminal_recovery_receipt"] = str(recovery_receipt_path)
+                semantic_path = output_root / f"semantic-{key}-{crosswalk_digest[:12]}.json"
+                semantic_input = sha256_bytes(canonical_bytes({
+                    "bundle": sha256_file(active_bundle_path), "crosswalk": crosswalk_digest,
+                    "runtime": runtime_digest,
+                }))
+                run([
+                    sys.executable, str(HERE / "verify_broker_semantics.py"),
+                    str(active_bundle_path), str(crosswalk), "--out", str(semantic_path),
+                ], {0, 1})
+                semantic = read_json(semantic_path, "terminally recovered broker semantic report")
+                artifacts["semantic_report"] = str(semantic_path)
+                checkpoint(
+                    checkpoints, stage="terminal_materiality_recovery",
+                    status="PASS" if semantic.get("status") == "PASS" else "NEEDS_WORK",
+                    input_digest=semantic_input, output=semantic_path, reused=False,
+                )
+                if semantic.get("status") != "PASS":
+                    write_state(
+                        state_path, run_id=run_id, status="BLOCKED_INTERNAL", request_digest=request_digest,
+                        sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
+                        checkpoints=checkpoints, artifacts=artifacts,
+                        tasks=[{
+                            "task_kind": "internal_fixed_point_defect",
+                            "failed_status": "NEEDS_CROSSWALK_REVIEW",
+                            "instruction": "The independently sealed terminal recovery did not satisfy the semantic verifier; repair the controller boundary, never the source evidence.",
+                        }],
+                        summary={"terminal_reason": "terminal_recovery_verification_defect"},
+                        blocker_class="INTERNAL_WORK", attempts=attempts,
+                    )
+                    return 2
+
+        if semantic.get("status") != "PASS":
+            prior_semantic_near_exhaustion = any(
+                task.get("task_kind") == "semantic_crosswalk_repair"
+                and int(task.get("attempt_budget", {}).get("attempts_remaining", 99)) <= 1
+                for task in prior_state.get("tasks", [])
+            )
+            use_terminal_lane = recovery_analysis["can_recover"] and (
+                prior_semantic_near_exhaustion or prior_terminal
+            )
+            task = {
+                "task_kind": "terminal_materiality_recovery" if use_terminal_lane else "semantic_crosswalk_repair",
                 "crosswalk": str(crosswalk),
                 "semantic_report": str(semantic_path),
                 "findings": semantic.get("findings", []),
-                "instruction": "Repair the crosswalk declarations only. Do not alter source evidence, schemas, dictionaries or validators.",
-            }],
-            summary={"total_violation_count": semantic.get("total_violation_count")},
-            blocker_class="INTERNAL_WORK", attempts=attempts,
-        )
-        return 2
+                "terminal_recovery_analysis": recovery_analysis,
+                "run_id": run_id,
+                "bundle_sha256": sha256_file(active_bundle_path),
+                "candidate_manifest_sha256": sha256_bytes(canonical_bytes(active_bundle.get("candidate_manifest"))),
+                "source_crosswalk_sha256": crosswalk_digest,
+                "semantic_report_sha256": sha256_file(semantic_path),
+                "instruction": (
+                    "Review every and only listed non-consumed candidate and preserve it in evidence quarantine; do not invent a value or select it for model use."
+                    if use_terminal_lane else
+                    "Repair all crosswalk declarations together. Do not alter source evidence, schemas, dictionaries or validators."
+                ),
+            }
+            write_state(
+                state_path, run_id=run_id, status="NEEDS_CROSSWALK_REVIEW", request_digest=request_digest,
+                sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
+                checkpoints=checkpoints, artifacts=artifacts, tasks=[task],
+                summary={
+                    "total_violation_count": semantic.get("total_violation_count"),
+                    "recoverable_nonconsumed_candidate_count": len(recovery_analysis["recoverable_candidate_ids"]),
+                    "blocking_selected_or_global_finding_count": len(recovery_analysis["blocking_findings"]),
+                    "terminal_materiality_lane": use_terminal_lane,
+                },
+                blocker_class="INTERNAL_WORK", attempts=attempts,
+            )
+            return 2
 
     compiled_root = output_root / f"compiled-{key}-{crosswalk_digest[:12]}"
     pack_path = compiled_root / "broker-pack.json"

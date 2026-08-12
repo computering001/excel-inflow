@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { validateInstrumentPeriodStateArtifact } from "./instrument_period_state.mjs";
 import { validateLayeredGraphConstitution } from "./layered_graph_constitution.mjs";
+import { hasBalancingRcf } from "./rcf_policy.mjs";
 
 const APPROVED_MAPPING_METHODS = new Set([
   "exact",
@@ -92,6 +93,25 @@ export function parseCsv(text) {
 }
 
 export function validateOpeningRcfSource(modelCase, tolerance = 1e-8) {
+  if (!hasBalancingRcf(modelCase)) {
+    const policy = modelCase.rcf_policy ?? {};
+    const errors = [];
+    if (policy.instrument_id !== undefined) {
+      errors.push({
+        id: "rcf.none_instrument_designation",
+        message: "No-balancing-facility mode cannot designate an instrument.",
+      });
+    }
+    for (const key of ["capacity", "opening_draw", "commitment_fee_value"]) {
+      if (Number(policy[key] ?? 0) !== 0) {
+        errors.push({
+          id: `rcf.none_nonzero_${key}`,
+          message: `No-balancing-facility mode requires ${key} to be zero.`,
+        });
+      }
+    }
+    return errors;
+  }
   const rcfInstrument = (modelCase.instruments ?? []).find(
     (instrument) =>
       instrument.instrument_id === modelCase.rcf_policy?.instrument_id,

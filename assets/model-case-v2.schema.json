@@ -95,6 +95,24 @@
           "type": "string",
           "minLength": 1
         },
+        "identifiers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lei": { "type": ["string", "null"] },
+            "isin": { "type": ["string", "null"] },
+            "cusip": { "type": ["string", "null"] },
+            "ticker": { "type": ["string", "null"] },
+            "factset_entity_id": { "type": ["string", "null"] },
+            "company_number": { "type": ["string", "null"] }
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
         "reporting_currency": {
           "type": "string",
           "pattern": "^[A-Z]{3}$"
@@ -931,14 +949,14 @@
     "rcf_policy": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "instrument_id",
-        "capacity",
-        "opening_draw",
-        "commitment_fee_convention",
-        "commitment_fee_value"
-      ],
       "properties": {
+        "mode": {
+          "enum": [
+            "balancing_rcf",
+            "none"
+          ],
+          "description": "Explicit liquidity-balancing mode. Omitted only for backwards-compatible named-facility cases; newly compiled cases always state balancing_rcf or none."
+        },
         "instrument_id": {
           "type": "string"
         },
@@ -963,7 +981,56 @@
           "type": "number",
           "minimum": 0
         }
-      }
+      },
+      "oneOf": [
+        {
+          "description": "One named RCF is the sole balancing liquidity facility. Legacy cases may omit mode when instrument_id is present.",
+          "required": [
+            "instrument_id",
+            "capacity",
+            "opening_draw",
+            "commitment_fee_convention",
+            "commitment_fee_value"
+          ],
+          "properties": {
+            "mode": {
+              "const": "balancing_rcf"
+            }
+          }
+        },
+        {
+          "description": "The issuer has no balancing facility. Revolvers may still exist in the instrument register as ordinary debt, but capacity, draw and fee authority are explicit zeros and no instrument is designated.",
+          "required": [
+            "mode",
+            "capacity",
+            "opening_draw",
+            "commitment_fee_convention",
+            "commitment_fee_value"
+          ],
+          "properties": {
+            "mode": {
+              "const": "none"
+            },
+            "capacity": {
+              "const": 0
+            },
+            "opening_draw": {
+              "const": 0
+            },
+            "commitment_fee_convention": {
+              "const": "none"
+            },
+            "commitment_fee_value": {
+              "const": 0
+            }
+          },
+          "not": {
+            "required": [
+              "instrument_id"
+            ]
+          }
+        }
+      ]
     },
     "cash_policy": {
       "type": "object",

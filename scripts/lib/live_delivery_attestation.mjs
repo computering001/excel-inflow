@@ -256,6 +256,12 @@ export async function compileLiveDeliveryAttestation({
       violations.push({ code: "publication.unreadable", detail: error.message });
     }
   }
+  // Publication paths are relative to the Stage-4 publication itself. The
+  // outer five-stage run keeps content-addressed builds under
+  // <run>/build-<case-hash>/; resolving verify/render against <run> silently
+  // looked in the wrong directory even though the manifest and workbook were
+  // correctly co-located and hash bound.
+  const publicationRoot = path.dirname(publicationPath);
   const [rowMap, semanticManifest, proofContract, modelCase, skillIntegrity] = await Promise.all([
     readJson(sidecars["row-map.json"].path, "row map"),
     readJson(sidecars["semantic-manifest.json"].path, "semantic manifest"),
@@ -361,8 +367,8 @@ export async function compileLiveDeliveryAttestation({
     invariant(published?.sha256 === descriptor.sha256, "publication.sidecar_hash", `Publication hash for ${name} does not match the delivered sidecar.`, violations);
   }
   for (const [label, directory, manifestEntries] of [
-    ["verification", path.join(root, "verify"), publication?.verification_files],
-    ["render", path.join(root, "render"), publication?.render_files],
+    ["verification", path.join(publicationRoot, "verify"), publication?.verification_files],
+    ["render", path.join(publicationRoot, "render"), publication?.render_files],
   ]) {
     invariant(Array.isArray(manifestEntries) && manifestEntries.length > 0, `publication.${label}_manifest`, `Publication has no ${label} file manifest.`, violations);
     let actualFiles = [];
@@ -397,7 +403,7 @@ export async function compileLiveDeliveryAttestation({
     }
   }
   try {
-    const recalcReceipt = await readJson(path.join(root, "verify", "libreoffice-recalc-receipt.json"), "LibreOffice recalculation receipt");
+    const recalcReceipt = await readJson(path.join(publicationRoot, "verify", "libreoffice-recalc-receipt.json"), "LibreOffice recalculation receipt");
     invariant(recalcReceipt.status === "PASS", "publication.recalc_receipt", `LibreOffice receipt status is ${recalcReceipt.status ?? "missing"}.`, violations);
     invariant(recalcReceipt.package_changed === true, "publication.recalc_noop", "LibreOffice receipt does not prove a non-no-op package conversion.", violations);
     invariant(Number(recalcReceipt.formula_cells ?? 0) > 0, "publication.recalc_coverage", "LibreOffice receipt visited no formula cells.", violations);

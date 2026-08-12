@@ -10,7 +10,20 @@ from pathlib import Path
 
 import run_attachment_evidence_pipeline as attachment
 import run_broker_pipeline as broker
+from compile_broker_candidate_manifest import compile_manifest
+from compile_broker_pack import validate_coverage
+from broker_terminal_recovery import (
+    analyse_terminal_recovery,
+    apply_terminal_review,
+    canonical_hash,
+    validate_terminal_recovery_independently,
+)
 from workflow_state import assert_transition
+from verify_broker_semantics import (
+    verifier_selected_candidate_ids,
+    verify_manifest_integrity,
+    verify_terminal_recovery_independently,
+)
 
 
 def check(condition: bool, message: str) -> None:
@@ -62,6 +75,21 @@ def main() -> int:
             check(len(declaration.get("response_schema_sha256", "")) == 64, f"{task_kind} schema is not hash-bound")
     checks += 1
 
+    terminal_status, terminal_packets, terminal_fixed, _ = broker.seal_internal_work(
+        prior={}, cache_key=cache_key, status="NEEDS_CROSSWALK_REVIEW",
+        tasks=[{
+            "task_kind": "terminal_materiality_recovery", "run_id": "ordinary-pack",
+            "bundle_sha256": "6" * 64, "candidate_manifest_sha256": "7" * 64,
+            "source_crosswalk_sha256": "8" * 64, "semantic_report_sha256": "9" * 64,
+            "terminal_recovery_analysis": {"recoverable_candidate_ids": ["bc-" + "1" * 24]},
+        }], checkpoints=checkpoints, summary={},
+    )
+    terminal_packet = terminal_packets[0]
+    check(terminal_status == "NEEDS_CROSSWALK_REVIEW" and terminal_fixed["status"] == "OPEN", "terminal materiality response lane did not remain resumable")
+    check(terminal_packet["model_host_response_boundary"]["expected_response_files"] == ["broker-terminal-materiality-review.json"], "terminal materiality response filename is not deterministic")
+    check(terminal_packet["attempt_budget"]["attempts_remaining"] == 2, "terminal materiality response has no independent finite budget")
+    checks += 3
+
     status1, tasks1, fixed1, _ = broker.seal_internal_work(
         prior={}, cache_key=cache_key, status="NEEDS_VISION",
         tasks=[vision_task], checkpoints=checkpoints, summary={},
@@ -74,24 +102,215 @@ def main() -> int:
     check(packet["model_host_response_boundary"]["python_may_not_author_response"] is True, "Python authorship boundary is absent")
     checks += 4
 
-    previous = prior_state(cache_key, tasks1, fixed1)
-    for expected_retry in (1, 2):
-        status, tasks, fixed, _ = broker.seal_internal_work(
-            prior=previous, cache_key=cache_key, status="NEEDS_VISION",
-            tasks=[vision_task], checkpoints=checkpoints, summary={},
-        )
-        check(status == "NEEDS_VISION", "frontier terminated before its finite retry budget")
-        check(fixed["unchanged_retry_count"] == expected_retry, "unchanged retry count is not monotonic")
-        previous = prior_state(cache_key, tasks, fixed)
-    status4, tasks4, fixed4, summary4 = broker.seal_internal_work(
-        prior=previous, cache_key=cache_key, status="NEEDS_VISION",
-        tasks=[vision_task], checkpoints=checkpoints, summary={},
+    # One conflicted period in a visible row must no longer quarantine its
+    # clean sibling periods. The immutable manifest partitions only the mixed
+    # row, and the independent integrity verifier reconstructs that partition.
+    conflict_id = "bvc-" + "a" * 24
+    table = {
+        "table_id": "mixed-table", "canonical_table_id": "mixed-table", "units": "millions",
+        "rows": [
+            [
+                {"row": 1, "column": 1, "raw_text": "Metric", "source_ref": "s1"},
+                {"row": 1, "column": 2, "raw_text": "2027E", "source_ref": "s2"},
+                {"row": 1, "column": 3, "raw_text": "2028E", "source_ref": "s3"},
+            ],
+            [
+                {"row": 2, "column": 1, "raw_text": "Revenue", "source_ref": "s4"},
+                {"row": 2, "column": 2, "raw_text": "100", "value": 100, "value_kind": "number", "source_ref": "s5"},
+                {"row": 2, "column": 3, "raw_text": "110", "value": 110, "value_kind": "number", "source_ref": "s6", "authority_status": "quarantined_conflict", "conflict_id": conflict_id},
+            ],
+        ],
+    }
+    mixed_bundle = {
+        "run_id": "mixed-authority", "documents": [{
+            "document_id": "mixed-doc", "house_id": "mixed-house",
+            "canonical_tables": [table], "tables": [table],
+        }],
+    }
+    mixed_manifest = compile_manifest(mixed_bundle, source_bundle_sha256="9" * 64)
+    row_candidates = [item for item in mixed_manifest["candidates"] if item["row"] == 2]
+    clean = next(item for item in row_candidates if item["authority_status"] == "verified")
+    dirty = next(item for item in row_candidates if item["authority_status"] == "quarantined_conflict")
+    check(len(row_candidates) == 2, "mixed-authority row was not partitioned at cell/period grain")
+    check({cell["column"] for cell in clean["source_cells"]} == {1, 2} and {cell["column"] for cell in dirty["source_cells"]} == {3}, "conflicted period contaminated clean candidate cells")
+    check(clean["period_indexes"][0]["period_label"] == "2027E" and dirty["period_indexes"][0]["period_label"] == "2028E", "period authority did not remain cell-addressed")
+    check(not verify_manifest_integrity(mixed_bundle, mixed_manifest), "independent manifest verifier rejected cell-granular authority")
+    checks += 4
+
+    # Ordinary evidence which remains unused after bounded semantic review must
+    # finish as a sealed, non-consumable quarantine instead of exhausting into
+    # BLOCKED_INTERNAL.  This is the positive case that used to be missing.
+    candidate_a = "bc-" + "1" * 24
+    candidate_b = "bc-" + "2" * 24
+    manifest = {
+        "manifest_version": "broker-candidate-manifest/1.0", "run_id": "ordinary-pack", "gate_status": "PASS",
+        "candidates": [
+            {"candidate_id": candidate_a, "document_id": "doc-a", "house_id": "house-a", "table_id": "table-a", "row": 2, "label": "Valuation note", "period_basis": "non_periodic", "numeric": True, "source_cells": [{"row": 2, "column": 2}], "authority_status": "verified"},
+            {"candidate_id": candidate_b, "document_id": "doc-b", "house_id": "house-b", "table_id": "table-b", "row": 3, "label": "Scenario reference", "period_basis": "non_periodic", "numeric": True, "source_cells": [{"row": 3, "column": 4}], "authority_status": "verified"},
+        ],
+    }
+    bundle = {"run_id": "ordinary-pack", "candidate_manifest": manifest}
+    fingerprint = {
+        "concept_id": "custom.valuation_note", "measurement_basis": "unspecified",
+        "restatement_basis": "not_applicable", "cash_flow_basis": "not_applicable",
+        "lease_basis": "not_applicable", "units": "millions", "currency": "USD",
+        "period_basis": "non_periodic", "sign_convention": "as_reported",
+        "accounting_basis": "unspecified", "operating_scope": "unspecified",
+    }
+    crosswalk = {
+        "schema_version": "broker-crosswalk/1.2", "run_id": "ordinary-pack",
+        "as_of": "2026-08-12", "reporting_currency": "USD", "units": "millions",
+        "forecast_periods": ["2027-12-31", "2028-12-31", "2029-12-31"],
+        "metrics": {}, "mappings": [],
+        "table_reviews": [{
+            "house_id": "house-a", "table_id": "table-a", "classification": "non_forecast",
+            "header_rows": [], "period_columns": [], "review_status": "reviewed",
+            "rationale": "Evidence-only scenario material with no forecast columns.",
+        }],
+        "coverage_ledger": [
+            {
+                "candidate_id": candidate_a, "house_id": "house-a", "table_id": "table-a", "row": 2,
+                "label": "Valuation note", "period_basis": "non_periodic", "period_indexes": [],
+                "source_cells": [{"row": 2, "column": 2}], "parent_candidate_id": None,
+                "semantic_role": "valuation_market_data", "economic_domain": "valuation",
+                "concept_id": "custom.valuation_note", "model_use": "reference_only",
+                "evidence_kind": "market_data", "definition_id": "custom.valuation_note",
+                "definition_fingerprint": fingerprint, "definition_evidence": "Source label is valuation-only evidence.",
+                "disposition": "not_model_relevant", "mapping_ids": [], "review_status": "reviewed",
+                "rationale": "Preserved as valuation evidence and not selected as a forecast model driver.",
+            },
+            {
+                "candidate_id": candidate_b, "house_id": "house-b", "table_id": "table-b", "row": 3,
+                "model_use": "reference_only", "disposition": "not_model_relevant", "mapping_ids": [],
+            },
+        ],
+    }
+    semantic = {"findings": [{"code": "SEM-DEFINITION-EVIDENCE", "candidate_id": candidate_b}]}
+    bindings = {
+        "bundle_sha256": "6" * 64,
+        "source_crosswalk_sha256": "7" * 64,
+        "semantic_report_sha256": "8" * 64,
+    }
+    review = {
+        "schema_version": "broker-terminal-materiality-review/1.0", "run_id": "ordinary-pack",
+        **bindings, "candidate_manifest_sha256": canonical_hash(manifest),
+        "producer_id": "model-host-test", "reviewed_at": None,
+        "reviews": [{
+            "candidate_id": candidate_b, "disposition": "preserve_unconsumed_quarantine",
+            "model_consumption": "prohibited", "rationale": "Unused evidence is preserved exactly and prohibited from model consumption.",
+        }],
+    }
+    analysis = analyse_terminal_recovery(bundle, crosswalk, semantic)
+    check(analysis["can_recover"] and analysis["recoverable_candidate_ids"] == [candidate_b], "ordinary unused evidence did not enter terminal recovery")
+    recovered, recovery_receipt = apply_terminal_review(
+        bundle=bundle, crosswalk=crosswalk, semantic_report=semantic, review=review,
+        bundle_sha256=bindings["bundle_sha256"], crosswalk_sha256=bindings["source_crosswalk_sha256"],
+        semantic_report_sha256=bindings["semantic_report_sha256"],
     )
-    check(status4 == "BLOCKED_INTERNAL", "exhausted fixed point did not terminate internally")
-    check(len(tasks4) == 1 and tasks4[0]["task_kind"] == "internal_fixed_point_defect", "stall did not collapse to one aggregate defect")
-    check(tasks4[0]["user_blocking"] is False, "aggregate internal defect became user blocking")
-    check(fixed4["status"] == "TERMINAL_DEFECT" and summary4["aggregate_internal_defect_count"] == 1, "terminal fixed-point receipt is incomplete")
-    checks += 6
+    terminal_entries, terminal_errors = validate_terminal_recovery_independently(bundle, recovered)
+    check(recovery_receipt["status"] == "PASS" and recovery_receipt["unresolved_selected_candidate_count"] == 0, "ordinary pack recovery did not seal PASS")
+    check(set(terminal_entries) == {candidate_b} and not terminal_errors, "ordinary evidence quarantine is not independently valid")
+    verifier_entries, verifier_errors = verify_terminal_recovery_independently(
+        bundle, recovered, bundle_sha256=bindings["bundle_sha256"]
+    )
+    check(set(verifier_entries) == {candidate_b} and not verifier_errors, "independent semantic oracle rejected the terminal recovery contract")
+    check(candidate_b not in {x["candidate_id"] for x in recovered["coverage_ledger"]}, "terminal candidate remained in the active semantic ledger")
+    coverage_bundle = json.loads(json.dumps(bundle))
+    coverage_bundle["documents"] = [{
+        "document_id": "doc-a", "house_id": "house-a", "tables": [{
+            "table_id": "table-a", "rows": [
+                [{"source_ref": "table-a!R1C1", "value": None}, {"source_ref": "table-a!R1C2", "value": None}],
+                [{"source_ref": "table-a!R2C1", "value": None}, {"source_ref": "table-a!R2C2", "value": "Valuation note"}],
+            ],
+        }],
+    }]
+    # Candidate B is terminal evidence from another captured table; include its
+    # source owner so the compiler can independently validate the manifest.
+    coverage_bundle["documents"].append({
+        "document_id": "doc-b", "house_id": "house-b", "tables": [{
+            "table_id": "table-b", "rows": [[], [], [
+                {"source_ref": "table-b!R3C1", "value": None},
+                {"source_ref": "table-b!R3C2", "value": None},
+                {"source_ref": "table-b!R3C3", "value": None},
+                {"source_ref": "table-b!R3C4", "value": "Scenario reference"},
+            ]],
+        }],
+    })
+    recovered["table_reviews"].append({
+        "house_id": "house-b", "table_id": "table-b", "classification": "non_forecast",
+        "header_rows": [], "period_columns": [], "review_status": "reviewed",
+        "rationale": "Evidence-only scenario material with no forecast columns.",
+    })
+    documents_by_house = {item["house_id"]: item for item in coverage_bundle["documents"]}
+    tables = {
+        table["table_id"]: (document, table)
+        for document in coverage_bundle["documents"] for table in document["tables"]
+    }
+    resolved_coverage, coverage_summary, _ = validate_coverage(
+        recovered, documents_by_house, tables, [], candidate_manifest=manifest,
+        semantic_violation_count=0, bundle=coverage_bundle, bundle_sha256="6" * 64,
+    )
+    check(coverage_summary["terminal_quarantined_candidate_count"] == 1 and coverage_summary["unresolved_selected_candidate_count"] == 0, "ordinary-pack compiler did not close the terminal evidence lane")
+    check(any(item.get("disposition") == "preserve_unconsumed_quarantine" for item in resolved_coverage), "compiled coverage receipt lost terminal evidence")
+    checks += 7
+
+    # Adversarial selected-cell and global-integrity findings still fail closed.
+    selected = json.loads(json.dumps(crosswalk))
+    selected["coverage_ledger"][1].update({"model_use": "active_input", "disposition": "mapped_metric", "mapping_ids": ["map-b"]})
+    selected_analysis = analyse_terminal_recovery(bundle, selected, semantic)
+    check(not selected_analysis["can_recover"] and selected_analysis["blocking_findings"][0]["reason"] == "selected_model_candidate_unresolved", "selected candidate entered terminal recovery")
+    misclassified = json.loads(json.dumps(crosswalk))
+    misclassified_bundle = json.loads(json.dumps(bundle))
+    misclassified_bundle["candidate_manifest"]["candidates"][1].update({
+        "label": "Revenue", "period_basis": "annual_forecast", "numeric": True,
+    })
+    misclassified_analysis = analyse_terminal_recovery(misclassified_bundle, misclassified, semantic)
+    check(not misclassified_analysis["can_recover"] and misclassified_analysis["blocking_findings"][0]["reason"] == "selected_model_candidate_unresolved", "crosswalk-misclassified Revenue escaped the independent model-driver oracle")
+    check(candidate_b in verifier_selected_candidate_ids(misclassified_bundle, misclassified), "semantic oracle did not independently reconstruct crosswalk-misclassified Revenue")
+    decorated_bundle = json.loads(json.dumps(bundle))
+    decorated_bundle["candidate_manifest"]["candidates"][1].update({
+        "label": "Adjusted EBITDA (USDm)", "period_basis": "annual_forecast", "numeric": True,
+    })
+    check(not analyse_terminal_recovery(decorated_bundle, crosswalk, semantic)["can_recover"], "decorated core-driver label escaped terminal blocking")
+    check(candidate_b in verifier_selected_candidate_ids(decorated_bundle, crosswalk), "semantic oracle missed decorated core-driver label")
+    component_bundle = json.loads(json.dumps(bundle))
+    component_bundle["candidate_manifest"]["candidates"][1].update({
+        "label": "Product Sales", "period_basis": "annual_forecast", "numeric": True,
+    })
+    check(analyse_terminal_recovery(component_bundle, crosswalk, semantic)["can_recover"], "reference-only revenue component was over-classified as a core model driver")
+    check(candidate_b not in verifier_selected_candidate_ids(component_bundle, crosswalk), "semantic oracle over-classified reference-only revenue component")
+    global_analysis = analyse_terminal_recovery(bundle, crosswalk, {"findings": [{"code": "SEM-SOURCE-INTEGRITY"}]})
+    check(not global_analysis["can_recover"] and global_analysis["blocking_findings"][0]["reason"] == "global_or_unbound_source_integrity_finding", "global integrity defect entered terminal recovery")
+    mutated = json.loads(json.dumps(recovered))
+    mutated["mappings"] = [{"sources": [{"table_id": "table-b", "row": 3, "column": 4}]}]
+    _terminal_entries, mutation_errors = validate_terminal_recovery_independently(bundle, mutated)
+    check(any("model-selected" in error for error in mutation_errors), "post-seal selected-cell mutation was not rejected")
+    _entries, bundle_binding_errors = validate_terminal_recovery_independently(
+        bundle, recovered, bundle_sha256="0" * 64
+    )
+    check(any("bundle bytes" in error for error in bundle_binding_errors), "terminal recovery accepted different verified bundle bytes")
+    extra_field_review = json.loads(json.dumps(review))
+    extra_field_review["invented_value"] = 123
+    try:
+        apply_terminal_review(
+            bundle=bundle, crosswalk=crosswalk, semantic_report=semantic,
+            review=extra_field_review, bundle_sha256=bindings["bundle_sha256"],
+            crosswalk_sha256=bindings["source_crosswalk_sha256"],
+            semantic_report_sha256=bindings["semantic_report_sha256"],
+        )
+    except ValueError as error:
+        check("undeclared fields" in str(error), "terminal response seam rejected extra value for the wrong reason")
+    else:
+        raise AssertionError("terminal response seam accepted an undeclared invented value")
+    checks += 11
+
+    blocked_status, tasks4, fixed4, summary4 = broker.seal_internal_work(
+        prior={}, cache_key=cache_key, status="BLOCKED_INTERNAL",
+        tasks=[{"task_kind": "internal_fixed_point_defect", "instruction": "Repair selected-cell authority conflict."}],
+        checkpoints=checkpoints, summary={},
+    )
+    check(blocked_status == "BLOCKED_INTERNAL" and len(tasks4) == 1, "selected/global terminal blocker was not aggregated")
+    checks += 1
 
     crosswalk_task = {
         "task_kind": "semantic_crosswalk_review",
@@ -178,9 +397,7 @@ def main() -> int:
         output.write_text(json.dumps({"status": "MUTATED"}), "utf-8")
         check(not broker.reusable(output, receipt, input_digest), "mutated checkpoint was reused")
         state_path = root / "broker-run-state.json"
-        for expected_status in (
-            "NEEDS_VISION", "NEEDS_VISION", "NEEDS_VISION", "BLOCKED_INTERNAL",
-        ):
+        for expected_status in ("NEEDS_VISION", "NEEDS_VISION", "NEEDS_VISION"):
             state = broker.write_state(
                 state_path,
                 run_id="fixed-point-test",
@@ -199,13 +416,13 @@ def main() -> int:
             check(state["pipeline_status"] == expected_status, "persisted fixed point did not obey its finite retry sequence")
         persisted = json.loads(state_path.read_text("utf-8"))
         check("fixed_point" in persisted and len(persisted["tasks"]) == 1, "persisted broker state omitted its aggregate fixed point")
-    checks += 7
+    checks += 6
 
     print(json.dumps({
         "status": "PASS",
         "checks": checks,
-        "positive_checks": checks - 4,
-        "mutation_checks": 4,
+        "positive_checks": checks - 10,
+        "mutation_checks": 10,
         "total_violation_count": 0,
     }, sort_keys=True))
     return 0

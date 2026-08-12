@@ -230,10 +230,14 @@ do not handcraft hashes or treat normalized JSON as proof of the original file.
 Restated figures replace superseded comparatives only when the filing clearly states the restated basis. Preserve predecessor history and calendarise only with an explicit bridge. Never splice differently scoped periods without a visible reconciliation.
 
 At the broker checkpoint, render the receipt screen and attach a broker
-preview built from the SEALED pack only — the per-house digest bands and the
-consensus faces, exactly the surface the Brokers tab will print — so the user
-confirms what was read before anything consumes it. The preview is generated
-from the pack artifact; it is never a hand-typed table.
+preview built from the SEALED pack only. It names the recommended
+primary-eligible coherent house, shows every selected concept/period value and
+its exact source cells, lists eligible alternates, and links the full preserved
+raw/evidence-only inventory. The user confirms that house before any broker
+value is consumed. The confirmation is bound to the preview hash, may select
+only another primary-eligible coherent house, and can never waive a selected
+cell conflict. The preview is generated from sealed artifacts; it is never a
+hand-typed table and resume never re-extracts the reports.
 
 Decisions are collected on native question cards: the ASCII screen is the
 receipt, the cards are the instrument. One checkpoint's cards form one
@@ -243,13 +247,20 @@ Checkpoint confirmations are cards too. Every card answer lands in
 `case-source.answers` under its stable question id; the compiler refuses a
 declaration pointing at an answer that was never recorded.
 
-Ask at most once and at most five targeted questions after deterministic pruning. Ask only for material facts that change debt, liquidity, interest, leverage or acquisition outputs and cannot be resolved from supplied evidence. Typical questions cover an unreconciled debt residual, unknown fixed/floating terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease mode, refinancing treatment or transaction timing. If more than five survive, say the inputs appear incomplete and request a corrected pack rather than presenting a questionnaire.
+Ask at most five targeted questions in one decision round after deterministic
+pruning. Ask only for material facts that change debt, liquidity, interest,
+leverage or acquisition outputs and cannot be resolved from supplied evidence.
+Typical questions cover an unreconciled debt residual, unknown fixed/floating
+terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease
+mode, refinancing treatment or transaction timing. If more than five genuine
+decisions survive, persist the answers and present the next deterministic round;
+question cardinality alone is never evidence that the source pack is defective.
 
 The visible run has exactly five labelled stages:
 
 1. `INPUTS` — receive the company, evidence pack and optional prior case;
-2. `EVIDENCE REVIEW` — validate, read and reconcile without user contact unless the pack is defective;
-3. `DECISIONS` — the only normal stop, containing zero to five questions together;
+2. `EVIDENCE REVIEW` — validate, read and reconcile, then require one sealed broker-primary confirmation;
+3. `DECISIONS` — zero to five genuinely unresolved modelling questions together, if any;
 4. `BUILD AND CHECKS` — solve, emit and validate without user contact; and
 5. `DELIVERY` — return the workbook, assumptions, findings and gate status.
 
@@ -676,8 +687,21 @@ The commands below are subordinate checkpoints or diagnostics. The production
 controller invokes them; an end user does not sequence them manually:
 
 ```bash
-node scripts/run_filings_pipeline.mjs <filings-extraction-request.json> --out <run-folder>/filings [--responses <response.json>]
+node scripts/run_filings_pipeline.mjs <filings-acquisition-or-extraction-request.json> --out <run-folder>/filings [--responses <response.json>]
 node scripts/compile_declared_evidence_run.mjs <attachment-ingress.json> --declarations <minimal-declarations.json> --out <folder>
 node scripts/propose_case_source.mjs <minimal-declarations.json> <case-evidence.json> --out <case-source.json>
 node scripts/verify/recalc_second_opinion.mjs --before <emitted.xlsx> --after <raw-after.xlsx> --before-map <before.json> --after-map <raw-after.json> --out <receipt.json> [--soffice-identity <sha256>]
 ```
+
+The preferred filing input is `filings-acquisition-request/1.0`. It is a
+declarative registry, never a search instruction: sources are user-supplied
+paths, runtime-library paths, or explicit HTTPS issuer/regulator URLs with an
+allowed-domain set. The controller materialises every source by SHA-256 and
+then invokes the same extraction lane. User-supplied sources own every period
+they cover ahead of retrieved or runtime-library sources. Overlapping annuals
+may supply different periods only through the sealed `period_authority` ledger;
+the latest selected filing remains the canonical statement topology, while an
+older report must be explicitly marked `selected_period_authority_support`.
+Restated comparatives still require the numeric historical bridge. Stable
+issuer identifiers and declared aliases flow from this registry through the
+filings evidence, case-source compiler and N2 entity gate.

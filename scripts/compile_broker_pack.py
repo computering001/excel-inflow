@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from broker_terminal_recovery import validate_terminal_recovery_independently
+
 
 NUMBER = re.compile(r"^\s*(\()?\s*[-+]?[$€£¥]?\s*(\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.(\d+))?\s*(%)?\s*\)?\s*$")
 # ------------------------------------------------------- the metric vocabulary
@@ -276,6 +278,8 @@ def validate_coverage(
     mapping_receipts: list[dict[str, Any]],
     candidate_manifest: dict[str, Any] | None = None,
     semantic_violation_count: int = 0,
+    bundle: dict[str, Any] | None = None,
+    bundle_sha256: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
     """Prove every declared future-period table row has one reviewed disposition."""
 
@@ -285,6 +289,15 @@ def validate_coverage(
         raise ValueError("The broker crosswalk requires a non-empty table_reviews ledger.")
     if not isinstance(ledger, list) or not ledger:
         raise ValueError("The broker crosswalk requires a non-empty coverage_ledger.")
+    terminal_by_id: dict[str, dict[str, Any]] = {}
+    if crosswalk.get("terminal_recovery"):
+        if bundle is None:
+            raise ValueError("Terminal broker quarantine requires the immutable verified bundle.")
+        terminal_by_id, terminal_errors = validate_terminal_recovery_independently(
+            bundle, crosswalk, bundle_sha256=bundle_sha256
+        )
+        if terminal_errors:
+            raise ValueError("Invalid terminal broker quarantine: " + "; ".join(terminal_errors))
     forecast_years = [int(str(period)[:4]) for period in crosswalk["forecast_periods"]]
     review_by_table: dict[str, dict[str, Any]] = {}
     expected: dict[tuple[str, int, str], dict[str, Any]] = {}
@@ -693,7 +706,13 @@ def validate_coverage(
         by_candidate_id[candidate_id] = resolved
 
     if candidate_manifest is not None:
-        missing_candidate_ids = sorted(set(expected_by_candidate_id) - set(by_candidate_id))
+        overlap = sorted(set(by_candidate_id) & set(terminal_by_id))
+        if overlap:
+            raise ValueError("Terminal broker quarantine overlaps the ordinary coverage ledger: " + ", ".join(overlap[:8]))
+        extra_terminal = sorted(set(terminal_by_id) - set(expected_by_candidate_id))
+        if extra_terminal:
+            raise ValueError("Terminal broker quarantine names candidates outside the immutable manifest: " + ", ".join(extra_terminal[:8]))
+        missing_candidate_ids = sorted(set(expected_by_candidate_id) - set(by_candidate_id) - set(terminal_by_id))
         if missing_candidate_ids:
             raise ValueError(
                 f"Broker candidate-manifest coverage is incomplete; {len(missing_candidate_ids)} candidates have no disposition: "
@@ -705,6 +724,39 @@ def validate_coverage(
     if missing_candidates:
         preview = ", ".join(f"{table}!R{row}:{basis}" for table, row, basis in missing_candidates[:8])
         raise ValueError(f"Broker forecast coverage is incomplete; {len(missing_candidates)} candidate rows have no disposition: {preview}.")
+    for candidate_id, terminal in sorted(terminal_by_id.items()):
+        candidate = expected_by_candidate_id[candidate_id]
+        table_id = str(candidate["table_id"])
+        _document, table = tables[table_id]
+        source_cells = []
+        for cell in candidate["source_cells"]:
+            row = int(cell["row"])
+            column = int(cell["column"])
+            source_cells.append({
+                "row": row,
+                "column": column,
+                "raw_value": table["rows"][row - 1][column - 1].get("raw_value"),
+                "authority_status": candidate.get("authority_status"),
+            })
+        resolved = {
+            "candidate_id": candidate_id,
+            "document_id": candidate.get("document_id"),
+            "house_id": candidate.get("house_id"),
+            "table_id": table_id,
+            "row": candidate.get("row"),
+            "label": candidate.get("label"),
+            "period_basis": candidate.get("period_basis"),
+            "period_indexes": candidate.get("period_indexes", []),
+            "source_cells": source_cells,
+            "disposition": "preserve_unconsumed_quarantine",
+            "model_use": "unresolved",
+            "model_consumption": "prohibited",
+            "finding_codes": terminal.get("finding_codes", []),
+            "rationale": terminal.get("rationale"),
+            "review_status": "reviewed",
+        }
+        resolved_ledger.append(resolved)
+        by_candidate_id[candidate_id] = resolved
     for candidate_id, entry in by_candidate_id.items():
         if entry.get("disposition") != "duplicate":
             continue
@@ -788,6 +840,8 @@ def validate_coverage(
         "detected_forecast_candidate_count": len(expected_by_candidate_id) if candidate_manifest is not None else len(expected),
         "coverage_entry_count": len(resolved_ledger),
         "unresolved_candidate_count": 0,
+        "terminal_quarantined_candidate_count": len(terminal_by_id),
+        "unresolved_selected_candidate_count": 0,
         "semantic_quality_violation_count": int(semantic_violation_count),
         "candidate_manifest_count": len(expected_by_candidate_id),
         "candidate_authority": "deterministic_manifest" if candidate_manifest is not None else "legacy_reviewer_columns_fail_closed",
@@ -1274,6 +1328,8 @@ def main() -> int:
         mapping_receipts,
         candidate_manifest=candidate_manifest,
         semantic_violation_count=int((semantic_report or {}).get("total_violation_count", 0)),
+        bundle=bundle,
+        bundle_sha256=bundle_sha256,
     )
     review_by_table = {
         review["table_id"]: review
@@ -1567,6 +1623,7 @@ def main() -> int:
         "mappings": mapping_receipts,
         "table_reviews_sha256": hash_json(crosswalk["table_reviews"]),
         "coverage_ledger_sha256": hash_json(crosswalk["coverage_ledger"]),
+        **({"terminal_recovery_sha256": hash_json(crosswalk["terminal_recovery"])} if crosswalk.get("terminal_recovery") else {}),
         "coverage_summary": coverage_summary,
         "coverage_ledger": resolved_coverage,
         "derived_mappings": resolved_derivations,

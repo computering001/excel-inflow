@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run broker and DCS evidence as one resumable production transaction.
+"""Run filings, broker and DCS evidence as one resumable production transaction.
 
 The component controllers remain the only owners of their respective evidence
 lanes.  This controller aggregates their typed states, materialises a resolved
@@ -269,6 +269,21 @@ def apply_filings_lane(
         raise ValueError("PASS filings lane omits its bundle or extraction registry")
     bundle = read_json(bundle_path, "filings evidence bundle")
     registry = read_json(registry_path, "document extraction registry")
+    acquisition_registry_path = Path(str(artifacts.get("filings_source_registry") or ""))
+    acquisition_registry = (
+        read_json(acquisition_registry_path, "filings source registry")
+        if acquisition_registry_path.is_file()
+        else None
+    )
+    if acquisition_registry is not None:
+        if acquisition_registry.get("schema_version") != "filings-source-registry/1.0":
+            raise ValueError("Filings source registry has the wrong schema version")
+        registry_body = {
+            key: value for key, value in acquisition_registry.items()
+            if key != "registry_sha256"
+        }
+        if acquisition_registry.get("registry_sha256") != sha256_value(registry_body):
+            raise ValueError("Filings source registry hash does not bind its complete payload")
     if bundle.get("schema_version") != "filings-evidence-bundle/1.0":
         raise ValueError("Filings bundle has the wrong schema version")
     calculated_bundle_hash = sha256_value({
@@ -297,6 +312,16 @@ def apply_filings_lane(
         if descriptor.get("adapter", {}).get("domain") != "document_extraction":
             continue
         attachment_id = str(descriptor.get("attachment_id") or "")
+        if acquisition_registry is not None:
+            source_entry = acquisition_registry.get("documents", {}).get(attachment_id)
+            if not isinstance(source_entry, dict):
+                raise ValueError(f"Filings acquisition registry has no source for attachment {attachment_id}")
+            acquired_path = Path(str(source_entry.get("path") or ""))
+            if not acquired_path.is_file():
+                raise ValueError(f"Acquired filing object is absent for attachment {attachment_id}")
+            if sha256_file(acquired_path) != source_entry.get("raw_sha256"):
+                raise ValueError(f"Acquired filing object hash does not match for attachment {attachment_id}")
+            descriptor["path"] = str(acquired_path)
         registry_entry = registry_documents.get(attachment_id)
         extraction_path = Path(str((registry_entry or {}).get("path") or ""))
         if not extraction_path.is_file():
@@ -308,11 +333,14 @@ def apply_filings_lane(
     unused = sorted(set(registry_documents) - used)
     if unused:
         raise ValueError(f"Filings registry contains unbound attachment(s): {', '.join(unused)}")
-    return resolved_ingress, {
+    returned_artifacts = {
         "filings_bundle": str(bundle_path),
         "document_extraction_registry": str(registry_path),
         "resolved_evidence_template": str(resolved_evidence_path),
     }
+    if acquisition_registry_path.is_file():
+        returned_artifacts["filings_source_registry"] = str(acquisition_registry_path)
+    return resolved_ingress, returned_artifacts
 
 
 def classify(lanes: dict[str, dict[str, Any]]) -> tuple[str, str | None, bool]:

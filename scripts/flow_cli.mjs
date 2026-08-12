@@ -174,7 +174,6 @@ async function main(argv) {
         "bad_inputs",
         "entity_stop",
         "filings_incomplete",
-        "inputs_look_wrong",
       ].includes(first.outcome)
         ? 1
         : 0;
@@ -224,7 +223,7 @@ async function main(argv) {
 
     if (command === "intake") {
       emit(first, options.out ?? null);
-      return ["bad_inputs", "entity_stop", "filings_incomplete", "inputs_look_wrong"].includes(
+      return ["bad_inputs", "entity_stop", "filings_incomplete"].includes(
         first.outcome,
       )
         ? 1

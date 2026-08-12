@@ -48,6 +48,7 @@ async function main() {
   compiled.evidence.case_source = proposeCaseSource({
     declarations,
     caseEvidence: compiled.evidence.case_evidence,
+    filings: compiled.evidence.filings,
   });
   const validation = validateEvidenceRun(compiled.evidence);
   await fs.mkdir(out, { recursive: true });

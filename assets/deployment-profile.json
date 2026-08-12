@@ -14,12 +14,16 @@
     "advanced-history-and-fx.md",
     "template-and-formatting.md",
     "broker-extraction.md",
+    "model-intent.md",
+    "development-and-release-loop.md",
     "validation.md"
   ],
   "asset_allowlist": [
     "broker-metric-dictionary.json",
     "broker-metric-dictionary.schema.json",
     "broker-pack.schema.json",
+    "broker-preview-v1.schema.json",
+    "broker-preview-confirmation-v1.schema.json",
     "broker-extraction-request.schema.json",
     "broker-extraction-bundle.schema.json",
     "broker-vision-result.schema.json",
@@ -33,9 +37,12 @@
     "broker-run-state.schema.json",
     "broker-runtime-members.json",
     "broker-model-host-response-boundary-v1.json",
+    "broker-terminal-materiality-review.schema.json",
     "attachment-evidence-controller.schema.json",
     "attachment-evidence-run-state.schema.json",
     "attachment-evidence-runtime-members.json",
+    "filings-acquisition-request-v1.schema.json",
+    "filings-source-registry-v1.schema.json",
     "filings-extraction-request-v1.schema.json",
     "filings-extraction-response-v1.schema.json",
     "filings-run-state.schema.json",
@@ -86,6 +93,8 @@
     "authority-projection-overrides.v3.json": "Empty correction registry retained with presentation epoch 3 as an explicit rollback route; it never inherits epoch-2 corrections.",
     "authority-projection-overrides.v4.json": "Empty correction registry for the source-founded presentation epoch 4 candidate. Epoch 4 must validate with zero approved differences; epochs 2 and 3 remain explicit rollback routes.",
     "broker-pack.schema.json": "Stage-1 normalised broker-pack contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
+    "broker-preview-v1.schema.json": "Hash-bound Stage-2 preview of the coherent primary-house series, exact source-cell provenance, alternates and preserved evidence-only inventory.",
+    "broker-preview-confirmation-v1.schema.json": "Minimal user confirmation bound to one broker preview hash and one primary-eligible coherent house.",
     "broker-extraction-request.schema.json": "External broker-document extraction request contract; consumed before the extraction entry point runs.",
     "broker-extraction-bundle.schema.json": "Lossless broker evidence bundle contract; loaded through the attachment-ingress schema helper and retained for independent validation.",
     "broker-vision-result.schema.json": "Hash-bound independent image-table transcription contract; responses are inputs to the vision consensus compiler.",
@@ -99,9 +108,12 @@
     "broker-run-state.schema.json": "Hash-bound resumable broker-controller state. It distinguishes internal extraction work from the narrow source conditions that may legitimately block the user.",
     "broker-runtime-members.json": "Single source of truth for the broker controller's hash-bound runtime closure; read independently by the controller and attachment ingress.",
     "broker-model-host-response-boundary-v1.json": "Closed model-host response seam for broker vision, targeted adjudication and semantic crosswalk tasks, including deterministic remedies and finite attempt budgets.",
+    "broker-terminal-materiality-review.schema.json": "Hash-bound model-host response contract for preserving independently proven non-consumed broker evidence after bounded semantic review; it cannot authorize model consumption or values.",
     "attachment-evidence-controller.schema.json": "Strict input contract for the single raw-attachment evidence owner.",
     "attachment-evidence-run-state.schema.json": "Typed resumable state contract separating internal work from genuine user evidence blockers.",
     "attachment-evidence-runtime-members.json": "Hash-bound runtime closure for the broker/DCS/case-source evidence transaction.",
+    "filings-acquisition-request-v1.schema.json": "Declarative, no-search filing-source registry contract for user-supplied, runtime-library and explicit official HTTPS sources.",
+    "filings-source-registry-v1.schema.json": "Content-addressed output ledger binding every acquired filing to source identity, precedence, periods and raw bytes.",
     "filings-extraction-request-v1.schema.json": "Strict raw-filing extraction request contract consumed by the resumable filings controller.",
     "filings-extraction-response-v1.schema.json": "Strict source-owned statement extraction response contract emitted from raw filing bytes.",
     "filings-run-state.schema.json": "Typed, resumable filings-controller state that separates internal extraction work from genuine source defects.",
@@ -170,6 +182,7 @@
     "lib/acquisition_policy.mjs",
     "lib/attachment_ingress.mjs",
     "lib/broker_anchor.mjs",
+    "lib/broker_preview.mjs",
     "lib/broker_metric_dictionary.mjs",
     "lib/case_compiler.mjs",
     "lib/case_source_proposer.mjs",
@@ -193,6 +206,7 @@
     "lib/forecast_candidate_compiler.mjs",
     "lib/forecast_observation.mjs",
     "lib/fixed_point_constitution.mjs",
+    "lib/filings_acquisition.mjs",
     "lib/formula_dsl.mjs",
     "lib/historical_interest_authority.mjs",
     "lib/historical_normalisation.mjs",
@@ -485,6 +499,7 @@
   },
   "python_module_allowlist": [
     "run_broker_pipeline.py",
+    "broker_terminal_recovery.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
@@ -647,6 +662,10 @@
     "run_broker_pipeline.py": {
       "may_import_third_party": [],
       "reason": "The broker controller is stdlib-only and sequences hash-bound evidence compilers without sharing their extraction or semantic implementation."
+    },
+    "broker_terminal_recovery.py": {
+      "may_import_third_party": [],
+      "reason": "The broker terminal-recovery helper is stdlib-only and proves negative model consumption from immutable candidate cells and the canonical metric dictionary; it neither reads PDFs nor authors visual or semantic judgments."
     },
     "extract_broker_evidence.py": {
       "may_import_third_party": [

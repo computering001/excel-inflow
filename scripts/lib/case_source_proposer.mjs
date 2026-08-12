@@ -1,5 +1,6 @@
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import { faceStatementManifestDigest } from "./face_statement_manifest.mjs";
+import { matchEntities } from "./flow_entity.mjs";
 
 const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
 
@@ -236,7 +237,12 @@ function clone(value) {
  * are declared; unfamiliar issuer-specific lines remain visible under their
  * exact filed label and proceed to the forecast authority graph.
  */
-export function proposeCaseSource({ declarations = {}, caseEvidence, evidenceRunSha256 = null }) {
+export function proposeCaseSource({
+  declarations = {},
+  caseEvidence,
+  evidenceRunSha256 = null,
+  filings = null,
+}) {
   if (!caseEvidence?.face_statement_manifests) {
     throw new Error("Case-source proposal requires sealed face-statement manifests.");
   }
@@ -249,9 +255,45 @@ export function proposeCaseSource({ declarations = {}, caseEvidence, evidenceRun
     }
   }
   const usedRowIds = new Set();
+  const declaredIdentity = clone(declarations.identity);
+  let identity = declaredIdentity;
+  if (filings?.entity_name) {
+    const filingIdentity = {
+      name: filings.entity_name,
+      identifiers: filings.entity_identifiers ?? {},
+      aliases: filings.entity_aliases ?? [],
+      consolidation_level: filings.consolidation_level ?? null,
+    };
+    const declaredDescriptor = {
+      name: declaredIdentity.issuer_name,
+      identifiers: declaredIdentity.identifiers ?? {},
+      aliases: declaredIdentity.aliases ?? [],
+      consolidation_level: declaredIdentity.consolidation_level ?? null,
+    };
+    const match = matchEntities(declaredDescriptor, filingIdentity);
+    if (["mismatch", "ambiguous"].includes(match.verdict)) {
+      throw new Error(
+        `Case-source identity conflicts with the sealed filings identity: ${match.kind ?? match.verdict}.`,
+      );
+    }
+    identity = {
+      ...declaredIdentity,
+      issuer_name: filings.entity_name,
+      reporting_currency: filings.reporting_currency ?? declaredIdentity.reporting_currency,
+      ...(Object.keys(filings.entity_identifiers ?? {}).length > 0
+        ? { identifiers: clone(filings.entity_identifiers) }
+        : {}),
+      ...((filings.entity_aliases ?? []).length > 0
+        ? { aliases: [...new Set([...(declaredIdentity.aliases ?? []), ...filings.entity_aliases])] }
+        : {}),
+      ...(filings.consolidation_level
+        ? { consolidation_level: filings.consolidation_level }
+        : {}),
+    };
+  }
   return {
     schema_version: "case-source-v1",
-    identity: clone(declarations.identity),
+    identity,
     evidence_refs: {
       evidence_run_sha256: evidenceRunSha256,
       ...(declarations.evidence_refs?.filings

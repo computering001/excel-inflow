@@ -50,6 +50,49 @@ const LEGAL_FORMS = new Set([
   "international",
 ]);
 
+const STABLE_IDENTIFIER_KEYS = Object.freeze([
+  "lei",
+  "factset_entity_id",
+  "company_number",
+  "isin",
+  "cusip",
+  "ticker",
+]);
+
+function normaliseIdentifier(value) {
+  const cleaned = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  return cleaned || null;
+}
+
+function entityDescriptor(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const identifiers = value.identifiers && typeof value.identifiers === "object"
+      ? value.identifiers
+      : {};
+    return {
+      name: String(value.name ?? value.entity_name ?? ""),
+      identifiers: Object.fromEntries(
+        STABLE_IDENTIFIER_KEYS
+          .map((key) => [key, normaliseIdentifier(identifiers[key] ?? value[key])])
+          .filter(([, identifier]) => identifier !== null),
+      ),
+      aliases: Array.isArray(value.aliases)
+        ? value.aliases.map(String).filter(Boolean)
+        : [],
+      consolidation_level: value.consolidation_level ?? null,
+    };
+  }
+  return {
+    name: String(value ?? ""),
+    identifiers: {},
+    aliases: [],
+    consolidation_level: null,
+  };
+}
+
 export function entityTokens(name) {
   return String(name ?? "")
     .toLowerCase()
@@ -57,6 +100,29 @@ export function entityTokens(name) {
     .split(/\s+/)
     .filter(Boolean)
     .filter((token) => !LEGAL_FORMS.has(token));
+}
+
+function tokenMatch(leftName, rightName) {
+  const left = entityTokens(leftName);
+  const right = entityTokens(rightName);
+  const leftSet = new Set(left);
+  const rightSet = new Set(right);
+  const shared = left.filter((token) => rightSet.has(token));
+  const onlyExport = left.filter((token) => !rightSet.has(token));
+  const onlyFiling = right.filter((token) => !leftSet.has(token));
+  if (left.length === 0 || right.length === 0) {
+    return { verdict: "unknown", shared, onlyExport, onlyFiling };
+  }
+  if (onlyExport.length === 0 && onlyFiling.length === 0) {
+    return { verdict: "match", shared, onlyExport, onlyFiling };
+  }
+  if (shared.length === 0) {
+    return { verdict: "mismatch", shared, onlyExport, onlyFiling };
+  }
+  if (onlyExport.length > 0 && onlyFiling.length > 0) {
+    return { verdict: "ambiguous", kind: "successor", shared, onlyExport, onlyFiling };
+  }
+  return { verdict: "ambiguous", kind: "subsidiary", shared, onlyExport, onlyFiling };
 }
 
 /**
@@ -68,30 +134,46 @@ export function entityTokens(name) {
  * name — and that is what gets shown.
  */
 export function matchEntities(exportEntity, filingEntity) {
-  const left = entityTokens(exportEntity);
-  const right = entityTokens(filingEntity);
-  const leftSet = new Set(left);
-  const rightSet = new Set(right);
-  const shared = left.filter((token) => rightSet.has(token));
-  const onlyExport = left.filter((token) => !rightSet.has(token));
-  const onlyFiling = right.filter((token) => !leftSet.has(token));
-
-  if (left.length === 0 || right.length === 0) {
-    return { verdict: "unknown", shared, onlyExport, onlyFiling };
+  const left = entityDescriptor(exportEntity);
+  const right = entityDescriptor(filingEntity);
+  const sharedIdentifierKeys = STABLE_IDENTIFIER_KEYS.filter(
+    (key) => left.identifiers[key] && right.identifiers[key],
+  );
+  const conflicts = sharedIdentifierKeys.filter(
+    (key) => left.identifiers[key] !== right.identifiers[key],
+  );
+  if (conflicts.length > 0) {
+    return {
+      verdict: "mismatch",
+      kind: "stable_identifier_conflict",
+      stable_identifiers_compared: sharedIdentifierKeys,
+      conflicting_identifiers: conflicts,
+      left_identifiers: left.identifiers,
+      right_identifiers: right.identifiers,
+      shared: [], onlyExport: [], onlyFiling: [],
+    };
   }
-  if (onlyExport.length === 0 && onlyFiling.length === 0) {
-    return { verdict: "match", shared, onlyExport, onlyFiling };
+  if (sharedIdentifierKeys.length > 0) {
+    return {
+      verdict: "match",
+      kind: "stable_identifier_match",
+      stable_identifiers_compared: sharedIdentifierKeys,
+      left_identifiers: left.identifiers,
+      right_identifiers: right.identifiers,
+      shared: [], onlyExport: [], onlyFiling: [],
+    };
   }
-  if (shared.length === 0) {
-    return { verdict: "mismatch", shared, onlyExport, onlyFiling };
+  const direct = tokenMatch(left.name, right.name);
+  if (direct.verdict === "match") return direct;
+  for (const leftName of [left.name, ...left.aliases]) {
+    for (const rightName of [right.name, ...right.aliases]) {
+      const alias = tokenMatch(leftName, rightName);
+      if (alias.verdict === "match") {
+        return { ...alias, kind: "declared_alias_match" };
+      }
+    }
   }
-  // Shares a name, differs on a distinguishing token in both directions: the
-  // signature of a merger or a renamed successor.
-  if (onlyExport.length > 0 && onlyFiling.length > 0) {
-    return { verdict: "ambiguous", kind: "successor", shared, onlyExport, onlyFiling };
-  }
-  // One is a strict extension of the other: holdco/opco, or a subsidiary.
-  return { verdict: "ambiguous", kind: "subsidiary", shared, onlyExport, onlyFiling };
+  return direct;
 }
 
 /**
@@ -100,8 +182,17 @@ export function matchEntities(exportEntity, filingEntity) {
  */
 export function entityNames(intake) {
   return {
-    exportEntity: intake?.export?.entity?.name ?? intake?.company_name ?? null,
-    filingEntity: intake?.filings?.entity_name ?? intake?.company_name ?? null,
+    exportEntity: intake?.export?.entity ?? intake?.company_name ?? null,
+    filingEntity: intake?.filings?.entity ?? (
+      intake?.filings?.entity_name
+        ? {
+            name: intake.filings.entity_name,
+            identifiers: intake.filings.entity_identifiers ?? {},
+            aliases: intake.filings.entity_aliases ?? [],
+            consolidation_level: intake.filings.consolidation_level ?? null,
+          }
+        : intake?.company_name ?? null
+    ),
   };
 }
 
@@ -112,7 +203,10 @@ export function entityStop(intake) {
     return { stop: false, match, export_entity: exportEntity, filing_entity: filingEntity };
   }
   const detail =
-    match.kind === "successor"
+    match.kind === "stable_identifier_conflict"
+      ? `The sources carry conflicting stable issuer identifiers (${match.conflicting_identifiers.join(", ")}). ` +
+        `Names alone cannot override that conflict.`
+      : match.kind === "successor"
       ? `Your export is for the predecessor or a different arm of the group. The gap ` +
         `this produces looks like a date problem and is not — re-exporting at the ` +
         `year end will not close it.`
@@ -125,16 +219,16 @@ export function entityStop(intake) {
     match,
     detail,
     screen: renderEntityScreen({
-      export_entity: exportEntity,
-      filing_entity: filingEntity,
+      export_entity: entityDescriptor(exportEntity).name,
+      filing_entity: entityDescriptor(filingEntity).name,
       detail,
       options: [
-        `Re-export from FactSet for ${filingEntity}`,
-        `Use filings for ${exportEntity} instead`,
+        `Re-export from FactSet for ${entityDescriptor(filingEntity).name}`,
+        `Use filings for ${entityDescriptor(exportEntity).name} instead`,
       ],
     }),
-    export_entity: exportEntity,
-    filing_entity: filingEntity,
+    export_entity: entityDescriptor(exportEntity).name,
+    filing_entity: entityDescriptor(filingEntity).name,
   };
 }
 

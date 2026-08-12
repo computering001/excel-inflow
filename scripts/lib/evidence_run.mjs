@@ -284,6 +284,24 @@ function compareEntity(findings, id, left, right) {
   }
 }
 
+function filingsEntity(filings) {
+  return {
+    name: filings?.entity_name ?? "",
+    identifiers: filings?.entity_identifiers ?? {},
+    aliases: filings?.entity_aliases ?? [],
+    consolidation_level: filings?.consolidation_level ?? null,
+  };
+}
+
+function modelEntity(modelCase) {
+  return {
+    name: modelCase?.issuer?.name ?? "",
+    identifiers: modelCase?.issuer?.identifiers ?? {},
+    aliases: modelCase?.issuer?.aliases ?? [],
+    consolidation_level: modelCase?.issuer?.consolidation_level ?? null,
+  };
+}
+
 function validateSourceInventory(run, findings) {
   const inventory = run.source_inventory ?? [];
   const bundleHash = run.ingress?.broker_evidence?.extraction_bundle_sha256;
@@ -2120,6 +2138,78 @@ function validateRestatements(run, sourceIds, findings) {
   }
 }
 
+function validateFilingPeriodAuthority(run, findings) {
+  const authority = run.filings?.period_authority;
+  if (!authority) {
+    if (run.filings?.source_registry_sha256) {
+      findings.push(finding(
+        "evidence.filings.period_authority_missing",
+        "BLOCK",
+        "Controlled filing acquisition is present but its period-level authority ledger is absent.",
+      ));
+    }
+    return;
+  }
+  const periods = run.filings?.historical_periods ?? [];
+  const inventory = new Map((run.source_inventory ?? []).map((source) => [source.source_id, source]));
+  const manifests = run.filings?.face_statement_manifests ?? {};
+  for (const section of ["income_statement", "cash_flow"]) {
+    const entries = authority[section] ?? [];
+    if (entries.length !== 3) {
+      findings.push(finding(
+        "evidence.filings.period_authority_count",
+        "BLOCK",
+        `${section} must carry exactly three filing-period authorities; found ${entries.length}.`,
+      ));
+      continue;
+    }
+    const topologySources = new Set((manifests[section] ?? []).map((manifest) => manifest.source_id));
+    for (const [index, entry] of entries.entries()) {
+      if (entry.period !== periods[index]) {
+        findings.push(finding(
+          "evidence.filings.period_authority_order",
+          "BLOCK",
+          `${section} authority ${index + 1} is ${entry.period}, not historical period ${periods[index]}.`,
+        ));
+      }
+      const source = inventory.get(entry.source_id);
+      if (!source || source.status !== "used") {
+        findings.push(finding(
+          "evidence.filings.period_authority_source",
+          "BLOCK",
+          `${section}.${entry.period} cites filing source ${entry.source_id}, which is not a used source.`,
+        ));
+      } else if (source.content_sha256 !== entry.document_sha256) {
+        findings.push(finding(
+          "evidence.filings.period_authority_hash",
+          "BLOCK",
+          `${section}.${entry.period} is detached from the raw bytes of ${entry.source_id}.`,
+        ));
+      }
+      if (!topologySources.has(entry.topology_source_id)) {
+        findings.push(finding(
+          "evidence.filings.period_authority_topology",
+          "BLOCK",
+          `${section}.${entry.period} cites absent topology source ${entry.topology_source_id}.`,
+        ));
+      }
+      const basisDecision = (run.decisions?.restatements ?? []).find(
+        (decision) => decision.period === entry.period,
+      );
+      if (
+        ["as_reported", "restated_comparative"].includes(entry.basis) &&
+        basisDecision?.basis !== entry.basis
+      ) {
+        findings.push(finding(
+          "evidence.filings.period_authority_basis",
+          "BLOCK",
+          `${section}.${entry.period} selects ${entry.basis} evidence but the historical basis decision is ${basisDecision?.basis ?? "absent"}.`,
+        ));
+      }
+    }
+  }
+}
+
 function validateDecisionSources(run, sourceIds, findings) {
   const inventory = new Map(
     (run.source_inventory ?? []).map((source) => [source.source_id, source]),
@@ -2622,9 +2712,9 @@ export function validateEvidenceRun(run) {
     findings,
   );
 
-  compareEntity(findings, "evidence.entity.case", run.company_name, modelCase.issuer?.name);
-  compareEntity(findings, "evidence.entity.filings", run.company_name, run.filings?.entity_name);
-  compareEntity(findings, "evidence.entity.export", run.filings?.entity_name, run.dcs_export?.entity?.name);
+  compareEntity(findings, "evidence.entity.case", filingsEntity(run.filings), modelEntity(modelCase));
+  compareEntity(findings, "evidence.entity.filings", run.company_name, filingsEntity(run.filings));
+  compareEntity(findings, "evidence.entity.export", filingsEntity(run.filings), run.dcs_export?.entity);
 
   const intake = runIntake({
     companyName: run.company_name,
@@ -2656,6 +2746,7 @@ export function validateEvidenceRun(run) {
   validateBrokerMapping(run, findings);
   validateBrokerIngressCoherence(run, findings);
   validateBrokerSourceTables(run, findings);
+  validateFilingPeriodAuthority(run, findings);
   validateRestatements(run, sourceIds, findings);
   validateDecisionSources(run, sourceIds, findings);
   validateForecastEvidence(run, findings);

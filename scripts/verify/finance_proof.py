@@ -343,7 +343,14 @@ class Proof:
             case["instruments"],
             key=lambda item: (number(item.get("display_order")), item["instrument_id"]),
         )
-        balancing_rcf_id = (case.get("rcf_policy") or {}).get("instrument_id")
+        rcf_policy = case.get("rcf_policy") or {}
+        balancing_rcf_enabled = (
+            rcf_policy.get("mode") != "none"
+            and bool(rcf_policy.get("instrument_id"))
+        )
+        balancing_rcf_id = (
+            rcf_policy.get("instrument_id") if balancing_rcf_enabled else None
+        )
         non_rcf = [
             item
             for item in instruments
@@ -955,11 +962,16 @@ class Proof:
                     self.compare("leverage", block_name, index, "net_debt_to_adjusted_ebitda", self.value(column, debt_rows["net_debt_to_adjusted_ebitda"]), expected_leverage)
 
                 undrawn = max(0.0, capacity - ending_rcf_native) * ending_fx
-                liquidity = liquidity_cash + undrawn - mechanics["commercial_paper"]
+                backstop_commercial_paper = (
+                    mechanics["commercial_paper"]
+                    if balancing_rcf_enabled
+                    else 0.0
+                )
+                liquidity = liquidity_cash + undrawn - backstop_commercial_paper
                 self.compare("liquidity", block_name, index, "undrawn_rcf", self.value(column, debt_rows["undrawn_rcf"]), undrawn)
                 # Commercial paper is displayed as a deduction inside the
                 # liquidity bridge even though its economic balance is positive.
-                self.compare("liquidity", block_name, index, "drawn_commercial_paper", self.value(column, debt_rows["drawn_commercial_paper"]), -mechanics["commercial_paper"])
+                self.compare("liquidity", block_name, index, "drawn_commercial_paper", self.value(column, debt_rows["drawn_commercial_paper"]), -backstop_commercial_paper)
                 self.compare("liquidity", block_name, index, "total_liquidity", self.value(column, debt_rows["total_liquidity"]), liquidity)
 
                 if debt_rows.get("debt_fx_translation") is not None:
