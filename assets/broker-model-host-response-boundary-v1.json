@@ -74,6 +74,18 @@
         "Resume the same controller transaction."
       ]
     },
+    "terminal_materiality_recovery": {
+      "remedy_id": "preserve_nonconsumed_regions_after_bounded_review",
+      "attempt_limit": 2,
+      "response_schema_path": "assets/broker-terminal-materiality-review.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read the complete hash-bound terminal-recovery analysis after ordinary semantic review is exhausted.",
+        "Review every and only candidate proven by the controller to have no mapping, selected model use or mapped source-cell overlap.",
+        "Preserve each reviewed candidate as unconsumed evidence quarantine; never infer, rewrite or supply a value.",
+        "Write broker-terminal-materiality-review.json and resume the unchanged controller transaction."
+      ]
+    },
     "internal_fixed_point_defect": {
       "remedy_id": "repair_controller_or_model_host_boundary",
       "attempt_limit": 1,

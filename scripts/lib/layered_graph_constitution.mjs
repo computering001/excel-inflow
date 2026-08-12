@@ -76,16 +76,33 @@ export function canonicalStatementDependencies(row) {
 export function canonicalForecastStatementDependencies(row) {
   const periodRules = (row.forecast_period_calculations ?? []).filter(Boolean);
   if (periodRules.length > 0) {
-    return [...new Set(periodRules.flatMap((rule) => rule?.refs ?? []))]
+    // Historical inference formulas read G:I directly. Their row-id ref is
+    // provenance for the historical observation series, not a dependency on
+    // the prior forecast cell. Treating it as a forecast self-edge made the
+    // physical oracle demand K->J and L->K paths that the deliberately
+    // anchored G:I formula must not contain.
+    const forecastRefs = periodRules.flatMap((rule) =>
+      ["historical_average", "historical_trend"].includes(rule?.operator)
+        ? []
+        : rule?.refs ?? [],
+    );
+    return [...new Set(forecastRefs)]
       .sort(portableCompare);
   }
   if (row.forecast_calculation) {
     return [...new Set(row.forecast_calculation.refs ?? [])].sort(portableCompare);
   }
+  const declaredFormulaAuthority = (row.forecast_period_authorities ?? [])
+    .filter(Boolean)
+    .some((authority) =>
+      ["accounting_identity", "driver_formula", "roll_forward"].includes(
+        authority.method,
+      ) || authority.source_kind === "formula",
+    );
   if (
     ["broker", "hardcode", "zero", "uncalculated"].includes(
       row.forecast_treatment,
-    ) ||
+    ) && !declaredFormulaAuthority ||
     row.forecast_capture_parent_id
   ) {
     return [];

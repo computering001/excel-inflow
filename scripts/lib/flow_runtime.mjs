@@ -2,7 +2,7 @@ import { canonicalise, hashValue } from "./run_store.mjs";
 import { assertWorkflowState } from "./workflow_state.mjs";
 
 export const FLOW_SCHEMA_VERSION = "debt-user-flow/1.0";
-export const FLOW_CONTROLLER_VERSION = "five-stage/2.2";
+export const FLOW_CONTROLLER_VERSION = "five-stage/2.3";
 export const STAGE_RECEIPT_SCHEMA_VERSION = "user-stage-receipt/1.0";
 
 export const STAGES = Object.freeze([
@@ -17,8 +17,8 @@ export const STAGES = Object.freeze([
     number: 2,
     id: "evidence_review",
     title: "EVIDENCE REVIEW",
-    contact: "none unless the pack is defective",
-    artifact: "evidence-run.json and case-source.json",
+    contact: "one broker-selection confirmation",
+    artifact: "broker-preview.json, evidence-run.json and case-source.json",
   }),
   Object.freeze({
     number: 3,

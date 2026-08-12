@@ -95,6 +95,7 @@ export async function writeRunCarrier({
   issuerIdentity,
   evidencePath,
   answersPath = null,
+  brokerConfirmationPath = null,
   status,
   artifacts = {},
 }) {
@@ -116,11 +117,26 @@ export async function writeRunCarrier({
     const extension = path.extname(answersPath).toLowerCase() === ".json" ? ".json" : ".txt";
     answersSnapshot = await snapshotFile(answersPath, path.join(snapshotDirectory, `answers${extension}`));
   }
+  let brokerConfirmationSnapshot = null;
+  if (brokerConfirmationPath) {
+    brokerConfirmationSnapshot = await snapshotFile(
+      brokerConfirmationPath,
+      path.join(snapshotDirectory, "broker-confirmation.json"),
+    );
+  }
 
   const files = {};
   await addExistingFile(files, "run_identity", canonicalRunRoot, identity.path);
   await addExistingFile(files, "evidence_run", canonicalRunRoot, evidenceSnapshot);
   if (answersSnapshot) await addExistingFile(files, "answers", canonicalRunRoot, answersSnapshot);
+  if (brokerConfirmationSnapshot) {
+    await addExistingFile(
+      files,
+      "broker_confirmation",
+      canonicalRunRoot,
+      brokerConfirmationSnapshot,
+    );
+  }
   await addExistingFile(
     files,
     "model_case",

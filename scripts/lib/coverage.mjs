@@ -7,6 +7,7 @@ import { resolveAnchorPlanDecision } from "./broker_anchor.mjs";
 import { coreConsumptionIds } from "./broker_metric_dictionary.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 import { compileOpeningInstrumentState } from "./instrument_period_state.mjs";
+import { isBalancingRcf } from "./rcf_policy.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -1376,6 +1377,7 @@ function instrumentChecks(modelCase) {
       }
     }
     if (instrument.class === "rcf") {
+      const balancing = isBalancingRcf(modelCase, instrument);
       if (!finite(instrument.facility_capacity)) {
         checks.push(
           result(
@@ -1386,9 +1388,10 @@ function instrumentChecks(modelCase) {
         );
       }
       if (
-        !modelCase.rcf_policy ||
-        !finite(modelCase.rcf_policy.commitment_fee_value) ||
-        !modelCase.rcf_policy.commitment_fee_convention
+        balancing &&
+        (!modelCase.rcf_policy ||
+          !finite(modelCase.rcf_policy.commitment_fee_value) ||
+          !modelCase.rcf_policy.commitment_fee_convention)
       ) {
         checks.push(
           result(
@@ -1398,6 +1401,7 @@ function instrumentChecks(modelCase) {
           ),
         );
       } else if (
+        balancing &&
         modelCase.rcf_policy.commitment_fee_convention === "bps_on_undrawn" &&
         !(Number(modelCase.rcf_policy.commitment_fee_value) > 0)
       ) {
@@ -1409,6 +1413,7 @@ function instrumentChecks(modelCase) {
           ),
         );
       } else if (
+        balancing &&
         modelCase.rcf_policy.commitment_fee_convention === "captured_in_residual" &&
         instrument.rate_type !== "unpriced"
       ) {

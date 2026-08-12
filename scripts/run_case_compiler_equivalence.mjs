@@ -560,6 +560,9 @@ const JUSTIFIED = [
   /^statement_structure_compiled_version$/,
   // Named default for legacy DCS lanes without a balance-basis declaration.
   /^instruments\[\d+\]\.balance_basis$/,
+  // Newly compiled cases state the balancing-facility mode explicitly. Legacy
+  // certified fixtures already imply balancing_rcf through instrument_id.
+  /^rcf_policy\.mode$/,
 ];
 
 function isJustified(diff) {

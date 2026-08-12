@@ -1963,8 +1963,25 @@ function removeOrphanDerivedStatementRows(section, rows) {
  */
 function badgeAdjustedEbitdaBridge(rows) {
   if (presentationEpoch() < 3) return;
-  const ebitda = rows.find((row) => row.semantic_role === "adjusted_ebitda");
-  if (!ebitda) return;
+  const netIncomeIndex = rows.findIndex(
+    (row) => row.semantic_role === "net_income",
+  );
+  if (netIncomeIndex < 0) return;
+
+  // The headline Adjusted EBITDA row belongs in the income statement.  The
+  // bridge title belongs only above the separate reconciliation block below
+  // net income.  Target the first retained post-net bridge output rather than
+  // the first row carrying the adjusted_ebitda role; the latter is normally
+  // the headline and previously moved this title into the middle of the P&L.
+  const bridgeIndex = rows.findIndex(
+    (row, index) =>
+      index > netIncomeIndex &&
+      (row.semantic_role === "depreciation_and_amortisation" ||
+        row.projection_origin === "required_economic_output" ||
+        row.projection_origin === "dependency_closure"),
+  );
+  if (bridgeIndex < 0) return;
+  const bridgeRow = rows[bridgeIndex];
   // A bridge title anywhere in the section — the issuer's own or a prior
   // compile's — means the block is already badged; matching by label, not
   // row id, because the existing header may be case-authored.
@@ -1974,17 +1991,20 @@ function badgeAdjustedEbitdaBridge(rows) {
       /ebitda\s+bridge/i.test(String(row.label ?? "")),
   );
   if (alreadyBadged) return;
-  const index = rows.indexOf(ebitda);
-  const previous = rows[index - 1];
+  const previous = rows[bridgeIndex - 1];
   if (previous?.row_type === "header") return;
-  rows.splice(index, 0, {
-    row_id: "adjusted_ebitda_bridge_header",
+  const occupiedIds = new Set(rows.map((row) => row.row_id));
+  const rowId = occupiedIds.has("adjusted_ebitda_bridge")
+    ? "adjusted_ebitda_bridge_header"
+    : "adjusted_ebitda_bridge";
+  rows.splice(bridgeIndex, 0, {
+    row_id: rowId,
     label: "Adjusted EBITDA bridge",
     row_type: "header",
     // The bridge can sit below net income; a block header there is exactly
     // the declared necessity the projection gate demands.
     projection_origin: "required_block_header",
-    projection_required_by: ebitda.row_id,
+    projection_required_by: bridgeRow.row_id,
   });
 }
 

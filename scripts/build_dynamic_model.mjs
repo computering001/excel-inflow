@@ -64,6 +64,7 @@ import { applyHistoricalNormalisation } from "./lib/historical_normalisation.mjs
 import { ensureIllustrativeAcquisitionCase } from "./lib/acquisition_policy.mjs";
 import {
   balancingRcfInstrument,
+  hasBalancingRcf,
   isBalancingRcf,
 } from "./lib/rcf_policy.mjs";
 import {
@@ -2848,6 +2849,7 @@ function configureOperatingModel(
   brokerRows,
   curveRows,
 ) {
+  const balancingRcfEnabled = hasBalancingRcf(modelCase);
   // The model ends where the reader can see it end. There is no hidden
   // "MODEL BUILD SUPPORT" block below the interest schedule any more.
   const maxRow = rowPlan.visible_end_row;
@@ -3230,7 +3232,9 @@ function configureOperatingModel(
   styleSection(
     sheet,
     rowPlan.section_headers.rcf_waterfall,
-    "6. RCF CASH SWEEP",
+    balancingRcfEnabled
+      ? "6. RCF CASH SWEEP"
+      : "6. CASH / LIQUIDITY WATERFALL — NO BALANCING FACILITY",
   );
   styleSection(
     sheet,
@@ -4841,8 +4845,12 @@ function configureOperatingModel(
       ]),
     ),
     liquidity_header: "Liquidity",
-    undrawn_rcf: "Undrawn RCF",
-    drawn_commercial_paper: "Less: drawn commercial paper",
+    undrawn_rcf: balancingRcfEnabled
+      ? "Undrawn RCF"
+      : "Undrawn balancing facility — none",
+    drawn_commercial_paper: balancingRcfEnabled
+      ? "Less: drawn commercial paper"
+      : "Commercial paper against RCF backstop — none",
     year_end_cash: explicitCashBuckets
       ? "Liquidity-eligible cash"
       : "Year-end cash",
@@ -5013,7 +5021,8 @@ function configureOperatingModel(
   );
   const rcfInstrument = balancingRcfInstrument(modelCase);
   const foreignRcf = Boolean(
-    instrumentBalanceCurrency(rcfInstrument) !== reportingCurrency,
+    rcfInstrument &&
+      instrumentBalanceCurrency(rcfInstrument) !== reportingCurrency,
   );
   const rcfAverageFx = (index) =>
     foreignRcf
@@ -5311,7 +5320,7 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${debtRows.drawn_commercial_paper}`,
-        commercialPaperPlans.length
+        balancingRcfEnabled && commercialPaperPlans.length
           ? `=-SUM(${commercialPaperPlans
               .map((plan) => `${column}${plan.debt_row}`)
               .join(",")})`
@@ -5546,7 +5555,7 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${debtRows.drawn_commercial_paper}`,
-      commercialPaperPlans.length
+      balancingRcfEnabled && commercialPaperPlans.length
         ? `=-SUM(${commercialPaperPlans
             .map((plan) => `${column}${plan.debt_row}`)
             .join(",")})`
@@ -5650,7 +5659,7 @@ function configureOperatingModel(
               : "=0"
             : undrawnRcfFormula(col);
         case "drawn_commercial_paper":
-          return commercialPaperPlans.length
+          return balancingRcfEnabled && commercialPaperPlans.length
             ? `=-SUM(${commercialPaperPlans
                 .map((plan) => `${col}${plan.debt_row}`)
                 .join(",")})`
@@ -5800,10 +5809,18 @@ function configureOperatingModel(
     cash_before_rcf: "Cash before RCF",
     minimum_cash: "Minimum cash (control)",
     cash_surplus_deficit: "Cash surplus / (deficit) vs minimum cash",
-    opening_rcf: "RCF — opening",
-    rcf_draw_waterfall: "RCF — drawdown",
-    rcf_repayment_waterfall: "RCF — repayment",
-    ending_rcf: "RCF — closing",
+    opening_rcf: balancingRcfEnabled
+      ? "RCF — opening"
+      : "Balancing facility — none",
+    rcf_draw_waterfall: balancingRcfEnabled
+      ? "RCF — drawdown"
+      : "Balancing-facility drawdown — none",
+    rcf_repayment_waterfall: balancingRcfEnabled
+      ? "RCF — repayment"
+      : "Balancing-facility repayment — none",
+    ending_rcf: balancingRcfEnabled
+      ? "RCF — closing"
+      : "Balancing-facility closing balance — none",
     liquidity_shortfall: "Residual liquidity shortfall",
   };
   for (const [id, row] of Object.entries(waterfallRows)) {
@@ -6181,7 +6198,7 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.opening_rcf}`,
-        `=${priorRcf}`,
+        balancingRcfEnabled ? `=${priorRcf}` : "=0",
       );
       // Spare commitment is read inside the draw, not parked on a row of its
       // own: the undrawn-RCF line in the liquidity block above already states
@@ -6191,7 +6208,18 @@ function configureOperatingModel(
       // not upsize it — so the INCREMENTAL draw is capped by what is left of
       // the commitment after the company's own opening draw, not by the whole
       // facility over again.
-      if (isAdjustment) {
+      if (!balancingRcfEnabled) {
+        applyFormula(
+          sheet,
+          `${blockColumn}${waterfallRows.rcf_draw_waterfall}`,
+          "=0",
+        );
+        applyFormula(
+          sheet,
+          `${blockColumn}${waterfallRows.rcf_repayment_waterfall}`,
+          "=0",
+        );
+      } else if (isAdjustment) {
         applyFormula(
           sheet,
           `${blockColumn}${waterfallRows.rcf_draw_waterfall}`,
@@ -6245,7 +6273,13 @@ function configureOperatingModel(
           );
         }
       }
-      if (foreignRcf && isAdjustment) {
+      if (!balancingRcfEnabled) {
+        applyFormula(
+          sheet,
+          `${blockColumn}${waterfallRows.ending_rcf}`,
+          "=0",
+        );
+      } else if (foreignRcf && isAdjustment) {
         applyFormula(
           sheet,
           `${blockColumn}${waterfallRows.ending_rcf}`,
@@ -6924,9 +6958,15 @@ function configureOperatingModel(
   const interestLabels = {
     instrument_interest: "Instrument-modelled interest",
     acquisition_interest: "Acquisition debt interest",
-    rcf_total_fees: "Total RCF fees",
-    rcf_interest: "RCF drawn interest",
-    rcf_commitment_fee: "RCF commitment fee",
+    rcf_total_fees: balancingRcfEnabled
+      ? "Total RCF fees"
+      : "Balancing-facility fees — none",
+    rcf_interest: balancingRcfEnabled
+      ? "RCF drawn interest"
+      : "Balancing-facility drawn interest — none",
+    rcf_commitment_fee: balancingRcfEnabled
+      ? "RCF commitment fee"
+      : "Balancing-facility commitment fee — none",
     lease_interest:
       leaseInterestBasis === "none"
         ? "Lease interest — not separately modelled"
@@ -7044,6 +7084,14 @@ function configureOperatingModel(
     }
     sheet.getRange(`D${interestRows.rcf_interest}`).format.numberFormat =
       rcfInstrument.rate_type === "floating" ? BENCHMARK : COUPON;
+  } else {
+    setValue(sheet, `C${interestRows.rcf_interest}`, "NONE");
+    setValue(sheet, `D${interestRows.rcf_interest}`, null);
+    setValue(sheet, `E${interestRows.rcf_interest}`, null);
+    styleFont(sheet, `C${interestRows.rcf_interest}`, COLORS.black);
+    sheet.getRange(
+      `D${interestRows.rcf_interest}:E${interestRows.rcf_interest}`,
+    ).format.fill = COLORS.grey;
   }
   // Column E is the BENCHMARK column. The commitment fee used to park the
   // facility CAPACITY there — 4,500, a balance, sitting under a heading that
@@ -7053,15 +7101,21 @@ function configureOperatingModel(
   setValue(
     sheet,
     `C${interestRows.rcf_commitment_fee}`,
-    commitmentFeeCapturedInResidual ? RATE_TYPE_LABEL.unpriced : COMMITMENT_FEE_BASIS_LABEL,
+    balancingRcfEnabled
+      ? commitmentFeeCapturedInResidual
+        ? RATE_TYPE_LABEL.unpriced
+        : COMMITMENT_FEE_BASIS_LABEL
+      : "NONE",
   );
   setValue(
     sheet,
     `D${interestRows.rcf_commitment_fee}`,
-    commitmentFeeCapturedInResidual ? null : visibleCommitmentFeeRate,
+    balancingRcfEnabled && !commitmentFeeCapturedInResidual
+      ? visibleCommitmentFeeRate
+      : null,
   );
   setValue(sheet, `E${interestRows.rcf_commitment_fee}`, null);
-  if (commitmentFeeCapturedInResidual) {
+  if (!balancingRcfEnabled || commitmentFeeCapturedInResidual) {
     styleFont(sheet, `C${interestRows.rcf_commitment_fee}`, COLORS.black);
     sheet.getRange(`D${interestRows.rcf_commitment_fee}:E${interestRows.rcf_commitment_fee}`).format.fill = COLORS.grey;
   } else {
@@ -7499,14 +7553,18 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${interestRows.rcf_interest}`,
-      foreignRcf
+      !balancingRcfEnabled
+        ? "=0"
+        : foreignRcf
         ? foreignRcfInterestFormula(priorRcf, column, rcfRate)
         : `=IF($C$${c.circularity}=0,0,-AVERAGE(${priorRcf},${column}${waterfallRows.ending_rcf})*${rcfRate})`,
     );
     applyFormula(
       sheet,
       `${column}${interestRows.rcf_commitment_fee}`,
-      foreignRcf
+      !balancingRcfEnabled
+        ? "=0"
+        : foreignRcf
         ? foreignRcfCommitmentFeeFormula(priorRcf, column)
         : `=IF($C$${c.circularity}=0,0,-MAX(0,${rcfCapacityRef}-AVERAGE(${priorRcf},${column}${waterfallRows.ending_rcf}))*$D$${interestRows.rcf_commitment_fee})`,
     );
@@ -7604,7 +7662,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${proFormaColumn}${interestRows.rcf_interest}`,
-      foreignRcf
+      !balancingRcfEnabled
+        ? "=0"
+        : foreignRcf
         ? foreignRcfInterestFormula(
             proFormaPriorRcf,
             proFormaColumn,
@@ -7615,7 +7675,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${proFormaColumn}${interestRows.rcf_commitment_fee}`,
-      foreignRcf
+      !balancingRcfEnabled
+        ? "=0"
+        : foreignRcf
         ? foreignRcfCommitmentFeeFormula(proFormaPriorRcf, proFormaColumn)
         : `=IF($C$${c.circularity}=0,0,-MAX(0,${rcfCapacityRef}-AVERAGE(${proFormaPriorRcf},${proFormaColumn}${waterfallRows.ending_rcf}))*$D$${interestRows.rcf_commitment_fee})`,
     );
@@ -7775,7 +7837,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${adjustmentColumn}${interestRows.rcf_interest}`,
-      foreignRcf
+      !balancingRcfEnabled
+        ? "=0"
+        : foreignRcf
         ? `=IF($C$${c.circularity}=0,0,${proFormaColumn}${interestRows.rcf_interest}-${column}${interestRows.rcf_interest})`
         : `=IF($C$${c.circularity}=0,0,-AVERAGE(${adjustmentPriorRcf},${adjustmentColumn}${waterfallRows.ending_rcf})*${rcfRate})`,
     );
@@ -7794,7 +7858,9 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${adjustmentColumn}${interestRows.rcf_commitment_fee}`,
-      foreignRcf
+      !balancingRcfEnabled
+        ? "=0"
+        : foreignRcf
         ? `=IF($C$${c.circularity}=0,0,${proFormaColumn}${interestRows.rcf_commitment_fee}-${column}${interestRows.rcf_commitment_fee})`
         : `=IF($C$${c.circularity}=0,0,` +
           `-${undrawnFee(proFormaPriorRcf, proFormaColumn)}` +

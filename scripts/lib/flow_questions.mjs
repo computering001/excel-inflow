@@ -24,7 +24,10 @@
 //      headline metric clears its threshold there is no money to state, and the
 //      question is not asked — rule 3 and rule 1 are the same rule seen twice.
 //
-//   4. HARD CAP OF FIVE, reached by pruning. See G6 below.
+//   4. FIVE QUESTION CARDS PER ROUND, reached by pruning and deterministic
+//      batching. A complex issuer may legitimately need another round; the
+//      card cap is a presentation constraint, never evidence that the upload
+//      is defective.
 //
 //   5. ONE-WORD ANSWERS. Enforced: exactly two options, each a single lowercase
 //      token, checked by `lintQuestion`.
@@ -48,12 +51,10 @@
 //     delete it. It is held back, and once the answers come in it is either moot
 //     or falls to its default as a stated assumption.
 //
-// Only roots of the surviving graph are asked. That is what makes the cap
-// principled: five is reached by removing questions that the graph says cannot
-// matter, never by truncating a sorted list. If more than five roots survive,
-// nothing is truncated — the run says the inputs are wrong, because thirty
-// unresolved material facts about one company's debt is a statement about the
-// export, not about the company.
+// Only roots of the surviving graph are asked. The first five form one sealed
+// round; subsequent roots remain pending and are replanned after those answers
+// are recorded. Nothing is discarded, defaulted or relabelled as missing
+// evidence merely because the company has more than five real decisions.
 
 import {
   compileImpactGraph,
@@ -1216,12 +1217,15 @@ export function planQuestions({
     )
       .map(([kind, question_ids]) => ({ kind, question_ids }))
       .sort((left, right) => left.kind.localeCompare(right.kind));
+    const questions = ordered.slice(0, limit);
     return {
       ...base,
-      status: "inputs_look_wrong",
-      blocker_class: "USER_EVIDENCE",
-      questions: [],
+      status: "ask",
+      questions,
       survivors: ordered,
+      pending_questions: ordered.slice(limit).map((question) => question.id),
+      remaining_question_count: ordered.length - questions.length,
+      decision_round: 1,
       unresolved_groups: groups,
     };
   }

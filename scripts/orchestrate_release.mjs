@@ -493,7 +493,6 @@ async function main() {
     const inputHashes = {
       controller: source.controller,
       runtime_snapshot: integrity.digest,
-      environment_probe: await hashFile(environment.artifact),
       ...inputs,
     };
     const inspected = await store.inspect({ checkpointId: id, recipe, inputHashes, outputs });

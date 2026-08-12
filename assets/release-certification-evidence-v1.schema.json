@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "release-certification-evidence/1.0",
+  "title": "Excel Inflow release-certification evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "certified_closure_sha256",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": { "const": "release-certification-evidence/1.0" },
+    "certified_closure_sha256": { "$ref": "#/$defs/sha256" },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_maximal",
+        "exact_net_cash",
+        "native_excel",
+        "visual_review",
+        "frozen_cohort",
+        "finance_proof_mutations",
+        "source_parity"
+      ],
+      "properties": {
+        "exact_maximal": { "$ref": "#/$defs/evidenceBinding" },
+        "exact_net_cash": { "$ref": "#/$defs/evidenceBinding" },
+        "native_excel": { "$ref": "#/$defs/evidenceBinding" },
+        "visual_review": { "$ref": "#/$defs/evidenceBinding" },
+        "frozen_cohort": { "$ref": "#/$defs/evidenceBinding" },
+        "finance_proof_mutations": { "$ref": "#/$defs/evidenceBinding" },
+        "source_parity": { "$ref": "#/$defs/evidenceBinding" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

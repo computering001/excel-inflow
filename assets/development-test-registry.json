@@ -15,6 +15,18 @@
       "script": "run_workflow_state_tests.mjs"
     },
     {
+      "id": "decision-round-batching",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_decision_round_tests.mjs"
+    },
+    {
+      "id": "entity-identity",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_entity_identity_tests.mjs"
+    },
+    {
       "id": "layered-graph-constitution",
       "phase": "graph",
       "runtime": "node",
@@ -119,6 +131,14 @@
       "script": "run_broker_public_layout_tests.py",
       "arguments": ["--corpus", "$BROKER_CORPUS", "--out", "$TEST_OUT"],
       "requires": ["BROKER_CORPUS"]
+    },
+    {
+      "id": "broker-real-pack-completion",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_broker_real_pack_completion_tests.py",
+      "arguments": ["--manifest", "$BROKER_REAL_PACK_MANIFEST", "--out", "$TEST_OUT"],
+      "requires": ["BROKER_REAL_PACK_MANIFEST"]
     },
     {
       "id": "filings-controller",

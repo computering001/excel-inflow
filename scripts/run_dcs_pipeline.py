@@ -20,6 +20,14 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "dcs-runtime-members.json"
 
+# A non-PASS extraction receipt is not automatically evidence that the user's
+# source is defective.  The extractor is an internal adapter, and new layouts
+# or violated receipt invariants belong to INTERNAL_WORK.  Only findings that
+# prove the source contains no usable evidence may cross the user boundary.
+FATAL_EXTRACT_VIOLATION_CODES = frozenset({
+    "DCS-EXTRACT-EMPTY",
+})
+
 
 def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
@@ -45,6 +53,24 @@ def read_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be a JSON object")
     return value
+
+
+def classify_extract_receipt(report: dict[str, Any]) -> tuple[str, bool, str]:
+    """Return workflow status, user-blocking flag and blocker owner.
+
+    Unknown or mixed violation codes fail toward internal ownership.  This is
+    deliberate: an adapter that cannot explain why it failed has not proved
+    that replacing an otherwise readable export would help.
+    """
+    violations = report.get("violations")
+    codes = {
+        str(item.get("code") or "")
+        for item in violations if isinstance(item, dict)
+    } if isinstance(violations, list) else set()
+    fatal = bool(codes) and codes.issubset(FATAL_EXTRACT_VIOLATION_CODES)
+    if fatal:
+        return "BLOCKED_INPUT", True, "FATAL_SOURCE"
+    return "BLOCKED_INTERNAL", False, "INTERNAL_WORK"
 
 
 def atomic_json(path: Path, value: Any) -> None:
@@ -280,12 +306,30 @@ def main() -> int:
         extract_input, source_tables, extract_reused,
     )
     if extract_report.get("status") != "PASS":
+        extract_status, extract_user_blocking, extract_owner = classify_extract_receipt(
+            extract_report
+        )
         write_state(
-            state_path, run_id=run_id, status="BLOCKED_INPUT", user_blocking=True,
-            blocker_class="FATAL_SOURCE", request_digest=request_digest,
+            state_path, run_id=run_id, status=extract_status,
+            user_blocking=extract_user_blocking,
+            blocker_class=extract_owner, request_digest=request_digest,
             source_digest=source_digest, runtime_digest=runtime_digest,
             cache_key=cache_key, checkpoints=checkpoints, artifacts=artifacts,
-            tasks=[], summary={"violations": extract_report.get("violations", [])},
+            tasks=[] if extract_user_blocking else [{
+                "task_kind": "dcs_extractor_repair",
+                "violations": extract_report.get("violations", []),
+                "instruction": (
+                    "Repair the lossless DCS adapter against these exact source bytes; "
+                    "do not ask the user to replace an unchanged readable export."
+                ),
+            }],
+            summary={
+                "terminal_reason": (
+                    "fatal_source" if extract_user_blocking
+                    else "dcs_extractor_requires_internal_repair"
+                ),
+                "violations": extract_report.get("violations", []),
+            },
         )
         return 2
 

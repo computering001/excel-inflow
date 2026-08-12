@@ -2,6 +2,7 @@
   "schema_version": "broker-runtime-members/1.0",
   "members": [
     "scripts/run_broker_pipeline.py",
+    "scripts/broker_terminal_recovery.py",
     "scripts/workflow_state.py",
     "scripts/extract_broker_evidence.py",
     "scripts/compile_broker_surface_census.py",
@@ -23,6 +24,7 @@
     "assets/broker-pack.schema.json",
     "assets/broker-metric-dictionary.json",
     "assets/broker-model-host-response-boundary-v1.json",
+    "assets/broker-terminal-materiality-review.schema.json",
     "assets/broker-run-state.schema.json",
     "assets/workflow-state-contract-v1.json"
   ]

@@ -16,7 +16,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 DOMAIN_BY_LEGACY_ROLE = {
     "operating_forecast": "operating",
     "cash_flow_forecast": "cash_flow",
@@ -55,6 +54,39 @@ ALLOWED_EVIDENCE = {
     "historical_observation", "non_numeric",
 }
 ID = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
+TERMINAL_MODEL_PERIOD_BASES = {"annual_forecast", "partial_period", "unresolved_period_header"}
+TERMINAL_SELECTED_MODEL_USES = {"active_input", "derived_input"}
+TERMINAL_MAPPED_DISPOSITIONS = {"mapped_metric", "mapped_guidance"}
+
+
+def _terminal_normalized_label(value: Any) -> str:
+    text = str(value or "").casefold().replace("&", " and ")
+    tokens = re.sub(r"[^a-z0-9]+", " ", text).split()
+    source_decorations = {
+        "usd", "gbp", "eur", "jpy", "chf", "usdm", "gbpm", "eurm", "jpym", "chfm",
+        "usdmn", "gbpmn", "eurmn", "m", "mm", "mn", "bn",
+        "million", "millions", "billion", "billions", "reported", "forecast",
+    }
+    while tokens and tokens[-1] in source_decorations:
+        tokens.pop()
+    return " ".join(tokens)
+
+
+def _terminal_core_labels() -> set[str]:
+    dictionary = json.loads((Path(__file__).resolve().parent.parent / "assets" / "broker-metric-dictionary.json").read_text("utf-8"))
+    if dictionary.get("schema_version") != "broker-metric-dictionary/1.0":
+        raise ValueError("Semantic verification requires broker-metric-dictionary/1.0.")
+    core_ids = set((dictionary.get("consumption") or {}).get("core") or [])
+    return {
+        label
+        for metric in dictionary.get("metrics") or []
+        if metric.get("id") in core_ids
+        for raw in [metric.get("display_label"), *(metric.get("examples") or [])]
+        if (label := _terminal_normalized_label(raw))
+    }
+
+
+TERMINAL_CORE_LABELS = _terminal_core_labels()
 MODEL_LABELS = re.compile(
     r"(?:revenue|sales|profit|ebit|ebitda|income|tax|depreciat|amortis|impair|"
     r"cash\s*(?:flow|from)|\bcfo\b|\bocf\b|\bfcf\b|\bfcfe\b|working\s*capital|"
@@ -232,7 +264,7 @@ def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) 
     """Reconstruct the manifest universe directly from canonical source tables."""
 
     findings: list[dict[str, Any]] = []
-    expected: dict[tuple[str, str, int], dict[str, Any]] = {}
+    expected: dict[tuple[str, str, int, str], dict[str, Any]] = {}
     canonical_tables: list[dict[str, Any]] = []
     for document in sorted(bundle.get("documents") or [], key=lambda item: str(item.get("document_id"))):
         tables = document.get("canonical_tables") or document.get("tables") or []
@@ -240,49 +272,49 @@ def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) 
             canonical_tables.append(table)
             table_id = str(table.get("canonical_table_id") or table.get("table_id"))
             for row_number, row in enumerate(table.get("rows") or [], start=1):
-                cells = []
-                numeric_count = 0
+                cells_by_authority: dict[str, list[dict[str, Any]]] = {}
+                numeric_by_authority: dict[str, int] = {}
                 for cell in row:
                     raw_text = str(cell.get("raw_text") or "").strip()
                     if not raw_text:
                         continue
-                    cells.append({
+                    authority = "quarantined_conflict" if cell.get("authority_status") == "quarantined_conflict" else "verified"
+                    cells_by_authority.setdefault(authority, []).append({
                         "row": int(cell.get("row", row_number)),
                         "column": int(cell.get("column", 0)),
                         "source_ref": str(cell.get("source_ref") or ""),
                         "raw_text": cell.get("raw_text"),
                     })
                     if number(cell.get("value") if cell.get("value") is not None else cell.get("raw_text")) is not None:
-                        numeric_count += 1
-                if not cells:
+                        numeric_by_authority[authority] = numeric_by_authority.get(authority, 0) + 1
+                if not cells_by_authority:
                     continue
                 label = next((str(cell.get("raw_text") or "").strip() for cell in row if str(cell.get("raw_text") or "").strip() and number(cell.get("value") if cell.get("value") is not None else cell.get("raw_text")) is None), "")
                 indent = max((float(cell.get("indent") or 0) for cell in row), default=0.0)
+                numeric_count = sum(numeric_by_authority.values())
                 source_row_kind = "subtotal" if numeric_count and any(bool(cell.get("bold")) for cell in row) else ("header" if numeric_count == 0 and label else "detail")
-                key = (str(document.get("document_id")), table_id, row_number)
-                expected[key] = {
-                    "house_id": document.get("house_id"),
-                    "source_cells": cells,
-                    "numeric": numeric_count > 0,
-                    "header": numeric_count == 0 and bool(label),
-                    "indent": indent,
-                    "row_kind": source_row_kind,
-                    "authority_status": (
-                        "quarantined_conflict"
-                        if any(cell.get("authority_status") == "quarantined_conflict" for cell in row)
-                        else "verified"
-                    ),
-                    "conflict_ids": sorted({
-                        str(cell.get("conflict_id"))
-                        for cell in row
-                        if cell.get("authority_status") == "quarantined_conflict"
-                        and str(cell.get("conflict_id") or "").strip()
-                    }),
-                }
+                for authority, cells in cells_by_authority.items():
+                    key = (str(document.get("document_id")), table_id, row_number, authority)
+                    expected[key] = {
+                        "house_id": document.get("house_id"),
+                        "source_cells": cells,
+                        "numeric": numeric_by_authority.get(authority, 0) > 0,
+                        "header": numeric_count == 0 and bool(label),
+                        "indent": indent,
+                        "row_kind": source_row_kind,
+                        "authority_status": authority,
+                        "conflict_ids": sorted({
+                            str(cell.get("conflict_id"))
+                            for cell in row
+                            if authority == "quarantined_conflict"
+                            and cell.get("authority_status") == "quarantined_conflict"
+                            and str(cell.get("conflict_id") or "").strip()
+                        }),
+                    }
 
-    actual: dict[tuple[str, str, int], dict[str, Any]] = {}
+    actual: dict[tuple[str, str, int, str], dict[str, Any]] = {}
     for candidate in manifest.get("candidates") or []:
-        key = (str(candidate.get("document_id")), str(candidate.get("table_id")), int(candidate.get("row", 0)))
+        key = (str(candidate.get("document_id")), str(candidate.get("table_id")), int(candidate.get("row", 0)), str(candidate.get("authority_status")))
         if key in actual:
             add(findings, "SEM-MANIFEST-ROW-DUPLICATE", f"Manifest repeats source row {key}.", candidate.get("candidate_id"))
         actual[key] = candidate
@@ -313,11 +345,17 @@ def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) 
     # A bold numeric subtotal becomes a parent only when following rows are
     # visibly more indented.  This is source-geometry evidence, not a guess
     # that every bold number owns the rows beneath it.
-    table_keys: dict[tuple[str, str], list[tuple[str, str, int]]] = {}
+    table_keys: dict[tuple[str, str], list[tuple[str, str, int, str]]] = {}
     for key in expected:
         table_keys.setdefault((key[0], key[1]), []).append(key)
     for keys in table_keys.values():
-        ordered = sorted(keys, key=lambda item: item[2])
+        # Hierarchy ownership uses the verified partition when a row is split;
+        # conflict partitions are evidence siblings, never alternate parents.
+        primary_keys = [
+            key for key in keys
+            if key[3] == "verified" or (key[0], key[1], key[2], "verified") not in expected
+        ]
+        ordered = sorted(primary_keys, key=lambda item: item[2])
         for position, subtotal_key in enumerate(ordered[:-1]):
             subtotal_source = expected[subtotal_key]
             if subtotal_source["row_kind"] != "subtotal":
@@ -427,7 +465,105 @@ def normalized_manifest_period(candidate: dict[str, Any], crosswalk: dict[str, A
     return "non_periodic", []
 
 
-def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
+def verifier_selected_candidate_ids(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> set[str]:
+    """Independent selected/potential-driver reconstruction for the oracle."""
+    candidates = {
+        str(item.get("candidate_id")): item
+        for item in (bundle.get("candidate_manifest") or {}).get("candidates") or []
+    }
+    selected = {
+        str(item.get("candidate_id"))
+        for item in crosswalk.get("coverage_ledger") or []
+        if item.get("model_use") in TERMINAL_SELECTED_MODEL_USES
+        or item.get("disposition") in TERMINAL_MAPPED_DISPOSITIONS
+        or bool(item.get("mapping_ids"))
+    }
+    mapped_cells = {
+        (str(source.get("table_id") or ""), int(source.get("row", 0)), int(source.get("column", 0)))
+        for mapping in crosswalk.get("mappings") or []
+        for source in mapping.get("sources") or []
+    }
+    for candidate_id, candidate in candidates.items():
+        source_cells = {
+            (str(candidate.get("table_id") or ""), int(item.get("row", 0)), int(item.get("column", 0)))
+            for item in candidate.get("source_cells") or []
+        }
+        if source_cells & mapped_cells:
+            selected.add(candidate_id)
+        if (
+            bool(candidate.get("numeric"))
+            and candidate.get("period_basis") in TERMINAL_MODEL_PERIOD_BASES
+            and _terminal_normalized_label(candidate.get("label")) in TERMINAL_CORE_LABELS
+        ):
+            selected.add(candidate_id)
+    return selected
+
+
+def verify_terminal_recovery_independently(
+    bundle: dict[str, Any], crosswalk: dict[str, Any], *, bundle_sha256: str | None
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Second implementation of terminal authority, independent of compiler."""
+    terminal = crosswalk.get("terminal_recovery")
+    if not terminal:
+        return {}, []
+    errors: list[str] = []
+    candidates = {
+        str(item.get("candidate_id")): item
+        for item in (bundle.get("candidate_manifest") or {}).get("candidates") or []
+    }
+    selected = verifier_selected_candidate_ids(bundle, crosswalk)
+    if terminal.get("schema_version") != "broker-terminal-recovery/1.0":
+        errors.append("terminal quarantine has an unsupported schema version")
+    if terminal.get("run_id") != bundle.get("run_id"):
+        errors.append("terminal quarantine is not bound to the bundle run_id")
+    if bundle_sha256 is not None and terminal.get("bundle_sha256") != bundle_sha256:
+        errors.append("terminal quarantine is not bound to the verified bundle bytes")
+    if terminal.get("candidate_manifest_sha256") != canonical_line_hash(bundle.get("candidate_manifest")):
+        errors.append("terminal quarantine is not bound to the immutable candidate manifest")
+    if terminal.get("bounded_review_status") != "exhausted":
+        errors.append("terminal quarantine was not created after bounded review exhaustion")
+    ordinary = {
+        str(item.get("candidate_id") or "") for item in crosswalk.get("coverage_ledger") or []
+    }
+    raw_entries = terminal.get("quarantined_candidates")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        errors.append("terminal quarantine has no reviewed candidates")
+        raw_entries = []
+    entries: dict[str, dict[str, Any]] = {}
+    for item in raw_entries:
+        candidate_id = str(item.get("candidate_id") or "")
+        candidate = candidates.get(candidate_id)
+        if candidate is None or candidate_id in entries:
+            errors.append(f"terminal quarantine has absent or duplicate candidate {candidate_id!r}")
+            continue
+        if candidate_id in ordinary:
+            errors.append(f"terminal quarantine candidate {candidate_id!r} also appears in the ordinary ledger")
+        for field in ("document_id", "house_id", "table_id", "row"):
+            if item.get(field) != candidate.get(field):
+                errors.append(f"terminal quarantine candidate {candidate_id!r} changed {field}")
+        if item.get("source_authority_status") != candidate.get("authority_status"):
+            errors.append(f"terminal quarantine candidate {candidate_id!r} changed source authority")
+        expected_cells = sorted(
+            (int(cell.get("row", 0)), int(cell.get("column", 0)))
+            for cell in candidate.get("source_cells") or []
+        )
+        actual_cells = sorted(
+            (int(cell.get("row", 0)), int(cell.get("column", 0)))
+            for cell in item.get("source_cells") or []
+        )
+        if actual_cells != expected_cells:
+            errors.append(f"terminal quarantine candidate {candidate_id!r} changed its source cells")
+        if candidate_id in selected:
+            errors.append(f"terminal quarantine candidate {candidate_id!r} is model-selected")
+        if item.get("disposition") != "preserve_unconsumed_quarantine" or item.get("model_consumption") != "prohibited":
+            errors.append(f"terminal quarantine candidate {candidate_id!r} permits model consumption")
+        if item.get("review_status") != "reviewed" or len(str(item.get("rationale") or "").strip()) < 12:
+            errors.append(f"terminal quarantine candidate {candidate_id!r} lacks reviewed rationale")
+        entries[candidate_id] = item
+    return entries, errors
+
+
+def verify(bundle: dict[str, Any], crosswalk: dict[str, Any], *, bundle_sha256: str | None = None) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     tables = table_index(bundle)
     manifest, manifest_findings = manifest_candidates(bundle)
@@ -436,6 +572,11 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
         findings.extend(verify_manifest_integrity(bundle, bundle["candidate_manifest"]))
     metrics = crosswalk.get("metrics") or {}
     raw_ledger = crosswalk.get("coverage_ledger") or []
+    terminal_ledger, terminal_errors = verify_terminal_recovery_independently(
+        bundle, crosswalk, bundle_sha256=bundle_sha256
+    )
+    for message in terminal_errors:
+        add(findings, "SEM-TERMINAL-RECOVERY", message)
     ledger: dict[str, dict[str, Any]] = {}
     normalized: dict[str, dict[str, Any]] = {}
 
@@ -446,6 +587,9 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
             continue
         if cid in ledger:
             add(findings, "SEM-LEDGER-DUPLICATE-ID", f"Coverage ledger repeats candidate_id {cid!r}.", cid)
+            continue
+        if cid in terminal_ledger:
+            add(findings, "SEM-TERMINAL-DUPLICATE", "Candidate appears in both ordinary and terminal quarantine ledgers.", cid)
             continue
         ledger[cid] = raw
         entry = normalized_entry(raw, metrics.get(raw.get("metric_id")))
@@ -569,7 +713,7 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
             add(findings, "SEM-RESTATEMENT-BASIS", "Restated label conflicts with definition fingerprint.", cid)
 
     for cid, candidate in manifest.items():
-        if cid not in ledger:
+        if cid not in ledger and cid not in terminal_ledger:
             add(findings, "SEM-CANDIDATE-UNDISPOSITIONED", "Immutable manifest candidate has no semantic disposition.", cid)
         parent = candidate.get("parent_candidate_id")
         if parent:
@@ -610,6 +754,12 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
             add(findings, "SEM-GUIDANCE-COLLISION", f"Metric {metric_id!r} collapses company guidance and broker-derived estimates.")
 
     status = "PASS" if not findings else "BLOCKED"
+    independently_selected = verifier_selected_candidate_ids(bundle, crosswalk)
+    unresolved_selected = {
+        str(finding.get("candidate_id"))
+        for finding in findings
+        if str(finding.get("candidate_id") or "") in independently_selected
+    }
     return {
         "schema_version": "broker-semantic-verification-report/1.0",
         "status": status,
@@ -618,6 +768,8 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> dict[str, Any]:
         "crosswalk_sha256": canonical_hash(crosswalk),
         "candidate_count": len(manifest),
         "coverage_entry_count": len(ledger),
+        "terminal_quarantined_candidate_count": len(terminal_ledger),
+        "unresolved_selected_candidate_count": len(unresolved_selected),
         "findings": findings,
     }
 
@@ -630,7 +782,7 @@ def main() -> int:
     args = parser.parse_args()
     bundle = json.loads(Path(args.bundle).read_text("utf-8"))
     crosswalk = json.loads(Path(args.crosswalk).read_text("utf-8"))
-    report = verify(bundle, crosswalk)
+    report = verify(bundle, crosswalk, bundle_sha256=hashlib.sha256(Path(args.bundle).read_bytes()).hexdigest())
     Path(args.out).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", "utf-8")
     print(json.dumps({"status": report["status"], "total_violation_count": report["total_violation_count"]}, sort_keys=True))
     return 0 if report["status"] == "PASS" else 1

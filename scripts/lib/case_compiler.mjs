@@ -2529,8 +2529,29 @@ function compilePolicies(caseSource, lanes, report) {
   const selections = caseSource.policies ?? {};
   const evidence = lanes.policy_evidence ?? {};
   const rcf = { ...clone(evidence.rcf ?? {}) };
+  if (rcf.mode === "none" || Object.keys(rcf).length === 0) {
+    delete rcf.instrument_id;
+    Object.assign(rcf, {
+      mode: "none",
+      capacity: 0,
+      opening_draw: 0,
+      commitment_fee_convention: "none",
+      commitment_fee_value: 0,
+    });
+  } else {
+    rcf.mode = "balancing_rcf";
+  }
   if (selections.rcf?.commitment_fee_convention !== undefined) {
-    rcf.commitment_fee_convention = selections.rcf.commitment_fee_convention;
+    if (rcf.mode === "none") {
+      report.add(
+        "policies.rcf.none_has_fee_selection",
+        "BLOCK",
+        "A commitment-fee convention was selected even though sealed evidence declares no balancing facility.",
+        "Remove the stale RCF fee selection; ordinary revolvers remain instrument-level debt.",
+      );
+    } else {
+      rcf.commitment_fee_convention = selections.rcf.commitment_fee_convention;
+    }
   }
   const cash = { ...clone(evidence.cash ?? {}) };
   if (selections.cash?.interest_income_cash_flow_classification !== undefined) {
@@ -2647,6 +2668,11 @@ export function compileCase(caseSource, evidence = {}) {
     issuer: {
       name: caseSource.identity?.issuer_name,
       ...(caseSource.identity?.ticker ? { ticker: caseSource.identity.ticker } : {}),
+      ...(caseSource.identity?.identifiers ? { identifiers: clone(caseSource.identity.identifiers) } : {}),
+      ...(caseSource.identity?.aliases ? { aliases: clone(caseSource.identity.aliases) } : {}),
+      ...(caseSource.identity?.consolidation_level
+        ? { consolidation_level: caseSource.identity.consolidation_level }
+        : {}),
       reporting_currency: caseSource.identity?.reporting_currency,
       ...(caseSource.identity?.accounting_framework
         ? {

@@ -31,8 +31,9 @@ Ask only when a question clears both bars: the model cannot resolve it from its
 sources, **and** the two plausible answers produce materially different output.
 Everything else becomes a stated assumption printed at the end. Use company
 language, state every option's consequence in money, phrase for a one-word
-answer, and **stop at five**. If more than five clear the bar, the inputs are
-wrong — say so rather than emitting thirty questions.
+answer, and show **at most five per round**. If more than five clear the bar,
+persist the answers and show the next deterministic round; the input pack is
+not defective merely because the company has more than five material decisions.
 
 The instrument-level source is the FactSet DCS debt export **taken at last fiscal
 year end**. An export taken at today's date is the commonest production error and

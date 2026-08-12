@@ -15,6 +15,7 @@ import {
   canonicalForecastStatementDependencies,
   compileLayeredGraphConstitution,
 } from "./layered_graph_constitution.mjs";
+import { balancingRcfMode } from "./rcf_policy.mjs";
 
 const MOVEMENT_DEFINITIONS = {
   operating_cash_flow: {
@@ -1053,6 +1054,7 @@ export function compileSemanticManifest(
     fiscal_year_end: modelCase.issuer?.fiscal_year_end ?? null,
     fiscal_calendar: modelCase.issuer?.fiscal_calendar ?? "fixed_date",
     rcf_contract: {
+      mode: balancingRcfMode(modelCase),
       instrument_id: modelCase.rcf_policy?.instrument_id ?? null,
       currency: rcfInstrument?.currency ?? null,
       reporting_currency: modelCase.issuer?.reporting_currency ?? null,

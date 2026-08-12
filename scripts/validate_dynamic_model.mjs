@@ -863,60 +863,75 @@ checks.push(
 );
 const rcfContract = semanticManifest.rcf_contract ?? {};
 const rcfContractErrors = [];
-for (const key of [
-  "instrument_id",
-  "policy_opening_draw",
-  "instrument_opening_balance",
-  "policy_capacity",
-  "instrument_capacity",
-]) {
-  if (
-    rcfContract[key] === null ||
-    rcfContract[key] === undefined ||
-    rcfContract[key] === ""
-  ) {
-    rcfContractErrors.push({ id: `missing_${key}` });
+const rcfContractMode = rcfContract.mode ??
+  (rcfContract.instrument_id ? "balancing_rcf" : "none");
+if (rcfContractMode === "none") {
+  for (const key of ["instrument_id", "instrument_opening_balance", "instrument_capacity"]) {
+    if (rcfContract[key] !== null && rcfContract[key] !== undefined && rcfContract[key] !== "") {
+      rcfContractErrors.push({ id: `none_has_${key}`, value: rcfContract[key] });
+    }
   }
-}
-if (
-  Math.abs(
-    numeric(rcfContract.policy_opening_draw) -
-      numeric(rcfContract.instrument_opening_balance),
-  ) >
-  toleranceFor(
-    "input-authority",
-    "currency",
-    numeric(rcfContract.policy_opening_draw),
-  )
-) {
-  rcfContractErrors.push({
-    id: "opening_draw",
-    policy: rcfContract.policy_opening_draw ?? null,
-    instrument: rcfContract.instrument_opening_balance ?? null,
-  });
-}
-if (
-  Math.abs(
-    numeric(rcfContract.policy_capacity) -
-      numeric(rcfContract.instrument_capacity),
-  ) >
-  toleranceFor(
-    "input-authority",
-    "currency",
-    numeric(rcfContract.policy_capacity),
-  )
-) {
-  rcfContractErrors.push({
-    id: "capacity",
-    policy: rcfContract.policy_capacity ?? null,
-    instrument: rcfContract.instrument_capacity ?? null,
-  });
+  for (const key of ["policy_opening_draw", "policy_capacity"]) {
+    if (numeric(rcfContract[key]) !== 0) {
+      rcfContractErrors.push({ id: `none_nonzero_${key}`, value: rcfContract[key] });
+    }
+  }
+} else {
+  for (const key of [
+    "instrument_id",
+    "policy_opening_draw",
+    "instrument_opening_balance",
+    "policy_capacity",
+    "instrument_capacity",
+  ]) {
+    if (
+      rcfContract[key] === null ||
+      rcfContract[key] === undefined ||
+      rcfContract[key] === ""
+    ) {
+      rcfContractErrors.push({ id: `missing_${key}` });
+    }
+  }
+  if (
+    Math.abs(
+      numeric(rcfContract.policy_opening_draw) -
+        numeric(rcfContract.instrument_opening_balance),
+    ) >
+    toleranceFor(
+      "input-authority",
+      "currency",
+      numeric(rcfContract.policy_opening_draw),
+    )
+  ) {
+    rcfContractErrors.push({
+      id: "opening_draw",
+      policy: rcfContract.policy_opening_draw ?? null,
+      instrument: rcfContract.instrument_opening_balance ?? null,
+    });
+  }
+  if (
+    Math.abs(
+      numeric(rcfContract.policy_capacity) -
+        numeric(rcfContract.instrument_capacity),
+    ) >
+    toleranceFor(
+      "input-authority",
+      "currency",
+      numeric(rcfContract.policy_capacity),
+    )
+  ) {
+    rcfContractErrors.push({
+      id: "capacity",
+      policy: rcfContract.policy_capacity ?? null,
+      instrument: rcfContract.instrument_capacity ?? null,
+    });
+  }
 }
 checks.push(
   record(
     "single-rcf-input-authority",
     rcfContractErrors.length === 0,
-    "The visible RCF opening draw and capacity resolve to one reconciled instrument source.",
+    "The liquidity policy either resolves to one reconciled balancing facility or explicitly proves that no balancing facility exists.",
     rcfContractErrors,
   ),
 );
@@ -1049,7 +1064,10 @@ const expectedSections = {
   income_statement: "3. INCOME STATEMENT",
   cash_flow: "4. CASH FLOW",
   debt_schedule: "5. DEBT SCHEDULE",
-  rcf_waterfall: "6. RCF CASH SWEEP",
+  rcf_waterfall:
+    rcfContractMode === "none"
+      ? "6. CASH / LIQUIDITY WATERFALL — NO BALANCING FACILITY"
+      : "6. RCF CASH SWEEP",
   interest_schedule: "7. INTEREST SCHEDULE",
 };
 const badSections = Object.entries(expectedSections)
@@ -2550,8 +2568,9 @@ const componentRows = [
       row: plan.interest_row,
     })),
   ...[
-    "rcf_interest",
-    "rcf_commitment_fee",
+    ...(rcfContractMode === "none"
+      ? []
+      : ["rcf_interest", "rcf_commitment_fee"]),
     "lease_interest",
     "other_unallocated_interest",
     "non_cash_interest",
@@ -2809,8 +2828,9 @@ const interestFormulaRows = [
     })),
   ...pikPrincipalRows,
   ...[
-    "rcf_interest",
-    "rcf_commitment_fee",
+    ...(rcfContractMode === "none"
+      ? []
+      : ["rcf_interest", "rcf_commitment_fee"]),
     "lease_interest",
     "other_unallocated_interest",
     "non_cash_interest",

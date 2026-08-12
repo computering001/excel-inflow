@@ -1,5 +1,19 @@
+export function balancingRcfMode(modelCase) {
+  const policy = modelCase?.rcf_policy;
+  if (policy?.mode === "none") return "none";
+  return policy?.mode === "balancing_rcf" || policy?.instrument_id
+    ? "balancing_rcf"
+    : "none";
+}
+
+export function hasBalancingRcf(modelCase) {
+  return balancingRcfMode(modelCase) === "balancing_rcf";
+}
+
 export function balancingRcfId(modelCase) {
-  return modelCase?.rcf_policy?.instrument_id ?? null;
+  return hasBalancingRcf(modelCase)
+    ? modelCase?.rcf_policy?.instrument_id ?? null
+    : null;
 }
 
 export function isBalancingRcf(modelCase, instrument) {
@@ -19,6 +33,26 @@ export function balancingRcfInstrument(modelCase) {
 
 export function validateBalancingRcf(modelCase) {
   const errors = [];
+  const policy = modelCase?.rcf_policy;
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) {
+    return ["rcf_policy must explicitly declare a balancing_rcf or none mode."];
+  }
+  if (balancingRcfMode(modelCase) === "none") {
+    if (policy.instrument_id !== undefined) {
+      errors.push("rcf_policy.instrument_id must be absent when mode is none.");
+    }
+    for (const key of ["capacity", "opening_draw", "commitment_fee_value"]) {
+      if (Number(policy[key] ?? 0) !== 0) {
+        errors.push(`rcf_policy.${key} must be zero when mode is none.`);
+      }
+    }
+    if ((policy.commitment_fee_convention ?? "none") !== "none") {
+      errors.push(
+        "rcf_policy.commitment_fee_convention must be none when mode is none.",
+      );
+    }
+    return errors;
+  }
   const id = balancingRcfId(modelCase);
   if (!id) {
     return ["rcf_policy.instrument_id must name the balancing liquidity facility."];

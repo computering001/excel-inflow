@@ -39,9 +39,10 @@ function parseArgs(argv) {
 
 function usage() {
   return [
-    "Usage: run_development_gate.mjs [--phase all|graph,workflow,evidence,forecast,economics,cohort,proof]",
+    "Usage: run_development_gate.mjs [--phase all|graph,workflow,evidence,forecast,economics,cohort,proof,real_corpus]",
     "  [--cases <case-directory>] [--representative <compiled-case.json>]",
     "  [--broker-corpus <external-corpus.json>]",
+    "  [--broker-real-pack-manifest <external-reviewed-pack-manifest.json>]",
     "  [--fixed-point-cases-manifest <external-case-manifest.json>]",
     "  [--python <python>] [--out <report-directory>]",
     "  [--concurrency <1-4>] [--timeout-ms <milliseconds>]",
@@ -75,6 +76,9 @@ function substitutions(options) {
     CASES: options.cases ? path.resolve(options.cases) : null,
     REPRESENTATIVE: options.representative ? path.resolve(options.representative) : null,
     BROKER_CORPUS: options["broker-corpus"] ? path.resolve(options["broker-corpus"]) : null,
+    BROKER_REAL_PACK_MANIFEST: options["broker-real-pack-manifest"]
+      ? path.resolve(options["broker-real-pack-manifest"])
+      : null,
     FIXED_POINT_CASES_MANIFEST: options["fixed-point-cases-manifest"]
       ? path.resolve(options["fixed-point-cases-manifest"])
       : null,

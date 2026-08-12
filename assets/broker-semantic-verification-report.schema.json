@@ -22,6 +22,8 @@
     "crosswalk_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "candidate_count": { "type": "integer", "minimum": 0 },
     "coverage_entry_count": { "type": "integer", "minimum": 0 },
+    "terminal_quarantined_candidate_count": { "type": "integer", "minimum": 0 },
+    "unresolved_selected_candidate_count": { "type": "integer", "minimum": 0 },
     "findings": {
       "type": "array",
       "items": {

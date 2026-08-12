@@ -380,14 +380,37 @@ assert.equal(
 
 const noRcfCase = structuredClone(modelCase);
 noRcfCase.case_id = "instrument_period_state_no_rcf";
-noRcfCase.instruments = noRcfCase.instruments.filter(
-  (candidate) => candidate.class !== "rcf",
-);
-delete noRcfCase.rcf_policy;
+noRcfCase.rcf_policy = {
+  mode: "none",
+  capacity: 0,
+  opening_draw: 0,
+  commitment_fee_convention: "none",
+  commitment_fee_value: 0,
+};
 const noRcfArtifact = compileInstrumentPeriodState(noRcfCase);
 assert.ok(
   noRcfArtifact.states.every((state) => state.inclusion.liquidity === false),
   "An instrument-only/no-RCF state graph invented a balancing facility.",
+);
+const ordinaryRevolverMaturity = noRcfArtifact.states.find(
+  (state) =>
+    state.instrument_id === "liquidity_rcf" && state.period_index === 0,
+);
+assert.equal(
+  ordinaryRevolverMaturity.repayment_state,
+  "maturity",
+  "A revolver became non-maturing merely because no balancing facility was designated.",
+);
+assert.equal(
+  ordinaryRevolverMaturity.inclusion.mandatory_repayment,
+  true,
+  "An ordinary revolver was excluded from contractual mandatory repayment.",
+);
+assert.equal(ordinaryRevolverMaturity.inclusion.liquidity, false);
+assert.equal(
+  mandatoryRepaymentForPeriod(noRcfArtifact, 0) >= 40,
+  true,
+  "The no-facility mandatory-repayment pool omitted an ordinary revolver maturity.",
 );
 
 const residualPricingCase = structuredClone(modelCase);
@@ -475,6 +498,7 @@ console.log(JSON.stringify({
     "non_maturing_with_in_horizon_date",
     "multi_rcf_role_separation",
     "no_rcf_state_graph",
+    "no_rcf_ordinary_revolver_maturity",
     "residual_pricing_authority",
     "zero_balance_maturity_exclusion",
     "issuance_before_maturity_inclusion",

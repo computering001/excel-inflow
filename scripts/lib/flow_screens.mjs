@@ -103,6 +103,89 @@ export function renderStageStatus({ stageId, status, summary, nextAction = null 
   return finishScreen(lines);
 }
 
+function previewNumber(value) {
+  if (!Number.isFinite(Number(value))) return "-";
+  const number = Number(value);
+  if (Math.abs(number) >= 1000) return number.toFixed(0);
+  if (Math.abs(number) >= 10) return number.toFixed(1).replace(/\.0$/, "");
+  return number.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+/**
+ * Stage 2's one mandatory broker checkpoint. The compact screen is a readable
+ * receipt; the adjacent JSON artifact carries every cell-addressed provenance
+ * record and every alternate without forcing a 500-line chat response.
+ */
+export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } = {}) {
+  const selected = (preview?.selection_cases ?? []).find(
+    (candidate) => candidate.house_id === preview?.recommended_primary_house_id,
+  );
+  const byMetric = new Map();
+  for (const value of selected?.selected_values ?? []) {
+    const record = byMetric.get(value.metric_id) ?? {
+      metric_id: value.metric_id,
+      kind: value.selection_kind,
+      values: [null, null, null],
+    };
+    record.values[value.period_index] = value.value;
+    byMetric.set(value.metric_id, record);
+  }
+  const lines = [
+    ...renderStageHeader("evidence_review", "action required"),
+    "",
+    "   SEALED BROKER PREVIEW",
+    "",
+    `   Raw houses preserved .... ${preview?.evidence_inventory?.raw_house_count ?? 0}`,
+    `   Raw tables preserved .... ${preview?.evidence_inventory?.raw_table_count ?? 0}`,
+    `   Evidence-only tables .... ${preview?.evidence_inventory?.evidence_only_table_count ?? 0}`,
+    `   Quarantined cells ....... ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,
+    "",
+    `   RECOMMENDED PRIMARY: ${selected?.house_name ?? "none"}`,
+    `   House id ............... ${selected?.house_id ?? "none"}`,
+    `   Headline anchor ........ ${preview?.headline_anchor ?? "none"}`,
+    "",
+    "   SELECTED MODEL VALUES       FY1       FY2       FY3",
+  ];
+  for (const record of [...byMetric.values()].sort((a, b) =>
+    a.metric_id.localeCompare(b.metric_id))) {
+    const label = record.metric_id.replace(/_/g, " ").slice(0, 24).padEnd(24);
+    const values = record.values
+      .map((value) => previewNumber(value).padStart(9))
+      .join(" ");
+    lines.push(`   ${label}${values}`);
+  }
+  const alternatives = (preview?.selection_cases ?? [])
+    .filter((candidate) => candidate.status === "PASS")
+    .filter((candidate) => candidate.house_id !== selected?.house_id);
+  lines.push("", "   ELIGIBLE ALTERNATES");
+  if (alternatives.length === 0) lines.push("   None");
+  else {
+    for (const candidate of alternatives) {
+      lines.push(`   ${candidate.house_id} - ${candidate.house_name}`);
+    }
+  }
+  if (confirmationErrors.length > 0) {
+    lines.push("", "   CONFIRMATION NOT ACCEPTED");
+    for (const error of confirmationErrors.slice(0, 4)) {
+      for (const line of indented(error, 3, RULE_WIDTH - 3)) lines.push(line);
+    }
+  }
+  lines.push(
+    "",
+    "   Full tables, exact source cells and alternates are in",
+    "   broker-preview.json. Confirmation selects a house; it",
+    "   cannot waive a conflict or promote quarantined evidence.",
+    "",
+    "   NEXT ACTION",
+    `   Reply CONFIRM ${selected?.house_id ?? "<house-id>"}, or select one`,
+    "   eligible alternate shown above.",
+    "",
+    `   Preview hash: ${String(preview?.preview_sha256 ?? "").slice(0, 16)}...`,
+    RULE,
+  );
+  return finishScreen(lines, { summariseOverflow: true });
+}
+
 // The welcome screen is reproduced verbatim from the user-flow document. It is a
 // constant rather than a template because there is nothing in it to vary: the
 // three inputs are fixed by the flow and the five stages are fixed by G1.
@@ -121,8 +204,8 @@ export const WELCOME_SCREEN = finishScreen([
   RULE,
   "",
   "   1  Provide the input pack                 <- you are here",
-  "   2  Evidence is read and reconciled        no contact",
-  "   3  Up to five questions are asked         only stop",
+  "   2  Evidence read; broker choice confirmed one stop",
+  "   3  Up to five real questions are asked    if needed",
   "   4  The workbook is built and checked      no contact",
   "   5  The model and concise findings arrive",
   "",
@@ -633,9 +716,10 @@ export function renderForecastPlanScreen(modelCase, sealedPlan = null) {
   return finishScreen(lines, { summariseOverflow: true });
 }
 
-// The cap of five is reached by pruning, never by truncation. When more than
-// five questions survive the decision graph the inputs are wrong, and saying so
-// is the correct output — a wall of thirty questions is not.
+// Legacy diagnostic renderer retained for archived receipts. Current runs use
+// Retained only for compatibility with archived receipts. Production question
+// planning now emits deterministic decision rounds of at most five;
+// cardinality alone is never evidence that the source pack is wrong.
 export function renderTooManyQuestions(survivors, { limit = 5 } = {}) {
   const lines = [
     ...renderStageHeader("decisions", "blocked"),

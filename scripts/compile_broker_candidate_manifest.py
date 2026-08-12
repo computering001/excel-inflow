@@ -138,87 +138,109 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                     if subtotal_parent and label_indent > subtotal_parent[1]
                     else header_parent_id
                 )
-                source_cells = [
-                    {
-                        "row": int(cell.get("row", row_number)),
-                        "column": int(cell.get("column", 0)),
-                        "source_ref": str(cell.get("source_ref") or ""),
-                        "raw_text": cell.get("raw_text"),
-                    }
-                    for cell in nonblank
-                ]
-                conflict_ids = sorted({
-                    str(cell.get("conflict_id"))
-                    for cell in nonblank
-                    if cell.get("authority_status") == "quarantined_conflict"
-                    and str(cell.get("conflict_id") or "").strip()
-                })
-                authority_status = "quarantined_conflict" if conflict_ids else "verified"
-                identity = {
-                    "document_id": document.get("document_id"),
-                    "table_id": table_id,
-                    "row": row_number,
-                    "source_cells": source_cells,
-                }
-                candidate_id = "bc-" + hashlib.sha256(canonical_bytes(identity)).hexdigest()[:24]
-                period_indexes = [
-                    dict(header_periods[column])
-                    for column in sorted(header_periods)
-                    if any(int(cell.get("column", 0)) == column and is_numeric_cell(cell) for cell in row)
-                ]
-                kinds = sorted({item["period_kind"] for item in period_indexes})
-                if "unresolved_period_header" in kinds:
-                    period_basis = "unresolved_period_header"
-                elif kinds == ["annual"]:
-                    period_basis = "annual_forecast"
-                elif kinds and set(kinds).issubset({"quarter", "quarter_span", "half_year", "half_year_span", "ltm", "ntm"}):
-                    period_basis = "partial_period"
-                elif kinds:
-                    period_basis = "unresolved_period_header"
-                    findings.append({
-                        "id": "broker_candidates.mixed_period_header",
-                        "severity": "warning",
+                # Preserve authority at cell/period grain. A single unresolved
+                # figure must not quarantine the other verified periods on the
+                # same visible row. We split only mixed-authority rows, keeping
+                # ordinary rows compact and source faithful.
+                partitions: dict[str, list[dict[str, Any]]] = {}
+                for cell in nonblank:
+                    authority = (
+                        "quarantined_conflict"
+                        if cell.get("authority_status") == "quarantined_conflict"
+                        else "verified"
+                    )
+                    partitions.setdefault(authority, []).append(cell)
+                created_ids: list[tuple[str, str]] = []
+                for authority_status in ("verified", "quarantined_conflict"):
+                    partition = partitions.get(authority_status) or []
+                    if not partition:
+                        continue
+                    source_cells = [
+                        {
+                            "row": int(cell.get("row", row_number)),
+                            "column": int(cell.get("column", 0)),
+                            "source_ref": str(cell.get("source_ref") or ""),
+                            "raw_text": cell.get("raw_text"),
+                        }
+                        for cell in partition
+                    ]
+                    conflict_ids = sorted({
+                        str(cell.get("conflict_id"))
+                        for cell in partition
+                        if cell.get("authority_status") == "quarantined_conflict"
+                        and str(cell.get("conflict_id") or "").strip()
+                    })
+                    identity = {
                         "document_id": document.get("document_id"),
                         "table_id": table_id,
                         "row": row_number,
-                        "period_kinds": kinds,
-                        "message": "Mixed period labels are preserved for semantic review and do not block evidence-only tables.",
+                        "source_cells": source_cells,
+                    }
+                    candidate_id = "bc-" + hashlib.sha256(canonical_bytes(identity)).hexdigest()[:24]
+                    period_indexes = [
+                        dict(header_periods[column])
+                        for column in sorted(header_periods)
+                        if any(int(cell.get("column", 0)) == column and is_numeric_cell(cell) for cell in partition)
+                    ]
+                    kinds = sorted({item["period_kind"] for item in period_indexes})
+                    if "unresolved_period_header" in kinds:
+                        period_basis = "unresolved_period_header"
+                    elif kinds == ["annual"]:
+                        period_basis = "annual_forecast"
+                    elif kinds and set(kinds).issubset({"quarter", "quarter_span", "half_year", "half_year_span", "ltm", "ntm"}):
+                        period_basis = "partial_period"
+                    elif kinds:
+                        period_basis = "unresolved_period_header"
+                        findings.append({
+                            "id": "broker_candidates.mixed_period_header",
+                            "severity": "warning",
+                            "document_id": document.get("document_id"),
+                            "table_id": table_id,
+                            "row": row_number,
+                            "period_kinds": kinds,
+                            "message": "Mixed period labels are preserved for semantic review and do not block evidence-only tables.",
+                        })
+                    else:
+                        period_basis = "non_periodic"
+                    partition_numeric_count = sum(1 for cell in partition if is_numeric_cell(cell))
+                    candidates.append({
+                        "candidate_id": candidate_id,
+                        "document_id": document.get("document_id"),
+                        "house_id": document.get("house_id"),
+                        "table_id": table_id,
+                        "row": row_number,
+                        "label": label,
+                        "row_kind": row_kind,
+                        "parent_candidate_id": parent_id,
+                        "period_basis": period_basis,
+                        "period_indexes": period_indexes,
+                        "source_cells": source_cells,
+                        "numeric": partition_numeric_count > 0,
+                        "numeric_cell_count": partition_numeric_count,
+                        "header_context": [item["period_label"] for item in period_indexes],
+                        "units": table.get("units"),
+                        "definition_hints": [{
+                            "kind": "presentation_hierarchy",
+                            "label_indent": label_indent,
+                            "label_bold": label_bold,
+                        }],
+                        "authority_status": authority_status,
+                        "conflict_ids": conflict_ids,
                     })
-                else:
-                    period_basis = "non_periodic"
-                candidates.append({
-                    "candidate_id": candidate_id,
-                    "document_id": document.get("document_id"),
-                    "house_id": document.get("house_id"),
-                    "table_id": table_id,
-                    "row": row_number,
-                    "label": label,
-                    "row_kind": row_kind,
-                    "parent_candidate_id": parent_id,
-                    "period_basis": period_basis,
-                    "period_indexes": period_indexes,
-                    "source_cells": source_cells,
-                    "numeric": numeric_count > 0,
-                    "numeric_cell_count": numeric_count,
-                    "header_context": [item["period_label"] for item in period_indexes],
-                    "units": table.get("units"),
-                    "definition_hints": [{
-                        "kind": "presentation_hierarchy",
-                        "label_indent": label_indent,
-                        "label_bold": label_bold,
-                    }],
-                    "authority_status": authority_status,
-                    "conflict_ids": conflict_ids,
-                })
+                    created_ids.append((authority_status, candidate_id))
+                structural_candidate_id = next(
+                    (candidate_id for authority, candidate_id in created_ids if authority == "verified"),
+                    created_ids[0][1],
+                )
                 if row_kind == "header":
-                    header_parent_id = candidate_id
+                    header_parent_id = structural_candidate_id
                     subtotal_parent = None
                 elif row_kind == "subtotal":
                     # A numeric subtotal becomes a parent only for following
                     # rows that are visibly more indented. Same-level rows end
                     # the scope, preventing a bold total from swallowing the
                     # rest of the statement.
-                    subtotal_parent = (candidate_id, label_indent)
+                    subtotal_parent = (structural_candidate_id, label_indent)
             if not table.get("rows"):
                 findings.append({
                     "id": "broker_candidates.empty_table",

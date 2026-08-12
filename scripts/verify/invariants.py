@@ -843,15 +843,31 @@ def validate_semantic_artifacts(
             periods_by_instrument.setdefault(state.get("instrument_id"), []).append(
                 state.get("period_index")
             )
-            if state.get("class") == "rcf" and (
+            if (
+                state.get("class") == "rcf"
+                and (state.get("inclusion") or {}).get("liquidity") is True
+                and (
                 state.get("repayment_state") != "discretionary_rcf"
                 or (state.get("inclusion") or {}).get("mandatory_repayment") is not False
                 or abs(float((state.get("maturity_repayment") or {}).get("basis_amount") or 0)) > 1e-9
+                )
             ):
                 errors.append(
                     {
                         "id": "manifest.instrument_period_state_invalid",
                         "message": "RCF entered the mandatory repayment pool.",
+                        "state_id": state_id,
+                    }
+                )
+            if (
+                state.get("class") == "rcf"
+                and (state.get("inclusion") or {}).get("liquidity") is not True
+                and state.get("repayment_state") == "discretionary_rcf"
+            ):
+                errors.append(
+                    {
+                        "id": "manifest.instrument_period_state_invalid",
+                        "message": "An ordinary revolver was treated as the balancing facility.",
                         "state_id": state_id,
                     }
                 )

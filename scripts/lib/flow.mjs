@@ -26,7 +26,6 @@ import {
   renderDeliveryReport,
   renderFailure,
   renderQuestionScreen,
-  renderTooManyQuestions,
   OPTIONAL_INPUTS,
   REQUIRED_INPUTS,
   WELCOME_SCREEN,
@@ -53,7 +52,6 @@ export {
   REQUIRED_INPUTS,
   OPTIONAL_INPUTS,
   renderQuestionScreen,
-  renderTooManyQuestions,
   renderDeliveryReport,
   renderFailure,
   parseAnswers,
@@ -100,8 +98,7 @@ function expectedContext(draftCase, intake) {
  *   { outcome: 'entity_stop' }       the export and the filings are not the
  *                                    same reporting entity
  *   { outcome: 'reconciliation_stop' } the export does not foot; re-supply
- *   { outcome: 'questions' }         up to five, the only stop
- *   { outcome: 'inputs_look_wrong' } more than five survived pruning
+ *   { outcome: 'questions' }         up to five in the current decision round
  *   { outcome: 'proceed' }           nothing to ask; straight through
  *
  * `residualDecision` is retained only so a second call can acknowledge that the
@@ -324,17 +321,6 @@ export function runIntake({
     };
   }
 
-  if (plan.status === "inputs_look_wrong") {
-    return {
-      outcome: "inputs_look_wrong",
-      stage: 3,
-      plan,
-      working_case: workingCase,
-      reconciliation,
-      stage_one: stageOne,
-      screen: renderTooManyQuestions(plan.survivors, { limit }),
-    };
-  }
   if (plan.status === "no_questions") {
     return {
       outcome: "proceed",

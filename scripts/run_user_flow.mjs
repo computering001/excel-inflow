@@ -22,6 +22,7 @@ import {
 } from "./lib/workflow_state.mjs";
 import {
   COMPANY_SCREEN,
+  renderBrokerPreviewScreen,
   renderDeliveryReport,
   renderFailure,
   renderForecastPlanScreen,
@@ -56,6 +57,12 @@ import {
   compileForecastBehaviorMap,
   validateForecastBehaviorMap,
 } from "./lib/forecast_behavior.mjs";
+import {
+  applyBrokerPreviewSelection,
+  compileBrokerPreview,
+  validateBrokerPreview,
+  verifyBrokerPreviewConfirmation,
+} from "./lib/broker_preview.mjs";
 import { compileCase } from "./lib/case_compiler.mjs";
 import {
   assertLiveDeliveryAttestation,
@@ -158,9 +165,19 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
     "scripts/lib/flow_reconcile.mjs",
     "scripts/lib/coverage.mjs",
     "scripts/lib/broker_anchor.mjs",
+    "scripts/lib/broker_preview.mjs",
+    "scripts/lib/broker_metric_dictionary.mjs",
+    "scripts/lib/flow_runtime.mjs",
+    "scripts/lib/flow_screens.mjs",
+    "scripts/lib/run_carrier.mjs",
+    "scripts/lib/workflow_state.mjs",
     "scripts/lib/statement_classifier.mjs",
     "assets/dcs-export.schema.json",
     "assets/broker-pack.schema.json",
+    "assets/broker-preview-v1.schema.json",
+    "assets/broker-preview-confirmation-v1.schema.json",
+    "assets/broker-metric-dictionary.json",
+    "assets/workflow-state-contract-v1.json",
     "assets/statement-semantic-taxonomy.v1.json",
   ]),
   decisions: Object.freeze([
@@ -278,7 +295,21 @@ async function loadAnswers(target, questions) {
   const text = await fs.readFile(path.resolve(target), "utf8");
   if (target.toLowerCase().endsWith(".json")) {
     const payload = JSON.parse(text);
-    return { answers: new Map(Object.entries(payload.answers ?? payload)), errors: [], complete: true };
+    const answers = new Map(Object.entries(payload.answers ?? payload));
+    const errors = [];
+    for (const question of questions ?? []) {
+      if (!answers.has(question.id)) {
+        errors.push(`Missing answer for ${question.id}.`);
+        continue;
+      }
+      const allowed = new Set((question.options ?? []).map((option) => option.id));
+      if (!allowed.has(answers.get(question.id))) {
+        errors.push(
+          `Invalid answer for ${question.id}; expected one of ${[...allowed].join(", ")}.`,
+        );
+      }
+    }
+    return { answers, errors, complete: errors.length === 0 };
   }
   return parseAnswers(text, questions);
 }
@@ -317,7 +348,6 @@ function stoppedOutcome(outcome) {
     "entity_stop",
     "reconciliation_stop",
     "awaiting_reexport",
-    "inputs_look_wrong",
     "decision_replay_blocked",
     "decision_graph_blocked",
   ].includes(outcome);
@@ -377,7 +407,8 @@ async function main() {
     throw new Error(
       "Usage: run_user_flow.mjs <evidence-run.json> --out <run-dir> or " +
         "run_user_flow.mjs --carrier <run-carrier.json> --out <run-dir> " +
-        "[--answers <answers.txt|json>] [--python <python>] [--soffice <path>] " +
+        "[--broker-confirmation <confirmation.json>] [--answers <answers.txt|json>] " +
+        "[--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
         "[--stop-after <stage>] [--json], or " +
         "run_user_flow.mjs --screen <company|inputs|evidence_review|decisions|build_checks|delivery>",
@@ -455,6 +486,9 @@ async function main() {
     }
     evidencePath = verifiedCarrier.files.evidence_run;
     if (!options.answers && verifiedCarrier.files.answers) options.answers = verifiedCarrier.files.answers;
+    if (!options["broker-confirmation"] && verifiedCarrier.files.broker_confirmation) {
+      options["broker-confirmation"] = verifiedCarrier.files.broker_confirmation;
+    }
     if (options["run-id"] && options["run-id"] !== verifiedCarrier.carrier.run_id) {
       throw new Error("--run-id does not match the verified run carrier.");
     }
@@ -495,6 +529,7 @@ async function main() {
   const stage1CaseSource = path.join(stage1Dir, "case-source.json");
   const stage1CaseEvidence = path.join(stage1Dir, "case-evidence.json");
   const stage1CompileReport = path.join(stage1Dir, "case-compile-report.json");
+  let stage2BrokerConfirmation = null;
   await writeTextAtomic(stage1Evidence, await fs.readFile(evidencePath, "utf8"));
   await writeJsonAtomic(stage1CaseSource, evidenceRun.case_source ?? {});
   await writeJsonAtomic(stage1CaseEvidence, evidenceRun.case_evidence ?? {});
@@ -508,6 +543,7 @@ async function main() {
       issuerIdentity,
       evidencePath: stage1Evidence,
       answersPath: typeof options.answers === "string" ? path.resolve(options.answers) : null,
+      brokerConfirmationPath: stage2BrokerConfirmation,
       status,
       artifacts,
     });
@@ -621,12 +657,147 @@ async function main() {
   // changing its question set or its reconciled case.
   const stage2Dir = path.join(runDir, "stages", "evidence_review");
   const stage2Result = path.join(stage2Dir, "intake-result.json");
+  const brokerPreviewPath = path.join(stage2Dir, "broker-preview.json");
+  const brokerPreviewScreenPath = path.join(stage2Dir, "broker-preview.txt");
+  const brokerPackArtifactPath = path.join(stage2Dir, "broker-pack.json");
+  const brokerSourceTablesArtifactPath = path.join(
+    stage2Dir,
+    "broker-source-tables.json",
+  );
+  const brokerCrosswalkReceiptArtifactPath = path.join(
+    stage2Dir,
+    "broker-crosswalk-receipt.json",
+  );
+  const brokerConfirmationTemplatePath = path.join(
+    stage2Dir,
+    "broker-confirmation-template.json",
+  );
+  const brokerConfirmationPath = path.join(stage2Dir, "broker-confirmation.json");
+  const brokerSelectedCaseEvidencePath = path.join(
+    stage2Dir,
+    "broker-selected-case-evidence.json",
+  );
+  const brokerSelectedCompileReportPath = path.join(
+    stage2Dir,
+    "broker-selected-case-compile-report.json",
+  );
+  let activeCaseEvidence = validation.handoff.case_evidence;
+  let activeCaseCompileReport = validation.handoff.case_compile_report;
+  let activeModelCase = validation.handoff.model_case;
+  let brokerSelectedCompilation = null;
+  const productionBrokerPreviewRequired = Boolean(
+    evidenceRun.ingress?.broker_evidence ||
+    evidenceRun.broker_pack?.recommended_primary_house_id ||
+    evidenceRun.broker_pack?.eligibility_summary,
+  );
+  let brokerPreview = null;
+  let brokerPreviewValidation = null;
+  let brokerConfirmation = null;
+  let brokerConfirmationCheck = null;
+  if (productionBrokerPreviewRequired) {
+    const brokerState =
+      evidenceRun.case_evidence?.lanes?.broker_evidence?.controller_state ?? {};
+    const brokerIngress = evidenceRun.ingress?.broker_evidence ?? {};
+    brokerPreview = compileBrokerPreview({
+      brokerPack: evidenceRun.broker_pack,
+      sourceTables: evidenceRun.broker_source_tables,
+      crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
+      bindingHashes: {
+        broker_pack_sha256:
+          brokerState.artifact_sha256?.broker_pack ??
+          hashValue(evidenceRun.broker_pack),
+        broker_source_tables_sha256:
+          brokerIngress.source_tables_sha256 ??
+          brokerState.artifact_sha256?.source_tables ??
+          hashValue(evidenceRun.broker_source_tables),
+        broker_crosswalk_receipt_sha256:
+          brokerIngress.crosswalk_receipt_sha256 ??
+          brokerState.artifact_sha256?.broker_crosswalk_receipt ??
+          hashValue(evidenceRun.broker_crosswalk_receipt),
+      },
+    });
+    await writeJsonAtomic(brokerPackArtifactPath, evidenceRun.broker_pack);
+    await writeJsonAtomic(
+      brokerSourceTablesArtifactPath,
+      evidenceRun.broker_source_tables,
+    );
+    await writeJsonAtomic(
+      brokerCrosswalkReceiptArtifactPath,
+      evidenceRun.broker_crosswalk_receipt,
+    );
+    brokerPreviewValidation = validateBrokerPreview(brokerPreview);
+    await writeJsonAtomic(brokerPreviewPath, brokerPreview);
+    await writeTextAtomic(
+      brokerPreviewScreenPath,
+      `${renderBrokerPreviewScreen(brokerPreview)}\n`,
+    );
+    await writeJsonAtomic(brokerConfirmationTemplatePath, {
+      schema_version: "broker-preview-confirmation/1.0",
+      preview_sha256: brokerPreview.preview_sha256,
+      selected_house_id: brokerPreview.recommended_primary_house_id,
+      confirmed: true,
+    });
+    if (typeof options["broker-confirmation"] === "string") {
+      brokerConfirmation = await readJson(
+        options["broker-confirmation"],
+        "broker confirmation",
+      );
+      brokerConfirmationCheck = verifyBrokerPreviewConfirmation(
+        brokerPreview,
+        brokerConfirmation,
+      );
+      if (brokerConfirmationCheck.valid) {
+        await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
+        stage2BrokerConfirmation = brokerConfirmationPath;
+        activeCaseEvidence = structuredClone(validation.handoff.case_evidence);
+        activeCaseEvidence.lanes = activeCaseEvidence.lanes ?? {};
+        activeCaseEvidence.lanes.controls = {
+          ...(activeCaseEvidence.lanes.controls ?? {}),
+          broker_case: brokerConfirmationCheck.selection.house_name,
+        };
+        brokerSelectedCompilation = compileCase(
+          validation.handoff.case_source,
+          activeCaseEvidence,
+        );
+        activeCaseCompileReport = brokerSelectedCompilation.report;
+        activeModelCase = brokerSelectedCompilation.model_case;
+        await writeJsonAtomic(brokerSelectedCaseEvidencePath, activeCaseEvidence);
+        await writeJsonAtomic(
+          brokerSelectedCompileReportPath,
+          activeCaseCompileReport,
+        );
+      }
+    }
+  }
   const stage2Inputs = {
     stage1_receipt: receipt1.receipt_hash,
     evidence_validation: await hashFile(stage1Validation),
+    broker_confirmation:
+      productionBrokerPreviewRequired && stage2BrokerConfirmation
+        ? await hashFile(stage2BrokerConfirmation)
+        : hashValue({ pending: productionBrokerPreviewRequired }),
     runtime: runtimeDigests.evidence_review,
   };
-  const stage2Outputs = { intake_result: stage2Result };
+  const stage2Outputs = {
+    intake_result: stage2Result,
+    ...(productionBrokerPreviewRequired
+      ? {
+          broker_preview: brokerPreviewPath,
+          broker_preview_screen: brokerPreviewScreenPath,
+          broker_pack: brokerPackArtifactPath,
+          broker_source_tables: brokerSourceTablesArtifactPath,
+          broker_crosswalk_receipt: brokerCrosswalkReceiptArtifactPath,
+          broker_confirmation_template: brokerConfirmationTemplatePath,
+          ...(stage2BrokerConfirmation
+            ? {
+                broker_confirmation: stage2BrokerConfirmation,
+                broker_selected_case_evidence: brokerSelectedCaseEvidencePath,
+                broker_selected_compile_report: brokerSelectedCompileReportPath,
+              }
+            : {}),
+        }
+      : {}),
+  };
   const cached2 = await readUsableStage({
     runDir,
     runId,
@@ -635,12 +806,70 @@ async function main() {
     previousReceiptHash: receipt1.receipt_hash,
     outputs: stage2Outputs,
   });
+  let receipt2;
+  if (
+    brokerSelectedCompilation &&
+    brokerSelectedCompilation.report?.status !== "clean"
+  ) {
+    const blocks = (brokerSelectedCompilation.report?.findings ?? []).filter(
+      (entry) => entry.severity === "BLOCK",
+    );
+    await writeJsonAtomic(stage2Result, {
+      outcome: "broker_selection_compile_blocked",
+      blocker_class: "INTERNAL_WORK",
+      findings: blocks,
+    });
+    receipt2 = await persistStage({
+      runDir,
+      runId,
+      stageId: "evidence_review",
+      status: "blocked",
+      inputHashes: stage2Inputs,
+      previousReceiptHash: receipt1.receipt_hash,
+      outputs: stage2Outputs,
+      detail: {
+        outcome: "broker_selection_compile_blocked",
+        blocker_class: "INTERNAL_WORK",
+        block_count: blocks.length,
+      },
+    });
+    return finish({
+      runDir,
+      screen: renderFailure({
+        stage: "evidence_review",
+        what_failed:
+          "The confirmed coherent broker house did not compile into a clean forecast authority graph.",
+        why:
+          "This is an internal evidence-to-model boundary defect. The sealed reports and confirmation remain preserved.",
+        what_would_fix_it: blocks.slice(0, 5).map((entry) => entry.message),
+      }),
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "BLOCKED",
+        stage: "evidence_review",
+        outcome: "broker_selection_compile_blocked",
+        blocker_class: "INTERNAL_WORK",
+        broker_preview: brokerPreviewPath,
+        receipt: receipt2,
+        reused_stages: reusedStages,
+      },
+    });
+  }
   const freshIntakeResult = runIntake({
     intake: validation.handoff.intake,
-    draftCase: validation.handoff.model_case,
+    draftCase: activeModelCase,
   });
+  if (brokerConfirmationCheck?.valid && !stoppedOutcome(freshIntakeResult.outcome)) {
+    applyBrokerPreviewSelection(
+      freshIntakeResult.working_case,
+      brokerPreview,
+      brokerConfirmation,
+    );
+  }
   let intakeResult = freshIntakeResult;
-  let receipt2;
   if (cached2.reusable) {
     const cachedSummary = await readJson(stage2Result, "cached intake result");
     if (hashValue(cachedSummary) === hashValue(serialisable(freshIntakeResult))) {
@@ -740,6 +969,108 @@ async function main() {
         stage: "evidence_review",
         outcome: intakeResult.outcome,
         blocker_class: blockerForStoppedOutcome(intakeResult.outcome),
+        receipt: receipt2,
+        reused_stages: reusedStages,
+      },
+    });
+  }
+  if (
+    productionBrokerPreviewRequired &&
+    (brokerPreview.status !== "PASS" || !brokerPreviewValidation?.valid)
+  ) {
+    receipt2 = await persistStage({
+      runDir,
+      runId,
+      stageId: "evidence_review",
+      status: "blocked",
+      inputHashes: stage2Inputs,
+      previousReceiptHash: receipt1.receipt_hash,
+      outputs: stage2Outputs,
+      detail: {
+        outcome: "broker_preview_blocked",
+        blocker_class: "INTERNAL_WORK",
+        violations: [
+          ...(brokerPreview.violations ?? []),
+          ...(brokerPreviewValidation?.violations ?? []),
+        ],
+      },
+    });
+    return finish({
+      runDir,
+      screen: renderFailure({
+        stage: "evidence_review",
+        what_failed: "The sealed broker pack could not produce one coherent selectable primary-house preview.",
+        why: "This is an internal evidence-to-model boundary defect. The reports remain preserved and must not be reattached.",
+        what_would_fix_it: [
+          ...(brokerPreview.violations ?? []),
+          ...(brokerPreviewValidation?.violations ?? []),
+        ].slice(0, 5),
+      }),
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "BLOCKED",
+        stage: "evidence_review",
+        outcome: "broker_preview_blocked",
+        blocker_class: "INTERNAL_WORK",
+        broker_preview: brokerPreviewPath,
+        receipt: receipt2,
+        reused_stages: reusedStages,
+      },
+    });
+  }
+  if (productionBrokerPreviewRequired && !brokerConfirmationCheck?.valid) {
+    const confirmationErrors = brokerConfirmationCheck?.errors ?? [];
+    const previewScreen = renderBrokerPreviewScreen(brokerPreview, {
+      confirmationErrors,
+    });
+    await writeTextAtomic(brokerPreviewScreenPath, `${previewScreen}\n`);
+    receipt2 = await persistStage({
+      runDir,
+      runId,
+      stageId: "evidence_review",
+      status: "action_required",
+      inputHashes: stage2Inputs,
+      previousReceiptHash: receipt1.receipt_hash,
+      outputs: stage2Outputs,
+      detail: {
+        outcome: "broker_confirmation_required",
+        preview_sha256: brokerPreview.preview_sha256,
+        recommended_primary_house_id:
+          brokerPreview.recommended_primary_house_id,
+        ...(confirmationErrors.length > 0
+          ? { confirmation_errors: confirmationErrors }
+          : {}),
+      },
+    });
+    const carrier = await persistCurrentCarrier("AWAITING_BROKER_CONFIRMATION", {
+      broker_preview: brokerPreviewPath,
+      broker_preview_screen: brokerPreviewScreenPath,
+      broker_pack: brokerPackArtifactPath,
+      broker_source_tables: brokerSourceTablesArtifactPath,
+      broker_crosswalk_receipt: brokerCrosswalkReceiptArtifactPath,
+      broker_confirmation_template: brokerConfirmationTemplatePath,
+      case_source: stage1CaseSource,
+      case_compile_report: stage1CompileReport,
+    });
+    return finish({
+      runDir,
+      screen: previewScreen,
+      machine: options.json === true,
+      result: {
+        schema_version: "user-flow-run/1.0",
+        controller_version: FLOW_CONTROLLER_VERSION,
+        run_id: runId,
+        status: "ACTION_REQUIRED",
+        stage: "evidence_review",
+        outcome: "broker_confirmation_required",
+        blocker_class: "USER_DECISION",
+        broker_preview: brokerPreviewPath,
+        broker_confirmation_template: brokerConfirmationTemplatePath,
+        carrier: carrier.path,
+        evidence_run: stage1Evidence,
         receipt: receipt2,
         reused_stages: reusedStages,
       },
@@ -873,7 +1204,7 @@ async function main() {
     );
     const recompilation = compileCase(
       answeredCaseSource,
-      validation.handoff.case_evidence,
+      activeCaseEvidence,
     );
     await writeJsonAtomic(answeredCaseSourcePath, answeredCaseSource);
     await writeJsonAtomic(answeredCompileReportPath, recompilation.report);
@@ -930,6 +1261,73 @@ async function main() {
       draftCase: recompilation.model_case,
       priorAnswers: recordedDecisionMap(answeredCaseSource),
     });
+    if (brokerConfirmationCheck?.valid && !stoppedOutcome(replayedIntake.outcome)) {
+      applyBrokerPreviewSelection(
+        replayedIntake.working_case,
+        brokerPreview,
+        brokerConfirmation,
+      );
+    }
+    if (replayedIntake.outcome === "questions") {
+      const pendingResult = path.join(stage3Dir, "question-result.json");
+      const pendingScreen = path.join(stage3Dir, "question-screen.txt");
+      await writeJsonAtomic(pendingResult, serialisable(replayedIntake));
+      await writeTextAtomic(pendingScreen, `${replayedIntake.screen}\n`);
+      // The answered case-source is now the authority for the next round.  It
+      // replaces only the carrier snapshot; immutable raw evidence stays the
+      // same and the normal compiler will replay every recorded decision.
+      const continuedEvidencePath = path.join(stage3Dir, "continued-evidence-run.json");
+      const continuedEvidence = structuredClone(evidenceRun);
+      continuedEvidence.case_source = answeredCaseSource;
+      await writeJsonAtomic(continuedEvidencePath, continuedEvidence);
+      await writeTextAtomic(stage1Evidence, await fs.readFile(continuedEvidencePath, "utf8"));
+      const receipt3 = await persistStage({
+        runDir,
+        runId,
+        stageId: "decisions",
+        status: "action_required",
+        inputHashes: {
+          stage2_receipt: receipt2.receipt_hash,
+          answers: await hashFile(path.resolve(options.answers)),
+        },
+        previousReceiptHash: receipt2.receipt_hash,
+        outputs: {
+          case_source: answeredCaseSourcePath,
+          case_compile_report: answeredCompileReportPath,
+          question_result: pendingResult,
+          question_screen: pendingScreen,
+          continued_evidence_run: continuedEvidencePath,
+        },
+        detail: {
+          question_count: replayedIntake.plan.questions.length,
+          remaining_question_count: replayedIntake.plan.remaining_question_count ?? 0,
+        },
+      });
+      // Do not carry the just-consumed answer file into the next round.
+      options.answers = null;
+      const carrier = await persistCurrentCarrier("AWAITING_DECISIONS", {
+        case_source: answeredCaseSourcePath,
+        case_compile_report: answeredCompileReportPath,
+      });
+      return finish({
+        runDir,
+        screen: replayedIntake.screen,
+        machine: options.json === true,
+        result: {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          run_id: runId,
+          status: "ACTION_REQUIRED",
+          stage: "decisions",
+          question_count: replayedIntake.plan.questions.length,
+          remaining_question_count: replayedIntake.plan.remaining_question_count ?? 0,
+          carrier: carrier.path,
+          evidence_run: continuedEvidencePath,
+          receipt: receipt3,
+          reused_stages: reusedStages,
+        },
+      });
+    }
     if (replayedIntake.outcome !== "proceed") {
       throw new Error(
         `Decision replay did not settle the freshly compiled case: ${replayedIntake.outcome}`,
@@ -946,7 +1344,7 @@ async function main() {
     await writeJsonAtomic(answeredCaseSourcePath, validation.handoff.case_source);
     await writeJsonAtomic(
       answeredCompileReportPath,
-      validation.handoff.case_compile_report,
+      activeCaseCompileReport,
     );
     answerHash = hashValue({ skipped: true });
   }

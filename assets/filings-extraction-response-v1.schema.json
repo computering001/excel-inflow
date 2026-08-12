@@ -19,7 +19,7 @@
           "attachment_id": { "type": "string", "minLength": 1 },
           "source_id": { "type": "string", "minLength": 1 },
           "raw_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "disposition": { "enum": ["selected_face_statement_authority", "reviewed_supplemental"] },
+          "disposition": { "enum": ["selected_face_statement_authority", "selected_period_authority_support", "reviewed_supplemental"] },
           "review_reason": { "type": "string", "minLength": 1 },
           "face_statement_manifests": {
             "type": "object",
@@ -42,6 +42,9 @@
       "required": ["entity_name", "reporting_currency", "units", "fiscal_calendar_kind", "historical_periods", "forecast_periods", "reported_gross_debt", "reported_cash"],
       "properties": {
         "entity_name": { "type": "string", "minLength": 1 },
+        "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
+        "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
         "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
         "units": { "type": "string", "minLength": 1 },
         "fiscal_calendar_kind": { "enum": ["fixed_date", "52_53_week"] },
@@ -57,6 +60,18 @@
         "leverage_basis": { "enum": ["includes_leases", "excludes_leases", null] },
         "minimum_operating_cash": { "type": ["number", "null"], "minimum": 0 },
         "announced_acquisition": { "type": ["object", "null"] }
+      }
+    },
+    "entityIdentifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lei": { "type": ["string", "null"] },
+        "isin": { "type": ["string", "null"] },
+        "cusip": { "type": ["string", "null"] },
+        "ticker": { "type": ["string", "null"] },
+        "factset_entity_id": { "type": ["string", "null"] },
+        "company_number": { "type": ["string", "null"] }
       }
     },
     "periods3": {

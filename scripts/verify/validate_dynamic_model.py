@@ -767,45 +767,68 @@ def main(argv: List[str]) -> int:
     # ------------------------------------------------ single-rcf-input-authority
     rcf_contract = semantic_manifest.get("rcf_contract") or {}
     rcf_contract_errors: List[Dict[str, Any]] = []
-    for key in (
-        "instrument_id",
-        "policy_opening_draw",
-        "instrument_opening_balance",
-        "policy_capacity",
-        "instrument_capacity",
-    ):
-        if rcf_contract.get(key) in (None, ""):
-            rcf_contract_errors.append({"id": "missing_%s" % key})
-    if not equal(
-        rcf_contract.get("policy_opening_draw"),
-        rcf_contract.get("instrument_opening_balance"),
-        policy.class_for("input-authority", "currency"),
-    ):
-        rcf_contract_errors.append(
-            {
-                "id": "opening_draw",
-                "policy": rcf_contract.get("policy_opening_draw"),
-                "instrument": rcf_contract.get("instrument_opening_balance"),
-            }
-        )
-    if not equal(
-        rcf_contract.get("policy_capacity"),
-        rcf_contract.get("instrument_capacity"),
-        policy.class_for("input-authority", "currency"),
-    ):
-        rcf_contract_errors.append(
-            {
-                "id": "capacity",
-                "policy": rcf_contract.get("policy_capacity"),
-                "instrument": rcf_contract.get("instrument_capacity"),
-            }
-        )
+    rcf_contract_mode = rcf_contract.get("mode") or (
+        "balancing_rcf" if rcf_contract.get("instrument_id") else "none"
+    )
+    if rcf_contract_mode == "none":
+        for key in (
+            "instrument_id",
+            "instrument_opening_balance",
+            "instrument_capacity",
+        ):
+            if rcf_contract.get(key) not in (None, ""):
+                rcf_contract_errors.append(
+                    {"id": "none_has_%s" % key, "value": rcf_contract.get(key)}
+                )
+        for key in ("policy_opening_draw", "policy_capacity"):
+            try:
+                policy_value = float(rcf_contract.get(key) or 0.0)
+            except (TypeError, ValueError):
+                policy_value = float("nan")
+            if policy_value != 0.0:
+                rcf_contract_errors.append(
+                    {"id": "none_nonzero_%s" % key, "value": rcf_contract.get(key)}
+                )
+    else:
+        for key in (
+            "instrument_id",
+            "policy_opening_draw",
+            "instrument_opening_balance",
+            "policy_capacity",
+            "instrument_capacity",
+        ):
+            if rcf_contract.get(key) in (None, ""):
+                rcf_contract_errors.append({"id": "missing_%s" % key})
+        if not equal(
+            rcf_contract.get("policy_opening_draw"),
+            rcf_contract.get("instrument_opening_balance"),
+            policy.class_for("input-authority", "currency"),
+        ):
+            rcf_contract_errors.append(
+                {
+                    "id": "opening_draw",
+                    "policy": rcf_contract.get("policy_opening_draw"),
+                    "instrument": rcf_contract.get("instrument_opening_balance"),
+                }
+            )
+        if not equal(
+            rcf_contract.get("policy_capacity"),
+            rcf_contract.get("instrument_capacity"),
+            policy.class_for("input-authority", "currency"),
+        ):
+            rcf_contract_errors.append(
+                {
+                    "id": "capacity",
+                    "policy": rcf_contract.get("policy_capacity"),
+                    "instrument": rcf_contract.get("instrument_capacity"),
+                }
+            )
     checks.append(
         record(
             "single-rcf-input-authority",
             len(rcf_contract_errors) == 0,
-            "The visible RCF opening draw and capacity resolve to one reconciled "
-            "instrument source.",
+            "The liquidity policy either resolves to one reconciled balancing "
+            "facility or explicitly proves that none exists.",
             rcf_contract_errors,
             violations=len(rcf_contract_errors),
         )
@@ -918,7 +941,11 @@ def main(argv: List[str]) -> int:
         "income_statement": "3. INCOME STATEMENT",
         "cash_flow": "4. CASH FLOW",
         "debt_schedule": "5. DEBT SCHEDULE",
-        "rcf_waterfall": "6. RCF CASH SWEEP",
+        "rcf_waterfall": (
+            "6. CASH / LIQUIDITY WATERFALL — NO BALANCING FACILITY"
+            if rcf_contract_mode == "none"
+            else "6. RCF CASH SWEEP"
+        ),
         "interest_schedule": "7. INTEREST SCHEDULE",
     }
     bad_sections = []
@@ -2504,18 +2531,41 @@ def main(argv: List[str]) -> int:
     # no stable semantic role - but a SECOND, disjoint cycle can never be
     # legal, whatever its rows are called: a fixed point the doctrine did not
     # declare is a level that only cached values can pin.
-    loop_core_rows = {
-        int(row)
-        for key, row in (row_plan.get("waterfall_rows") or {}).items()
-        if key in ("rcf_draw_waterfall", "rcf_repayment_waterfall", "cash_before_rcf", "balancing_cash")
-    }
+    if rcf_contract_mode == "none":
+        ending_cash_rows = {
+            int(item["row"])
+            for section_rows in (row_plan.get("statement_rows") or {}).values()
+            for item in section_rows
+            if item.get("semantic_role") == "ending_cash" and item.get("row")
+        }
+        loop_core_rows = ending_cash_rows | {
+            int((row_plan.get("interest_summary_rows") or {})["interest_income_schedule"])
+        }
+        loop_core_requires_all = True
+    else:
+        loop_core_rows = {
+            int(row)
+            for key, row in (row_plan.get("waterfall_rows") or {}).items()
+            if key in (
+                "rcf_draw_waterfall",
+                "rcf_repayment_waterfall",
+                "cash_before_rcf",
+                "balancing_cash",
+            )
+        }
+        loop_core_requires_all = False
     cycle_errors = []
     sanctioned_cycles = 0
     cycle_rows_visited = 0
     for column in FORECAST_COLUMNS:
         for component in column_cycles(column):
             cycle_rows_visited += len(component)
-            if loop_core_rows and any(row in loop_core_rows for row in component):
+            core_matched = (
+                loop_core_rows.issubset(set(component))
+                if loop_core_requires_all
+                else any(row in loop_core_rows for row in component)
+            )
+            if loop_core_rows and core_matched:
                 sanctioned_cycles += 1
                 continue
             cycle_errors.append(
@@ -2933,6 +2983,11 @@ def main(argv: List[str]) -> int:
         gated_cache[address] = result
         return result
 
+    rcf_component_ids = (
+        []
+        if rcf_contract_mode == "none"
+        else ["rcf_interest", "rcf_commitment_fee"]
+    )
     component_rows = [
         {
             "id": "instrument_interest.%s" % plan["instrument_id"],
@@ -2957,8 +3012,7 @@ def main(argv: List[str]) -> int:
     ] + [
         {"id": identifier, "row": interest_rows[identifier]}
         for identifier in (
-            "rcf_interest",
-            "rcf_commitment_fee",
+            *rcf_component_ids,
             "lease_interest",
             "other_unallocated_interest",
             "non_cash_interest",
@@ -3191,8 +3245,7 @@ def main(argv: List[str]) -> int:
     ] + pik_principal_rows + [
         {"id": identifier, "row": interest_rows[identifier]}
         for identifier in (
-            "rcf_interest",
-            "rcf_commitment_fee",
+            *rcf_component_ids,
             "lease_interest",
             "other_unallocated_interest",
             "non_cash_interest",

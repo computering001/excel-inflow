@@ -23,6 +23,9 @@
         "case_id": { "type": "string", "minLength": 1 },
         "issuer_name": { "type": "string", "minLength": 1 },
         "ticker": { "type": ["string", "null"] },
+        "identifiers": { "$ref": "#/$defs/entityIdentifiers" },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
         "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
         "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
         "units": { "enum": ["millions", "thousands", "billions"] },
@@ -220,6 +223,18 @@
     }
   },
   "$defs": {
+    "entityIdentifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lei": { "type": ["string", "null"] },
+        "isin": { "type": ["string", "null"] },
+        "cusip": { "type": ["string", "null"] },
+        "ticker": { "type": ["string", "null"] },
+        "factset_entity_id": { "type": ["string", "null"] },
+        "company_number": { "type": ["string", "null"] }
+      }
+    },
     "manifestRefList": {
       "type": "array",
       "items": {

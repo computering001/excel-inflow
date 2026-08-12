@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
+import { acquireFilingsSources } from "./lib/filings_acquisition.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { canonicalise } from "./lib/run_store.mjs";
 import {
@@ -25,6 +26,7 @@ const ATTEMPT_LIMIT = 3;
 const execFileAsync = promisify(execFile);
 const REQUEST_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-extraction-request-v1.schema.json"), "utf8"));
 const RESPONSE_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-extraction-response-v1.schema.json"), "utf8"));
+const SOURCE_REGISTRY_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v1.schema.json"), "utf8"));
 const RUNTIME_MANIFEST = JSON.parse(readFileSync(path.join(ASSETS, "filings-runtime-members.json"), "utf8"));
 const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
 
@@ -183,6 +185,86 @@ function deriveLines(manifests) {
   );
 }
 
+function declarationPriority(declaration) {
+  return [
+    Number.isInteger(declaration?.authority_rank) ? declaration.authority_rank : 3,
+    String(declaration?.filing_date ?? "0000-00-00"),
+    declaration?.restatement_basis === "restated_comparative" ? 0 : 1,
+    String(declaration?.document_id ?? ""),
+  ];
+}
+
+function compareDeclarationPriority(left, right) {
+  const a = declarationPriority(left);
+  const b = declarationPriority(right);
+  return a[0] - b[0] || b[1].localeCompare(a[1]) || a[2] - b[2] || a[3].localeCompare(b[3]);
+}
+
+function compilePeriodAuthority({ request, response, manifests, errors }) {
+  const responseBySource = new Map();
+  for (const document of response.documents ?? []) responseBySource.set(document.source_id, document);
+  const requestBySource = new Map();
+  for (const document of request.documents ?? []) requestBySource.set(document.source_id, document);
+  const periods = response.filing_facts?.historical_periods ?? [];
+  const authority = {};
+  for (const section of SECTIONS) {
+    if (manifests[section].length !== 1) {
+      errors.push(`${section} must resolve to one canonical complete-face-statement topology; found ${manifests[section].length}`);
+      authority[section] = [];
+      continue;
+    }
+    const manifest = manifests[section][0];
+    const selected = requestBySource.get(manifest.source_id);
+    if (!selected) {
+      errors.push(`${section} canonical manifest source ${manifest.source_id} is absent from the request`);
+      authority[section] = [];
+      continue;
+    }
+    let selectedOwnsAtLeastOnePeriod = false;
+    authority[section] = periods.map((period) => {
+      const candidates = (request.documents ?? [])
+        .filter((document) =>
+          (!document.section_coverage || document.section_coverage.includes(section)) &&
+          (!document.covered_periods || document.covered_periods.includes(period)),
+        )
+        .sort(compareDeclarationPriority);
+      const preferred = candidates[0] ?? selected;
+      if (preferred.source_id === selected.source_id) selectedOwnsAtLeastOnePeriod = true;
+      const authorityResponse = responseBySource.get(preferred.source_id);
+      if (
+        preferred.source_id !== selected.source_id &&
+        authorityResponse?.disposition !== "selected_period_authority_support"
+      ) {
+        errors.push(
+          `${section}.${period} uses ${preferred.source_id} as period authority without selected_period_authority_support disposition`,
+        );
+      }
+      return {
+        period,
+        source_id: preferred.source_id,
+        document_id: preferred.document_id,
+        document_sha256: authorityResponse?.raw_sha256 ?? manifest.document_sha256,
+        origin: preferred.origin ?? "legacy_direct",
+        basis: preferred.restatement_basis ?? "as_reported",
+        filing_date: preferred.filing_date ?? null,
+        topology_source_id: manifest.source_id,
+        reason:
+          (preferred.origin ?? "legacy_direct") === "user_supplied"
+            ? "User-supplied filing is authoritative ahead of retrieved or runtime-library sources."
+            : preferred.restatement_basis === "restated_comparative"
+              ? "Latest declared restated comparative is authoritative within the same source tier."
+              : "Highest-ranked declared complete filing source is authoritative.",
+      };
+    });
+    if (!selectedOwnsAtLeastOnePeriod) {
+      errors.push(
+        `${section} topology source ${selected.source_id} is lower-priority for every selected historical period`,
+      );
+    }
+  }
+  return authority;
+}
+
 function compileResponse({ response, request, sourceHashes }) {
   const errors = validateJsonSchema(response, RESPONSE_SCHEMA);
   if (response.run_id !== request.run_id) errors.push("response run_id does not match request");
@@ -220,6 +302,9 @@ function compileResponse({ response, request, sourceHashes }) {
     if (document.disposition === "reviewed_supplemental" && selectedCount !== 0) {
       errors.push(`supplemental document ${document.document_id} attempts to contribute selected face statements`);
     }
+    if (document.disposition === "selected_period_authority_support" && selectedCount !== 0) {
+      errors.push(`period-support document ${document.document_id} attempts to own canonical statement topology`);
+    }
     documentExtractions.push({
       schema_version: "document-extraction/1.0",
       attachment_id: document.attachment_id,
@@ -245,8 +330,10 @@ function compileResponse({ response, request, sourceHashes }) {
       }
     }
   }
+  const periodAuthority = compilePeriodAuthority({ request, response, manifests, errors });
   const filings = {
     ...structuredClone(response.filing_facts ?? {}),
+    period_authority: periodAuthority,
     face_statement_manifests: manifests,
     income_statement: deriveLines(manifests.income_statement),
     cash_flow: deriveLines(manifests.cash_flow),
@@ -259,25 +346,83 @@ async function main() {
   const outIndex = process.argv.indexOf("--out");
   const responseIndex = process.argv.indexOf("--responses");
   if (!process.argv[2] || outIndex < 0 || !process.argv[outIndex + 1]) {
-    throw new Error("Usage: run_filings_pipeline.mjs <request.json> --out <folder> [--responses <response.json>]");
+    throw new Error("Usage: run_filings_pipeline.mjs <acquisition-or-extraction-request.json> --out <folder> [--responses <response.json>]");
   }
   const outputRoot = path.resolve(process.argv[outIndex + 1]);
   let responsePath = responseIndex >= 0 ? path.resolve(process.argv[responseIndex + 1]) : null;
   await fs.mkdir(outputRoot, { recursive: true });
   const statePath = path.join(outputRoot, "filings-run-state.json");
-  const request = await readJson(requestPath, "filings extraction request");
+  const inputRequest = await readJson(requestPath, "filings request");
+  const runtimeHash = await runtimeClosure();
+  const inputRequestHash = await sha256File(requestPath);
+  let request = inputRequest;
+  let effectiveRequestPath = requestPath;
+  const acquisitionArtifacts = {};
+  if (inputRequest.schema_version === "filings-acquisition-request/1.0") {
+    try {
+      const acquired = await acquireFilingsSources({
+        request: inputRequest,
+        requestPath,
+        outDir: path.join(outputRoot, "acquisition"),
+        extractionRequestSchema: REQUEST_SCHEMA,
+        sourceRegistrySchema: SOURCE_REGISTRY_SCHEMA,
+      });
+      request = acquired.extractionRequest;
+      effectiveRequestPath = acquired.extractionRequestPath;
+      acquisitionArtifacts.filings_source_registry = acquired.registryPath;
+      acquisitionArtifacts.acquired_extraction_request = acquired.extractionRequestPath;
+    } catch (error) {
+      const message = String(error?.message ?? error);
+      const fatalSource = /ENOENT|expected_sha256 does not match|HTTP 4(?:00|01|03|04|10)/i.test(message);
+      const requestHash = sha256(canonicalBytes({ input_request_sha256: inputRequestHash }));
+      const cacheKey = sha256(canonicalBytes({ request: requestHash, sources: {}, runtime: runtimeHash }));
+      const prior = await readJson(statePath, "prior filings run state").catch(() => null);
+      const attempts = priorAttempts(prior, cacheKey);
+      await writeState(statePath, {
+        ...stateBase({
+          runId: inputRequest.run_id ?? "invalid-filings-acquisition",
+          requestHash,
+          sourceHashes: {},
+          runtimeHash,
+          cacheKey,
+          attempts,
+        }),
+        pipeline_status: fatalSource ? "BLOCKED_INPUT" : "BLOCKED_INTERNAL",
+        user_blocking: fatalSource,
+        blocker_class: fatalSource ? "FATAL_SOURCE" : "INTERNAL_WORK",
+        tasks: fatalSource ? [] : [{
+          task_kind: "filings_acquisition_repair",
+          instruction: "Repair the controlled declarative source registry or acquisition controller; do not search for an undeclared replacement and do not ask for unchanged readable evidence.",
+          violation: message,
+        }],
+        summary: { terminal_reason: fatalSource ? "fatal_source" : "filings_acquisition_failed", message },
+      });
+      return 2;
+    }
+  }
   const requestErrors = validateJsonSchema(request, REQUEST_SCHEMA);
   if (requestErrors.length > 0) throw new Error(`Filings request is invalid: ${requestErrors[0]}`);
-  const requestHash = await sha256File(requestPath);
-  const runtimeHash = await runtimeClosure();
+  const requestHash = sha256(canonicalBytes({
+    input_request_sha256: await sha256File(requestPath),
+    effective_request_sha256: await sha256File(effectiveRequestPath),
+  }));
   const sourceHashes = {};
   const sourceFailures = [];
   const requestBase = path.dirname(requestPath);
   const identities = new Set();
+  const documentIds = new Set();
+  const attachmentIds = new Set();
+  const sourceIds = new Set();
   for (const document of request.documents) {
     const identity = `${document.document_id}|${document.attachment_id}|${document.source_id}`;
     if (identities.has(identity)) sourceFailures.push(`duplicate filing document identity ${identity}`);
     identities.add(identity);
+    if (documentIds.has(document.document_id)) sourceFailures.push(`duplicate filing document_id ${document.document_id}`);
+    if (attachmentIds.has(document.attachment_id)) sourceFailures.push(`duplicate filing attachment_id ${document.attachment_id}`);
+    if (sourceIds.has(document.source_id)) sourceFailures.push(`duplicate filing source_id ${document.source_id}`);
+    documentIds.add(document.document_id);
+    attachmentIds.add(document.attachment_id);
+    sourceIds.add(document.source_id);
     const target = resolveFrom(requestBase, document.path);
     try {
       const digest = await sha256File(target);
@@ -308,7 +453,7 @@ async function main() {
     const nativeRoot = path.join(outputRoot, `native-${cacheKey.slice(0, 16)}`);
     const completed = await execFileAsync(
       "python3",
-      [path.join(HERE, "extract_filing_statements.py"), requestPath, "--out", nativeRoot],
+      [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
       { cwd: HERE, maxBuffer: 32 * 1024 * 1024 },
     ).then((value) => ({ ...value, code: 0 })).catch((error) => ({
       stdout: error.stdout ?? "",
@@ -332,7 +477,7 @@ async function main() {
         artifact_sha256: nativeReceipt ? { native_extraction_receipt: await sha256File(nativeReceiptPath) } : {},
         tasks: [{
           task_kind: "filing_extraction_adjudication",
-          request_path: requestPath,
+          request_path: effectiveRequestPath,
           candidate_response_path: await fs.stat(nativeResponse).then(() => nativeResponse).catch(() => null),
           unresolved_lines: findings,
           instruction: "Adjudicate only the named unresolved statement headings, period columns or lines. Preserve the native candidate's remaining rows byte-for-byte; do not re-author complete statements or ask for unchanged readable filings to be re-uploaded.",
@@ -356,6 +501,11 @@ async function main() {
     responseHash = await sha256File(responsePath);
     response = await readJson(responsePath, "filings extraction response");
     compiled = compileResponse({ response, request, sourceHashes });
+    if (acquisitionArtifacts.filings_source_registry) {
+      compiled.filings.source_registry_sha256 = await sha256File(
+        acquisitionArtifacts.filings_source_registry,
+      );
+    }
     responseErrors.push(...compiled.errors);
   } catch (error) {
     responseErrors.push(error.message);
@@ -417,6 +567,7 @@ async function main() {
   const artifacts = {
     filings_bundle: bundlePath,
     document_extraction_registry: registryPath,
+    ...acquisitionArtifacts,
     ...nativeArtifacts,
   };
   await writeState(statePath, {
