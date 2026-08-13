@@ -22,19 +22,132 @@ import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { FLOW_CONTROLLER_VERSION, createStageReceipt } from "./lib/flow_runtime.mjs";
 import { verifyRunCarrier, writeRunCarrier } from "./lib/run_carrier.mjs";
 
-const FIXTURE_ROOT =
-  "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/" +
-  "broker-semantic-quality-r4/compiled";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-const read = async (name) =>
-  JSON.parse(await fs.readFile(path.join(FIXTURE_ROOT, name), "utf8"));
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
 const clone = (value) => structuredClone(value);
+
+/**
+ * Repository-owned broker-preview fixture.
+ *
+ * This test previously read a developer-machine output directory.  That made
+ * the installed gate depend on bytes which were neither in the package nor
+ * reproducible by the test.  Build the smallest complete, provenance-owned
+ * three-house pack in memory instead: seven model-driving concepts x three
+ * periods, with every value bound to one analytical source cell.
+ */
+function previewFixture() {
+  const periods = ["2026-12-31", "2027-12-31", "2028-12-31"];
+  const concepts = [
+    ["revenue", "Revenue", [1200, 1320, 1450]],
+    ["ebit", "EBIT", [240, 265, 290]],
+    ["depreciation_and_amortisation", "D&A", [75, 78, 80]],
+    ["effective_tax_rate", "Tax rate", [0.2, 0.21, 0.22]],
+    ["capex", "Capex", [-100, -110, -120]],
+    ["change_in_working_capital", "Change in working capital", [-20, -22, -24]],
+    ["dividends", "Dividends", [-80, -85, -90]],
+  ];
+  const houses = ["alpha", "beta", "gamma"].map((id, houseIndex) => {
+    const scale = 1 + houseIndex * 0.01;
+    return {
+      house_id: `fixture_${id}`,
+      house_name: `Fixture ${id[0].toUpperCase()}${id.slice(1)}`,
+      published_date: "2026-08-12",
+      document: {
+        file_name: `fixture-${id}.pdf`,
+        media_type: "application/pdf",
+        text_extractable: true,
+        extraction_method: "native_pdf_table",
+        extraction_evidence_sha256: String(houseIndex + 1).repeat(64),
+        page_reference: "repository-owned broker preview fixture",
+      },
+      estimates: Object.fromEntries(
+        concepts.map(([metricId, _label, values]) => [
+          metricId,
+          values.map((value) => Number((value * scale).toFixed(6))),
+        ]),
+      ),
+    };
+  });
+  const sourceTables = {
+    schema_version: "broker-source-tables/1.0",
+    run_id: "broker-preview-repository-fixture",
+    houses: houses.map((house, houseIndex) => ({
+      house_id: house.house_id,
+      house_name: house.house_name,
+      source_id: `source.${house.house_id}`,
+      content_sha256: String(houseIndex + 4).repeat(64),
+      published_date: house.published_date,
+      file_name: house.document.file_name,
+      tables: [{
+        table_id: `${house.house_id}.p1.t1`,
+        title: "Forecast summary",
+        source_location: "page 1, table 1",
+        units: "USD millions except tax rate",
+        extraction_method: "native_pdf_table",
+        workbook_presentation: "analytical_table",
+        rows: [
+          ["Metric", "FY26", "FY27", "FY28"],
+          ...concepts.map(([metricId, label]) => [
+            label,
+            ...house.estimates[metricId],
+          ]),
+        ],
+      }],
+    })),
+  };
+  const mappings = houses.flatMap((house) =>
+    concepts.flatMap(([metricId], metricIndex) =>
+      periods.map((_period, periodIndex) => {
+        const value = house.estimates[metricId][periodIndex];
+        return {
+          mapping_id: `m.${house.house_id}.${metricId}.${periodIndex}`,
+          house_id: house.house_id,
+          metric_id: metricId,
+          definition_id: `metric.${metricId}`,
+          period_index: periodIndex,
+          components: [{
+            table_id: `${house.house_id}.p1.t1`,
+            row: metricIndex + 2,
+            column: periodIndex + 2,
+            source_ref:
+              `${house.document.file_name}#page=1;table=1;` +
+              `r=${metricIndex + 2};c=${periodIndex + 2}`,
+            raw_value: value,
+            coefficient: 1,
+            contribution: value,
+          }],
+          constant: 0,
+          multiplier: 1,
+          value,
+          rationale: "Direct repository-owned fixture forecast cell.",
+          review_status: "auto_exact",
+        };
+      }),
+    ),
+  );
+  const brokerPack = {
+    schema_version: "broker-pack/1.0",
+    forecast_periods: periods,
+    houses,
+    flex_elections: [],
+  };
+  const receipt = {
+    schema_version: "broker-crosswalk-receipt/1.2",
+    status: "PASS",
+    mapping_count: mappings.length,
+    mappings,
+    coverage_summary: {
+      unresolved_candidate_count: 0,
+      unresolved_selected_candidate_count: 0,
+      terminal_quarantined_candidate_count: 0,
+    },
+  };
+  return { brokerPack, sourceTables, receipt };
+}
 
 function confirmation(preview, houseId = preview.recommended_primary_house_id) {
   return {
@@ -57,14 +170,14 @@ async function test(name, callback) {
   }
 }
 
-const [basePack, baseTables, baseReceipt, previewSchema, confirmationSchema] =
-  await Promise.all([
-    read("broker-pack.json"),
-    read("broker-source-tables.json"),
-    read("broker-crosswalk-receipt.json"),
-    fs.readFile(new URL("../assets/broker-preview-v1.schema.json", import.meta.url), "utf8").then(JSON.parse),
-    fs.readFile(new URL("../assets/broker-preview-confirmation-v1.schema.json", import.meta.url), "utf8").then(JSON.parse),
-  ]);
+const repositoryFixture = previewFixture();
+const [previewSchema, confirmationSchema] = await Promise.all([
+  fs.readFile(new URL("../assets/broker-preview-v1.schema.json", import.meta.url), "utf8").then(JSON.parse),
+  fs.readFile(new URL("../assets/broker-preview-confirmation-v1.schema.json", import.meta.url), "utf8").then(JSON.parse),
+]);
+const basePack = repositoryFixture.brokerPack;
+const baseTables = repositoryFixture.sourceTables;
+const baseReceipt = repositoryFixture.receipt;
 
 const pack = clone(basePack);
 pack.houses.forEach((house, index) => {
@@ -236,8 +349,9 @@ await test("unselected quarantined cell remains evidence-only without poisoning 
   const selectedHouse = pack.houses[0];
   const house = tables.houses.find((candidate) => candidate.house_id === selectedHouse.house_id);
   const table = house.tables[0];
+  table.rows.push(["Evidence-only valuation multiple", "9.5x", "10.0x", "10.5x"]);
   const row = table.rows.length;
-  const column = table.rows.at(-1).length;
+  const column = 2;
   table.cell_authorities = [
     ...(table.cell_authorities ?? []),
     {
