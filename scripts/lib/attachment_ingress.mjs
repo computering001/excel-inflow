@@ -365,6 +365,13 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
     detected_forecast_candidate_count: candidateCount,
     coverage_entry_count: crosswalk.coverage_ledger?.length ?? 0,
     unresolved_candidate_count: unresolvedCandidateCount,
+    // Terminal-materiality quarantine and selected-but-unresolved counts are
+    // part of the Python receipt's closed summary; a PASS receipt requires
+    // zero unresolved selections, and the terminal count mirrors the sealed
+    // terminal_recovery ledger exactly.
+    terminal_quarantined_candidate_count:
+      crosswalk.terminal_recovery?.quarantined_candidates?.length ?? 0,
+    unresolved_selected_candidate_count: 0,
     semantic_quality_violation_count: Number(semanticReport?.total_violation_count ?? 0),
     candidate_manifest_count: candidateCount,
     candidate_authority: "deterministic_manifest",
@@ -579,15 +586,32 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       `Broker controller run state fails its contract: ${runStateErrors[0]}`,
     );
   }
+  // PASS and PASS_DEGRADED are the only closed broker lanes. A degraded close
+  // is lawful ONLY with its quarantine receipts disclosed in the summary — a
+  // receipt-less degraded state is an invalid closure, not an acceptable lane
+  // (the JS twin of the attachment controller's closure-integrity guard).
+  const brokerLaneDegraded = runState.json.pipeline_status === "PASS_DEGRADED";
   if (
-    runState.json.pipeline_status !== "PASS" ||
+    !["PASS", "PASS_DEGRADED"].includes(runState.json.pipeline_status) ||
     runState.json.user_blocking !== false ||
     runState.json.blocker_class !== null ||
     (runState.json.tasks ?? []).length !== 0
   ) {
     throw new Error(
-      `Broker controller run is ${runState.json.pipeline_status}, not a terminal PASS.`,
+      `Broker controller run is ${runState.json.pipeline_status}, not a closed lane (PASS or PASS_DEGRADED).`,
     );
+  }
+  if (brokerLaneDegraded) {
+    const summary = runState.json.summary ?? {};
+    const quarantineDisclosed =
+      summary.degraded === true &&
+      (Number.isInteger(summary.quarantined_conflict_count) ||
+        Number.isInteger(summary.quarantined_surface_count));
+    if (!quarantineDisclosed) {
+      throw new Error(
+        "Broker controller run is PASS_DEGRADED without its quarantine receipts; a degraded close must disclose quarantined_conflict_count/quarantined_surface_count.",
+      );
+    }
   }
   const currentRuntimeClosure = await brokerRuntimeClosureSha256();
   if (runState.json.runtime_closure_sha256 !== currentRuntimeClosure) {
@@ -645,12 +669,23 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     "surface_census",
     "semantic_verification",
     "pack_compilation",
+    // A degraded lane must carry the receipted degraded close itself.
+    ...(brokerLaneDegraded ? ["physical_degraded_close"] : []),
   ]);
+  // In a degraded close, the ordinary vision / physical-reconciliation
+  // frontier legitimately did NOT pass — that is what the bounded degraded
+  // close superseded. Those stages are exempt from the PASS requirement, and
+  // the verified bundle binds to the degraded-close output instead.
+  const degradedSupersededStages = new Set(
+    brokerLaneDegraded ? ["vision", "physical_reconciliation"] : [],
+  );
   const checkpointStages = new Set();
   const checkpointArtifacts = {
     extract: "extraction_bundle",
     surface_census: "surface_census",
-    vision: "verified_bundle",
+    ...(brokerLaneDegraded
+      ? { physical_degraded_close: "verified_bundle" }
+      : { vision: "verified_bundle" }),
     semantic_verification: "semantic_report",
     pack_compilation: "broker_pack",
   };
@@ -659,6 +694,7 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       throw new Error(`Broker controller run repeats checkpoint ${checkpoint.stage}.`);
     }
     checkpointStages.add(checkpoint.stage);
+    if (degradedSupersededStages.has(checkpoint.stage)) continue;
     if (checkpoint.status !== "PASS" || !checkpoint.output_sha256) {
       throw new Error(`Broker controller checkpoint ${checkpoint.stage} is not PASS and hash-bound.`);
     }
@@ -674,7 +710,7 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   }
   for (const stage of expectedCheckpointStages) {
     if (!checkpointStages.has(stage)) {
-      throw new Error(`Broker controller PASS state lacks checkpoint ${stage}.`);
+      throw new Error(`Broker controller closed state lacks checkpoint ${stage}.`);
     }
   }
   const extractionErrors = validateJsonSchema(

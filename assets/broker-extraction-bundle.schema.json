@@ -119,6 +119,13 @@
         "quarantined_conflict_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "degraded": {
+          "type": "boolean"
+        },
+        "quarantined_surface_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -167,9 +174,55 @@
           "message": {
             "type": "string",
             "minLength": 1
+          },
+          "quarantine_reason_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Names the bounded-recovery reason when a surface was closed quarantined_evidence_only."
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_linked": {
+            "type": "boolean"
+          },
+          "table_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "row": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "column": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conflict_id": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
+    },
+    "physical_capture_receipt": {
+      "type": "object",
+      "description": "Aggregate physical-closure receipt written by the canonical stage or the bounded degraded close; per-surface receipts live on the documents."
     }
   },
   "$defs": {
@@ -263,6 +316,13 @@
             "needs_vision",
             "blocked"
           ]
+        },
+        "physical_capture_receipts": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Per-surface physical capture receipts (PASS / PASS_EVIDENCE_ONLY with basis), sealed alongside the canonical or degraded close."
         }
       }
     },
@@ -459,12 +519,40 @@
           "type": "object"
         },
         "vision_disposition": {
-          "enum": ["analytical_tables", "verified_non_tabular"]
+          "enum": [
+            "analytical_tables",
+            "verified_non_tabular",
+            "quarantined_evidence_only"
+          ]
         },
         "vision_non_tabular_reasons": {
           "type": "array",
           "minItems": 2,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "quarantine": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_use",
+            "reason_id",
+            "scope"
+          ],
+          "properties": {
+            "model_use": {
+              "const": "prohibited"
+            },
+            "reason_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "scope": {
+              "const": "surface"
+            }
+          }
         }
       }
     },
@@ -590,11 +678,16 @@
           ]
         },
         "continuation_certificate": {
-          "type": ["object", "null"]
+          "type": [
+            "object",
+            "null"
+          ]
         },
         "effective_period_headers": {
           "type": "array",
-          "items": {"type": "object"}
+          "items": {
+            "type": "object"
+          }
         },
         "rows": {
           "type": "array",

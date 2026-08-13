@@ -154,10 +154,22 @@ def main() -> int:
     new_census_path = output_root / f"surface-census-{new_key}.json"
     new_census_receipt = output_root / f"surface-census-{new_key}.receipt.json"
     snapshot_path = state_path.parent / f"broker-run-state-premigration-{old_key}.json"
-    for target in (new_extract_root, new_extract_receipt, new_census_path, new_census_receipt, snapshot_path):
-        if target.exists():
-            return fail(findings, "migration.target_exists",
-                        f"Migration target already exists, refusing to overwrite: {target}")
+    new_extract_input = rbp.sha256_bytes(rbp.canonical_bytes({
+        "request": request_digest, "sources": sources, "runtime": new_runtime,
+    }))
+    # Crash-window recovery: the state swap is the LAST step, so a rerun may
+    # find targets from an interrupted migration. Each existing target is
+    # either receipt-verified (resume through it) or a refusal — never a
+    # silent overwrite and never a wedge that requires hand-deletion.
+    if snapshot_path.exists() and snapshot_path.read_bytes() != state_path.read_bytes():
+        return fail(findings, "migration.snapshot_mismatch",
+                    "A pre-migration snapshot exists but does not match the current run state; "
+                    "refusing to guess which vintage is authoritative.")
+    resume_extract = new_extract_root.exists() or new_extract_receipt.exists()
+    if resume_extract and not rbp.reusable(new_bundle_path, new_extract_receipt, new_extract_input):
+        return fail(findings, "migration.partial_target_invalid",
+                    f"An earlier migration left {new_extract_root} in an unverifiable state; "
+                    "remove it and rerun, nothing has been changed.")
 
     # 6. Re-home the extraction root byte-for-byte (hardlinks where possible).
     #    artifact_root is the single self-referential path: when it names the
@@ -170,30 +182,33 @@ def main() -> int:
         return fail(findings, "migration.bundle_artifact_root_unexpected",
                     "The extraction bundle artifact_root is neither its own checkpoint root "
                     "nor an existing evidence directory.")
-    file_count = link_or_copy_tree(old_extract_root, new_extract_root)
-    if rewrite_artifact_root:
-        bundle["artifact_root"] = str(new_extract_root)
-        # The bundle carries the rewritten root, so break the hardlink first.
-        new_bundle_path.unlink()
-        rbp.atomic_json(new_bundle_path, bundle)
-    new_extract_input = rbp.sha256_bytes(rbp.canonical_bytes({
-        "request": request_digest, "sources": sources, "runtime": new_runtime,
-    }))
-    rbp.seal_checkpoint(new_bundle_path, new_extract_receipt, new_extract_input)
+    if resume_extract:
+        file_count = sum(1 for item in new_extract_root.rglob("*") if item.is_file())
+    else:
+        file_count = link_or_copy_tree(old_extract_root, new_extract_root)
+        if rewrite_artifact_root:
+            bundle["artifact_root"] = str(new_extract_root)
+            # The bundle carries the rewritten root, so break the hardlink first.
+            new_bundle_path.unlink()
+            rbp.atomic_json(new_bundle_path, bundle)
+        rbp.seal_checkpoint(new_bundle_path, new_extract_receipt, new_extract_input)
 
     # 7. Census content is unchanged; it re-seals against the migrated bundle.
-    shutil.copy2(old_census_path, new_census_path)
     new_census_input = rbp.sha256_bytes(rbp.canonical_bytes({
         "bundle": rbp.sha256_file(new_bundle_path), "runtime": new_runtime,
     }))
-    rbp.seal_checkpoint(new_census_path, new_census_receipt, new_census_input)
+    if not rbp.reusable(new_census_path, new_census_receipt, new_census_input):
+        shutil.copy2(old_census_path, new_census_path)
+        rbp.seal_checkpoint(new_census_path, new_census_receipt, new_census_input)
 
     # 8. Migrated state replaces broker-run-state.json IN PLACE (that is the
-    #    file the controller resumes from); the pre-migration state is kept as
-    #    an immutable snapshot beside it. Exhaustion history is carried
-    #    verbatim; downstream artifacts are invalidated; status is untouched
-    #    (the controller, not this tool, decides the next transition).
-    shutil.copy2(state_path, snapshot_path)
+    #    file the controller resumes from) as the LAST step of the migration;
+    #    the pre-migration state is kept as an immutable snapshot beside it.
+    #    Exhaustion history is carried verbatim; downstream artifacts are
+    #    invalidated; status is untouched (the controller, not this tool,
+    #    decides the next transition).
+    if not snapshot_path.exists():
+        shutil.copy2(state_path, snapshot_path)
     migrated = dict(prior)
     migrated["runtime_closure_sha256"] = new_runtime
     migrated["cache_key"] = new_cache_key
@@ -206,11 +221,14 @@ def main() -> int:
     migrated["artifact_sha256"] = {
         name: rbp.sha256_file(Path(value)) for name, value in sorted(kept_artifacts.items())
     }
+    # Checkpoint entries follow broker-run-state.schema.json exactly
+    # (additionalProperties: false); migration provenance lives in the
+    # receipt file and the premigration snapshot, not in extra keys.
     migrated["checkpoints"] = [
         {"stage": "extract", "status": "PASS", "input_sha256": new_extract_input,
-         "output": str(new_bundle_path), "reused": True, "migrated": True},
+         "output_sha256": rbp.sha256_file(new_bundle_path), "reused": True},
         {"stage": "surface_census", "status": "PASS", "input_sha256": new_census_input,
-         "output": str(new_census_path), "reused": True, "migrated": True},
+         "output_sha256": rbp.sha256_file(new_census_path), "reused": True},
     ]
     # The internal fixed-point frontier is REBASED, not erased: the prior
     # terminal status, terminal reasons and the defect/adjudication task
@@ -237,12 +255,6 @@ def main() -> int:
         "monotonic_from_prior": True,
         "checkpoint_reuse_required": True,
         "terminal_reasons": list(prior_fixed.get("terminal_reasons") or []),
-    }
-    migrated["migration"] = {
-        "schema_version": RECEIPT_SCHEMA,
-        "from_runtime_closure_sha256": prior_runtime,
-        "to_runtime_closure_sha256": new_runtime,
-        "premigration_state": str(snapshot_path),
     }
     rbp.atomic_json(state_path, migrated)
 

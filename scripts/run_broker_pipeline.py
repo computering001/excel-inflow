@@ -1042,6 +1042,22 @@ def main() -> int:
                     "--out",
                     str(degraded_path),
                 ], {0, 2})
+                if not degraded_path.is_file():
+                    # The degraded close itself failed to emit — genuine
+                    # controller corruption, reported as a named terminal
+                    # state instead of an unhandled crash with no state.
+                    write_state(
+                        state_path, run_id=run_id, status="BLOCKED_INTERNAL",
+                        request_digest=request_digest, sources=sources,
+                        runtime_digest=runtime_digest, cache_key=cache_key,
+                        checkpoints=checkpoints, artifacts=artifacts, tasks=[],
+                        summary={
+                            "terminal_reason": "degraded_close_emitted_no_bundle",
+                            "message": "compile_broker_vision --degrade-exhausted produced no output bundle.",
+                        },
+                        blocker_class="INTERNAL_WORK", attempts=attempts,
+                    )
+                    return 2
                 seal_checkpoint(degraded_path, degraded_receipt, degraded_input)
             degraded_bundle = read_json(degraded_path, "degraded broker bundle")
             checkpoint(
@@ -1172,15 +1188,26 @@ def main() -> int:
         }))
         degraded_reused = reusable(degraded_path, degraded_receipt, degraded_input)
         if not degraded_reused:
+            # --responses is REQUIRED by the vision compiler; without it
+            # argparse exits 2, which sits inside the allowed exit set and
+            # would silently skip the mandated close. An exhausted resume with
+            # no responses on disk degrades against an empty directory: every
+            # unresolved surface closes quarantined-evidence-only.
+            if responses is not None and responses.is_dir():
+                degrade_responses = responses
+            else:
+                degrade_responses = output_root / "degrade-empty-responses"
+                degrade_responses.mkdir(parents=True, exist_ok=True)
             degrade_command = [
                 sys.executable,
                 str(HERE / "compile_broker_vision.py"),
                 str(active_bundle_path),
                 "--degrade-exhausted",
+                "--responses",
+                str(degrade_responses),
+                "--out",
+                str(degraded_path),
             ]
-            if responses is not None and responses.is_dir():
-                degrade_command.extend(["--responses", str(responses)])
-            degrade_command.extend(["--out", str(degraded_path)])
             run(degrade_command, {0, 2})
             if degraded_path.is_file():
                 seal_checkpoint(degraded_path, degraded_receipt, degraded_input)

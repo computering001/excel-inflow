@@ -111,6 +111,12 @@
       "script": "run_broker_migration_tests.py"
     },
     {
+      "id": "broker-preview-gate",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_broker_preview_tests.mjs"
+    },
+    {
       "id": "internal-evidence-fixed-point",
       "phase": "workflow",
       "runtime": "python",

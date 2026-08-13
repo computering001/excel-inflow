@@ -64,6 +64,11 @@ def cells(rows: list[list[str]]) -> list[list[dict[str, Any]]]:
                 "column": column_index,
                 "raw_text": value,
                 "value": value,
+                "value_kind": (
+                    "number"
+                    if value and value.replace(".", "", 1).replace("-", "", 1).isdigit()
+                    else "text" if value else "blank"
+                ),
                 "source_ref": f"fixture:r{row_index}c{column_index}",
             }
             for column_index, value in enumerate(row, 1)
@@ -150,13 +155,18 @@ def build_house(
         tokens = numeric_tokens(rows)
         census_payload = {
             "schema_version": "broker-surface-census/1.0",
+            "document_id": document_id,
             "surface_id": f"{document_id}.p1",
             "kind": "pdf_page",
             "source_numeric_tokens": tokens,
+            "source_table_numeric_tokens": tokens,
             "whole_surface_numeric_token_count": len(tokens),
             "nonblank_cell_count": sum(1 for row in rows for value in row if value),
-            "table_discovery_lanes": ["native_pdf_lines"],
+            "table_discovery_lanes": [
+                {"lane_id": "native_pdf_lines", "status": "pass", "candidate_count": 1},
+            ],
             "uncovered_numeric_regions": [],
+            "material_uncovered_region_count": 0,
         }
         census_path = artifact_root / document_id / "p1.census.json"
         write_json(census_path, census_payload)
@@ -164,10 +174,27 @@ def build_house(
             "surface_id": f"{document_id}.p1",
             "kind": "pdf_page",
             "ordinal": 1,
+            "width": 612,
+            "height": 792,
             "source_table_numeric_tokens": tokens,
             "whole_surface_numeric_token_count": len(tokens),
             "native_text_chars": 420,
-            "lane_status": {"vision": "not_required"},
+            "native_word_count": 80,
+            "numeric_token_count": len(tokens),
+            "table_count": 1,
+            "image_count": 0,
+            "table_discovery_lanes": [
+                {"lane_id": "native_pdf_lines", "status": "pass", "candidate_count": 1},
+            ],
+            "uncovered_numeric_regions": [],
+            "artifact_refs": [f"{document_id}-census"],
+            "lane_status": {
+                "native_text": "pass",
+                "geometry": "pass",
+                "tables": "pass",
+                "images": "none",
+                "vision": "not_required",
+            },
             "surface_census_artifact_id": f"{document_id}-census",
         }
         return {
@@ -213,17 +240,23 @@ def build_house(
     census_path = artifact_root / document_id / "p4.census.json"
     write_json(census_path, {
         "schema_version": "broker-surface-census/1.0",
+        "document_id": document_id,
         "surface_id": surface_id,
         "kind": "image_page",
         "source_numeric_tokens": [],
+        "source_table_numeric_tokens": [],
         "whole_surface_numeric_token_count": 0,
         "nonblank_cell_count": 0,
-        "table_discovery_lanes": [],
+        "table_discovery_lanes": [
+            {"lane_id": "image_render", "status": "empty", "candidate_count": 0},
+        ],
         "uncovered_numeric_regions": [{
             "region_id": f"{document_id}.p4.r1",
             "bbox": [10, 10, 300, 180],
             "material": True,
+            "disposition": "requires_vision",
         }],
+        "material_uncovered_region_count": 1,
     })
     return {
         "document_id": document_id,
@@ -238,16 +271,31 @@ def build_house(
             "surface_id": surface_id,
             "kind": "image_page",
             "ordinal": 4,
+            "width": 612,
+            "height": 792,
             "source_table_numeric_tokens": [],
             "whole_surface_numeric_token_count": 0,
             "table_count": 0,
             "native_text_chars": 0,
+            "native_word_count": 0,
+            "numeric_token_count": 0,
+            "image_count": 1,
+            "table_discovery_lanes": [
+                {"lane_id": "image_render", "status": "empty", "candidate_count": 0},
+            ],
             "uncovered_numeric_regions": [{
                 "region_id": f"{document_id}.p4.r1",
                 "bbox": [10, 10, 300, 180],
                 "material": True,
+                "disposition": "requires_vision",
             }],
-            "lane_status": {"vision": "required"},
+            "lane_status": {
+                "native_text": "empty",
+                "geometry": "pass",
+                "tables": "none",
+                "images": "pass",
+                "vision": "required",
+            },
             "surface_census_artifact_id": f"{document_id}-census",
             "artifact_refs": [f"{document_id}-image", f"{document_id}-task"],
         }],
@@ -325,7 +373,7 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
                 "period_columns": period_columns,
             })
     ledger = []
-    shell = {"forecast_periods": ["2027", "2028", "2029"]}
+    shell = {"forecast_periods": ["2027-12-31", "2028-12-31", "2029-12-31"]}
     for candidate in manifest.get("candidates", []):
         quarantined = candidate.get("authority_status") == "quarantined_conflict"
         period_basis, period_ordinals = normalized_manifest_period(candidate, shell)
@@ -337,7 +385,11 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
             "label": candidate.get("label"),
             "period_basis": period_basis,
             "period_indexes": period_ordinals,
-            "source_cells": candidate.get("source_cells") or [],
+            "source_cells": [
+                {"row": int(cell.get("row")), "column": int(cell.get("column"))}
+                for cell in (candidate.get("source_cells") or [])
+                if cell.get("row") and cell.get("column")
+            ],
             "parent_candidate_id": candidate.get("parent_candidate_id"),
             "economic_domain": "operating",
             "definition_id": "dict.custom.fixture_reference",
@@ -346,13 +398,13 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
             "definition_fingerprint": {
                 "concept_id": "custom.fixture_reference",
                 "measurement_basis": "reported",
-                "restatement_basis": "as_reported",
-                "cash_flow_basis": "none",
-                "lease_basis": "post_ifrs16",
+                "restatement_basis": "not_applicable",
+                "cash_flow_basis": "not_applicable",
+                "lease_basis": "not_applicable",
                 "units": "millions",
                 "currency": "USD",
                 "period_basis": candidate.get("period_basis"),
-                "sign_convention": "as_displayed",
+                "sign_convention": "as_reported",
                 "accounting_basis": "ifrs",
                 "operating_scope": "continuing",
             },
@@ -365,6 +417,8 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
     def metric(concept: str, domain: str) -> dict[str, Any]:
         return {
             "definition_id": f"dict.{concept}",
+            "label": concept.replace("_", " ").title(),
+            "unit_kind": "currency",
             "concept_id": concept,
             "economic_domain": domain,
             "semantic_role": "operating_forecast",
@@ -373,13 +427,13 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
             "definition_fingerprint": {
                 "concept_id": concept,
                 "measurement_basis": "reported",
-                "restatement_basis": "as_reported",
-                "cash_flow_basis": "none",
-                "lease_basis": "post_ifrs16",
+                "restatement_basis": "not_applicable",
+                "cash_flow_basis": "not_applicable",
+                "lease_basis": "not_applicable",
                 "units": "millions",
                 "currency": "USD",
                 "period_basis": "annual_forecast",
-                "sign_convention": "as_displayed",
+                "sign_convention": "as_reported",
                 "accounting_basis": "ifrs",
                 "operating_scope": "continuing",
             },
@@ -391,8 +445,7 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
         "as_of": "2026-06-30",
         "reporting_currency": "USD",
         "units": "millions",
-        "manifest_sha256": manifest.get("manifest_sha256"),
-        "forecast_periods": ["2027", "2028", "2029"],
+        "forecast_periods": ["2027-12-31", "2028-12-31", "2029-12-31"],
         "metrics": {
             "revenue": metric("revenue", "operating"),
             "ebit": metric("ebit", "operating"),
@@ -451,6 +504,7 @@ def main() -> int:
         for document in documents:
             source = source_dir / f"{document['document_id']}.pdf"
             source.write_bytes(b"%PDF-fixture " + document["document_id"].encode("utf-8"))
+            document["raw_sha256"] = broker.sha256_file(source)
             request_documents.append({
                 "document_id": document["document_id"],
                 "house_id": document["house_id"],
@@ -482,9 +536,13 @@ def main() -> int:
             "runtime": runtime_digest,
         }))
         key = cache_key[:16]
+        for document in documents:
+            document["byte_length"] = (source_dir / f"{document['document_id']}.pdf").stat().st_size
         bundle = {
             "schema_version": "broker-extraction-bundle/1.0",
             "run_id": request["run_id"],
+            "created_at": "2026-08-13T00:00:00Z",
+            "extractor_version": "fixture/1.0",
             "artifact_root": str(artifact_root),
             "documents": documents,
             "summary": {},
@@ -643,19 +701,102 @@ def main() -> int:
         check(status == "PASS" and blocker is None and user_blocking is False, "attachment did not accept the degraded closed lane")
         checks += 1
 
-        # ...but only WITH its quarantine receipt (closure integrity).
-        stripped = dict(final_state)
-        stripped["summary"] = {"degraded": True}
-        broken = {"broker": stripped}
-        # replicate the controller-level guard
-        broker_lane = broken["broker"]
-        broker_summary = broker_lane.get("summary") or {}
-        quarantine_disclosed = bool(broker_summary.get("degraded")) and (
-            "quarantined_conflict_count" in broker_summary
-            or "quarantined_surface_count" in broker_summary
+        # --- the REAL JS ingress gate (compileBrokerEvidence), the segment a
+        #     degraded close crosses next on the way to case compilation. The
+        #     lawful close must be ACCEPTED and a receipt-stripped close must
+        #     be REFUSED by the production gate itself, not by a re-derived
+        #     boolean. ---
+        artifacts_map = final_state["artifacts"]
+        source_tables_json = json.loads(Path(artifacts_map["source_tables"]).read_text("utf-8"))
+        pack_json = json.loads(Path(artifacts_map["broker_pack"]).read_text("utf-8"))
+        pack_house_by_id = {h["house_id"]: h for h in pack_json.get("houses", [])}
+        source_inventory = []
+        attachments = {}
+        for house in source_tables_json.get("houses", []):
+            pack_house = pack_house_by_id.get(house.get("house_id"), {})
+            source_inventory.append({
+                "source_id": house.get("source_id"),
+                "kind": "user_broker_research",
+                "status": "used",
+                "text_extractable": (pack_house.get("document") or {}).get("text_extractable"),
+            })
+            attachments[house.get("source_id")] = {
+                "raw_sha256": house.get("content_sha256"),
+                "file_name": house.get("file_name"),
+            }
+        driver = root / "ingress-driver.mjs"
+        driver.write_text(
+            'import { compileBrokerEvidence } from '
+            + json.dumps((HERE / "lib" / "attachment_ingress.mjs").as_uri())
+            + ';\n'
+            'import fs from "node:fs/promises";\n'
+            'const config = JSON.parse(await fs.readFile(process.argv[2], "utf8"));\n'
+            'const evidence = {\n'
+            '  broker_pack: JSON.parse(await fs.readFile(config.broker_pack_path, "utf8")),\n'
+            '  source_inventory: config.source_inventory,\n'
+            '  case_evidence: { lanes: {} },\n'
+            '};\n'
+            'const sourceAttachment = new Map(Object.entries(config.attachments));\n'
+            'try {\n'
+            '  await compileBrokerEvidence({\n'
+            '    declaration: config.declaration,\n'
+            '    specDir: config.spec_dir,\n'
+            '    evidence,\n'
+            '    sourceAttachment,\n'
+            '  });\n'
+            '  const lane = evidence.case_evidence.lanes.broker_pack ?? {};\n'
+            '  console.log(JSON.stringify({\n'
+            '    ok: true,\n'
+            '    raw_table_house_count: (lane.raw_tables ?? []).length,\n'
+            '    mapping_count: (lane.source_mappings ?? []).length,\n'
+            '    controller_status: evidence.case_evidence.lanes.broker_evidence?.controller_state?.pipeline_status ?? null,\n'
+            '  }));\n'
+            '} catch (error) {\n'
+            '  console.log(JSON.stringify({ ok: false, message: String(error.message) }));\n'
+            '  process.exitCode = 1;\n'
+            '}\n',
+            "utf-8",
         )
-        check(not quarantine_disclosed, "the stripped closure was wrongly accepted as disclosed")
-        checks += 1
+
+        def run_ingress(state_file: Path) -> dict[str, Any]:
+            config_path = root / f"ingress-config-{state_file.stem}.json"
+            write_json(config_path, {
+                "broker_pack_path": artifacts_map["broker_pack"],
+                "source_inventory": source_inventory,
+                "attachments": attachments,
+                "spec_dir": str(root),
+                "declaration": {
+                    "run_state_path": str(state_file),
+                    "extraction_bundle_path": artifacts_map["verified_bundle"],
+                    "source_tables_path": artifacts_map["source_tables"],
+                    "crosswalk_path": artifacts_map["crosswalk"],
+                    "crosswalk_receipt_path": artifacts_map["broker_crosswalk_receipt"],
+                    "semantic_verification_path": artifacts_map["semantic_report"],
+                },
+            })
+            completed = subprocess.run(
+                ["node", str(driver), str(config_path)],
+                cwd=HERE, text=True, capture_output=True, check=False,
+            )
+            check(completed.stdout.strip() != "", f"ingress driver emitted nothing: {completed.stderr[-1500:]}")
+            return json.loads(completed.stdout)
+
+        accepted = run_ingress(output_root / "broker-run-state.json")
+        check(accepted.get("ok") is True, f"the JS ingress refused the lawful degraded close: {accepted.get('message')}")
+        check(accepted.get("controller_status") == "PASS_DEGRADED", "the degraded controller state was not projected into case evidence")
+        check(int(accepted.get("raw_table_house_count", 0)) == 5, "ingress did not preserve every house in raw_tables")
+        checks += 3
+
+        # ...and only WITH its quarantine receipts (closure integrity, enforced
+        # by the production gate).
+        stripped = json.loads(Path(output_root / "broker-run-state.json").read_text("utf-8"))
+        stripped["summary"] = {"degraded": True}
+        stripped_path = output_root / "broker-run-state-stripped.json"
+        write_json(stripped_path, stripped)
+        refused = run_ingress(stripped_path)
+        check(refused.get("ok") is False, "a receipt-stripped degraded close was accepted by the JS ingress")
+        check("quarantine receipts" in str(refused.get("message")), f"the stripped-closure refusal is unnamed: {refused.get('message')}")
+        checks += 2
 
         # The re-arm defect itself: an aggregate terminal task must count as
         # prior targeted resolution so the quarantine fallback stays armed.

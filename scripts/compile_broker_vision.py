@@ -92,6 +92,7 @@ def material_uncovered_region_count(bundle: dict[str, Any]) -> int:
             "covered",
             "covered_by_vision",
             "verified_non_tabular",
+            "quarantined_evidence_only",
         }
     )
 
@@ -156,6 +157,7 @@ def bind_final_surface_census(
                 "covered",
                 "covered_by_vision",
                 "verified_non_tabular",
+                "quarantined_evidence_only",
             }
         ),
     }
@@ -1229,6 +1231,10 @@ def main() -> int:
     source_count = sum(len(document["numeric_ledger"]["source_tokens"]) for document in bundle["documents"])
     missing_count = sum(len(document["numeric_ledger"]["missing_tokens"]) for document in bundle["documents"])
     duplicate_count = sum(len(document["numeric_ledger"]["duplicate_tokens"]) for document in bundle["documents"])
+    bundle["summary"]["document_count"] = len(bundle["documents"])
+    bundle["summary"]["surface_count"] = sum(
+        len(document.get("surfaces", [])) for document in bundle["documents"]
+    )
     bundle["summary"]["table_count"] = table_count
     bundle["summary"]["cell_count"] = cell_count
     bundle["summary"]["numeric_token_count"] = source_count

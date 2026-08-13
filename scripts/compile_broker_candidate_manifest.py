@@ -89,15 +89,53 @@ def classify_row(row: list[dict[str, Any]], label: str, numeric_count: int) -> s
     return "detail"
 
 
+def surface_model_prohibited(surface: dict[str, Any]) -> bool:
+    """A surface closed as preserved evidence contributes NO candidates.
+
+    Both closures share the same receipt language ("contributes no
+    model-eligible table"): the bounded quarantine after exhaustion and the
+    two-pass verified-non-tabular disposition. Enforcing it here — where
+    candidates are minted — is what makes the receipt true; native tables that
+    happened to exist on such a surface stay preserved in the bundle and in
+    tables_for_hash, but never become mappable values.
+    """
+    if (surface.get("quarantine") or {}).get("model_use") == "prohibited":
+        return True
+    return surface.get("vision_disposition") in {
+        "quarantined_evidence_only",
+        "verified_non_tabular",
+    }
+
+
 def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None = None) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     candidates: list[dict[str, Any]] = []
     tables_for_hash: list[dict[str, Any]] = []
     for document in sorted(bundle.get("documents", []), key=lambda item: str(item.get("document_id"))):
+        prohibited_surfaces = {
+            str(surface.get("surface_id")): surface
+            for surface in document.get("surfaces", [])
+            if surface_model_prohibited(surface)
+        }
         tables = document.get("canonical_tables") or document.get("tables") or []
         for table in sorted(tables, key=lambda item: str(item.get("canonical_table_id") or item.get("table_id"))):
             table_id = str(table.get("canonical_table_id") or table.get("table_id"))
             tables_for_hash.append(table)
+            surface_id = str(table.get("surface_id"))
+            if surface_id in prohibited_surfaces:
+                findings.append({
+                    "id": "broker_candidates.surface_model_prohibited",
+                    "severity": "warning",
+                    "document_id": document.get("document_id"),
+                    "table_id": table_id,
+                    "surface_id": surface_id,
+                    "message": (
+                        "The surface is preserved evidence only "
+                        f"({prohibited_surfaces[surface_id].get('vision_disposition')}); "
+                        "its tables contribute no model-eligible candidates."
+                    ),
+                })
+                continue
             header_periods: dict[int, dict[str, Any]] = {
                 int(item["column"]): {
                     "column": int(item["column"]),

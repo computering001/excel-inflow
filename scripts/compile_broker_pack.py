@@ -888,8 +888,18 @@ def main() -> int:
     crosswalk = json.loads(Path(args.crosswalk).read_text("utf-8"))
     output_root = Path(args.out).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    if bundle.get("schema_version") != "broker-extraction-bundle/1.0" or bundle.get("gate_status") != "PASS":
-        raise ValueError("Broker evidence must be a PASS broker-extraction-bundle/1.0 before semantic mapping.")
+    # The pack accepts BOTH closed physical shapes: the extraction bundle
+    # (early-vision-zone closure) and the canonical-tables bundle (canonical
+    # reconciliation closure). Requiring only the extraction schema silently
+    # terminated every run that traversed the canonical stage.
+    if (
+        bundle.get("schema_version") not in {"broker-extraction-bundle/1.0", "broker-canonical-tables/1.0"}
+        or bundle.get("gate_status") != "PASS"
+    ):
+        raise ValueError(
+            "Broker evidence must be a PASS broker-extraction-bundle/1.0 or "
+            "broker-canonical-tables/1.0 before semantic mapping."
+        )
     if crosswalk.get("schema_version") not in {"broker-crosswalk/1.1", "broker-crosswalk/1.2"}:
         raise ValueError("Unsupported broker crosswalk schema.")
     if crosswalk.get("run_id") != bundle.get("run_id"):

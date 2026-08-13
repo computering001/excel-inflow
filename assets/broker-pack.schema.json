@@ -441,7 +441,8 @@
               "enum": [
                 "native",
                 "verified_image_transcription",
-                "mixed_verified"
+                "mixed_verified",
+                "evidence_only_quarantine"
               ],
               "description": "How the normalized estimates were obtained. verified_image_transcription and mixed_verified require independently checked, cell-addressed image evidence."
             },

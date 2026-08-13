@@ -1416,9 +1416,20 @@ function compileBrokerEvidenceLayout(modelCase) {
   const mappings = modelCase.broker_pack?.source_mappings ?? [];
   if (!Array.isArray(houses) || houses.length === 0) return null;
   if (!Array.isArray(mappings) || mappings.length === 0) {
-    throw new Error(
-      "Full broker source tables were supplied without cell-addressed source_mappings.",
+    // Zero mappings is the CORRECT sealed state when every preserved table is
+    // evidence-only (quarantined or non-analytical): the tabs render as
+    // hardcoded evidence with no model links. It is a defect only when an
+    // analytical table exists that should have been mappable.
+    const anyAnalytical = houses.some((house) =>
+      (house.tables ?? []).some(
+        (table) => table.workbook_presentation === "analytical_table",
+      ),
     );
+    if (anyAnalytical) {
+      throw new Error(
+        "Full broker source tables were supplied without cell-addressed source_mappings.",
+      );
+    }
   }
   const usedNames = new Set(["Operating Model", "> Brokers", "Brokers", "Forward Curves"]);
   const cellMap = new Map();
@@ -11031,7 +11042,12 @@ function assertShippedPlan(plan, declared) {
         );
       }
     }
-    counts.grouped_broker_rows = brokerOutlined;
+    // A zero-consumption pack (FORECAST_WATERFALL, or all houses evidence
+    // only) legally declares no grouped broker rows; the visited-nothing gate
+    // applies only when the plan itself declared a population to visit.
+    if (declared.brokers.outline_rows.length > 0) {
+      counts.grouped_broker_rows = brokerOutlined;
+    }
   }
 
   // --- Standing rules, asserted rather than assumed ------------------------
@@ -11847,12 +11863,17 @@ async function main(packaging = null) {
   // reported a clean pass. A count of zero here is not "nothing needed doing";
   // on any case in the suite it means the pass ran against a shape it did not
   // recognise.
+  // A zero-consumption broker pack (FORECAST_WATERFALL, or every house
+  // evidence-only) legally has no grouped broker rows anywhere; the
+  // visited-nothing rule applies to those scanners only when the case
+  // declared a population to visit.
+  const brokerRowsDeclared = (brokerRows?.contributorRows ?? []).length > 0;
   const emptyScanners = Object.entries({
     asserted_formula_provenance: assertedFormulaProvenance,
     refreshed_formula_caches: refreshedFormulaCaches,
     solver_patched_formula_caches: solverPatchedFormulaCaches,
     outlined_rows: outlinedRows,
-    grouped_broker_rows: groupedBrokerRows,
+    ...(brokerRowsDeclared ? { grouped_broker_rows: groupedBrokerRows } : {}),
     indented_labels: indentedLabels,
     centred_block_titles: centredBlockTitles,
     default_font_patched: defaultFontPatched,
@@ -11863,7 +11884,9 @@ async function main(packaging = null) {
     plan_outlined_rows: planCounts.outlined_rows,
     plan_indented_labels: planCounts.indented_labels,
     plan_centred_block_titles: planCounts.centred_block_titles,
-    plan_grouped_broker_rows: planCounts.grouped_broker_rows,
+    ...(brokerRowsDeclared
+      ? { plan_grouped_broker_rows: planCounts.grouped_broker_rows }
+      : {}),
     // The synthesised plan's cached layer, counted the same way. `historical`
     // is the acyclic face the solver's horizon does not reach, `solver` is the
     // three forecast years, and `evaluated` is everything that was still
@@ -11873,7 +11896,9 @@ async function main(packaging = null) {
     synthesised_solver_caches: synthesis.solver_cached_cells,
     synthesised_evaluated_caches: synthesis.evaluated_cached_cells,
     synthesised_adjustment_gate_cells: synthesisedCounts.adjustment_gate_cells,
-    synthesised_grouped_broker_rows: synthesisedCounts.grouped_broker_rows,
+    ...(brokerRowsDeclared
+      ? { synthesised_grouped_broker_rows: synthesisedCounts.grouped_broker_rows }
+      : {}),
   }).filter(([, count]) => !(Number(count) > 0));
   if (emptyScanners.length > 0) {
     throw new Error(

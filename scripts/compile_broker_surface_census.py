@@ -60,7 +60,8 @@ def compile_census(bundle: dict[str, Any], bundle_root: Path) -> dict[str, Any]:
                 region for region in census.get("uncovered_numeric_regions", [])
                 if region.get("material")
                 and region.get("disposition") not in {
-                    "covered", "covered_by_vision", "verified_non_tabular"
+                    "covered", "covered_by_vision", "verified_non_tabular",
+                    "quarantined_evidence_only"
                 }
             ]
             if material and surface.get("lane_status", {}).get("vision") not in {"required", "complete"}:

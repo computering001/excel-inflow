@@ -325,7 +325,7 @@ function validateSourceInventory(run, findings) {
       sourceTable &&
       sourceTable.content_sha256 === source.content_sha256 &&
       document?.text_extractable === false &&
-      ["verified_image_transcription", "mixed_verified"].includes(document?.extraction_method) &&
+      ["verified_image_transcription", "mixed_verified", "evidence_only_quarantine"].includes(document?.extraction_method) &&
       document?.extraction_evidence_sha256 === bundleHash
     );
   };
