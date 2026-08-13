@@ -122,7 +122,7 @@ def period_token(value: Any) -> str | None:
 PERIOD_LIKE_TOKEN = re.compile(
     r"^(?:(?:fy|cy)\s*\d|(?:q[1-4]|[1-4]q|h[12]|[12]h)\b|"
     r"(?:ltm|ntm|ttm)\b|(?:3|6|9)m\s*(?:fy|cy)?\s*\d|"
-    r"(?:19|20)\d{2}\s*/\s*\d{2})",
+    r"(?:19|20)\d{1,3}(?:\s*/\s*\d{1,4})?)",
     re.I,
 )
 
@@ -163,6 +163,37 @@ def table_unresolved_period_columns(table: dict[str, Any]) -> set[int]:
             if raw and PERIOD_LIKE_TOKEN.search(raw) and not period_token(raw):
                 columns.add(int(cell.get("column", 0)))
     return columns
+
+
+def header_fragment_only(table: dict[str, Any]) -> bool:
+    """Return True only for a native table made solely of broken period text.
+
+    PDF table finders frequently emit a narrow, header-only object whose box is
+    just outside the rendered table box.  Such an object has no economic row
+    label and no value authority; retaining it beside a verified rendered grid
+    manufactures a second unresolved table.  The test is intentionally strict:
+    every nonblank cell must be a complete period or a period-shaped fragment,
+    there must be at least one unresolved fragment, and there may be no numeric
+    economic value.  A disjoint table with a real row label therefore survives.
+    """
+    values = [
+        re.sub(r"\s+", " ", str(cell.get("raw_text") or "").strip())
+        for row in table.get("rows", [])
+        for cell in row
+        if str(cell.get("raw_text") or "").strip()
+    ]
+    if not values or not any(PERIOD_LIKE_TOKEN.search(value) and not period_token(value) for value in values):
+        return False
+    return all(
+        period_token(value) is not None
+        or bool(PERIOD_LIKE_TOKEN.search(value))
+        for value in values
+    ) and not table_numeric_tokens(table)
+
+
+def rendered_has_complete_period_grid(table: dict[str, Any]) -> bool:
+    """A rendered authority can supersede a header fragment only when complete."""
+    return has_rendered_authority(table) and len(table_period_headers(table)) >= 2
 
 
 def continuation_certificate(
@@ -358,6 +389,11 @@ def native_table_covered_by_rendered(
     native_tokens = set(table_numeric_tokens(native))
     for rendered in rendered_tables:
         if bbox_min_overlap(native.get("bbox"), rendered.get("bbox")) > 0.0:
+            return True
+        if header_fragment_only(native) and rendered_has_complete_period_grid(rendered):
+            # Same surface is guaranteed by canonicalise_tables' by-surface
+            # grouping.  The native object carries no economic observation;
+            # the complete dual-read grid owns the visible header authority.
             return True
         rendered_observations = economic_observations(rendered)
         rendered_labels = {label for label, _period in rendered_observations}
@@ -862,7 +898,10 @@ def main() -> int:
     compiled, findings = canonicalise_bundle(bundle)
     for document in compiled.get("documents", []):
         document["tables"] = copy.deepcopy(document.get("canonical_tables", []))
-    compiled["schema_version"] = "broker-canonical-tables/1.0"
+    # This is still the broker extraction bundle after canonical physical
+    # reconciliation. Keep one public bundle schema across controller stages;
+    # the canonical-table version is carried by its own nested receipt/assets.
+    compiled["schema_version"] = "broker-extraction-bundle/1.0"
     compiled["source_bundle_sha256"] = hashlib.sha256(input_path.read_bytes()).hexdigest()
     compiled["canonical_findings"] = findings
     compiled["gate_status"] = compiled["physical_capture_receipt"]["status"]

@@ -367,6 +367,16 @@ FORECAST_WATERFALL with zero broker consumption). `BLOCKED_INTERNAL` remains
 only for genuine controller corruption or tampered artifacts — never for
 readable research that would not reconcile.
 
+A truncated native period token is ordinary evidence ambiguity. Prefer the
+complete period label visibly transcribed from the hash-bound rendered grid;
+otherwise prohibit only that column. Preserve multi-page tables through an
+explicit continuation certificate so a header on the first page owns the
+continuation pages without being guessed again. If a remaining semantic defect
+belongs to a house whose selected mapping consumes the affected cell, remove
+that house from model authority, retain all of its evidence, independently
+reverify the pruned crosswalk, and continue through the forecast waterfall. The
+company model must not stop merely because a broker house becomes unusable.
+
 A sealed broker run may cross an intentional controller upgrade without losing
 its receipted progress or its exhaustion history. Migrate — never resume
 blind — with the fail-closed migration tool, pinning the exact prior runtime

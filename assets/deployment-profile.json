@@ -38,6 +38,9 @@
     "broker-runtime-members.json",
     "broker-model-host-response-boundary-v1.json",
     "broker-terminal-materiality-review.schema.json",
+    "broker-period-header-review.schema.json",
+    "broker-table-engine-registry-v1.json",
+    "broker-table-engine-result.schema.json",
     "attachment-evidence-controller.schema.json",
     "attachment-evidence-run-state.schema.json",
     "attachment-evidence-runtime-members.json",
@@ -109,6 +112,9 @@
     "broker-runtime-members.json": "Single source of truth for the broker controller's hash-bound runtime closure; read independently by the controller and attachment ingress.",
     "broker-model-host-response-boundary-v1.json": "Closed model-host response seam for broker vision, targeted adjudication and semantic crosswalk tasks, including deterministic remedies and finite attempt budgets.",
     "broker-terminal-materiality-review.schema.json": "Hash-bound model-host response contract for preserving independently proven non-consumed broker evidence after bounded semantic review; it cannot authorize model consumption or values.",
+    "broker-period-header-review.schema.json": "Hash-bound rendered-grid period-header review contract. It can resolve a truncated native-text fragment only from the preserved page image and otherwise leaves that column quarantined.",
+    "broker-table-engine-registry-v1.json": "Closed broker table-engine capability registry. Rogo remains the required model-host reader; optional Surya and Docling adapters are discovered only when the deployment host actually provides them.",
+    "broker-table-engine-result.schema.json": "Provider-neutral table-engine result contract used before the existing dual-read reconciliation and semantic gates.",
     "attachment-evidence-controller.schema.json": "Strict input contract for the single raw-attachment evidence owner.",
     "attachment-evidence-run-state.schema.json": "Typed resumable state contract separating internal work from genuine user evidence blockers.",
     "attachment-evidence-runtime-members.json": "Hash-bound runtime closure for the broker/DCS/case-source evidence transaction.",
@@ -289,6 +295,8 @@
     "compile_broker_pack.py",
     "compile_broker_surface_census.py",
     "verify_broker_semantics.py",
+    "broker_period_recovery.py",
+    "broker_table_engine.py",
     "extract_dcs_evidence.py",
     "compile_dcs_evidence.py",
     "verify/dcs_evidence_oracle.py",
@@ -302,8 +310,8 @@
     "verify/workbook_semantic_oracle.py",
     "verify/verify_delivery.py"
   ],
-  "_python_entry_point_note": "Twenty-three Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
-  "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The five broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
+  "_python_entry_point_note": "Twenty-five Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers, recovery tools and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
+  "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
   "python_entry_point_notes": {
     "migrate_broker_run_state.py": "Fail-closed, receipted migration of a sealed broker run across an intentional runtime-closure change; re-homes receipt-verified checkpoints and preserves exhaustion history so a live run resumes without losing progress or re-uploading sources. Invoked only on controller upgrades, never in ordinary runs.",
     "run_attachment_evidence_pipeline.py": "The sole raw-attachment evidence transaction owner; it sequences the broker and DCS controllers, case-source proposal and sealed ingress compilation.",
@@ -314,7 +322,9 @@
     "compile_broker_surface_census.py": "Invoked by run_broker_pipeline.py as the independent coverage checkpoint; retained independently runnable for diagnostics.",
     "compile_broker_vision.py": "Invoked by run_broker_pipeline.py for two-read reconciliation and bounded cell adjudication; retained independently runnable for diagnostics.",
     "verify_broker_semantics.py": "Invoked by run_broker_pipeline.py as an independent semantic gate; retained independently runnable for diagnostics.",
-    "compile_broker_pack.py": "Invoked by run_broker_pipeline.py only after prior broker checkpoints pass; retained independently runnable for diagnostics."
+    "compile_broker_pack.py": "Invoked by run_broker_pipeline.py only after prior broker checkpoints pass; retained independently runnable for diagnostics.",
+    "broker_period_recovery.py": "Invoked by run_broker_pipeline.py after physical capture to resolve rendered period headers or quarantine only unresolved columns; retained independently runnable for diagnostics.",
+    "broker_table_engine.py": "Optional provider-neutral adapter for host-installed table engines; Rogo remains the required model-host path and every result still enters dual-read reconciliation."
   },
   "python_entry_point_smoke": {
     "migrate_broker_run_state.py": {
@@ -399,6 +409,16 @@
         0
       ],
       "expect_output_contains": "usage: verify_broker_semantics.py"
+    },
+    "broker_period_recovery.py": {
+      "argv": ["--help"],
+      "expect_exit": [0],
+      "expect_output_contains": "usage: broker_period_recovery.py"
+    },
+    "broker_table_engine.py": {
+      "argv": ["--help"],
+      "expect_exit": [0],
+      "expect_output_contains": "usage: broker_table_engine.py"
     },
     "extract_dcs_evidence.py": {
       "argv": [
@@ -524,6 +544,8 @@
     "compile_broker_canonical_tables.py",
     "compile_broker_surface_census.py",
     "verify_broker_semantics.py",
+    "broker_period_recovery.py",
+    "broker_table_engine.py",
     "extract_dcs_evidence.py",
     "compile_dcs_evidence.py",
     "emit/__init__.py",
@@ -680,6 +702,14 @@
     "broker_terminal_recovery.py": {
       "may_import_third_party": [],
       "reason": "The broker terminal-recovery helper is stdlib-only and proves negative model consumption from immutable candidate cells and the canonical metric dictionary; it neither reads PDFs nor authors visual or semantic judgments."
+    },
+    "broker_period_recovery.py": {
+      "may_import_third_party": [],
+      "reason": "The period-header recovery helper is stdlib-only. It binds model-host transcription to preserved rendered artifacts and otherwise quarantines only the unresolved columns."
+    },
+    "broker_table_engine.py": {
+      "may_import_third_party": [],
+      "reason": "The provider-neutral adapter is stdlib-only and discovers optional host engines without importing or bundling them; normalized output still passes through the independent broker reconciliation gates."
     },
     "extract_broker_evidence.py": {
       "may_import_third_party": [

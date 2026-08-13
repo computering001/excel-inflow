@@ -29,7 +29,7 @@ PERIOD_LIKE = re.compile(
     # that merely mention a year (for example "higher in FY2026") are row
     # content, not unresolved headers.
     r"^(?:(?:fy|cy)\s*\d|(?:q[1-4]|[1-4]q|h[12]|[12]h)\b|(?:ltm|ntm|ttm)\b|"
-    r"(?:3|6|9)m\s*(?:fy|cy)?\s*\d|(?:19|20)\d{2}\s*/\s*\d{2})",
+    r"(?:3|6|9)m\s*(?:fy|cy)?\s*\d|(?:19|20)\d{1,3}(?:\s*/\s*\d{1,4})?)",
     re.I,
 )
 
@@ -162,7 +162,10 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                         if (
                             kind == "unresolved_period_header"
                             and inherited
-                            and inherited.get("authority") == "continuation_certificate"
+                            and inherited.get("authority") in {
+                                "continuation_certificate",
+                                "rendered_header_review",
+                            }
                         ):
                             # Preserve the truncated raw fragment in source
                             # cells while using only the sealed predecessor

@@ -295,6 +295,19 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
     dispositionCounts[disposition] = (dispositionCounts[disposition] ?? 0) + 1;
     coveredCandidateIds.add(String(entry.candidate_id ?? ""));
   }
+  const terminalCandidates = crosswalk.terminal_recovery?.quarantined_candidates ?? [];
+  const terminalById = new Map();
+  for (const entry of terminalCandidates) {
+    const candidateId = String(entry.candidate_id ?? "");
+    if (!candidateId || terminalById.has(candidateId)) {
+      throw new Error("Broker terminal recovery has an absent or duplicate candidate_id.");
+    }
+    if (coveredCandidateIds.has(candidateId)) {
+      throw new Error(`Broker terminal recovery overlaps ordinary coverage for ${candidateId}.`);
+    }
+    terminalById.set(candidateId, entry);
+    coveredCandidateIds.add(candidateId);
+  }
   const manifestCandidates = extraction.candidate_manifest?.candidates ?? [];
   const manifestById = new Map(
     manifestCandidates.map((entry) => [String(entry.candidate_id ?? ""), entry]),
@@ -359,18 +372,92 @@ function recomputeBrokerReceipt({ extraction, sourceTables, crosswalk, semanticR
       }),
     };
   });
+  for (const [candidateId, terminal] of [...terminalById.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    const candidate = manifestById.get(candidateId);
+    if (!candidate) {
+      throw new Error(`Broker terminal recovery candidate ${candidateId} is absent from the immutable manifest.`);
+    }
+    const source = sourceTableMap.get(candidate.table_id);
+    const extracted = extractedTables.get(candidate.table_id);
+    if (!source || !extracted || source.house_id !== candidate.house_id) {
+      throw new Error(`Broker terminal recovery candidate ${candidateId} cites an absent or cross-house table.`);
+    }
+    const sourceCells = (candidate.source_cells ?? []).map((reference) => {
+      const row = Number(reference.row);
+      const column = Number(reference.column);
+      const sourceValue = source.table.rows?.[row - 1]?.[column - 1];
+      const extractedCell = extracted.table.rows?.[row - 1]?.[column - 1];
+      if (extractedCell === undefined) {
+        throw new Error(`Broker terminal recovery candidate ${candidateId} is detached from ${candidate.table_id}!R${row}C${column}.`);
+      }
+      return {
+        row,
+        column,
+        // Terminal recovery is compiled from the immutable manifest/extraction
+        // cells, whose raw_value may deliberately be absent even though the
+        // values-only workbook projection contains the rendered scalar.
+        raw_value: extractedCell.raw_value ?? null,
+        authority_status: candidate.authority_status,
+      };
+    });
+    const forecastYears = (crosswalk.forecast_periods ?? []).map((period) => Number(String(period).slice(0, 4)));
+    const normalizedPeriodIndexes = [];
+    const declaredKinds = new Set();
+    for (const item of candidate.period_indexes ?? []) {
+      if (Number.isInteger(item)) {
+        normalizedPeriodIndexes.push(item);
+        continue;
+      }
+      if (!item || typeof item !== "object") continue;
+      declaredKinds.add(String(item.period_kind ?? ""));
+      const match = String(item.period_label ?? "").match(/(?:FY|CY)?\s*((?:19|20)\d{2})/i);
+      const year = match ? Number(match[1]) : NaN;
+      const periodIndex = forecastYears.indexOf(year);
+      if (periodIndex >= 0) normalizedPeriodIndexes.push(periodIndex);
+    }
+    const uniquePeriodIndexes = [...new Set(normalizedPeriodIndexes)].sort((left, right) => left - right);
+    const manifestBasis = candidate.period_basis;
+    const normalizedPeriodBasis = uniquePeriodIndexes.length > 0
+      ? "annual_forecast"
+      : (["quarter", "half_year", "partial_period"].includes(manifestBasis) || [...declaredKinds].some((kind) => ["quarter", "half_year"].includes(kind)))
+        ? "partial_period"
+        : (["event_date", "non_periodic"].includes(manifestBasis) || declaredKinds.has("event_date"))
+          ? "non_periodic"
+          : ["annual", "historical"].includes(manifestBasis)
+            ? "historical"
+            : "non_periodic";
+    coverageLedger.push({
+      candidate_id: candidateId,
+      document_id: candidate.document_id,
+      house_id: candidate.house_id,
+      table_id: candidate.table_id,
+      row: candidate.row,
+      label: candidate.label,
+      period_basis: normalizedPeriodBasis,
+      period_indexes: uniquePeriodIndexes,
+      source_cells: sourceCells,
+      disposition: "preserve_unconsumed_quarantine",
+      model_use: "unresolved",
+      model_consumption: "prohibited",
+      finding_codes: terminal.finding_codes ?? [],
+      rationale: terminal.rationale,
+      review_status: "reviewed",
+    });
+    dispositionCounts.preserve_unconsumed_quarantine =
+      (dispositionCounts.preserve_unconsumed_quarantine ?? 0) + 1;
+  }
   const expectedSummary = {
     table_count: sourceTableMap.size,
     table_review_count: crosswalk.table_reviews?.length ?? 0,
     detected_forecast_candidate_count: candidateCount,
-    coverage_entry_count: crosswalk.coverage_ledger?.length ?? 0,
+    coverage_entry_count: coverageLedger.length,
     unresolved_candidate_count: unresolvedCandidateCount,
     // Terminal-materiality quarantine and selected-but-unresolved counts are
     // part of the Python receipt's closed summary; a PASS receipt requires
     // zero unresolved selections, and the terminal count mirrors the sealed
     // terminal_recovery ledger exactly.
     terminal_quarantined_candidate_count:
-      crosswalk.terminal_recovery?.quarantined_candidates?.length ?? 0,
+      terminalCandidates.length,
     unresolved_selected_candidate_count: 0,
     semantic_quality_violation_count: Number(semanticReport?.total_violation_count ?? 0),
     candidate_manifest_count: candidateCount,
@@ -613,6 +700,56 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       );
     }
   }
+  const degradedClosureStages = new Set(
+    (runState.json.checkpoints ?? [])
+      .filter((checkpoint) => checkpoint.status === "PASS")
+      .map((checkpoint) => checkpoint.stage)
+      .filter((stage) => [
+        "physical_degraded_close",
+        "period_header_recovery",
+        "house_local_authority_fallback",
+      ].includes(stage)),
+  );
+  if (brokerLaneDegraded && degradedClosureStages.size === 0) {
+    throw new Error(
+      "Broker controller PASS_DEGRADED state has no recognised hash-bound degradation checkpoint.",
+    );
+  }
+  if (
+    brokerLaneDegraded &&
+    degradedClosureStages.has("house_local_authority_fallback") &&
+    !runState.json.artifacts?.house_exclusion_receipt
+  ) {
+    throw new Error(
+      "Broker house-local authority fallback is missing its exclusion receipt.",
+    );
+  }
+  if (
+    brokerLaneDegraded &&
+    degradedClosureStages.has("period_header_recovery") &&
+    !runState.json.artifacts?.period_header_recovery_receipt
+  ) {
+    throw new Error(
+      "Broker period-header fallback is missing its recovery receipt.",
+    );
+  }
+  const stateOwnedArtifact = async (artifactName, label) => {
+    const statePath = runState.json.artifacts?.[artifactName];
+    if (!statePath) throw new Error(`${label} is absent from the broker controller state.`);
+    const artifactPath = path.resolve(statePath);
+    const bytes = await fs.readFile(artifactPath);
+    const digest = sha256(bytes);
+    if (runState.json.artifact_sha256?.[artifactName] !== digest) {
+      throw new Error(`${label} is not hash-owned by the broker controller state.`);
+    }
+    return { path: artifactPath, bytes, sha256: digest, json: await readJsonFile(artifactPath, label) };
+  };
+  const periodRecoveryReceipt = degradedClosureStages.has("period_header_recovery")
+    ? await stateOwnedArtifact("period_header_recovery_receipt", "Broker period-header recovery receipt")
+    : null;
+  const houseExclusionReceipt = degradedClosureStages.has("house_local_authority_fallback")
+    ? await stateOwnedArtifact("house_exclusion_receipt", "Broker house-exclusion receipt")
+    : null;
   const currentRuntimeClosure = await brokerRuntimeClosureSha256();
   if (runState.json.runtime_closure_sha256 !== currentRuntimeClosure) {
     throw new Error(
@@ -669,8 +806,8 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     "surface_census",
     "semantic_verification",
     "pack_compilation",
-    // A degraded lane must carry the receipted degraded close itself.
-    ...(brokerLaneDegraded ? ["physical_degraded_close"] : []),
+    // A degraded lane must carry at least one recognised, receipted closure.
+    ...(brokerLaneDegraded ? [...degradedClosureStages] : []),
   ]);
   // In a degraded close, the ordinary vision / physical-reconciliation
   // frontier legitimately did NOT pass — that is what the bounded degraded
@@ -684,7 +821,17 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     extract: "extraction_bundle",
     surface_census: "surface_census",
     ...(brokerLaneDegraded
-      ? { physical_degraded_close: "verified_bundle" }
+      ? {
+          ...(degradedClosureStages.has("physical_degraded_close")
+            ? { physical_degraded_close: "verified_bundle" }
+            : {}),
+          ...(degradedClosureStages.has("period_header_recovery")
+            ? { period_header_recovery: "verified_bundle" }
+            : {}),
+          ...(degradedClosureStages.has("house_local_authority_fallback")
+            ? { house_local_authority_fallback: "semantic_report" }
+            : {}),
+        }
       : { vision: "verified_bundle" }),
     semantic_verification: "semantic_report",
     pack_compilation: "broker_pack",
@@ -695,6 +842,16 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     }
     checkpointStages.add(checkpoint.stage);
     if (degradedSupersededStages.has(checkpoint.stage)) continue;
+    if (
+      brokerLaneDegraded &&
+      checkpoint.stage === "semantic_verification" &&
+      degradedClosureStages.has("house_local_authority_fallback")
+    ) {
+      // The first semantic report is intentionally the finding that triggers
+      // the house-local fallback. The PASS fallback checkpoint below owns the
+      // final semantic_report bytes.
+      continue;
+    }
     if (checkpoint.status !== "PASS" || !checkpoint.output_sha256) {
       throw new Error(`Broker controller checkpoint ${checkpoint.stage} is not PASS and hash-bound.`);
     }
@@ -727,6 +884,20 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       `Broker extraction bundle is ${extraction.json.gate_status}, not PASS.`,
     );
   }
+  if (periodRecoveryReceipt) {
+    const periodReceipt = periodRecoveryReceipt.json;
+    if (
+      periodReceipt.schema_version !== "broker-period-header-recovery-receipt/1.0" ||
+      periodReceipt.status !== "PASS" ||
+      Number(periodReceipt.remaining_target_count ?? 0) !== 0 ||
+      Number(periodReceipt.target_count ?? 0) < 1 ||
+      Number(periodReceipt.resolved_header_count ?? 0) + Number(periodReceipt.quarantined_column_count ?? 0) < 1 ||
+      JSON.stringify(canonicalise(extraction.json.period_header_recovery_receipt ?? null)) !==
+        JSON.stringify(canonicalise(periodReceipt))
+    ) {
+      throw new Error("Broker period-header recovery receipt is incomplete or detached from the recovered bundle.");
+    }
+  }
   const candidateErrors = validateJsonSchema(
     extraction.json.candidate_manifest,
     BROKER_CANDIDATE_MANIFEST_SCHEMA,
@@ -735,6 +906,31 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     throw new Error(
       `Broker immutable candidate manifest fails its contract: ${candidateErrors[0]}`,
     );
+  }
+  if (houseExclusionReceipt) {
+    const exclusion = houseExclusionReceipt.json;
+    const excludedHouses = new Set(exclusion.excluded_house_ids ?? []);
+    const terminalCandidates = crosswalk.json.terminal_recovery?.quarantined_candidates ?? [];
+    const terminalHouses = new Set(terminalCandidates.map((entry) => entry.house_id));
+    const manifestCandidates = extraction.json.candidate_manifest?.candidates ?? [];
+    const excludedManifestCount = manifestCandidates.filter((entry) => excludedHouses.has(entry.house_id)).length;
+    if (
+      exclusion.schema_version !== "broker-house-exclusion-receipt/1.0" ||
+      exclusion.status !== "PASS" ||
+      excludedHouses.size < 1 ||
+      [...terminalHouses].some((houseId) => !excludedHouses.has(houseId)) ||
+      terminalHouses.size !== excludedHouses.size ||
+      terminalCandidates.length !== excludedManifestCount ||
+      Number(exclusion.preserved_candidate_count ?? -1) !== terminalCandidates.length ||
+      Number(exclusion.remaining_mapping_count ?? -1) !== (crosswalk.json.mappings ?? []).length ||
+      Number(exclusion.model_consumption_added ?? -1) !== 0 ||
+      (crosswalk.json.mappings ?? []).some((mapping) => excludedHouses.has(mapping.house_id)) ||
+      exclusion.recovered_crosswalk_sha256 !== canonicalCompactSha256(crosswalk.json) ||
+      !semanticReport ||
+      exclusion.terminal_semantic_report_sha256 !== crosswalk.json.terminal_recovery?.semantic_report_sha256
+    ) {
+      throw new Error("Broker house-exclusion receipt is incomplete, stale, or permits excluded-house model consumption.");
+    }
   }
   if (
     extraction.json.candidate_manifest.gate_status !== "PASS" ||
@@ -940,8 +1136,13 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     JSON.stringify(canonicalise(receipt.json.coverage_ledger)) !==
       JSON.stringify(canonicalise(receiptClosure.coverageLedger))
   ) {
+    const actualById = new Map((receipt.json.coverage_ledger ?? []).map((entry) => [entry.candidate_id, entry]));
+    const expectedById = new Map(receiptClosure.coverageLedger.map((entry) => [entry.candidate_id, entry]));
+    const firstMismatch = [...new Set([...actualById.keys(), ...expectedById.keys()])]
+      .sort()
+      .find((candidateId) => JSON.stringify(canonicalise(actualById.get(candidateId))) !== JSON.stringify(canonicalise(expectedById.get(candidateId))));
     throw new Error(
-      "Broker crosswalk receipt coverage ledger does not exactly reproduce the reviewed source evidence.",
+      `Broker crosswalk receipt coverage ledger does not exactly reproduce the reviewed source evidence${firstMismatch ? ` at ${firstMismatch}` : ""}.`,
     );
   }
   if (

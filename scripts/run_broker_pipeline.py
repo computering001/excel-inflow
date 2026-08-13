@@ -25,7 +25,9 @@ from broker_terminal_recovery import (
     analyse_terminal_recovery,
     apply_terminal_review,
     automatic_negative_consumption_review,
+    degrade_finding_houses,
 )
+from broker_period_recovery import canonical_hash as period_canonical_hash, target_inventory as period_target_inventory
 from workflow_state import assert_state, assert_transition
 
 
@@ -185,6 +187,8 @@ def task_response_files(task: dict[str, Any]) -> list[str]:
         return [f"{surface_id}.pass1.json", f"{surface_id}.pass2.json"]
     if kind in {"targeted_cell_adjudication", "bounded_capture_adjudication"} and surface_id:
         return [f"{surface_id}.resolution.json"]
+    if kind == "period_header_adjudication":
+        return ["broker-period-header-review.json"]
     if kind in {
         "semantic_crosswalk_review",
         "semantic_crosswalk_repair",
@@ -663,6 +667,47 @@ def physical_reconciliation_tasks(bundle: dict[str, Any]) -> list[dict[str, Any]
             ),
         })
     return tasks
+
+
+def period_header_tasks(bundle: dict[str, Any], bundle_path: Path) -> list[dict[str, Any]]:
+    """Create one aggregate rendered-header task for every unresolved table.
+
+    The model host reads already-sealed page images/crops and supplies only the
+    complete visible period labels. It cannot edit table values, source cells,
+    schemas or mappings at this boundary.
+    """
+    targets = []
+    documents = {str(item.get("document_id")): item for item in bundle.get("documents", [])}
+    for item in period_target_inventory(bundle):
+        document = documents.get(str(item.get("document_id"))) or {}
+        artifact_by_id = {str(artifact.get("artifact_id")): artifact for artifact in document.get("artifacts", [])}
+        rendered_artifacts = []
+        for artifact_id in item.get("image_artifact_ids", []):
+            artifact = artifact_by_id.get(str(artifact_id))
+            target = artifact_path(bundle, document, str(artifact_id)) if artifact else None
+            if target:
+                rendered_artifacts.append({
+                    "artifact_id": artifact_id,
+                    "kind": artifact.get("kind"),
+                    "path": str(target),
+                    "sha256": artifact.get("sha256"),
+                })
+        targets.append({**item, "rendered_artifacts": rendered_artifacts})
+    if not targets:
+        return []
+    return [{
+        "task_kind": "period_header_adjudication",
+        "bundle_sha256": sha256_file(bundle_path),
+        "canonical_tables_sha256": bundle.get("canonical_tables_sha256"),
+        "candidate_manifest_sha256": period_canonical_hash(bundle.get("candidate_manifest")),
+        "targets": targets,
+        "instruction": (
+            "Read the complete annual labels from the already-rendered grids and write only those "
+            "visible labels into broker-period-header-review.json. Never infer a missing digit from "
+            "sequence alone. If a label remains unreadable, omit that column: the controller will "
+            "quarantine only that column and continue the model through the forecast waterfall."
+        ),
+    }]
 
 
 def write_state(
@@ -1267,6 +1312,87 @@ def main() -> int:
             f"Canonical physical reconciliation returned invalid status {physical_status!r}."
         )
 
+    # Every closed state and downstream ingress declaration refers to the
+    # actual physical-authority bundle, even when no vision/degraded filename
+    # was needed. Avoid making clean-native and degraded paths expose different
+    # artifact interfaces.
+    artifacts["verified_bundle"] = str(active_bundle_path)
+
+    # Physical preservation can be complete while a rendered period label is
+    # still truncated in the PDF text lane. Resolve that late boundary here,
+    # before a semantic crosswalk can consume it. One model-host read is
+    # allowed; an omitted/unreadable column then degrades locally rather than
+    # stopping the broker lane or the company model.
+    unresolved_period_targets = period_target_inventory(active_bundle)
+    if unresolved_period_targets:
+        period_review_path = responses / "broker-period-header-review.json" if responses else None
+        prior_period_task = any(
+            task.get("task_kind") == "period_header_adjudication"
+            for task in prior_state.get("tasks", [])
+        )
+        if not period_review_path or not period_review_path.is_file():
+            if not prior_period_task and not bounded_recovery_exhausted(prior_state, attempts):
+                checkpoint(
+                    checkpoints, stage="period_header_recovery", status="NEEDS_WORK",
+                    input_digest=sha256_file(active_bundle_path), output=None, reused=False,
+                )
+                write_state(
+                    state_path, run_id=run_id, status="NEEDS_RESOLUTION",
+                    request_digest=request_digest, sources=sources,
+                    runtime_digest=runtime_digest, cache_key=cache_key,
+                    checkpoints=checkpoints, artifacts=artifacts,
+                    tasks=period_header_tasks(active_bundle, active_bundle_path),
+                    summary={
+                        "unresolved_period_table_count": len(unresolved_period_targets),
+                        "terminal_reason": None,
+                    },
+                    blocker_class="INTERNAL_WORK", attempts=attempts,
+                )
+                return 2
+        period_input = sha256_bytes(canonical_bytes({
+            "bundle": sha256_file(active_bundle_path),
+            "review": sha256_file(period_review_path) if period_review_path and period_review_path.is_file() else None,
+            "quarantine_unresolved": True,
+            "runtime": runtime_digest,
+        }))
+        period_path = output_root / f"period-resolved-{key}-{period_input[:12]}.json"
+        period_receipt_path = output_root / f"period-resolved-{key}-{period_input[:12]}.receipt.json"
+        period_checkpoint_receipt = output_root / f"period-resolved-{key}-{period_input[:12]}.checkpoint.json"
+        period_reused = reusable(period_path, period_checkpoint_receipt, period_input)
+        if not period_reused:
+            command = [
+                sys.executable, str(HERE / "broker_period_recovery.py"),
+                str(active_bundle_path), "--quarantine-unresolved",
+                "--out", str(period_path), "--receipt", str(period_receipt_path),
+            ]
+            if period_review_path and period_review_path.is_file():
+                command.extend(["--review", str(period_review_path)])
+            completed_period = run(command, {0, 1, 2})
+            if completed_period.returncode != 0 or not period_path.is_file():
+                # A malformed response never becomes authority. Once the
+                # bounded task has been attempted, close without it by local
+                # column quarantine rather than surfacing another stop.
+                command = [
+                    sys.executable, str(HERE / "broker_period_recovery.py"),
+                    str(active_bundle_path), "--quarantine-unresolved",
+                    "--out", str(period_path), "--receipt", str(period_receipt_path),
+                ]
+                run(command, {0})
+            seal_checkpoint(period_path, period_checkpoint_receipt, period_input)
+        recovered_period_bundle = read_json(period_path, "period-resolved broker bundle")
+        period_receipt = read_json(period_receipt_path, "period-header recovery receipt")
+        if period_receipt.get("status") != "PASS":
+            raise RuntimeError("Period-header recovery did not reach its bounded terminal state.")
+        active_bundle_path = period_path
+        active_bundle = recovered_period_bundle
+        artifacts["verified_bundle"] = str(period_path)
+        artifacts["period_header_recovery_receipt"] = str(period_receipt_path)
+        lane_degraded = bool(lane_degraded or period_receipt.get("quarantined_column_count"))
+        checkpoint(
+            checkpoints, stage="period_header_recovery", status="PASS",
+            input_digest=period_input, output=period_path, reused=period_reused,
+        )
+
     crosswalk = Path(args.crosswalk).resolve() if args.crosswalk else None
     if not crosswalk or not crosswalk.is_file():
         checkpoint(checkpoints, stage="semantic_crosswalk", status="NEEDS_WORK", input_digest=sha256_file(active_bundle_path), output=None, reused=False)
@@ -1325,6 +1451,55 @@ def main() -> int:
     if semantic.get("status") != "PASS":
         source_crosswalk = read_json(crosswalk, "broker crosswalk")
         recovery_analysis = analyse_terminal_recovery(active_bundle, source_crosswalk, semantic)
+        # A candidate-local semantic failure may already touch a selected
+        # mapping. The old recovery correctly refused to call that cell
+        # "unconsumed" but had no transition to make it unconsumed. Exclude
+        # only the finding-owned house now, preserve all its evidence, and
+        # independently re-run semantics before any pack can compile.
+        if recovery_analysis["blocking_findings"] and all(
+            item.get("reason") == "selected_model_candidate_unresolved"
+            for item in recovery_analysis["blocking_findings"]
+        ):
+            try:
+                recovered_crosswalk, exclusion_receipt, terminal_semantic = degrade_finding_houses(
+                    bundle=active_bundle,
+                    crosswalk=source_crosswalk,
+                    semantic_report=semantic,
+                    bundle_sha256=sha256_file(active_bundle_path),
+                    source_crosswalk_sha256=crosswalk_digest,
+                )
+            except ValueError:
+                pass
+            else:
+                recovered_path = output_root / f"house-excluded-crosswalk-{key}-{crosswalk_digest[:12]}.json"
+                exclusion_receipt_path = output_root / f"house-excluded-crosswalk-{key}-{crosswalk_digest[:12]}.receipt.json"
+                terminal_semantic_path = output_root / f"house-excluded-terminal-semantic-{key}-{crosswalk_digest[:12]}.json"
+                atomic_json(recovered_path, recovered_crosswalk)
+                atomic_json(exclusion_receipt_path, exclusion_receipt)
+                atomic_json(terminal_semantic_path, terminal_semantic)
+                crosswalk = recovered_path
+                crosswalk_digest = sha256_file(crosswalk)
+                artifacts["crosswalk"] = str(crosswalk)
+                artifacts["house_exclusion_receipt"] = str(exclusion_receipt_path)
+                artifacts["terminal_recovery_receipt"] = str(exclusion_receipt_path)
+                semantic_path = output_root / f"semantic-{key}-{crosswalk_digest[:12]}.json"
+                semantic_input = sha256_bytes(canonical_bytes({
+                    "bundle": sha256_file(active_bundle_path), "crosswalk": crosswalk_digest,
+                    "runtime": runtime_digest,
+                }))
+                run([
+                    sys.executable, str(HERE / "verify_broker_semantics.py"),
+                    str(active_bundle_path), str(crosswalk), "--out", str(semantic_path),
+                ], {0, 1})
+                semantic = read_json(semantic_path, "house-excluded broker semantic report")
+                artifacts["semantic_report"] = str(semantic_path)
+                checkpoint(
+                    checkpoints, stage="house_local_authority_fallback",
+                    status="PASS" if semantic.get("status") == "PASS" else "NEEDS_WORK",
+                    input_digest=semantic_input, output=semantic_path, reused=False,
+                )
+                lane_degraded = True
+                recovery_analysis = analyse_terminal_recovery(active_bundle, recovered_crosswalk, semantic)
         terminal_review_path = responses / "broker-terminal-materiality-review.json" if responses else None
         prior_terminal = any(
             task.get("task_kind") == "terminal_materiality_recovery"
@@ -1501,6 +1676,21 @@ def main() -> int:
     summary["quarantined_surface_count"] = active_bundle.get("summary", {}).get(
         "quarantined_surface_count", 0
     )
+    summary["excluded_house_count"] = 0
+    if artifacts.get("house_exclusion_receipt"):
+        exclusion_summary = read_json(
+            Path(artifacts["house_exclusion_receipt"]), "broker house-exclusion receipt"
+        )
+        summary["excluded_house_count"] = len(exclusion_summary.get("excluded_house_ids", []))
+        # The excluded candidates are preserved in terminal quarantine inside
+        # the recovered crosswalk, not by mutating source cells in the bundle.
+        # Surface that receipted degradation explicitly so PASS can never hide
+        # a house-local authority fallback.
+        summary["quarantined_conflict_count"] = max(
+            int(summary.get("quarantined_conflict_count") or 0),
+            int(exclusion_summary.get("preserved_candidate_count") or 0),
+        )
+        summary["degraded"] = True
     write_state(
         state_path, run_id=run_id,
         status="PASS_DEGRADED" if summary["degraded"] else "PASS",

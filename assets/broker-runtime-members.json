@@ -3,6 +3,8 @@
   "members": [
     "scripts/run_broker_pipeline.py",
     "scripts/broker_terminal_recovery.py",
+    "scripts/broker_period_recovery.py",
+    "scripts/broker_table_engine.py",
     "scripts/workflow_state.py",
     "scripts/extract_broker_evidence.py",
     "scripts/compile_broker_surface_census.py",
@@ -25,6 +27,9 @@
     "assets/broker-metric-dictionary.json",
     "assets/broker-model-host-response-boundary-v1.json",
     "assets/broker-terminal-materiality-review.schema.json",
+    "assets/broker-period-header-review.schema.json",
+    "assets/broker-table-engine-registry-v1.json",
+    "assets/broker-table-engine-result.schema.json",
     "assets/broker-run-state.schema.json",
     "assets/workflow-state-contract-v1.json"
   ]

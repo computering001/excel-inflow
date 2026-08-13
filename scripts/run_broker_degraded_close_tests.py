@@ -360,12 +360,18 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
         for table in document.get("tables", []):
             header = table.get("rows", [[]])[0] if table.get("rows") else []
             period_columns = []
+            effective_headers = {
+                int(item.get("column")): str(item.get("period_label") or "")
+                for item in table.get("effective_period_headers", [])
+                if item.get("column")
+            }
             for cell_entry in header:
-                text = str(cell_entry.get("raw_text") or "")
+                column = int(cell_entry.get("column"))
+                text = effective_headers.get(column, str(cell_entry.get("raw_text") or ""))
                 if "2027" in text:
-                    period_columns.append({"column": int(cell_entry.get("column")), "period_basis": "annual_forecast", "period_index": 0})
+                    period_columns.append({"column": column, "period_basis": "annual_forecast", "period_index": 0})
                 elif "2028" in text:
-                    period_columns.append({"column": int(cell_entry.get("column")), "period_basis": "annual_forecast", "period_index": 1})
+                    period_columns.append({"column": column, "period_basis": "annual_forecast", "period_index": 1})
             table_reviews.append({
                 "table_id": table.get("canonical_table_id") or table.get("table_id"),
                 "house_id": document.get("house_id"),

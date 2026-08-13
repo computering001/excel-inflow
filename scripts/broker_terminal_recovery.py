@@ -220,6 +220,127 @@ def automatic_negative_consumption_review(
     }
 
 
+def degrade_finding_houses(
+    *,
+    bundle: dict[str, Any],
+    crosswalk: dict[str, Any],
+    semantic_report: dict[str, Any],
+    bundle_sha256: str,
+    source_crosswalk_sha256: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Remove only finding-owned houses from consumption, then seal evidence.
+
+    This is the executable counterpart to "exclude Kepler/Berenberg".  It is
+    intentionally negative-only: no mapping is created or rewritten, no value
+    is changed, and no other house is touched.  A global/unbound finding cannot
+    use this path because its impact cannot be localised safely.
+    """
+    candidates = candidate_index(bundle)
+    findings = list(semantic_report.get("findings") or [])
+    finding_candidate_ids = {
+        str(item.get("candidate_id") or "") for item in findings
+        if str(item.get("candidate_id") or "")
+    }
+    if not findings or any(
+        not str(item.get("candidate_id") or "")
+        or str(item.get("candidate_id") or "") not in candidates
+        for item in findings
+    ):
+        raise ValueError("House-local fallback requires every semantic finding to bind one immutable candidate.")
+    excluded_houses = sorted({
+        str(candidates[candidate_id].get("house_id") or "")
+        for candidate_id in finding_candidate_ids
+    })
+    if not excluded_houses or any(not house_id for house_id in excluded_houses):
+        raise ValueError("House-local fallback could not resolve finding-owned houses.")
+    excluded = set(excluded_houses)
+    target_ids = sorted(
+        candidate_id for candidate_id, candidate in candidates.items()
+        if str(candidate.get("house_id") or "") in excluded
+    )
+    pruned = copy.deepcopy(crosswalk)
+    removed_mapping_ids = {
+        str(mapping.get("mapping_id") or "")
+        for mapping in pruned.get("mappings", [])
+        if str(mapping.get("house_id") or "") in excluded
+    }
+    pruned["mappings"] = [
+        mapping for mapping in pruned.get("mappings", [])
+        if str(mapping.get("house_id") or "") not in excluded
+    ]
+    pruned["coverage_ledger"] = [
+        entry for entry in pruned.get("coverage_ledger", [])
+        if str(entry.get("house_id") or "") not in excluded
+    ]
+    if "derived_mappings" in pruned:
+        pruned["derived_mappings"] = [
+            item for item in pruned.get("derived_mappings", [])
+            if str(item.get("house_id") or "") not in excluded
+            and str(item.get("mapping_id") or "") not in removed_mapping_ids
+        ]
+    if "flex_elections" in pruned:
+        pruned["flex_elections"] = [
+            item for item in pruned.get("flex_elections", [])
+            if str(item.get("source_house_id") or "") not in excluded
+        ]
+    # A caller-authored pooled series cannot prove which house values remain
+    # after exclusion. Remove the optional cache and let the pack compiler
+    # recompute only from retained mappings.
+    pruned.pop("provider_consensus", None)
+
+    synthetic_report = {
+        "schema_version": "broker-semantic-verification-report/1.0",
+        "status": "BLOCKED",
+        "total_violation_count": len(target_ids),
+        "candidate_manifest_sha256": canonical_hash(bundle.get("candidate_manifest")),
+        "crosswalk_sha256": canonical_hash(pruned),
+        "candidate_count": len(candidates),
+        "coverage_entry_count": len(pruned.get("coverage_ledger", [])),
+        "terminal_quarantined_candidate_count": 0,
+        "unresolved_selected_candidate_count": 0,
+        "findings": [
+            {
+                "code": "TERMINAL-HOUSE-EXCLUSION",
+                "candidate_id": candidate_id,
+                "message": "The finding-owned house is preserved as evidence and removed from model authority.",
+            }
+            for candidate_id in target_ids
+        ],
+    }
+    synthetic_sha = canonical_hash(synthetic_report)
+    review = automatic_negative_consumption_review(
+        bundle=bundle,
+        crosswalk_sha256=canonical_hash(pruned),
+        semantic_report_sha256=synthetic_sha,
+        semantic_report=synthetic_report,
+        bundle_sha256=bundle_sha256,
+    )
+    review["producer_id"] = "broker-controller-house-exclusion/1.0"
+    recovered, terminal_receipt = apply_terminal_review(
+        bundle=bundle,
+        crosswalk=pruned,
+        semantic_report=synthetic_report,
+        review=review,
+        bundle_sha256=bundle_sha256,
+        crosswalk_sha256=canonical_hash(pruned),
+        semantic_report_sha256=synthetic_sha,
+    )
+    exclusion_receipt = {
+        "schema_version": "broker-house-exclusion-receipt/1.0",
+        "status": "PASS",
+        "source_crosswalk_sha256": source_crosswalk_sha256,
+        "recovered_crosswalk_sha256": canonical_hash(recovered),
+        "source_semantic_report_sha256": canonical_hash(semantic_report),
+        "terminal_semantic_report_sha256": synthetic_sha,
+        "excluded_house_ids": excluded_houses,
+        "removed_mapping_ids": sorted(item for item in removed_mapping_ids if item),
+        "preserved_candidate_count": len(target_ids),
+        "remaining_mapping_count": len(recovered.get("mappings", [])),
+        "model_consumption_added": 0,
+    }
+    return recovered, exclusion_receipt, synthetic_report
+
+
 def apply_terminal_review(
     *,
     bundle: dict[str, Any],

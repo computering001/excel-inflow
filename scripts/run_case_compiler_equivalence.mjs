@@ -719,6 +719,51 @@ for (const name of files) {
       (row) => row?.row_id === match[2],
     ) ?? null;
   };
+  const statementRowsById = new Map(
+    [
+      ...(compiled.statement_structure?.income_statement ?? []),
+      ...(compiled.statement_structure?.cash_flow ?? []),
+    ].map((row) => [row.row_id, row]),
+  );
+  const historicalFormulaValue = (rowId, period, visiting = new Set()) => {
+    const row = statementRowsById.get(rowId);
+    if (!row || visiting.has(rowId)) return null;
+    const direct = row.values?.[period];
+    if (direct !== null && direct !== undefined && Number.isFinite(Number(direct))) return Number(direct);
+    const rule = row.calculation;
+    if (!rule?.operator || !Array.isArray(rule.refs)) return null;
+    const next = new Set(visiting).add(rowId);
+    const values = rule.refs.map((ref) => historicalFormulaValue(ref, period, next));
+    if (values.some((value) => value === null || !Number.isFinite(value))) return null;
+    switch (rule.operator) {
+      case "sum": return values.reduce((total, value) => total + value, 0);
+      case "link": return values[0] ?? null;
+      case "negate": return -(values[0] ?? 0);
+      case "negate_sum": return -values.reduce((total, value) => total + value, 0);
+      case "subtract": return values.slice(1).reduce((value, item) => value - item, values[0] ?? 0);
+      case "ratio": return Math.abs(values[1] ?? 0) > 1e-12 ? values[0] / values[1] : null;
+      case "negated_ratio": return Math.abs(values[1] ?? 0) > 1e-12 ? -values[0] / values[1] : null;
+      default: return null;
+    }
+  };
+  // The legacy certified cohort often left a formula row's entire values
+  // array null. The proposer now materialises only its three historical
+  // values from the declared accounting identity. Treat that as a named
+  // migration only after independently recomputing all three values from the
+  // compiled dependency graph; forecasts must remain null.
+  const isDerivedHistoricalMaterialization = (diff) => {
+    const match = diff.path.match(/^statement_structure\.(income_statement|cash_flow)\[([^\]]+)\]\.values$/);
+    if (!match || !(diff.expected === "null" || diff.certifiedAbsent === true)) return false;
+    const row = statementRowsById.get(match[2]);
+    if (!row?.calculation || !Array.isArray(row.values) || row.values.length !== 6) return false;
+    if (row.values.slice(3).some((value) => value !== null && value !== undefined)) return false;
+    return [0, 1, 2].every((period) => {
+      const expectedValue = historicalFormulaValue(row.row_id, period);
+      const actualValue = row.values[period];
+      return Number.isFinite(expectedValue) && Number.isFinite(Number(actualValue)) &&
+        Math.abs(Number(actualValue) - expectedValue) <= 1e-9;
+    });
+  };
   const isAuthorityMaterialisedValue = (diff) => {
     const match = diff.path.match(/^statement_structure\.(income_statement|cash_flow)\[[^\]]+\]\.values\[([3-5])\]$/);
     if (!match) return false;
@@ -780,6 +825,7 @@ for (const name of files) {
     isJustified(diff) ||
     isFixtureReceipt(diff) ||
     isFinanceAddbackMigration(diff) ||
+    isDerivedHistoricalMaterialization(diff) ||
     isAuthorityMaterialisedValue(diff) ||
     isRelocatedLinkRule(diff) ||
     isLinkDirectionSwap(diff);
@@ -1069,6 +1115,19 @@ for (const name of files) {
         const authority = caseRow?.forecast_period_authorities?.[Number(match[1]) - 3];
         return Boolean(authority && typeof authority === "object");
       };
+      const planDerivedHistoricalMaterialization = (id, d) => {
+        if (d.path !== `${id}.values`) return false;
+        if (!(d.expected === "null" || d.expected === "(absent)")) return false;
+        const caseRow = compiledCaseRows.get(id);
+        if (!caseRow?.calculation || !Array.isArray(caseRow.values) || caseRow.values.length !== 6) return false;
+        if (caseRow.values.slice(3).some((value) => value !== null && value !== undefined)) return false;
+        return [0, 1, 2].every((period) => {
+          const expectedValue = historicalFormulaValue(id, period);
+          const actualValue = caseRow.values[period];
+          return Number.isFinite(expectedValue) && Number.isFinite(Number(actualValue)) &&
+            Math.abs(Number(actualValue) - expectedValue) <= 1e-9;
+        });
+      };
       const planCalcMigration = (id, d) => {
         if (!/\.(forecast_calculation|calculation)(\.|$)|\.(historical_)?dependency_refs(\[\d+\])?$/.test(d.path)) {
           return false;
@@ -1180,9 +1239,13 @@ for (const name of files) {
                     ...(certified.statement_structure?.cash_flow ?? []),
                   ].find((row) => row?.row_id === "adjusted_ebitda");
                   const caseRow = compiledCaseRows.get("adjusted_ebitda");
+                  const legacyComparableValues = certCaseRow?.values ??
+                    (Array.isArray(caseRow?.values) && caseRow.values.slice(3).every((value) => value === null)
+                      ? caseRow.values
+                      : null);
                   return Boolean(
                     certCaseRow && caseRow &&
-                    JSON.stringify(certCaseRow.values ?? null) ===
+                    JSON.stringify(legacyComparableValues) ===
                       JSON.stringify(caseRow.values ?? null),
                   );
                 })()) &&
@@ -1194,6 +1257,7 @@ for (const name of files) {
                 (d.actual === "(absent)" || d.actual === "null") &&
                 /"method":"(carry_forward|explicit_zero)","reason":"Legacy last-/.test(d.expected ?? "")),
           );
+          rowDiffs = rowDiffs.filter((d) => !planDerivedHistoricalMaterialization(id, d));
           if (rowDiffs.length === 0) continue;
           const shellClass = rowDiffs.every((d) =>
             /\.(values(\[\d+\])?|calculation(\.refs(\[\d+\])?)?|dependency_refs|row_type|forecast_treatment)$/.test(d.path) &&

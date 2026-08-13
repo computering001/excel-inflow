@@ -381,6 +381,26 @@ that row by authority while retaining the same source row and label. The clean
 periods remain eligible for review and mapping; the conflicted period alone is
 quarantined. A single bad cell must never contaminate clean sibling periods.
 
+Treat a truncated native-text year such as `202` or `203` as an extraction
+fragment, not as a disputed economic value and never as a year that may be
+completed by guesswork. If the preserved rendered grid shows the full header,
+one hash-bound `period_header_adjudication` may transcribe that visible label
+and record `rendered_header_review` as the effective header authority while the
+raw fragment remains byte-for-byte unchanged. If the read is still unavailable,
+quarantine only that period column and continue with its clean sibling columns.
+Repeated headers and table continuations across pages inherit periods only
+through a source-owned continuation certificate; a page number, narrative year
+or nearby table never supplies the missing header.
+
+If a semantic conflict remains in a cell that an active mapping consumes, the
+controller first removes every mapping, consensus component and eligibility
+claim for the finding-owned house, independently re-runs the semantic verifier,
+and resumes with the surviving houses or the ordinary forecast waterfall. This
+is a deterministic house-local authority fallback, not deletion: all raw tables
+and candidates for the excluded house remain preserved as model-prohibited
+evidence. A global integrity finding, an unowned finding or a finding spanning
+unidentifiable houses is not eligible for this transition.
+
 Every internal task packet must carry a deterministic task ID, a registered
 remedy, a finite attempt budget, a stage-local progress measure, the exact
 expected response filename(s), the response-schema hash and an instruction to
@@ -417,6 +437,14 @@ list is not a table. Disagreement produces a cell-level conflict manifest. One
 targeted third read resolves or quarantines only those cells and overlays the
 result onto the richer agreed transcription; it never replaces the full table
 surface.
+
+The required model-host reader is Rogo. An installed host may additionally use
+the provider-neutral `broker_table_engine.py` adapter with a registered optional
+Surya or Docling installation. Optional engines are accelerators, not new
+authorities: their output is normalized to the same grid contract and still
+requires the existing independent dual-read, source-binding, period, unit and
+semantic gates. The skill does not bundle their model weights or compiled
+dependencies and must continue correctly when neither is installed.
 
 Pass the resulting broker pack, source tables, crosswalk and receipt into the
 attachment ingress `broker_evidence` declaration before compiling the evidence

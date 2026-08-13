@@ -9,6 +9,7 @@
       "producer_kind": "model_host",
       "steps": [
         "Read the hash-bound page image and every supplied region crop.",
+        "Use Rogo vision directly, or a registered optional Surya/Docling adapter when the host exposes it; every provider must normalize to the same sealed response contract.",
         "Write two independent grid-preserving responses with different producer fingerprints.",
         "Bind each response to the exact document, surface, image hash and pass index.",
         "Resume the same broker controller transaction without changing source bytes."
@@ -36,6 +37,18 @@
         "Preserve resolved cells and either resolve or quarantine each remaining cell.",
         "Write the exact hash-bound response artifact named by the task packet.",
         "Resume the same broker controller transaction."
+      ]
+    },
+    "period_header_adjudication": {
+      "remedy_id": "rendered_period_header_read_then_local_quarantine",
+      "attempt_limit": 1,
+      "response_schema_path": "assets/broker-period-header-review.schema.json",
+      "producer_kind": "model_host",
+      "steps": [
+        "Read only the named period-header cells from the sealed whole-page image and region crops.",
+        "Record each complete visible period label with its document, surface, table and column binding; never complete a truncated year from sequence alone.",
+        "Omit any still-unreadable column so the controller can quarantine that column while retaining clean sibling periods.",
+        "Write broker-period-header-review.json and resume the same controller transaction."
       ]
     },
     "semantic_crosswalk_review": {

@@ -132,6 +132,23 @@ assert any(
     for item in header_findings
 )
 
+# The live Kepler/Berenberg failure was even narrower: a PDF lane emitted only
+# the year fragments in a disjoint sliver, so it shared neither geometry nor an
+# economic row/value with the complete rendered grid. Header-only fragments on
+# the same surface are corroboration, not a second analytical table.
+header_only_native = table(
+    "native-header-only-disjoint",
+    "native_pdf_lines",
+    [["FY20", "FY2"]],
+    bbox=[10, 2, 300, 8],
+)
+header_only_resolved, _ = canonicalise_bundle(bundle(
+    [header_only_native, complete_rendered], ["20", "2", "2025", "2026", "100", "110"]
+))
+header_only_manifest = compile_manifest(header_only_resolved, source_bundle_sha256="d" * 64)
+assert len(header_only_resolved["documents"][0]["canonical_tables"]) == 1
+assert header_only_manifest["summary"]["unresolved_period_header_count"] == 0
+
 # A genuinely separate native table on the same page must survive.  The
 # rendered authority is table-specific, not permission to erase a page.
 disjoint_native = table(
@@ -252,7 +269,7 @@ assert unrelated["effective_period_headers"] == []
 
 print(json.dumps({
     "status": "PASS",
-    "positive_archetypes": 4,
+    "positive_archetypes": 5,
     "adversarial_mutations_caught": 5,
     "rendered_disagreement_status": conflicted["physical_capture_receipt"]["status"],
     "native_recovery_status": native_pending["physical_capture_receipt"]["status"],

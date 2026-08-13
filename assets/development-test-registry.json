@@ -143,6 +143,24 @@
       "script": "run_broker_physical_reconciliation_tests.py"
     },
     {
+      "id": "broker-period-header-recovery",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_period_header_tests.py"
+    },
+    {
+      "id": "broker-house-exclusion",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_house_exclusion_tests.py"
+    },
+    {
+      "id": "broker-table-engine-adapter",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_table_engine_tests.py"
+    },
+    {
       "id": "broker-public-layout-corpus",
       "phase": "real_corpus",
       "runtime": "python",

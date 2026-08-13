@@ -43,6 +43,17 @@
     "candidate_manifest": {
       "type": "object"
     },
+    "period_header_recovery_receipt": {
+      "type": "object"
+    },
+    "source_bundle_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "canonical_findings": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
     "vision_conflict_manifests": {
       "type": "array",
       "items": {
