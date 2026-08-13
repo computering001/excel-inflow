@@ -50,11 +50,39 @@ def canonical_bytes(value: Any) -> bytes:
 
 
 def prior_targeted_resolution_attempted(state: dict[str, Any]) -> bool:
+    # The internal_fixed_point_defect aggregate REPLACES the targeted tasks it
+    # summarises; forgetting that history un-armed the quarantine fallback at
+    # the exact moment it was needed (the v57 live Astra defect).
     return any(
         task.get("task_kind") in {
             "targeted_cell_adjudication",
             "bounded_capture_adjudication",
+            "internal_fixed_point_defect",
         }
+        for task in state.get("tasks", [])
+    )
+
+
+def bounded_recovery_exhausted(state: dict[str, Any], attempts: dict[str, Any]) -> bool:
+    """The finite terminal signal for ordinary evidence ambiguity.
+
+    True once the vision attempt budget is spent or the internal fixed point
+    stalled to its retry limit. From here the physical lane must CLOSE
+    (degraded, evidence preserved, quarantine receipts) rather than loop or
+    terminate the run.
+    """
+    if int(attempts.get("vision_attempt_count", 0)) >= int(
+        attempts.get("vision_attempt_limit", VISION_ATTEMPT_LIMIT)
+    ):
+        return True
+    fixed = state.get("fixed_point", {}) or {}
+    limit = int(fixed.get("unchanged_retry_limit") or 0)
+    if limit and int(fixed.get("unchanged_retry_count") or 0) + 1 >= limit:
+        return True
+    if fixed.get("status") == "TERMINAL_DEFECT":
+        return True
+    return any(
+        task.get("task_kind") == "internal_fixed_point_defect"
         for task in state.get("tasks", [])
     )
 
@@ -682,7 +710,7 @@ def write_state(
         )
         blocker_class = "INTERNAL_WORK"
         user_blocking = False
-    elif status == "PASS":
+    elif status in {"PASS", "PASS_DEGRADED"}:
         fixed_point = {
             "schema_version": "broker-internal-fixed-point/1.0",
             "status": "CLOSED",
@@ -694,7 +722,7 @@ def write_state(
             "remaining_task_count": 0,
             "progress_score": INTERNAL_STAGE_ORDINAL["PASS"] * 10000,
             "progress_sha256": sha256_bytes(canonical_bytes({
-                "cache_key": cache_key, "status": "PASS",
+                "cache_key": cache_key, "status": status,
             })),
             "task_set_sha256": sha256_bytes(canonical_bytes([])),
             "unchanged_retry_count": 0,
@@ -958,36 +986,77 @@ def main() -> int:
                     "Preserve the visible grid or explicitly classify the surface as verified_non_tabular."
                 )
             exhausted = attempt_exhausted
-            if exhausted:
-                tasks = [{
-                    "task_kind": "bounded_capture_adjudication",
-                    "document_id": task.get("document_id"),
-                    "surface_id": task.get("surface_id"),
-                    "prior_task": task,
-                    "instruction": (
-                        "The bounded full-surface reads are exhausted. Adjudicate only the remaining physical "
-                        "regions/cells, or certify verified_non_tabular where independently supported. This is "
-                        "internal work and is not a request for replacement readable research."
-                    ),
-                } for task in tasks]
-            write_state(
-                state_path, run_id=run_id,
-                status="NEEDS_RESOLUTION" if exhausted else "NEEDS_VISION",
-                request_digest=request_digest,
-                sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
-                checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
-                summary={
-                    "unresolved_surface_count": len(tasks),
-                    "vision_attempt_count": attempts["vision_attempt_count"],
-                    "terminal_reason": (
-                        "bounded_vision_retry_escalated_to_targeted_adjudication"
-                        if exhausted else None
-                    ),
-                    "findings": active_bundle.get("findings", []),
-                },
-                blocker_class="INTERNAL_WORK", attempts=attempts,
+            fully_exhausted = exhausted and bounded_recovery_exhausted(prior_state, attempts)
+            if not fully_exhausted:
+                if exhausted:
+                    tasks = [{
+                        "task_kind": "bounded_capture_adjudication",
+                        "document_id": task.get("document_id"),
+                        "surface_id": task.get("surface_id"),
+                        "prior_task": task,
+                        "instruction": (
+                            "The bounded full-surface reads are exhausted. Adjudicate only the remaining physical "
+                            "regions/cells, or certify verified_non_tabular where independently supported. This is "
+                            "internal work and is not a request for replacement readable research."
+                        ),
+                    } for task in tasks]
+                write_state(
+                    state_path, run_id=run_id,
+                    status="NEEDS_RESOLUTION" if exhausted else "NEEDS_VISION",
+                    request_digest=request_digest,
+                    sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
+                    checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
+                    summary={
+                        "unresolved_surface_count": len(tasks),
+                        "vision_attempt_count": attempts["vision_attempt_count"],
+                        "terminal_reason": (
+                            "bounded_vision_retry_escalated_to_targeted_adjudication"
+                            if exhausted else None
+                        ),
+                        "findings": active_bundle.get("findings", []),
+                    },
+                    blocker_class="INTERNAL_WORK", attempts=attempts,
+                )
+                return 2
+            # Both the full-surface read budget and the retry frontier are
+            # spent: close the lane DEGRADED here — quarantine the smallest
+            # defensible regions, preserve every report verbatim — instead of
+            # queueing unwinnable internal work.
+            degraded_path = output_root / f"verified-{key}-degraded.json"
+            degraded_receipt = output_root / f"verified-{key}-degraded.receipt.json"
+            degraded_input = sha256_bytes(canonical_bytes({
+                "bundle": sha256_file(bundle_path),
+                "responses": responses_digest,
+                "runtime": runtime_digest,
+                "degrade_exhausted": True,
+            }))
+            degraded_reused = reusable(degraded_path, degraded_receipt, degraded_input)
+            if not degraded_reused:
+                run([
+                    sys.executable,
+                    str(HERE / "compile_broker_vision.py"),
+                    str(bundle_path),
+                    "--responses",
+                    str(responses),
+                    "--degrade-exhausted",
+                    "--out",
+                    str(degraded_path),
+                ], {0, 2})
+                seal_checkpoint(degraded_path, degraded_receipt, degraded_input)
+            degraded_bundle = read_json(degraded_path, "degraded broker bundle")
+            checkpoint(
+                checkpoints,
+                stage="physical_degraded_close",
+                status="PASS" if (degraded_bundle.get("physical_capture_receipt") or {}).get("status") == "PASS" else "NEEDS_WORK",
+                input_digest=degraded_input,
+                output=degraded_path,
+                reused=degraded_reused,
             )
-            return 2
+            if (degraded_bundle.get("physical_capture_receipt") or {}).get("status") == "PASS":
+                active_bundle_path = degraded_path
+                active_bundle = degraded_bundle
+                artifacts["verified_bundle"] = str(degraded_path)
+                artifacts["degraded_close_bundle"] = str(degraded_path)
 
     # Canonical physical reconciliation is an explicit stage even when native
     # extraction appeared complete. It owns lane overlap and numeric ownership;
@@ -1082,6 +1151,63 @@ def main() -> int:
             if physical_status != "PASS" and attempt_exhausted:
                 physical_status = "NEEDS_RESOLUTION"
 
+    lane_degraded = bool((active_bundle.get("summary") or {}).get("degraded"))
+    if (
+        physical_status in {"NEEDS_VISION", "NEEDS_RESOLUTION"}
+        and bounded_recovery_exhausted(prior_state, attempts)
+    ):
+        # The bounded budget is spent on ORDINARY evidence ambiguity. The
+        # delivery constitution forbids terminating here: close the physical
+        # lane DEGRADED — quarantine the smallest defensible regions, preserve
+        # every report verbatim, and continue into semantic work with only
+        # clean cells eligible. BLOCKED_INTERNAL below remains reachable only
+        # if even this full-degradation close cannot produce a sealed receipt,
+        # which is genuine controller corruption rather than evidence doubt.
+        degraded_path = output_root / f"reconciled-{key}-degraded.json"
+        degraded_receipt = output_root / f"reconciled-{key}-degraded.receipt.json"
+        degraded_input = sha256_bytes(canonical_bytes({
+            "bundle": sha256_file(active_bundle_path),
+            "runtime": runtime_digest,
+            "degrade_exhausted": True,
+        }))
+        degraded_reused = reusable(degraded_path, degraded_receipt, degraded_input)
+        if not degraded_reused:
+            degrade_command = [
+                sys.executable,
+                str(HERE / "compile_broker_vision.py"),
+                str(active_bundle_path),
+                "--degrade-exhausted",
+            ]
+            if responses is not None and responses.is_dir():
+                degrade_command.extend(["--responses", str(responses)])
+            degrade_command.extend(["--out", str(degraded_path)])
+            run(degrade_command, {0, 2})
+            if degraded_path.is_file():
+                seal_checkpoint(degraded_path, degraded_receipt, degraded_input)
+        if degraded_path.is_file():
+            candidate_bundle = read_json(degraded_path, "degraded broker bundle")
+            candidate_status = (
+                candidate_bundle.get("physical_capture_receipt") or {}
+            ).get("status")
+            checkpoint(
+                checkpoints,
+                stage="physical_degraded_close",
+                status="PASS" if candidate_status == "PASS" else "NEEDS_WORK",
+                input_digest=degraded_input,
+                output=degraded_path,
+                reused=degraded_reused,
+            )
+            if candidate_status == "PASS":
+                active_bundle_path = degraded_path
+                active_bundle = candidate_bundle
+                artifacts["reconciled_bundle"] = str(degraded_path)
+                artifacts["degraded_close_bundle"] = str(degraded_path)
+                # Downstream evidence compilation must consume the bundle that
+                # CARRIES the quarantine dispositions, never a rawer one.
+                artifacts["verified_bundle"] = str(degraded_path)
+                physical_status = "PASS"
+                lane_degraded = True
+
     if physical_status in {"NEEDS_VISION", "NEEDS_RESOLUTION"}:
         tasks = (
             vision_tasks(active_bundle, responses)
@@ -1141,7 +1267,30 @@ def main() -> int:
     semantic_receipt = output_root / f"semantic-{key}-{crosswalk_digest[:12]}.receipt.json"
     semantic_reused = reusable(semantic_path, semantic_receipt, semantic_input)
     if not semantic_reused:
-        run([sys.executable, str(HERE / "verify_broker_semantics.py"), str(active_bundle_path), str(crosswalk), "--out", str(semantic_path)], {0, 1})
+        completed_semantic = run([sys.executable, str(HERE / "verify_broker_semantics.py"), str(active_bundle_path), str(crosswalk), "--out", str(semantic_path)], {0, 1})
+        if not semantic_path.is_file():
+            # The reviewer-supplied crosswalk broke the independent verifier
+            # before it could report. That is a defective REVIEW ARTIFACT, not
+            # a controller crash: name it and ask for a corrected review.
+            checkpoint(checkpoints, stage="semantic_verification", status="NEEDS_WORK", input_digest=semantic_input, output=None, reused=False)
+            write_state(
+                state_path, run_id=run_id, status="NEEDS_CROSSWALK_REVIEW", request_digest=request_digest,
+                sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
+                checkpoints=checkpoints, artifacts=artifacts,
+                tasks=[{
+                    "task_kind": "semantic_crosswalk_repair",
+                    "crosswalk_sha256": crosswalk_digest,
+                    "verifier_diagnostic": (completed_semantic.stderr or completed_semantic.stdout).strip()[-2000:],
+                    "instruction": (
+                        "The supplied crosswalk is structurally invalid (the independent "
+                        "verifier could not evaluate it). Correct the review artifact; do "
+                        "not alter source evidence or the verifier."
+                    ),
+                }],
+                summary={"terminal_reason": None, "crosswalk_invalid": True},
+                blocker_class="INTERNAL_WORK", attempts=attempts,
+            )
+            return 2
         seal_checkpoint(semantic_path, semantic_receipt, semantic_input)
     semantic = read_json(semantic_path, "broker semantic report")
     artifacts["semantic_report"] = str(semantic_path)
@@ -1317,8 +1466,18 @@ def main() -> int:
             else "DEFER_TO_FORECAST_WATERFALL"
         ),
     }
+    summary["degraded"] = bool(
+        lane_degraded
+        or active_bundle.get("summary", {}).get("degraded")
+        or summary.get("quarantined_conflict_count")
+    )
+    summary["quarantined_surface_count"] = active_bundle.get("summary", {}).get(
+        "quarantined_surface_count", 0
+    )
     write_state(
-        state_path, run_id=run_id, status="PASS", request_digest=request_digest,
+        state_path, run_id=run_id,
+        status="PASS_DEGRADED" if summary["degraded"] else "PASS",
+        request_digest=request_digest,
         sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
         checkpoints=checkpoints, artifacts=artifacts, tasks=[], summary=summary,
         blocker_class=None, attempts=attempts,

@@ -343,8 +343,18 @@ def apply_filings_lane(
     return resolved_ingress, returned_artifacts
 
 
+CLOSED_LANE_STATUSES = {"PASS", "PASS_DEGRADED"}
+
+
 def classify(lanes: dict[str, dict[str, Any]]) -> tuple[str, str | None, bool]:
-    blockers = [state.get("blocker_class") for state in lanes.values() if state.get("pipeline_status") != "PASS"]
+    # PASS_DEGRADED is a CLOSED broker lane: evidence preserved, irreconcilable
+    # regions quarantined model_use=prohibited. The delivery constitution makes
+    # broker uncertainty a degradation domain, never a delivery blocker.
+    blockers = [
+        state.get("blocker_class")
+        for state in lanes.values()
+        if state.get("pipeline_status") not in CLOSED_LANE_STATUSES
+    ]
     if not blockers:
         return "PASS", None, False
     if any(blocker in USER_BLOCKERS for blocker in blockers):
@@ -582,6 +592,23 @@ def main() -> int:
             "state_sha256": sha256_file(state_paths[kind]) if state_paths[kind].is_file() else None,
         })
     status, blocker, user_blocking = classify(lanes)
+    broker_lane = lanes.get("broker") or {}
+    if broker_lane.get("pipeline_status") == "PASS_DEGRADED":
+        broker_summary = broker_lane.get("summary") or {}
+        quarantine_disclosed = bool(broker_summary.get("degraded")) and (
+            "quarantined_conflict_count" in broker_summary
+            or "quarantined_surface_count" in broker_summary
+        )
+        if not quarantine_disclosed:
+            # A degraded close without its quarantine receipt is an invalid
+            # artifact closure, not an acceptable lane.
+            broker_lane["pipeline_status"] = "BLOCKED_INTERNAL"
+            broker_lane["blocker_class"] = "INTERNAL_WORK"
+            broker_lane["user_blocking"] = False
+            broker_lane.setdefault("summary", {})["terminal_reason"] = (
+                "degraded_close_missing_quarantine_receipt"
+            )
+            status, blocker, user_blocking = classify(lanes)
     tasks = [
         {"lane": kind, **task}
         for kind, state in lanes.items()
@@ -661,7 +688,13 @@ def main() -> int:
             status="PASS", blocker=None, user_blocking=False, lanes=lanes,
             checkpoints=checkpoints, artifacts=artifacts, tasks=[],
             summary={
-                "lane_statuses": {kind: "PASS" for kind in lanes},
+                "lane_statuses": {
+                    kind: state.get("pipeline_status") for kind, state in lanes.items()
+                },
+                "degraded_lanes": sorted(
+                    kind for kind, state in lanes.items()
+                    if state.get("pipeline_status") == "PASS_DEGRADED"
+                ),
                 "evidence_run_sha256": sha256_file(Path(artifacts["evidence_run"])),
             },
         )

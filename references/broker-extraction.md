@@ -85,13 +85,30 @@ The extraction bundle may be `PASS`, `NEEDS_VISION`, `NEEDS_RESOLUTION` or
 `BLOCKED`. `NEEDS_RESOLUTION` is an internal resumable state and must not be
 presented to the user as a request for new source files.
 
-Only `PASS` may enter a build. `NEEDS_VISION` and `NEEDS_RESOLUTION` are work
-instructions addressed to this run: execute the vision passes, adjudicate the
-conflicts, carry the bundle to `PASS`. A run may not proceed on the portion
-that happened to resolve, and may not substitute values assembled in
-conversation for the surfaces that did not. When broker documents are present,
-ingress requires the passing bundle before Stage 2 opens; there is no path from
-a stalled extraction to a delivered workbook.
+Only a CLOSED lane may enter a build, and the broker lane closes in exactly
+two ways: `PASS`, or `PASS_DEGRADED` after the bounded recovery budget is
+exhausted. `NEEDS_VISION` and `NEEDS_RESOLUTION` are work instructions
+addressed to this run: execute the vision passes, adjudicate the conflicts,
+carry the bundle toward `PASS`. A run may not proceed on the portion that
+happened to resolve while ordinary work remains, and may not substitute values
+assembled in conversation for the surfaces that did not resolve.
+
+When the finite budget is spent — vision attempts, fixed-point retries or an
+aggregate internal defect — the controller closes the lane itself as
+`PASS_DEGRADED`: the smallest defensible regions (a cell conflict, or a whole
+surface) are quarantined `model_use=prohibited`, every raw report stays
+preserved verbatim on its evidence tab, and quarantine counts are disclosed in
+the state summary and the Stage-2 preview. Broker uncertainty REDUCES broker
+authority — through continuation, quarantine, mapping exclusion, another
+coherent house, down to FORECAST_WATERFALL with zero broker consumption — and
+never blocks Debt, Build or Delivery. Only the four declared fatal reasons
+(issuer/period unresolved, material opening debt unresolved, equation system
+unsolved, workbook emission/validation failed) may block delivery, and none of
+them is a broker reason. Never render broker-only uncertainty as "cannot
+advance"; never delete unresolved evidence to fake an ordinary `PASS`; never
+ask the user to re-upload unchanged readable research. `BLOCKED` and
+`BLOCKED_INTERNAL` remain only for genuine controller corruption or tampered
+artifacts.
 
 Require all of the following before `PASS`:
 
@@ -115,7 +132,11 @@ semantic mapping does not cure an incomplete source extraction.
 
 ## Semantic crosswalk
 
-Create one `broker-crosswalk/1.2` only after the extraction bundle is `PASS`.
+Create one `broker-crosswalk/1.2` only after the physical lane is closed —
+the extraction bundle is `PASS`, or it carries a degraded-close physical
+capture receipt (`PASS_DEGRADED` path). Quarantined candidates may only be
+preserved in evidence quarantine; a crosswalk that activates one for model use
+is refused by the semantic verifier.
 Map by stable house id, metric id and forecast period. Each mapped value names
 one or more source table cells, a coefficient, optional constant, optional
 multiplier, rationale and review status. This declarative form supports a direct

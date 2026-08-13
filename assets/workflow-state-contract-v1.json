@@ -50,16 +50,18 @@
         "NEEDS_CROSSWALK_REVIEW": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
         "BLOCKED_INTERNAL": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
         "BLOCKED_INPUT": { "blocker_classes": ["USER_EVIDENCE", "FATAL_SOURCE"], "user_blocking": true },
-        "PASS": { "blocker_classes": [null], "user_blocking": false }
+        "PASS": { "blocker_classes": [null], "user_blocking": false },
+        "PASS_DEGRADED": { "blocker_classes": [null], "user_blocking": false, "description": "Bounded reconciliation exhausted on ordinary readable evidence; the smallest defensible regions are quarantined model_use=prohibited, all raw evidence is preserved, and the lane is CLOSED. Broker uncertainty degrades broker authority; it never terminates delivery (delivery_blocker_constitution)." }
       },
       "transitions": {
-        "NEEDS_VISION": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
-        "NEEDS_RESOLUTION": ["NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
-        "NEEDS_CROSSWALK": ["NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
-        "NEEDS_CROSSWALK_REVIEW": ["NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS"],
-        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "PASS"],
+        "NEEDS_VISION": ["NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "NEEDS_RESOLUTION": ["NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "NEEDS_CROSSWALK": ["NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "NEEDS_CROSSWALK_REVIEW": ["NEEDS_CROSSWALK_REVIEW", "BLOCKED_INTERNAL", "PASS", "PASS_DEGRADED"],
+        "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_VISION", "NEEDS_RESOLUTION", "NEEDS_CROSSWALK", "NEEDS_CROSSWALK_REVIEW", "PASS", "PASS_DEGRADED"],
         "BLOCKED_INPUT": ["BLOCKED_INPUT"],
-        "PASS": ["PASS", "BLOCKED_INTERNAL"]
+        "PASS": ["PASS", "BLOCKED_INTERNAL"],
+        "PASS_DEGRADED": ["PASS_DEGRADED", "PASS", "BLOCKED_INTERNAL"]
       }
     },
     "dcs": {

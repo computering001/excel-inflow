@@ -329,6 +329,12 @@ def main() -> int:
         raise AssertionError("terminal response seam accepted an undeclared invented value")
     checks += 11
 
+    # CONTRACT (delivery-blocker constitution, v58): seal_internal_work's
+    # BLOCKED_INTERNAL aggregation is the backstop for genuine controller
+    # corruption/stall ONLY. Exhausted ORDINARY evidence ambiguity never
+    # reaches this seal at the physical frontier any more — the controller
+    # closes that lane PASS_DEGRADED with quarantine receipts first, proven
+    # end to end by run_broker_degraded_close_tests.py.
     blocked_status, tasks4, fixed4, summary4 = broker.seal_internal_work(
         prior={}, cache_key=cache_key, status="BLOCKED_INTERNAL",
         tasks=[{"task_kind": "internal_fixed_point_defect", "instruction": "Repair selected-cell authority conflict."}],
@@ -403,6 +409,10 @@ def main() -> int:
             "tasks": [{"task_kind": "internal_fixed_point_defect", "task_id": "filings-defect"}],
         },
     }
+    # Same contract at the attachment layer: this aggregation path is for
+    # lanes that are GENUINELY internally defective. A broker lane that closed
+    # PASS_DEGRADED is accepted by classify() as a closed lane and never
+    # reaches this frontier (run_broker_degraded_close_tests.py).
     aggregate, attachment_terminal = attachment.task_frontier(
         terminal_lanes, status="BLOCKED_INTERNAL", transaction_hash="f" * 64,
     )

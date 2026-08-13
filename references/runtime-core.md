@@ -356,6 +356,30 @@ exhausts a task budget, emit one aggregate `internal_fixed_point_defect` with
 `NEEDS_RESOLUTION`, `NEEDS_CROSSWALK` or `NEEDS_CROSSWALK_REVIEW` packet as an
 end-user question.
 
+Exhausted ordinary evidence ambiguity never terminates the run. Once the
+bounded recovery budget is spent (vision attempts, fixed-point retries or an
+aggregate internal defect), the controller closes the physical lane itself as
+`PASS_DEGRADED`: the smallest defensible regions are quarantined
+`model_use=prohibited`, every raw report stays preserved verbatim, quarantine
+counts are disclosed in the state summary, and the run continues to Debt,
+Build and Delivery on the surviving broker authority (down to
+FORECAST_WATERFALL with zero broker consumption). `BLOCKED_INTERNAL` remains
+only for genuine controller corruption or tampered artifacts — never for
+readable research that would not reconcile.
+
+A sealed broker run may cross an intentional controller upgrade without losing
+its receipted progress or its exhaustion history. Migrate — never resume
+blind — with the fail-closed migration tool, pinning the exact prior runtime
+closure digest recorded in the run's `broker-run-state.json`:
+
+```text
+python3 scripts/migrate_broker_run_state.py <broker-extraction-request.json> --state <run-folder>/broker/broker-run-state.json --out <run-folder>/broker --from-closure <prior-runtime-closure-sha256>
+```
+
+The tool refuses on any request, source-hash, receipt or vintage mismatch,
+re-homes only receipt-verified checkpoints, writes a migration receipt beside
+the state, and never asks the user to re-upload unchanged sources.
+
 Do not force the complete broker-page inventory (page images, OCR lanes and
 narrative regions) into the workbook carrier. `broker-source-tables/1.0` remains
 the lossless run artifact; attachment ingress deterministically projects every

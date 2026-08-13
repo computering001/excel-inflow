@@ -99,6 +99,18 @@
       "script": "run_evidence_pipeline_tests.py"
     },
     {
+      "id": "broker-degraded-close",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_degraded_close_tests.py"
+    },
+    {
+      "id": "broker-carrier-migration",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_migration_tests.py"
+    },
+    {
       "id": "internal-evidence-fixed-point",
       "phase": "workflow",
       "runtime": "python",

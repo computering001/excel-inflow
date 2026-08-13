@@ -218,6 +218,53 @@ def comparable_response(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def quarantine_surface_evidence_only(
+    *,
+    bundle: dict[str, Any],
+    document: dict[str, Any],
+    surface: dict[str, Any],
+    findings: list[dict[str, Any]],
+    reason_id: str,
+    message: str,
+) -> None:
+    """Close one ambiguous surface as preserved, model-prohibited evidence.
+
+    Physical preservation and model authority are different facts: the page
+    render, raw fragments and census stay sealed, but the surface certifies
+    no analytical table and no cell from it may enter a mapping. Used only
+    under --degrade-exhausted, after the bounded attempt budget is gone.
+    """
+    surface["source_table_numeric_tokens"] = []
+    surface["vision_disposition"] = "quarantined_evidence_only"
+    surface["quarantine"] = {
+        "model_use": "prohibited",
+        "reason_id": reason_id,
+        "scope": "surface",
+    }
+    surface["lane_status"]["vision"] = "complete"
+    surface["vision_reason"] = None
+    surface["vision_conflict_summary"] = {
+        "conflict_count": 0,
+        "quarantined_conflict_count": 0,
+        "resolved_conflict_count": 0,
+    }
+    for region in surface.get("uncovered_numeric_regions", []):
+        if region.get("material"):
+            region["disposition"] = "quarantined_evidence_only"
+    bind_final_surface_census(bundle=bundle, document=document, surface=surface)
+    findings.append({
+        "id": "broker_vision.surface_quarantined_after_bounded_recovery",
+        "severity": "warning",
+        "document_id": document["document_id"],
+        "surface_id": str(surface.get("surface_id") or ""),
+        "quarantine_reason_id": reason_id,
+        "message": (
+            f"{message} The surface is preserved as evidence-only after bounded "
+            "recovery was exhausted; no cell from it is model-eligible."
+        ),
+    })
+
+
 def classify_surface_disposition(passes: list[dict[str, Any]]) -> tuple[str | None, str | None]:
     """Close the physical capture question independently of model use.
 
@@ -770,8 +817,23 @@ def main() -> int:
             "another NEEDS_RESOLUTION state."
         ),
     )
+    parser.add_argument(
+        "--degrade-exhausted",
+        action="store_true",
+        help=(
+            "The bounded attempt budget is exhausted: close the physical lane "
+            "DEGRADED. Implies --quarantine-unresolved for disputed cells and "
+            "additionally quarantines whole ambiguous surfaces (missing or "
+            "disagreeing reads, structureless or empty transcriptions, invalid "
+            "resolutions) as preserved evidence with model_use=prohibited. "
+            "Integrity failures (missing/hash-mismatched artifacts, non-independent "
+            "passes, broken bindings) are never degradable."
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
+    if args.degrade_exhausted:
+        args.quarantine_unresolved = True
     bundle_path = Path(args.bundle).resolve()
     response_root = Path(args.responses).resolve()
     output_path = Path(args.out).resolve()
@@ -822,6 +884,13 @@ def main() -> int:
             pass_paths = [Path(str(response_base) + ".pass1.json"), Path(str(response_base) + ".pass2.json")]
             resolution_path = Path(str(response_base) + ".resolution.json")
             if not all(path.is_file() for path in pass_paths):
+                if args.degrade_exhausted:
+                    quarantine_surface_evidence_only(
+                        bundle=bundle, document=document, surface=surface, findings=findings,
+                        reason_id="response_missing_after_exhaustion",
+                        message="Two independent vision responses never became available within the bounded budget.",
+                    )
+                    continue
                 unresolved += 1
                 findings.append({"id": "broker_vision.response_missing", "severity": "warning", "document_id": document["document_id"], "surface_id": surface_id, "message": "Two independent vision responses are required."})
                 continue
@@ -849,6 +918,13 @@ def main() -> int:
                 findings.append({"id": "broker_vision.passes_not_independent", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Pass 1 and pass 2 must have distinct producer IDs and execution fingerprints; renaming one producer is not independence."})
                 continue
             disposition, disposition_error = classify_surface_disposition(passes)
+            if disposition_error and args.degrade_exhausted:
+                quarantine_surface_evidence_only(
+                    bundle=bundle, document=document, surface=surface, findings=findings,
+                    reason_id="surface_disposition_unresolved_after_exhaustion",
+                    message="Independent reads never agreed whether the surface is tabular.",
+                )
+                continue
             if disposition_error:
                 unresolved += 1
                 findings.append({
@@ -950,7 +1026,26 @@ def main() -> int:
                             resolution,
                             conflict_manifest,
                         )
-                        if not valid_resolution or not decisions_ok:
+                        if (not valid_resolution or not decisions_ok) and args.degrade_exhausted:
+                            accepted = max(passes, key=response_richness)
+                            conflict_decisions = {
+                                **automatic_decisions,
+                                **bounded_quarantine_decisions(conflict_manifest),
+                            }
+                            default_authority_status = "verified_adjudicated"
+                            default_authority_basis = "bounded_conflict_quarantine"
+                            conflict_manifests.append(conflict_manifest)
+                            findings.append({
+                                "id": "broker_vision.conflict_quarantined_after_bounded_recovery",
+                                "severity": "warning",
+                                "document_id": document["document_id"],
+                                "surface_id": surface_id,
+                                "message": (
+                                    "The supplied discrepancy resolution was invalid after the bounded "
+                                    "budget; the disputed cells are preserved as unavailable evidence."
+                                ),
+                            })
+                        elif not valid_resolution or not decisions_ok:
                             unresolved += 1
                             findings.append({
                                 "id": "broker_vision.resolution_invalid",
@@ -960,11 +1055,12 @@ def main() -> int:
                                 "message": decision_error or "The discrepancy resolution is missing its image binding or review note.",
                             })
                             continue
-                        accepted = max(passes, key=response_richness)
-                        conflict_decisions = {**automatic_decisions, **reviewed_decisions}
-                        default_authority_status = "verified_adjudicated"
-                        default_authority_basis = "targeted_conflict_adjudication"
-                        conflict_manifests.append(conflict_manifest)
+                        else:
+                            accepted = max(passes, key=response_richness)
+                            conflict_decisions = {**automatic_decisions, **reviewed_decisions}
+                            default_authority_status = "verified_adjudicated"
+                            default_authority_basis = "targeted_conflict_adjudication"
+                            conflict_manifests.append(conflict_manifest)
                     elif args.quarantine_unresolved:
                         accepted = max(passes, key=response_richness)
                         conflict_decisions = {
@@ -1012,10 +1108,24 @@ def main() -> int:
                 region.get("material") for region in surface.get("uncovered_numeric_regions", [])
             )
             if material_surface and not new_tables:
+                if args.degrade_exhausted:
+                    quarantine_surface_evidence_only(
+                        bundle=bundle, document=document, surface=surface, findings=findings,
+                        reason_id="vacuous_consensus_after_exhaustion",
+                        message="Both transcriptions stayed empty for a material surface.",
+                    )
+                    continue
                 unresolved += 1
                 findings.append({"id": "broker_vision.vacuous_consensus", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Two empty transcriptions cannot certify a material image or uncovered numeric region."})
                 continue
             if any(not table.get("rows") or not any(any(str(cell.get("raw_text") or "").strip() for cell in row) for row in table["rows"]) for table in new_tables):
+                if args.degrade_exhausted:
+                    quarantine_surface_evidence_only(
+                        bundle=bundle, document=document, surface=surface, findings=findings,
+                        reason_id="empty_table_after_exhaustion",
+                        message="A transcribed table stayed empty across the bounded budget.",
+                    )
+                    continue
                 unresolved += 1
                 findings.append({"id": "broker_vision.empty_table", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "A vision table is empty and cannot certify source coverage."})
                 continue
@@ -1027,6 +1137,13 @@ def main() -> int:
                 table for table in new_tables
                 if not (table.get("transcription_structure") or {}).get("is_grid")
             ]
+            if structureless and len(structureless) == len(new_tables) and args.degrade_exhausted:
+                quarantine_surface_evidence_only(
+                    bundle=bundle, document=document, surface=surface, findings=findings,
+                    reason_id="structureless_transcription_after_exhaustion",
+                    message="Every transcription for this surface lacked row labels or period headings.",
+                )
+                continue
             if structureless and len(structureless) == len(new_tables):
                 unresolved += 1
                 findings.append({
@@ -1129,6 +1246,16 @@ def main() -> int:
         for row in table.get("rows", [])
         for cell in row
         if cell.get("authority_status") == "quarantined_conflict"
+    )
+    bundle["summary"]["quarantined_surface_count"] = sum(
+        1
+        for document in bundle["documents"]
+        for surface in document.get("surfaces", [])
+        if surface.get("vision_disposition") == "quarantined_evidence_only"
+    )
+    bundle["summary"]["degraded"] = bool(
+        bundle["summary"]["quarantined_conflict_count"]
+        or bundle["summary"]["quarantined_surface_count"]
     )
     bundle["vision_conflict_manifests"] = conflict_manifests
     bundle["findings"] = findings

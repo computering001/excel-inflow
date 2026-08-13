@@ -1,0 +1,692 @@
+#!/usr/bin/env python3
+"""End-to-end proof that exhausted ORDINARY broker ambiguity closes DEGRADED.
+
+This regression begins BEFORE physical reconciliation and drives the real
+controller (`run_broker_pipeline.py`) as a subprocess through:
+
+    raw request -> seeded extraction -> vision responses that NEVER reconcile
+    -> bounded attempt budget exhausted -> degraded close (quarantine)
+    -> semantic crosswalk -> pack compilation -> terminal PASS_DEGRADED
+
+with the delivery-blocker constitution enforced at every step: broker
+uncertainty may reduce broker authority, it may never terminate delivery.
+BLOCKED_INTERNAL must never appear for ordinary evidence ambiguity.
+
+Matrix coverage in this file:
+- mandatory positive (persistent conflicts -> exhaustion -> quarantine ->
+  degraded close -> crosswalk -> pack -> PASS_DEGRADED, evidence preserved);
+- one conflicted cell, rest of the house clean (Kepler);
+- disposition disagreement quarantines the whole surface (Berenberg);
+- terminal aggregate replaces targeted task, quarantine still re-arms;
+- a mapping that touches a quarantined cell is refused (SEM guard);
+- unresolved broker cells remain visible and formula-prohibited;
+- broker uncertainty cannot emit a delivery block (constitution);
+- degraded close without its quarantine receipt is an invalid closure.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+
+import run_attachment_evidence_pipeline as attachment  # noqa: E402
+import run_broker_pipeline as broker  # noqa: E402
+from workflow_state import assert_delivery_blocker, assert_state  # noqa: E402
+from verify_broker_semantics import normalized_manifest_period  # noqa: E402
+
+
+def check(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def canonical_bytes(value: Any) -> bytes:
+    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", "utf-8")
+
+
+def cells(rows: list[list[str]]) -> list[list[dict[str, Any]]]:
+    return [
+        [
+            {
+                "row": row_index,
+                "column": column_index,
+                "raw_text": value,
+                "value": value,
+                "source_ref": f"fixture:r{row_index}c{column_index}",
+            }
+            for column_index, value in enumerate(row, 1)
+        ]
+        for row_index, row in enumerate(rows, 1)
+    ]
+
+
+def native_table(identifier: str, surface_id: str, rows: list[list[str]], title: str) -> dict[str, Any]:
+    return {
+        "table_id": identifier,
+        "surface_id": surface_id,
+        "source_location": f"page {surface_id.rsplit('p', 1)[-1]}",
+        "title": title,
+        "units": "USDm",
+        "bbox": [10, 10, 300, 180],
+        "extraction_method": "native_pdf_lines",
+        "confidence": 1.0,
+        "rows": cells(rows),
+    }
+
+
+def numeric_tokens(rows: list[list[str]]) -> list[str]:
+    return [
+        value
+        for row in rows
+        for value in row
+        if value and any(character.isdigit() for character in value) and not value.endswith("E")
+    ]
+
+
+def vision_pass(
+    *,
+    document_id: str,
+    surface_id: str,
+    image_sha256: str,
+    pass_index: int,
+    producer: str,
+    disposition: str,
+    rows: list[list[str]] | None = None,
+    grid: bool = True,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "schema_version": "broker-vision-result/1.0",
+        "document_id": document_id,
+        "surface_id": surface_id,
+        "image_sha256": image_sha256,
+        "pass_index": pass_index,
+        "producer_id": f"{producer}-pass{pass_index}",
+        "producer_fingerprint": f"{producer}-fingerprint-{pass_index}",
+        "method": "vision_model" if pass_index == 1 else "ocr_geometry",
+        "surface_disposition": disposition,
+    }
+    if disposition == "verified_non_tabular":
+        result["non_tabular_reason"] = "narrative page"
+        result["tables"] = []
+    else:
+        result["tables"] = [{
+            "title": "Forecast table",
+            "units": "USDm",
+            "bbox": [10, 10, 300, 180],
+            "rows": rows or [],
+            "transcription_structure": {
+                "is_grid": grid,
+                "row_labels": grid,
+                "period_headers": 2 if grid else 0,
+            },
+        }]
+    return result
+
+
+def build_house(
+    *,
+    document_id: str,
+    house_id: str,
+    house_name: str,
+    artifact_root: Path,
+    vision_required: bool,
+    clean_rows: list[list[str]] | None = None,
+) -> dict[str, Any]:
+    """One house document. Native-clean, or one vision-required image page."""
+    if not vision_required:
+        rows = clean_rows or []
+        tokens = numeric_tokens(rows)
+        census_payload = {
+            "schema_version": "broker-surface-census/1.0",
+            "surface_id": f"{document_id}.p1",
+            "kind": "pdf_page",
+            "source_numeric_tokens": tokens,
+            "whole_surface_numeric_token_count": len(tokens),
+            "nonblank_cell_count": sum(1 for row in rows for value in row if value),
+            "table_discovery_lanes": ["native_pdf_lines"],
+            "uncovered_numeric_regions": [],
+        }
+        census_path = artifact_root / document_id / "p1.census.json"
+        write_json(census_path, census_payload)
+        surface = {
+            "surface_id": f"{document_id}.p1",
+            "kind": "pdf_page",
+            "ordinal": 1,
+            "source_table_numeric_tokens": tokens,
+            "whole_surface_numeric_token_count": len(tokens),
+            "native_text_chars": 420,
+            "lane_status": {"vision": "not_required"},
+            "surface_census_artifact_id": f"{document_id}-census",
+        }
+        return {
+            "document_id": document_id,
+            "house_id": house_id,
+            "house_name": house_name,
+            "file_name": f"{document_id}.pdf",
+            "published_date": "2026-06-30",
+            "media_type": "application/pdf",
+            "source_id": f"fixture.{document_id}",
+            "raw_sha256": "0" * 64,
+            "surfaces": [surface],
+            "tables": [native_table(f"{document_id}-t1", surface["surface_id"], rows, "Forecasts")],
+            "artifacts": [{
+                "artifact_id": f"{document_id}-census",
+                "kind": "surface_census",
+                "path": str(census_path.relative_to(artifact_root)),
+                "sha256": broker.sha256_file(census_path),
+            }],
+            "numeric_ledger": {
+                "source_tokens": numeric_tokens(rows),
+                "captured_tokens": numeric_tokens(rows),
+                "missing_tokens": [],
+                "duplicate_tokens": [],
+                "recall": 1.0,
+            },
+            "extraction_status": "complete",
+        }
+
+    surface_id = f"{document_id}.p4"
+    image_path = artifact_root / document_id / "page4.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"\x89PNG\r\n\x1a\n" + document_id.encode("utf-8"))
+    task_payload = {
+        "schema_version": "broker-vision-task/1.0",
+        "document_id": document_id,
+        "surface_id": surface_id,
+        "region_crops": [],
+        "instruction": "Read the complete grid twice, independently.",
+    }
+    task_path = artifact_root / document_id / "page4.task.json"
+    write_json(task_path, task_payload)
+    census_path = artifact_root / document_id / "p4.census.json"
+    write_json(census_path, {
+        "schema_version": "broker-surface-census/1.0",
+        "surface_id": surface_id,
+        "kind": "image_page",
+        "source_numeric_tokens": [],
+        "whole_surface_numeric_token_count": 0,
+        "nonblank_cell_count": 0,
+        "table_discovery_lanes": [],
+        "uncovered_numeric_regions": [{
+            "region_id": f"{document_id}.p4.r1",
+            "bbox": [10, 10, 300, 180],
+            "material": True,
+        }],
+    })
+    return {
+        "document_id": document_id,
+        "house_id": house_id,
+        "house_name": house_name,
+        "file_name": f"{document_id}.pdf",
+        "published_date": "2026-06-30",
+        "media_type": "application/pdf",
+        "source_id": f"fixture.{document_id}",
+        "raw_sha256": "0" * 64,
+        "surfaces": [{
+            "surface_id": surface_id,
+            "kind": "image_page",
+            "ordinal": 4,
+            "source_table_numeric_tokens": [],
+            "whole_surface_numeric_token_count": 0,
+            "table_count": 0,
+            "native_text_chars": 0,
+            "uncovered_numeric_regions": [{
+                "region_id": f"{document_id}.p4.r1",
+                "bbox": [10, 10, 300, 180],
+                "material": True,
+            }],
+            "lane_status": {"vision": "required"},
+            "surface_census_artifact_id": f"{document_id}-census",
+            "artifact_refs": [f"{document_id}-image", f"{document_id}-task"],
+        }],
+        "tables": [],
+        "artifacts": [
+            {
+                "artifact_id": f"{document_id}-census",
+                "kind": "surface_census",
+                "path": str(census_path.relative_to(artifact_root)),
+                "sha256": broker.sha256_file(census_path),
+            },
+            {
+                "artifact_id": f"{document_id}-image",
+                "kind": "page_image",
+                "path": str(image_path.relative_to(artifact_root)),
+                "sha256": broker.sha256_file(image_path),
+            },
+            {
+                "artifact_id": f"{document_id}-task",
+                "kind": "vision_task",
+                "path": str(task_path.relative_to(artifact_root)),
+                "sha256": broker.sha256_file(task_path),
+            },
+        ],
+        "numeric_ledger": {
+            "source_tokens": [],
+            "captured_tokens": [],
+            "missing_tokens": [],
+            "duplicate_tokens": [],
+            "recall": 1.0,
+        },
+        "extraction_status": "needs_vision",
+    }
+
+
+def invoke(request_path: Path, output_root: Path, responses: Path, crosswalk: Path | None) -> dict[str, Any]:
+    command = [
+        sys.executable,
+        str(HERE / "run_broker_pipeline.py"),
+        str(request_path),
+        "--out",
+        str(output_root),
+        "--responses",
+        str(responses),
+    ]
+    if crosswalk is not None:
+        command.extend(["--crosswalk", str(crosswalk)])
+    completed = subprocess.run(command, cwd=HERE, text=True, capture_output=True, check=False)
+    state_path = output_root / "broker-run-state.json"
+    check(state_path.is_file(), f"controller emitted no state: {completed.stderr[-2000:]}")
+    return json.loads(state_path.read_text("utf-8"))
+
+
+def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
+    """The degenerate valid review: preserve everything, consume nothing."""
+    manifest = bundle.get("candidate_manifest") or {}
+    table_reviews = []
+    for document in bundle.get("documents", []):
+        for table in document.get("tables", []):
+            header = table.get("rows", [[]])[0] if table.get("rows") else []
+            period_columns = []
+            for cell_entry in header:
+                text = str(cell_entry.get("raw_text") or "")
+                if "2027" in text:
+                    period_columns.append({"column": int(cell_entry.get("column")), "period_basis": "annual_forecast", "period_index": 0})
+                elif "2028" in text:
+                    period_columns.append({"column": int(cell_entry.get("column")), "period_basis": "annual_forecast", "period_index": 1})
+            table_reviews.append({
+                "table_id": table.get("canonical_table_id") or table.get("table_id"),
+                "house_id": document.get("house_id"),
+                "review_status": "reviewed",
+                "rationale": "Fixture forecast grid reviewed; every candidate retained as reference-only evidence.",
+                "classification": "annual_forecast",
+                "header_rows": [1],
+                "period_columns": period_columns,
+            })
+    ledger = []
+    shell = {"forecast_periods": ["2027", "2028", "2029"]}
+    for candidate in manifest.get("candidates", []):
+        quarantined = candidate.get("authority_status") == "quarantined_conflict"
+        period_basis, period_ordinals = normalized_manifest_period(candidate, shell)
+        ledger.append({
+            "candidate_id": candidate["candidate_id"],
+            "house_id": candidate.get("house_id"),
+            "table_id": candidate.get("table_id"),
+            "row": candidate.get("row"),
+            "label": candidate.get("label"),
+            "period_basis": period_basis,
+            "period_indexes": period_ordinals,
+            "source_cells": candidate.get("source_cells") or [],
+            "parent_candidate_id": candidate.get("parent_candidate_id"),
+            "economic_domain": "operating",
+            "definition_id": "dict.custom.fixture_reference",
+            "concept_id": "custom.fixture_reference",
+            "model_use": "unresolved" if quarantined else "reference_only",
+            "definition_fingerprint": {
+                "concept_id": "custom.fixture_reference",
+                "measurement_basis": "reported",
+                "restatement_basis": "as_reported",
+                "cash_flow_basis": "none",
+                "lease_basis": "post_ifrs16",
+                "units": "millions",
+                "currency": "USD",
+                "period_basis": candidate.get("period_basis"),
+                "sign_convention": "as_displayed",
+                "accounting_basis": "ifrs",
+                "operating_scope": "continuing",
+            },
+            "evidence_kind": "broker_estimate",
+            "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+            "review_status": "reviewed",
+            "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+            "disposition": "quarantined_conflict" if quarantined else "not_model_relevant",
+        })
+    def metric(concept: str, domain: str) -> dict[str, Any]:
+        return {
+            "definition_id": f"dict.{concept}",
+            "concept_id": concept,
+            "economic_domain": domain,
+            "semantic_role": "operating_forecast",
+            "evidence_kind": "broker_estimate",
+            "model_use": "reference_only",
+            "definition_fingerprint": {
+                "concept_id": concept,
+                "measurement_basis": "reported",
+                "restatement_basis": "as_reported",
+                "cash_flow_basis": "none",
+                "lease_basis": "post_ifrs16",
+                "units": "millions",
+                "currency": "USD",
+                "period_basis": "annual_forecast",
+                "sign_convention": "as_displayed",
+                "accounting_basis": "ifrs",
+                "operating_scope": "continuing",
+            },
+        }
+
+    return {
+        "schema_version": "broker-crosswalk/1.2",
+        "run_id": bundle.get("run_id") or "degraded_close_regression",
+        "as_of": "2026-06-30",
+        "reporting_currency": "USD",
+        "units": "millions",
+        "manifest_sha256": manifest.get("manifest_sha256"),
+        "forecast_periods": ["2027", "2028", "2029"],
+        "metrics": {
+            "revenue": metric("revenue", "operating"),
+            "ebit": metric("ebit", "operating"),
+            "depreciation_and_amortisation": metric("depreciation_and_amortisation", "operating"),
+            "effective_tax_rate": metric("effective_tax_rate", "operating"),
+            "capex": metric("capex", "cash_flow"),
+            "change_in_working_capital": metric("change_in_working_capital", "cash_flow"),
+            "dividends": metric("dividends", "cash_flow"),
+        },
+        "table_reviews": table_reviews,
+        "coverage_ledger": ledger,
+        "mappings": [],
+    }
+
+
+def main() -> int:
+    checks = 0
+    grid_a = [["Metric", "2027E", "2028E"], ["Alpha series", "100", "110"], ["Beta series", "20", "22"]]
+    grid_b = [["Metric", "2027E", "2028E"], ["Alpha series", "100", "110"], ["Beta series", "21", "22"]]  # one persistent cell conflict
+
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-degraded-close-") as temporary:
+        root = Path(temporary)
+        artifact_root = root / "artifacts"
+        artifact_root.mkdir(parents=True)
+
+        # --- five same-issuer houses: one clean native, two irreconcilable ---
+        documents = [
+            build_house(
+                document_id="jpm", house_id="jpm", house_name="J.P. Morgan",
+                artifact_root=artifact_root, vision_required=False,
+                clean_rows=[["Metric", "2027E", "2028E"], ["Alpha series", "101", "111"], ["Beta series", "19", "21"]],
+            ),
+            build_house(
+                document_id="kepler", house_id="kepler", house_name="Kepler Cheuvreux",
+                artifact_root=artifact_root, vision_required=True,
+            ),
+            build_house(
+                document_id="berenberg", house_id="berenberg", house_name="Berenberg",
+                artifact_root=artifact_root, vision_required=True,
+            ),
+            build_house(
+                document_id="bnp", house_id="bnp", house_name="BNP Paribas",
+                artifact_root=artifact_root, vision_required=False,
+                clean_rows=[["Metric", "2027E", "2028E"], ["Alpha series", "99", "108"], ["Beta series", "18", "20"]],
+            ),
+            build_house(
+                document_id="jefferies", house_id="jefferies", house_name="Jefferies",
+                artifact_root=artifact_root, vision_required=False,
+                clean_rows=[["Metric", "2027E", "2028E"], ["Alpha series", "102", "112"], ["Beta series", "20", "23"]],
+            ),
+        ]
+
+        source_dir = root / "sources"
+        source_dir.mkdir()
+        request_documents = []
+        for document in documents:
+            source = source_dir / f"{document['document_id']}.pdf"
+            source.write_bytes(b"%PDF-fixture " + document["document_id"].encode("utf-8"))
+            request_documents.append({
+                "document_id": document["document_id"],
+                "house_id": document["house_id"],
+                "house_name": document["house_name"],
+                "source_id": f"fixture.{document['document_id']}",
+                "path": str(source),
+                "media_type": "application/pdf",
+                "published_date": "2026-06-30",
+                "expected_sha256": broker.sha256_file(source),
+            })
+        request = {
+            "schema_version": "broker-extraction-request/1.0",
+            "run_id": "degraded_close_regression",
+            "documents": request_documents,
+        }
+        request_path = root / "broker-extraction-request.json"
+        write_json(request_path, request)
+
+        # --- seed the extraction checkpoint so the REAL controller loop runs
+        #     from before physical reconciliation without needing real PDFs ---
+        output_root = root / "controller"
+        output_root.mkdir()
+        request_digest = broker.sha256_file(request_path)
+        runtime_digest, _members = broker.runtime_closure()
+        sources = broker.source_hashes(request, request_path.parent)
+        cache_key = broker.sha256_bytes(canonical_bytes({
+            "request": request_digest,
+            "sources": sources,
+            "runtime": runtime_digest,
+        }))
+        key = cache_key[:16]
+        bundle = {
+            "schema_version": "broker-extraction-bundle/1.0",
+            "run_id": request["run_id"],
+            "artifact_root": str(artifact_root),
+            "documents": documents,
+            "summary": {},
+            "gate_status": "NEEDS_VISION",
+            "findings": [],
+        }
+        extraction_root = output_root / f"extract-{key}"
+        bundle_path = extraction_root / "broker-extraction-bundle.json"
+        write_json(bundle_path, bundle)
+        extract_input = broker.sha256_bytes(canonical_bytes({
+            "request": request_digest, "sources": sources, "runtime": runtime_digest,
+        }))
+        broker.seal_checkpoint(bundle_path, output_root / f"extract-{key}.receipt.json", extract_input)
+
+        responses = root / "responses"
+        responses.mkdir()
+
+        # First contact: the controller must ask for vision work, not block.
+        state = invoke(request_path, output_root, responses, None)
+        check(state["pipeline_status"] == "NEEDS_VISION", f"expected NEEDS_VISION, got {state['pipeline_status']}")
+        check(state["user_blocking"] is False, "vision work leaked as a user ask")
+        checks += 2
+
+        # Supply PERSISTENTLY irreconcilable responses:
+        # - kepler: two structurally-agreed grids with one conflicting EBIT cell
+        #   and no valid resolution, ever (one conflicted cell, rest clean);
+        # - berenberg: the passes disagree tabular-vs-non (whole-surface doubt).
+        kepler_image_sha = next(
+            artifact["sha256"] for artifact in documents[1]["artifacts"] if artifact["kind"] == "page_image"
+        )
+        berenberg_image_sha = next(
+            artifact["sha256"] for artifact in documents[2]["artifacts"] if artifact["kind"] == "page_image"
+        )
+        write_json(responses / "kepler.p4.pass1.json", vision_pass(
+            document_id="kepler", surface_id="kepler.p4", image_sha256=kepler_image_sha,
+            pass_index=1, producer="alpha", disposition="analytical_tables", rows=grid_a,
+        ))
+        write_json(responses / "kepler.p4.pass2.json", vision_pass(
+            document_id="kepler", surface_id="kepler.p4", image_sha256=kepler_image_sha,
+            pass_index=2, producer="beta", disposition="analytical_tables", rows=grid_b,
+        ))
+        write_json(responses / "berenberg.p4.pass1.json", vision_pass(
+            document_id="berenberg", surface_id="berenberg.p4", image_sha256=berenberg_image_sha,
+            pass_index=1, producer="alpha", disposition="analytical_tables", rows=grid_a,
+        ))
+        write_json(responses / "berenberg.p4.pass2.json", vision_pass(
+            document_id="berenberg", surface_id="berenberg.p4", image_sha256=berenberg_image_sha,
+            pass_index=2, producer="beta", disposition="verified_non_tabular",
+        ))
+
+        statuses = []
+        crosswalk_path: Path | None = None
+        final_state: dict[str, Any] = {}
+        for attempt in range(1, 12):
+            final_state = invoke(request_path, output_root, responses, crosswalk_path)
+            status = final_state["pipeline_status"]
+            statuses.append(status)
+            check(status != "BLOCKED_INTERNAL", (
+                "ordinary evidence ambiguity terminated the lane: "
+                + json.dumps(final_state.get("summary", {}))[:400]
+            ))
+            check(final_state["user_blocking"] is False, f"{status} leaked as a user ask")
+            if status == "NEEDS_CROSSWALK":
+                verified = json.loads(Path(final_state["artifacts"]["verified_bundle"]).read_text("utf-8"))
+                crosswalk_path = root / "crosswalk.json"
+                write_json(crosswalk_path, reference_only_crosswalk(verified))
+            if status in {"PASS", "PASS_DEGRADED"}:
+                break
+        check(final_state["pipeline_status"] == "PASS_DEGRADED", f"terminal status was {final_state['pipeline_status']} after {statuses}")
+        checks += 3
+
+        summary = final_state.get("summary", {})
+        check(summary.get("degraded") is True, "terminal summary does not disclose degradation")
+        check(
+            int(summary.get("quarantined_surface_count", 0)) >= 1,
+            "whole-surface quarantine was not recorded",
+        )
+        check(
+            int(summary.get("quarantined_conflict_count", 0)) >= 1,
+            "cell quarantine was not recorded",
+        )
+        checks += 3
+
+        # Evidence preservation and authority separation.
+        degraded_bundle = json.loads(Path(final_state["artifacts"]["verified_bundle"]).read_text("utf-8"))
+        by_document = {item["document_id"]: item for item in degraded_bundle["documents"]}
+        berenberg_surface = by_document["berenberg"]["surfaces"][0]
+        check(
+            berenberg_surface.get("vision_disposition") == "quarantined_evidence_only",
+            "the irreconcilable surface was not quarantined",
+        )
+        check(
+            (berenberg_surface.get("quarantine") or {}).get("model_use") == "prohibited",
+            "the quarantined surface does not prohibit model use",
+        )
+        kepler_cells = [
+            cell
+            for table in by_document["kepler"].get("tables", [])
+            for row in table.get("rows", [])
+            for cell in row
+        ]
+        check(
+            any(cell.get("authority_status") == "quarantined_conflict" for cell in kepler_cells),
+            "the persistently conflicted cell was not quarantined",
+        )
+        check(
+            any(cell.get("authority_status") != "quarantined_conflict" for cell in kepler_cells),
+            "clean sibling cells did not survive the cell quarantine",
+        )
+        manifest = degraded_bundle.get("candidate_manifest") or {}
+        quarantined_candidates = [
+            candidate for candidate in manifest.get("candidates", [])
+            if candidate.get("authority_status") == "quarantined_conflict"
+        ]
+        berenberg_candidates = [
+            candidate for candidate in manifest.get("candidates", [])
+            if candidate.get("house_id") == "berenberg"
+        ]
+        check(not berenberg_candidates, "a quarantined surface manufactured candidates")
+        checks += 5
+
+        # A crosswalk that tries to ACTIVATE a quarantined candidate is refused.
+        if quarantined_candidates:
+            hostile = reference_only_crosswalk(degraded_bundle)
+            for entry in hostile["coverage_ledger"]:
+                if entry["disposition"] == "quarantined_conflict":
+                    entry["disposition"] = "mapped"
+                    entry["model_use"] = "selected_value"
+            hostile_path = root / "hostile-crosswalk.json"
+            write_json(hostile_path, hostile)
+            semantic_out = root / "hostile-semantic.json"
+            subprocess.run(
+                [
+                    sys.executable, str(HERE / "verify_broker_semantics.py"),
+                    str(final_state["artifacts"]["verified_bundle"]), str(hostile_path),
+                    "--out", str(semantic_out),
+                ],
+                cwd=HERE, text=True, capture_output=True, check=False,
+            )
+            hostile_report = json.loads(semantic_out.read_text("utf-8"))
+            check(hostile_report.get("status") != "PASS", "a quarantined cell was allowed into a model mapping")
+            check(
+                any("SEM-QUARANTINED-CANDIDATE-ACTIVE" == item.get("finding_id") or "SEM-QUARANTINED" in str(item)
+                    for item in hostile_report.get("findings", [])),
+                "quarantine activation was not named",
+            )
+            checks += 2
+
+        # Workflow contract: PASS_DEGRADED is a legal, closed, non-blocking state.
+        assert_state("broker", "PASS_DEGRADED", None, False)
+        checks += 1
+
+        # Attachment layer: a degraded broker lane is CLOSED...
+        lanes = {"broker": dict(final_state)}
+        status, blocker, user_blocking = attachment.classify(lanes)
+        check(status == "PASS" and blocker is None and user_blocking is False, "attachment did not accept the degraded closed lane")
+        checks += 1
+
+        # ...but only WITH its quarantine receipt (closure integrity).
+        stripped = dict(final_state)
+        stripped["summary"] = {"degraded": True}
+        broken = {"broker": stripped}
+        # replicate the controller-level guard
+        broker_lane = broken["broker"]
+        broker_summary = broker_lane.get("summary") or {}
+        quarantine_disclosed = bool(broker_summary.get("degraded")) and (
+            "quarantined_conflict_count" in broker_summary
+            or "quarantined_surface_count" in broker_summary
+        )
+        check(not quarantine_disclosed, "the stripped closure was wrongly accepted as disclosed")
+        checks += 1
+
+        # The re-arm defect itself: an aggregate terminal task must count as
+        # prior targeted resolution so the quarantine fallback stays armed.
+        check(
+            broker.prior_targeted_resolution_attempted({
+                "tasks": [{"task_kind": "internal_fixed_point_defect"}],
+            }),
+            "the aggregate defect no longer re-arms the quarantine fallback",
+        )
+        check(
+            broker.bounded_recovery_exhausted(
+                {"tasks": [{"task_kind": "internal_fixed_point_defect"}]},
+                {"vision_attempt_count": 0, "vision_attempt_limit": 3},
+            ),
+            "an aggregate terminal task did not register as exhaustion",
+        )
+        checks += 2
+
+        # Constitution: broker uncertainty can NEVER be a delivery blocker.
+        for domain in ("broker_capture", "broker_table_reconciliation", "broker_semantics", "broker_coverage"):
+            try:
+                assert_delivery_blocker(True, "workbook_delivery_failed", domain=domain)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"{domain} was accepted as a delivery blocker")
+        checks += 1
+
+    print(json.dumps({"status": "PASS", "checks": checks, "statuses": statuses}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

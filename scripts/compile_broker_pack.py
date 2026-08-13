@@ -1357,12 +1357,23 @@ def main() -> int:
             table.get("extraction_method") in {"vision_pass_consensus", "manual_verified"}
             for table in document.get("tables", [])
         )
-        if not has_native and not has_verified_image:
+        surfaces = document.get("surfaces", [])
+        all_evidence_only = bool(surfaces) and all(
+            surface.get("vision_disposition") in {"quarantined_evidence_only", "verified_non_tabular"}
+            for surface in surfaces
+        )
+        if not has_native and not has_verified_image and not all_evidence_only:
             raise ValueError(
-                f"{document['file_name']} has neither native evidence nor a verified image transcription."
+                f"{document.get('file_name') or document.get('document_id')} has neither native "
+                "evidence nor a verified image transcription."
             )
+        # A house whose every surface closed as preserved evidence (quarantined
+        # after bounded recovery, or verified non-tabular) is a legitimate
+        # evidence-only participant: it renders on its Bxx tab and supplies
+        # zero model-eligible cells. Deleting it would hide reviewed evidence.
         extraction_method = (
-            "mixed_verified" if has_native and has_verified_image
+            "evidence_only_quarantine" if not has_native and not has_verified_image
+            else "mixed_verified" if has_native and has_verified_image
             else "verified_image_transcription" if has_verified_image
             else "native"
         )

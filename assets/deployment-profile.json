@@ -279,6 +279,7 @@
   "_python_note": "The Python runtime modules ship alongside the JavaScript closure. They are held to the same standard: the closure is COMPUTED from python_entry_points by an ast walk (never a regex \u2014 this tree has docstring lines beginning `from ...` that a regex reads as imports) and compared with python_module_allowlist in both directions; a disagreement fails the build. Third-party imports are checked against allowed_python_third_party_imports exactly as a bare JS specifier is checked against allowed_bare_imports.",
   "python_entry_points": [
     "run_broker_pipeline.py",
+    "migrate_broker_run_state.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
@@ -304,6 +305,7 @@
   "_python_entry_point_note": "Twenty-two Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
   "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The five broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
   "python_entry_point_notes": {
+    "migrate_broker_run_state.py": "Fail-closed, receipted migration of a sealed broker run across an intentional runtime-closure change; re-homes receipt-verified checkpoints and preserves exhaustion history so a live run resumes without losing progress or re-uploading sources. Invoked only on controller upgrades, never in ordinary runs.",
     "run_attachment_evidence_pipeline.py": "The sole raw-attachment evidence transaction owner; it sequences the broker and DCS controllers, case-source proposal and sealed ingress compilation.",
     "run_dcs_pipeline.py": "Invoked by run_attachment_evidence_pipeline.py as the resumable DCS checkpoint; independently runnable for diagnostics.",
     "extract_filing_statements.py": "Invoked by run_filings_pipeline.mjs as the native raw-filing extraction checkpoint; independently runnable for diagnostics.",
@@ -315,6 +317,15 @@
     "compile_broker_pack.py": "Invoked by run_broker_pipeline.py only after prior broker checkpoints pass; retained independently runnable for diagnostics."
   },
   "python_entry_point_smoke": {
+    "migrate_broker_run_state.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: migrate_broker_run_state.py"
+    },
     "run_attachment_evidence_pipeline.py": {
       "argv": ["--help"],
       "expect_exit": [0],
@@ -499,6 +510,7 @@
   },
   "python_module_allowlist": [
     "run_broker_pipeline.py",
+    "migrate_broker_run_state.py",
     "broker_terminal_recovery.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
@@ -637,6 +649,10 @@
   },
   "_python_vendoring_policy": "Every entry above is provision=native and vendoring=forbidden, and the compiler enforces both: it refuses any provision other than native, and refuses to ship a vendored_dependencies entry whose name collides with a Python third-party root. None of these packages is vendored. Vendoring a package the host already provides is how you ship a version conflict.",
   "python_package_dependency_policy": {
+    "migrate_broker_run_state.py": {
+      "may_import_third_party": [],
+      "reason": "The fail-closed broker run migration tool is stdlib-only; it reuses run_broker_pipeline's digest primitives so a migrated checkpoint is sealed by byte-identical rules, and it authors no evidence of its own."
+    },
     "extract_filing_statements.py": {
       "may_import_third_party": [
         "fitz"

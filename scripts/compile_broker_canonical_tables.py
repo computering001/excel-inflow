@@ -692,9 +692,29 @@ def physical_capture_receipt(
     unowned = sorted((captured - source).elements())
     rendered = any(has_rendered_authority(table) for table in tables)
     verified_non_tabular = surface.get("vision_disposition") == "verified_non_tabular"
+    quarantined_evidence_only = (
+        surface.get("vision_disposition") == "quarantined_evidence_only"
+    )
     findings: list[dict[str, Any]] = []
 
-    if verified_non_tabular:
+    if quarantined_evidence_only:
+        # Physical preservation is COMPLETE (bytes, renders, raw fragments all
+        # sealed); model authority is separately prohibited by the quarantine.
+        status = "PASS_EVIDENCE_ONLY"
+        basis = "bounded_quarantine_after_exhaustion"
+        findings.append({
+            "id": "broker_canonical.surface_quarantined_evidence_only",
+            "severity": "warning",
+            "scope": "physical_capture",
+            "model_linked": False,
+            "document_id": document_id,
+            "surface_id": surface_id,
+            "message": (
+                "Bounded reconciliation was exhausted; the surface is preserved as "
+                "evidence-only and contributes no model-eligible table."
+            ),
+        })
+    elif verified_non_tabular:
         status = "PASS_EVIDENCE_ONLY"
         basis = "two_pass_verified_non_tabular"
     elif tables and not missing and not unowned:
