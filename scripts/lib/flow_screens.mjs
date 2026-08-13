@@ -1014,14 +1014,33 @@ export const CARD_CONTRACT = Object.freeze({
 
 export function toQuestionCards(questions, { round = "A" } = {}) {
   const cards = questions.map((question, index) => {
-    const id = question.question_id ?? `${round}${index + 1}`;
-    const options = (question.options ?? []).map((option, optionIndex) => ({
-      option_id: option.id ?? option.word ?? String(optionIndex + 1),
-      label:
-        (option.label ?? option.word ?? String(optionIndex + 1)) +
-        (option.default || optionIndex === 0 ? " (default)" : ""),
-      is_default: Boolean(option.default) || optionIndex === 0,
-    }));
+    // The card id must be the question's OWN stable id whenever it has one —
+    // recorded answers key on it. A synthetic round ordinal is a last resort
+    // for fixtures only.
+    const id = question.id ?? question.question_id ?? `${round}${index + 1}`;
+    // "Skip records the marked default" is a decision contract: the marked
+    // option must be the question's declared default_option, never a
+    // positional guess. Index 0 is only the fallback when the question
+    // declares no default at all.
+    const declaredDefault = question.default_option ?? null;
+    const hasDeclaredDefault =
+      declaredDefault !== null &&
+      (question.options ?? []).some(
+        (option) => (option.id ?? option.word) === declaredDefault,
+      );
+    const options = (question.options ?? []).map((option, optionIndex) => {
+      const optionId = option.id ?? option.word ?? String(optionIndex + 1);
+      const isDefault = hasDeclaredDefault
+        ? optionId === declaredDefault
+        : Boolean(option.default) || optionIndex === 0;
+      return {
+        option_id: optionId,
+        label:
+          (option.label ?? option.word ?? String(optionIndex + 1)) +
+          (isDefault ? " (default)" : ""),
+        is_default: isDefault,
+      };
+    });
     if (options.length < CARD_CONTRACT.min_options || options.length > CARD_CONTRACT.max_options) {
       throw new Error(
         `Question ${id} has ${options.length} options; cards carry ${CARD_CONTRACT.min_options}-${CARD_CONTRACT.max_options}.`,

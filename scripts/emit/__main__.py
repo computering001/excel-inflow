@@ -69,6 +69,13 @@ def main(argv=None):
         print(json.dumps(summary, indent=2))
         clean = all(counter["mismatch"] == 0 for counter in summary["channels"].values())
         clean = clean and summary["cells"]["missing"] == 0 and summary["cells"]["extra"] == 0
+        # Structural and sheet-level channels are part of the verdict, not
+        # commentary: a missing/extra sheet, a workbook-property mismatch or a
+        # sheet-level channel difference (widths, freeze, merges, CF) fails.
+        clean = clean and all(count == 0 for count in summary.get("structural", {}).values())
+        clean = clean and all(
+            bucket.get("not_ok", 0) == 0 for bucket in summary.get("sheet_level", {}).values()
+        )
         return 0 if clean else 1
 
     document = _load(args.plan, not args.no_validate)

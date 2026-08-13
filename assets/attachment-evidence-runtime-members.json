@@ -18,6 +18,7 @@
     "scripts/lib/broker_anchor.mjs",
     "scripts/lib/broker_metric_dictionary.mjs",
     "scripts/lib/case_compiler.mjs",
+    "scripts/lib/forecast_behavior.mjs",
     "scripts/lib/coverage.mjs",
     "scripts/lib/design_contract.mjs",
     "scripts/lib/economic_solve_policy.mjs",

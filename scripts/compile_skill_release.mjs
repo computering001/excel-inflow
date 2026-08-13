@@ -28,9 +28,10 @@
  *     specifier is checked against `allowed_bare_imports`, and the declared
  *     `required_at` is verified against where the import actually appears.
  *  2. Instructions with an empty code fence, a stripped run command, or a
- *     reference to a script that is not in the package. The blanket
- *     `scripts/`-line strip is replaced by an explicit, reasoned rule list;
- *     every rule must match, and the result is asserted.
+ *     reference to a script that is not in the package. Strip rules come from
+ *     `instruction_strip_rules_runtime` (currently empty — the compiled
+ *     central instructions carry no local-only commands); when a rule exists,
+ *     it must match exactly once and the result is asserted.
  *  3. A closure that has moved since certification. The certification gate no
  *     longer trusts a hand-set string alone: it recomputes a hash over the
  *     resolved script and asset closure and names the paths that changed.

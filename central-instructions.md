@@ -239,12 +239,12 @@ Checkpoint confirmations are cards too. Every card answer lands in
 `case-source.answers` under its stable question id; the compiler refuses a
 declaration pointing at an answer that was never recorded.
 
-Ask at most once and at most five targeted questions after deterministic pruning. Ask only for material facts that change debt, liquidity, interest, leverage or acquisition outputs and cannot be resolved from supplied evidence. Typical questions cover an unreconciled debt residual, unknown fixed/floating terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease mode, refinancing treatment or transaction timing. If more than five survive, say the inputs appear incomplete and request a corrected pack rather than presenting a questionnaire.
+Ask at most five targeted questions per round after deterministic pruning. Ask only for material facts that change debt, liquidity, interest, leverage or acquisition outputs and cannot be resolved from supplied evidence. Typical questions cover an unreconciled debt residual, unknown fixed/floating terms, missing RCF capacity or drawn amount, unclear cash eligibility, lease mode, refinancing treatment or transaction timing. If more than five survive, persist the answers and present the next deterministic round; question cardinality alone is never evidence that the source pack is defective.
 
 The visible run has exactly five labelled stages:
 
 1. `INPUTS` — receive the company, evidence pack and optional prior case;
-2. `EVIDENCE REVIEW` — validate, read and reconcile without user contact unless the pack is defective;
+2. `EVIDENCE REVIEW` — validate, read and reconcile; when broker documents are present this stage requires one sealed broker-primary confirmation (a house, or FORECAST WATERFALL);
 3. `DECISIONS` — the only normal stop, containing zero to five questions together;
 4. `BUILD AND CHECKS` — solve, emit and validate without user contact; and
 5. `DELIVERY` — return the workbook, assumptions, findings and gate status.
@@ -343,11 +343,16 @@ end-user question.
 
 Do not force the complete broker-page inventory into the workbook carrier.
 `broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
-deterministically projects only tables dispositioned `analytical_table` into
-`model_case.broker_pack.raw_tables`. Evidence-only tables stay hash-bound in the
-run, every supplied house remains represented, and every mapped cell must land
-on an analytical table. The two arrays are therefore related by the reviewed
-disposition ledger, not by full-array equality.
+deterministically projects EVERY reviewed tabular grid into
+`model_case.broker_pack.raw_tables` — table membership must be complete, and an
+evidence-only table is never discarded from the projection. The reviewed
+disposition ledger governs CONSUMPTION, not membership: evidence-only tables
+render as hardcoded source evidence, every mapped cell must land on an
+analytical table, and every supplied house remains represented. Exhausted
+ordinary broker ambiguity closes the lane `PASS_DEGRADED` with quarantine
+receipts and the run continues to Debt, Build and Delivery; only the four
+constitutional fatal reasons block delivery, and none of them is a broker
+reason.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves

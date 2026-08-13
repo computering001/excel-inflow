@@ -680,7 +680,109 @@ for (const name of files) {
   ];
   const isFixtureReceipt = (diff) =>
     fixtureAuthority && FIXTURE_RECEIPTS.some((rx) => rx.test(diff.path));
-  const isJustifiedAll = (diff) => isJustified(diff) || isFixtureReceipt(diff);
+  // Named paired migration: the finance add-back moved from a legacy
+  // intermediate forecast rule to the schedule-owned semantic role
+  // (case_compiler stamps semantic_role "net_finance_addback", forecast
+  // treatment formula, and deletes the negate(net_finance_result) rule —
+  // arithmetically identical, direct schedule path). The pair is justified
+  // ONLY when both halves carry these exact literals; either half alone is a
+  // real divergence. With the pair classified, the solve/plan equivalence
+  // clauses run and prove the arithmetic identity instead of assuming it.
+  const isFinanceAddbackMigration = (diff) => {
+    const row = /^statement_structure\.cash_flow\[finance_costs_net_addback\]\.(semantic_role|forecast_calculation)$/;
+    const match = diff.path.match(row);
+    if (!match) return false;
+    const paths = new Set(allDiffs.map((entry) => entry.path));
+    const base = "statement_structure.cash_flow[finance_costs_net_addback].";
+    if (!paths.has(`${base}semantic_role`) || !paths.has(`${base}forecast_calculation`)) {
+      return false;
+    }
+    if (match[1] === "semantic_role") {
+      return diff.certifiedAbsent === true && diff.actual === JSON.stringify("net_finance_addback");
+    }
+    return (
+      diff.expected === JSON.stringify({ operator: "negate", refs: ["net_finance_result"] }) &&
+      (diff.actual === undefined || diff.actual === "(absent)" || diff.actual === summarize(undefined))
+    );
+  };
+  // Authority-materialized forecast slots: the certified vintage predates
+  // waterfall_v1 and left the slot NULL (uncalculated — not zero); the
+  // compiled row computes it under a declared forecast-period authority
+  // receipt for exactly that period. With no certified value to disagree
+  // with and the authority receipt carrying the provenance, this is
+  // materialization, not divergence. A certified NUMBER that changed
+  // remains an economic diff.
+  const compiledStatementRow = (path) => {
+    const match = path.match(/^statement_structure\.(income_statement|cash_flow)\[([^\]]+)\]/);
+    if (!match) return null;
+    return (compiled.statement_structure?.[match[1]] ?? []).find(
+      (row) => row?.row_id === match[2],
+    ) ?? null;
+  };
+  const isAuthorityMaterialisedValue = (diff) => {
+    const match = diff.path.match(/^statement_structure\.(income_statement|cash_flow)\[[^\]]+\]\.values\[([3-5])\]$/);
+    if (!match) return false;
+    if (!(diff.expected === "null" || diff.certifiedAbsent === true)) return false;
+    const row = compiledStatementRow(diff.path);
+    const authority = row?.forecast_period_authorities?.[Number(match[2]) - 3];
+    return Boolean(authority && typeof authority === "object");
+  };
+  // Relocated per-period link rules: the certified whole-row
+  // forecast_calculation {operator:"link"} moved into compiled
+  // forecast_period_calculations with the identical operator and refs.
+  const isRelocatedLinkRule = (diff) => {
+    const rowMatch = diff.path.match(/^statement_structure\.(income_statement|cash_flow)\[([^\]]+)\]\.(forecast_calculation|forecast_period_calculations\[\d+\])$/);
+    if (!rowMatch) return false;
+    const row = compiledStatementRow(diff.path);
+    if (!row) return false;
+    if (rowMatch[3] === "forecast_calculation") {
+      if (!(diff.actual === "null" || diff.actual === "(absent)")) return false;
+      let certified;
+      try { certified = JSON.parse(diff.expected); } catch { return false; }
+      if (certified?.operator !== "link") return false;
+      return (row.forecast_period_calculations ?? []).some(
+        (rule) =>
+          rule?.operator === "link" &&
+          JSON.stringify(rule.refs) === JSON.stringify(certified.refs),
+      );
+    }
+    if (!(diff.expected === "null" || diff.certifiedAbsent === true)) return false;
+    let compiledRule;
+    try { compiledRule = JSON.parse(diff.actual); } catch { return false; }
+    return compiledRule?.operator === "link";
+  };
+  // Identity-link direction swap: certified anchored row A on row B
+  // (A <- link(B)); the compiled case anchors B on A instead (B <- link(A)).
+  // Both close the same two-row identity; the dependency direction moved to
+  // the authoritative side. Justified only when the exact counter-link
+  // exists on the compiled counterpart row.
+  const isLinkDirectionSwap = (diff) => {
+    const match = diff.path.match(/^statement_structure\.(income_statement|cash_flow)\[([^\]]+)\]\.(forecast_calculation|forecast_period_calculations\[\d+\])$/);
+    if (!match) return false;
+    if (!(diff.actual === "null" || diff.actual === "(absent)")) return false;
+    let certified;
+    try { certified = JSON.parse(diff.expected); } catch { return false; }
+    if (certified?.operator !== "link" || (certified.refs ?? []).length !== 1) return false;
+    const counterpart = [
+      ...(compiled.statement_structure?.income_statement ?? []),
+      ...(compiled.statement_structure?.cash_flow ?? []),
+    ].find((row) => row?.row_id === certified.refs[0]);
+    if (!counterpart) return false;
+    const linksBack = (rule) =>
+      rule?.operator === "link" &&
+      JSON.stringify(rule.refs) === JSON.stringify([match[2]]);
+    return (
+      linksBack(counterpart.forecast_calculation) ||
+      (counterpart.forecast_period_calculations ?? []).some(linksBack)
+    );
+  };
+  const isJustifiedAll = (diff) =>
+    isJustified(diff) ||
+    isFixtureReceipt(diff) ||
+    isFinanceAddbackMigration(diff) ||
+    isAuthorityMaterialisedValue(diff) ||
+    isRelocatedLinkRule(diff) ||
+    isLinkDirectionSwap(diff);
   const justified = allDiffs.filter(isJustifiedAll);
   // Presentation is compiler-owned convention, verified post-canonicalisation
   // by the plan clause; sealed-level presentation drift in the hand-authored
@@ -937,10 +1039,50 @@ for (const name of files) {
         if (copy.calculation?.operator === "sum" && Array.isArray(copy.calculation.refs)) {
           copy.calculation = { ...copy.calculation, refs: [...copy.calculation.refs].sort() };
         }
+        if (copy.forecast_calculation?.operator === "sum" && Array.isArray(copy.forecast_calculation.refs)) {
+          copy.forecast_calculation = { ...copy.forecast_calculation, refs: [...copy.forecast_calculation.refs].sort() };
+        }
+        // Dependency ref lists are set-valued facts about the graph; their
+        // serialisation order is bookkeeping.
+        for (const key of ["dependency_refs", "historical_dependency_refs"]) {
+          if (Array.isArray(copy[key])) copy[key] = [...copy[key]].sort();
+        }
         return copy;
       });
       const certPlan = compileRowPlan(certified).statement_rows;
       const compPlan = compileRowPlan(compiled).statement_rows;
+      // Case-level adjudications carry to their plan expression: a compiled
+      // CASE row whose forecast slot is authority-materialized, or whose
+      // legacy whole-row rule migrated to the schedule role / per-period
+      // rules / the counterpart link, produces the same named difference in
+      // the derived plan.
+      const compiledCaseRows = new Map(
+        ["income_statement", "cash_flow"].flatMap((section) =>
+          (compiled.statement_structure?.[section] ?? []).map((row) => [row.row_id, row]),
+        ),
+      );
+      const planAuthorityMaterialised = (id, d) => {
+        const match = d.path.match(/\.values\[([3-5])\]$/);
+        if (!match) return false;
+        if (!(d.expected === "null" || d.expected === "(absent)")) return false;
+        const caseRow = compiledCaseRows.get(id);
+        const authority = caseRow?.forecast_period_authorities?.[Number(match[1]) - 3];
+        return Boolean(authority && typeof authority === "object");
+      };
+      const planCalcMigration = (id, d) => {
+        if (!/\.(forecast_calculation|calculation)(\.|$)|\.(historical_)?dependency_refs(\[\d+\])?$/.test(d.path)) {
+          return false;
+        }
+        const caseRow = compiledCaseRows.get(id);
+        if (!caseRow) return false;
+        return Boolean(
+          (caseRow.semantic_role && caseRow.forecast_treatment === "formula") ||
+          (caseRow.forecast_period_calculations ?? []).some((rule) => rule && rule.operator) ||
+          (caseRow.forecast_period_authorities ?? []).some(
+            (authority) => authority && typeof authority === "object",
+          ),
+        );
+      };
       let named = 0;
       let hard = 0;
       for (const section of ["income_statement", "cash_flow"]) {
@@ -950,6 +1092,14 @@ for (const name of files) {
           const certRow = a.get(id);
           const compRow = b.get(id);
           if (certRow?.row_type === "header" || compRow?.row_type === "header") continue;
+          // The legacy intermediate net_finance_result CF row is REMOVED by
+          // the schedule-owned finance-addback migration ("a roundabout
+          // audit trail"); named only when its replacement role is present.
+          if (
+            !compRow &&
+            id === "net_finance_result" &&
+            b.get("finance_costs_net_addback")?.semantic_role === "net_finance_addback"
+          ) { named += 1; continue; }
           // Compiler-extra display ratios are presentation-canonical rows a
           // sparser vintage simply omitted.
           if (!certRow && ["ratio", "negated_ratio", "growth"].includes(compRow?.calculation?.operator)) continue;
@@ -989,7 +1139,60 @@ for (const name of files) {
               // that cached the numbers into its plan differs inertly.
               !(/\.values(\[\d+\])?$/.test(d.path) &&
                 compRow?.calculation &&
-                (d.actual === "(absent)" || d.actual === "null")),
+                (d.actual === "(absent)" || d.actual === "null")) &&
+              // Case-level named classes at plan granularity.
+              !planAuthorityMaterialised(id, d) &&
+              !planCalcMigration(id, d) &&
+              // A treatment upgraded from legacy uncalculated to formula is
+              // named only when the compiled case actually carries the wiring
+              // (a rule or schedule role) that earns the formula treatment.
+              !(/\.forecast_treatment$/.test(d.path) &&
+                d.expected === '"uncalculated"' &&
+                d.actual === '"formula"' &&
+                (() => {
+                  const caseRow = compiledCaseRows.get(id);
+                  return Boolean(
+                    caseRow?.semantic_role ||
+                    caseRow?.forecast_calculation ||
+                    (caseRow?.forecast_period_calculations ?? []).some((rule) => rule && rule.operator),
+                  );
+                })()) &&
+              // The addback role stamp is the migration's own artifact.
+              !(/\.semantic_role$/.test(d.path) &&
+                d.actual === '"net_finance_addback"' &&
+                (d.expected === "(absent)" || d.expected === "null")) &&
+              // A self-carry treatment removed on an authority-governed row
+              // is the same migration as its removed prior_period rule.
+              !(/\.forecast_treatment$/.test(d.path) &&
+                d.expected === '"formula"' &&
+                (d.actual === "(absent)" || d.actual === "null") &&
+                (compiledCaseRows.get(id)?.forecast_period_authorities ?? []).some(
+                  (authority) => authority && typeof authority === "object",
+                )) &&
+              // The EBITDA bridge recomposed its member list; the case clause
+              // already proved the row's six values identical, so a changed
+              // decomposition of the same totals is composition, not
+              // economics. Anchored to exact value equality on the row.
+              !(/^adjusted_ebitda\.(forecast_calculation(\.refs(\[\d+\])?)?|dependency_refs(\[\d+\])?)$/.test(d.path) &&
+                (() => {
+                  const certCaseRow = [
+                    ...(certified.statement_structure?.income_statement ?? []),
+                    ...(certified.statement_structure?.cash_flow ?? []),
+                  ].find((row) => row?.row_id === "adjusted_ebitda");
+                  const caseRow = compiledCaseRows.get("adjusted_ebitda");
+                  return Boolean(
+                    certCaseRow && caseRow &&
+                    JSON.stringify(certCaseRow.values ?? null) ===
+                      JSON.stringify(caseRow.values ?? null),
+                  );
+                })()) &&
+              // Legacy last-resort carry DECISIONS are superseded by declared
+              // authorities (stripped above as justified receipts); the
+              // orphaned decision shell is the migration's residue, named
+              // only for the exact legacy reason literals.
+              !(/\.forecast_decision(\.|$)/.test(d.path) &&
+                (d.actual === "(absent)" || d.actual === "null") &&
+                /"method":"(carry_forward|explicit_zero)","reason":"Legacy last-/.test(d.expected ?? "")),
           );
           if (rowDiffs.length === 0) continue;
           const shellClass = rowDiffs.every((d) =>
@@ -997,6 +1200,22 @@ for (const name of files) {
             /^(rcf_draw|rcf_repayment|ending_cash|opening_cash|debt_issuance|debt_repayment)\b/.test(d.path),
           );
           if (shellClass) { named += 1; continue; }
+          // The finance add-back's schedule-owned migration at plan level:
+          // the legacy negate(net_finance_result) rule and its false
+          // dependency refs disappear together, nothing else on the row may
+          // differ, and the solved values above already proved equality.
+          const financeAddbackMigration =
+            rowDiffs.length > 0 &&
+            rowDiffs.every((d) =>
+              d.path.startsWith("finance_costs_net_addback.") &&
+              ((d.path === "finance_costs_net_addback.forecast_calculation" &&
+                d.expected === '{"operator":"negate","refs":["net_finance_result"]}' &&
+                (d.actual === "(absent)" || d.actual === "null")) ||
+                (/^finance_costs_net_addback\.(historical_)?dependency_refs$/.test(d.path) &&
+                  d.expected === '["net_finance_result"]' &&
+                  d.actual === "[]")),
+            );
+          if (financeAddbackMigration) { named += 1; continue; }
           const legacyDefault =
             ["carry_forward", "explicit_zero"].includes(
               certRow?.forecast_decision?.method,
@@ -1041,6 +1260,7 @@ console.log(`TOTAL hard plan diffs: ${hardPlanDiffCount}`);
 console.log(`TOTAL failed plan compiles: ${failedPlanCompileCount}`);
 if (
   totalBlocks > 0 ||
+  totalDiffs > 0 ||
   failedSolveCount > 0 ||
   hardPlanDiffCount > 0 ||
   failedPlanCompileCount > 0

@@ -378,8 +378,20 @@ def summarise(report):
     totals = {key: {"compared": 0, "match": 0, "mismatch": 0} for key, _ in CELL_CHANNELS}
     cells = {"expected": 0, "actual": 0, "missing": 0, "extra": 0}
     sheet_level = {}
+    # Structural failures the verdict must count: a sheet lost from the actual
+    # plan, an extra sheet, a sheet-order change, or a workbook-level property
+    # mismatch. Skipping them made the comparison exit clean on a workbook
+    # missing an entire evidence tab.
+    structural = {"missing_sheets": 0, "extra_sheets": 0, "workbook_mismatches": 0}
+    expected_names = set(report["sheets"].keys())
+    actual_names = set(report["workbook"].get("sheet_order", {}).get("actual") or [])
+    structural["extra_sheets"] = len(actual_names - expected_names) if actual_names else 0
+    for record in report["workbook"].values():
+        if isinstance(record, dict) and record.get("match") is False:
+            structural["workbook_mismatches"] += 1
     for sheet in report["sheets"].values():
         if sheet.get("missing_sheet"):
+            structural["missing_sheets"] += 1
             continue
         cells["expected"] += sheet["cells_expected"]
         cells["actual"] += sheet["cells_actual"]
@@ -400,7 +412,12 @@ def summarise(report):
                         mismatch = len(mismatch)
                     mismatch += len(record.get("extra", [])) if isinstance(record.get("extra"), list) else record.get("extra", 0)
                 bucket["ok" if not mismatch else "not_ok"] += 1
-    return {"cells": cells, "channels": totals, "sheet_level": sheet_level}
+    return {
+        "cells": cells,
+        "channels": totals,
+        "sheet_level": sheet_level,
+        "structural": structural,
+    }
 
 
 def load_plan(path):

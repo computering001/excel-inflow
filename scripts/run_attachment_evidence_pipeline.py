@@ -174,8 +174,23 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             "artifact_sha256": {},
             "summary": {"message": f"Internal {kind} request declaration is absent: {request_path}"},
         }
-    completed = run(command)
+    state_before = None
     if state_path.is_file():
+        try:
+            state_before = state_path.read_bytes()
+        except OSError:
+            state_before = None
+    completed = run(command)
+    # A lane state is trusted only when THIS invocation stands behind it: the
+    # controller exited cleanly (0 = closed, 2 = typed non-terminal state), or
+    # it rewrote the state file during this run. A crash that left yesterday's
+    # bytes untouched must fall through to the no-state classification below,
+    # never resume a previous transaction's verdict.
+    state_is_current = completed.returncode in {0, 2} or (
+        state_path.is_file()
+        and (state_before is None or state_path.read_bytes() != state_before)
+    )
+    if state_path.is_file() and state_is_current:
         try:
             state = read_json(state_path, f"{kind} run state")
             if not isinstance(state.get("user_blocking"), bool):

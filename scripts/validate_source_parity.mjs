@@ -528,7 +528,17 @@ for (let i = violations.length - 1; i >= 0; i -= 1) {
 }
 
 const byKind = violations.reduce((m, v) => (m[v.kind] = (m[v.kind] ?? 0) + 1, m), {});
-const blocking = violations.filter((v) => v.kind === "FLATTENED_FORMULA" || v.kind === "FLATTENED_LINK");
+// Quarantine-class leaks (a formula referencing a forbidden support sheet),
+// undocumented exceptions and missing provenance are integrity failures, not
+// style warnings; a WARN that exits 0 on them is a fail-open gate.
+const BLOCKING_KINDS = new Set([
+  "FLATTENED_FORMULA",
+  "FLATTENED_LINK",
+  "EXCEPTION_LEAKED_COMBINATION",
+  "EXCEPTION_UNDOCUMENTED",
+  "MISSING_PROVENANCE",
+]);
+const blocking = violations.filter((v) => BLOCKING_KINDS.has(v.kind));
 
 // The status reflects only the passes that ACTUALLY APPLIED. When the ledger
 // pass abstained, its silence is not evidence of correctness, so a clean run is

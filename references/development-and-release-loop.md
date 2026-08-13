@@ -45,21 +45,25 @@ invokes release governance.
 
 ```text
 node scripts/run_development_gate.mjs \
-  --scope workflow,economics,authority \
+  --phase workflow,evidence,forecast \
   --cases <v2-case-directory> \
-  --representative <representative-v2-case.json> \
-  --maximal <standard-maximal.xlsx> \
-  --net-cash <standard-net-cash.xlsx> \
+  --representative <representative-compiled-case.json> \
+  --fixed-point-cases-manifest <external-case-manifest.json> \
   --out <development-evidence-directory>
 ```
 
-Scopes:
+Phases come from `assets/development-test-registry.json` and are the only
+selector the gate accepts:
 
-- `contracts`: static contract lint;
-- `workflow`: intake, question flow and statement classification;
-- `economics`: dynamic, recursive and deterministic solver/graph tests;
-- `authority`: both physical workbook authorities and authority mutations;
-- `all`: every scope above.
+- `workflow`: state contract, intake, question flow, fixed-point constitution;
+- `evidence`: broker/DCS/filings controllers, degraded-close and carrier
+  migration, attachment ingress, broker preview gate;
+- `graph`: equation graph, SCC and layered-graph constitution;
+- `forecast`: behavior, observation ledger and topology;
+- `economics`: instrument state, opening debt, value semantics;
+- `cohort` / `proof` / `real_corpus`: cohort keel, delivery proof and external
+  real-corpus suites (the latter BLOCK without their custody inputs);
+- omit `--phase` to run every phase.
 
 The command writes one report with command, duration, status, exit code and
 captured output for every gate. Missing required inputs are `BLOCKED`, never

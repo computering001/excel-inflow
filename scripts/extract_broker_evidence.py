@@ -1560,6 +1560,16 @@ def main() -> int:
             try:
                 if descriptor.get("media_type") != "application/pdf":
                     raise
+                # The declared-hash gate is NOT recoverable: the rendered
+                # fallback exists for structured-extraction failures on the
+                # pinned bytes, never as a route around a source-integrity
+                # mismatch. Re-verify before any recovery.
+                source_path = (request_path.parent / str(descriptor.get("path") or "")).resolve() \
+                    if not Path(str(descriptor.get("path") or "")).is_absolute() \
+                    else Path(str(descriptor.get("path") or ""))
+                expected = descriptor.get("expected_sha256")
+                if expected and (not source_path.is_file() or sha256_file(source_path) != expected):
+                    raise
                 recovered = extract_readable_pdf_fallback(
                     output_root, request_path.parent, descriptor, args.render_dpi, error
                 )

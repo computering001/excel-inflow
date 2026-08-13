@@ -218,7 +218,7 @@ def main() -> int:
                         authorities += [direct("commitment_fee_convention", conv_cell, norm(conv_cell["display_value"]).replace(" ", "_")), direct("commitment_fee_value", fee_cell, fee)]
                     else: missing.append("commitment_fee_terms")
 
-            for field in STRUCTURED_OPTIONAL:
+            for field in sorted(STRUCTURED_OPTIONAL):
                 cell = value_for(field)
                 if not cell: continue
                 value: Any = cell["display_value"]

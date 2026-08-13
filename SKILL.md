@@ -359,11 +359,22 @@ end-user question.
 
 Do not force the complete broker-page inventory into the workbook carrier.
 `broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
-deterministically projects only tables dispositioned `analytical_table` into
-`model_case.broker_pack.raw_tables`. Evidence-only tables stay hash-bound in the
-run, every supplied house remains represented, and every mapped cell must land
-on an analytical table. The two arrays are therefore related by the reviewed
-disposition ledger, not by full-array equality.
+deterministically projects EVERY reviewed tabular grid into
+`model_case.broker_pack.raw_tables` — table membership must be complete, and an
+evidence-only table is never discarded from the projection. The reviewed
+disposition ledger governs CONSUMPTION, not membership: evidence-only tables
+render as hardcoded source evidence, every mapped cell must land on an
+analytical table, and every supplied house remains represented.
+
+Exhausted ordinary broker ambiguity closes the lane `PASS_DEGRADED`, never
+terminal: the smallest defensible regions are quarantined
+`model_use=prohibited`, every raw report stays preserved, quarantine counts are
+disclosed on the Stage-2 preview, and the run continues to Debt, Build and
+Delivery on the surviving broker authority (down to FORECAST_WATERFALL with
+zero broker consumption). Only the four constitutional fatal reasons block
+delivery, and none of them is a broker reason. A sealed run crosses a
+controller upgrade via `scripts/migrate_broker_run_state.py` (fail-closed,
+receipted; see runtime-core), never by re-uploading unchanged sources.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves

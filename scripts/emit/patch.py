@@ -40,6 +40,7 @@ that marker.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import zipfile
@@ -562,7 +563,13 @@ def apply(plan, path, *, backup=None):
     for spec in workbook_spec["sheets"]:
         part = parts.get(spec["name"])
         if part is None or part not in members:
-            continue
+            # A sheet the plan declares but the package lacks is a defect the
+            # caller must see, never a silent skip the counted report cannot
+            # distinguish from "nothing to patch".
+            raise ValueError(
+                f"Plan sheet {spec['name']!r} has no worksheet part in the package; "
+                "the workbook does not carry the plan it claims to."
+            )
         sheet_xml = members[part].decode("utf8")
         sheet_xml, cached, corrected = _write_values(sheet_xml, spec["cells"])
         members[part] = sheet_xml.encode("utf8")
@@ -771,11 +778,20 @@ def apply(plan, path, *, backup=None):
     written = [name for name in order if name in members] + [
         name for name in members if name not in order
     ]
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name in written:
-            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o600 << 16
-            archive.writestr(info, members[name])
+    # Write-to-temp-then-replace: the deliverable and its pre-patch original
+    # must never coexist as a truncated file. A crash mid-write leaves the
+    # original untouched; os.replace is atomic on the same filesystem.
+    temporary = path.with_name(path.name + ".patch-tmp")
+    try:
+        with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
+            for name in written:
+                info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o600 << 16
+                archive.writestr(info, members[name])
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
     return report

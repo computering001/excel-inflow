@@ -262,11 +262,19 @@ def main() -> int:
         source_tables, checkpoint_receipt, extract_input
     )
     if not extract_reused:
+        # rc 1 is a CRASH class (corrupt zip, malformed JSON, unsupported
+        # extension) that must reach the source-fault classifier below rather
+        # than raising with no typed state; rc 2 WITH a complete receipt is a
+        # typed refusal that must reach classify_extract_receipt, not the
+        # crash heuristics.
         completed = run([
             sys.executable, str(HERE / "extract_dcs_evidence.py"),
             str(request_path), "--out", str(extract_root),
-        ], {0, 2})
-        if completed.returncode != 0 or not all(path.is_file() for path in (source_tables, candidate_manifest, extraction_receipt)):
+        ], {0, 1, 2})
+        if (
+            not all(path.is_file() for path in (source_tables, candidate_manifest, extraction_receipt))
+            or completed.returncode not in {0, 2}
+        ):
             detail = (completed.stderr or completed.stdout).strip()[-4000:]
             source_fault = (
                 source.stat().st_size == 0
@@ -366,7 +374,6 @@ def main() -> int:
             ], {0, 2})
             if not proposed.is_file():
                 raise RuntimeError("DCS adapter did not emit a crosswalk proposal")
-            seal(proposed, proposal_receipt, proposal_input)
             proposal_status_path = proposed.with_name("dcs-crosswalk-proposal-receipt.json")
             proposal = read_json(proposal_status_path, "DCS proposal receipt")
             artifacts["crosswalk_proposal_receipt"] = str(proposal_status_path)
@@ -389,6 +396,10 @@ def main() -> int:
                     summary={"terminal_reason": "unresolved_required_terms" if unresolved else "unrecognized_dcs_layout"},
                 )
                 return 2
+            # Seal ONLY a successful proposal. Sealing before the status check
+            # made a failed proposal reusable: every resume skipped the failure
+            # branch and fed the incomplete crosswalk to the compiler.
+            seal(proposed, proposal_receipt, proposal_input)
         add_checkpoint(checkpoints, "crosswalk_proposal", "PASS", proposal_input, proposed, proposal_reused)
         crosswalk = proposed
 

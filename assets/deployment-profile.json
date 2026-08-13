@@ -302,7 +302,7 @@
     "verify/workbook_semantic_oracle.py",
     "verify/verify_delivery.py"
   ],
-  "_python_entry_point_note": "Twenty-two Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
+  "_python_entry_point_note": "Twenty-three Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
   "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The five broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
   "python_entry_point_notes": {
     "migrate_broker_run_state.py": "Fail-closed, receipted migration of a sealed broker run across an intentional runtime-closure change; re-homes receipt-verified checkpoints and preserves exhaustion history so a live run resumes without losing progress or re-uploading sources. Invoked only on controller upgrades, never in ordinary runs.",
@@ -558,9 +558,7 @@
     "verify/xlsx.py",
     "verify/verify_delivery.py"
   ],
-  "_python_module_allowlist_omissions": {
-    "verify/compare_reports.py": "Diffs a Node validation-report.json against the Python port's, check for check. Its whole purpose is to prove the port matches an incumbent that cannot ship; inside the release there is no Node report to diff against. Deliberately not an entry point, therefore deliberately not in the closure."
-  },
+  "_python_module_allowlist_omissions": {},
   "allowed_python_third_party_imports": {
     "openpyxl": {
       "distribution": "openpyxl",
@@ -804,89 +802,6 @@
       }
     ]
   },
-  "instruction_strip_rules": [
-    {
-      "id": "local-emitter-bullet",
-      "reason": "build_dynamic_model.mjs IS now in the shipped closure, but only one of its two modes ships. --plan-only needs no private tooling and no LibreOffice and is the release's build path; --out needs scripts/build_package.mjs, which carries the private workbook library import and the ./extract_plan.mjs import and is excluded from the package. The incumbent bullet describes both modes as available, so it is REPLACED rather than deleted: the emitter must be named, because it is there, and the mode that is not there must not be offered.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "- `scripts/build_dynamic_model.mjs` \u2014 the emitter, and it has two modes that are not interchangeable. `--plan-only` writes the plan and needs no private tooling and no LibreOffice; `--out <workbook.xlsx>` writes the package directly through the private artifact writer and recalculates it through LibreOffice. Both are set out under **Build rules**; say which one produced a file.\n",
-      "replace": "- `scripts/build_dynamic_model.mjs` \u2014 the emitter. `--plan-only` writes the plan and needs no private tooling and no LibreOffice; it is the only mode this package carries. The direct-to-workbook mode is a local certification tool and is not present here, so a workbook is always reached through the plan and the renderer. Set out under **Build rules**.\n"
-    },
-    {
-      "id": "two-build-paths-subsection",
-      "reason": "SKILL.md documents both emitter modes. Only --plan-only ships, so the subsection is REPLACED with the one path the package can actually run, commands included \u2014 and it must carry them, because the compiler requires every declared entry point to be named by a runnable fenced command. What the incumbent says that stays true is kept: package-level patch facts arrive as ordinary plan facts, validate precedes build, and neither producer may be named for a file it did not produce. Written as one literal over the whole subsection on purpose \u2014 any edit to it fails the compile rather than shipping half a rewritten instruction.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "### The two build paths\n\nThe emitter now writes `plan.json` directly. There are therefore two paths to a workbook, they produce the same workbook, and they are **not** interchangeable. Choose by what the machine actually has, and never name a path that did not produce the file.\n\n**`--plan-only` is the shipping path.** The emitter writes the plan and nothing else: it reads no workbook, runs no converter, and never loads the private artifact writer. It is therefore the path that runs where that package is absent, which is every machine the release runs on. The renderer turns the plan into the workbook:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>\npython3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json\npython3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>\n```\n\n`--out` is required in both modes and always names the **workbook**. Under `--plan-only` no workbook is written: the plan lands at `<workbook.xlsx>.plan.json`, the five validator sidecars land beside it, and the run prints `status: PLANNED` with its cached-cell counts and `unresolved_caches`. A run reporting any unresolved cache has failed \u2014 it means a formula the plan carries has no value a reader would see before recalculating.\n\n**`--out <workbook.xlsx>` on its own is the local certification path.** The emitter writes the package through the private artifact writer, recalculates it through LibreOffice, applies the terminal patches and captures the plan back out of the finished file:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --out <workbook.xlsx> [--soffice <path>]\n```\n\nIt runs only where the private writer and LibreOffice both exist. It is how a model is certified before release, and every certified reference workbook in this package came from it. That same run also synthesises the `--plan-only` plan and asserts the two agree, so certifying here certifies the shipping path rather than merely coexisting with it. Where a plan has to be recovered from a workbook that was already built, that is done by the local `extract_plan.mjs` tool, which is not part of the released package.\n\nThree things bind on both paths:\n\n- Everything the Node pipeline applies as a package-level patch \u2014 the adjustment gate rewrite, the frozen pane, the row outlines, the label indents, the `centerContinuous` block titles \u2014 reaches the renderer as an ordinary plan fact. On the captured plan because it is read back after the terminal patch; on the synthesised plan because the emitter declares it from the row plan. The renderer must therefore never re-apply any of them as a patch of its own.\n- Always run `validate` before `build`, on either path's plan.\n- Never present the renderer as the producer of a model it did not render, and never present the artifact writer as the producer of a model that was rendered from a plan.\n\n",
-      "replace": "### The build path\n\nThe emitter writes `plan.json` from the case; the renderer turns that plan into the workbook. That is the whole path, and it is the one this package ships:\n\n```text\nnode scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>\npython3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json\npython3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>\n```\n\n`--out` is required on the emitter and always names the **workbook**, but the emitter writes no workbook: the plan lands at `<workbook.xlsx>.plan.json`, the five validator sidecars land beside it, and the run prints `status: PLANNED` with its cached-cell counts and `unresolved_caches`. A run reporting any unresolved cache has failed \u2014 it means a formula the plan carries has no value a reader would see before recalculating.\n\nThe emitter reads no workbook, runs no converter and loads no private writer, which is why it runs wherever this package runs. There is a second path, used to certify a model before release, that writes the package directly through a private artifact writer and recalculates it through LibreOffice. It is **not** part of this package. A workbook that arrived that way was not produced here.\n\nThree things bind:\n\n- Everything the emitting pipeline applies as a package-level patch \u2014 the adjustment gate rewrite, the frozen pane, the row outlines, the label indents, the `centerContinuous` block titles \u2014 reaches the renderer as an ordinary plan fact, declared by the emitter from the row plan. The renderer must therefore never re-apply any of them as a patch of its own.\n- Always run `validate` before `build`.\n- Never present the renderer as the producer of a model it did not render, and never present the artifact writer as the producer of a model that was rendered from a plan.\n\n"
-    },
-    {
-      "id": "local-dynamic-validator-bullet",
-      "reason": "validate_dynamic_model.mjs imports private workbook library and cannot ship.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "- `scripts/validate_dynamic_model.mjs`\n",
-      "replace": ""
-    },
-    {
-      "id": "coverage-gate-commands",
-      "reason": "debt-overlay.mjs is the local dispatcher and does not ship. The same two operations are shipped commands on the economics CLI.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "scripts/debt-overlay.mjs validate-case <case.json>\nscripts/debt-overlay.mjs coverage <case.json> --out <coverage.json>",
-      "replace": "node scripts/debt-model-economics.mjs validate-case <case.json>\nnode scripts/debt-model-economics.mjs coverage <case.json> --out <coverage.json>"
-    },
-    {
-      "id": "dynamic-build-commands",
-      "reason": "solve ships; the local Node build CLI does not. Emission happens through the Python renderer and the workbook writer described under the deployment host workbook compatibility contract, so the block states that rather than leaving an empty fence. The replacement said 'no build CLI' until the instructions started carrying `python3 scripts/emit/__main__.py build`, which is a build CLI \u2014 corrected to 'no Node build CLI'.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "Build with:\n\n```text\nscripts/debt-overlay.mjs solve <case.json> <solution.json>\nscripts/debt-overlay.mjs build <case.json> --out <workbook.xlsx>\n```\n",
-      "replace": "Solve the case first:\n\n```text\nnode scripts/debt-model-economics.mjs solve <case.json> <solution.json>\n```\n\nThen emit the workbook from the solved case with the workbook writer described under *deployment host workbook compatibility contract*. This package ships no Node build CLI; the solved case is the numeric authority the emitted workbook must match.\n"
-    },
-    {
-      "id": "deterministic-validation-commands",
-      "reason": "The local dispatcher's validate and test subcommands do not ship. The fence is removed rather than rewritten because the instructions already carry the shipped verifiers and their real signatures a few lines below; rewriting it would print the same four commands twice with different spellings.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "Run:\n\n```text\nscripts/debt-overlay.mjs validate <workbook.xlsx> --out <folder>\nscripts/debt-overlay.mjs test-v2 <v2-cases-folder> <output-folder>\nscripts/debt-overlay.mjs test-recursive <representative-v2-case.json> <output-folder>\nscripts/debt-overlay.mjs test-deterministic <representative-v2-case.json> <output-folder>\nnode scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-export <json>] [--broker-pack <json>] [--filings <json>] [--soffice <path>] [--baselines <dir>] [--json]\n```\n",
-      "replace": "The deterministic validator and the v2, recursive and determinism harnesses are local-only tools and are not part of this package. The independent verifiers below are the ones that run here. Run the portable production controller with:\n\n```text\nnode scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-export <json>] [--broker-pack <json>] [--filings <json>] [--soffice <path>] [--baselines <dir>] [--json]\n```\n"
-    },
-    {
-      "id": "native-excel-sanitiser",
-      "reason": "The DrawingML sanitiser is a local-only tool and there is no native Excel in deployment host. Removing the fence outright, rather than emptying it, keeps the surrounding instruction intact.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "After any native Excel save, remove only unintended Excel-created DrawingML shapes:\n\n```text\nscripts/debt-overlay.mjs sanitize-native <workbook.xlsx> --out <workbook.xlsx>\n```\n\nThen rerun deterministic validation.",
-      "replace": "After any native Excel save, remove only unintended Excel-created DrawingML shapes, then rerun deterministic validation. The DrawingML sanitiser is a local-only tool and is not part of this package."
-    },
-    {
-      "id": "manual-evidence-gates",
-      "reason": "The local dispatcher's flag fragment is what previously survived as an orphan. Matched as a regex because the flags have been reflowed across lines more than once; the fence and both flag names still have to be there. The replacement text said the gates 'have no command in this package', which stopped being true once verify/validate_dynamic_model.py started accepting --visual-reviewed and --finance-reviewed. What stayed true is that those flags RECORD evidence produced elsewhere: neither gate closes because a flag was passed.",
-      "kind": "regex",
-      "flags": "g",
-      "occurrences": "exactly_one",
-      "find": "Supply the visual and native evidence to close the two manual gates:\\n\\n```text\\nscripts/debt-overlay\\.mjs validate[\\s\\S]*?--finance-reviewed[^\\n]*\\n```\\n",
-      "replace": "Supply the visual and native evidence to close the two manual gates. Record both beside the workbook and state them in the delivered summary. `--visual-reviewed` and `--finance-reviewed` on the shipped Python validator record that evidence; they do not produce it and neither gate closes merely because a flag was passed.\n"
-    },
-    {
-      "id": "contract-linter-command",
-      "reason": "lint_contracts.mjs loads local certification contracts that are deliberately excluded from the release. It would throw on its first excluded read inside the package.",
-      "kind": "literal",
-      "occurrences": "exactly_one",
-      "find": "node scripts/lint_contracts.mjs [skill-folder]\n",
-      "replace": ""
-    },
-    {
-      "id": "local-spreadsheet-runtime-phrasing",
-      "reason": "Carried over from the previous compiler. The local phrasing names a runtime that does not exist in deployment host.",
-      "kind": "literal",
-      "occurrences": "any",
-      "find": "Use the installed spreadsheet workflow and its supported spreadsheet runtime for local `.xlsx` authoring.",
-      "replace": "Use Excel to create or edit the workbook."
-    }
-  ],
   "_removed_strip_rules": {
     "local-plan-extractor-name": "Removed on 2026-07-27, not weakened. It rewrote the single sentence naming `extract_plan.mjs`; that sentence now sits inside the block two-build-paths-subsection removes wholesale, so the rule would match zero times and fail its own exactly_one declaration. The invariant it protected \u2014 no bare `extract_plan.mjs` surviving into the compiled instructions \u2014 is asserted independently, and more strongly, by the dangling-script-reference check, which resolves bare filenames against the shipped basenames and fails the build on any that do not resolve. Restore this rule if the extractor is ever named outside that block."
   },

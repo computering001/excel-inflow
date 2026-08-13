@@ -308,28 +308,6 @@ across sections; **unmatched rows in the BUILT model are never reported at all**
 so a spurious extra row is invisible; output truncates at 40 fill differences
 and 20 indent differences.
 
-### `lint_contracts.mjs` — are the contracts internally coherent
-
-```text
-lint_contracts.mjs [skill-folder]
-```
-
-Reads the asset contracts and asserts that column roles do not overlap, section
-counts and IDs agree across taxonomy and template, control cells agree, scenario
-truth tables cover the controls, the QA cases cover the four required
-archetypes, the dynamic taxonomy asserts no fixed-row authority, the runtime
-certification state is coherent and the reference crosswalk is complete with its
-source defects explicitly overridden.
-
-**Cannot see:** it **never opens a workbook**. It validates the contracts
-against each other, not the model against the contracts.
-
-It also **fails fast by exception**: the first failed check throws and nothing
-further runs, so only one failure is ever visible per run and nothing is
-written. Its printed `status` is a hardcoded literal that can only read `PASS`.
-Several of its assertions are hardcoded magic numbers tied to the reference
-model, which will need a human when a second reference lands.
-
 ### `verify/validate_dynamic_model.py` — the port that runs where the Node validator cannot
 
 ```text
