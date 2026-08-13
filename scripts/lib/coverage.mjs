@@ -822,6 +822,10 @@ export function statementAuthorityChecks(modelCase) {
     "rcf_draw",
     "rcf_repayment",
     "lease_principal",
+    // Opening cash is owned by the cash-bucket schedule in exactly the same
+    // way debt issuance is owned by the debt schedule. The filed value remains
+    // evidence, while the visible model cell links to the schedule authority.
+    "opening_cash",
     // Computed by the solver from the debt schedule (PIK, fee amortisation),
     // never from filed history.
     "non_cash_interest_addback",
@@ -1943,12 +1947,19 @@ function brokerChecks(modelCase) {
   const compiledBrokerRows = [
     ...rows,
     ...normaliseStatementRows(modelCase, "cash_flow"),
+    // Include the sealed statement inventory as well as its visible
+    // projection. A non-authoritative EBIT bridge can be projected from the
+    // face while still carrying the exact broker-period disposition that
+    // explains why the pack metric is retained rather than orphaned.
+    ...(modelCase.statement_structure?.income_statement ?? []),
+    ...(modelCase.statement_structure?.cash_flow ?? []),
   ];
   const consumedMetricIds = new Set(
     compiledBrokerRows
       .map((row) => row.broker_metric_id)
       .filter(Boolean),
   );
+  const brokerDisabled = modelCase.controls?.broker_case === "Forecast Waterfall";
   for (const [metricId, metric] of Object.entries(pack.metrics ?? {})) {
     if (consumedMetricIds.has(metricId)) continue;
     const disposition = metric.model_disposition;
@@ -1957,6 +1968,7 @@ function brokerChecks(modelCase) {
       ["reference_only", "rejected", "not_applicable"].includes(disposition) &&
       typeof reason === "string" &&
       reason.trim().length > 0;
+    const waterfallReferenceOnly = brokerDisabled;
     // A disclosed broker subtotal may deliberately remain a counter-headline
     // rather than drive the model when the compiled statement calculates the
     // same semantic concept from visible constituents.  This is generic: it
@@ -1970,15 +1982,20 @@ function brokerChecks(modelCase) {
       return (
         row.forecast_treatment === "formula" ||
         row.historical_authority === "derived_formula" ||
+        (row.forecast_period_authorities ?? []).some(
+          (authority) => authority?.source_kind === "broker",
+        ) ||
         Boolean(rule && Array.isArray(rule.refs) && rule.refs.length > 0)
       );
     });
     checks.push(
       result(
         `broker_pack.${metricId}.consumption`,
-        explicitlyExcluded || derivedSemanticReference ? "PASS" : "BLOCK",
+        explicitlyExcluded || waterfallReferenceOnly || derivedSemanticReference ? "PASS" : "BLOCK",
         explicitlyExcluded
           ? `${metricId} is explicitly ${disposition}: ${reason.trim()}`
+          : waterfallReferenceOnly
+            ? `${metricId} is retained as broker evidence only; the confirmed forecast waterfall owns the model forecast.`
           : derivedSemanticReference
             ? `${metricId} is retained on Brokers as a disclosed counter-headline while the visible model derives the same semantic concept through its declared calculation graph.`
           : `${metricId} is present in the accepted broker pack but maps to no visible statement or schedule node. Map it exactly once or reject it with a model disposition and reason.`,

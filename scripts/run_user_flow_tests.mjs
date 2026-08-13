@@ -9,6 +9,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { inspectScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
+import {
+  DELIVERY_BLOCKED_OUTCOMES,
+  DELIVERY_FATAL_REASONS,
+  normaliseUserFlowResult,
+} from "./lib/workflow_state.mjs";
 
 const exec = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -201,6 +206,58 @@ await test("question path stops once and never treats action-required as success
   const second = await flow(acquisitionEvidence, runDir, ["--stop-after", "decisions"]);
   assert(second.status === "ACTION_REQUIRED", JSON.stringify(second));
   assert(!second.reused_stages.includes("decisions"), "action-required decision stage was reused as success");
+});
+
+await test("delivery blocker constitution covers every terminal user-flow outcome", async () => {
+  const source = await fs.readFile(path.join(HERE, "run_user_flow.mjs"), "utf8");
+  const blockedOutcomes = [...source.matchAll(
+    /status:\s*"BLOCKED"[\s\S]{0,220}?outcome:\s*"([a-z0-9_]+)"/g,
+  )].map((match) => match[1]);
+  blockedOutcomes.push(
+    "bad_inputs",
+    "filings_incomplete",
+    "entity_stop",
+    "reconciliation_stop",
+    "awaiting_reexport",
+    "decision_replay_blocked",
+    "decision_graph_blocked",
+  );
+  assert(blockedOutcomes.length > 0, "user flow exposes no statically auditable BLOCKED outcomes");
+  const declared = new Set(Object.keys(DELIVERY_BLOCKED_OUTCOMES));
+  for (const outcome of new Set(blockedOutcomes)) {
+    const binding = DELIVERY_BLOCKED_OUTCOMES[outcome];
+    assert(
+      binding && DELIVERY_FATAL_REASONS.includes(binding.fatal_reason),
+      `${outcome} lacks one of the declared fatal delivery reasons`,
+    );
+    assert(binding.domain, `${outcome} lacks a blocker domain`);
+    declared.delete(outcome);
+  }
+  assert(declared.size === 0, `constitution declares stale BLOCKED outcomes: ${[...declared].join(", ")}`);
+  let undeclaredRejected = false;
+  try {
+    normaliseUserFlowResult({
+      status: "BLOCKED",
+      stage: "evidence_review",
+      outcome: "future_undeclared_stop",
+      blocker_class: "INTERNAL_WORK",
+    });
+  } catch {
+    undeclaredRejected = true;
+  }
+  assert(undeclaredRejected, "an undeclared future delivery blocker was accepted");
+  let brokerRejected = false;
+  try {
+    normaliseUserFlowResult({
+      status: "BLOCKED",
+      stage: "evidence_review",
+      outcome: "broker_uncertainty_blocked",
+      blocker_class: "INTERNAL_WORK",
+    });
+  } catch {
+    brokerRejected = true;
+  }
+  assert(brokerRejected, "broker uncertainty became a terminal delivery blocker");
 });
 
 await test("supplied answer persists and resumes deterministically", async () => {

@@ -260,17 +260,43 @@ def table_index(bundle: dict[str, Any]) -> dict[str, tuple[str, list[list[dict[s
     return output
 
 
+def model_prohibited_surface_ids(bundle: dict[str, Any]) -> set[str]:
+    """Independently identify surfaces that can preserve evidence but mint no authority."""
+    return {
+        str(surface.get("surface_id"))
+        for document in bundle.get("documents") or []
+        for surface in document.get("surfaces") or []
+        if (
+            (surface.get("quarantine") or {}).get("model_use") == "prohibited"
+            and surface.get("vision_disposition") == "quarantined_evidence_only"
+        ) or surface.get("vision_disposition") == "verified_non_tabular"
+    }
+
+
+def fully_model_prohibited_bundle(bundle: dict[str, Any]) -> bool:
+    surfaces = [
+        surface
+        for document in bundle.get("documents") or []
+        for surface in document.get("surfaces") or []
+    ]
+    prohibited = model_prohibited_surface_ids(bundle)
+    return bool(surfaces) and all(str(surface.get("surface_id")) in prohibited for surface in surfaces)
+
+
 def verify_manifest_integrity(bundle: dict[str, Any], manifest: dict[str, Any]) -> list[dict[str, Any]]:
     """Reconstruct the manifest universe directly from canonical source tables."""
 
     findings: list[dict[str, Any]] = []
     expected: dict[tuple[str, str, int, str], dict[str, Any]] = {}
     canonical_tables: list[dict[str, Any]] = []
+    prohibited_surfaces = model_prohibited_surface_ids(bundle)
     for document in sorted(bundle.get("documents") or [], key=lambda item: str(item.get("document_id"))):
         tables = document.get("canonical_tables") or document.get("tables") or []
         for table in sorted(tables, key=lambda item: str(item.get("canonical_table_id") or item.get("table_id"))):
             canonical_tables.append(table)
             table_id = str(table.get("canonical_table_id") or table.get("table_id"))
+            if str(table.get("surface_id")) in prohibited_surfaces:
+                continue
             for row_number, row in enumerate(table.get("rows") or [], start=1):
                 cells_by_authority: dict[str, list[dict[str, Any]]] = {}
                 numeric_by_authority: dict[str, int] = {}
@@ -431,7 +457,7 @@ def manifest_candidates(bundle: dict[str, Any]) -> tuple[dict[str, dict[str, Any
             add(findings, "SEM-MANIFEST-DUPLICATE-ID", f"Manifest repeats candidate_id {cid!r}.", cid)
         else:
             result[cid] = candidate
-    if not result:
+    if not result and not fully_model_prohibited_bundle(bundle):
         add(findings, "SEM-MANIFEST-EMPTY", "The deterministic candidate manifest contains no candidates.")
     return result, findings
 
@@ -573,6 +599,11 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any], *, bundle_sha256: 
         findings.extend(verify_manifest_integrity(bundle, bundle["candidate_manifest"]))
     metrics = crosswalk.get("metrics") or {}
     raw_ledger = crosswalk.get("coverage_ledger") or []
+    empty_evidence_only = fully_model_prohibited_bundle(bundle) and not manifest
+    if not manifest and not empty_evidence_only:
+        add(findings, "SEM-EMPTY-AUTHORITY-UNPROVEN", "A zero-candidate broker lane is lawful only when every preserved surface is independently model-prohibited.")
+    if empty_evidence_only and (raw_ledger or crosswalk.get("mappings") or crosswalk.get("derived_mappings")):
+        add(findings, "SEM-EMPTY-AUTHORITY-ACTIVE", "A fully evidence-only broker lane cannot carry candidate dispositions, mappings or derivations.")
     terminal_ledger, terminal_errors = verify_terminal_recovery_independently(
         bundle, crosswalk, bundle_sha256=bundle_sha256
     )

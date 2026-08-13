@@ -215,6 +215,18 @@ function declaredSources(modelCase, rowId) {
 
 function formulaAuthority(definition) {
   if (definition.formula_authority) return definition.formula_authority;
+  const periodCalculations = (definition.forecast_period_calculations ?? []).filter(Boolean);
+  if (
+    periodCalculations.length > 0 &&
+    periodCalculations.every((calculation) =>
+      ["historical_average", "historical_trend"].includes(calculation.operator),
+    )
+  ) {
+    // These formulas read the sealed historical observation window directly.
+    // They deliberately have no forecast-node dependency edge, but they are
+    // still compiler-authored formulas rather than presentation-only rows.
+    return "compiler";
+  }
   if (
     definition.forecast_capture_parent_id ||
     definition.forecast_treatment === "uncalculated"

@@ -27,9 +27,11 @@ Matrix coverage in this file:
 from __future__ import annotations
 
 import json
+import argparse
 import subprocess
 import sys
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,7 @@ import run_attachment_evidence_pipeline as attachment  # noqa: E402
 import run_broker_pipeline as broker  # noqa: E402
 from workflow_state import assert_delivery_blocker, assert_state  # noqa: E402
 from verify_broker_semantics import normalized_manifest_period  # noqa: E402
+from compile_broker_candidate_manifest import compile_manifest  # noqa: E402
 
 
 def check(condition: bool, message: str) -> None:
@@ -461,13 +464,43 @@ def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def empty_evidence_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
+    """A zero-consumption review for a bundle whose every surface is prohibited."""
+    shell = reference_only_crosswalk(bundle)
+    shell["table_reviews"] = [
+        {
+            "table_id": table.get("canonical_table_id") or table.get("table_id"),
+            "house_id": document.get("house_id"),
+            "review_status": "reviewed",
+            "rationale": "The extraction-owned surface disposition prohibits model use; the preserved table is evidence only.",
+            "classification": "non_forecast",
+            "header_rows": [],
+            "period_columns": [],
+        }
+        for document in bundle.get("documents", [])
+        for table in document.get("tables", [])
+    ]
+    shell["coverage_ledger"] = []
+    shell["mappings"] = []
+    return shell
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", help="Optional persistent artifact directory for downstream integration tests.")
+    args = parser.parse_args()
     checks = 0
     grid_a = [["Metric", "2027E", "2028E"], ["Alpha series", "100", "110"], ["Beta series", "20", "22"]]
     grid_b = [["Metric", "2027E", "2028E"], ["Alpha series", "100", "110"], ["Beta series", "21", "22"]]  # one persistent cell conflict
 
-    with tempfile.TemporaryDirectory(prefix="excel-inflow-degraded-close-") as temporary:
+    context = (
+        nullcontext(str(Path(args.out).resolve()))
+        if args.out
+        else tempfile.TemporaryDirectory(prefix="excel-inflow-degraded-close-")
+    )
+    with context as temporary:
         root = Path(temporary)
+        root.mkdir(parents=True, exist_ok=True)
         artifact_root = root / "artifacts"
         artifact_root.mkdir(parents=True)
 
@@ -664,6 +697,72 @@ def main() -> int:
         check(not berenberg_candidates, "a quarantined surface manufactured candidates")
         checks += 5
 
+        # A future pack may have no usable broker candidate at all. That is a
+        # lawful all-evidence-only lane, not a reason to prevent the company
+        # forecast waterfall from building a model. Prove the exact semantic
+        # and pack chain, then prove a fabricated active mapping is rejected.
+        empty_root = root / "all-evidence-only"
+        empty_root.mkdir()
+        empty_bundle = json.loads(json.dumps(degraded_bundle))
+        for document in empty_bundle.get("documents", []):
+            for surface in document.get("surfaces", []):
+                surface["vision_disposition"] = "quarantined_evidence_only"
+                surface["quarantine"] = {
+                    "model_use": "prohibited",
+                    "reason_id": "all_surface_regression",
+                    "scope": "surface",
+                }
+        empty_bundle["candidate_manifest"] = compile_manifest(empty_bundle)
+        check(empty_bundle["candidate_manifest"]["candidates"] == [], "all-evidence-only manifest was not empty")
+        empty_bundle["canonical_tables_sha256"] = empty_bundle["candidate_manifest"]["canonical_tables_sha256"]
+        empty_bundle_path = empty_root / "verified-bundle.json"
+        write_json(empty_bundle_path, empty_bundle)
+        empty_crosswalk = empty_evidence_only_crosswalk(empty_bundle)
+        empty_crosswalk_path = empty_root / "crosswalk.json"
+        write_json(empty_crosswalk_path, empty_crosswalk)
+        semantic_path = empty_root / "semantic.json"
+        semantic_run = subprocess.run([
+            sys.executable, str(HERE / "verify_broker_semantics.py"),
+            str(empty_bundle_path), str(empty_crosswalk_path), "--out", str(semantic_path),
+        ], cwd=HERE, text=True, capture_output=True, check=False)
+        empty_semantic = json.loads(semantic_path.read_text("utf-8"))
+        check(semantic_run.returncode == 0 and empty_semantic.get("status") == "PASS", f"empty semantic lane blocked: {empty_semantic}")
+        empty_pack_root = empty_root / "compiled"
+        pack_run = subprocess.run([
+            sys.executable, str(HERE / "compile_broker_pack.py"),
+            str(empty_bundle_path), str(empty_crosswalk_path), "--out", str(empty_pack_root),
+        ], cwd=HERE, text=True, capture_output=True, check=False)
+        check(pack_run.returncode == 0, f"empty pack compilation blocked: {pack_run.stderr[-1200:]}")
+        empty_pack = json.loads((empty_pack_root / "broker-pack.json").read_text("utf-8"))
+        empty_receipt = json.loads((empty_pack_root / "broker-crosswalk-receipt.json").read_text("utf-8"))
+        check(empty_receipt.get("mapping_count") == 0 and empty_receipt.get("coverage_ledger") == [], "empty pack invented authority")
+        check(all(house.get("eligibility") == "reference_only" for house in empty_pack.get("houses", [])), "empty pack made a house eligible")
+        check(empty_pack.get("eligibility_summary", {}).get("run_can_continue_without_broker_question") is True, "empty pack did not defer safely to the forecast waterfall")
+
+        hostile_empty = json.loads(json.dumps(empty_crosswalk))
+        hostile_empty["mappings"] = [{
+            "mapping_id": "hostile.empty.mapping",
+            "house_id": empty_bundle["documents"][0]["house_id"],
+            "metric_id": "revenue",
+            "definition_id": "dict.revenue",
+            "period_index": 0,
+            "sources": [{"table_id": empty_bundle["documents"][0]["tables"][0]["table_id"], "row": 2, "column": 2, "coefficient": 1}],
+            "constant": 0,
+            "multiplier": 1,
+            "rationale": "Hostile attempt to reactivate an evidence-only surface.",
+            "review_status": "reviewed",
+        }]
+        hostile_empty_path = empty_root / "hostile-crosswalk.json"
+        write_json(hostile_empty_path, hostile_empty)
+        hostile_semantic_path = empty_root / "hostile-semantic.json"
+        hostile_semantic_run = subprocess.run([
+            sys.executable, str(HERE / "verify_broker_semantics.py"),
+            str(empty_bundle_path), str(hostile_empty_path), "--out", str(hostile_semantic_path),
+        ], cwd=HERE, text=True, capture_output=True, check=False)
+        hostile_semantic = json.loads(hostile_semantic_path.read_text("utf-8"))
+        check(hostile_semantic_run.returncode != 0 and any(item.get("code") == "SEM-EMPTY-AUTHORITY-ACTIVE" for item in hostile_semantic.get("findings", [])), "hostile empty mapping was not rejected")
+        checks += 7
+
         # A crosswalk that tries to ACTIVATE a quarantined candidate is refused.
         if quarantined_candidates:
             hostile = reference_only_crosswalk(degraded_bundle)
@@ -824,6 +923,29 @@ def main() -> int:
             else:
                 raise AssertionError(f"{domain} was accepted as a delivery blocker")
         checks += 1
+
+        if args.out:
+            write_json(root / "degraded-close-test-output.json", {
+                "schema_version": "broker-degraded-close-test-output/1.0",
+                "status": "PASS",
+                "controller_state_path": str((output_root / "broker-run-state.json").resolve()),
+                "degraded_artifacts": {
+                    "extraction_bundle_path": str(Path(final_state["artifacts"]["verified_bundle"]).resolve()),
+                    "crosswalk_path": str(Path(final_state["artifacts"]["crosswalk"]).resolve()),
+                    "semantic_report_path": str(Path(final_state["artifacts"]["semantic_report"]).resolve()),
+                    "broker_pack_path": str(Path(final_state["artifacts"]["broker_pack"]).resolve()),
+                    "source_tables_path": str(Path(final_state["artifacts"]["source_tables"]).resolve()),
+                    "crosswalk_receipt_path": str(Path(final_state["artifacts"]["broker_crosswalk_receipt"]).resolve()),
+                },
+                "all_evidence_only": {
+                    "extraction_bundle_path": str(empty_bundle_path.resolve()),
+                    "crosswalk_path": str(empty_crosswalk_path.resolve()),
+                    "semantic_report_path": str(semantic_path.resolve()),
+                    "broker_pack_path": str((empty_pack_root / "broker-pack.json").resolve()),
+                    "source_tables_path": str((empty_pack_root / "broker-source-tables.json").resolve()),
+                    "crosswalk_receipt_path": str((empty_pack_root / "broker-crosswalk-receipt.json").resolve()),
+                },
+            })
 
     print(json.dumps({"status": "PASS", "checks": checks, "statuses": statuses}, sort_keys=True))
     return 0

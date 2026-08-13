@@ -738,12 +738,30 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   }
   if (
     extraction.json.candidate_manifest.gate_status !== "PASS" ||
-    extraction.json.candidate_manifest.candidates.length === 0 ||
     extraction.json.candidate_manifest.canonical_tables_sha256 !==
       extraction.json.canonical_tables_sha256
   ) {
     throw new Error(
-      "Broker candidate manifest is empty, non-PASS or detached from the canonical tables.",
+      "Broker candidate manifest is non-PASS or detached from the canonical tables.",
+    );
+  }
+  const extractionSurfaces = (extraction.json.documents ?? []).flatMap(
+    (document) => document.surfaces ?? [],
+  );
+  const fullyModelProhibited =
+    extractionSurfaces.length > 0 &&
+    extractionSurfaces.every(
+      (surface) =>
+        (surface.vision_disposition === "quarantined_evidence_only" &&
+          surface.quarantine?.model_use === "prohibited") ||
+        surface.vision_disposition === "verified_non_tabular",
+    );
+  if (
+    extraction.json.candidate_manifest.candidates.length === 0 &&
+    !fullyModelProhibited
+  ) {
+    throw new Error(
+      "Broker candidate manifest is empty without an extraction-owned all-surfaces evidence-only disposition.",
     );
   }
   const artifactRoot = path.resolve(
@@ -954,7 +972,10 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     receipt.json.coverage_summary?.table_count !==
       receipt.json.coverage_summary?.table_review_count ||
     !Array.isArray(receipt.json.coverage_ledger) ||
-    receipt.json.coverage_ledger.length === 0
+    (receipt.json.coverage_ledger.length === 0 &&
+      !(fullyModelProhibited &&
+        extraction.json.candidate_manifest.candidates.length === 0 &&
+        receipt.json.mapping_count === 0))
   ) {
     throw new Error(
       "Broker crosswalk PASS receipt lacks complete, zero-unresolved semantic coverage evidence.",

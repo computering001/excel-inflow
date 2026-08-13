@@ -86,6 +86,10 @@ function resolveHistoricalStatementSeries(modelCase, section) {
     const row = byId.get(rowId);
     if (!row || visiting.has(rowId)) return null;
 
+    // Filed finance expense is entered once on the Interest Schedule and the
+    // face statement is a schedule shell.  Resolve that source-owned authority
+    // here instead of trusting the duplicate row cache (or treating its
+    // deliberately empty calculation refs as missing history).
     const stated = row.values?.[periodIndex];
     if (finite(stated)) {
       cache.set(rowId, Number(stated));
@@ -1798,6 +1802,22 @@ function validateBrokerSourceTables(run, findings) {
     (count, house) => count + (house.tables ?? []).length,
     0,
   );
+  const candidateCount =
+    receipt?.coverage_summary?.candidate_manifest_count ??
+    receipt?.coverage_summary?.detected_forecast_candidate_count ??
+    null;
+  const evidenceOnlyEmptyAuthority =
+    candidateCount === 0 &&
+    receipt?.coverage_summary?.mapping_count === 0 &&
+    Array.isArray(receipt?.mappings) &&
+    receipt.mappings.length === 0 &&
+    Array.isArray(receipt?.coverage_ledger) &&
+    receipt.coverage_ledger.length === 0 &&
+    (evidenceTables.houses ?? []).every((house) =>
+      (house.tables ?? []).every(
+        (table) => table.workbook_presentation === "evidence_only",
+      ),
+    );
   if (
     receipt?.coverage_summary?.unresolved_candidate_count !== 0 ||
     receipt?.coverage_summary?.semantic_quality_violation_count !== 0 ||
@@ -1805,13 +1825,13 @@ function validateBrokerSourceTables(run, findings) {
     receipt?.coverage_summary?.table_count !==
       receipt?.coverage_summary?.table_review_count ||
     !Array.isArray(receipt?.coverage_ledger) ||
-    receipt.coverage_ledger.length === 0
+    (receipt.coverage_ledger.length === 0 && !evidenceOnlyEmptyAuthority)
   ) {
     findings.push(
       finding(
         "evidence.broker_source_tables.semantic_coverage_incomplete",
         "BLOCK",
-        "Full-table broker evidence requires a non-empty semantic coverage ledger with every table reviewed and zero unresolved forecast candidates.",
+        "Full-table broker evidence requires complete semantic coverage and zero unresolved forecast candidates; a zero-entry ledger is valid only when the independently reviewed pack has zero candidates, zero mappings and evidence-only presentation throughout.",
       ),
     );
   }

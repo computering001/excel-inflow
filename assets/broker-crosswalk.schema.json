@@ -217,14 +217,16 @@
     },
     "table_reviews": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
+      "description": "One review per preserved structured table. Empty is lawful only when every broker surface is independently model-prohibited and therefore no structured table survived as model-eligible evidence.",
       "items": {
         "$ref": "#/$defs/tableReview"
       }
     },
     "coverage_ledger": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
+      "description": "One disposition per immutable candidate. Empty is lawful only when the extraction-owned candidate manifest is empty because every preserved broker surface is independently model-prohibited; compiler, semantic verifier and ingress re-prove that condition.",
       "items": {
         "$ref": "#/$defs/coverageEntry"
       }

@@ -39,7 +39,24 @@
       "A broker house or report remains preserved when one cell is quarantined.",
       "Broker uncertainty alone cannot terminate model delivery.",
       "No degraded path may invent or silently substitute a broker value."
-    ]
+    ],
+    "blocked_outcomes": {
+      "run_case_mutated_during_pause": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
+      "bad_evidence": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
+      "bad_inputs": { "fatal_reason": "issuer_or_reporting_period_unresolved", "domain": "issuer_period" },
+      "filings_incomplete": { "fatal_reason": "issuer_or_reporting_period_unresolved", "domain": "issuer_period" },
+      "entity_stop": { "fatal_reason": "issuer_or_reporting_period_unresolved", "domain": "issuer_period" },
+      "reconciliation_stop": { "fatal_reason": "opening_debt_unresolved", "domain": "opening_debt" },
+      "awaiting_reexport": { "fatal_reason": "opening_debt_unresolved", "domain": "opening_debt" },
+      "decision_replay_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "decision_graph_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "broker_selection_compile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "broker_preview_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
+      "case_recompile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "forecast_authority_unresolved": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
+      "workbook_build_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workbook_build" },
+      "delivery_attestation_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "delivery_attestation" }
+    }
   },
   "layers": {
     "broker": {
@@ -114,7 +131,7 @@
       "states": {
         "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PAUSED": { "blocker_classes": [null], "user_blocking": false, "stages": ["inputs", "evidence_review", "decisions", "build_checks"] },
-        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["evidence_review", "decisions"] },
+        "ACTION_REQUIRED": { "blocker_classes": ["INTERNAL_WORK", "USER_DECISION"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions"] },
         "BLOCKED": { "blocker_classes": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false, "stages": ["delivery"] }
       },

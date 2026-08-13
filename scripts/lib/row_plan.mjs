@@ -1824,6 +1824,16 @@ function collapseEquivalentEbitOperatingProfit(rows) {
         Math.abs(value - right[index]) <= 1e-9,
     );
   if (!identical) return;
+  const collapsedForecastAuthority = ["broker", "hardcode", "zero"].includes(
+    ebit.forecast_treatment,
+  )
+    ? {
+        forecast_treatment: ebit.forecast_treatment,
+        broker_metric_id: ebit.broker_metric_id,
+        values: ebit.values,
+        forecast_period_authorities: ebit.forecast_period_authorities,
+      }
+    : null;
   for (const row of rows) {
     for (const rule of statementRules(row)) {
       if (!Array.isArray(rule.refs)) continue;
@@ -1884,6 +1894,36 @@ function collapseEquivalentEbitOperatingProfit(rows) {
       operatingProfit.forecast_period_calculations.map((rule) =>
         selfLink(rule) ? null : rule,
       );
+  }
+  // If Tier 1 selected the compiled EBIT row as the exogenous broker
+  // headline, collapsing its identical filed alias must transfer that
+  // authority to the surviving issuer-captioned row. Adopting EBIT's
+  // historical bridge formula instead would create the cycle
+  // EBITDA -> Operating profit -> EBITDA after the duplicate is removed.
+  if (collapsedForecastAuthority) {
+    operatingProfit.forecast_treatment =
+      collapsedForecastAuthority.forecast_treatment;
+    if (collapsedForecastAuthority.broker_metric_id) {
+      operatingProfit.broker_metric_id =
+        collapsedForecastAuthority.broker_metric_id;
+    } else {
+      delete operatingProfit.broker_metric_id;
+    }
+    if (collapsedForecastAuthority.values) {
+      operatingProfit.values = structuredClone(collapsedForecastAuthority.values);
+    }
+    if (collapsedForecastAuthority.forecast_period_authorities) {
+      operatingProfit.forecast_period_authorities = structuredClone(
+        collapsedForecastAuthority.forecast_period_authorities,
+      );
+    } else {
+      // applyBrokerAnchorRule deliberately clears compiled period receipts
+      // before assigning the live broker metric. Do not retain the survivor's
+      // now-stale accounting-identity receipts after authority transfers.
+      delete operatingProfit.forecast_period_authorities;
+    }
+    delete operatingProfit.forecast_calculation;
+    delete operatingProfit.forecast_period_calculations;
   }
   // The surviving row owns both identities: solver and emitters that resolve
   // by the ebit role must land on the one visible answer.

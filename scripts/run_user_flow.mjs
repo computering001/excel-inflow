@@ -756,6 +756,27 @@ async function main() {
           ...(activeCaseEvidence.lanes.controls ?? {}),
           broker_case: brokerConfirmationCheck.selection.house_name,
         };
+        if (
+          brokerConfirmationCheck.selection.house_id === "FORECAST_WATERFALL"
+        ) {
+          const brokerLane = activeCaseEvidence.lanes.broker_pack ?? {};
+          brokerLane.metrics = Object.fromEntries(
+            Object.entries(brokerLane.metrics ?? {}).map(([metricId, metric]) => [
+              metricId,
+              {
+                ...metric,
+                provider_consensus: [null, null, null],
+                brokers: Object.fromEntries(
+                  Object.keys(metric.brokers ?? {}).map((houseName) => [
+                    houseName,
+                    [null, null, null],
+                  ]),
+                ),
+              },
+            ]),
+          );
+          activeCaseEvidence.lanes.broker_pack = brokerLane;
+        }
         brokerSelectedCompilation = compileCase(
           validation.handoff.case_source,
           activeCaseEvidence,
@@ -1185,7 +1206,7 @@ async function main() {
           schema_version: "user-flow-run/1.0",
           controller_version: FLOW_CONTROLLER_VERSION,
           run_id: runId,
-          status: "BLOCKED",
+          status: "ACTION_REQUIRED",
           stage: "decisions",
           outcome: "answers_incomplete",
           blocker_class: "USER_DECISION",

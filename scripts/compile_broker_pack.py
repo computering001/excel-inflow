@@ -285,10 +285,10 @@ def validate_coverage(
 
     reviews = crosswalk.get("table_reviews")
     ledger = crosswalk.get("coverage_ledger")
-    if not isinstance(reviews, list) or not reviews:
-        raise ValueError("The broker crosswalk requires a non-empty table_reviews ledger.")
-    if not isinstance(ledger, list) or not ledger:
-        raise ValueError("The broker crosswalk requires a non-empty coverage_ledger.")
+    if not isinstance(reviews, list):
+        raise ValueError("The broker crosswalk requires a table_reviews array.")
+    if not isinstance(ledger, list):
+        raise ValueError("The broker crosswalk requires a coverage_ledger array.")
     terminal_by_id: dict[str, dict[str, Any]] = {}
     if crosswalk.get("terminal_recovery"):
         if bundle is None:
@@ -302,6 +302,25 @@ def validate_coverage(
     review_by_table: dict[str, dict[str, Any]] = {}
     expected: dict[tuple[str, int, str], dict[str, Any]] = {}
     expected_by_candidate_id: dict[str, dict[str, Any]] = {}
+    prohibited_surface_ids = {
+        str(surface.get("surface_id"))
+        for document in (bundle or {}).get("documents", [])
+        for surface in document.get("surfaces", [])
+        if (
+            (surface.get("quarantine") or {}).get("model_use") == "prohibited"
+            and surface.get("vision_disposition") == "quarantined_evidence_only"
+        ) or surface.get("vision_disposition") == "verified_non_tabular"
+    }
+    all_surfaces = [
+        surface
+        for document in (bundle or {}).get("documents", [])
+        for surface in document.get("surfaces", [])
+    ]
+    fully_model_prohibited = bool(all_surfaces) and all(
+        str(surface.get("surface_id")) in prohibited_surface_ids for surface in all_surfaces
+    )
+    if not reviews and not fully_model_prohibited:
+        raise ValueError("An empty table_reviews ledger is lawful only when every broker surface is model-prohibited.")
     if candidate_manifest is not None:
         if candidate_manifest.get("manifest_version") != "broker-candidate-manifest/1.0":
             raise ValueError("The deterministic candidate manifest has an unsupported version.")
@@ -355,8 +374,10 @@ def validate_coverage(
                 "period_indexes": sorted(set(period_indexes)),
                 "period_columns_by_index": period_columns_by_index,
             }
-        if not expected_by_candidate_id:
-            raise ValueError("The deterministic candidate manifest cannot be empty.")
+        if not expected_by_candidate_id and not fully_model_prohibited:
+            raise ValueError("The deterministic candidate manifest cannot be empty unless every preserved surface is model-prohibited.")
+        if not expected_by_candidate_id and (ledger or mapping_receipts or crosswalk.get("derived_mappings")):
+            raise ValueError("A fully evidence-only zero-candidate broker lane cannot carry dispositions, mappings or derivations.")
 
     for index, review in enumerate(reviews):
         table_id = review.get("table_id")
@@ -366,6 +387,7 @@ def validate_coverage(
         if table_id in review_by_table:
             raise ValueError(f"Table {table_id!r} has more than one semantic review.")
         document, table = tables[table_id]
+        table_model_prohibited = str(table.get("surface_id")) in prohibited_surface_ids
         if document["house_id"] != house_id:
             raise ValueError(f"table_reviews[{index}] reaches across houses from {house_id!r} to {document['house_id']!r}.")
         if review.get("review_status") != "reviewed" or not str(review.get("rationale") or "").strip():
@@ -376,6 +398,8 @@ def validate_coverage(
             if row < 1 or row > len(table["rows"]):
                 raise ValueError(f"table_reviews[{index}] header row {row} is outside {table_id!r}.")
         period_columns = review.get("period_columns") or []
+        if table_model_prohibited and (classification not in NON_FORECAST_TABLE_CLASSES or period_columns):
+            raise ValueError(f"Model-prohibited table {table_id!r} must be reviewed as non-forecast evidence with no period columns.")
         if classification == "annual_forecast" and not any(item.get("period_basis") == "annual_forecast" for item in period_columns):
             raise ValueError(f"Annual forecast table {table_id!r} declares no annual forecast columns.")
         if classification == "partial_period" and not any(item.get("period_basis") == "partial_period" for item in period_columns):
@@ -417,7 +441,7 @@ def validate_coverage(
         # multi-year forecast header. This independent contradiction check is
         # intentionally conservative: it fires only when one row identifies
         # at least two of the model's three forecast years.
-        if classification in NON_FORECAST_TABLE_CLASSES:
+        if classification in NON_FORECAST_TABLE_CLASSES and not table_model_prohibited:
             for row in table["rows"][: min(10, len(table["rows"]))]:
                 years = {
                     year
@@ -429,6 +453,9 @@ def validate_coverage(
                         f"Table {table_id!r} is classified {classification} but contains an apparent forecast header for {sorted(years)}."
                     )
 
+        if table_model_prohibited:
+            review_by_table[table_id] = review
+            continue
         for basis in PERIOD_BASES:
             columns = [item for item in period_columns if item.get("period_basis") == basis]
             if not columns:
@@ -1350,6 +1377,15 @@ def main() -> int:
         for mapping in mapping_receipts
         for component in mapping["components"]
     }
+    prohibited_surface_ids = {
+        str(surface.get("surface_id"))
+        for document in bundle.get("documents", [])
+        for surface in document.get("surfaces", [])
+        if (
+            (surface.get("quarantine") or {}).get("model_use") == "prohibited"
+            and surface.get("vision_disposition") == "quarantined_evidence_only"
+        ) or surface.get("vision_disposition") == "verified_non_tabular"
+    }
 
     source_label = crosswalk.get("source_label") or (
         f"{len(documents_by_house)}-house broker pack extracted and cell-crosswalked from hash-bound source documents"
@@ -1570,7 +1606,10 @@ def main() -> int:
             "primary_eligible_house_count": sum(house["eligibility"] == "primary_eligible" for house in houses),
             "supplemental_eligible_house_count": sum(house["eligibility"] == "supplemental_eligible" for house in houses),
             "reference_only_house_count": sum(house["eligibility"] == "reference_only" for house in houses),
-            "run_can_continue_without_broker_question": bool(ranked_primary),
+            # Broker sufficiency selects broker authority; it does not decide
+            # whether the company model may continue. With no eligible house,
+            # the sealed preview selects the ordinary forecast waterfall.
+            "run_can_continue_without_broker_question": True,
         },
         **({"provider_consensus": crosswalk["provider_consensus"]} if crosswalk.get("provider_consensus") else {}),
     }
@@ -1600,14 +1639,17 @@ def main() -> int:
                         # cannot feed the model.
                         "workbook_presentation": (
                             "evidence_only"
-                            if table.get("workbook_presentation_hint") == "evidence_only"
+                            if str(table.get("surface_id")) in prohibited_surface_ids
+                            or table.get("workbook_presentation_hint") == "evidence_only"
                             else "analytical_table"
                             if review_by_table[table["table_id"]]["classification"] != "non_forecast"
                             or table["table_id"] in mapped_table_ids
                             else "evidence_only"
                         ),
                         "workbook_presentation_reason": (
-                            "Transcription carries no row labels or period headings, so it renders as "
+                            "The source surface is independently model-prohibited after bounded review; the table remains visible evidence only."
+                            if str(table.get("surface_id")) in prohibited_surface_ids
+                            else "Transcription carries no row labels or period headings, so it renders as "
                             "evidence only and is prohibited from model formulas."
                             if table.get("workbook_presentation_hint") == "evidence_only"
                             else "Reviewed analytical/financial table retained on the values-only broker evidence sheet."

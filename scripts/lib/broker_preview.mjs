@@ -540,7 +540,7 @@ export function compileBrokerPreview({
     }
     if (
       Boolean(declaredEligibility.run_can_continue_without_broker_question) !==
-      (packPrimary.length > 0)
+      true
     ) {
       topViolations.push("Pack eligibility_summary continuation flag is stale.");
     }
@@ -820,6 +820,16 @@ export function applyBrokerPreviewSelection(modelCase, preview, confirmation) {
     ...(modelCase.controls ?? {}),
     broker_case: verified.selection.house_name,
   };
+  if (verified.selection.house_id === "FORECAST_WATERFALL") {
+    for (const section of ["income_statement", "cash_flow"]) {
+      for (const row of modelCase.statement_structure?.[section] ?? []) {
+        delete row.broker_metric_id;
+        if (row.forecast_treatment === "broker") {
+          delete row.forecast_treatment;
+        }
+      }
+    }
+  }
   modelCase.stage_three_answers = {
     ...(modelCase.stage_three_answers ?? {}),
     "broker.primary_house": verified.selection.house_id,

@@ -657,12 +657,18 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       row.row_type = "calculation";
       row.calculation = { operator: "sum", refs: [] };
       row.semantic_role ??= shellRole;
+      // A filed finance line has one visible statement location but the
+      // Interest Schedule is its calculation authority in history and
+      // forecast.  Keep the filed values as evidence on the row; declare the
+      // schedule ownership explicitly even when those values are already
+      // usable, so source-parity validation does not mistake the schedule
+      // shell for a second hardcoded model authority.
+      row.historical_authority = "schedule_link";
       if (shellRole === "opening_cash") row.style_role ??= "subsection";
       const usableHistory = (row.values ?? [])
         .slice(0, 3)
         .every((value) => value !== null && Number.isFinite(Number(value)));
       if (!usableHistory) {
-        row.historical_authority = "schedule_link";
         delete row.values;
       }
     }
@@ -1699,6 +1705,36 @@ const CAPTURE_MEMBERSHIP_OPERATORS = new Set([
   "link",
 ]);
 
+// Growth and ratio rows are visible derived displays. They consume statement
+// amounts but are not themselves additive statement detail, so a headline
+// forecast may never capture/blank them. This also repairs stale compiled
+// cases that still carry capture metadata from an older doctrine pass.
+const DERIVED_DISPLAY_OPERATORS = new Set([
+  "growth",
+  "ratio",
+  "negated_ratio",
+]);
+
+function restoreDerivedDisplayIdentity(row) {
+  if (
+    row?.semantic_role === "effective_tax_rate" ||
+    !DERIVED_DISPLAY_OPERATORS.has(row?.calculation?.operator)
+  ) {
+    return false;
+  }
+  delete row.forecast_capture_parent_id;
+  delete row.forecast_capture_mode;
+  delete row.forecast_capture_note;
+  delete row.forecast_capture_certificates;
+  if (row.formula_authority === "intentionally_blank") {
+    delete row.formula_authority;
+  }
+  if (row.forecast_treatment === "uncalculated") {
+    delete row.forecast_treatment;
+  }
+  return true;
+}
+
 const CAPTURE_HEADLINE_ROLES = new Set([
   "revenue",
   "ebit",
@@ -1940,6 +1976,11 @@ export function compileForecastCaptureTopology(
     const rowsById = new Map(rows.map((row) => [row.row_id, row]));
     const parentsByChild = formulaMembershipIndex(rows);
 
+    // Run before validating pre-existing capture declarations. A compiler
+    // upgrade must not leave a ratio/growth row blank merely because an older
+    // case artifact incorrectly stamped it as captured detail.
+    for (const row of rows) restoreDerivedDisplayIdentity(row);
+
     // Compiler-authored capture may never point outside its own statement.
     for (const row of rows) {
       if (!row.forecast_capture_parent_id) continue;
@@ -1962,6 +2003,7 @@ export function compileForecastCaptureTopology(
 
     for (const row of rows) {
       if (row.row_type === "header") continue;
+      if (restoreDerivedDisplayIdentity(row)) continue;
       if (derivedRowIds.has(row.row_id)) continue;
       if (CAPTURE_REQUIRED_ROLES.has(row.semantic_role)) continue;
       if (row.broker_metric_id || row.forecast_calculation) continue;
@@ -2197,6 +2239,47 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   for (const row of allRows) {
     if (row.semantic_role) byRole.set(row.semantic_role, row);
   }
+  const brokerDisabled = modelCase.controls?.broker_case === "Forecast Waterfall";
+  let filedProfitLevel = null;
+  if (brokerDisabled) {
+    // A sealed preview with no selectable broker authority is an affirmative
+    // model decision, not a missing-input state. Remove inherited broker
+    // ownership before compiling the ordinary evidence/history waterfall;
+    // retaining the marker would make a null broker series outrank usable
+    // company history and could recreate a profit-bridge cycle.
+    for (const row of allRows) {
+      delete row.broker_metric_id;
+      if (row.forecast_treatment === "broker") {
+        delete row.forecast_treatment;
+      }
+    }
+    const profitRoles = new Set([
+      "operating_profit",
+      "ebit",
+      "ebitda",
+      "adjusted_ebitda",
+    ]);
+    filedProfitLevel = allRows.find(
+      (row) =>
+        profitRoles.has(row.semantic_role) &&
+        row.historical_authority === "source_input" &&
+        (row.values ?? []).slice(0, 3).every(
+          (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+        ),
+    );
+    if (
+      filedProfitLevel?.forecast_calculation?.operator === "link" &&
+      (filedProfitLevel.forecast_calculation.refs ?? []).some((rowId) =>
+        profitRoles.has(rowsById.get(rowId)?.semantic_role),
+      )
+    ) {
+      delete filedProfitLevel.forecast_calculation;
+      delete filedProfitLevel.forecast_period_calculations;
+      if (filedProfitLevel.forecast_treatment === "formula") {
+        delete filedProfitLevel.forecast_treatment;
+      }
+    }
+  }
   // 1. Broker links: a pack metric whose id names a statement role is
   // consumed there.  Calculation rows consume as treatment overrides;
   // input rows only carry the link.
@@ -2211,7 +2294,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     "dividends",
     "share_buybacks",
   ]);
-  for (const metricId of packMetrics) {
+  for (const metricId of brokerDisabled ? [] : packMetrics) {
     if (!CONSUMABLE_ROLES.has(metricId)) continue;
     const row = byRole.get(metricId);
     if (!row || row.row_type === "header") continue;
@@ -2241,6 +2324,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   const ntiForOp = rowsById.get("non_trading_items");
   if (
     statOp && ebit && statOp !== ebit &&
+    (!brokerDisabled || statOp !== filedProfitLevel) &&
     !statOp.calculation && !statOp.forecast_calculation
   ) {
     wire(
@@ -2270,7 +2354,8 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   if (
     ebit && adjRefsIncludeEbit &&
     !ebit.forecast_calculation &&
-    Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "ebit")
+    Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "ebit") &&
+    !brokerDisabled
   ) {
     ebit.broker_metric_id ??= "ebit";
     ebit.forecast_treatment = "broker";
@@ -2480,6 +2565,26 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
       finding.context,
     );
   }
+  // Ensure every material rate driver participates in the same executable
+  // waterfall even when it was historically derived and therefore absent
+  // from capture topology. This is most visible for ETR: in forecast it is an
+  // input to tax, not an identity derived back from the tax it calculates.
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase.statement_structure?.[section] ?? []) {
+      if (row.semantic_role !== "effective_tax_rate") continue;
+      const existing = captureTopology.behavior_map.find(
+        (entry) => entry.section === section && entry.row_id === row.row_id,
+      );
+      if (!existing) {
+        captureTopology.behavior_map.push({
+          section,
+          row_id: row.row_id,
+          behavior: "driver_linked_flow",
+          allowed_methods: [...ALLOWED_METHODS_BY_BEHAVIOR.driver_linked_flow],
+        });
+      }
+    }
+  }
   return captureTopology.behavior_map;
 }
 
@@ -2520,6 +2625,54 @@ function verifyManifestSeals(caseSource, manifestsBySection, report) {
         "Reference every manifest the case builds from; unreferenced evidence cannot influence the model.",
         { section, supplied: supplied.length },
       );
+    }
+  }
+
+}
+
+function synchronizeDerivedHistoricalForecastCaches(modelCase) {
+  const rows = [
+    ...(modelCase.statement_structure?.income_statement ?? []),
+    ...(modelCase.statement_structure?.cash_flow ?? []),
+  ];
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const evaluate = (row, periodIndex, visiting = new Set()) => {
+    if (!row || visiting.has(row.row_id)) return null;
+    const rule = row.calculation;
+    if (!rule || (rule.refs ?? []).length === 0) {
+      const literal = row.values?.[periodIndex];
+      return literal === null || literal === undefined || !Number.isFinite(Number(literal))
+        ? null
+        : Number(literal);
+    }
+    const next = new Set(visiting).add(row.row_id);
+    const values = rule.refs.map((ref) => evaluate(byId.get(ref), periodIndex, next));
+    if (values.some((value) => value === null)) return null;
+    switch (rule.operator) {
+      case "link": return values[0];
+      case "sum": return values.reduce((sum, value) => sum + value, 0);
+      case "subtract": return values.slice(1).reduce((value, item) => value - item, values[0]);
+      case "negate": return -values[0];
+      case "negate_sum": return -values.reduce((sum, value) => sum + value, 0);
+      case "ratio": return Math.abs(values[1]) > 1e-12 ? values[0] / values[1] : 0;
+      case "negated_ratio": return Math.abs(values[1]) > 1e-12 ? -values[0] / values[1] : 0;
+      default: return null;
+    }
+  };
+  for (const row of rows) {
+    if (!row.calculation || (row.calculation.refs ?? []).length === 0) continue;
+    const history = [0, 1, 2].map((index) => evaluate(row, index));
+    if (!history.every((value) => value !== null && Number.isFinite(value))) continue;
+    row.values ??= [null, null, null, null, null, null];
+    history.forEach((value, index) => { row.values[index] = value; });
+    for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+      const rule = row.forecast_period_calculations?.[forecastIndex];
+      if (rule?.operator === "historical_average") {
+        row.values[forecastIndex + 3] = history.reduce((sum, value) => sum + value, 0) / 3;
+      } else if (rule?.operator === "historical_trend") {
+        const slope = ((history[1] - history[0]) + (history[2] - history[1])) / 2;
+        row.values[forecastIndex + 3] = history[2] + slope * (forecastIndex + 1);
+      }
     }
   }
 }
@@ -2783,6 +2936,12 @@ export function compileCase(caseSource, evidence = {}) {
 
   // Phase F — the consumption doctrine decides which rows the model forecasts
   // and which the anchor captures, before any forecast is minted.
+  // Historical finance expense is carried by its dedicated reconciliation
+  // contract because instrument-level rows do not necessarily reproduce the
+  // filed P&L total. Seed the filed statement authority before the derived
+  // stratum evaluates PBT and ETR.
+  const forecastWaterfallSelected =
+    modelCase.controls?.broker_case === "Forecast Waterfall";
   const derivedRowIds = applyDerivedStratum(modelCase, evidence);
   for (const rowId of applyDeclaredDerivedRows(modelCase, caseSource, report)) {
     derivedRowIds.add(rowId);
@@ -2824,6 +2983,9 @@ export function compileCase(caseSource, evidence = {}) {
     );
   }
   Object.assign(modelCase, materialized);
+  if (forecastWaterfallSelected) {
+    synchronizeDerivedHistoricalForecastCaches(modelCase);
+  }
 
   // Cross-statement restatements have one legal direction: the cash-flow
   // bridge may consume an income-statement row.  If an authored mixed-period

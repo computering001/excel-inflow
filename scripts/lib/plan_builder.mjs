@@ -306,6 +306,16 @@ class PlanFormat {
     });
   }
 
+  set shrinkToFit(shrink) {
+    this._range._eachCell((cell) => {
+      cell.alignment = {
+        ...(cell.alignment ?? {}),
+        shrink_to_fit: Boolean(shrink),
+      };
+      cell.styled = true;
+    });
+  }
+
   /**
    * Column width and row height are SHEET facts, not cell facts, and setting
    * one does not bring a cell into existence — the writer emitted `<col>` and

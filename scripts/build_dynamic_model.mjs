@@ -3042,6 +3042,13 @@ function configureOperatingModel(
     const range = sheet.getRange(address);
     range.format.font = { bold: true };
     range.format.horizontalAlignment = "center";
+    // The selected authority is a name, not an amount.  Real selections are
+    // routinely longer than the compact control column (for example
+    // "Forecast Waterfall" or a full broker-house name).  Keep the canonical
+    // panel width and fit the label inside its own cell: allowing centred text
+    // to spill left collides with the occupied label cell and also leaves no
+    // clean background pixel with which to prove the conditional state fill.
+    range.format.shrinkToFit = true;
   };
   const styleToggleControl = (address) => {
     const range = sheet.getRange(address);
@@ -3118,7 +3125,13 @@ function configureOperatingModel(
   sheet.getRange(`C${c.broker_case}`).dataValidation = {
     rule: {
       type: "list",
-      values: ["Consensus", "High", "Low", ...brokerRows.names],
+      values: [
+        "Consensus",
+        "High",
+        "Low",
+        "Forecast Waterfall",
+        ...brokerRows.names,
+      ],
     },
   };
 

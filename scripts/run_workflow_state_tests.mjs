@@ -150,6 +150,7 @@ pass("user-flow normalisation persists typed ownership", () => {
   assert(paused.blocker_class === null && paused.user_blocking === false, "pause owns a blocker");
   const internal = normaliseUserFlowResult({
     status: "BLOCKED", stage: "evidence_review", blocker_class: "INTERNAL_WORK",
+    outcome: "broker_preview_blocked",
   });
   assert(
     internal.user_blocking === false,
@@ -165,7 +166,7 @@ rejects(
 
 rejects(
   "action-required is only legal at the decisions stage",
-  () => normaliseUserFlowResult({ status: "ACTION_REQUIRED", stage: "inputs" }),
+  () => normaliseUserFlowResult({ status: "ACTION_REQUIRED", stage: "build_checks" }),
   /cannot occur at stage/,
 );
 

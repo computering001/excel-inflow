@@ -185,6 +185,14 @@
       "script": "run_user_flow_tests.mjs"
     },
     {
+      "id": "degraded-broker-delivery",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_degraded_broker_delivery_tests.mjs",
+      "arguments": ["$CASES"],
+      "requires": ["CASES"]
+    },
+    {
       "id": "case-compiler-equivalence",
       "phase": "cohort",
       "runtime": "node",

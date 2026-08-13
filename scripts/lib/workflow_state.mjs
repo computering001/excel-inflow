@@ -15,6 +15,11 @@ if (WORKFLOW_STATE_CONTRACT.schema_version !== "workflow-state-contract/1.0") {
 const USER_BLOCKERS = new Set(WORKFLOW_STATE_CONTRACT.user_blocking_classes);
 const DELIVERY_CONSTITUTION =
   WORKFLOW_STATE_CONTRACT.delivery_blocker_constitution;
+const BLOCKED_OUTCOMES =
+  DELIVERY_CONSTITUTION?.blocked_outcomes ?? {};
+export const DELIVERY_BLOCKED_OUTCOMES = Object.freeze(
+  structuredClone(BLOCKED_OUTCOMES),
+);
 
 if (
   DELIVERY_CONSTITUTION?.schema_version !==
@@ -128,11 +133,45 @@ export function normaliseUserFlowResult(result) {
       `BLOCKED user-flow result at ${value.stage ?? "unknown"} lacks typed blocker ownership`,
     );
   }
+  if (value.status === "BLOCKED") {
+    const binding = BLOCKED_OUTCOMES[value.outcome];
+    if (!binding) {
+      throw new Error(
+        `BLOCKED user-flow outcome ${JSON.stringify(value.outcome)} is not declared by the delivery-blocker constitution`,
+      );
+    }
+    if (
+      value.fatal_reason !== undefined &&
+      value.fatal_reason !== binding.fatal_reason
+    ) {
+      throw new Error(
+        `BLOCKED user-flow outcome ${value.outcome} changed its declared fatal reason`,
+      );
+    }
+    if (
+      value.blocker_domain !== undefined &&
+      value.blocker_domain !== binding.domain
+    ) {
+      throw new Error(
+        `BLOCKED user-flow outcome ${value.outcome} changed its declared blocker domain`,
+      );
+    }
+    value.fatal_reason = binding.fatal_reason;
+    value.blocker_domain = binding.domain;
+    assertDeliveryBlocker({
+      blocked: true,
+      fatalReason: value.fatal_reason,
+      domain: value.blocker_domain,
+    });
+  }
   if (["SCREEN", "PAUSED", "PASS_PENDING_MANUAL"].includes(value.status)) {
     if (value.blocker_class !== undefined && value.blocker_class !== null) {
       throw new Error(`${value.status} user-flow result cannot carry a blocker class`);
     }
     value.blocker_class = null;
+    if (value.fatal_reason !== undefined || value.blocker_domain !== undefined) {
+      throw new Error(`${value.status} user-flow result cannot carry a delivery blocker`);
+    }
   }
   value.user_blocking = USER_BLOCKERS.has(value.blocker_class ?? null);
   assertWorkflowState("user_flow", {

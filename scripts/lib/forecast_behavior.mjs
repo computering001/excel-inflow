@@ -220,6 +220,16 @@ function classifySignals(modelCase, row, section, rows) {
     return result;
   }
 
+  // Effective tax rate is historically derived but forecast as an economic
+  // driver. Treating its historical tax/PBT formula as an absolute forecast
+  // identity creates the circular pair tax = PBT*rate and rate = tax/PBT
+  // whenever broker authority is unavailable. The normal evidence waterfall
+  // must instead choose guidance, broker, assumption or historical inference.
+  if (role === "effective_tax_rate") {
+    add("row_semantics", "forecast_tax_rate_driver", "driver_linked_flow", 0.96);
+    return result;
+  }
+
   const rowTypeIdentity = rules.some((rule) =>
     IDENTITY_OPERATORS.has(normalise(rule?.operator).replaceAll(" ", "_")),
   );

@@ -187,8 +187,18 @@ export function runReleaseN0N9({ modelCase, dcsExport = null, brokerPack = null,
   // N5 -- deterministic broker anchor
   let anchor;
   try { anchor = M.N5.selectBrokerAnchor(modelCase); } catch (error) { anchor = { supported: false, error: error.message }; }
-  gates.push(gate("N5", [anchor.supported === true ? passed("anchor-resolves", `Anchor: ${anchor.label ?? (anchor.anchors ?? []).join(" + ")}.`, anchor) : failed("anchor-resolves", anchor.error ?? "Broker anchor does not resolve.", anchor)], { anchor }));
-  if (anchor.supported !== true) return { status: "STOPPED", gates, outputs, node_order: RELEASE_NODE_ORDER };
+  const forecastWaterfall = modelCase.controls?.broker_case === "Forecast Waterfall";
+  const anchorResolved = anchor.supported === true || forecastWaterfall;
+  gates.push(gate("N5", [anchorResolved
+    ? passed(
+        "anchor-resolves",
+        forecastWaterfall
+          ? "Broker authority is explicitly disabled; the sealed forecast waterfall owns forecast selection."
+          : `Anchor: ${anchor.label ?? (anchor.anchors ?? []).join(" + ")}.`,
+        { ...anchor, resolution_mode: forecastWaterfall ? "forecast_waterfall" : "broker_anchor" },
+      )
+    : failed("anchor-resolves", anchor.error ?? "Broker anchor does not resolve.", anchor)], { anchor }));
+  if (!anchorResolved) return { status: "STOPPED", gates, outputs, node_order: RELEASE_NODE_ORDER };
   outputs.anchor = anchor;
 
   // N4 -- signed debt reconciliation.  Uploaded exports remain authoritative;

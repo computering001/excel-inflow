@@ -59,6 +59,10 @@ function fixture() {
       calculation: { operator: "sum", refs: ["strange_product_total"] },
       forecast_period_authorities: direct(40),
     }),
+    row("revenue_growth", "Revenue growth", undefined, {
+      row_type: "calculation",
+      calculation: { operator: "growth", refs: ["revenue"] },
+    }),
     row("unusual_cost_pool", "Unfamiliar fulfilment outlay", [-4, -5, -6, null, null, null]),
     row("gross_result", "Issuer gross result", undefined, {
       row_type: "calculation",
@@ -93,6 +97,10 @@ function fixture() {
       semantic_role: "ebit",
       calculation: { operator: "sum", refs: ["gross_result", "mixed_line", "is_da_expense"] },
       forecast_period_authorities: direct(20),
+    }),
+    row("ebit_margin", "Issuer operating margin", undefined, {
+      row_type: "calculation",
+      calculation: { operator: "ratio", refs: ["ebit", "revenue"] },
     }),
     row("interest_expense", "Funding expense", undefined, {
       row_type: "calculation",
@@ -195,6 +203,13 @@ assert(
 );
 for (const protectedId of ["revenue", "ebit", "is_da_expense", "depreciation_and_amortisation", "pre_tax_income", "tax_expense", "net_income"]) {
   assert(!income.get(protectedId).forecast_capture_parent_id, `${protectedId} was illegally captured.`);
+}
+for (const displayId of ["revenue_growth", "ebit_margin"]) {
+  assert(
+    !income.get(displayId).forecast_capture_parent_id &&
+      !income.get(displayId).forecast_capture_certificates,
+    `${displayId} was incorrectly captured instead of retaining its visible derived formula.`,
+  );
 }
 const cash = new Map(base.statement_structure.cash_flow.map((candidate) => [candidate.row_id, candidate]));
 assert(!cash.get("odd_operating_cash").forecast_capture_parent_id, "The full cash-flow waterfall was blanket-captured.");

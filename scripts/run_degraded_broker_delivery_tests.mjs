@@ -1,0 +1,267 @@
+#!/usr/bin/env node
+
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import {
+  compileBrokerPreview,
+  validateBrokerPreview,
+  verifyBrokerPreviewConfirmation,
+} from "./lib/broker_preview.mjs";
+import { compileCase } from "./lib/case_compiler.mjs";
+
+const exec = promisify(execFile);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..");
+const cases = path.resolve(
+  process.argv[2] ??
+    process.env.DEBT_OVERLAY_CASES_DIR ??
+    "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+);
+const python = process.env.EXCEL_INFLOW_TEST_PYTHON ?? "python3";
+const soffice = path.resolve(
+  process.env.SOFFICE_BIN ??
+    "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+);
+const out = path.resolve(
+  process.argv[3] ??
+    (await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-degraded-delivery."))),
+);
+await fs.mkdir(out, { recursive: true });
+
+const readJson = async (file) => JSON.parse(await fs.readFile(file, "utf8"));
+const writeJson = async (file, value) => {
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
+};
+const assert = (condition, message) => {
+  if (!condition) throw new Error(message);
+};
+
+async function command(executable, args, options = {}) {
+  return exec(executable, args, {
+    cwd: ROOT,
+    timeout: options.timeout ?? 300000,
+    maxBuffer: 128 * 1024 * 1024,
+    env: {
+      ...process.env,
+      PYTHONDONTWRITEBYTECODE: "1",
+      ...(options.env ?? {}),
+    },
+  });
+}
+
+// 1. Drive the real broker controller through persistent cell/surface conflict
+// exhaustion. It must close PASS_DEGRADED and preserve every source table.
+const brokerRoot = path.join(out, "broker-controller");
+await command("python3", [
+  path.join(HERE, "run_broker_degraded_close_tests.py"),
+  "--out",
+  brokerRoot,
+]);
+const brokerOutput = await readJson(
+  path.join(brokerRoot, "degraded-close-test-output.json"),
+);
+assert(brokerOutput.status === "PASS", "degraded broker controller did not pass");
+const degradedState = await readJson(brokerOutput.controller_state_path);
+assert(
+  degradedState.pipeline_status === "PASS_DEGRADED",
+  `expected PASS_DEGRADED, received ${degradedState.pipeline_status}`,
+);
+
+// 2. Use the compiler-produced all-evidence-only pack. This is the hardest
+// continuation case: five preserved houses, zero model-linked broker cells.
+const artifacts = brokerOutput.all_evidence_only;
+const [brokerPack, sourceTables, crosswalkReceipt] = await Promise.all([
+  readJson(artifacts.broker_pack_path),
+  readJson(artifacts.source_tables_path),
+  readJson(artifacts.crosswalk_receipt_path),
+]);
+assert(
+  brokerPack.eligibility_summary?.run_can_continue_without_broker_question ===
+    true,
+  "zero-authority pack did not defer to the forecast waterfall",
+);
+const preview = compileBrokerPreview({
+  brokerPack,
+  sourceTables,
+  crosswalkReceipt,
+});
+const previewValidation = validateBrokerPreview(preview);
+assert(
+  preview.status === "PASS" &&
+    preview.selection_mode === "forecast_waterfall" &&
+    preview.selected_value_count === 0 &&
+    previewValidation.valid,
+  `all-evidence-only preview did not select the waterfall: ${[
+    ...preview.violations,
+    ...previewValidation.violations,
+  ].join("; ")}`,
+);
+const confirmation = {
+  schema_version: "broker-preview-confirmation/1.0",
+  preview_sha256: preview.preview_sha256,
+  selected_house_id: "FORECAST_WATERFALL",
+  confirmed: true,
+};
+assert(
+  verifyBrokerPreviewConfirmation(preview, confirmation).valid,
+  "forecast-waterfall confirmation did not validate",
+);
+
+// 3. Recompile an existing complete issuer evidence case with broker authority
+// explicitly disabled. Company history and accounting formulas—not invented
+// broker values—must resolve the forecast waterfall.
+const cleanEvidencePath = path.join(out, "clean-evidence-run.json");
+await command(process.execPath, [
+  path.join(HERE, "run_evidence_run_tests.mjs"),
+  cases,
+  "--emit-clean",
+  cleanEvidencePath,
+]);
+const cleanEvidence = await readJson(cleanEvidencePath);
+cleanEvidence.case_evidence.lanes.controls = {
+  ...cleanEvidence.case_evidence.lanes.controls,
+  broker_case: "Forecast Waterfall",
+};
+const compiled = compileCase(
+  cleanEvidence.case_source,
+  cleanEvidence.case_evidence,
+);
+const compileBlocks = (compiled.report.findings ?? []).filter(
+  (finding) => finding.severity === "BLOCK",
+);
+assert(
+  compiled.report.status === "clean" && compileBlocks.length === 0,
+  `forecast-waterfall case did not compile: ${compileBlocks
+    .map((finding) => finding.message)
+    .join("; ")}`,
+);
+assert(
+  compiled.model_case.controls.broker_case === "Forecast Waterfall",
+  "compiled case silently selected a broker",
+);
+for (const section of ["income_statement", "cash_flow"]) {
+  for (const row of compiled.model_case.statement_structure?.[section] ?? []) {
+    assert(!row.broker_metric_id, `${section}.${row.row_id} retained broker ownership`);
+    assert(
+      row.forecast_treatment !== "broker",
+      `${section}.${row.row_id} retained broker treatment`,
+    );
+  }
+}
+const casePath = path.join(out, "forecast-waterfall-model-case.json");
+// This fixture's only Stage-3 decision is already reflected in lease_policy;
+// record it so this test isolates degraded broker continuation rather than
+// pausing on an unrelated, intentionally material user decision.
+compiled.model_case.stage_three_answers = {
+  ...(compiled.model_case.stage_three_answers ?? {}),
+  lease_in_leverage: "yes",
+};
+compiled.model_case.broker_pack = {
+  ...compiled.model_case.broker_pack,
+  raw_tables: structuredClone(sourceTables.houses),
+  source_mappings: structuredClone(crosswalkReceipt.mappings ?? []),
+  house_metadata: Object.fromEntries(
+    brokerPack.houses.map((house) => [
+      house.house_id,
+      {
+        published_date: house.published_date,
+        document: house.document.file_name,
+        source_id:
+          sourceTables.houses.find((source) => source.house_id === house.house_id)
+            ?.source_id ?? house.house_id,
+      },
+    ]),
+  ),
+  house_digests: Object.fromEntries(
+    brokerPack.houses.map((house) => [
+      house.house_id,
+      {
+        house_name: house.house_name,
+        digest: structuredClone(house.digest ?? []),
+        digest_coverage: structuredClone(house.digest_coverage),
+      },
+    ]),
+  ),
+};
+await writeJson(casePath, compiled.model_case);
+
+// The release controller intentionally gives child tools an isolated HOME.
+// Preserve the selected interpreter's actual package roots explicitly so a
+// valid host does not appear to lose user-site dependencies under isolation.
+const pythonPathProbe = await command(python, [
+  "-c",
+  "import site; print(':'.join([*site.getsitepackages(), site.getusersitepackages()]))",
+]);
+const selectedPythonPath = [
+  pythonPathProbe.stdout.trim(),
+  process.env.PYTHONPATH ?? "",
+]
+  .filter(Boolean)
+  .join(":");
+
+// 4. Build through the actual Stage-4 portable controller. The result must be
+// a real three-sheet workbook with all broker source tables still present as
+// evidence-only sheets and zero broker mappings in formulas.
+const buildRoot = path.join(out, "delivered-build");
+const stage4 = await command(
+  process.execPath,
+  [
+    path.join(HERE, "orchestrate_release.mjs"),
+    casePath,
+    "--out",
+    buildRoot,
+    "--case-only",
+    "--python",
+    python,
+    "--soffice",
+    soffice,
+    "--json",
+  ],
+  {
+    timeout: 1200000,
+    env: { PYTHONPATH: selectedPythonPath },
+  },
+);
+const buildResult = JSON.parse(stage4.stdout);
+assert(
+  buildResult.status === "PASS_PENDING_MANUAL" && buildResult.total_violations === 0,
+  `degraded build did not deliver: ${JSON.stringify(buildResult).slice(0, 2000)}`,
+);
+const workbook = path.resolve(buildResult.workbook);
+const workbookStat = await fs.stat(workbook);
+assert(workbookStat.size > 0, "delivered workbook is empty");
+const semanticManifest = await readJson(`${workbook}.semantic-manifest.json`);
+assert(
+  semanticManifest?.broker_evidence?.mapping_count === 0 ||
+    semanticManifest?.broker_evidence?.model_linked_mapping_count === 0 ||
+    !(semanticManifest?.broker_evidence),
+  "delivered workbook claims model-linked broker mappings",
+);
+
+const report = {
+  schema_version: "degraded-broker-delivery-test/1.0",
+  status: "PASS",
+  broker_controller_status: degradedState.pipeline_status,
+  broker_house_count: brokerPack.houses.length,
+  raw_table_count: sourceTables.houses.reduce(
+    (count, house) => count + (house.tables ?? []).length,
+    0,
+  ),
+  broker_mapping_count: crosswalkReceipt.mapping_count,
+  broker_preview_mode: preview.selection_mode,
+  broker_preview_selected_value_count: preview.selected_value_count,
+  case_compile_status: compiled.report.status,
+  stage4_status: buildResult.status,
+  workbook,
+  workbook_bytes: workbookStat.size,
+  total_violations: buildResult.total_violations,
+};
+await writeJson(path.join(out, "degraded-broker-delivery-test-report.json"), report);
+process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

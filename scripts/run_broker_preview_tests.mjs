@@ -408,7 +408,7 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
     primary_eligible_house_count: 0,
     supplemental_eligible_house_count: degradedPack.houses.length,
     reference_only_house_count: 0,
-    run_can_continue_without_broker_question: false,
+    run_can_continue_without_broker_question: true,
   };
   const preview = compile({ pack: degradedPack });
   assert(preview.status === "PASS", JSON.stringify(preview.violations));

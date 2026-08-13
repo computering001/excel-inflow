@@ -57,6 +57,72 @@ function historicalValues(row) {
   return (row?.values ?? []).slice(0, 3).map((value) => finite(value) ? Number(value) : null);
 }
 
+function evaluatedHistoricalValues(row, rows) {
+  const byId = new Map((rows ?? []).map((candidate) => [candidate.row_id, candidate]));
+  const evaluate = (candidate, periodIndex, visiting = new Set()) => {
+    const literal = candidate?.values?.[periodIndex];
+    if (!candidate?.calculation || visiting.has(candidate.row_id)) {
+      return finite(literal) ? Number(literal) : null;
+    }
+    const nextVisiting = new Set(visiting).add(candidate.row_id);
+    const operands = (candidate.calculation.refs ?? []).map((rowId) =>
+      evaluate(byId.get(rowId), periodIndex, nextVisiting),
+    );
+    if (operands.some((value) => !finite(value))) {
+      return finite(literal) ? Number(literal) : null;
+    }
+    const operator = candidate.calculation.operator;
+    if (operator === "sum") return operands.reduce((sum, value) => sum + value, 0);
+    if (operator === "subtract") return operands.slice(1).reduce((value, item) => value - item, operands[0]);
+    if (operator === "link") return operands[0] ?? null;
+    if (operator === "negate") return -(operands[0] ?? 0);
+    if (operator === "negate_sum") return -operands.reduce((sum, value) => sum + value, 0);
+    if (operator === "ratio") return Math.abs(operands[1]) > 1e-12 ? operands[0] / operands[1] : null;
+    if (operator === "negated_ratio") return Math.abs(operands[1]) > 1e-12 ? -operands[0] / operands[1] : null;
+    return null;
+  };
+  return [0, 1, 2].map((periodIndex) => evaluate(row, periodIndex));
+}
+
+function applyFiledFinanceHistoricalAuthority(modelCase, rows) {
+  const nextRows = structuredClone(rows ?? []);
+  if (modelCase?.controls?.broker_case !== "Forecast Waterfall") {
+    return nextRows;
+  }
+  const interest = modelCase?.historical_interest_reconciliation;
+  if (!Array.isArray(interest?.reported_interest)) return nextRows;
+  const expense = nextRows.find(
+    (row) => row.semantic_role === "interest_expense",
+  );
+  if (expense) {
+    expense.values ??= [null, null, null, null, null, null];
+    for (let index = 0; index < 3; index += 1) {
+      expense.values[index] = -Math.abs(Number(interest.reported_interest[index] ?? 0));
+    }
+  }
+  return nextRows;
+}
+
+function normaliseEvaluatedHistoricalValues(rows) {
+  const sourceRows = rows ?? [];
+  return sourceRows.map((row) => {
+    const evaluated = evaluatedHistoricalValues(row, sourceRows);
+    if (
+      !row.calculation ||
+      (row.calculation.refs ?? []).length === 0 ||
+      !evaluated.every(finite)
+    ) {
+      return row;
+    }
+    const next = structuredClone(row);
+    next.values ??= [null, null, null, null, null, null];
+    for (let index = 0; index < 3; index += 1) {
+      next.values[index] = Number(evaluated[index]);
+    }
+    return next;
+  });
+}
+
 function historicalCandidate(row, behavior, forecastIndex) {
   const history = historicalValues(row);
   const observed = history.filter((value) => value !== null);
@@ -205,6 +271,7 @@ function observationCandidates(observationInput, row, forecastIndex, windowStart
 
 function formulaCandidate(row, behavior, forecastIndex) {
   if (isScheduleOwnedForecastRole(row.semantic_role)) return { method: "schedule_link", origin: "semantic_schedule", source_kind: "schedule", ownership: "absolute", formula_spec: { operator: "schedule_link", semantic_role: row.semantic_role } };
+  if (row.semantic_role === "effective_tax_rate") return null;
   // A historical aggregate formula is evidence of membership, not a stronger
   // line-level forecast. Once the topology compiler has certified the row as
   // captured detail, reusing that historical sum would keep the intermediate
@@ -255,6 +322,23 @@ function formulaCandidate(row, behavior, forecastIndex) {
         : method === "roll_forward"
           ? "The declared per-period roll-forward remains visible and competes at its waterfall rung."
           : "The declared driver formula remains visible and competes at its waterfall rung.",
+  };
+}
+
+function derivedDisplayCandidate(row) {
+  if (
+    row?.semantic_role === "effective_tax_rate" ||
+    !["growth", "ratio", "negated_ratio"].includes(row?.calculation?.operator)
+  ) {
+    return null;
+  }
+  return {
+    method: "accounting_identity",
+    origin: "derived_display_formula",
+    source_kind: "formula",
+    ownership: "absolute",
+    formula_spec: structuredClone(row.calculation),
+    note: "The derived growth, margin or rate row is owned by its visible accounting formula.",
   };
 }
 
@@ -500,6 +584,20 @@ function captureCandidate(modelCase, row, rows, forecastIndex, material, section
 function candidateId(stateId, index, candidate) { return `${stateId}:${String(index + 1).padStart(2, "0")}:${candidate.origin}:${candidate.method}`; }
 
 export function compileForecastPlan(modelCase, rowsBySection, { observations = [], observationLedger = null, behaviorMap = [] } = {}) {
+  const normalisedRowsBySection = Object.fromEntries(
+    ["income_statement", "cash_flow"].map((section) => [
+      section,
+      normaliseEvaluatedHistoricalValues(
+        section === "income_statement"
+          ? applyFiledFinanceHistoricalAuthority(
+              modelCase,
+              rowsBySection?.[section] ?? [],
+            )
+          : rowsBySection?.[section] ?? [],
+      ),
+    ]),
+  );
+  rowsBySection = normalisedRowsBySection;
   const forecastPeriods = periods(modelCase);
   const historicalPeriods = (modelCase?.periods ?? []).filter((period) => period?.status === "historical").map((period) => period.date);
   const windowStarts = forecastPeriods.map((periodEnd, index) => {
@@ -592,12 +690,29 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         if (broker) candidates.push(broker);
         const formula = formulaCandidate(row, behavior, forecastIndex);
         if (formula) candidates.push(formula);
+        const derivedDisplay = derivedDisplayCandidate(row);
+        if (derivedDisplay) candidates.push(derivedDisplay);
         // Evidence is assembled independently of formula presence.  Only a
         // genuine accounting identity or schedule link owns the row before
         // this ladder; driver and roll-forward formulas compete at their
         // declared waterfall rungs.
         candidates.push(...observationCandidates(observationInput, row, forecastIndex, windowStarts[forecastIndex], forecastPeriods[forecastIndex]));
-        const inferred = historicalCandidate(row, behavior, forecastIndex);
+        let inferred = historicalCandidate(row, behavior, forecastIndex);
+        if (!inferred && behavior === "driver_linked_flow") {
+          const evaluated = evaluatedHistoricalValues(row, sectionRows);
+          if (evaluated.every(finite)) {
+            inferred = historicalCandidate(
+              { ...row, values: evaluated },
+              behavior,
+              forecastIndex,
+            );
+            if (inferred) {
+              inferred.note =
+                `${inferred.note ?? "Historical inference selected."} ` +
+                "The comparable history was independently evaluated from the row's filed accounting formula.";
+            }
+          }
+        }
         if (inferred) candidates.push(inferred);
         const eventZero = eventZeroCandidate(modelCase, row, behavior);
         if (eventZero) candidates.push(eventZero);
@@ -634,7 +749,12 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           section === "income_statement" &&
           anchorOwnedRoles.has(row.semantic_role) &&
           Boolean(broker);
-        const absoluteFormula = formula?.ownership === "absolute";
+        const absoluteFormula =
+          formula?.ownership === "absolute"
+            ? formula
+            : derivedDisplay?.ownership === "absolute"
+              ? derivedDisplay
+              : null;
         const invalidCapture = candidates.find(
           (candidate) => candidate.origin === "invalid_capture_candidate",
         );
@@ -657,8 +777,8 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         const rankedIndependent = selectForecastAuthority(compatible);
         let owner = invalidCapture ?? (anchorOwned
           ? broker
-          : absoluteFormula && compatible.includes(formula)
-            ? formula
+          : absoluteFormula && compatible.includes(absoluteFormula)
+            ? absoluteFormula
             : rankedIndependent ??
               certifiedCapture ??
               // Deliberate absence is a valid owner of last resort: a captured
@@ -800,6 +920,25 @@ function calculationFromState(state) {
   return null;
 }
 
+function evaluateMaterializedForecastCalculation(calculation, row) {
+  if (
+    !["historical_average", "historical_trend"].includes(
+      calculation?.operator,
+    )
+  ) {
+    return null;
+  }
+  const history = (row.values ?? []).slice(0, 3).map(Number);
+  if (history.length !== 3 || history.some((value) => !Number.isFinite(value))) {
+    return null;
+  }
+  if (calculation.operator === "historical_average") {
+    return history.reduce((sum, value) => sum + value, 0) / history.length;
+  }
+  const slope = ((history[1] - history[0]) + (history[2] - history[1])) / 2;
+  return history[2] + slope * (Number(calculation.forecast_index ?? 0) + 1);
+}
+
 /**
  * Apply a sealed forecast plan to a fresh case. This is the only bridge from
  * the candidate compiler to the existing v2 solver/renderer. It writes
@@ -809,8 +948,20 @@ export function materializeForecastPlan(modelCase, plan) {
   const next = structuredClone(modelCase);
   next.statement_structure_compiled_version = "semantic-statements/1.0";
   const rowsByKey = new Map();
+  const rowsBySection = new Map();
   for (const section of ["income_statement", "cash_flow"]) {
-    for (const row of next.statement_structure?.[section] ?? []) {
+    const sectionRows = normaliseEvaluatedHistoricalValues(
+      section === "income_statement" &&
+          next.controls?.broker_case === "Forecast Waterfall"
+        ? applyFiledFinanceHistoricalAuthority(
+            next,
+            next.statement_structure?.[section] ?? [],
+          )
+        : next.statement_structure?.[section] ?? [],
+    );
+    next.statement_structure[section] = sectionRows;
+    rowsBySection.set(section, sectionRows);
+    for (const row of sectionRows) {
       rowsByKey.set(`${section}\u0000${row.row_id}`, row);
     }
   }
@@ -823,13 +974,41 @@ export function materializeForecastPlan(modelCase, plan) {
     row.forecast_period_authorities[state.forecast_index] = authorityFromState(state, candidate);
     const calculation = calculationFromState(state);
     if (calculation) {
+      if (
+        ["historical_average", "historical_trend"].includes(calculation.operator)
+      ) {
+        const evaluated = evaluatedHistoricalValues(
+          row,
+          rowsBySection.get(state.section) ?? [],
+        );
+        if (evaluated.every(finite)) {
+          // Preserve the historical accounting formula and supply its
+          // independently evaluated caches as the observation basis used by
+          // both the solver and the emitted G:I-referencing forecast formula.
+          // Without this, a derived historical ratio could render correctly
+          // in Excel while the solver retained either nulls or an earlier
+          // provisional value compiled before the statement topology closed.
+          row.values ??= [null, null, null, null, null, null];
+          for (let historicalIndex = 0; historicalIndex < 3; historicalIndex += 1) {
+            row.values[historicalIndex] = Number(evaluated[historicalIndex]);
+          }
+        }
+      }
       row.forecast_period_calculations ??= [null, null, null];
       row.forecast_period_calculations[state.forecast_index] = calculation;
       row.forecast_treatment = "formula";
     }
     if (finite(state.value)) {
       row.values ??= [null, null, null, null, null, null];
-      row.values[state.forecast_index + 3] = Number(state.value);
+      const evaluatedStateValue = calculation
+        ? evaluateMaterializedForecastCalculation(
+            calculation,
+            row,
+          )
+        : null;
+      row.values[state.forecast_index + 3] = finite(evaluatedStateValue)
+        ? Number(evaluatedStateValue)
+        : Number(state.value);
     }
     if (state.producer_type === "broker_link") {
       row.broker_metric_id ??= candidate?.broker_metric_id ?? row.semantic_role;

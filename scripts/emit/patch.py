@@ -44,6 +44,7 @@ import os
 import re
 import shutil
 import zipfile
+from html import unescape as html_unescape
 from pathlib import Path
 
 _TAG = re.compile(r"<([A-Za-z_][\w.:-]*)((?:[^>\"']|\"[^\"]*\"|'[^']*')*?)(/?)>")
@@ -125,7 +126,11 @@ def _sheet_parts(members):
         if not target:
             continue
         target = target[1:] if target.startswith("/") else (target if target.startswith("xl/") else f"xl/{target}")
-        parts[attrs.get("name")] = target
+        # XML attribute entities are semantic characters.  In particular the
+        # divider sheet `> Brokers` is serialized as `&gt; Brokers`; compare
+        # its decoded name to the literal plan rather than inventing a missing
+        # worksheet defect.
+        parts[html_unescape(attrs.get("name") or "")] = target
     return parts
 
 
