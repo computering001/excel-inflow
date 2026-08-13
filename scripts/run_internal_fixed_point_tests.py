@@ -15,6 +15,7 @@ from compile_broker_pack import validate_coverage
 from broker_terminal_recovery import (
     analyse_terminal_recovery,
     apply_terminal_review,
+    automatic_negative_consumption_review,
     canonical_hash,
     validate_terminal_recovery_independently,
 )
@@ -202,6 +203,25 @@ def main() -> int:
     }
     analysis = analyse_terminal_recovery(bundle, crosswalk, semantic)
     check(analysis["can_recover"] and analysis["recoverable_candidate_ids"] == [candidate_b], "ordinary unused evidence did not enter terminal recovery")
+    automatic_review = automatic_negative_consumption_review(
+        bundle=bundle,
+        crosswalk_sha256=bindings["source_crosswalk_sha256"],
+        semantic_report_sha256=bindings["semantic_report_sha256"],
+        semantic_report=semantic,
+        bundle_sha256=bindings["bundle_sha256"],
+    )
+    automatically_recovered, automatic_receipt = apply_terminal_review(
+        bundle=bundle, crosswalk=crosswalk, semantic_report=semantic,
+        review=automatic_review, bundle_sha256=bindings["bundle_sha256"],
+        crosswalk_sha256=bindings["source_crosswalk_sha256"],
+        semantic_report_sha256=bindings["semantic_report_sha256"],
+    )
+    check(
+        automatic_receipt["status"] == "PASS"
+        and automatically_recovered["terminal_recovery"]["producer_id"]
+        == "broker-controller-negative-consumption/1.0",
+        "controller-owned exhausted-recovery fallback did not close without a model-host response",
+    )
     recovered, recovery_receipt = apply_terminal_review(
         bundle=bundle, crosswalk=crosswalk, semantic_report=semantic, review=review,
         bundle_sha256=bindings["bundle_sha256"], crosswalk_sha256=bindings["source_crosswalk_sha256"],
@@ -254,7 +274,9 @@ def main() -> int:
     check(any(item.get("disposition") == "preserve_unconsumed_quarantine" for item in resolved_coverage), "compiled coverage receipt lost terminal evidence")
     checks += 7
 
-    # Adversarial selected-cell and global-integrity findings still fail closed.
+    # Actually selected cells and global-integrity findings still fail closed.
+    # Potential core drivers that are not selected degrade to unavailable
+    # evidence so the company forecast waterfall can continue.
     selected = json.loads(json.dumps(crosswalk))
     selected["coverage_ledger"][1].update({"model_use": "active_input", "disposition": "mapped_metric", "mapping_ids": ["map-b"]})
     selected_analysis = analyse_terminal_recovery(bundle, selected, semantic)
@@ -265,14 +287,17 @@ def main() -> int:
         "label": "Revenue", "period_basis": "annual_forecast", "numeric": True,
     })
     misclassified_analysis = analyse_terminal_recovery(misclassified_bundle, misclassified, semantic)
-    check(not misclassified_analysis["can_recover"] and misclassified_analysis["blocking_findings"][0]["reason"] == "selected_model_candidate_unresolved", "crosswalk-misclassified Revenue escaped the independent model-driver oracle")
-    check(candidate_b in verifier_selected_candidate_ids(misclassified_bundle, misclassified), "semantic oracle did not independently reconstruct crosswalk-misclassified Revenue")
+    check(misclassified_analysis["can_recover"], "unselected Revenue did not degrade to evidence quarantine")
+    check(candidate_b in misclassified_analysis["recoverable_potential_driver_candidate_ids"], "Revenue was not disclosed as a degraded potential model driver")
+    check(candidate_b not in verifier_selected_candidate_ids(misclassified_bundle, misclassified), "semantic oracle incorrectly treated unselected Revenue as consumed")
     decorated_bundle = json.loads(json.dumps(bundle))
     decorated_bundle["candidate_manifest"]["candidates"][1].update({
         "label": "Adjusted EBITDA (USDm)", "period_basis": "annual_forecast", "numeric": True,
     })
-    check(not analyse_terminal_recovery(decorated_bundle, crosswalk, semantic)["can_recover"], "decorated core-driver label escaped terminal blocking")
-    check(candidate_b in verifier_selected_candidate_ids(decorated_bundle, crosswalk), "semantic oracle missed decorated core-driver label")
+    decorated_analysis = analyse_terminal_recovery(decorated_bundle, crosswalk, semantic)
+    check(decorated_analysis["can_recover"], "decorated unselected core driver did not degrade safely")
+    check(candidate_b in decorated_analysis["recoverable_potential_driver_candidate_ids"], "decorated core driver was not disclosed in degraded authority inventory")
+    check(candidate_b not in verifier_selected_candidate_ids(decorated_bundle, crosswalk), "semantic oracle incorrectly consumed decorated core driver")
     component_bundle = json.loads(json.dumps(bundle))
     component_bundle["candidate_manifest"]["candidates"][1].update({
         "label": "Product Sales", "period_basis": "annual_forecast", "numeric": True,

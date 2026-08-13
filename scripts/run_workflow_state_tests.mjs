@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { createStageReceipt, verifyStageReceipt } from "./lib/flow_runtime.mjs";
 import {
+  assertDeliveryBlocker,
   assertWorkflowState,
   assertWorkflowTransition,
   normaliseUserFlowResult,
@@ -44,6 +45,40 @@ pass("canonical contract loads", () => {
   for (const layer of ["broker", "dcs", "filings", "attachment", "user_flow", "stage_receipt"]) {
     assert(WORKFLOW_STATE_CONTRACT.layers[layer], `layer registry omits ${layer}`);
   }
+  assert(
+    Object.keys(WORKFLOW_STATE_CONTRACT.delivery_blocker_constitution.fatal_reasons).length === 4,
+    "delivery blocker constitution must have exactly four fatal reasons",
+  );
+});
+
+pass("broker defects degrade and cannot claim a delivery block", () => {
+  assertDeliveryBlocker({ blocked: false, domain: "broker_semantics" });
+  rejects(
+    "broker-only delivery block",
+    () => assertDeliveryBlocker({
+      blocked: true,
+      domain: "broker_table_reconciliation",
+      fatalReason: "workbook_delivery_failed",
+    }),
+    /degradation domain/,
+  );
+});
+
+pass("only the four declared fatal reasons can block delivery", () => {
+  assertDeliveryBlocker({
+    blocked: true,
+    domain: "economic_graph",
+    fatalReason: "equation_system_unsolved",
+  });
+  rejects(
+    "undeclared fatal reason",
+    () => assertDeliveryBlocker({
+      blocked: true,
+      domain: "economic_graph",
+      fatalReason: "broker_headers_disagree",
+    }),
+    /declared fatal reason/,
+  );
 });
 
 pass("valid internal and user-owned states are accepted", () => {
@@ -159,9 +194,16 @@ rejects(
 
 pass("Python controllers consume the same canonical contract", () => {
   const source = [
-    "from workflow_state import assert_state, assert_transition",
+    "from workflow_state import assert_delivery_blocker, assert_state, assert_transition",
     "assert_state('broker', 'NEEDS_VISION', 'INTERNAL_WORK', False)",
     "assert_transition('dcs', 'NEEDS_CROSSWALK', 'PASS')",
+    "assert_delivery_blocker(True, 'opening_debt_unresolved', domain='debt')",
+    "try:",
+    "    assert_delivery_blocker(True, 'workbook_delivery_failed', domain='broker_capture')",
+    "except ValueError:",
+    "    pass",
+    "else:",
+    "    raise AssertionError('broker delivery block passed')",
     "try:",
     "    assert_state('attachment', 'BLOCKED_INPUT', 'INTERNAL_WORK', True)",
     "except ValueError:",

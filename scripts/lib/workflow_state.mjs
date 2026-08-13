@@ -13,6 +13,51 @@ if (WORKFLOW_STATE_CONTRACT.schema_version !== "workflow-state-contract/1.0") {
 }
 
 const USER_BLOCKERS = new Set(WORKFLOW_STATE_CONTRACT.user_blocking_classes);
+const DELIVERY_CONSTITUTION =
+  WORKFLOW_STATE_CONTRACT.delivery_blocker_constitution;
+
+if (
+  DELIVERY_CONSTITUTION?.schema_version !==
+  "delivery-blocker-constitution/1.0"
+) {
+  throw new Error("Workflow-state contract has no delivery-blocker constitution");
+}
+
+export const DELIVERY_FATAL_REASONS = Object.freeze(
+  Object.keys(DELIVERY_CONSTITUTION.fatal_reasons ?? {}),
+);
+
+/**
+ * Assert the narrow production delivery boundary.
+ *
+ * Internal controller work remains resumable and broker evidence degrades to
+ * the forecast waterfall. A terminal delivery block is legal only when it is
+ * assigned to one of the four declared, model-fatal reasons.
+ */
+export function assertDeliveryBlocker({
+  blocked,
+  fatalReason = null,
+  domain = null,
+} = {}) {
+  const nonBlocking = new Set(
+    DELIVERY_CONSTITUTION.non_delivery_blocking_domains ?? [],
+  );
+  if (blocked !== true) {
+    if (fatalReason !== null) {
+      throw new Error("A non-blocked delivery result cannot carry a fatal reason");
+    }
+    return true;
+  }
+  if (nonBlocking.has(domain)) {
+    throw new Error(`${domain} is a degradation domain, not a delivery blocker`);
+  }
+  if (!DELIVERY_FATAL_REASONS.includes(fatalReason)) {
+    throw new Error(
+      `Delivery block must name one declared fatal reason; received ${JSON.stringify(fatalReason)}`,
+    );
+  }
+  return true;
+}
 
 export function assertWorkflowState(
   layer,

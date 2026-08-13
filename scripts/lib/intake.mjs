@@ -2,10 +2,10 @@
  * INTAKE — node N0. The only N0.
  *
  * Stage 1 of the user flow supplies three things: a company name, a debt
- * export and a broker set. This module validates all three and fails fast with
- * a message specific enough to act on. "Broker set contains 2 contributors,
- * minimum 3" beats failing at the anchor stage twenty steps later, and it beats
- * "validation failed" at any distance.
+ * export and a broker set. This module validates their integrity. Broker
+ * sufficiency is intentionally NOT decided here: the forecast compiler owns
+ * one cross-source waterfall and may resolve a missing broker value from
+ * company guidance, actual-plus-remainder, formulas or historical inference.
  *
  * Two other implementations of N0 existed alongside this one and have been
  * collapsed into it:
@@ -81,11 +81,7 @@ export const REMEDY = Object.freeze({
   NONE: "none",
 });
 
-/**
- * Metrics scripts/lib/coverage.mjs blocks on. Named here so an absent metric
- * is diagnosed at upload rather than at the coverage gate, where the user is
- * no longer holding the file that would fix it.
- */
+/** Metrics the broker preview reports when absent; none is broker-mandatory. */
 export const REQUIRED_BROKER_METRICS = Object.freeze([
   "revenue",
   "depreciation_and_amortisation",
@@ -1086,11 +1082,11 @@ function checkBrokerMetrics(pack, houses, findings) {
       findings.push(
         finding(
           "broker_metric_undeclared",
-          SEVERITY.ERROR,
+          SEVERITY.WARNING,
           "incomplete",
-          REMEDY.RE_SUPPLY,
+          REMEDY.PROCEED_WITH_NOTE,
           `broker_pack.metrics.${metricId}`,
-          `The pack does not carry ${metricId}. The coverage gate blocks on it, so an absent metric stops the build later regardless — it is reported here, while you are still holding the notes.`,
+          `The broker pack does not carry ${metricId}. That broker authority is unavailable; the sealed forecast waterfall must resolve each material row-period from another evidenced source.`,
         ),
       );
     }
@@ -1130,18 +1126,15 @@ function checkBrokerMetrics(pack, houses, findings) {
   for (const metricId of REQUIRED_BROKER_METRICS) {
     if (!declared.has(metricId)) continue;
     if (contributorCount[metricId] === 0) {
-      const severity = metricId === "revenue" ? SEVERITY.ERROR : SEVERITY.WARNING;
+      const severity = SEVERITY.WARNING;
       findings.push(
         finding(
           "broker_metric_unsupported",
           severity,
           "incomplete",
-          severity === SEVERITY.ERROR ? REMEDY.RE_SUPPLY : REMEDY.PROCEED_WITH_NOTE,
+          REMEDY.PROCEED_WITH_NOTE,
           `broker_pack.metrics.${metricId}`,
-          `${metricId} is declared but no house supplies a figure for it.` +
-            (severity === SEVERITY.ERROR
-              ? " Revenue anchors the operating forecast and cannot be derived."
-              : " It will be held at the last reported level and printed in the stated assumptions."),
+          `${metricId} is declared but no house supplies a usable figure. The broker candidate is unavailable; the forecast waterfall must select another evidenced authority and disclose it.`,
           { metric: metricId },
         ),
       );
@@ -1156,11 +1149,11 @@ function checkBrokerMetrics(pack, houses, findings) {
       findings.push(
         finding(
           "broker_revenue_period_unsupported",
-          SEVERITY.ERROR,
+          SEVERITY.WARNING,
           "incomplete",
-          REMEDY.RE_SUPPLY,
+          REMEDY.PROCEED_WITH_NOTE,
           "broker_pack.metrics.revenue",
-          `Revenue has no named-house estimate for forecast period${missingPeriods.length === 1 ? "" : "s"} ${missingPeriods.join(", ")}. Revenue is the operating forecast anchor in every year, so a partly populated series cannot be treated as complete.`,
+          `Revenue has no named-house estimate for forecast period${missingPeriods.length === 1 ? "" : "s"} ${missingPeriods.join(", ")}. Those periods remain unavailable from brokers and must be resolved by the forecast waterfall without borrowing another house.`,
           { missing_periods: missingPeriods, contributors_by_period: contributorCountByPeriod.revenue },
         ),
       );
@@ -1175,11 +1168,11 @@ function checkBrokerMetrics(pack, houses, findings) {
     findings.push(
       finding(
         "broker_anchor_unresolvable",
-        SEVERITY.ERROR,
+        SEVERITY.WARNING,
         "incomplete",
-        REMEDY.RE_SUPPLY,
+        REMEDY.PROCEED_WITH_NOTE,
         "broker_pack.metrics",
-        "Neither EBIT nor Adj. EBITDA has a single contributing house. The forecast needs one broker-supported headline anchor; D&A then bridges to the other headline metric.",
+        "Neither EBIT nor Adj. EBITDA has a usable broker contributor. No broker headline anchor will be selected; the forecast waterfall must resolve the issuer statement graph from other evidence.",
         { anchor_contributors: anchorCounts },
       ),
     );
@@ -1195,11 +1188,11 @@ function checkBrokerMetrics(pack, houses, findings) {
     findings.push(
       finding(
         "broker_anchor_periods_unresolvable",
-        SEVERITY.ERROR,
+        SEVERITY.WARNING,
         "incomplete",
-        REMEDY.RE_SUPPLY,
+        REMEDY.PROCEED_WITH_NOTE,
         "broker_pack.metrics",
-        "The forecast needs one consistent headline anchor (the better-supported of EBIT or Adj. EBITDA) plus D&A across all three forecast periods. EBIT and Adj. EBITDA are never used together as independent inputs.",
+        "No single broker house supplies a complete compatible headline plus D&A bridge across all forecast periods. Broker authority will not be mixed across houses; the forecast waterfall must resolve the missing periods from other evidence.",
         { contributors_by_period: Object.fromEntries(ANCHOR_METRICS.map((metricId) => [metricId, contributorCountByPeriod[metricId] ?? [0, 0, 0]])) },
       ),
     );

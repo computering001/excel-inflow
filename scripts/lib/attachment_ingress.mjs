@@ -128,18 +128,16 @@ async function dcsRuntimeClosureSha256() {
 }
 
 /**
- * Project the lossless broker-page inventory onto the values-only workbook
- * evidence sheets.  The run artifact retains every reviewed table; the model
- * case carries only tables explicitly dispositioned `analytical_table`.
- * House metadata is retained even when a house has no presentable table so the
- * projection cannot silently remove a supplied broker document.
+ * Project the reviewed broker-table inventory onto the values-only workbook
+ * evidence sheets. Every table is carried so the Bxx tabs are a complete,
+ * vertically stacked hardcoded representation of the reviewed grids.
+ * `workbook_presentation=evidence_only` prohibits model consumption; it does
+ * not delete the table from the workbook evidence tabs.
  */
 function brokerWorkbookTableProjection(sourceTables) {
   return (sourceTables?.houses ?? []).map((house) => ({
     ...structuredClone(house),
-    tables: (house.tables ?? [])
-      .filter((table) => table.workbook_presentation === "analytical_table")
-      .map((table) => structuredClone(table)),
+    tables: (house.tables ?? []).map((table) => structuredClone(table)),
   }));
 }
 
@@ -1016,11 +1014,21 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       (house.tables ?? []).map((table) => table.table_id),
     ),
   );
+  const analyticalTableIds = new Set(
+    (sourceTables.json.houses ?? []).flatMap((house) =>
+      (house.tables ?? [])
+        .filter((table) => table.workbook_presentation === "analytical_table")
+        .map((table) => table.table_id),
+    ),
+  );
   for (const mapping of receipt.json.mappings ?? []) {
     for (const component of mapping.components ?? []) {
-      if (!workbookTableIds.has(component.table_id)) {
+      if (
+        !workbookTableIds.has(component.table_id) ||
+        !analyticalTableIds.has(component.table_id)
+      ) {
         throw new Error(
-          `Broker mapping ${mapping.mapping_id ?? `${mapping.house_id}.${mapping.metric_id}.${mapping.period_index}`} uses ${component.table_id}, but that table is not dispositioned analytical_table for workbook presentation.`,
+          `Broker mapping ${mapping.mapping_id ?? `${mapping.house_id}.${mapping.metric_id}.${mapping.period_index}`} uses ${component.table_id}, but that table is not dispositioned analytical_table for model consumption.`,
         );
       }
     }

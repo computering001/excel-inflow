@@ -1572,11 +1572,11 @@ def main() -> int:
                         "units": table.get("units"),
                         "extraction_method": table["extraction_method"],
                         # A transcription with no row labels and no period
-                        # headings is not an analytical table however the
-                        # reviewer classified it: it cannot be read, so it
-                        # cannot be presented. It stays in the run evidence,
-                        # and because a mapped cell on an evidence_only table
-                        # is a blocker, it cannot feed the model either.
+                        # headings is not a model-consumable analytical table
+                        # however the reviewer classified it. It still renders
+                        # as a values-only evidence block; because a mapped
+                        # cell on an evidence_only table is a blocker, it
+                        # cannot feed the model.
                         "workbook_presentation": (
                             "evidence_only"
                             if table.get("workbook_presentation_hint") == "evidence_only"
@@ -1586,13 +1586,13 @@ def main() -> int:
                             else "evidence_only"
                         ),
                         "workbook_presentation_reason": (
-                            "Transcription carries no row labels or period headings, so it is retained as "
-                            "run evidence only and is not readable as an analyst table."
+                            "Transcription carries no row labels or period headings, so it renders as "
+                            "evidence only and is prohibited from model formulas."
                             if table.get("workbook_presentation_hint") == "evidence_only"
                             else "Reviewed analytical/financial table retained on the values-only broker evidence sheet."
                             if review_by_table[table["table_id"]]["classification"] != "non_forecast"
                             or table["table_id"] in mapped_table_ids
-                            else "Reviewed non-forecast legal, disclosure or narrative table retained in the run evidence but omitted from the analyst workbook."
+                            else "Reviewed non-forecast table rendered as evidence only and prohibited from model formulas."
                         ),
                         "rows": scalar_rows(table),
                         "cell_authorities": [

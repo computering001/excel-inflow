@@ -466,7 +466,14 @@ def normalized_manifest_period(candidate: dict[str, Any], crosswalk: dict[str, A
 
 
 def verifier_selected_candidate_ids(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> set[str]:
-    """Independent selected/potential-driver reconstruction for the oracle."""
+    """Independent reconstruction of candidates actually selected for use.
+
+    Potential model drivers are not selected merely because of their label.
+    If their source cell cannot be resolved, terminal recovery must quarantine
+    it and the company forecast waterfall must choose another authority.  This
+    oracle still independently proves that no quarantined cell overlaps a real
+    mapping or an active crosswalk declaration.
+    """
     candidates = {
         str(item.get("candidate_id")): item
         for item in (bundle.get("candidate_manifest") or {}).get("candidates") or []
@@ -489,12 +496,6 @@ def verifier_selected_candidate_ids(bundle: dict[str, Any], crosswalk: dict[str,
             for item in candidate.get("source_cells") or []
         }
         if source_cells & mapped_cells:
-            selected.add(candidate_id)
-        if (
-            bool(candidate.get("numeric"))
-            and candidate.get("period_basis") in TERMINAL_MODEL_PERIOD_BASES
-            and _terminal_normalized_label(candidate.get("label")) in TERMINAL_CORE_LABELS
-        ):
             selected.add(candidate_id)
     return selected
 

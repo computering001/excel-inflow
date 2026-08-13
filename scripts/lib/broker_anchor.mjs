@@ -190,6 +190,16 @@ export function resolveBrokerForecastSelection(
   }
   const consensus = () => consensusSelection(metric, forecastIndex);
   const selected = modelCase.controls?.broker_case ?? "Consensus";
+  if (selected === "Forecast Waterfall") {
+    return {
+      value: null,
+      source_kind: "broker_authority_unavailable",
+      source_name: null,
+      substituted: false,
+      substitution_reason:
+        "The sealed broker preview selected the cross-source forecast waterfall; no broker cell may be consumed.",
+    };
+  }
   if (selected === "Consensus") return consensus();
   const values = Object.entries(metric.brokers ?? {})
     .map(([name, series]) => [name, series?.[forecastIndex]])
@@ -302,7 +312,7 @@ export function applyTier1AnchorOwnership(modelCase) {
 
 export function selectBrokerAnchor(modelCase, rows = []) {
   const selectedBrokerCase = modelCase?.controls?.broker_case ?? "Consensus";
-  const namedPrimary = !["Consensus", "High", "Low"].includes(selectedBrokerCase)
+  const namedPrimary = !["Consensus", "High", "Low", "Forecast Waterfall"].includes(selectedBrokerCase)
     ? selectedBrokerCase
     : null;
   const counts = {};
@@ -362,6 +372,7 @@ export function selectBrokerAnchor(modelCase, rows = []) {
       compareDefinitionSignatures(signatures.broker, signatures.statement),
     ]),
   );
+  const brokerDisabled = selectedBrokerCase === "Forecast Waterfall";
   return {
     counts,
     counts_by_period: countsByPeriod,
@@ -373,7 +384,7 @@ export function selectBrokerAnchor(modelCase, rows = []) {
     // Exactly one headline plus D&A needs full-period support. We never fall
     // back to using both headline metrics, because doing so merely moves their
     // consensus mismatch into D&A.
-    supported: counts[headlineAnchor] > 0 && counts[da] > 0,
+    supported: !brokerDisabled && counts[headlineAnchor] > 0 && counts[da] > 0,
     definition_signatures: definitionSignatures,
     definition_compatibility: definitionCompatibility,
     label,

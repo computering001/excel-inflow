@@ -119,6 +119,140 @@ def period_token(value: Any) -> str | None:
     return normalise(candidate) if PERIOD_TOKEN.fullmatch(candidate) else None
 
 
+PERIOD_LIKE_TOKEN = re.compile(
+    r"^(?:(?:fy|cy)\s*\d|(?:q[1-4]|[1-4]q|h[12]|[12]h)\b|"
+    r"(?:ltm|ntm|ttm)\b|(?:3|6|9)m\s*(?:fy|cy)?\s*\d|"
+    r"(?:19|20)\d{2}\s*/\s*\d{2})",
+    re.I,
+)
+
+
+def surface_position(surface_id: Any) -> tuple[str, int] | None:
+    """Return the document-local surface family and ordinal."""
+    match = re.search(r"^(.*)\.(?:p|s)(\d+)$", str(surface_id or ""))
+    if not match:
+        return None
+    return match.group(1), int(match.group(2))
+
+
+def table_column_count(table: dict[str, Any]) -> int:
+    return max(
+        (int(cell.get("column", 0)) for row in table.get("rows", []) for cell in row),
+        default=0,
+    )
+
+
+def table_period_headers(table: dict[str, Any]) -> dict[int, str]:
+    headers: dict[int, str] = {
+        int(item["column"]): str(item["period_label"])
+        for item in table.get("effective_period_headers", [])
+        if period_token(item.get("period_label"))
+    }
+    for row in table.get("rows", []):
+        for cell in row:
+            if period_token(cell.get("raw_text")):
+                headers[int(cell.get("column", 0))] = str(cell.get("raw_text") or "").strip()
+    return headers
+
+
+def table_unresolved_period_columns(table: dict[str, Any]) -> set[int]:
+    columns: set[int] = set()
+    for row in table.get("rows", []):
+        for cell in row:
+            raw = re.sub(r"\s+", " ", str(cell.get("raw_text") or "").strip())
+            if raw and PERIOD_LIKE_TOKEN.search(raw) and not period_token(raw):
+                columns.add(int(cell.get("column", 0)))
+    return columns
+
+
+def continuation_certificate(
+    previous: dict[str, Any], current: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Prove an adjacent-page continuation without changing source cells.
+
+    Repeated headers are direct evidence.  Omitted or truncated headers may be
+    inherited only when adjacent surfaces share document lineage, table title,
+    units and column geometry.  The certificate records the exact inherited
+    columns; downstream code never relabels an inference as raw source text.
+    """
+    prior_position = surface_position(previous.get("surface_id"))
+    current_position = surface_position(current.get("surface_id"))
+    if (
+        not prior_position
+        or not current_position
+        or prior_position[0] != current_position[0]
+        or current_position[1] != prior_position[1] + 1
+    ):
+        return None
+    prior_headers = table_period_headers(previous)
+    current_headers = table_period_headers(current)
+    if len(prior_headers) < 2:
+        return None
+    same_columns = table_column_count(previous) == table_column_count(current)
+    prior_title = normalise(previous.get("title"))
+    prior_lineage_title = normalise(
+        (previous.get("continuation_certificate") or {}).get("continuation_title")
+    ) or prior_title
+    current_title = normalise(current.get("title"))
+    continued_title = re.sub(r"\b(?:continued|contd|cont)\b", "", current_title).strip()
+    same_title = bool(
+        prior_lineage_title
+        and (
+            prior_lineage_title == current_title
+            or prior_lineage_title == continued_title
+        )
+    )
+    title_continuation = same_title or bool(prior_lineage_title and not current_title)
+    prior_units = normalise(previous.get("units"))
+    current_units = normalise(current.get("units"))
+    compatible_units = not prior_units or not current_units or prior_units == current_units
+    if not same_columns or not compatible_units:
+        return None
+
+    if current_headers == prior_headers:
+        basis = "repeated_header"
+        inherited: list[dict[str, Any]] = []
+    else:
+        unresolved_columns = table_unresolved_period_columns(current)
+        inheritable_columns = sorted(
+            column for column in prior_headers
+            if column not in current_headers
+            and (not current_headers or column in unresolved_columns)
+        )
+        # Header omission/truncation needs the stronger title match because
+        # adjacent pages can contain unrelated tables with the same width.
+        if not title_continuation or not inheritable_columns:
+            return None
+        basis = "truncated_header" if unresolved_columns else "omitted_header"
+        inherited = [
+            {
+                "column": column,
+                "period_label": prior_headers[column],
+                "source_table_id": previous["canonical_table_id"],
+                "source_surface_id": previous["surface_id"],
+            }
+            for column in inheritable_columns
+        ]
+
+    body = {
+        "schema_version": "broker-table-continuation-certificate/1.0",
+        "predecessor_table_id": previous["canonical_table_id"],
+        "predecessor_surface_id": previous["surface_id"],
+        "current_surface_id": current["surface_id"],
+        "basis": basis,
+        "same_title": same_title,
+        "title_continuation": title_continuation,
+        "continuation_title": prior_lineage_title or current_title or None,
+        "compatible_units": compatible_units,
+        "same_column_count": same_columns,
+        "inherited_period_headers": inherited,
+    }
+    return {
+        **body,
+        "certificate_sha256": hashlib.sha256(canonical_bytes(body)).hexdigest(),
+    }
+
+
 def economic_observations(table: dict[str, Any]) -> dict[tuple[str, str], list[str]]:
     """Return row/period/value observations independent of PDF cell geometry.
 
@@ -205,6 +339,32 @@ def rendered_native_authority_pair(left: dict[str, Any], right: dict[str, Any]) 
     rendered = [item for item in (left, right) if has_rendered_authority(item)]
     native = [item for item in (left, right) if not has_rendered_authority(item)]
     return len(rendered) == 1 and len(native) == 1
+
+
+def native_table_covered_by_rendered(
+    native: dict[str, Any], rendered_tables: list[dict[str, Any]]
+) -> bool:
+    """Prove a native table is a corroborating read of a rendered table.
+
+    A page may contain several genuinely separate tables, so the presence of
+    any rendered table cannot suppress every native table on that page.  A
+    native lane is superseded only when it physically intersects a rendered
+    table, or when both lanes share an economic row label and numeric value.
+    The latter covers PDF extractors whose boxes shrink to a header/body
+    fragment while retaining immutable row/value evidence.
+    """
+    native_observations = economic_observations(native)
+    native_labels = {label for label, _period in native_observations}
+    native_tokens = set(table_numeric_tokens(native))
+    for rendered in rendered_tables:
+        if bbox_min_overlap(native.get("bbox"), rendered.get("bbox")) > 0.0:
+            return True
+        rendered_observations = economic_observations(rendered)
+        rendered_labels = {label for label, _period in rendered_observations}
+        rendered_tokens = set(table_numeric_tokens(rendered))
+        if native_labels.intersection(rendered_labels) and native_tokens.intersection(rendered_tokens):
+            return True
+    return False
 
 
 def segmentation_equivalent(left: dict[str, Any], right: dict[str, Any]) -> bool:
@@ -306,7 +466,83 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
         by_surface.setdefault(str(table.get("surface_id")), []).append(table)
 
     for surface_id in sorted(by_surface):
-        remaining = sorted(by_surface[surface_id], key=lambda item: item["table_id"])
+        surface_tables = sorted(by_surface[surface_id], key=lambda item: item["table_id"])
+        rendered_tables = [item for item in surface_tables if has_rendered_authority(item)]
+        native_tables = [item for item in surface_tables if not has_rendered_authority(item)]
+        if rendered_tables:
+            # Vision compilation accepts a rendered surface only after two
+            # independent, hash-bound reads agree (or one targeted resolution
+            # dispositions every displayed conflict).  That accepted surface
+            # is therefore the physical table authority.  Native PDF lanes are
+            # still preserved by the source-bundle hash, artifacts and numeric
+            # receipt, but they must not survive as competing analytical
+            # tables merely because a PDF extractor emitted a smaller/different
+            # bounding box.  In particular, truncated native year fragments
+            # must not manufacture unresolved period cells beside a complete
+            # rendered header.
+            #
+            # Conflicts between rendered tables are deliberately NOT hidden:
+            # they remain in ``remaining`` and are checked below.  Model-linked
+            # value accuracy is independently enforced by the crosswalk and
+            # semantic verifier after this physical-capture boundary.
+            superseded_native = [
+                item for item in native_tables
+                if native_table_covered_by_rendered(item, rendered_tables)
+            ]
+            for rendered in rendered_tables:
+                corroborating = [
+                    item for item in superseded_native
+                    if native_table_covered_by_rendered(item, [rendered])
+                ]
+                if not corroborating:
+                    continue
+                rendered["source_table_ids"] = sorted({
+                    *(
+                        str(item)
+                        for item in (rendered.get("source_table_ids") or [rendered["table_id"]])
+                    ),
+                    *(str(item["table_id"]) for item in corroborating),
+                })
+                rendered["extraction_methods"] = sorted({
+                    *(
+                        str(item)
+                        for item in (
+                            rendered.get("extraction_methods")
+                            or [rendered.get("extraction_method")]
+                        )
+                        if item
+                    ),
+                    *(
+                        str(method)
+                        for item in corroborating
+                        for method in (
+                            item.get("extraction_methods")
+                            or [item.get("extraction_method")]
+                        )
+                        if method
+                    ),
+                })
+            unmatched_native = [
+                item for item in native_tables if item not in superseded_native
+            ]
+            remaining = [*rendered_tables, *unmatched_native]
+            if superseded_native:
+                findings.append({
+                    "id": "broker_canonical.native_tables_superseded_by_rendered_surface",
+                    "severity": "warning",
+                    "scope": "physical_capture",
+                    "model_linked": False,
+                    "surface_id": surface_id,
+                    "rendered_table_ids": [item["table_id"] for item in rendered_tables],
+                    "native_table_ids": [item["table_id"] for item in superseded_native],
+                    "message": (
+                        "The independently verified rendered surface is the physical table authority; "
+                        "native PDF table lanes remain preserved as corroboration and cannot create "
+                        "competing analytical rows or period headers."
+                    ),
+                })
+        else:
+            remaining = surface_tables
         while remaining:
             seed = remaining.pop(0)
             group = [seed]
@@ -368,19 +604,66 @@ def canonicalise_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, An
             )
             canonical.append(merged_table(ranked[0], group))
 
-    # Deterministic continuation hints are evidence, not joins.  Matching
-    # headers across adjacent surfaces retain both tables and link them.
-    ordered = sorted(canonical, key=lambda item: (str(item.get("surface_id")), item["canonical_table_id"]))
-    previous_by_header: dict[str, dict[str, Any]] = {}
+    # Build a deterministic continuation graph. Raw page cells remain
+    # immutable; inferred headers live only in a hash-bound certificate.
+    ordered = sorted(
+        canonical,
+        key=lambda item: (
+            surface_position(item.get("surface_id")) or (str(item.get("surface_id")), 0),
+            item["canonical_table_id"],
+        ),
+    )
+    prior_tables: list[dict[str, Any]] = []
     for table in ordered:
-        rows = table_matrix(table)
-        header = json.dumps(rows[0] if rows else [], separators=(",", ":"))
-        previous = previous_by_header.get(header)
-        current_match = re.search(r"\.(?:p|s)(\d+)$", str(table.get("surface_id")))
-        previous_match = re.search(r"\.(?:p|s)(\d+)$", str(previous.get("surface_id"))) if previous else None
-        adjacent = bool(current_match and previous_match and int(current_match.group(1)) == int(previous_match.group(1)) + 1)
-        table["continuation_of"] = previous["canonical_table_id"] if previous and header != "[]" and adjacent else None
-        previous_by_header[header] = table
+        current_position = surface_position(table.get("surface_id"))
+        candidates = [
+            (candidate, continuation_certificate(candidate, table))
+            for candidate in prior_tables
+            if current_position
+            and surface_position(candidate.get("surface_id"))
+            and surface_position(candidate.get("surface_id"))[0] == current_position[0]
+            and surface_position(candidate.get("surface_id"))[1] == current_position[1] - 1
+        ]
+        proven = [(candidate, certificate) for candidate, certificate in candidates if certificate]
+        # Ambiguity is fail-safe: no inheritance when two predecessor tables
+        # independently look compatible.
+        if len(proven) == 1:
+            previous, certificate = proven[0]
+            table["continuation_of"] = previous["canonical_table_id"]
+            table["continuation_certificate"] = certificate
+            table["effective_period_headers"] = [
+                *(
+                    {
+                        "column": column,
+                        "period_label": label,
+                        "authority": "source_cell",
+                        "source_table_id": table["canonical_table_id"],
+                        "source_surface_id": table["surface_id"],
+                    }
+                    for column, label in sorted(table_period_headers(table).items())
+                ),
+                *(
+                    {
+                        **item,
+                        "authority": "continuation_certificate",
+                    }
+                    for item in certificate["inherited_period_headers"]
+                ),
+            ]
+        else:
+            table["continuation_of"] = None
+            table["continuation_certificate"] = None
+            table["effective_period_headers"] = [
+                {
+                    "column": column,
+                    "period_label": label,
+                    "authority": "source_cell",
+                    "source_table_id": table["canonical_table_id"],
+                    "source_surface_id": table["surface_id"],
+                }
+                for column, label in sorted(table_period_headers(table).items())
+            ]
+        prior_tables.append(table)
     return ordered, findings
 
 

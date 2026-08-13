@@ -356,13 +356,13 @@ exhausts a task budget, emit one aggregate `internal_fixed_point_defect` with
 `NEEDS_RESOLUTION`, `NEEDS_CROSSWALK` or `NEEDS_CROSSWALK_REVIEW` packet as an
 end-user question.
 
-Do not force the complete broker-page inventory into the workbook carrier.
-`broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
-deterministically projects only tables dispositioned `analytical_table` into
-`model_case.broker_pack.raw_tables`. Evidence-only tables stay hash-bound in the
-run, every supplied house remains represented, and every mapped cell must land
-on an analytical table. The two arrays are therefore related by the reviewed
-disposition ledger, not by full-array equality.
+Do not force the complete broker-page inventory (page images, OCR lanes and
+narrative regions) into the workbook carrier. `broker-source-tables/1.0` remains
+the lossless run artifact; attachment ingress deterministically projects every
+reviewed tabular grid into `model_case.broker_pack.raw_tables`. Evidence-only
+tables render as hardcoded source evidence but remain prohibited from model
+formulas. Every supplied house remains represented and every mapped cell must
+land on an analytical table.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves

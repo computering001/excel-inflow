@@ -2,7 +2,7 @@ import { canonicalise, hashValue } from "./run_store.mjs";
 import { assertWorkflowState } from "./workflow_state.mjs";
 
 export const FLOW_SCHEMA_VERSION = "debt-user-flow/1.0";
-export const FLOW_CONTROLLER_VERSION = "five-stage/2.3";
+export const FLOW_CONTROLLER_VERSION = "five-stage/2.4";
 export const STAGE_RECEIPT_SCHEMA_VERSION = "user-stage-receipt/1.0";
 
 export const STAGES = Object.freeze([

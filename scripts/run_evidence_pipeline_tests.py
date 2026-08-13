@@ -111,6 +111,36 @@ def main() -> int:
     assert_true(disposition is None and error, "mixed physical dispositions did not remain unresolved")
     checks += 1
 
+    conflict_manifest = {
+        "conflicts": [
+            {
+                "conflict_id": "bvc-" + "1" * 24,
+                "requires_targeted_adjudication": True,
+            },
+            {
+                "conflict_id": "bvc-" + "2" * 24,
+                "requires_targeted_adjudication": False,
+                "auto_resolution_source": "pass1_native_corroborated",
+            },
+        ],
+    }
+    quarantined = vision.bounded_quarantine_decisions(conflict_manifest)
+    assert_true(
+        list(quarantined) == ["bvc-" + "1" * 24]
+        and quarantined["bvc-" + "1" * 24]["status"] == "quarantined",
+        "bounded visual fallback did not quarantine every and only unresolved cells",
+    )
+    assert_true(
+        broker.prior_targeted_resolution_attempted({
+            "tasks": [{"task_kind": "targeted_cell_adjudication"}],
+        })
+        and not broker.prior_targeted_resolution_attempted({
+            "tasks": [{"task_kind": "independent_table_transcription"}],
+        }),
+        "controller did not distinguish first visual read from exhausted targeted recovery",
+    )
+    checks += 2
+
     try:
         broker.write_state(
             Path("unused.json"), run_id="test", status="NEEDS_VISION",

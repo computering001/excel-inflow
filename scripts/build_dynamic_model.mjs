@@ -1453,9 +1453,11 @@ function compileBrokerEvidenceLayout(modelCase) {
       };
       row = coverageRow + 2;
     }
-    const presentationTables = (house.tables ?? []).filter(
-      (table) => table.workbook_presentation !== "evidence_only",
-    );
+    // Every readable broker table is rendered. `evidence_only` is a model-use
+    // disposition, not a presentation deletion: it prohibits formulas from
+    // consuming the table, while the analyst still gets the full hardcoded
+    // source evidence on the house tab.
+    const presentationTables = house.tables ?? [];
     const tableLayouts = presentationTables.map((table) => {
       const metaRow = row;
       const dataStartRow = metaRow + 1;
@@ -1513,6 +1515,21 @@ function compileBrokerEvidenceLayout(modelCase) {
     cellMap,
     mappingByKey,
     houseByName,
+    tableCount: sheets.reduce(
+      (total, sheet) => total + (sheet.house.tables ?? []).length,
+      0,
+    ),
+    evidenceOnlyTableCount: sheets.reduce(
+      (total, sheet) =>
+        total +
+        (sheet.house.tables ?? []).filter(
+          (table) => table.workbook_presentation === "evidence_only",
+        ).length,
+      0,
+    ),
+    quarantinedCellCount: [...cellMap.values()].filter(
+      (cell) => cell.authority?.status === "quarantined_conflict",
+    ).length,
   };
 }
 
@@ -1675,7 +1692,14 @@ function buildBrokerEvidenceSheets(workbook, layout) {
       setValue(
         sheet,
         `B${metaRow}`,
-        [table.title, table.source_location, table.units].filter(Boolean).join(" | ") || table.table_id,
+        [
+          table.title,
+          table.source_location,
+          table.units,
+          table.workbook_presentation === "evidence_only"
+            ? "evidence only — not model-linked"
+            : null,
+        ].filter(Boolean).join(" | ") || table.table_id,
       );
       sheet.getRange(`B${metaRow}:${lastColumn}${metaRow}`).format.fill = COLORS.navy;
       styleFont(sheet, `B${metaRow}:${lastColumn}${metaRow}`, COLORS.white, { bold: true });
@@ -2047,9 +2071,13 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         const brokerRow = brokerRows[nameIndex];
         expression +=
           `,IF(${liveCaseCell}="${name.replace(/"/g, '""')}",` +
-          `IF(${column}${brokerRow}="",${column}${consensusRow},${column}${brokerRow})`;
+          `${column}${brokerRow}`;
       });
-      expression += `,${column}${consensusRow}`;
+      // An unrecognised/degraded selection deliberately returns blank. The
+      // statement row's sealed forecast authority then comes from company
+      // evidence, formulas or history; this display selector may never invent
+      // a consensus fallback for a missing named-house cell.
+      expression += `,""`;
       expression += ")".repeat(3 + names.length);
       applyFormula(sheet, `${column}${metricRow}`, `=${expression}`);
     }
@@ -2131,6 +2159,60 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
       row += 1;
     }
     row += 1;
+  }
+
+  // A compact, visible evidence disposition. This is deliberately on the
+  // central Brokers sheet: a quarantined source cell must not silently vanish
+  // merely because the forecast waterfall found a safe non-broker authority.
+  // The raw value remains on its house tab in amber; this block tells the
+  // analyst whether broker cells were linked, retained only as evidence, or
+  // excluded from formulas.
+  if (brokerEvidence) {
+    setValue(sheet, `B${row}`, "BROKER EVIDENCE STATUS");
+    sheet.getRange(`B${row}:${LAST_COLUMN}${row}`).format.fill = COLORS.navy;
+    styleFont(sheet, `B${row}:${LAST_COLUMN}${row}`, COLORS.white, { bold: true });
+    row += 1;
+    const brokerCase = String(modelCase.controls?.broker_case ?? "");
+    setValue(sheet, `B${row}`, "Forecast authority");
+    setValue(
+      sheet,
+      `C${row}`,
+      brokerCase === "Forecast Waterfall"
+        ? "Company evidence / forecast waterfall — no broker case selected"
+        : brokerCase || "Not selected",
+    );
+    styleFont(sheet, `C${row}`, brokerCase === "Forecast Waterfall" ? COLORS.stateAmber : COLORS.black, {
+      bold: true,
+    });
+    row += 1;
+    setValue(sheet, `B${row}`, "Model-linked broker mappings");
+    setValue(sheet, `C${row}`, brokerEvidence.mappingByKey.size);
+    styleFont(sheet, `C${row}`, COLORS.black);
+    row += 1;
+    setValue(sheet, `B${row}`, "Quarantined source cells");
+    setValue(sheet, `C${row}`, brokerEvidence.quarantinedCellCount);
+    setValue(
+      sheet,
+      `D${row}`,
+      brokerEvidence.quarantinedCellCount > 0
+        ? "Retained on source tabs; prohibited from model formulas"
+        : "None",
+    );
+    styleFont(
+      sheet,
+      `C${row}:D${row}`,
+      brokerEvidence.quarantinedCellCount > 0 ? COLORS.stateAmber : COLORS.grey,
+    );
+    row += 1;
+    setValue(sheet, `B${row}`, "Raw broker tables rendered");
+    setValue(sheet, `C${row}`, brokerEvidence.tableCount);
+    setValue(
+      sheet,
+      `D${row}`,
+      `${brokerEvidence.evidenceOnlyTableCount} evidence-only`,
+    );
+    styleFont(sheet, `C${row}:D${row}`, COLORS.grey);
+    row += 2;
   }
 
   // INDEPENDENT FORECAST ASSUMPTIONS LIVE HERE, NOT ON THE MODEL FACE.

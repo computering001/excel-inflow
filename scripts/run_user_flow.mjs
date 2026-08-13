@@ -734,7 +734,8 @@ async function main() {
     await writeJsonAtomic(brokerConfirmationTemplatePath, {
       schema_version: "broker-preview-confirmation/1.0",
       preview_sha256: brokerPreview.preview_sha256,
-      selected_house_id: brokerPreview.recommended_primary_house_id,
+      selected_house_id:
+        brokerPreview.recommended_primary_house_id ?? "FORECAST_WATERFALL",
       confirmed: true,
     });
     if (typeof options["broker-confirmation"] === "string") {

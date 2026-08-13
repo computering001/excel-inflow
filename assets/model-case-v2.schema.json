@@ -495,7 +495,7 @@
         "raw_tables": {
           "type": "array",
           "maxItems": 10,
-          "description": "Optional deterministic workbook projection of the immutable broker evidence. Each house remains hash-bound to its source, but only tables dispositioned analytical_table are carried here; evidence_only tables remain in the run-level broker_source_tables artifact. It never replaces broker_pack.metrics as the calculation authority.",
+          "description": "Optional deterministic workbook projection of the immutable broker evidence. Each reviewed table for each house is carried as a values-only source block; evidence_only tables remain formula-ineligible. It never replaces broker_pack.metrics as the calculation authority.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -574,7 +574,7 @@
                         "analytical_table",
                         "evidence_only"
                       ],
-                      "description": "Optional for legacy cases. evidence_only tables remain hash-bound run evidence and are not rendered in the analyst workbook."
+                      "description": "Optional for legacy cases. evidence_only tables render as values-only source evidence but remain prohibited from model formulas."
                     },
                     "workbook_presentation_reason": {
                       "type": "string",

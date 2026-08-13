@@ -21,7 +21,11 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from broker_terminal_recovery import analyse_terminal_recovery, apply_terminal_review
+from broker_terminal_recovery import (
+    analyse_terminal_recovery,
+    apply_terminal_review,
+    automatic_negative_consumption_review,
+)
 from workflow_state import assert_state, assert_transition
 
 
@@ -43,6 +47,16 @@ INTERNAL_STAGE_ORDINAL = {
 
 def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def prior_targeted_resolution_attempted(state: dict[str, Any]) -> bool:
+    return any(
+        task.get("task_kind") in {
+            "targeted_cell_adjudication",
+            "bounded_capture_adjudication",
+        }
+        for task in state.get("tasks", [])
+    )
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -902,11 +916,24 @@ def main() -> int:
         verified_path = output_root / f"verified-{key}-{responses_digest[:12]}.json"
         vision_receipt = output_root / f"verified-{key}-{responses_digest[:12]}.receipt.json"
         vision_input = sha256_bytes(canonical_bytes({
-            "bundle": sha256_file(bundle_path), "responses": responses_digest, "runtime": runtime_digest,
+            "bundle": sha256_file(bundle_path),
+            "responses": responses_digest,
+            "runtime": runtime_digest,
+            "quarantine_unresolved": prior_targeted_resolution_attempted(prior_state),
         }))
         vision_reused = reusable(verified_path, vision_receipt, vision_input)
         if not vision_reused:
-            run([sys.executable, str(HERE / "compile_broker_vision.py"), str(bundle_path), "--responses", str(responses), "--out", str(verified_path)], {0, 2})
+            vision_command = [
+                sys.executable,
+                str(HERE / "compile_broker_vision.py"),
+                str(bundle_path),
+                "--responses",
+                str(responses),
+            ]
+            if prior_targeted_resolution_attempted(prior_state):
+                vision_command.append("--quarantine-unresolved")
+            vision_command.extend(["--out", str(verified_path)])
+            run(vision_command, {0, 2})
             seal_checkpoint(verified_path, vision_receipt, vision_input)
         active_bundle_path = verified_path
         active_bundle = read_json(verified_path, "verified broker bundle")
@@ -1013,20 +1040,23 @@ def main() -> int:
                 "bundle": sha256_file(active_bundle_path),
                 "responses": responses_digest,
                 "runtime": runtime_digest,
+                "quarantine_unresolved": prior_targeted_resolution_attempted(prior_state),
             }))
             reconciled_reused = reusable(
                 reconciled_path, reconciled_receipt, reconciled_input
             )
             if not reconciled_reused:
-                run([
+                vision_command = [
                     sys.executable,
                     str(HERE / "compile_broker_vision.py"),
                     str(active_bundle_path),
                     "--responses",
                     str(responses),
-                    "--out",
-                    str(reconciled_path),
-                ], {0, 2})
+                ]
+                if prior_targeted_resolution_attempted(prior_state):
+                    vision_command.append("--quarantine-unresolved")
+                vision_command.extend(["--out", str(reconciled_path)])
+                run(vision_command, {0, 2})
                 seal_checkpoint(
                     reconciled_path, reconciled_receipt, reconciled_input
                 )
@@ -1124,18 +1154,35 @@ def main() -> int:
             task.get("task_kind") == "terminal_materiality_recovery"
             for task in prior_state.get("tasks", [])
         )
+        prior_semantic_near_exhaustion = any(
+            task.get("task_kind") == "semantic_crosswalk_repair"
+            and int(task.get("attempt_budget", {}).get("attempts_remaining", 99)) <= 1
+            for task in prior_state.get("tasks", [])
+        )
+        automatic_terminal = recovery_analysis["can_recover"] and (
+            prior_semantic_near_exhaustion or prior_terminal
+        )
         if (
-            recovery_analysis["can_recover"]
-            and prior_terminal
-            and terminal_review_path
-            and terminal_review_path.is_file()
+            automatic_terminal
         ):
+            if terminal_review_path and terminal_review_path.is_file():
+                terminal_review = read_json(
+                    terminal_review_path, "terminal broker materiality review"
+                )
+            else:
+                terminal_review = automatic_negative_consumption_review(
+                    bundle=active_bundle,
+                    crosswalk_sha256=crosswalk_digest,
+                    semantic_report_sha256=sha256_file(semantic_path),
+                    semantic_report=semantic,
+                    bundle_sha256=sha256_file(active_bundle_path),
+                )
             try:
                 recovered_crosswalk, recovery_receipt = apply_terminal_review(
                     bundle=active_bundle,
                     crosswalk=source_crosswalk,
                     semantic_report=semantic,
-                    review=read_json(terminal_review_path, "terminal broker materiality review"),
+                    review=terminal_review,
                     bundle_sha256=sha256_file(active_bundle_path),
                     crosswalk_sha256=crosswalk_digest,
                     semantic_report_sha256=sha256_file(semantic_path),
@@ -1186,11 +1233,6 @@ def main() -> int:
                     return 2
 
         if semantic.get("status") != "PASS":
-            prior_semantic_near_exhaustion = any(
-                task.get("task_kind") == "semantic_crosswalk_repair"
-                and int(task.get("attempt_budget", {}).get("attempts_remaining", 99)) <= 1
-                for task in prior_state.get("tasks", [])
-            )
             use_terminal_lane = recovery_analysis["can_recover"] and (
                 prior_semantic_near_exhaustion or prior_terminal
             )

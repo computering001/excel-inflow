@@ -1823,8 +1823,8 @@ function brokerChecks(modelCase) {
     return [
       result(
         "broker_pack",
-        "BLOCK",
-        "A broker pack is required for the v2 production workflow.",
+        "WARN",
+        "No broker pack is available; the forecast authority waterfall must resolve every material row-period from company evidence, formulas or history.",
       ),
     ];
   }
@@ -1846,8 +1846,8 @@ function brokerChecks(modelCase) {
       checks.push(
         result(
           `broker_pack.${metricId}`,
-          "BLOCK",
-          `Broker pack is missing required metric ${metricId}.`,
+          "WARN",
+          `Broker pack has no ${metricId} authority. The forecast waterfall must resolve it elsewhere if the issuer statement requires it.`,
         ),
       );
     }
@@ -1923,13 +1923,13 @@ function brokerChecks(modelCase) {
     result(
       "broker_pack.forecast_anchor",
       anchorCoverage[0].populated === 0 && !declaredAuthorityPass
-        ? "BLOCK"
+        ? "WARN"
         : "PASS",
       anchorCoverage[0].populated > 0
         ? `${anchorCoverage[0].metricId} selected as the operating forecast anchor.`
         : declaredAuthorityPass
           ? `Declared statement graph resolves EBIT and EBITDA from ${[...authorities].join(", ")}.`
-          : "Neither EBIT/EBITDA nor a complete declared alternative authority path has usable broker coverage.",
+          : "No broker headline anchor is usable. The sealed forecast waterfall, not this broker-only check, owns final economic sufficiency.",
       {
         coverage: anchorCoverage,
         declared_statement_authority: {
@@ -1996,12 +1996,12 @@ function brokerAnchorResolutionChecks(modelCase) {
   return [
     result(
       "broker_pack.anchor_resolution",
-      decision.status === "unresolved" ? "BLOCK" : "PASS",
+      decision.status === "unresolved" ? "WARN" : "PASS",
       decision.status === "applied"
         ? `Broker anchor resolves through ${decision.selection.headline_anchor} plus D&A.`
         : decision.status === "not_applicable"
           ? "The statement declares an alternative forecast authority; the EBIT/EBITDA broker-anchor rule is not applicable."
-          : `Broker anchor is unresolved: ${decision.reason}`,
+          : `Broker anchor is unavailable: ${decision.reason}. The forecast waterfall must resolve the statement graph without broker authority.`,
       {
         status: decision.status,
         reason: decision.reason ?? null,

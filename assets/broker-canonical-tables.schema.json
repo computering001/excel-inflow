@@ -33,6 +33,26 @@
                 "units": {"type": ["string", "null"]},
                 "footnotes": {"type": "array", "items": {"type": "string"}},
                 "continuation_of": {"type": ["string", "null"]},
+                "continuation_certificate": {
+                  "type": ["object", "null"],
+                  "additionalProperties": false,
+                  "required": ["schema_version", "predecessor_table_id", "predecessor_surface_id", "current_surface_id", "basis", "same_title", "title_continuation", "continuation_title", "compatible_units", "same_column_count", "inherited_period_headers", "certificate_sha256"],
+                  "properties": {
+                    "schema_version": {"const": "broker-table-continuation-certificate/1.0"},
+                    "predecessor_table_id": {"type": "string", "minLength": 1},
+                    "predecessor_surface_id": {"type": "string", "minLength": 1},
+                    "current_surface_id": {"type": "string", "minLength": 1},
+                    "basis": {"enum": ["repeated_header", "omitted_header", "truncated_header"]},
+                    "same_title": {"type": "boolean"},
+                    "title_continuation": {"type": "boolean"},
+                    "continuation_title": {"type": ["string", "null"]},
+                    "compatible_units": {"type": "boolean"},
+                    "same_column_count": {"type": "boolean"},
+                    "inherited_period_headers": {"type": "array", "items": {"type": "object"}},
+                    "certificate_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+                  }
+                },
+                "effective_period_headers": {"type": "array", "items": {"type": "object"}},
                 "rows": {"type": "array", "minItems": 1}
               }
             }

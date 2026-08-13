@@ -499,6 +499,7 @@ export function compileBrokerPreview({
     crosswalkReceipt?.coverage_summary?.unresolved_selected_candidate_count ?? 0,
   );
   const topViolations = [];
+  const waterfallReasons = [];
   if (crosswalkReceipt?.status !== "PASS") {
     topViolations.push("The broker crosswalk receipt is not PASS.");
   }
@@ -507,10 +508,10 @@ export function compileBrokerPreview({
       `The broker receipt has ${unresolvedSelectedCandidateCount} unresolved model-selected candidate(s).`,
     );
   }
-  if (!headlineAnchor) topViolations.push("No broker headline anchor is available.");
-  if (packPrimary.length === 0) topViolations.push("The sealed pack has no primary-eligible house.");
+  if (!headlineAnchor) waterfallReasons.push("No broker headline anchor is available.");
+  if (packPrimary.length === 0) waterfallReasons.push("The sealed pack has no primary-eligible house.");
   if (!packRecommended) {
-    topViolations.push("The sealed pack does not declare recommended_primary_house_id.");
+    waterfallReasons.push("The sealed pack does not declare recommended_primary_house_id.");
   }
   if (packRecommended && !packPrimary.some((house) => house.house_id === packRecommended)) {
     topViolations.push(
@@ -553,17 +554,19 @@ export function compileBrokerPreview({
     topViolations.push("Broker crosswalk receipt mapping_count is stale.");
   }
   if (!finalRecommended) {
-    topViolations.push("No primary-eligible house has a complete selectable coherent series.");
+    waterfallReasons.push("No primary-eligible house has a complete selectable coherent series.");
   }
   if (packRecommended && !finalValidCases.some((item) => item.house_id === packRecommended)) {
-    topViolations.push(
-      `Pack-recommended house ${packRecommended} is not selectable under the exact provenance gate.`,
+    waterfallReasons.push(
+      `Pack-recommended house ${packRecommended} is unavailable under the exact provenance gate; another clean house or the forecast waterfall is selected.`,
     );
   }
+  const selectionMode = finalRecommended ? "primary_house" : "forecast_waterfall";
   const status = topViolations.length === 0 ? "PASS" : "BLOCK";
   const preview = {
     schema_version: BROKER_PREVIEW_SCHEMA_VERSION,
     status,
+    selection_mode: selectionMode,
     ...bindings,
     pack_recommended_primary_house_id: packRecommended,
     recommended_primary_house_id: finalRecommended?.house_id ?? null,
@@ -587,6 +590,7 @@ export function compileBrokerPreview({
       note:
         "Unselected evidence remains visible and sealed. It cannot be promoted by confirmation.",
     },
+    forecast_waterfall_reasons: [...new Set(waterfallReasons)].sort(),
     violations: [...new Set(topViolations)].sort(),
   };
   return Object.freeze({ ...preview, preview_sha256: brokerPreviewSha256(preview) });
@@ -596,6 +600,9 @@ export function validateBrokerPreview(preview) {
   const violations = [];
   if (preview?.schema_version !== BROKER_PREVIEW_SCHEMA_VERSION) {
     violations.push("Broker preview schema version is unsupported.");
+  }
+  if (!["primary_house", "forecast_waterfall"].includes(preview?.selection_mode)) {
+    violations.push("Broker preview selection_mode is unsupported.");
   }
   if (preview?.preview_sha256 !== brokerPreviewSha256(preview ?? {})) {
     violations.push("Broker preview hash does not match its canonical contents.");
@@ -661,15 +668,16 @@ export function validateBrokerPreview(preview) {
           );
         }
       }
-      if (selected.selectable !== true) {
+      if (candidate.status === "PASS" && selected.selectable !== true) {
         violations.push(
           `Selection case ${candidate.house_id} contains a non-selectable ${selected.metric_id} period ${selected.period_index + 1}.`,
         );
       }
       for (const component of selected.provenance?.components ?? []) {
         if (
-          component.selectable !== true ||
-          component.cell_authority_status === "quarantined_conflict"
+          candidate.status === "PASS" &&
+          (component.selectable !== true ||
+            component.cell_authority_status === "quarantined_conflict")
         ) {
           violations.push(
             `Selection case ${candidate.house_id} consumes quarantined or evidence-only cell ${component.table_id}!R${component.row}C${component.column}.`,
@@ -680,7 +688,7 @@ export function validateBrokerPreview(preview) {
     for (const metricId of [...requiredPrimaryHouseIds(), candidate.headline_anchor]) {
       for (const periodIndex of PERIODS) {
         const key = `primary_house|${metricId}|${periodIndex}`;
-        if (!primaryKeys.has(key)) {
+        if (candidate.status === "PASS" && !primaryKeys.has(key)) {
           violations.push(
             `Selection case ${candidate.house_id} omits required coherent value ${metricId} period ${periodIndex + 1}.`,
           );
@@ -701,9 +709,21 @@ export function validateBrokerPreview(preview) {
   }
   if (
     preview?.status === "PASS" &&
+    preview?.selection_mode === "primary_house" &&
     !caseIds.has(preview?.recommended_primary_house_id)
   ) {
     violations.push("PASS preview does not name a present recommended selection case.");
+  }
+  if (
+    preview?.status === "PASS" &&
+    preview?.selection_mode === "forecast_waterfall" &&
+    (preview?.recommended_primary_house_id !== null ||
+      preview?.selected_value_count !== 0 ||
+      (preview?.forecast_waterfall_reasons ?? []).length === 0)
+  ) {
+    violations.push(
+      "Forecast-waterfall preview must select no broker values and disclose why broker authority is unavailable.",
+    );
   }
   const recommended = (preview?.selection_cases ?? []).find(
     (candidate) => candidate.house_id === preview?.recommended_primary_house_id,
@@ -757,14 +777,29 @@ export function verifyBrokerPreviewConfirmation(preview, confirmation) {
   if (confirmation?.preview_sha256 !== preview?.preview_sha256) {
     errors.push("Broker confirmation is stale: preview_sha256 does not match.");
   }
-  const selected = (preview?.selection_cases ?? []).find(
-    (candidate) => candidate.house_id === confirmation?.selected_house_id,
-  );
+  const waterfall = preview?.selection_mode === "forecast_waterfall";
+  const selected = waterfall
+    ? confirmation?.selected_house_id === "FORECAST_WATERFALL"
+      ? {
+          house_id: "FORECAST_WATERFALL",
+          house_name: "Forecast Waterfall",
+          status: "PASS",
+          selected_values: [],
+        }
+      : null
+    : (preview?.selection_cases ?? []).find(
+        (candidate) => candidate.house_id === confirmation?.selected_house_id,
+      );
   if (!selected || selected.status !== "PASS") {
-    errors.push("Broker confirmation does not select a primary-eligible PASS house.");
+    errors.push(
+      waterfall
+        ? "Broker confirmation must select FORECAST_WATERFALL."
+        : "Broker confirmation does not select a primary-eligible PASS house.",
+    );
   }
   if (
     selected &&
+    !waterfall &&
     !(preview?.primary_eligible_house_ids ?? []).includes(selected.house_id)
   ) {
     errors.push("Selected broker house is not in the preview's eligible set.");

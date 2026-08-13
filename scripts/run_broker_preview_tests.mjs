@@ -96,6 +96,17 @@ function previewFixture() {
             ...house.estimates[metricId],
           ]),
         ],
+      }, {
+        table_id: `${house.house_id}.p2.t1`,
+        title: "Supplemental valuation reference",
+        source_location: "page 2, table 1",
+        units: "x",
+        extraction_method: "native_pdf_table",
+        workbook_presentation: "evidence_only",
+        rows: [
+          ["Metric", "Value"],
+          ["Illustrative multiple", 12.5 + houseIndex],
+        ],
       }],
     })),
   };
@@ -220,6 +231,21 @@ await test("sealed preview is deterministic, schema-valid and screen-safe", () =
   );
 });
 
+await test("evidence-only tables remain visible inventory but cannot be selected", () => {
+  const value = compile();
+  assert(
+    value.evidence_inventory.evidence_only_table_count === baseTables.houses.length,
+    "preview failed to retain every evidence-only table in its visible inventory",
+  );
+  assert(
+    value.selection_cases.every((selectionCase) =>
+      selectionCase.selected_values.every((selection) =>
+        (selection.provenance?.components ?? []).every((component) =>
+          !component.table_id.endsWith(".p2.t1")))),
+    "evidence-only source cell entered a model selection",
+  );
+});
+
 await test("file API binds exact artifact bytes for proof-gate use", async () => {
   const out = await fs.mkdtemp(path.join(os.tmpdir(), "broker-preview-files."));
   const packPath = path.join(out, "broker-pack.json");
@@ -311,7 +337,7 @@ await test("mixed-house primary period mutation is rejected", () => {
   assert(!validation.valid && validation.violations.some((error) => /mixes/.test(error)), "mixed period passed");
 });
 
-await test("selected quarantined source cell blocks the preview", () => {
+await test("selected quarantined source cell demotes only its house and cannot be consumed", () => {
   const tables = clone(baseTables);
   const selectedHouse = pack.houses[0];
   const mapping = baseReceipt.mappings.find(
@@ -337,10 +363,14 @@ await test("selected quarantined source cell blocks the preview", () => {
     },
   ];
   const preview = compile({ tables });
-  assert(preview.status === "BLOCK", "selected quarantined cell did not block");
+  assert(preview.status === "PASS", JSON.stringify(preview.violations));
   assert(
     preview.selection_cases.find((candidate) => candidate.house_id === selectedHouse.house_id).status === "BLOCK",
     "affected house remained selectable",
+  );
+  assert(
+    preview.recommended_primary_house_id !== selectedHouse.house_id,
+    "preview still recommended the house containing the quarantined selected cell",
   );
 });
 
@@ -365,6 +395,38 @@ await test("unselected quarantined cell remains evidence-only without poisoning 
   const preview = compile({ tables });
   assert(preview.status === "PASS", JSON.stringify(preview.violations));
   assert(preview.evidence_inventory.quarantined_cell_count === 1, "quarantine not disclosed");
+});
+
+await test("no coherent house succeeds through a zero-consumption forecast-waterfall preview", () => {
+  const degradedPack = clone(pack);
+  degradedPack.houses.forEach((house) => {
+    house.eligibility = "supplemental_eligible";
+    house.missing_primary_metrics = ["revenue", "ebit_or_adjusted_ebitda"];
+  });
+  degradedPack.recommended_primary_house_id = null;
+  degradedPack.eligibility_summary = {
+    primary_eligible_house_count: 0,
+    supplemental_eligible_house_count: degradedPack.houses.length,
+    reference_only_house_count: 0,
+    run_can_continue_without_broker_question: false,
+  };
+  const preview = compile({ pack: degradedPack });
+  assert(preview.status === "PASS", JSON.stringify(preview.violations));
+  assert(preview.selection_mode === "forecast_waterfall", "degraded pack did not select forecast waterfall");
+  assert(preview.recommended_primary_house_id === null && preview.selected_value_count === 0, "degraded preview selected broker values");
+  assert(validateBrokerPreview(preview).valid, validateBrokerPreview(preview).violations.join("; "));
+  const accepted = confirmation(preview, "FORECAST_WATERFALL");
+  const verified = verifyBrokerPreviewConfirmation(preview, accepted);
+  assert(verified.valid && verified.selection.house_name === "Forecast Waterfall", verified.errors.join("; "));
+  const modelCase = { controls: { broker_case: "Consensus" } };
+  applyBrokerPreviewSelection(modelCase, preview, accepted);
+  assert(modelCase.controls.broker_case === "Forecast Waterfall", "forecast-waterfall selection was not applied");
+  assert(
+    resolveBrokerForecastSelection(modelCase, "revenue", 0).value === null,
+    "forecast-waterfall mode consumed a broker cell",
+  );
+  const screen = renderBrokerPreviewScreen(preview);
+  assert(screen.includes("FORECAST WATERFALL"), "degraded preview screen hides the selected authority mode");
 });
 
 await test("named-house gaps never mix to consensus while explicit consensus remains available", () => {

@@ -98,7 +98,18 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
         for table in sorted(tables, key=lambda item: str(item.get("canonical_table_id") or item.get("table_id"))):
             table_id = str(table.get("canonical_table_id") or table.get("table_id"))
             tables_for_hash.append(table)
-            header_periods: dict[int, dict[str, Any]] = {}
+            header_periods: dict[int, dict[str, Any]] = {
+                int(item["column"]): {
+                    "column": int(item["column"]),
+                    "period_label": str(item["period_label"]),
+                    "period_kind": period_kind(str(item["period_label"])),
+                    "authority": item.get("authority", "source_cell"),
+                    "source_table_id": item.get("source_table_id", table_id),
+                    "source_surface_id": item.get("source_surface_id", table.get("surface_id")),
+                }
+                for item in table.get("effective_period_headers", [])
+                if period_kind(str(item.get("period_label") or ""))
+            }
             header_parent_id: str | None = None
             subtotal_parent: tuple[str, float] | None = None
             for row_number, row in enumerate(table.get("rows", []), start=1):
@@ -109,10 +120,23 @@ def compile_manifest(bundle: dict[str, Any], *, source_bundle_sha256: str | None
                     label_value = text(cell.get("raw_text"))
                     kind = period_kind(label_value)
                     if kind:
+                        inherited = header_periods.get(int(cell.get("column", 0)))
+                        if (
+                            kind == "unresolved_period_header"
+                            and inherited
+                            and inherited.get("authority") == "continuation_certificate"
+                        ):
+                            # Preserve the truncated raw fragment in source
+                            # cells while using only the sealed predecessor
+                            # certificate as period authority.
+                            continue
                         header_periods[int(cell.get("column", 0))] = {
                             "column": int(cell.get("column", 0)),
                             "period_label": label_value,
                             "period_kind": kind,
+                            "authority": "source_cell",
+                            "source_table_id": table_id,
+                            "source_surface_id": table.get("surface_id"),
                         }
                         if kind == "unresolved_period_header":
                             findings.append({

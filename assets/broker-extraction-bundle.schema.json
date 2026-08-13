@@ -589,6 +589,13 @@
             "null"
           ]
         },
+        "continuation_certificate": {
+          "type": ["object", "null"]
+        },
+        "effective_period_headers": {
+          "type": "array",
+          "items": {"type": "object"}
+        },
         "rows": {
           "type": "array",
           "minItems": 1,

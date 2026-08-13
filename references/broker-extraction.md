@@ -246,9 +246,10 @@ The compiler must prove:
 - every mapping is owned by at least one candidate and no model-selected
   candidate is unresolved;
 - a bounded-review terminal quarantine may close only immutable candidates
-  independently proven to have no mapping, no mapped-cell overlap and no
-  potential core-driver identity; it remains evidence, permits no model
-  consumption and is counted separately in the receipt;
+  independently proven to have no mapping or mapped-cell overlap; a potential
+  core-driver identity is recorded as unavailable and routed through the
+  forecast waterfall rather than deleted; it remains evidence, permits no
+  model consumption and is counted separately in the receipt;
 - every disposition passes the independent semantic relevance, provenance,
   definition and duplicate-equivalence gates;
 - every transparent derived mapping consumes all declared input candidates and
@@ -278,20 +279,22 @@ source location, units, publication date, filename and source hash. Preserve
 source row and column order, use two blank rows between blocks, keep numeric
 values as blue hardcodes and labels as black text, and never place tables side
 by side. It contains values only and must not be an economic calculation
-surface. Legal boilerplate, third-party disclosure tables and narrative-only
-material remain losslessly preserved in the run artifact with
-`workbook_presentation=evidence_only` but are not rendered in the analyst
-workbook. Every table used by a model mapping must be rendered.
+surface. Every reviewed tabular grid is rendered, including supplemental or
+third-party tables dispositioned `workbook_presentation=evidence_only`. That
+disposition means "preserved but prohibited from model formulas"; it does not
+mean hidden. Pure narrative or boilerplate remains in the lossless page artifact
+rather than being fabricated into a table. Every table used by a model mapping
+must be `analytical_table` and rendered.
 
 These are two deliberately different artifacts. `broker-source-tables/1.0`
 keeps the complete reviewed page inventory. `model_case.broker_pack.raw_tables`
-is the deterministic projection of that inventory containing every house but
-only its `analytical_table` tables. Never require their table counts or hashes
-to be identical, never discard an evidence-only table from the run artifact,
-and never hand-select a narrower workbook subset. Attachment ingress compiles
-the projection and the evidence gate independently recomputes it from the
-per-table disposition ledger. A mapped source cell on an `evidence_only` table
-is a blocker.
+is the deterministic table projection of that inventory containing every
+reviewed table for every house. Their enclosing schemas differ, so do not equate
+top-level artifact hashes, but table membership must be complete. Never discard
+an evidence-only table or hand-select a narrower workbook subset. Attachment
+ingress compiles the projection and the evidence gate independently recomputes
+it from the per-table disposition ledger. A mapped source cell on an
+`evidence_only` table is a blocker.
 
 The main `Brokers` sheet links mapped house estimates to those evidence cells.
 The Operating Model continues to link only to `Brokers`; it must never reference
@@ -330,8 +333,10 @@ block. At the semantic stage, preserve every captured row broadly, map model
 inputs narrowly, submit the machine-authored proposal to the independent
 semantic verifier, repair all reported crosswalk findings together, and resume.
 Do not ask the user to hand-author a crosswalk. A material conflict in a cell
-actually selected for model use remains blocking until resolved or quarantined;
-an evidence-only/non-tabular surface or an unused-table conflict does not.
+actually selected for model use must be resolved or have that mapping removed
+before the cell can be quarantined; it blocks broker consumption, not delivery
+of the company model. An evidence-only/non-tabular surface or an unused-table
+conflict does not interrupt the run.
 
 After the ordinary semantic-repair budget is consumed, the controller may
 enter `terminal_materiality_recovery`. This is not an evidence-dropping path.
@@ -339,13 +344,15 @@ The model host must write `broker-terminal-materiality-review.json`, bound to
 the exact bundle bytes, candidate manifest, source crosswalk and semantic
 report. Every reviewed candidate is then preserved with its exact source cells
 under `preserve_unconsumed_quarantine` and `model_consumption=prohibited`.
-The compiler independently reconstructs selected cells and potential core
-drivers from mappings, immutable labels, forecast-period context and the
-canonical broker metric dictionary. A Revenue, EBIT/EBITDA, D&A, tax, capex,
-working-capital, dividend or buyback candidate therefore remains blocking even
-if a defective crosswalk calls it reference-only. Global source-integrity
-findings also remain blocking. Only genuinely unused evidence can close this
-way; no value may be inferred or invented.
+The compiler independently reconstructs cells actually selected by mappings as
+well as potential core drivers from immutable labels, forecast-period context
+and the canonical broker metric dictionary. An actually selected conflicted
+cell cannot be quarantined while it is consumed: remove that mapping and route
+the affected model node through the forecast waterfall. A potential Revenue,
+EBIT/EBITDA, D&A, tax, capex, working-capital, dividend or buyback candidate is
+preserved and explicitly marked unavailable; its label alone does not stop the
+company model. Global source-integrity findings still remain internal defects.
+No value may be inferred or invented.
 
 Source authority is cell- and period-granular. When one visible row contains
 both verified and conflicted cells, the immutable candidate manifest partitions

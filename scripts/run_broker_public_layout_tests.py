@@ -78,7 +78,9 @@ def main() -> int:
     assert corpus.get("schema_version") == "public-broker-layout-corpus/1.0"
     documents = corpus.get("documents")
     assert isinstance(documents, list) and 5 <= len(documents) <= 10
-    assert len({item["house_id"] for item in documents}) >= 5
+    required_house_count = int(corpus.get("required_distinct_house_count", 5))
+    assert 2 <= required_house_count <= 10
+    assert len({item["house_id"] for item in documents}) >= required_house_count
 
     request_documents: list[dict[str, Any]] = []
     corpus_checks: list[dict[str, Any]] = []

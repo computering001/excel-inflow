@@ -19,7 +19,29 @@ def workflow_contract() -> dict[str, Any]:
         raise ValueError("Workflow-state contract has the wrong schema version")
     if not isinstance(value.get("layers"), dict):
         raise ValueError("Workflow-state contract has no layer registry")
+    constitution = value.get("delivery_blocker_constitution")
+    if not isinstance(constitution, dict) or constitution.get("schema_version") != "delivery-blocker-constitution/1.0":
+        raise ValueError("Workflow-state contract has no delivery-blocker constitution")
     return value
+
+
+def assert_delivery_blocker(
+    blocked: bool,
+    fatal_reason: str | None = None,
+    *,
+    domain: str | None = None,
+) -> None:
+    constitution = workflow_contract()["delivery_blocker_constitution"]
+    if not blocked:
+        if fatal_reason is not None:
+            raise ValueError("A non-blocked delivery result cannot carry a fatal reason")
+        return
+    if domain in set(constitution.get("non_delivery_blocking_domains", [])):
+        raise ValueError(f"{domain} is a degradation domain, not a delivery blocker")
+    if fatal_reason not in constitution.get("fatal_reasons", {}):
+        raise ValueError(
+            f"Delivery block must name one declared fatal reason; received {fatal_reason!r}"
+        )
 
 
 def assert_state(

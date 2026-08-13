@@ -7,6 +7,7 @@
   "required": [
     "schema_version",
     "status",
+    "selection_mode",
     "broker_pack_sha256",
     "broker_source_tables_sha256",
     "broker_crosswalk_receipt_sha256",
@@ -21,12 +22,14 @@
     "selected_value_count",
     "evidence_inventory",
     "evidence_only_quarantine",
+    "forecast_waterfall_reasons",
     "violations",
     "preview_sha256"
   ],
   "properties": {
     "schema_version": { "const": "broker-preview/1.0" },
     "status": { "enum": ["PASS", "BLOCK"] },
+    "selection_mode": { "enum": ["primary_house", "forecast_waterfall"] },
     "broker_pack_sha256": { "$ref": "#/$defs/sha256" },
     "broker_source_tables_sha256": { "$ref": "#/$defs/sha256" },
     "broker_crosswalk_receipt_sha256": { "$ref": "#/$defs/sha256" },
@@ -81,6 +84,11 @@
         "quarantined_candidates": { "type": "array", "items": { "type": "object" } },
         "note": { "type": "string", "minLength": 1 }
       }
+    },
+    "forecast_waterfall_reasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     },
     "violations": {
       "type": "array",

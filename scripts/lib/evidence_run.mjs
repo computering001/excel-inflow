@@ -1727,22 +1727,20 @@ function validateBrokerSourceTables(run, findings) {
     );
     return;
   }
-  // The evidence envelope is lossless; the workbook is intentionally not.
-  // Only reviewed analytical/financial tables may enter the values-only Bxx
-  // sheets.  Recompute that projection independently here rather than trusting
-  // the ingress compiler or accepting a caller-selected subset.
+  // Every reviewed table enters the values-only Bxx sheets. Evidence-only is a
+  // consumption prohibition, not a presentation deletion. Recompute the full
+  // table projection independently rather than accepting a caller-selected
+  // subset.
   const expectedWorkbookTables = (evidenceTables.houses ?? []).map((house) => ({
     ...structuredClone(house),
-    tables: (house.tables ?? [])
-      .filter((table) => table.workbook_presentation === "analytical_table")
-      .map((table) => structuredClone(table)),
+    tables: (house.tables ?? []).map((table) => structuredClone(table)),
   }));
   if (hashValue(expectedWorkbookTables) !== hashValue(modelTables)) {
     findings.push(
       finding(
         "evidence.broker_source_tables.model_case_mismatch",
         "BLOCK",
-        "The model case does not equal the deterministic analytical-table projection of the full broker evidence inventory.",
+        "The model case does not equal the deterministic full-table projection of the broker evidence inventory.",
       ),
     );
   }
@@ -1868,14 +1866,24 @@ function validateBrokerSourceTables(run, findings) {
       (house.tables ?? []).map((table) => table.table_id),
     ),
   );
+  const analyticalTableIds = new Set(
+    (evidenceTables.houses ?? []).flatMap((house) =>
+      (house.tables ?? [])
+        .filter((table) => table.workbook_presentation === "analytical_table")
+        .map((table) => table.table_id),
+    ),
+  );
   for (const mapping of receipt?.mappings ?? []) {
     for (const component of mapping.components ?? []) {
-      if (!workbookTableIds.has(component.table_id)) {
+      if (
+        !workbookTableIds.has(component.table_id) ||
+        !analyticalTableIds.has(component.table_id)
+      ) {
         findings.push(
           finding(
             "evidence.broker_source_tables.mapped_table_not_rendered",
             "BLOCK",
-            `Broker mapping ${mapping.mapping_id ?? `${mapping.house_id}.${mapping.metric_id}.${mapping.period_index}`} uses ${component.table_id}, which is not an analytical workbook table.`,
+            `Broker mapping ${mapping.mapping_id ?? `${mapping.house_id}.${mapping.metric_id}.${mapping.period_index}`} uses ${component.table_id}, which is not an analytical model-consumption table.`,
           ),
         );
       }

@@ -2,12 +2,12 @@
 """Seal non-consumed broker findings without weakening selected-cell authority.
 
 This module makes no visual judgment and authors no value. It proves the
-negative consumption fact from mappings and immutable source cells, then uses
-the canonical dictionary's core tier plus immutable label/period context as an
-independent potential-driver oracle. The model host must still explicitly
-review every recoverable candidate. Selected cells, potential core drivers and
-global source-integrity findings are terminal blockers and cannot enter this
-lane even when a defective crosswalk calls them reference-only.
+negative-consumption fact from mappings and immutable source cells. The model
+host must still explicitly review every recoverable candidate. A cell that is
+actually mapped remains a hard broker-authority blocker; a merely potential
+core driver may be quarantined and made unavailable so the company forecast
+waterfall can select a different, evidenced authority. Global source-integrity
+findings remain blockers because they are not safely localisable to one cell.
 """
 
 from __future__ import annotations
@@ -98,13 +98,14 @@ def mapped_cells(crosswalk: dict[str, Any]) -> set[tuple[str, int, int]]:
 
 
 def selected_candidate_ids(bundle: dict[str, Any], crosswalk: dict[str, Any]) -> set[str]:
-    """Return both selected and independently potential model-driver candidates.
+    """Return candidates the crosswalk actually attempts to consume.
 
-    Crosswalk declarations alone are not authority for the negative fact.  An
-    immutable numeric forecast row whose source-owned label is a canonical
-    model driver remains selected-for-safety even if a bad crosswalk calls it
-    reference-only.  This prevents terminal recovery becoming a semantic
-    misclassification laundering route.
+    This is deliberately narrower than the potential-driver inventory below.
+    Recovery is allowed only after the candidate is removed from every mapping
+    and active ledger declaration.  Quarantining a potential Revenue/EBIT/etc.
+    candidate is therefore safe: it cannot silently become model authority,
+    while the forecast compiler remains free to choose company evidence,
+    guidance, history or another verified broker cell.
     """
     candidates = candidate_index(bundle)
     consumed_cells = mapped_cells(crosswalk)
@@ -120,13 +121,22 @@ def selected_candidate_ids(bundle: dict[str, Any], crosswalk: dict[str, Any]) ->
     for candidate_id, candidate in candidates.items():
         if candidate_cells(candidate) & consumed_cells:
             selected.add(candidate_id)
-        if (
-            bool(candidate.get("numeric"))
-            and candidate.get("period_basis") in MODEL_PERIOD_BASES
-            and normalized_label(candidate.get("label")) in CORE_DRIVER_LABELS
-        ):
-            selected.add(candidate_id)
     return selected
+
+
+def potential_driver_candidate_ids(bundle: dict[str, Any]) -> set[str]:
+    """Return immutable candidates whose absence can affect the model waterfall.
+
+    Potential-driver status is disclosure metadata, never permission to consume
+    a conflicted cell and never a reason to stop the whole company model.
+    """
+    return {
+        candidate_id
+        for candidate_id, candidate in candidate_index(bundle).items()
+        if bool(candidate.get("numeric"))
+        and candidate.get("period_basis") in MODEL_PERIOD_BASES
+        and normalized_label(candidate.get("label")) in CORE_DRIVER_LABELS
+    }
 
 
 def analyse_terminal_recovery(
@@ -136,6 +146,7 @@ def analyse_terminal_recovery(
 ) -> dict[str, Any]:
     candidates = candidate_index(bundle)
     selected = selected_candidate_ids(bundle, crosswalk)
+    potential = potential_driver_candidate_ids(bundle)
     recoverable: set[str] = set()
     blocking: list[dict[str, Any]] = []
     for finding in semantic_report.get("findings", []):
@@ -159,7 +170,53 @@ def analyse_terminal_recovery(
         "recoverable_candidate_ids": sorted(recoverable),
         "blocking_findings": blocking,
         "selected_candidate_ids": sorted(selected),
+        "potential_driver_candidate_ids": sorted(potential),
+        "recoverable_potential_driver_candidate_ids": sorted(recoverable & potential),
         "can_recover": bool(recoverable) and not blocking,
+    }
+
+
+def automatic_negative_consumption_review(
+    *,
+    bundle: dict[str, Any],
+    crosswalk_sha256: str,
+    semantic_report_sha256: str,
+    semantic_report: dict[str, Any],
+    bundle_sha256: str,
+) -> dict[str, Any]:
+    """Author the controller-owned terminal *non-consumption* decision.
+
+    This is not OCR, semantic mapping or value authorship.  It is the finite
+    fallback after the model host has exhausted its bounded attempts: every
+    still-local candidate is preserved, prohibited from model use, and handed
+    to the ordinary forecast waterfall as unavailable broker evidence.
+    """
+    candidate_ids = sorted({
+        str(finding.get("candidate_id") or "")
+        for finding in semantic_report.get("findings", [])
+        if str(finding.get("candidate_id") or "")
+    })
+    return {
+        "schema_version": "broker-terminal-materiality-review/1.0",
+        "run_id": bundle.get("run_id"),
+        "bundle_sha256": bundle_sha256,
+        "candidate_manifest_sha256": canonical_hash(bundle.get("candidate_manifest")),
+        "source_crosswalk_sha256": crosswalk_sha256,
+        "semantic_report_sha256": semantic_report_sha256,
+        "producer_id": "broker-controller-negative-consumption/1.0",
+        "reviewed_at": None,
+        "reviews": [
+            {
+                "candidate_id": candidate_id,
+                "disposition": "preserve_unconsumed_quarantine",
+                "model_consumption": "prohibited",
+                "rationale": (
+                    "Bounded internal recovery exhausted; preserve the raw candidate, "
+                    "prohibit model consumption, and continue through the forecast waterfall."
+                ),
+            }
+            for candidate_id in candidate_ids
+        ],
     }
 
 
@@ -175,7 +232,7 @@ def apply_terminal_review(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     analysis = analyse_terminal_recovery(bundle, crosswalk, semantic_report)
     if analysis["blocking_findings"]:
-        raise ValueError("Selected model cells or global source-integrity findings cannot be terminally quarantined.")
+        raise ValueError("Actually mapped model cells or global source-integrity findings cannot be terminally quarantined.")
     if review.get("schema_version") != "broker-terminal-materiality-review/1.0":
         raise ValueError("Terminal materiality review has the wrong schema version.")
     allowed_review_fields = {

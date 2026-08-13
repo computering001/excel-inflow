@@ -11,6 +11,36 @@
     "USER_DECISION",
     "FATAL_SOURCE"
   ],
+  "delivery_blocker_constitution": {
+    "schema_version": "delivery-blocker-constitution/1.0",
+    "fatal_reasons": {
+      "issuer_or_reporting_period_unresolved": "The issuer identity or reporting-period basis cannot be established safely after controlled acquisition and reconciliation.",
+      "opening_debt_unresolved": "No defensible material opening-debt position remains after DCS, filings and explicit supplements are exhausted.",
+      "equation_system_unsolved": "The sealed economic equation graph cannot solve or reconcile without inventing an input.",
+      "workbook_delivery_failed": "The workbook cannot be emitted, validated or opened without corruption."
+    },
+    "non_delivery_blocking_domains": [
+      "broker_capture",
+      "broker_table_reconciliation",
+      "broker_semantics",
+      "broker_coverage"
+    ],
+    "broker_degradation_order": [
+      "retry_rendered_region",
+      "inherit_certified_page_continuation",
+      "quarantine_affected_cell",
+      "exclude_affected_mapping",
+      "select_complete_primary_house",
+      "forecast_waterfall",
+      "deliver_with_visible_warning"
+    ],
+    "invariants": [
+      "A broker conflict may quarantine only the affected cell or mapping.",
+      "A broker house or report remains preserved when one cell is quarantined.",
+      "Broker uncertainty alone cannot terminate model delivery.",
+      "No degraded path may invent or silently substitute a broker value."
+    ]
+  },
   "layers": {
     "broker": {
       "states": {

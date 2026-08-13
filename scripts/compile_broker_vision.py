@@ -483,6 +483,22 @@ def automatic_conflict_decisions(manifest: dict[str, Any]) -> dict[str, dict[str
     return decisions
 
 
+def bounded_quarantine_decisions(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Terminally preserve only conflicts that lack independent corroboration."""
+    return {
+        item["conflict_id"]: {
+            "conflict_id": item["conflict_id"],
+            "status": "quarantined",
+            "rationale": (
+                "Bounded targeted reconciliation was exhausted; preserve the "
+                "disputed source cell and prohibit model consumption."
+            ),
+        }
+        for item in manifest.get("conflicts", [])
+        if item.get("requires_targeted_adjudication", True)
+    }
+
+
 def numeric_token(value: Any) -> str | None:
     if value is None or isinstance(value, bool):
         return None
@@ -745,6 +761,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bundle")
     parser.add_argument("--responses", required=True)
+    parser.add_argument(
+        "--quarantine-unresolved",
+        action="store_true",
+        help=(
+            "After a prior bounded targeted-resolution attempt, preserve each "
+            "still-disputed cell as unavailable evidence instead of returning "
+            "another NEEDS_RESOLUTION state."
+        ),
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     bundle_path = Path(args.bundle).resolve()
@@ -940,6 +965,26 @@ def main() -> int:
                         default_authority_status = "verified_adjudicated"
                         default_authority_basis = "targeted_conflict_adjudication"
                         conflict_manifests.append(conflict_manifest)
+                    elif args.quarantine_unresolved:
+                        accepted = max(passes, key=response_richness)
+                        conflict_decisions = {
+                            **automatic_decisions,
+                            **bounded_quarantine_decisions(conflict_manifest),
+                        }
+                        default_authority_status = "verified_adjudicated"
+                        default_authority_basis = "bounded_conflict_quarantine"
+                        conflict_manifests.append(conflict_manifest)
+                        findings.append({
+                            "id": "broker_vision.conflict_quarantined_after_bounded_recovery",
+                            "severity": "warning",
+                            "document_id": document["document_id"],
+                            "surface_id": surface_id,
+                            "message": (
+                                f"{len(targeted_conflicts)} unresolved displayed cell(s) were "
+                                "preserved as unavailable evidence after bounded recovery. All "
+                                "other verified cells and tables remain eligible."
+                            ),
+                        })
                     else:
                         unresolved += 1
                         conflict_manifests.append(conflict_manifest)

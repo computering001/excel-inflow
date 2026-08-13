@@ -117,6 +117,7 @@ function previewNumber(value) {
  * record and every alternate without forcing a 500-line chat response.
  */
 export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } = {}) {
+  const waterfallMode = preview?.selection_mode === "forecast_waterfall";
   const selected = (preview?.selection_cases ?? []).find(
     (candidate) => candidate.house_id === preview?.recommended_primary_house_id,
   );
@@ -140,8 +141,9 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     `   Evidence-only tables .... ${preview?.evidence_inventory?.evidence_only_table_count ?? 0}`,
     `   Quarantined cells ....... ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,
     "",
-    `   RECOMMENDED PRIMARY: ${selected?.house_name ?? "none"}`,
-    `   House id ............... ${selected?.house_id ?? "none"}`,
+    `   SELECTION MODE ......... ${waterfallMode ? "FORECAST WATERFALL" : "PRIMARY HOUSE"}`,
+    `   RECOMMENDED PRIMARY: ${selected?.house_name ?? (waterfallMode ? "none - broker authority unavailable" : "none")}`,
+    `   House id ............... ${selected?.house_id ?? (waterfallMode ? "FORECAST_WATERFALL" : "none")}`,
     `   Headline anchor ........ ${preview?.headline_anchor ?? "none"}`,
     "",
     "   SELECTED MODEL VALUES       FY1       FY2       FY3",
@@ -164,6 +166,18 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
       lines.push(`   ${candidate.house_id} - ${candidate.house_name}`);
     }
   }
+  if (waterfallMode) {
+    lines.push("", "   BROKER AUTHORITY GAPS");
+    for (const reason of preview?.forecast_waterfall_reasons ?? []) {
+      for (const line of indented(reason, 3, RULE_WIDTH - 3)) lines.push(line);
+    }
+    lines.push(
+      "",
+      "   No broker value will be selected. Company evidence,",
+      "   formulas and historical inference remain subject to",
+      "   the forecast-authority and workbook-integrity gates.",
+    );
+  }
   if (confirmationErrors.length > 0) {
     lines.push("", "   CONFIRMATION NOT ACCEPTED");
     for (const error of confirmationErrors.slice(0, 4)) {
@@ -177,8 +191,8 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     "   cannot waive a conflict or promote quarantined evidence.",
     "",
     "   NEXT ACTION",
-    `   Reply CONFIRM ${selected?.house_id ?? "<house-id>"}, or select one`,
-    "   eligible alternate shown above.",
+    `   Reply CONFIRM ${selected?.house_id ?? (waterfallMode ? "FORECAST_WATERFALL" : "<house-id>")}${waterfallMode ? "." : ", or select one"}`,
+    ...(waterfallMode ? [] : ["   eligible alternate shown above."]),
     "",
     `   Preview hash: ${String(preview?.preview_sha256 ?? "").slice(0, 16)}...`,
     RULE,
