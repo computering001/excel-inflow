@@ -358,14 +358,14 @@ def main() -> int:
         cache_key=cache_key, status="NEEDS_VISION", tasks=[vision_task],
         checkpoints=checkpoints, summary={},
     )
-    check(regressed_status == "BLOCKED_INTERNAL", "stage regression was accepted")
-    check(len(regressed_tasks) == 1 and not regressed_fixed["monotonic_from_prior"], "stage regression did not become one defect")
-    try:
-        assert_transition("broker", "NEEDS_RESOLUTION", "NEEDS_VISION")
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("workflow constitution admitted a resolution-to-vision regression")
+    check(regressed_status == "NEEDS_VISION", "late-discovered vision work was terminalised")
+    check(
+        len(regressed_tasks) == 1
+        and regressed_fixed["monotonic_from_prior"]
+        and regressed_fixed["work_graph"]["schema_version"] == "broker-work-graph/1.0",
+        "late task discovery did not append to the work graph",
+    )
+    assert_transition("broker", "NEEDS_RESOLUTION", "NEEDS_VISION")
     checks += 3
 
     try:
@@ -421,6 +421,72 @@ def main() -> int:
     check(attachment_terminal["aggregate_terminal_defect_count"] == 1, "attachment emitted more than one terminal defect")
     checks += 3
 
+    semantic_attempts = {
+        "execution_response_sha256": [],
+        "vision_response_sha256": [],
+        "vision_attempt_count": 0,
+        "vision_attempt_limit": 3,
+        "task_execution_receipts": {},
+    }
+    semantic_status, semantic_tasks, semantic_fixed, _ = broker.seal_internal_work(
+        prior={},
+        cache_key=cache_key,
+        status="NEEDS_CROSSWALK_REVIEW",
+        tasks=[{
+            "task_kind": "semantic_crosswalk_repair",
+            "candidate_manifest_sha256": "9" * 64,
+        }],
+        checkpoints=checkpoints,
+        summary={},
+        attempts=semantic_attempts,
+    )
+    semantic_prior = {
+        "cache_key": cache_key,
+        "pipeline_status": semantic_status,
+        "tasks": semantic_tasks,
+        "fixed_point": semantic_fixed,
+        "work_graph": semantic_fixed["work_graph"],
+    }
+    broker.record_task_execution_attempt(
+        semantic_attempts,
+        semantic_prior,
+        "7" * 64,
+        {"semantic_crosswalk_repair"},
+    )
+    broker.record_task_execution_attempt(
+        semantic_attempts,
+        semantic_prior,
+        "7" * 64,
+        {"semantic_crosswalk_repair"},
+    )
+    check(
+        broker.task_family_execution_count(
+            semantic_attempts,
+            semantic_prior,
+            {"semantic_crosswalk_repair"},
+        ) == 1,
+        "duplicate semantic response consumed two executions",
+    )
+    broker.record_task_execution_attempt(
+        semantic_attempts,
+        semantic_prior,
+        "8" * 64,
+        {"semantic_crosswalk_repair"},
+    )
+    check(
+        broker.task_family_execution_count(
+            semantic_attempts,
+            semantic_prior,
+            {"semantic_crosswalk_repair"},
+        ) == 2,
+        "distinct semantic responses did not advance the task-family budget",
+    )
+    check(
+        semantic_attempts["vision_attempt_count"] == 0,
+        "semantic repair incorrectly consumed the physical-vision budget",
+    )
+    checks += 3
+
     with tempfile.TemporaryDirectory(prefix="excel-inflow-fixed-point-") as temporary:
         root = Path(temporary)
         output = root / "output.json"
@@ -432,6 +498,8 @@ def main() -> int:
         output.write_text(json.dumps({"status": "MUTATED"}), "utf-8")
         check(not broker.reusable(output, receipt, input_digest), "mutated checkpoint was reused")
         state_path = root / "broker-run-state.json"
+        graph_hashes = []
+        graph_revisions = []
         for expected_status in ("NEEDS_VISION", "NEEDS_VISION", "NEEDS_VISION"):
             state = broker.write_state(
                 state_path,
@@ -449,9 +517,16 @@ def main() -> int:
                 blocker_class="INTERNAL_WORK",
             )
             check(state["pipeline_status"] == expected_status, "persisted fixed point did not obey its finite retry sequence")
+            check(
+                state["tasks"][0]["attempt_budget"]["attempts_used"] == 0,
+                "polling consumed a task execution attempt",
+            )
+            graph_hashes.append(state["work_graph"]["graph_sha256"])
+            graph_revisions.append(state["work_graph"]["revision"])
         persisted = json.loads(state_path.read_text("utf-8"))
         check("fixed_point" in persisted and len(persisted["tasks"]) == 1, "persisted broker state omitted its aggregate fixed point")
-    checks += 6
+        check(len(set(graph_hashes)) == 1 and len(set(graph_revisions)) == 1, "unchanged polling mutated the work graph")
+    checks += 8
 
     print(json.dumps({
         "status": "PASS",

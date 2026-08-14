@@ -1265,6 +1265,23 @@ def main() -> int:
         check("quarantine receipts" in str(refused.get("message")), f"the stripped-closure refusal is unnamed: {refused.get('message')}")
         checks += 2
 
+        tampered_graph = json.loads(
+            Path(output_root / "broker-run-state.json").read_text("utf-8")
+        )
+        tampered_graph["work_graph"]["graph_sha256"] = "0" * 64
+        tampered_graph_path = output_root / "broker-run-state-graph-tampered.json"
+        write_json(tampered_graph_path, tampered_graph)
+        refused_graph = run_ingress(tampered_graph_path)
+        check(
+            refused_graph.get("ok") is False,
+            "a degraded close with a tampered work graph was accepted by JS ingress",
+        )
+        check(
+            "work graph hash" in str(refused_graph.get("message")),
+            f"the graph-tamper refusal is unnamed: {refused_graph.get('message')}",
+        )
+        checks += 2
+
         # The re-arm defect itself: an aggregate terminal task must count as
         # prior targeted resolution so the quarantine fallback stays armed.
         check(

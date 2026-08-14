@@ -131,6 +131,12 @@
       "script": "run_internal_fixed_point_tests.py"
     },
     {
+      "id": "broker-work-graph",
+      "phase": "workflow",
+      "runtime": "python",
+      "script": "run_broker_work_graph_tests.py"
+    },
+    {
       "id": "dcs-lossless-evidence",
       "phase": "evidence",
       "runtime": "python",

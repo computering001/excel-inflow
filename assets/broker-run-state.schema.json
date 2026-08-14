@@ -4,6 +4,42 @@
   "title": "Resumable Excel Inflow broker evidence transaction",
   "type": "object",
   "additionalProperties": false,
+  "$defs": {
+    "workGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "cache_key", "status", "revision", "nodes",
+        "open_task_ids", "completed_node_ids", "frontier_history_sha256",
+        "current_frontier_sha256", "monotonic_from_prior", "violations",
+        "graph_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "broker-work-graph/1.0" },
+        "cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "status": { "enum": ["OPEN", "CLOSED"] },
+        "revision": { "type": "integer", "minimum": 0 },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["node_id", "node_kind"]
+          }
+        },
+        "open_task_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "completed_node_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "frontier_history_sha256": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "uniqueItems": true
+        },
+        "current_frontier_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "monotonic_from_prior": { "const": true },
+        "violations": { "type": "array", "maxItems": 0 },
+        "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
   "required": [
     "schema_version",
     "run_id",
@@ -19,6 +55,7 @@
     "artifact_sha256",
     "tasks",
     "fixed_point",
+    "work_graph",
     "summary"
   ],
   "properties": {
@@ -86,11 +123,19 @@
           },
           "attempt_budget": {
             "type": "object",
-            "required": ["attempts_used", "attempt_limit", "attempts_remaining"],
+            "required": [
+              "attempts_used", "attempt_limit", "attempts_remaining",
+              "accepted_execution_receipt_sha256"
+            ],
             "properties": {
               "attempts_used": { "type": "integer", "minimum": 0 },
               "attempt_limit": { "type": "integer", "minimum": 1 },
-              "attempts_remaining": { "type": "integer", "minimum": 0 }
+              "attempts_remaining": { "type": "integer", "minimum": 0 },
+              "accepted_execution_receipt_sha256": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "uniqueItems": true
+              }
             }
           },
           "progress_measure": {
@@ -120,7 +165,7 @@
         "passed_checkpoint_count", "remaining_task_count", "progress_score",
         "progress_sha256", "task_set_sha256", "unchanged_retry_count",
         "unchanged_retry_limit", "monotonic_from_prior",
-        "checkpoint_reuse_required", "terminal_reasons"
+        "checkpoint_reuse_required", "terminal_reasons", "work_graph"
       ],
       "properties": {
         "schema_version": { "const": "broker-internal-fixed-point/1.0" },
@@ -136,19 +181,34 @@
         "unchanged_retry_limit": { "type": "integer", "minimum": 1 },
         "monotonic_from_prior": { "type": "boolean" },
         "checkpoint_reuse_required": { "const": true },
-        "terminal_reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+        "terminal_reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "work_graph": { "$ref": "#/$defs/workGraph" }
       }
     },
+    "work_graph": { "$ref": "#/$defs/workGraph" },
     "attempts": {
       "type": "object",
       "properties": {
+        "execution_response_sha256": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "uniqueItems": true
+        },
         "vision_response_sha256": {
           "type": "array",
           "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "uniqueItems": true
         },
         "vision_attempt_count": { "type": "integer", "minimum": 0 },
-        "vision_attempt_limit": { "type": "integer", "minimum": 1 }
+        "vision_attempt_limit": { "type": "integer", "minimum": 1 },
+        "task_execution_receipts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "uniqueItems": true
+          }
+        }
       },
       "additionalProperties": false
     },

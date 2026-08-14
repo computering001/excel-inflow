@@ -94,6 +94,16 @@ carry the bundle toward `PASS`. A run may not proceed on the portion that
 happened to resolve while ordinary work remains, and may not substitute values
 assembled in conversation for the surfaces that did not resolve.
 
+The internal controller is an append-only work graph, not an ordered stage
+machine. A task discovered after crosswalk or resolution may be another vision
+task when a later compiler exposes a previously hidden physical ambiguity.
+That transition is legal. The prior checkpoint/task/receipt nodes must remain
+present, the new task is appended, and a separately computed graph hash binds
+the current frontier. An unchanged poll is byte-identical and consumes no
+budget. Only a new accepted execution receipt, bound to the stable task id and
+response bytes, consumes that task's finite budget. The closed graph has no
+open task ids and is independently re-hashed again at attachment ingress.
+
 A page that passed native extraction can be promoted to rendered recovery only
 after canonical token reconciliation. Such a page has no extraction-time
 `vision_task` by construction, so the canonical compiler must mint one
@@ -494,7 +504,9 @@ in an unused cell/table, a partial broker or an unselected house cannot stop the
 model. Surface one consolidated Stage-3 question only if the complete waterfall
 still lacks a material model driver.
 
-If extraction fails, request the smallest corrected source: an unprotected PDF,
-the original spreadsheet, a higher-resolution page, or confirmation of one
-specific unit/period. Never substitute public consensus for a missing supplied
-broker source inside a production evidence run.
+Only a genuinely unreadable source boundary — encrypted/corrupt bytes or a
+missing immutable object — can request the smallest corrected source, such as
+an unprotected PDF or original spreadsheet. A readable low-resolution or
+awkward page stays controller-owned: render, crop, recover, adjudicate, then
+quarantine locally if still uncertain. Never substitute public consensus for
+a missing supplied broker source inside a production evidence run.

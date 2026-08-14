@@ -59,9 +59,10 @@ def main() -> int:
         "vision_attempt_limit": 3,
     }
     assert_true(broker.record_vision_attempt(attempts, "a" * 64) is False, "first vision attempt exhausted early")
-    assert_true(broker.record_vision_attempt(attempts, "a" * 64) is False, "second identical vision attempt exhausted early")
-    assert_true(broker.record_vision_attempt(attempts, "a" * 64) is True, "identical bad vision response could retry forever")
-    assert_true(len(attempts["vision_response_sha256"]) == 1, "vision audit ledger duplicated identical response bytes")
+    assert_true(broker.record_vision_attempt(attempts, "a" * 64) is False, "duplicate response consumed an attempt")
+    assert_true(broker.record_vision_attempt(attempts, "b" * 64) is False, "second unique vision execution exhausted early")
+    assert_true(broker.record_vision_attempt(attempts, "c" * 64) is True, "three distinct vision executions did not exhaust the bounded remedy")
+    assert_true(len(attempts["vision_response_sha256"]) == 3, "vision audit ledger did not retain one entry per unique execution")
     checks += 1
 
     internal = {"broker": {"pipeline_status": "NEEDS_VISION", "blocker_class": "INTERNAL_WORK"}}

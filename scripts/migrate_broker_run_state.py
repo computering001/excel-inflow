@@ -230,14 +230,22 @@ def main() -> int:
         {"stage": "surface_census", "status": "PASS", "input_sha256": new_census_input,
          "output_sha256": rbp.sha256_file(new_census_path), "reused": True},
     ]
-    # The internal fixed-point frontier is REBASED, not erased: the prior
-    # terminal status, terminal reasons and the defect/adjudication task
-    # history stay in the state (they are what keep the bounded degraded-close
-    # boundary armed), but the monotonic stage cursor restarts at zero.
-    # Without this rebase the first legitimate post-migration transition
-    # (e.g. BLOCKED_INTERNAL ordinal 6 -> NEEDS_CROSSWALK ordinal 4) would be
-    # misread as an internal stage regression and re-terminate the lane.
+    # The internal frontier is rebased into the append-only work graph.  The
+    # prior task history remains in the premigration snapshot and migration
+    # receipt; the new graph has no scalar stage cursor to regress.
     prior_fixed = dict(prior.get("fixed_point") or {})
+    migrated.setdefault("attempts", {}).setdefault("task_execution_receipts", {})
+    migrated_work_graph = rbp.build_work_graph(
+        prior={},
+        cache_key=new_cache_key,
+        tasks=[
+            task for task in prior.get("tasks", [])
+            if isinstance(task, dict) and task.get("task_id")
+        ],
+        checkpoints=migrated["checkpoints"],
+        task_execution_receipts=migrated["attempts"]["task_execution_receipts"],
+        closed=False,
+    )
     migrated["fixed_point"] = {
         "schema_version": "broker-internal-fixed-point/1.0",
         "status": prior_fixed.get("status", "OPEN"),
@@ -251,11 +259,13 @@ def main() -> int:
         })),
         "task_set_sha256": prior_fixed.get("task_set_sha256", rbp.sha256_bytes(rbp.canonical_bytes([]))),
         "unchanged_retry_count": 0,
-        "unchanged_retry_limit": prior_fixed.get("unchanged_retry_limit", 0),
+        "unchanged_retry_limit": max(1, int(prior_fixed.get("unchanged_retry_limit", 1))),
         "monotonic_from_prior": True,
         "checkpoint_reuse_required": True,
-        "terminal_reasons": list(prior_fixed.get("terminal_reasons") or []),
+        "terminal_reasons": [],
+        "work_graph": migrated_work_graph,
     }
+    migrated["work_graph"] = migrated_work_graph
     rbp.atomic_json(state_path, migrated)
 
     receipt = {

@@ -28,6 +28,7 @@ from broker_terminal_recovery import (
     degrade_finding_houses,
 )
 from broker_period_recovery import canonical_hash as period_canonical_hash, target_inventory as period_target_inventory
+from broker_work_graph import build_work_graph, verify_work_graph
 from workflow_state import assert_state, assert_transition
 
 
@@ -36,16 +37,6 @@ ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "broker-runtime-members.json"
 MODEL_HOST_BOUNDARY = ROOT / "assets" / "broker-model-host-response-boundary-v1.json"
 VISION_ATTEMPT_LIMIT = 3
-
-INTERNAL_STAGE_ORDINAL = {
-    "NEEDS_VISION": 2,
-    "NEEDS_RESOLUTION": 3,
-    "NEEDS_CROSSWALK": 4,
-    "NEEDS_CROSSWALK_REVIEW": 5,
-    "BLOCKED_INTERNAL": 6,
-    "PASS": 7,
-}
-
 
 def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
@@ -82,6 +73,8 @@ def bounded_recovery_exhausted(state: dict[str, Any], attempts: dict[str, Any]) 
     if limit and int(fixed.get("unchanged_retry_count") or 0) + 1 >= limit:
         return True
     if fixed.get("status") == "TERMINAL_DEFECT":
+        return True
+    if prior_targeted_resolution_attempted(state):
         return True
     return any(
         task.get("task_kind") == "internal_fixed_point_defect"
@@ -213,10 +206,9 @@ def task_identity(task: dict[str, Any], cache_key: str) -> tuple[str, str]:
     return f"broker-task-{input_sha[:24]}", input_sha
 
 
-def fixed_point_stage(status: str, tasks: list[dict[str, Any]]) -> tuple[int, str]:
-    ordinal = INTERNAL_STAGE_ORDINAL.get(status, 0)
+def fixed_point_stage(status: str, tasks: list[dict[str, Any]]) -> str:
     kinds = sorted({str(task.get("task_kind") or "unknown") for task in tasks})
-    return ordinal, "+".join(kinds) if kinds else status.lower()
+    return "+".join(kinds) if kinds else status.lower()
 
 
 def seal_internal_work(
@@ -227,22 +219,23 @@ def seal_internal_work(
     tasks: list[dict[str, Any]],
     checkpoints: list[dict[str, Any]],
     summary: dict[str, Any],
+    attempts: dict[str, Any] | None = None,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-    """Seal one monotonic, finitely retryable internal-work frontier.
+    """Seal one append-only, finitely executable internal-work frontier.
 
-    The function deliberately does not answer a task.  It binds the visual or
-    semantic work to an external model-host response contract, counts unchanged
-    retries, proves stage monotonicity and collapses any exhausted/regressed
-    frontier into one controller-owned terminal defect.
+    Task kinds are deliberately unordered. Canonical reconciliation may
+    discover a new rendered-vision task after resolution or crosswalk work;
+    this appends work to the graph and is not a stage regression. Merely
+    observing the same frontier never consumes an attempt.
     """
     boundary = model_host_boundary()
-    prior_fixed = prior.get("fixed_point", {}) if prior.get("cache_key") == cache_key else {}
     prior_tasks = {
         item.get("task_id"): item
         for item in prior.get("tasks", [])
         if isinstance(item, dict) and item.get("task_id")
     }
-    ordinal, stage = fixed_point_stage(status, tasks)
+    attempt_ledger = (attempts or {}).get("task_execution_receipts", {})
+    stage = fixed_point_stage(status, tasks)
     passed_checkpoints = sum(1 for item in checkpoints if item.get("status") == "PASS")
     sealed: list[dict[str, Any]] = []
     for defect_ordinal, task in enumerate(tasks, start=1):
@@ -255,10 +248,14 @@ def seal_internal_work(
             )
         task_id, input_sha = task_identity(packet, cache_key)
         prior_packet = prior_tasks.get(task_id, {})
-        attempts_used = min(
-            int(prior_packet.get("attempt_budget", {}).get("attempts_used", -1)) + 1,
-            int(declaration["attempt_limit"]),
-        )
+        accepted_receipts = sorted(set(attempt_ledger.get(task_id, [])))
+        if not accepted_receipts:
+            accepted_receipts = sorted(set(
+                prior_packet.get("attempt_budget", {}).get(
+                    "accepted_execution_receipt_sha256", []
+                )
+            ))
+        attempts_used = min(len(accepted_receipts), int(declaration["attempt_limit"]))
         response_files = task_response_files(packet)
         packet.update({
             "task_id": task_id,
@@ -276,10 +273,11 @@ def seal_internal_work(
                 "attempts_used": attempts_used,
                 "attempt_limit": declaration["attempt_limit"],
                 "attempts_remaining": max(0, declaration["attempt_limit"] - attempts_used),
+                "accepted_execution_receipt_sha256": accepted_receipts,
             },
             "progress_measure": {
                 "stage": stage,
-                "stage_ordinal": ordinal,
+                "stage_ordinal": 0,
                 "defect_ordinal": defect_ordinal,
                 "defect_count": len(tasks),
                 "passed_checkpoint_count": passed_checkpoints,
@@ -299,67 +297,51 @@ def seal_internal_work(
         })
         sealed.append(packet)
 
-    task_set_sha = sha256_bytes(canonical_bytes([
-        {"task_id": task["task_id"], "input": task["progress_measure"]["task_input_sha256"]}
-        for task in sealed
-    ]))
-    progress_score = ordinal * 10000 + passed_checkpoints * 100 - len(sealed)
-    progress_sha = sha256_bytes(canonical_bytes({
-        "stage_ordinal": ordinal,
-        "passed_checkpoint_count": passed_checkpoints,
-        "task_set_sha256": task_set_sha,
-    }))
-    same_transaction = prior.get("cache_key") == cache_key
-    prior_ordinal = int(prior_fixed.get("stage_ordinal", -1)) if same_transaction else -1
-    prior_passed = int(prior_fixed.get("passed_checkpoint_count", -1)) if same_transaction else -1
-    prior_progress_sha = prior_fixed.get("progress_sha256") if same_transaction else None
-    regression_reasons: list[str] = []
-    if same_transaction and prior_ordinal > ordinal:
-        regression_reasons.append(
-            f"internal stage regressed from ordinal {prior_ordinal} to {ordinal}"
-        )
-    if same_transaction and prior_ordinal == ordinal and prior_passed > passed_checkpoints:
-        regression_reasons.append(
-            f"passed checkpoint count regressed from {prior_passed} to {passed_checkpoints}"
-        )
-    stall_count = (
-        int(prior_fixed.get("unchanged_retry_count", 0)) + 1
-        if prior_progress_sha == progress_sha and same_transaction
-        else 0
+    work_graph = build_work_graph(
+        prior=prior,
+        cache_key=cache_key,
+        tasks=sealed,
+        checkpoints=checkpoints,
+        task_execution_receipts=attempt_ledger,
+        closed=False,
     )
-    exhausted_tasks = [
-        task["task_id"]
-        for task in sealed
-        if task["attempt_budget"]["attempts_remaining"] == 0
-    ]
+    graph_errors = verify_work_graph(work_graph)
+    if graph_errors:
+        raise ValueError(
+            "Broker work graph failed its independent invariants: "
+            + ", ".join(graph_errors)
+        )
+    task_set_sha = work_graph["current_frontier_sha256"]
+    progress_sha = work_graph["graph_sha256"]
+    progress_score = (
+        len(work_graph["nodes"]) * 1_000_000
+        + len(work_graph["frontier_history_sha256"]) * 10_000
+        + len(work_graph["completed_node_ids"]) * 100
+        - len(work_graph["open_task_ids"])
+    )
     stall_limit = int(boundary["stall_attempt_limit"])
-    terminal_reasons = list(regression_reasons)
-    if status == "BLOCKED_INTERNAL":
-        terminal_reasons.append("an upstream broker checkpoint returned BLOCKED_INTERNAL")
-    if stall_count >= stall_limit:
-        terminal_reasons.append(
-            f"internal progress frontier was unchanged for {stall_count} retries"
-        )
-    if exhausted_tasks:
-        terminal_reasons.append(
-            f"task attempt budget exhausted: {', '.join(sorted(exhausted_tasks))}"
-        )
+    terminal_reasons = (
+        ["an upstream broker checkpoint returned BLOCKED_INTERNAL"]
+        if status == "BLOCKED_INTERNAL"
+        else []
+    )
 
     fixed = {
         "schema_version": "broker-internal-fixed-point/1.0",
         "status": "TERMINAL_DEFECT" if terminal_reasons else "OPEN",
         "stage": stage,
-        "stage_ordinal": ordinal,
+        "stage_ordinal": 0,
         "passed_checkpoint_count": passed_checkpoints,
         "remaining_task_count": len(sealed),
         "progress_score": progress_score,
         "progress_sha256": progress_sha,
         "task_set_sha256": task_set_sha,
-        "unchanged_retry_count": stall_count,
+        "unchanged_retry_count": 0,
         "unchanged_retry_limit": stall_limit,
-        "monotonic_from_prior": not regression_reasons,
+        "monotonic_from_prior": work_graph["monotonic_from_prior"],
         "checkpoint_reuse_required": True,
         "terminal_reasons": terminal_reasons,
+        "work_graph": work_graph,
     }
     if not terminal_reasons:
         return status, sealed, fixed, summary
@@ -403,10 +385,11 @@ def seal_internal_work(
             "attempts_used": 0,
             "attempt_limit": 1,
             "attempts_remaining": 1,
+            "accepted_execution_receipt_sha256": [],
         },
         "progress_measure": {
             "stage": "terminal_internal_defect",
-            "stage_ordinal": INTERNAL_STAGE_ORDINAL["BLOCKED_INTERNAL"],
+            "stage_ordinal": 0,
             "defect_ordinal": 1,
             "defect_count": 1,
             "passed_checkpoint_count": passed_checkpoints,
@@ -451,18 +434,71 @@ def source_hashes(request: dict[str, Any], request_dir: Path) -> dict[str, str]:
     return dict(sorted(hashes.items()))
 
 
-def record_vision_attempt(attempts: dict[str, Any], response_digest: str) -> bool:
-    """Record an invocation, even when the host resubmits identical bad bytes.
+def record_task_execution_attempt(
+    attempts: dict[str, Any],
+    prior_state: dict[str, Any],
+    response_digest: str,
+    task_kinds: set[str],
+) -> bool:
+    """Record one accepted execution receipt against its prior task frontier.
 
-    Unique response hashes remain useful audit evidence, but they are not an
-    attempt counter: otherwise the same unchanged invalid response can keep a
-    run in NEEDS_VISION forever.  The returned boolean is the finite terminal
-    signal for this cache key.
+    Replaying identical bytes or merely polling the controller is not an
+    execution attempt.  The ledger is keyed by stable task id so unrelated
+    lane progress cannot consume a broker task's finite remedy budget.
     """
-    if response_digest not in attempts["vision_response_sha256"]:
-        attempts["vision_response_sha256"].append(response_digest)
-    attempts["vision_attempt_count"] = int(attempts.get("vision_attempt_count", 0)) + 1
+    accepted = attempts.setdefault("execution_response_sha256", [])
+    is_new = response_digest not in accepted
+    if is_new:
+        accepted.append(response_digest)
+        ledger = attempts.setdefault("task_execution_receipts", {})
+        for task in prior_state.get("tasks", []):
+            if task.get("task_kind") not in task_kinds or not task.get("task_id"):
+                continue
+            receipts = ledger.setdefault(str(task["task_id"]), [])
+            if response_digest not in receipts:
+                receipts.append(response_digest)
+    return is_new
+
+
+def record_vision_attempt(
+    attempts: dict[str, Any],
+    response_digest: str,
+    prior_state: dict[str, Any] | None = None,
+) -> bool:
+    record_task_execution_attempt(
+        attempts,
+        prior_state or {},
+        response_digest,
+        {
+            "independent_table_transcription",
+            "targeted_cell_adjudication",
+            "bounded_capture_adjudication",
+            "period_header_adjudication",
+        },
+    )
+    accepted = attempts.setdefault("vision_response_sha256", [])
+    if response_digest not in accepted:
+        accepted.append(response_digest)
+    attempts["vision_attempt_count"] = len(accepted)
     return attempts["vision_attempt_count"] >= int(attempts["vision_attempt_limit"])
+
+
+def task_family_execution_count(
+    attempts: dict[str, Any],
+    state: dict[str, Any],
+    task_kinds: set[str],
+) -> int:
+    """Count distinct accepted responses for one append-only task family."""
+    kind_by_id = {
+        str(node.get("node_id")): str(node.get("task_kind") or "")
+        for node in (state.get("work_graph") or {}).get("nodes", [])
+        if isinstance(node, dict) and node.get("node_kind") == "task"
+    }
+    accepted: set[str] = set()
+    for task_id, receipts in attempts.get("task_execution_receipts", {}).items():
+        if kind_by_id.get(str(task_id)) in task_kinds:
+            accepted.update(str(receipt) for receipt in receipts)
+    return len(accepted)
 
 
 def run(command: list[str], allowed: set[int]) -> subprocess.CompletedProcess[str]:
@@ -781,31 +817,57 @@ def write_state(
             tasks=tasks,
             checkpoints=checkpoints,
             summary=summary,
+            attempts=attempts,
         )
         blocker_class = "INTERNAL_WORK"
         user_blocking = False
     elif status in {"PASS", "PASS_DEGRADED"}:
+        closed_work_graph = build_work_graph(
+            prior=prior,
+            cache_key=cache_key,
+            tasks=[],
+            checkpoints=checkpoints,
+            task_execution_receipts=(attempts or {}).get(
+                "task_execution_receipts", {}
+            ),
+            closed=True,
+        )
+        graph_errors = verify_work_graph(closed_work_graph)
+        if graph_errors:
+            raise ValueError(
+                "Closed broker work graph failed its independent invariants: "
+                + ", ".join(graph_errors)
+            )
         fixed_point = {
             "schema_version": "broker-internal-fixed-point/1.0",
             "status": "CLOSED",
             "stage": "pass",
-            "stage_ordinal": INTERNAL_STAGE_ORDINAL["PASS"],
+            "stage_ordinal": 0,
             "passed_checkpoint_count": sum(
                 1 for item in checkpoints if item.get("status") == "PASS"
             ),
             "remaining_task_count": 0,
-            "progress_score": INTERNAL_STAGE_ORDINAL["PASS"] * 10000,
-            "progress_sha256": sha256_bytes(canonical_bytes({
-                "cache_key": cache_key, "status": status,
-            })),
-            "task_set_sha256": sha256_bytes(canonical_bytes([])),
+            "progress_score": len(closed_work_graph["nodes"]) * 1_000_000,
+            "progress_sha256": closed_work_graph["graph_sha256"],
+            "task_set_sha256": closed_work_graph["current_frontier_sha256"],
             "unchanged_retry_count": 0,
             "unchanged_retry_limit": model_host_boundary()["stall_attempt_limit"],
             "monotonic_from_prior": True,
             "checkpoint_reuse_required": True,
             "terminal_reasons": [],
+            "work_graph": closed_work_graph,
         }
     else:
+        not_applicable_work_graph = build_work_graph(
+            prior=prior,
+            cache_key=cache_key,
+            tasks=[],
+            checkpoints=checkpoints,
+            task_execution_receipts=(attempts or {}).get(
+                "task_execution_receipts", {}
+            ),
+            closed=True,
+        )
         fixed_point = {
             "schema_version": "broker-internal-fixed-point/1.0",
             "status": "NOT_APPLICABLE",
@@ -825,6 +887,7 @@ def write_state(
             "monotonic_from_prior": True,
             "checkpoint_reuse_required": True,
             "terminal_reasons": [],
+            "work_graph": not_applicable_work_graph,
         }
     assert_state("broker", status, blocker_class, user_blocking)
     assert_transition(
@@ -852,10 +915,13 @@ def write_state(
         },
         "tasks": tasks,
         "fixed_point": fixed_point,
+        "work_graph": fixed_point["work_graph"],
         "attempts": attempts or {
+            "execution_response_sha256": [],
             "vision_response_sha256": [],
             "vision_attempt_count": 0,
             "vision_attempt_limit": VISION_ATTEMPT_LIMIT,
+            "task_execution_receipts": {},
         },
         "summary": summary,
     }
@@ -923,6 +989,11 @@ def main() -> int:
         if prior_state.get("cache_key") == cache_key
         else []
     )
+    prior_execution_responses = (
+        prior_state.get("attempts", {}).get("execution_response_sha256", [])
+        if prior_state.get("cache_key") == cache_key
+        else []
+    )
     prior_attempt_count = (
         prior_state.get("attempts", {}).get(
             "vision_attempt_count",
@@ -931,10 +1002,21 @@ def main() -> int:
         if prior_state.get("cache_key") == cache_key
         else 0
     )
+    prior_task_execution_receipts = (
+        prior_state.get("attempts", {}).get("task_execution_receipts", {})
+        if prior_state.get("cache_key") == cache_key
+        else {}
+    )
     attempts = {
+        "execution_response_sha256": list(dict.fromkeys(prior_execution_responses)),
         "vision_response_sha256": list(dict.fromkeys(prior_attempts)),
         "vision_attempt_count": prior_attempt_count,
         "vision_attempt_limit": VISION_ATTEMPT_LIMIT,
+        "task_execution_receipts": {
+            str(task_id): list(dict.fromkeys(receipts))
+            for task_id, receipts in prior_task_execution_receipts.items()
+            if isinstance(receipts, list)
+        },
     }
     key = cache_key[:16]
 
@@ -1014,7 +1096,10 @@ def main() -> int:
             for target in sorted(responses.glob("*.json"))
             if target.is_file()
         }))
-        attempt_exhausted = record_vision_attempt(attempts, responses_digest)
+        response_seen_before = responses_digest in attempts["vision_response_sha256"]
+        attempt_exhausted = record_vision_attempt(
+            attempts, responses_digest, prior_state
+        )
         verified_path = output_root / f"verified-{key}-{responses_digest[:12]}.json"
         vision_receipt = output_root / f"verified-{key}-{responses_digest[:12]}.receipt.json"
         vision_input = sha256_bytes(canonical_bytes({
@@ -1059,7 +1144,10 @@ def main() -> int:
                     "Replace both pass files for this surface with a new independent read. "
                     "Preserve the visible grid or explicitly classify the surface as verified_non_tabular."
                 )
-            exhausted = attempt_exhausted
+            # Replaying the same already-evaluated full-surface read is not a
+            # new attempt. It is evidence that this remedy tier is exhausted,
+            # so move to targeted adjudication rather than polling forever.
+            exhausted = attempt_exhausted or response_seen_before
             fully_exhausted = exhausted and bounded_recovery_exhausted(prior_state, attempts)
             if not fully_exhausted:
                 if exhausted:
@@ -1195,7 +1283,10 @@ def main() -> int:
                 for target in sorted(responses.glob("*.json"))
                 if target.is_file()
             }))
-            attempt_exhausted = record_vision_attempt(attempts, responses_digest)
+            response_seen_before = responses_digest in attempts["vision_response_sha256"]
+            attempt_exhausted = record_vision_attempt(
+                attempts, responses_digest, prior_state
+            )
             reconciled_path = output_root / f"reconciled-{key}-{responses_digest[:12]}.json"
             reconciled_receipt = output_root / f"reconciled-{key}-{responses_digest[:12]}.receipt.json"
             reconciled_input = sha256_bytes(canonical_bytes({
@@ -1241,7 +1332,9 @@ def main() -> int:
             physical_status = (
                 active_bundle.get("physical_capture_receipt") or {}
             ).get("status")
-            if physical_status != "PASS" and attempt_exhausted:
+            if physical_status != "PASS" and (
+                attempt_exhausted or response_seen_before
+            ):
                 physical_status = "NEEDS_RESOLUTION"
 
     lane_degraded = bool((active_bundle.get("summary") or {}).get("degraded"))
@@ -1450,6 +1543,16 @@ def main() -> int:
         return 2
 
     crosswalk_digest = sha256_file(crosswalk)
+    record_task_execution_attempt(
+        attempts,
+        prior_state,
+        crosswalk_digest,
+        {
+            "semantic_crosswalk_review",
+            "semantic_crosswalk_repair",
+            "broker_pack_repair",
+        },
+    )
     artifacts["crosswalk"] = str(crosswalk)
     semantic_path = output_root / f"semantic-{key}-{crosswalk_digest[:12]}.json"
     semantic_input = sha256_bytes(canonical_bytes({
@@ -1548,6 +1651,24 @@ def main() -> int:
             and int(task.get("attempt_budget", {}).get("attempts_remaining", 99)) <= 1
             for task in prior_state.get("tasks", [])
         )
+        semantic_attempt_limit = int(
+            model_host_boundary()["tasks"]["semantic_crosswalk_repair"][
+                "attempt_limit"
+            ]
+        )
+        prior_semantic_near_exhaustion = bool(
+            prior_semantic_near_exhaustion
+            or task_family_execution_count(
+                attempts,
+                prior_state,
+                {
+                    "semantic_crosswalk_review",
+                    "semantic_crosswalk_repair",
+                    "broker_pack_repair",
+                },
+            )
+            >= max(1, semantic_attempt_limit - 1)
+        )
         automatic_terminal = recovery_analysis["can_recover"] and (
             prior_semantic_near_exhaustion or prior_terminal
         )
@@ -1555,6 +1676,12 @@ def main() -> int:
             automatic_terminal
         ):
             if terminal_review_path and terminal_review_path.is_file():
+                record_task_execution_attempt(
+                    attempts,
+                    prior_state,
+                    sha256_file(terminal_review_path),
+                    {"terminal_materiality_recovery"},
+                )
                 terminal_review = read_json(
                     terminal_review_path, "terminal broker materiality review"
                 )

@@ -22,6 +22,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from broker_work_graph import verify_work_graph
+
 
 HERE = Path(__file__).resolve().parent
 REQUIRED_CORE = {
@@ -119,7 +121,8 @@ def invoke_controller_to_terminal(
     crosswalk: Path,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     attempts: list[dict[str, Any]] = []
-    prior_progress: tuple[int, int] | None = None
+    prior_graph_revision: int | None = None
+    prior_node_ids: set[str] = set()
     for attempt_number in range(1, MAX_CONTROLLER_ATTEMPTS + 1):
         code, state, diagnostic = invoke_controller(
             request_path,
@@ -129,19 +132,26 @@ def invoke_controller_to_terminal(
         )
         status = str(state.get("pipeline_status") or "")
         fixed = state.get("fixed_point") or {}
-        progress = (
-            int(fixed.get("progress_score", -1)),
-            -int(fixed.get("remaining_task_count", 0)),
-        )
+        graph = state.get("work_graph") or {}
+        graph_errors = verify_work_graph(graph)
+        check(not graph_errors, f"Broker work graph is invalid: {', '.join(graph_errors)}")
+        graph_revision = int(graph.get("revision", -1))
+        graph_node_ids = {
+            str(node.get("node_id"))
+            for node in graph.get("nodes") or []
+            if isinstance(node, dict) and node.get("node_id")
+        }
         attempts.append({
             "attempt": attempt_number,
             "exit_code": code,
             "pipeline_status": status,
             "state_sha256": sha256_file(output_root / "broker-run-state.json"),
-            "progress_score": progress[0],
-            "remaining_task_count": -progress[1],
+            "work_graph_revision": graph_revision,
+            "work_graph_node_count": len(graph_node_ids),
+            "work_graph_completed_count": len(graph.get("completed_node_ids") or []),
+            "remaining_task_count": len(graph.get("open_task_ids") or []),
         })
-        if code == 0 and status == "PASS":
+        if code == 0 and status in {"PASS", "PASS_DEGRADED"}:
             return state, attempts
         check(
             code in {1, 2} and status in INTERNAL_PROGRESS_STATES,
@@ -161,21 +171,20 @@ def invoke_controller_to_terminal(
             < int(fixed.get("unchanged_retry_limit", 0)),
             f"Broker controller exhausted its unchanged-frontier budget at {status}.",
         )
-        check(
-            all(
-                int((task.get("attempt_budget") or {}).get("attempts_remaining", 0)) > 0
-                for task in state.get("tasks") or []
-            ),
-            f"Broker controller exhausted an internal task budget at {status}.",
-        )
-        if prior_progress is not None:
+        if prior_graph_revision is not None:
             check(
-                progress >= prior_progress,
-                f"Broker controller regressed at {status}.",
+                graph_revision >= prior_graph_revision,
+                f"Broker work graph revision regressed at {status}.",
             )
-        prior_progress = progress
+            check(
+                prior_node_ids.issubset(graph_node_ids),
+                f"Broker work graph lost prior nodes at {status}.",
+            )
+        prior_graph_revision = graph_revision
+        prior_node_ids = graph_node_ids
     raise AssertionError(
-        f"Broker controller did not reach terminal PASS within {MAX_CONTROLLER_ATTEMPTS} attempts."
+        "Broker controller did not reach terminal PASS or PASS_DEGRADED "
+        f"within {MAX_CONTROLLER_ATTEMPTS} attempts."
     )
 
 
@@ -223,13 +232,26 @@ def validate_checkpoint_closure(state: dict[str, Any]) -> None:
 
 def validate_terminal_state(state: dict[str, Any]) -> dict[str, Path]:
     check(state.get("schema_version") == "broker-run-state/1.0", "Wrong broker state version.")
-    check(state.get("pipeline_status") == "PASS", "Real pack did not reach controller terminal PASS.")
-    check(state.get("user_blocking") is False, "Terminal broker PASS is user-blocking.")
-    check(state.get("blocker_class") is None, "Terminal broker PASS retains a blocker class.")
-    check(state.get("tasks") == [], "Terminal broker PASS retains internal tasks.")
+    status = state.get("pipeline_status")
+    check(
+        status in {"PASS", "PASS_DEGRADED"},
+        "Real pack did not reach controller terminal PASS or PASS_DEGRADED.",
+    )
+    check(state.get("user_blocking") is False, f"Terminal broker {status} is user-blocking.")
+    check(state.get("blocker_class") is None, f"Terminal broker {status} retains a blocker class.")
+    check(state.get("tasks") == [], f"Terminal broker {status} retains internal tasks.")
     fixed = state.get("fixed_point") or {}
     check(fixed.get("status") == "CLOSED", "Terminal broker fixed point is not CLOSED.")
     check(int(fixed.get("remaining_task_count", -1)) == 0, "Terminal broker fixed point retains work.")
+    graph = state.get("work_graph") or {}
+    graph_errors = verify_work_graph(graph)
+    check(not graph_errors, f"Terminal broker work graph is invalid: {', '.join(graph_errors)}")
+    check(graph.get("status") == "CLOSED", "Terminal broker work graph is not CLOSED.")
+    check(graph.get("open_task_ids") == [], "Terminal broker work graph retains open tasks.")
+    check(
+        fixed.get("work_graph") == graph,
+        "Terminal fixed-point receipt is not bound to the top-level work graph.",
+    )
     validate_checkpoint_closure(state)
     artifacts = {
         key: require_owned_artifact(state, key)

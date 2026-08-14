@@ -11625,6 +11625,7 @@ function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
   brokerRows.sheetOrder = brokerEvidence
     ? [
         "Operating Model",
+        brokerEvidence.dividerName,
         "Brokers",
         ...brokerEvidence.sheets.map((sheet) => sheet.name),
         "Forward Curves",

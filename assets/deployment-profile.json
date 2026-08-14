@@ -35,6 +35,7 @@
     "broker-semantic-verification-report.schema.json",
     "broker-surface-census.schema.json",
     "broker-run-state.schema.json",
+    "broker-work-graph-v1.schema.json",
     "broker-runtime-members.json",
     "broker-model-host-response-boundary-v1.json",
     "broker-terminal-materiality-review.schema.json",
@@ -109,6 +110,7 @@
     "broker-semantic-verification-report.schema.json": "Independent broker semantic-verification report contract loaded through the attachment-ingress schema helper.",
     "broker-surface-census.schema.json": "Whole-surface broker census contract retained for independent validation.",
     "broker-run-state.schema.json": "Hash-bound resumable broker-controller state. It distinguishes internal extraction work from the narrow source conditions that may legitimately block the user.",
+    "broker-work-graph-v1.schema.json": "Append-only broker task, checkpoint and execution-receipt graph. It permits legitimate late task discovery without stage regression while proving that completed work never disappears.",
     "broker-runtime-members.json": "Single source of truth for the broker controller's hash-bound runtime closure; read independently by the controller and attachment ingress.",
     "broker-model-host-response-boundary-v1.json": "Closed model-host response seam for broker vision, targeted adjudication and semantic crosswalk tasks, including deterministic remedies and finite attempt budgets.",
     "broker-terminal-materiality-review.schema.json": "Hash-bound model-host response contract for preserving independently proven non-consumed broker evidence after bounded semantic review; it cannot authorize model consumption or values.",
@@ -532,6 +534,7 @@
     "run_broker_pipeline.py",
     "migrate_broker_run_state.py",
     "broker_terminal_recovery.py",
+    "broker_work_graph.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
@@ -702,6 +705,10 @@
     "broker_terminal_recovery.py": {
       "may_import_third_party": [],
       "reason": "The broker terminal-recovery helper is stdlib-only and proves negative model consumption from immutable candidate cells and the canonical metric dictionary; it neither reads PDFs nor authors visual or semantic judgments."
+    },
+    "broker_work_graph.py": {
+      "may_import_third_party": [],
+      "reason": "The broker work-graph helper is stdlib-only and records append-only task, checkpoint and execution-receipt lineage without reading source documents or authoring evidence."
     },
     "broker_period_recovery.py": {
       "may_import_third_party": [],

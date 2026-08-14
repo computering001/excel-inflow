@@ -345,16 +345,19 @@ must be exhausted through native lanes, 300-DPI-or-better table crops, two
 independent structured reads and one bounded cell adjudication before any cell
 is quarantined.
 
-Treat the broker state as a sealed internal fixed-point frontier. Every task
-names its deterministic remedy, response contract, exact output filename,
-attempt budget and monotonic progress measure. The model host authors the
-visual or semantic response; Python only sequences and verifies it. Resume the
-same controller after each response and reuse every valid checkpoint. If the
-frontier regresses, remains byte-identical beyond the finite retry limit or
-exhausts a task budget, emit one aggregate `internal_fixed_point_defect` with
-`user_blocking=false`. Never present the underlying `NEEDS_VISION`,
-`NEEDS_RESOLUTION`, `NEEDS_CROSSWALK` or `NEEDS_CROSSWALK_REVIEW` packet as an
-end-user question.
+Treat the broker state as a sealed append-only work graph, not a linear stage
+cursor. Checkpoints, internal tasks and accepted execution receipts are
+immutable graph nodes; only the current task frontier changes. A later
+canonical or semantic pass may lawfully discover new vision work after
+resolution or crosswalk work, and that is an appended obligation rather than a
+stage regression. Every task names its deterministic remedy, response
+contract, exact output filename and finite execution budget. Polling or
+re-presenting identical response bytes consumes no attempt; only a new,
+hash-bound model-host execution receipt tied to the stable task id does. The
+model host authors visual or semantic responses; Python sequences and verifies
+them. Resume the same controller after each response and reuse every valid
+checkpoint. Never present `NEEDS_VISION`, `NEEDS_RESOLUTION`,
+`NEEDS_CROSSWALK` or `NEEDS_CROSSWALK_REVIEW` as an end-user question.
 
 Do not force the complete broker-page inventory into the workbook carrier.
 `broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
@@ -672,16 +675,15 @@ invitation to work the case by hand: a run whose case changed while it waited
 is a different run wearing the first one's receipts, and `continue` blocks it
 as `run_case_mutated_during_pause` rather than certifying the substitution.
 
-A stalled evidence stage is a blocked run, not a state to be routed around. An
-extraction that reports `NEEDS_VISION` has named the work it still owes: the
-vision passes are executed and the bundle is carried to `PASS`. An extraction
-that reports `NEEDS_RESOLUTION` is resumed and adjudicated. Neither status may
-be answered by composing the missing facts in chat, by narrowing the document
-set until the stage reports clean, or by proceeding with the evidence the
-stage did produce. A pack assembled in conversation is not evidence, and every
-gate downstream of it will certify it faithfully — which is precisely why the
-substitution has to be refused here, at ingress, where the difference between
-a read document and a recalled one is still visible.
+A non-terminal evidence frontier is internal work, not a user-visible blocked
+run. `NEEDS_VISION` executes the two reads; `NEEDS_RESOLUTION` executes bounded
+adjudication; later work may append in either direction. Once the finite remedy
+budget has genuinely been executed, unresolved broker regions are quarantined
+and the graph closes `PASS_DEGRADED`; they do not hold Debt, Build or Delivery.
+No status may be cleared by composing missing facts in chat or deleting a
+difficult report. A pack assembled from memory is not evidence: the lawful
+fallback is less broker authority, down to zero, with the raw source and
+quarantine receipt preserved.
 
 ### Controlled evidence and proof commands
 

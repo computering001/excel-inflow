@@ -54,6 +54,78 @@ function canonicalCompactSha256(value) {
   return sha256(Buffer.from(`${JSON.stringify(canonicalise(value))}\n`, "utf8"));
 }
 
+function verifyClosedBrokerWorkGraph(runState) {
+  const graph = runState?.work_graph;
+  if (!graph || typeof graph !== "object" || Array.isArray(graph)) {
+    throw new Error("Broker controller state has no append-only work graph.");
+  }
+  const body = structuredClone(graph);
+  delete body.graph_sha256;
+  if (graph.graph_sha256 !== canonicalCompactSha256(body)) {
+    throw new Error("Broker controller work graph hash is invalid.");
+  }
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const nodeIds = nodes.map((node) => node?.node_id);
+  const nodeSet = new Set(nodeIds);
+  const nodeById = new Map(nodes.map((node) => [node?.node_id, node]));
+  if (
+    nodeIds.some((nodeId) => typeof nodeId !== "string" || nodeId.length === 0) ||
+    nodeSet.size !== nodeIds.length
+  ) {
+    throw new Error("Broker controller work graph has duplicate or missing node IDs.");
+  }
+  if (canonicalJson(nodeIds) !== canonicalJson([...nodeIds].sort())) {
+    throw new Error("Broker controller work graph nodes are not canonically ordered.");
+  }
+  for (const nodeId of [
+    ...(graph.open_task_ids ?? []),
+    ...(graph.completed_node_ids ?? []),
+  ]) {
+    if (!nodeSet.has(nodeId)) {
+      throw new Error(`Broker controller work graph references absent node ${nodeId}.`);
+    }
+  }
+  for (const node of nodes) {
+    if (
+      node?.node_kind === "execution_receipt" &&
+      nodeById.get(node.task_id)?.node_kind !== "task"
+    ) {
+      throw new Error(
+        "Broker controller work graph execution receipt has no task node.",
+      );
+    }
+  }
+  const expectedFrontier = canonicalCompactSha256(
+    [...(graph.open_task_ids ?? [])].sort(),
+  );
+  if (
+    graph.current_frontier_sha256 !== expectedFrontier ||
+    !(graph.frontier_history_sha256 ?? []).includes(expectedFrontier)
+  ) {
+    throw new Error("Broker controller work graph frontier seal is invalid.");
+  }
+  if (
+    (graph.open_task_ids ?? []).some((nodeId) =>
+      new Set(graph.completed_node_ids ?? []).has(nodeId),
+    )
+  ) {
+    throw new Error("Broker controller work graph marks one task both open and complete.");
+  }
+  if (
+    graph.status !== "CLOSED" ||
+    (graph.open_task_ids ?? []).length !== 0 ||
+    (graph.violations ?? []).length !== 0 ||
+    graph.monotonic_from_prior !== true
+  ) {
+    throw new Error("Broker controller work graph is not a valid closed frontier.");
+  }
+  if (canonicalJson(runState?.fixed_point?.work_graph) !== canonicalJson(graph)) {
+    throw new Error(
+      "Broker controller fixed-point receipt is not bound to its work graph.",
+    );
+  }
+}
+
 async function rerunPythonVerifier(scriptPath, argv, supplied, label) {
   const temporary = await fs.mkdtemp(
     path.join(os.tmpdir(), "excel-inflow-independent-verifier-"),
@@ -741,6 +813,7 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       `Broker controller run state fails its contract: ${runStateErrors[0]}`,
     );
   }
+  verifyClosedBrokerWorkGraph(runState.json);
   // PASS and PASS_DEGRADED are the only closed broker lanes. A degraded close
   // is lawful ONLY with its quarantine receipts disclosed in the summary — a
   // receipt-less degraded state is an invalid closure, not an acceptable lane

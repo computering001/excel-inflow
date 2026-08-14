@@ -127,7 +127,15 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       cwd: ROOT,
       timeout: timeoutMs,
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      env: {
+        ...process.env,
+        PYTHONDONTWRITEBYTECODE: "1",
+        // Node-authored integration tests may launch the shipping Python
+        // controller or Stage 4 themselves.  They must inherit the exact
+        // interpreter selected for this development gate rather than silently
+        // falling back to whichever `python3` happens to be on PATH.
+        EXCEL_INFLOW_TEST_PYTHON: python,
+      },
     });
     return {
       id: test.id,

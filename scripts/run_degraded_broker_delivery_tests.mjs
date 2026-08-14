@@ -165,7 +165,14 @@ compiled.model_case.stage_three_answers = {
 };
 compiled.model_case.broker_pack = {
   ...compiled.model_case.broker_pack,
-  raw_tables: structuredClone(sourceTables.houses),
+  raw_tables: structuredClone(
+    sourceTables.houses.map(({ pages: _pages, ...house }) => house),
+  ),
+  page_evidence: structuredClone(
+    sourceTables.houses
+      .filter((house) => (house.pages ?? []).length > 0)
+      .map(({ tables: _tables, ...house }) => house),
+  ),
   source_mappings: structuredClone(crosswalkReceipt.mappings ?? []),
   house_metadata: Object.fromEntries(
     brokerPack.houses.map((house) => [
