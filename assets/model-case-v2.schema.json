@@ -55,6 +55,25 @@
       "const": "dcs_evidence_v1",
       "description": "dcs_evidence_v1 proves every model-driving debt term against the immutable, per-run DCS evidence ledger. It is optional only for archived diagnostic fixtures; a production attachment-ingress run requires it."
     },
+    "model_demand_graph_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Hash of the frozen company-specific model-demand graph compiled before final forecast materialisation."
+    },
+    "selected_authority_contract_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Hash of the exact one-writer authority contract consumed by the materialised forecast case."
+    },
+    "run_constitution_graph_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Hash of the joined source-to-model run constitution graph."
+    },
+    "evidence_quality_mode": {
+      "enum": ["VERIFIED", "DEGRADED", "INPUT_REQUIRED"],
+      "description": "Quality of optional evidence after local quarantine and deterministic authority fallback."
+    },
     "instrument_term_authorities": {
       "type": "array",
       "items": {

@@ -96,6 +96,94 @@ def main() -> int:
             "a missing internal controller declaration became a user re-upload request",
         )
         checks += 1
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-optional-broker-supervisor-") as temporary:
+        root = Path(temporary)
+        request = root / "broker-request.json"
+        request.write_text("{}\n", "utf-8")
+        output = root / "run"
+        calls: list[list[str]] = []
+        original_run = attachment.run
+
+        def fake_run(command: list[str]) -> subprocess.CompletedProcess[str]:
+            calls.append(command)
+            state_path = output / "broker" / "broker-run-state.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            closed = "--close-optional" in command
+            state_path.write_text(json.dumps({
+                "schema_version": "broker-run-state/1.0",
+                "pipeline_status": "PASS_DEGRADED" if closed else "NEEDS_VISION",
+                "user_blocking": False,
+                "blocker_class": None if closed else "INTERNAL_WORK",
+                "tasks": [] if closed else [{"task_kind": "independent_table_transcription"}],
+                "artifacts": {},
+                "artifact_sha256": {},
+                "summary": {"degraded": closed},
+            }), "utf-8")
+            return subprocess.CompletedProcess(command, 0 if closed else 2, "", "")
+
+        attachment.run = fake_run
+        try:
+            closed_state = attachment.run_lane(
+                "broker",
+                {"request_path": str(request)},
+                root,
+                output,
+            )
+        finally:
+            attachment.run = original_run
+        assert_true(
+            closed_state["pipeline_status"] == "PASS_DEGRADED",
+            "top attachment supervisor did not contain optional broker work",
+        )
+        assert_true(
+            len(calls) == 2 and "--close-optional" in calls[1],
+            "top attachment supervisor did not execute one normal pass then its circuit breaker",
+        )
+        checks += 2
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-broker-context-") as temporary:
+        root = Path(temporary)
+        broker_request = root / "broker-request.json"
+        broker_request.write_text(json.dumps({
+            "schema_version": "broker-extraction-request/1.0",
+            "run_id": "broker-context-test",
+            "documents": [],
+        }), "utf-8")
+        evidence = root / "evidence.json"
+        evidence.write_text(json.dumps({"filings": {}}), "utf-8")
+        ingress = root / "ingress.json"
+        ingress.write_text(json.dumps({"evidence_run_path": str(evidence)}), "utf-8")
+        filings_bundle = root / "filings-bundle.json"
+        filings_bundle.write_text(json.dumps({
+            "filings": {
+                "historical_periods": ["2023-12-31", "2024-12-31", "2025-12-31"],
+                "forecast_periods": ["2026-12-31", "2027-12-31", "2028-12-31"],
+                "reporting_currency": "GBP",
+                "units": "millions",
+            },
+        }), "utf-8")
+        spec_path = root / "spec.json"
+        spec = {
+            "attachment_ingress_path": str(ingress),
+            "broker": {"request_path": str(broker_request)},
+        }
+        spec_path.write_text(json.dumps(spec), "utf-8")
+        declaration = attachment.broker_declaration_with_model_context(
+            spec=spec,
+            spec_path=spec_path,
+            output_root=root / "run",
+            filings_state={"artifacts": {"filings_bundle": str(filings_bundle)}},
+        )
+        derived = json.loads(Path(declaration["request_path"]).read_text("utf-8"))
+        assert_true(
+            derived["model_context"] == {
+                "as_of": "2025-12-31",
+                "reporting_currency": "GBP",
+                "units": "millions",
+                "forecast_periods": ["2026-12-31", "2027-12-31", "2028-12-31"],
+            },
+            "broker optional-close request did not inherit the sealed filings basis",
+        )
+        checks += 1
     assert_true(vision.transcription_structure(table_passes[0]["tables"][0])["is_grid"], "labelled period grid was not recognized")
     checks += 1
 

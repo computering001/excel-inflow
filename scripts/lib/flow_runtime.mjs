@@ -5,7 +5,7 @@ import {
 } from "./workflow_state.mjs";
 
 export const FLOW_SCHEMA_VERSION = "debt-user-flow/1.0";
-export const FLOW_CONTROLLER_VERSION = "five-stage/2.4";
+export const FLOW_CONTROLLER_VERSION = "six-milestone/3.0";
 export const STAGE_RECEIPT_SCHEMA_VERSION = "user-stage-receipt/1.0";
 
 export const VISIBLE_MILESTONES = Object.freeze(

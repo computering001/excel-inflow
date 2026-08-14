@@ -662,6 +662,8 @@ node scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-expor
 node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>
 node scripts/run_forecast_observation_tests.mjs
 node scripts/run_forecast_behavior_tests.mjs
+node scripts/run_product_constitution_tests.mjs
+node scripts/run_run_constitution_graph_tests.mjs
 node scripts/run_equation_graph_tests.mjs
 node scripts/run_fixed_point_constitution_tests.mjs --manifest <fixed-point-cases.json>
 node scripts/test_release_convergence_seam.mjs

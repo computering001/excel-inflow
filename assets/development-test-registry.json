@@ -66,12 +66,24 @@
       "runtime": "node",
       "script": "run_forecast_observation_tests.mjs"
     },
-    {
-      "id": "evidence-resolution-v2",
-      "phase": "evidence",
-      "runtime": "node",
-      "script": "run_evidence_resolution_v2_tests.mjs"
-    },
+  {
+    "id": "evidence-resolution-v2",
+    "phase": "evidence",
+    "runtime": "node",
+    "script": "run_evidence_resolution_v2_tests.mjs"
+  },
+  {
+    "id": "run-constitution-graph",
+    "phase": "graph",
+    "runtime": "node",
+    "script": "run_run_constitution_graph_tests.mjs"
+  },
+  {
+    "id": "product-constitution",
+    "phase": "workflow",
+    "runtime": "node",
+    "script": "run_product_constitution_tests.mjs"
+  },
     {
       "id": "forecast-topology",
       "phase": "forecast",

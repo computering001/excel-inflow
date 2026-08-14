@@ -48,6 +48,10 @@ import run_broker_pipeline as broker  # noqa: E402
 from workflow_state import assert_delivery_blocker, assert_state  # noqa: E402
 from verify_broker_semantics import normalized_manifest_period  # noqa: E402
 from compile_broker_candidate_manifest import compile_manifest  # noqa: E402
+from broker_terminal_recovery import (  # noqa: E402
+    compile_reference_only_crosswalk,
+    degrade_all_broker_authority,
+)
 
 
 def check(condition: bool, message: str) -> None:
@@ -1329,6 +1333,77 @@ def main() -> int:
             else:
                 raise AssertionError(f"{domain} was accepted as a delivery blocker")
         checks += 1
+
+        # Universal circuit breaker: even a globally unusable semantic review
+        # preserves the complete archive, selects zero values, and passes both
+        # the independent semantic oracle and the real pack compiler.
+        zero_bundle_path = Path(final_state["artifacts"]["verified_bundle"])
+        zero_source_crosswalk_path = Path(final_state["artifacts"]["crosswalk"])
+        zero_bundle = json.loads(zero_bundle_path.read_text("utf-8"))
+        zero_source_crosswalk = json.loads(zero_source_crosswalk_path.read_text("utf-8"))
+        reference_shell = compile_reference_only_crosswalk(zero_bundle, {
+            "as_of": "2026-06-30",
+            "reporting_currency": "USD",
+            "units": "millions",
+            "forecast_periods": ["2027-12-31", "2028-12-31", "2029-12-31"],
+        })
+        check(reference_shell.get("mappings") == [], "reference-only shell invented a mapping")
+        check(
+            all(item.get("model_use") == "reference_only" for item in reference_shell.get("metrics", {}).values()),
+            "reference-only shell promoted a metric",
+        )
+        zero_crosswalk, zero_receipt, _ = degrade_all_broker_authority(
+            bundle=zero_bundle,
+            crosswalk=reference_shell,
+            bundle_sha256=broker.sha256_file(zero_bundle_path),
+            source_crosswalk_sha256=broker.sha256_bytes(canonical_bytes(reference_shell)),
+            reason="Regression-forced global semantic failure.",
+        )
+        zero_crosswalk_path = root / "zero-authority-crosswalk.json"
+        write_json(zero_crosswalk_path, zero_crosswalk)
+        zero_semantic_path = root / "zero-authority-semantic.json"
+        zero_verify = subprocess.run(
+            [
+                sys.executable,
+                str(HERE / "verify_broker_semantics.py"),
+                str(zero_bundle_path),
+                str(zero_crosswalk_path),
+                "--out",
+                str(zero_semantic_path),
+            ],
+            cwd=HERE,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(zero_verify.returncode == 0, zero_verify.stderr or zero_verify.stdout)
+        zero_semantic = json.loads(zero_semantic_path.read_text("utf-8"))
+        check(zero_semantic.get("status") == "PASS", "zero-authority semantic oracle did not pass")
+        check(zero_crosswalk.get("mappings") == [], "zero-authority fallback retained a mapping")
+        check(
+            len((zero_crosswalk.get("terminal_recovery") or {}).get("quarantined_candidates", []))
+            == len((zero_bundle.get("candidate_manifest") or {}).get("candidates", [])),
+            "zero-authority fallback did not preserve every immutable candidate",
+        )
+        check(zero_receipt.get("model_consumption_added") == 0, "zero-authority fallback added model use")
+        zero_pack_root = root / "zero-authority-pack"
+        zero_compile = subprocess.run(
+            [
+                sys.executable,
+                str(HERE / "compile_broker_pack.py"),
+                str(zero_bundle_path),
+                str(zero_crosswalk_path),
+                "--out",
+                str(zero_pack_root),
+            ],
+            cwd=HERE,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        check(zero_compile.returncode == 0, zero_compile.stderr or zero_compile.stdout)
+        check((zero_pack_root / "broker-pack.json").is_file(), "zero-authority pack was not emitted")
+        checks += 8
 
         if args.out:
             write_json(root / "degraded-close-test-output.json", {

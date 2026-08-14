@@ -120,11 +120,7 @@
       "awaiting_reexport": { "fatal_reason": "opening_debt_unresolved", "domain": "opening_debt" },
       "decision_replay_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
       "decision_graph_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
-      "broker_selection_compile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
-      "broker_preview_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
-      "broker_auto_selection_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
       "case_recompile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
-      "forecast_authority_unresolved": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
       "workbook_build_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workbook_build" },
       "delivery_attestation_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "delivery_attestation" }
     }

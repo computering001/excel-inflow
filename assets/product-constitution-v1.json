@@ -1,0 +1,80 @@
+{
+  "schema_version": "excel-inflow-product-constitution/1.0",
+  "objective": "Deliver the best defensible 3H+3F debt-overlay workbook from mandatory company and debt evidence; optional evidence may improve authority but may never prevent delivery.",
+  "visible_milestones": [
+    "company",
+    "filings",
+    "brokers",
+    "debt",
+    "build",
+    "deliver"
+  ],
+  "evidence_lanes": {
+    "filings": {
+      "criticality": "mandatory",
+      "required_for": ["issuer_identity", "historical_statement_tree", "period_basis"]
+    },
+    "dcs": {
+      "criticality": "mandatory_for_live_debt_terms",
+      "required_for": ["opening_debt", "currency", "maturity", "pricing", "rcf_capacity"]
+    },
+    "broker": {
+      "criticality": "optional",
+      "failure_action": "remove_broker_authority_and_continue",
+      "archive_required": true,
+      "full_document_semantic_closure_required": false
+    }
+  },
+  "authority_ladder": [
+    "accounting_identity_or_schedule",
+    "company_commitment_or_guidance",
+    "selected_coherent_broker_house",
+    "explicit_user_assumption",
+    "formula_or_rollforward",
+    "seasonal_or_historical_inference",
+    "supported_explicit_zero",
+    "unresolved"
+  ],
+  "broker_rules": {
+    "one_coherent_house": true,
+    "cross_house_period_fallback": false,
+    "selected_cell_provenance_required": true,
+    "selected_cell_conflict_action": "remove_selected_edge_and_rerun_authority",
+    "unselected_conflict_action": "log_only",
+    "bounded_internal_attempts": 2,
+    "no_progress_action": "zero_broker_authority"
+  },
+  "causal_blocker_rule": {
+    "block_only_when_all": [
+      "unresolved",
+      "reachable_to_material_output",
+      "no_alternative_authority_path"
+    ],
+    "ask_once_when": "a user-resolvable material economic decision has no safe authority or default",
+    "degrade_when": "an optional evidence authority fails and another lawful authority path exists",
+    "log_when": "a finding is not consumed by nor reachable to a material workbook output"
+  },
+  "hard_block_domains": [
+    "issuer_and_period_basis",
+    "opening_debt_and_live_contractual_terms",
+    "economic_graph_determinacy_and_convergence",
+    "workbook_formula_and_package_integrity"
+  ],
+  "runtime_gates": [
+    "identity_period_units",
+    "selected_authority_provenance",
+    "material_forecast_coverage",
+    "opening_debt_reconciliation",
+    "equation_graph_and_fixed_point",
+    "formula_cache_and_workbook_integrity",
+    "structural_render"
+  ],
+  "release_only_gates": [
+    "unused_broker_semantic_enrichment",
+    "public_layout_corpus",
+    "full_mutation_cohort",
+    "exact_pixel_authority",
+    "native_excel_restoration",
+    "package_install_and_route_certification"
+  ]
+}

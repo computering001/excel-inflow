@@ -366,6 +366,91 @@ export async function compileLiveDeliveryAttestation({
     invariant(Boolean(published), "publication.sidecar_missing", `Publication manifest omits ${name}.`, violations);
     invariant(published?.sha256 === descriptor.sha256, "publication.sidecar_hash", `Publication hash for ${name} does not match the delivered sidecar.`, violations);
   }
+  const graphBoundCase = Boolean(
+    modelCase?.model_demand_graph_sha256 ||
+    modelCase?.selected_authority_contract_sha256 ||
+    modelCase?.run_constitution_graph_sha256
+  );
+  if (graphBoundCase) {
+    const authorityDirectory = path.join(publicationRoot, "authority");
+    const authorityManifest = publication?.authority_files;
+    let authorityFiles = [];
+    try {
+      authorityFiles = await relativeFiles(authorityDirectory);
+    } catch (error) {
+      violations.push({ code: "publication.authority_directory", detail: error.message });
+    }
+    const authorityInventory = publicationInventoryClosure(
+      authorityFiles,
+      authorityManifest,
+    );
+    invariant(
+      authorityInventory.ok && authorityFiles.length === 3,
+      "publication.authority_completeness",
+      "Publication does not contain exactly the three graph-bound authority artifacts.",
+      violations,
+    );
+    for (const entry of authorityManifest ?? []) {
+      const candidate = path.resolve(authorityDirectory, String(entry.path ?? ""));
+      invariant(
+        isInside(candidate, authorityDirectory),
+        "publication.authority_path",
+        `Authority entry escapes its evidence directory: ${entry.path}.`,
+        violations,
+      );
+      if (!isInside(candidate, authorityDirectory)) continue;
+      try {
+        invariant(
+          await hashFile(candidate) === entry.sha256,
+          "publication.authority_hash",
+          `Authority evidence hash differs for ${entry.path}.`,
+          violations,
+        );
+      } catch (error) {
+        violations.push({
+          code: "publication.authority_missing",
+          detail: `${entry.path}: ${error.message}`,
+        });
+      }
+    }
+    try {
+      const demand = await readJson(
+        path.join(authorityDirectory, "model_demand_graph.json"),
+        "published model-demand graph",
+      );
+      const selected = await readJson(
+        path.join(authorityDirectory, "selected_authority_contract.json"),
+        "published selected-authority contract",
+      );
+      const runGraph = await readJson(
+        path.join(authorityDirectory, "run_constitution_graph.json"),
+        "published run constitution graph",
+      );
+      invariant(
+        demand.graph_sha256 === modelCase.model_demand_graph_sha256,
+        "authority.model_demand_graph",
+        "Published demand graph differs from the model-case binding.",
+        violations,
+      );
+      invariant(
+        selected.contract_sha256 === modelCase.selected_authority_contract_sha256 &&
+          selected.model_demand_graph_sha256 === demand.graph_sha256,
+        "authority.selected_contract",
+        "Published selected-authority contract is not bound to the demand graph/model case.",
+        violations,
+      );
+      invariant(
+        runGraph.graph_sha256 === modelCase.run_constitution_graph_sha256 &&
+          runGraph.model_demand_graph_sha256 === demand.graph_sha256 &&
+          runGraph.selected_authority_contract_sha256 === selected.contract_sha256,
+        "authority.run_constitution_graph",
+        "Published run constitution graph is not bound to the selected authority/model case.",
+        violations,
+      );
+    } catch (error) {
+      violations.push({ code: "publication.authority_unreadable", detail: error.message });
+    }
+  }
   for (const [label, directory, manifestEntries] of [
     ["verification", path.join(publicationRoot, "verify"), publication?.verification_files],
     ["render", path.join(publicationRoot, "render"), publication?.render_files],

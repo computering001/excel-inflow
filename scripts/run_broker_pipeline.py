@@ -25,6 +25,8 @@ from broker_terminal_recovery import (
     analyse_terminal_recovery,
     apply_terminal_review,
     automatic_negative_consumption_review,
+    compile_reference_only_crosswalk,
+    degrade_all_broker_authority,
     degrade_finding_houses,
 )
 from broker_period_recovery import canonical_hash as period_canonical_hash, target_inventory as period_target_inventory
@@ -1025,6 +1027,11 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--responses")
     parser.add_argument("--crosswalk")
+    parser.add_argument(
+        "--close-optional",
+        action="store_true",
+        help="Preserve unresolved broker surfaces as evidence-only and continue with zero broker authority.",
+    )
     args = parser.parse_args()
 
     request_path = Path(args.request).resolve()
@@ -1159,11 +1166,18 @@ def main() -> int:
         return 2
 
     responses = Path(args.responses).resolve() if args.responses else None
+    if args.close_optional and (responses is None or not responses.is_dir()):
+        responses = output_root / "optional-close-empty-responses"
+        responses.mkdir(parents=True, exist_ok=True)
+        attempts["vision_attempt_count"] = attempts["vision_attempt_limit"]
     active_bundle_path = bundle_path
     active_bundle = bundle
     if bundle.get("gate_status") == "NEEDS_VISION":
         tasks = vision_tasks(bundle, responses)
-        if not responses or any(task.get("missing_passes") for task in tasks):
+        if (
+            (not responses or any(task.get("missing_passes") for task in tasks))
+            and not args.close_optional
+        ):
             checkpoint(checkpoints, stage="vision", status="NEEDS_WORK", input_digest=sha256_file(bundle_path), output=None, reused=False)
             write_state(
                 state_path, run_id=run_id, status="NEEDS_VISION", request_digest=request_digest,
@@ -1608,21 +1622,51 @@ def main() -> int:
 
     crosswalk = Path(args.crosswalk).resolve() if args.crosswalk else None
     if not crosswalk or not crosswalk.is_file():
-        checkpoint(checkpoints, stage="semantic_crosswalk", status="NEEDS_WORK", input_digest=sha256_file(active_bundle_path), output=None, reused=False)
-        write_state(
-            state_path, run_id=run_id, status="NEEDS_CROSSWALK", request_digest=request_digest,
-            sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
-            checkpoints=checkpoints, artifacts=artifacts,
-            tasks=[{
-                "task_kind": "semantic_crosswalk_review",
-                "verified_bundle": str(active_bundle_path),
-                "candidate_manifest_sha256": sha256_bytes(canonical_bytes(active_bundle.get("candidate_manifest"))),
-                "instruction": "Review every analytical table and disposition every annual and partial-period candidate. Map broadly, consume narrowly, and never map a quarantined cell.",
-            }],
-            summary={"candidate_count": len(active_bundle.get("candidate_manifest", {}).get("candidates", []))},
-            blocker_class="INTERNAL_WORK", attempts=attempts,
-        )
-        return 2
+        if isinstance(request.get("model_context"), dict):
+            reference_shell = compile_reference_only_crosswalk(
+                active_bundle, request["model_context"]
+            )
+            shell_hash = sha256_bytes(canonical_bytes(reference_shell))
+            zero_crosswalk, zero_receipt, zero_semantic = degrade_all_broker_authority(
+                bundle=active_bundle,
+                crosswalk=reference_shell,
+                bundle_sha256=sha256_file(active_bundle_path),
+                source_crosswalk_sha256=shell_hash,
+                reason=(
+                    "No model-host semantic crosswalk was available; preserve all broker "
+                    "evidence and continue with zero broker model authority."
+                ),
+            )
+            crosswalk = output_root / f"zero-authority-crosswalk-{key}-{shell_hash[:12]}.json"
+            zero_receipt_path = output_root / f"zero-authority-crosswalk-{key}-{shell_hash[:12]}.receipt.json"
+            zero_semantic_path = output_root / f"zero-authority-terminal-semantic-{key}-{shell_hash[:12]}.json"
+            atomic_json(crosswalk, zero_crosswalk)
+            atomic_json(zero_receipt_path, zero_receipt)
+            atomic_json(zero_semantic_path, zero_semantic)
+            artifacts["crosswalk"] = str(crosswalk)
+            artifacts["zero_authority_receipt"] = str(zero_receipt_path)
+            artifacts["terminal_recovery_receipt"] = str(zero_receipt_path)
+            lane_degraded = True
+            checkpoint(
+                checkpoints, stage="semantic_crosswalk", status="PASS",
+                input_digest=sha256_file(active_bundle_path), output=crosswalk, reused=False,
+            )
+        else:
+            checkpoint(checkpoints, stage="semantic_crosswalk", status="NEEDS_WORK", input_digest=sha256_file(active_bundle_path), output=None, reused=False)
+            write_state(
+                state_path, run_id=run_id, status="NEEDS_CROSSWALK", request_digest=request_digest,
+                sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
+                checkpoints=checkpoints, artifacts=artifacts,
+                tasks=[{
+                    "task_kind": "semantic_crosswalk_review",
+                    "verified_bundle": str(active_bundle_path),
+                    "candidate_manifest_sha256": sha256_bytes(canonical_bytes(active_bundle.get("candidate_manifest"))),
+                    "instruction": "Author a selected-cell crosswalk only for model-demand nodes. Unselected rows remain preserved evidence and never block delivery.",
+                }],
+                summary={"candidate_count": len(active_bundle.get("candidate_manifest", {}).get("candidates", []))},
+                blocker_class="INTERNAL_WORK", attempts=attempts,
+            )
+            return 2
 
     crosswalk_digest = sha256_file(crosswalk)
     record_task_execution_attempt(
@@ -1723,6 +1767,58 @@ def main() -> int:
                 )
                 lane_degraded = True
                 recovery_analysis = analyse_terminal_recovery(active_bundle, recovered_crosswalk, semantic)
+        if semantic.get("status") != "PASS":
+            # Broker evidence is optional to model delivery. Once a supplied
+            # crosswalk has failed the independent semantic oracle, remove the
+            # entire broker authority edge set, preserve every immutable
+            # candidate in terminal quarantine, and rerun the oracle. This is
+            # the finite circuit breaker for global/unbound findings and for a
+            # house-local repair that still cannot close.
+            try:
+                zero_crosswalk, zero_receipt, zero_semantic = degrade_all_broker_authority(
+                    bundle=active_bundle,
+                    crosswalk=read_json(crosswalk, "active broker crosswalk"),
+                    bundle_sha256=sha256_file(active_bundle_path),
+                    source_crosswalk_sha256=crosswalk_digest,
+                    reason=(
+                        "The supplied broker semantic mapping did not pass the independent "
+                        "oracle; preserve all reports and continue with zero broker model authority."
+                    ),
+                )
+            except ValueError:
+                pass
+            else:
+                zero_path = output_root / f"zero-authority-crosswalk-{key}-{crosswalk_digest[:12]}.json"
+                zero_receipt_path = output_root / f"zero-authority-crosswalk-{key}-{crosswalk_digest[:12]}.receipt.json"
+                zero_semantic_path = output_root / f"zero-authority-terminal-semantic-{key}-{crosswalk_digest[:12]}.json"
+                atomic_json(zero_path, zero_crosswalk)
+                atomic_json(zero_receipt_path, zero_receipt)
+                atomic_json(zero_semantic_path, zero_semantic)
+                crosswalk = zero_path
+                crosswalk_digest = sha256_file(crosswalk)
+                artifacts["crosswalk"] = str(crosswalk)
+                artifacts["zero_authority_receipt"] = str(zero_receipt_path)
+                artifacts["terminal_recovery_receipt"] = str(zero_receipt_path)
+                semantic_path = output_root / f"semantic-{key}-{crosswalk_digest[:12]}.json"
+                semantic_input = sha256_bytes(canonical_bytes({
+                    "bundle": sha256_file(active_bundle_path), "crosswalk": crosswalk_digest,
+                    "runtime": runtime_digest,
+                }))
+                run([
+                    sys.executable, str(HERE / "verify_broker_semantics.py"),
+                    str(active_bundle_path), str(crosswalk), "--out", str(semantic_path),
+                ], {0, 1})
+                semantic = read_json(semantic_path, "zero-authority broker semantic report")
+                artifacts["semantic_report"] = str(semantic_path)
+                checkpoint(
+                    checkpoints, stage="zero_broker_authority_fallback",
+                    status="PASS" if semantic.get("status") == "PASS" else "NEEDS_WORK",
+                    input_digest=semantic_input, output=semantic_path, reused=False,
+                )
+                lane_degraded = True
+                recovery_analysis = analyse_terminal_recovery(
+                    active_bundle, zero_crosswalk, semantic
+                )
         terminal_review_path = responses / "broker-terminal-materiality-review.json" if responses else None
         prior_terminal = any(
             task.get("task_kind") == "terminal_materiality_recovery"

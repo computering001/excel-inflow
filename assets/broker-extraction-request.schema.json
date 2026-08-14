@@ -8,6 +8,22 @@
   "properties": {
     "schema_version": { "const": "broker-extraction-request/1.0" },
     "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "model_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as_of", "reporting_currency", "units", "forecast_periods"],
+      "properties": {
+        "as_of": { "type": "string", "format": "date" },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions", "billions"] },
+        "forecast_periods": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "string", "format": "date" }
+        }
+      }
+    },
     "documents": {
       "type": "array",
       "minItems": 1,

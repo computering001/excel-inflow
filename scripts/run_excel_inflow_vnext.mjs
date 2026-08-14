@@ -14,11 +14,8 @@ import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import {
-  compileEvidenceResolutionV2,
-  evidenceResolutionCanonicalJson,
-} from "./lib/evidence_resolution_v2.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { authorityQualitySummary } from "./lib/run_constitution_graph.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -290,37 +287,22 @@ async function main() {
     });
   }
 
-  const forecastPlanPath = path.join(userFlowOut, "stages", "decisions", "forecast-plan.json");
-  const caseReportPath = path.join(userFlowOut, "stages", "decisions", "case-compile-report.json");
-  const forecastPlan = await readJson(forecastPlanPath, "forecast plan");
-  const caseCompileReport = await readJson(caseReportPath, "case compile report");
-  const resolution = compileEvidenceResolutionV2({
-    evidenceRun,
-    forecastPlan,
-    laneStates: attachmentState?.lane_states ?? {},
-    caseCompileReport,
-  });
-  const resolutionPath = path.join(out, "evidence-resolution-v2.json");
-  await fs.writeFile(resolutionPath, evidenceResolutionCanonicalJson(resolution));
-  artifacts.evidence_resolution = resolutionPath;
+  const decisionsRoot = path.join(userFlowOut, "stages", "decisions");
+  const forecastPlanPath = path.join(decisionsRoot, "forecast-plan.json");
+  const demandGraphPath = path.join(decisionsRoot, "model-demand-graph.json");
+  const authorityContractPath = path.join(decisionsRoot, "selected-authority-contract.json");
+  const runGraphPath = path.join(decisionsRoot, "run-constitution-graph.json");
+  const authorityContract = await readJson(
+    authorityContractPath,
+    "selected authority contract",
+  );
+  const runGraph = await readJson(runGraphPath, "run constitution graph");
+  const qualitySummary = authorityQualitySummary(authorityContract);
   artifacts.forecast_plan = forecastPlanPath;
-  checkpoints.push(await checkpoint("authority_resolution", resolution.status, resolutionPath));
-  if (!["PASS", "PASS_DEGRADED"].includes(resolution.status)) {
-    return finish({
-      out,
-      runId,
-      status: resolution.status === "ACTION_REQUIRED" ? "ACTION_REQUIRED" : resolution.status === "BLOCKED" ? "BLOCKED" : "NEEDS_INTERNAL_WORK",
-      qualityMode: resolution.quality_mode,
-      blockerClass: resolution.blocker_class,
-      checkpoints,
-      artifacts,
-      summary: {
-        message: "The unified authority graph did not reach a buildable fixed point.",
-        unresolved_material_count: resolution.authority_graph.unresolved_material_count,
-        finding_count: resolution.findings.length,
-      },
-    });
-  }
+  artifacts.model_demand_graph = demandGraphPath;
+  artifacts.selected_authority_contract = authorityContractPath;
+  artifacts.run_constitution_graph = runGraphPath;
+  checkpoints.push(await checkpoint("authority_resolution", "PASS", runGraphPath));
 
   const resumeArgs = [
     path.join(HERE, "run_user_flow.mjs"),
@@ -358,7 +340,7 @@ async function main() {
     out,
     runId,
     status: "PASS_PENDING_MANUAL",
-    qualityMode: resolution.quality_mode,
+    qualityMode: authorityContract.quality_mode,
     blockerClass: null,
     checkpoints,
     artifacts,
@@ -366,9 +348,9 @@ async function main() {
       message: "The model was built and independently validated; native Excel review remains the declared manual gate.",
       delivery_file: userFlowResult.delivery_file,
       workbook_sha256: userFlowResult.delivery_file_sha256,
-      quality_receipt_sha256: resolution.receipt.resolution_sha256,
-      quarantined_evidence_count: resolution.receipt.quarantine_count,
-      fallback_count: resolution.receipt.fallback_count,
+      quality_receipt_sha256: runGraph.graph_sha256,
+      quarantined_evidence_count: qualitySummary.quarantined_evidence_count,
+      fallback_count: qualitySummary.fallback_count,
       total_violations: userFlowResult.total_violations,
     },
   });

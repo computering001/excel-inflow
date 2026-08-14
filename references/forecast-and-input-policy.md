@@ -352,8 +352,8 @@ Never for history.** Historic movements come from the filings without exception.
 When broker data is supplied or available:
 
 - retain used values on `Brokers`;
-- require the full-table semantic coverage ledger to disposition every detected
-  annual and partial-period row before selecting an authority;
+- require exact semantic coverage and provenance only for broker cells proposed
+  as model authority; preserve all other rows/pages as non-blocking evidence;
 - create a visible selector or consensus choice;
 - preserve metric and period definitions;
 - preserve stable definition ids and never average reported, adjusted, restated,
