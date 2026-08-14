@@ -424,6 +424,8 @@ async function main() {
     throw new Error(
       "Usage: orchestrate_release.mjs <case.json> --out <run-dir> " +
       "[--dcs-export <json>] [--broker-pack <json>] [--filings <json>] " +
+      "[--model-demand-graph <json>] [--selected-authority-contract <json>] " +
+      "[--run-constitution-graph <json>] " +
       "[--case-only] [--python <python>] [--soffice <path>] " +
       "[--workspace-token <token>] [--json]",
     );
@@ -434,6 +436,57 @@ async function main() {
   const runDir = isolated.run_root;
   await fs.mkdir(runDir, { recursive: true });
   const modelCase = await json(casePath);
+  const authorityOptionPaths = {
+    model_demand_graph: options["model-demand-graph"]
+      ? path.resolve(options["model-demand-graph"])
+      : null,
+    selected_authority_contract: options["selected-authority-contract"]
+      ? path.resolve(options["selected-authority-contract"])
+      : null,
+    run_constitution_graph: options["run-constitution-graph"]
+      ? path.resolve(options["run-constitution-graph"])
+      : null,
+  };
+  const expectedAuthorityHashes = {
+    model_demand_graph: modelCase.model_demand_graph_sha256 ?? null,
+    selected_authority_contract: modelCase.selected_authority_contract_sha256 ?? null,
+    run_constitution_graph: modelCase.run_constitution_graph_sha256 ?? null,
+  };
+  const authorityRequired = Object.values(expectedAuthorityHashes).some(Boolean);
+  if (
+    authorityRequired &&
+    Object.values(authorityOptionPaths).some((target) => !target)
+  ) {
+    throw new Error(
+      "A graph-bound model case requires all three Stage-3 authority artifacts.",
+    );
+  }
+  const authorityArtifacts = {};
+  if (authorityRequired) {
+    for (const [name, target] of Object.entries(authorityOptionPaths)) {
+      const value = await json(target);
+      const actual =
+        value.graph_sha256 ?? value.contract_sha256 ?? null;
+      if (actual !== expectedAuthorityHashes[name]) {
+        throw new Error(`${name} does not match the hash sealed into model-case.json.`);
+      }
+      authorityArtifacts[name] = { path: target, value };
+    }
+    if (
+      authorityArtifacts.selected_authority_contract.value.model_demand_graph_sha256 !==
+      expectedAuthorityHashes.model_demand_graph
+    ) {
+      throw new Error("Selected-authority contract is not bound to the supplied demand graph.");
+    }
+    if (
+      authorityArtifacts.run_constitution_graph.value.model_demand_graph_sha256 !==
+        expectedAuthorityHashes.model_demand_graph ||
+      authorityArtifacts.run_constitution_graph.value.selected_authority_contract_sha256 !==
+        expectedAuthorityHashes.selected_authority_contract
+    ) {
+      throw new Error("Run constitution graph is not bound to the supplied authority artifacts.");
+    }
+  }
   const caseHash = await hashFile(casePath);
   const runId = validateRunId(String(options["run-id"] ?? `stage4-${caseHash.slice(0, 24)}`));
   const workspaceToken = String(
@@ -928,12 +981,16 @@ async function main() {
   // flow can hash, resume and attest it without knowing the checkpoint store
   // layout.
   const publicationPath = path.join(runDir, "publication.json");
+  const finalAuthorityDir = path.join(runDir, "authority");
   const publishOutputs = {
     workbook: finalWorkbook,
     semantic_gates: finalSemantic,
     verify: { path: finalVerifyDir, kind: "directory" },
     render: { path: finalRenderDir, kind: "directory" },
     publication: publicationPath,
+    ...(authorityRequired
+      ? { authority: { path: finalAuthorityDir, kind: "directory" } }
+      : {}),
     ...sidecarOutputs(finalWorkbook),
   };
   step = await checkpoint({
@@ -945,6 +1002,14 @@ async function main() {
       recalculate_receipt: checkpointReceipts.recalculate,
       terminal_patch_receipt: checkpointReceipts.terminal_patch,
       environment_probe: await hashFile(environment.artifact),
+      ...Object.fromEntries(
+        await Promise.all(
+          Object.entries(authorityArtifacts).map(async ([name, artifact]) => [
+            name,
+            await hashFile(artifact.path),
+          ]),
+        ),
+      ),
     },
     outputs: publishOutputs,
     action: async (workDir) => {
@@ -972,6 +1037,14 @@ async function main() {
       }
       await atomicReplaceDirectory(verificationBundle, finalVerifyDir);
       await atomicReplaceDirectory(renderDir, finalRenderDir);
+      if (authorityRequired) {
+        const authorityBundle = path.join(workDir, "authority-bundle");
+        await fs.mkdir(authorityBundle, { recursive: true });
+        for (const [name, artifact] of Object.entries(authorityArtifacts)) {
+          await fs.copyFile(artifact.path, path.join(authorityBundle, `${name}.json`));
+        }
+        await atomicReplaceDirectory(authorityBundle, finalAuthorityDir);
+      }
       const sidecars = Object.fromEntries(
         await Promise.all(SIDECAR_SUFFIXES.map(async (suffix) => [
           suffix.slice(1),
@@ -1015,6 +1088,9 @@ async function main() {
         verification_files: await fileManifest(finalVerifyDir),
         render_files: await fileManifest(finalRenderDir),
         checkpoint_receipts: priorCheckpointReceipts,
+        authority_files: authorityRequired
+          ? await fileManifest(finalAuthorityDir)
+          : [],
       });
       return {
         status: "PASS",

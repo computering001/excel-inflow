@@ -59,9 +59,18 @@ import {
   validateForecastBehaviorMap,
 } from "./lib/forecast_behavior.mjs";
 import {
+  compileModelDemandGraph,
+  compileRunConstitutionGraph,
+  compileSelectedAuthorityContract,
+  validateModelDemandGraph,
+  validateRunConstitutionGraph,
+  validateSelectedAuthorityContract,
+} from "./lib/run_constitution_graph.mjs";
+import {
   applyBrokerPreviewSelection,
   applyBrokerPreviewSelectionToCaseEvidence,
   automaticBrokerPreviewConfirmation,
+  compileBrokerForecastWaterfallFallback,
   compileBrokerPreview,
   validateBrokerPreview,
   verifyBrokerPreviewConfirmation,
@@ -191,9 +200,15 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
     "scripts/lib/forecast_behavior.mjs",
     "scripts/lib/forecast_candidate_compiler.mjs",
     "scripts/lib/forecast_observation.mjs",
+    "scripts/lib/run_constitution_graph.mjs",
     "assets/forecast-behavior-map-v1.schema.json",
     "assets/forecast-plan-v2.schema.json",
     "assets/forecast-observation-ledger-v1.schema.json",
+    "assets/model-demand-graph-v1.schema.json",
+    "assets/selected-authority-contract-v1.schema.json",
+    "assets/run-constitution-graph-v1.schema.json",
+    "assets/product-constitution-v1.json",
+    "assets/product-constitution-v1.schema.json",
     "assets/case-source.schema.json",
   ]),
   delivery: Object.freeze([
@@ -701,24 +716,39 @@ async function main() {
     const brokerState =
       evidenceRun.case_evidence?.lanes?.broker_evidence?.controller_state ?? {};
     const brokerIngress = evidenceRun.ingress?.broker_evidence ?? {};
-    brokerPreview = compileBrokerPreview({
-      brokerPack: evidenceRun.broker_pack,
-      sourceTables: evidenceRun.broker_source_tables,
-      crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
-      bindingHashes: {
-        broker_pack_sha256:
-          brokerState.artifact_sha256?.broker_pack ??
-          hashValue(evidenceRun.broker_pack),
-        broker_source_tables_sha256:
-          brokerIngress.source_tables_sha256 ??
-          brokerState.artifact_sha256?.source_tables ??
-          hashValue(evidenceRun.broker_source_tables),
-        broker_crosswalk_receipt_sha256:
-          brokerIngress.crosswalk_receipt_sha256 ??
-          brokerState.artifact_sha256?.broker_crosswalk_receipt ??
-          hashValue(evidenceRun.broker_crosswalk_receipt),
-      },
-    });
+    const brokerBindingHashes = {
+      broker_pack_sha256:
+        brokerState.artifact_sha256?.broker_pack ??
+        hashValue(evidenceRun.broker_pack),
+      broker_source_tables_sha256:
+        brokerIngress.source_tables_sha256 ??
+        brokerState.artifact_sha256?.source_tables ??
+        hashValue(evidenceRun.broker_source_tables),
+      broker_crosswalk_receipt_sha256:
+        brokerIngress.crosswalk_receipt_sha256 ??
+        brokerState.artifact_sha256?.broker_crosswalk_receipt ??
+        hashValue(evidenceRun.broker_crosswalk_receipt),
+    };
+    const fallbackBrokerPreview = (reasons) =>
+      compileBrokerForecastWaterfallFallback({
+        brokerPack: evidenceRun.broker_pack,
+        sourceTables: evidenceRun.broker_source_tables,
+        crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
+        bindingHashes: brokerBindingHashes,
+        reasons,
+      });
+    try {
+      brokerPreview = compileBrokerPreview({
+        brokerPack: evidenceRun.broker_pack,
+        sourceTables: evidenceRun.broker_source_tables,
+        crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
+        bindingHashes: brokerBindingHashes,
+      });
+    } catch (error) {
+      brokerPreview = fallbackBrokerPreview([
+        `Primary-house preview compilation failed internally: ${error.message}`,
+      ]);
+    }
     await writeJsonAtomic(brokerPackArtifactPath, evidenceRun.broker_pack);
     await writeJsonAtomic(
       brokerSourceTablesArtifactPath,
@@ -729,6 +759,13 @@ async function main() {
       evidenceRun.broker_crosswalk_receipt,
     );
     brokerPreviewValidation = validateBrokerPreview(brokerPreview);
+    if (brokerPreview.status !== "PASS" || !brokerPreviewValidation.valid) {
+      brokerPreview = fallbackBrokerPreview([
+        ...(brokerPreview.violations ?? []),
+        ...(brokerPreviewValidation.violations ?? []),
+      ]);
+      brokerPreviewValidation = validateBrokerPreview(brokerPreview);
+    }
     await writeJsonAtomic(brokerPreviewPath, brokerPreview);
     await writeTextAtomic(
       brokerPreviewScreenPath,
@@ -788,6 +825,44 @@ async function main() {
       );
       activeCaseCompileReport = brokerSelectedCompilation.report;
       activeModelCase = brokerSelectedCompilation.model_case;
+      if (
+        brokerSelectedCompilation.report?.status !== "clean" &&
+        brokerPreview.selection_mode === "primary_house"
+      ) {
+        const failedSelectionFindings = (
+          brokerSelectedCompilation.report?.findings ?? []
+        )
+          .filter((entry) => entry.severity === "BLOCK")
+          .map((entry) => entry.message);
+        brokerPreview = fallbackBrokerPreview([
+          "The selected coherent broker house did not compile cleanly and was removed from model authority.",
+          ...failedSelectionFindings,
+        ]);
+        brokerPreviewValidation = validateBrokerPreview(brokerPreview);
+        brokerConfirmation = automaticBrokerPreviewConfirmation(brokerPreview);
+        brokerConfirmationCheck = verifyBrokerPreviewConfirmation(
+          brokerPreview,
+          brokerConfirmation,
+        );
+        await writeJsonAtomic(brokerPreviewPath, brokerPreview);
+        await writeTextAtomic(
+          brokerPreviewScreenPath,
+          `${renderBrokerPreviewScreen(brokerPreview)}\n`,
+        );
+        await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
+        const fallbackProjection = applyBrokerPreviewSelectionToCaseEvidence(
+          validation.handoff.case_evidence,
+          brokerPreview,
+          brokerConfirmation,
+        );
+        activeCaseEvidence = fallbackProjection.case_evidence;
+        brokerSelectedCompilation = compileCase(
+          validation.handoff.case_source,
+          activeCaseEvidence,
+        );
+        activeCaseCompileReport = brokerSelectedCompilation.report;
+        activeModelCase = brokerSelectedCompilation.model_case;
+      }
       await writeJsonAtomic(brokerSelectedCaseEvidencePath, activeCaseEvidence);
       await writeJsonAtomic(
         brokerSelectedCompileReportPath,
@@ -841,7 +916,7 @@ async function main() {
       (entry) => entry.severity === "BLOCK",
     );
     await writeJsonAtomic(stage2Result, {
-      outcome: "broker_selection_compile_blocked",
+      outcome: "case_recompile_blocked",
       blocker_class: "INTERNAL_WORK",
       findings: blocks,
     });
@@ -854,7 +929,7 @@ async function main() {
       previousReceiptHash: receipt1.receipt_hash,
       outputs: stage2Outputs,
       detail: {
-        outcome: "broker_selection_compile_blocked",
+        outcome: "case_recompile_blocked",
         blocker_class: "INTERNAL_WORK",
         block_count: blocks.length,
       },
@@ -876,7 +951,7 @@ async function main() {
         run_id: runId,
         status: "BLOCKED",
         stage: "evidence_review",
-        outcome: "broker_selection_compile_blocked",
+        outcome: "case_recompile_blocked",
         blocker_class: "INTERNAL_WORK",
         broker_preview: brokerPreviewPath,
         receipt: receipt2,
@@ -960,7 +1035,7 @@ async function main() {
         runDir,
         runId,
         stageId: "decisions",
-        status: "blocked",
+        status: "action_required",
         inputHashes: { stage2_receipt: receipt2.receipt_hash },
         previousReceiptHash: receipt2.receipt_hash,
         outputs: { decision_result: stage3Result },
@@ -974,7 +1049,7 @@ async function main() {
           schema_version: "user-flow-run/1.0",
           controller_version: FLOW_CONTROLLER_VERSION,
           run_id: runId,
-          status: "BLOCKED",
+          status: "ACTION_REQUIRED",
           stage: "decisions",
           outcome: intakeResult.outcome,
           blocker_class: blockerForStoppedOutcome(intakeResult.outcome),
@@ -1004,107 +1079,18 @@ async function main() {
     productionBrokerPreviewRequired &&
     (brokerPreview.status !== "PASS" || !brokerPreviewValidation?.valid)
   ) {
-    receipt2 = await persistStage({
-      runDir,
-      runId,
-      stageId: "evidence_review",
-      status: "blocked",
-      inputHashes: stage2Inputs,
-      previousReceiptHash: receipt1.receipt_hash,
-      outputs: stage2Outputs,
-      detail: {
-        outcome: "broker_preview_blocked",
-        blocker_class: "INTERNAL_WORK",
-        violations: [
-          ...(brokerPreview.violations ?? []),
-          ...(brokerPreviewValidation?.violations ?? []),
-        ],
-      },
-    });
-    return finish({
-      runDir,
-      screen: renderFailure({
-        stage: "evidence_review",
-        what_failed: "The sealed broker pack could not produce one coherent selectable primary-house preview.",
-        why: "This is an internal evidence-to-model boundary defect. The reports remain preserved and must not be reattached.",
-        what_would_fix_it: [
-          ...(brokerPreview.violations ?? []),
-          ...(brokerPreviewValidation?.violations ?? []),
-        ].slice(0, 5),
-      }),
-      machine: options.json === true,
-      result: {
-        schema_version: "user-flow-run/1.0",
-        controller_version: FLOW_CONTROLLER_VERSION,
-        run_id: runId,
-        status: "BLOCKED",
-        stage: "evidence_review",
-        outcome: "broker_preview_blocked",
-        blocker_class: "INTERNAL_WORK",
-        broker_preview: brokerPreviewPath,
-        receipt: receipt2,
-        reused_stages: reusedStages,
-      },
-    });
+    throw new Error(
+      `Zero-broker fallback preview invariant failed: ${[
+        ...(brokerPreview.violations ?? []),
+        ...(brokerPreviewValidation?.violations ?? []),
+      ][0] ?? "unknown preview violation"}`,
+    );
   }
   if (productionBrokerPreviewRequired && !brokerConfirmationCheck?.valid) {
     const confirmationErrors = brokerConfirmationCheck?.errors ?? [];
-    const previewScreen = renderFailure({
-      stage: "evidence_review",
-      what_failed: "The controller could not seal its automatic broker selection.",
-      why: "This is an internal selection defect. The broker evidence remains preserved and no user response can repair it.",
-      what_would_fix_it: confirmationErrors,
-    });
-    await writeTextAtomic(brokerPreviewScreenPath, `${previewScreen}\n`);
-    receipt2 = await persistStage({
-      runDir,
-      runId,
-      stageId: "evidence_review",
-      status: "blocked",
-      inputHashes: stage2Inputs,
-      previousReceiptHash: receipt1.receipt_hash,
-      outputs: stage2Outputs,
-      detail: {
-        outcome: "broker_auto_selection_blocked",
-        blocker_class: "INTERNAL_WORK",
-        preview_sha256: brokerPreview.preview_sha256,
-        recommended_primary_house_id:
-          brokerPreview.recommended_primary_house_id,
-        ...(confirmationErrors.length > 0
-          ? { confirmation_errors: confirmationErrors }
-          : {}),
-      },
-    });
-    const carrier = await persistCurrentCarrier("BLOCKED_INTERNAL", {
-      broker_preview: brokerPreviewPath,
-      broker_preview_screen: brokerPreviewScreenPath,
-      broker_pack: brokerPackArtifactPath,
-      broker_source_tables: brokerSourceTablesArtifactPath,
-      broker_crosswalk_receipt: brokerCrosswalkReceiptArtifactPath,
-      broker_confirmation_template: brokerConfirmationTemplatePath,
-      case_source: stage1CaseSource,
-      case_compile_report: stage1CompileReport,
-    });
-    return finish({
-      runDir,
-      screen: previewScreen,
-      machine: options.json === true,
-      result: {
-        schema_version: "user-flow-run/1.0",
-        controller_version: FLOW_CONTROLLER_VERSION,
-        run_id: runId,
-        status: "BLOCKED",
-        stage: "evidence_review",
-        outcome: "broker_auto_selection_blocked",
-        blocker_class: "INTERNAL_WORK",
-        broker_preview: brokerPreviewPath,
-        broker_confirmation_template: brokerConfirmationTemplatePath,
-        carrier: carrier.path,
-        evidence_run: stage1Evidence,
-        receipt: receipt2,
-        reused_stages: reusedStages,
-      },
-    });
+    throw new Error(
+      `Zero-broker automatic confirmation invariant failed: ${confirmationErrors[0] ?? "unknown confirmation violation"}`,
+    );
   }
   if (!receipt2) {
     receipt2 = await persistStage({
@@ -1143,6 +1129,9 @@ async function main() {
   const forecastPlanPath = path.join(stage3Dir, "forecast-plan.txt");
   const forecastPlanJsonPath = path.join(stage3Dir, "forecast-plan.json");
   const forecastBehaviorPath = path.join(stage3Dir, "forecast-behavior-map.json");
+  const modelDemandGraphPath = path.join(stage3Dir, "model-demand-graph.json");
+  const selectedAuthorityContractPath = path.join(stage3Dir, "selected-authority-contract.json");
+  const runConstitutionGraphPath = path.join(stage3Dir, "run-constitution-graph.json");
   let answeredCase;
   let answerHash;
   if (intakeResult.outcome === "questions") {
@@ -1388,6 +1377,9 @@ async function main() {
     forecast_plan: forecastPlanPath,
     forecast_plan_json: forecastPlanJsonPath,
     forecast_behavior_map: forecastBehaviorPath,
+    model_demand_graph: modelDemandGraphPath,
+    selected_authority_contract: selectedAuthorityContractPath,
+    run_constitution_graph: runConstitutionGraphPath,
     case_source: answeredCaseSourcePath,
     case_compile_report: answeredCompileReportPath,
   };
@@ -1437,6 +1429,13 @@ async function main() {
         `Forecast behavior artifact is invalid: ${behaviorValidation.violations[0]?.message ?? "unknown violation"}`,
       );
     }
+    const modelDemandGraph = compileModelDemandGraph(planningCase);
+    const demandValidation = validateModelDemandGraph(modelDemandGraph);
+    if (!demandValidation.valid) {
+      throw new Error(
+        `Model-demand graph is invalid: ${demandValidation.errors[0] ?? "unknown violation"}`,
+      );
+    }
     const forecastPlan = compileForecastPlan(
       planningCase,
       planningCase.statement_structure,
@@ -1453,8 +1452,39 @@ async function main() {
     if (forecastPlanErrors.length > 0) {
       throw new Error(`Forecast plan artifact is invalid: ${forecastPlanErrors[0]}`);
     }
+    const selectedAuthorityContract = compileSelectedAuthorityContract({
+      modelCase: planningCase,
+      forecastPlan,
+      modelDemandGraph,
+      evidenceRun,
+    });
+    const authorityValidation = validateSelectedAuthorityContract(
+      selectedAuthorityContract,
+      { modelDemandGraph, forecastPlan },
+    );
+    if (!authorityValidation.valid) {
+      throw new Error(
+        `Selected-authority contract is invalid: ${authorityValidation.errors[0] ?? "unknown violation"}`,
+      );
+    }
+    const runConstitutionGraph = compileRunConstitutionGraph({
+      evidenceRun,
+      modelCase: planningCase,
+      forecastPlan,
+      modelDemandGraph,
+      selectedAuthorityContract,
+    });
+    const constitutionValidation = validateRunConstitutionGraph(runConstitutionGraph);
+    if (!constitutionValidation.valid) {
+      throw new Error(
+        `Run constitution graph is invalid: ${constitutionValidation.errors[0] ?? "unknown violation"}`,
+      );
+    }
     await writeJsonAtomic(forecastBehaviorPath, behaviorMap);
     await writeJsonAtomic(forecastPlanJsonPath, forecastPlan);
+    await writeJsonAtomic(modelDemandGraphPath, modelDemandGraph);
+    await writeJsonAtomic(selectedAuthorityContractPath, selectedAuthorityContract);
+    await writeJsonAtomic(runConstitutionGraphPath, runConstitutionGraph);
     if (forecastPlan.status !== "PASS") {
       await writeTextAtomic(
         forecastPlanPath,
@@ -1464,7 +1494,7 @@ async function main() {
         runDir,
         runId,
         stageId: "decisions",
-        status: "blocked",
+        status: "action_required",
         inputHashes: stage3Inputs,
         previousReceiptHash: receipt2.receipt_hash,
         outputs: {
@@ -1486,7 +1516,7 @@ async function main() {
           schema_version: "user-flow-run/1.0",
           controller_version: FLOW_CONTROLLER_VERSION,
           run_id: runId,
-          status: "BLOCKED",
+          status: "ACTION_REQUIRED",
           stage: "decisions",
           outcome: "forecast_authority_unresolved",
           blocker_class: "USER_DECISION",
@@ -1498,6 +1528,11 @@ async function main() {
       });
     }
     answeredCase = materializeForecastPlan(planningCase, forecastPlan);
+    answeredCase.model_demand_graph_sha256 = modelDemandGraph.graph_sha256;
+    answeredCase.selected_authority_contract_sha256 =
+      selectedAuthorityContract.contract_sha256;
+    answeredCase.run_constitution_graph_sha256 = runConstitutionGraph.graph_sha256;
+    answeredCase.evidence_quality_mode = selectedAuthorityContract.quality_mode;
     const parityErrors = validateForecastPlanCaseParity(answeredCase, forecastPlan);
     if (parityErrors.length > 0) {
       throw new Error(`Materialized forecast plan parity failed: ${parityErrors[0]}`);
@@ -1519,6 +1554,10 @@ async function main() {
         question_count: intakeResult.outcome === "questions" ? intakeResult.plan.questions.length : 0,
         forecast_plan_sha256: forecastPlanSha256(forecastPlan),
         forecast_state_count: forecastPlan.states.length,
+        model_demand_graph_sha256: modelDemandGraph.graph_sha256,
+        selected_authority_contract_sha256:
+          selectedAuthorityContract.contract_sha256,
+        run_constitution_graph_sha256: runConstitutionGraph.graph_sha256,
       },
     });
   }
@@ -1527,6 +1566,9 @@ async function main() {
       model_case: answeredCasePath,
       case_source: answeredCaseSourcePath,
       case_compile_report: answeredCompileReportPath,
+      model_demand_graph: modelDemandGraphPath,
+      selected_authority_contract: selectedAuthorityContractPath,
+      run_constitution_graph: runConstitutionGraphPath,
     });
     return finish({
       runDir,
@@ -1542,6 +1584,9 @@ async function main() {
         carrier: carrier.path,
         evidence_run: stage1Evidence,
         model_case: answeredCasePath,
+        model_demand_graph: modelDemandGraphPath,
+        selected_authority_contract: selectedAuthorityContractPath,
+        run_constitution_graph: runConstitutionGraphPath,
         reused_stages: reusedStages,
       },
     });
@@ -1637,6 +1682,9 @@ async function main() {
     stage3_receipt: receipt3.receipt_hash,
     model_case: caseHash,
     forecast_plan: await hashFile(forecastPlanJsonPath),
+    model_demand_graph: await hashFile(modelDemandGraphPath),
+    selected_authority_contract: await hashFile(selectedAuthorityContractPath),
+    run_constitution_graph: await hashFile(runConstitutionGraphPath),
     runtime: runtimeDigests.build_checks,
   };
   const stage4Outputs = {
@@ -1682,6 +1730,12 @@ async function main() {
       brokerPath,
       "--filings",
       filingsPath,
+      "--model-demand-graph",
+      modelDemandGraphPath,
+      "--selected-authority-contract",
+      selectedAuthorityContractPath,
+      "--run-constitution-graph",
+      runConstitutionGraphPath,
       "--json",
     ];
     if (options.python) args.push("--python", options.python);

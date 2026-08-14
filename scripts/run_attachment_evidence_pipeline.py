@@ -215,6 +215,25 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
                     "message": str(error),
                 },
             }
+        if (
+            kind == "broker"
+            and state.get("pipeline_status") not in CLOSED_LANE_STATUSES
+            and state.get("blocker_class") == "INTERNAL_WORK"
+        ):
+            # The broker lane is optional. Give the model-host-owned path one
+            # normal pass, then execute the controller's negative-only circuit
+            # breaker in the same attachment transaction. This preserves all
+            # source bytes/page images, selects no disputed value, and prevents
+            # an internal task packet from becoming a terminal chat response.
+            closed = run([*command, "--close-optional"])
+            if closed.returncode in {0, 2} and state_path.is_file():
+                state = read_json(state_path, "broker optional-close state")
+                assert_state(
+                    kind,
+                    str(state.get("pipeline_status") or ""),
+                    state.get("blocker_class"),
+                    state.get("user_blocking") is True,
+                )
         return state
     detail = (completed.stderr or completed.stdout).strip()[-4000:]
     # An absent/corrupt caller-supplied raw file is the one no-state failure
@@ -235,6 +254,65 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
         "artifact_sha256": {},
         "summary": {"message": detail or f"{kind} controller exited without a state"},
     }
+
+
+def broker_declaration_with_model_context(
+    *,
+    spec: dict[str, Any],
+    spec_path: Path,
+    output_root: Path,
+    filings_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Bind the optional broker lane to the mandatory company period basis.
+
+    This lets the broker controller close lawfully with zero selected authority
+    even when no model-host crosswalk is available. The source request remains
+    immutable; a derived request is written inside the run folder and included
+    in the broker lane cache key.
+    """
+    declaration = json.loads(json.dumps(spec.get("broker") or {}))
+    request_path = resolve(spec_path.parent, declaration.get("request_path"))
+    if not request_path or not request_path.is_file():
+        return declaration
+    request = read_json(request_path, "broker request")
+    if isinstance(request.get("model_context"), dict):
+        return declaration
+    ingress_path = resolve(spec_path.parent, spec.get("attachment_ingress_path"))
+    if not ingress_path or not ingress_path.is_file():
+        return declaration
+    ingress = read_json(ingress_path, "attachment-ingress template")
+    evidence_path = resolve(ingress_path.parent, ingress.get("evidence_run_path"))
+    if not evidence_path or not evidence_path.is_file():
+        return declaration
+    evidence = read_json(evidence_path, "base evidence-run template")
+    filings = evidence.get("filings") or {}
+    if (
+        (len(filings.get("forecast_periods") or []) != 3)
+        and isinstance(filings_state, dict)
+    ):
+        bundle_path = Path(str((filings_state.get("artifacts") or {}).get("filings_bundle") or ""))
+        if bundle_path.is_file():
+            bundle = read_json(bundle_path, "filings evidence bundle for broker model context")
+            filings = bundle.get("filings") or filings
+    historical = list(filings.get("historical_periods") or [])
+    forecast = list(filings.get("forecast_periods") or [])
+    if (
+        len(forecast) != 3
+        or not historical
+        or not filings.get("reporting_currency")
+        or not filings.get("units")
+    ):
+        return declaration
+    request["model_context"] = {
+        "as_of": historical[-1],
+        "reporting_currency": filings["reporting_currency"],
+        "units": filings["units"],
+        "forecast_periods": forecast,
+    }
+    derived_path = output_root / "internal-requests" / "broker-extraction-request.json"
+    atomic_json(derived_path, request)
+    declaration["request_path"] = str(derived_path)
+    return declaration
 
 
 def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dict[str, Path]) -> dict[str, Any]:
@@ -599,7 +677,17 @@ def main() -> int:
     for kind in ("filings", "broker", "dcs"):
         if not spec.get(kind):
             continue
-        lanes[kind] = run_lane(kind, spec[kind], spec_path.parent, output_root)
+        declaration = (
+            broker_declaration_with_model_context(
+                spec=spec,
+                spec_path=spec_path,
+                output_root=output_root,
+                filings_state=lanes.get("filings"),
+            )
+            if kind == "broker"
+            else spec[kind]
+        )
+        lanes[kind] = run_lane(kind, declaration, spec_path.parent, output_root)
         state_paths[kind] = output_root / kind / f"{kind}-run-state.json"
         checkpoints.append({
             "stage": kind,

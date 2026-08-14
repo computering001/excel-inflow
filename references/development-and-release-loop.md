@@ -132,7 +132,7 @@ Run the smallest scope that covers a local change, plus sentinels:
 Heavy native Excel, full renders, goldens and installation are not development
 sentinels. They run at the representative-workbook and release phases.
 
-The workflow scope includes the unattended five-stage user-journey suite. It
+The workflow scope includes the unattended six-milestone user-journey suite. It
 must prove clean no-question delivery, one consolidated question round,
 deterministic multi-round batching when more than five decisions survive,
 broker-preview confirmation and stale-confirmation rejection, defective
@@ -178,6 +178,20 @@ declared on-state SCC, that breaker mode removes the SCC and zeros every
 model-generated finance role, and that debt, maturity, cash and liquidity
 mechanics remain live. A converged workbook with an undeclared edge or cycle is
 a failed candidate.
+
+The product constitution and its joined run graph have standalone executable
+sentinels:
+
+```text
+node scripts/run_product_constitution_tests.mjs
+node scripts/run_run_constitution_graph_tests.mjs
+```
+
+The first proves the causal `LOG / DEGRADE / ASK ONCE / BLOCK` matrix and that
+broker-only faults cannot become delivery blockers. The second proves exact
+model-demand coverage, one selected authority per demand node, source-to-model
+reachability and hash-bound graph closure. Both are required whenever evidence
+criticality, authority selection, blocker policy or the visible journey changes.
 
 A gate that reads workbook geometry — section rows, sheet spans, zone extents,
 row counts — must ship with a positive test on at least one EXPANDED and one

@@ -594,6 +594,65 @@ export function compileBrokerPreview({
   return Object.freeze({ ...preview, preview_sha256: brokerPreviewSha256(preview) });
 }
 
+/**
+ * Deterministically disable all broker model authority while preserving the
+ * sealed pack and complete source-table inventory. This is the lawful fallback
+ * for an optional broker selection/control-plane defect: no value is invented,
+ * promoted or silently mixed across houses.
+ */
+export function compileBrokerForecastWaterfallFallback({
+  brokerPack,
+  sourceTables,
+  crosswalkReceipt,
+  bindingHashes = null,
+  reasons = [],
+}) {
+  const bindings = requireBindings(bindingHashes, {
+    brokerPack,
+    sourceTables,
+    crosswalkReceipt,
+  });
+  const quarantinedCandidates = structuredClone(
+    crosswalkReceipt?.terminal_recovery?.quarantined_candidates ?? [],
+  );
+  const preview = {
+    schema_version: BROKER_PREVIEW_SCHEMA_VERSION,
+    status: "PASS",
+    selection_mode: "forecast_waterfall",
+    ...bindings,
+    pack_recommended_primary_house_id:
+      brokerPack?.recommended_primary_house_id ?? null,
+    recommended_primary_house_id: null,
+    recommended_primary_house_name: null,
+    headline_anchor: null,
+    headline_anchor_coverage: {},
+    forecast_periods: structuredClone(brokerPack?.forecast_periods ?? []),
+    primary_eligible_house_ids: [],
+    selection_cases: [],
+    selected_value_count: 0,
+    evidence_inventory: tableInventory(sourceTables),
+    evidence_only_quarantine: {
+      terminal_quarantined_candidate_count: Number(
+        crosswalkReceipt?.coverage_summary?.terminal_quarantined_candidate_count ??
+        quarantinedCandidates.length,
+      ),
+      unresolved_selected_candidate_count: 0,
+      unresolved_candidate_count: Number(
+        crosswalkReceipt?.coverage_summary?.unresolved_candidate_count ?? 0,
+      ),
+      quarantined_candidates: quarantinedCandidates,
+      note:
+        "Broker model authority is disabled for this run; all supplied reports remain sealed evidence.",
+    },
+    forecast_waterfall_reasons: [...new Set([
+      ...reasons.map((reason) => String(reason)).filter(Boolean),
+      "Broker authority was unavailable or failed its optional selection boundary; the ordinary forecast waterfall owns every model state.",
+    ])].sort(),
+    violations: [],
+  };
+  return Object.freeze({ ...preview, preview_sha256: brokerPreviewSha256(preview) });
+}
+
 export function validateBrokerPreview(preview) {
   const violations = [];
   if (preview?.schema_version !== BROKER_PREVIEW_SCHEMA_VERSION) {
@@ -737,6 +796,7 @@ export function validateBrokerPreview(preview) {
   }
   if (
     preview?.status === "PASS" &&
+    preview?.selection_mode === "primary_house" &&
     Number(preview?.evidence_only_quarantine?.unresolved_selected_candidate_count ?? 0) !== 0
   ) {
     violations.push("PASS preview has unresolved selected broker candidates.");

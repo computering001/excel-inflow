@@ -230,15 +230,16 @@ pass("user-flow normalisation persists typed ownership", () => {
   assert(decision.user_blocking === true, "decision is not user blocking");
   const paused = normaliseUserFlowResult({ status: "PAUSED", stage: "inputs" });
   assert(paused.blocker_class === null && paused.user_blocking === false, "pause owns a blocker");
-  const internal = normaliseUserFlowResult({
+});
+
+rejects(
+  "optional broker control-plane defects cannot terminate the company run",
+  () => normaliseUserFlowResult({
     status: "BLOCKED", stage: "evidence_review", blocker_class: "INTERNAL_WORK",
     outcome: "broker_preview_blocked",
-  });
-  assert(
-    internal.user_blocking === false,
-    "an internal evidence fixed-point defect surfaced as a user blocker",
-  );
-});
+  }),
+  /is not declared by the delivery-blocker constitution/,
+);
 
 rejects(
   "an untyped user-flow block is forbidden",
