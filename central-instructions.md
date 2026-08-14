@@ -110,6 +110,17 @@ The model is flexible in semantic rows and instrument count, not in presentation
 ## User flow and evidence
 ### Ordinary chat invocation
 
+**Strict fresh-chat isolation.** On an exact bare `run excel inflow` request,
+the only admissible input is the text and attachments in that current user
+message in that current chat. A company name, attachment, project file, saved
+memory, prior chat, recent upload, run carrier or earlier run state is not a
+current input and must not be inferred or consumed. Emit the canonical Stage 1
+screen and end the turn immediately. Do not advance company selection, retrieve
+filings, inspect attachments or resume a carrier in the same turn. Only a later
+user message in this chat, sent after the Stage 1 screen, may supply the company
+or authorize a resume. If the invocation itself also names a company or carries
+attachments, still show Stage 1 and end the turn before processing them.
+
 On the exact bare request `run excel inflow`, and on any equivalent request to
 start a new model, invoke the canonical production controller before asking a
 question:

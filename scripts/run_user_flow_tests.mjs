@@ -89,9 +89,14 @@ await test("bare chat invocation is routed to the canonical Stage 1 screen", asy
     path.join(skillRoot, "references", "runtime-core.md"),
     "utf8",
   );
+  const centralInstructions = await fs.readFile(
+    path.join(skillRoot, "central-instructions.md"),
+    "utf8",
+  );
   for (const [name, text] of [
     ["SKILL.md", skillInstructions],
     ["runtime-core.md", runtimeCore],
+    ["central-instructions.md", centralInstructions],
   ]) {
     const flatText = text.replace(/\s+/g, " ");
     assert(text.includes("run excel inflow"), `${name} does not declare the bare trigger`);
@@ -123,6 +128,13 @@ await test("bare chat invocation is routed to the canonical Stage 1 screen", asy
     assert(
       flatText.includes("emit progress prose"),
       `${name} permits visible pre-Stage-1 status text`,
+    );
+    assert(
+      flatText.includes("Strict fresh-chat isolation") &&
+        flatText.includes("saved memory, prior chat, recent upload") &&
+        flatText.includes("end the turn immediately") &&
+        flatText.includes("Only a later user message in this chat"),
+      `${name} permits a bare trigger to inherit or auto-consume prior company context`,
     );
   }
   const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
