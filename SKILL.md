@@ -10,14 +10,15 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 
 ### Non-bypassable end-user route
 
-An end-user company workbook has exactly one producer:
-`scripts/run_user_flow.mjs` and the Build controller it invokes. After
-attachments are normalised, continue or resume that controller through its
-hash-bound run carrier. Never construct a workbook directly in chat, with
-ad-hoc Python/OpenPyXL, from a compact or generic template, through a
-lower-level emitter command, or by patching cells. If the controlled route
-cannot run, **BLOCK** and preserve the carrier; a smaller substitute is never a
-valid fallback.
+An end-user company workbook has exactly one top-level producer. The vNext
+candidate uses `scripts/run_excel_inflow_vnext.mjs`; it owns raw evidence,
+authority resolution and quality classification, then delegates the unchanged
+workbook stage to `scripts/run_user_flow.mjs`. The active v64 rollback invokes
+`run_user_flow.mjs` directly. Never sequence both routes by hand, and never
+construct a workbook directly in chat, with ad-hoc Python/OpenPyXL, from a
+compact or generic template, through a lower-level emitter command, or by
+patching cells. If the controlled route cannot run, **BLOCK** and preserve the
+carrier; a smaller substitute is never a valid fallback.
 
 Attach only the workbook path returned by a final `user-flow-run/1.0` result
 whose controller version matches the installed production manifest, whose
@@ -40,6 +41,63 @@ Deliver a model, not a populated form. Totals, ratios, roll-forwards, pro forma 
 Run one deterministic graph:
 
 `normalise evidence -> classify issuer rows -> compile semantic graph -> coverage gate -> solve economics -> compile row plan -> emit -> recalculate -> terminal patch -> verify -> render -> deliver`
+
+### vNext model-first control plane
+
+`scripts/run_excel_inflow_vnext.mjs` is the candidate end-to-end owner above
+that proven graph. It invokes the raw filings, broker and DCS transaction,
+pauses at the compiled model-decision boundary, seals one
+`evidence-resolution/2.0`, and only then delegates the unchanged workbook stage
+to `run_user_flow.mjs`. The v64 controller remains the rollback implementation;
+it is not rewritten or removed during vNext certification.
+
+The resolution artifact contains one content-addressed source index, one
+cross-lane observation ledger, one per-node authority graph, quarantines,
+blocker ownership and a quality receipt. Large source tables and PDFs remain in
+the run store and are referenced by hash rather than copied into the case.
+Filings own historical statements, DCS owns contractual debt hardcodes and
+broker research contributes only verified model-driving forecast cells.
+
+The model is built by default. Optional evidence uncertainty reduces authority
+through the declared forecast waterfall and produces `DEGRADED`; it does not
+stop delivery. A user interruption is permitted only when a material economic
+node remains unresolved after the complete waterfall. Internal work is hidden
+and resumable. A terminal block is limited to a fatal source/identity/opening-
+debt boundary, an underdetermined economic graph, or workbook integrity.
+
+The ordinary candidate command is:
+
+```text
+node scripts/run_excel_inflow_vnext.mjs \
+  --attachment-spec <attachment-evidence-controller.json> \
+  --out <run-folder> [--answers <answers.json>] \
+  [--python <python>] [--soffice <soffice>]
+```
+
+For a read-only inspection or fixture that already has a sealed evidence run,
+compile the same cross-lane resolution artifact directly with:
+
+```text
+node scripts/compile_evidence_resolution_v2.mjs <evidence-run.json> \
+  [--forecast-plan <forecast-plan.json>] \
+  [--attachment-state <attachment-state.json>] \
+  [--case-report <case-compile-report.json>] \
+  --out <evidence-resolution-v2.json>
+```
+
+The source-owned contract and adversarial test is runnable as:
+
+```text
+node scripts/run_evidence_resolution_v2_tests.mjs
+```
+
+The standalone compiler is diagnostic only. It cannot replace the vNext
+controller for a company run, and its output cannot author a workbook.
+
+`PASS_PENDING_MANUAL` may carry quality `VERIFIED` or `DEGRADED`. Both require
+zero workbook violations; degraded means only that optional evidence was
+quarantined or a lower, disclosed authority rung was selected. No degraded path
+may invent a value.
 
 The semantic graph is canonical; physical row numbers are compiled output. Preserve the issuer label, attach a semantic role and evidence class, and route unmatched material rows to one targeted question or a fail-closed stop. Never solve from workbook coordinates or add a cell-specific exception.
 
@@ -244,13 +302,11 @@ do not handcraft hashes or treat normalized JSON as proof of the original file.
 Restated figures replace superseded comparatives only when the filing clearly states the restated basis. Preserve predecessor history and calendarise only with an explicit bridge. Never splice differently scoped periods without a visible reconciliation.
 
 At the broker checkpoint, compile one internal receipt from the SEALED pack.
-It names the recommended primary-eligible coherent house, records every
-selected concept/period value and exact source cells, and retains eligible
-alternates and the complete evidence inventory. Accept the recommended clean
-house automatically; if none exists, select the ordinary forecast waterfall.
-An explicit override may choose only another clean coherent house and can never
-waive a selected-cell conflict. Do not expose OCR, vision, reconciliation,
-preview or confirmation as separate chat stages.
+Accept the recommended clean coherent house automatically, or select the
+ordinary forecast waterfall when no coherent house exists. Keep exact selected
+source cells, alternates and the complete evidence inventory in artifacts, not
+as multiple chat stages. An explicit override may choose only another clean
+house and can never waive a selected-cell conflict.
 
 Decisions are collected on native question cards: the ASCII screen is the
 receipt, the cards are the instrument. One checkpoint's cards form one
@@ -384,24 +440,47 @@ them. Resume the same controller after each response and reuse every valid
 checkpoint. Never present `NEEDS_VISION`, `NEEDS_RESOLUTION`,
 `NEEDS_CROSSWALK` or `NEEDS_CROSSWALK_REVIEW` as an end-user question.
 
-Do not force the complete broker-page inventory into the workbook carrier.
-`broker-source-tables/1.0` remains the lossless run artifact; attachment ingress
-deterministically projects EVERY reviewed tabular grid into
-`model_case.broker_pack.raw_tables` — table membership must be complete, and an
-evidence-only table is never discarded from the projection. The reviewed
-disposition ledger governs CONSUMPTION, not membership: evidence-only tables
-render as hardcoded source evidence, every mapped cell must land on an
-analytical table, and every supplied house remains represented.
+Exhausted ordinary evidence ambiguity never terminates the run. Once the
+bounded recovery budget is spent (vision attempts, fixed-point retries or an
+aggregate internal defect), the controller closes the physical lane itself as
+`PASS_DEGRADED`: the smallest defensible regions are quarantined
+`model_use=prohibited`, every raw report stays preserved verbatim, quarantine
+counts are disclosed in the state summary, and the run continues to Debt,
+Build and Delivery on the surviving broker authority (down to
+FORECAST_WATERFALL with zero broker consumption). `BLOCKED_INTERNAL` remains
+only for genuine controller corruption or tampered artifacts — never for
+readable research that would not reconcile.
 
-Exhausted ordinary broker ambiguity closes the lane `PASS_DEGRADED`, never
-terminal: the smallest defensible regions are quarantined
-`model_use=prohibited`, every raw report stays preserved, quarantine counts are
-disclosed on the Stage-2 preview, and the run continues to Debt, Build and
-Delivery on the surviving broker authority (down to FORECAST_WATERFALL with
-zero broker consumption). Only the four constitutional fatal reasons block
-delivery, and none of them is a broker reason. A sealed run crosses a
-controller upgrade via `scripts/migrate_broker_run_state.py` (fail-closed,
-receipted; see runtime-core), never by re-uploading unchanged sources.
+A truncated native period token is ordinary evidence ambiguity. Prefer the
+complete period label visibly transcribed from the hash-bound rendered grid;
+otherwise prohibit only that column. Preserve multi-page tables through an
+explicit continuation certificate so a header on the first page owns the
+continuation pages without being guessed again. If a remaining semantic defect
+belongs to a house whose selected mapping consumes the affected cell, remove
+that house from model authority, retain all of its evidence, independently
+reverify the pruned crosswalk, and continue through the forecast waterfall. The
+company model must not stop merely because a broker house becomes unusable.
+
+A sealed broker run may cross an intentional controller upgrade without losing
+its receipted progress or its exhaustion history. Migrate — never resume
+blind — with the fail-closed migration tool, pinning the exact prior runtime
+closure digest recorded in the run's `broker-run-state.json`:
+
+```text
+python3 scripts/migrate_broker_run_state.py <broker-extraction-request.json> --state <run-folder>/broker/broker-run-state.json --out <run-folder>/broker --from-closure <prior-runtime-closure-sha256>
+```
+
+The tool refuses on any request, source-hash, receipt or vintage mismatch,
+re-homes only receipt-verified checkpoints, writes a migration receipt beside
+the state, and never asks the user to re-upload unchanged sources.
+
+Do not force the complete broker-page inventory (page images, OCR lanes and
+narrative regions) into the workbook carrier. `broker-source-tables/1.0` remains
+the lossless run artifact; attachment ingress deterministically projects every
+reviewed tabular grid into `model_case.broker_pack.raw_tables`. Evidence-only
+tables render as hardcoded source evidence but remain prohibited from model
+formulas. Every supplied house remains represented and every mapped cell must
+land on an analytical table.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves

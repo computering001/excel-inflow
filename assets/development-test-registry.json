@@ -67,6 +67,12 @@
       "script": "run_forecast_observation_tests.mjs"
     },
     {
+      "id": "evidence-resolution-v2",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_evidence_resolution_v2_tests.mjs"
+    },
+    {
       "id": "forecast-topology",
       "phase": "forecast",
       "runtime": "node",

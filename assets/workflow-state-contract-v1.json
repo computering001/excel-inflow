@@ -11,6 +11,13 @@
     "USER_DECISION",
     "FATAL_SOURCE"
   ],
+  "vnext_quality_modes": {
+    "VERIFIED": "Every selected model authority is source-bound and verified.",
+    "DEGRADED": "Optional evidence was quarantined or a lower authority rung was used; the model remains buildable and no value was invented.",
+    "INPUT_REQUIRED": "The complete authority waterfall left a material economic node unresolved; one consolidated user decision is required.",
+    "INTERNAL_WORK": "Controller-owned work or a workflow defect remains; it is not a user question and must resume or be repaired internally.",
+    "FATAL": "A narrow source, identity, opening-debt, equation-system or workbook-integrity boundary prevents a defensible model."
+  },
   "visible_journey": {
     "schema_version": "visible-journey/1.0",
     "display_rule": "Only this six-milestone journey is user-visible. Five-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
@@ -189,6 +196,20 @@
         "BLOCKED_INTERNAL": ["BLOCKED_INTERNAL", "NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "PASS"],
         "BLOCKED_INPUT": ["BLOCKED_INPUT"],
         "PASS": ["PASS", "NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "BLOCKED_INTERNAL"]
+      }
+    },
+    "vnext": {
+      "states": {
+        "NEEDS_INTERNAL_WORK": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true },
+        "BLOCKED": { "blocker_classes": ["FATAL_SOURCE"], "user_blocking": true },
+        "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "NEEDS_INTERNAL_WORK": ["NEEDS_INTERNAL_WORK", "ACTION_REQUIRED", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "ACTION_REQUIRED": ["ACTION_REQUIRED", "NEEDS_INTERNAL_WORK", "BLOCKED", "PASS_PENDING_MANUAL"],
+        "BLOCKED": ["BLOCKED"],
+        "PASS_PENDING_MANUAL": ["PASS_PENDING_MANUAL"]
       }
     },
     "user_flow": {

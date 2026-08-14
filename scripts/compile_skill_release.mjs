@@ -672,7 +672,19 @@ await withTempScript("probe.py", PYTHON_PROBE_SOURCE, async (probeScript) => {
     }
     let report;
     try {
-      report = JSON.parse(run.stdout);
+      // Some otherwise valid third-party imports write informational or
+      // deprecation text to stdout (notably recent PyMuPDF builds when the
+      // compatibility `fitz` module is imported).  The probe owns the final
+      // JSON record, not every byte emitted by imported packages.  Parse that
+      // terminal record while still failing closed when no JSON object exists.
+      const jsonLine = run.stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .reverse()
+        .find((line) => line.startsWith("{") && line.endsWith("}"));
+      if (!jsonLine) throw new Error("missing terminal JSON record");
+      report = JSON.parse(jsonLine);
     } catch {
       interpreterProbes.push({ candidate, usable: false, reason: "probe produced no JSON" });
       continue;

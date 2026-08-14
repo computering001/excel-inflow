@@ -246,7 +246,8 @@ async function exactEnvironmentProbe({ python, soffice, integrity, runDir }) {
     [
       "import json,os,sys",
       `sys.path.insert(0, ${JSON.stringify(HERE)})`,
-      "import fitz,PIL,numpy",
+      "import importlib.util,PIL,numpy",
+      "fitz=__import__('pymupdf' if importlib.util.find_spec('pymupdf') else 'fitz')",
       "from render.textfit import load_font_set",
       "fonts=load_font_set()",
       "print(json.dumps({'fitz':getattr(fitz,'VersionBind',None) or getattr(fitz,'__version__',None),'pillow':PIL.__version__,'numpy':numpy.__version__,'font_regular':fonts.regular_path,'font_bold':fonts.bold_path},sort_keys=True))",
@@ -263,7 +264,16 @@ async function exactEnvironmentProbe({ python, soffice, integrity, runDir }) {
     });
   } else {
     try {
-      dependencies = JSON.parse(dependencyProbe.stdout.trim());
+      // New PyMuPDF releases may emit a deprecation notice before a legacy
+      // `fitz` import. The capability probe owns only its final JSON record;
+      // diagnostic prose must not turn an installed renderer into a false
+      // missing-dependency block.
+      const payload = dependencyProbe.stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .at(-1);
+      dependencies = JSON.parse(payload);
     } catch (error) {
       violations.push({ code: "RENDER_DEPENDENCY_PROBE_INVALID", detail: error.message });
     }

@@ -31,6 +31,24 @@ Do not claim that one workbook satisfies both profiles when a source formula con
 
 Record every material departure in the QA certificate and delivery summary. Keep forensic detail outside the user-facing workbook unless the user requests it.
 
+### Evidence-to-model boundary
+
+Preserve raw evidence losslessly, but prove only observations the model may
+consume. Full-document capture and model authority are different products. A
+bad unused broker cell, an unmapped valuation table or an evidence-only page
+cannot stop a debt model. Quarantine it by source cell and continue. A selected
+broker observation that cannot be verified is removed from authority and the
+same concept-period falls through the company-guidance, commitment, user-
+assumption and historical rungs. The model may consume zero broker values while
+still retaining every supplied report as evidence.
+
+The resulting workbook carries a quality mode: `VERIFIED` when every selected
+authority is verified, `DEGRADED` when optional evidence was quarantined or a
+lower rung was used, and `INPUT_REQUIRED` only when a material economic node
+remains unresolved. DCS price, YTW, OAS and other market metadata remain
+supplemental evidence unless a model equation explicitly declares them; they
+never silently substitute for coupon or benchmark-plus-margin terms.
+
 ## 3. Fixed scope
 
 Always include:

@@ -26,6 +26,21 @@ A value can enter the normalized pack only through a reviewed, cell-addressed
 crosswalk back to the evidence. Never discard the full tables merely because
 the model uses only a subset of their metrics.
 
+For vNext, full-table preservation is not a permission gate for the model.
+Render and retain every page, then locate and verify only model-driving
+concept-period cells for authority. The semantic ledger may continue to enrich
+reference-only tables, but an incomplete unused table can only degrade evidence
+quality. It cannot prevent Debt, Build or Deliver. A selected-cell conflict is
+removed from authority and routed through the ordinary forecast waterfall; it
+does not poison its row, sibling periods, house or document.
+
+Multi-page tables are one physical continuation graph, not one flattened
+guess. Header inheritance requires an adjacent-page, same-document certificate
+with compatible title/units/column geometry. Repeated headers remain their own
+source cells; omitted headers inherit only through that certificate; truncated
+headers use a hash-bound rendered-header read or quarantine that period. Every
+continued value retains its own page/table/row/column/crop provenance.
+
 ## Evidence chain
 
 The chain is:

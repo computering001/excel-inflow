@@ -373,6 +373,14 @@ indicative broker fixture, but it must be labelled as test data and must never
 be presented as sourced research. Do not fabricate broker observations for a
 real-company production run.
 
+The 3–10 reports are the supplied evidence set, not a minimum consumption
+quota. If no house has a verified value for a concept-period, consume no broker
+value there and continue down the ordinary authority waterfall. If every house
+is unusable for model authority, retain every report on its image-evidence tab,
+record zero broker consumption and build from company evidence, schedules,
+visible assumptions or historical methods. Broker absence alone is never a
+delivery blocker.
+
 For an autonomous public-company test, isolate the indicative forecasts inside
 `public-test-run/1.0`. Use visibly synthetic house identities and preserve the
 `SYNTHETIC TEST DATA` label in the case and workbook. Public filings may support

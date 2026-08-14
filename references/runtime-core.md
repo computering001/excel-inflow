@@ -6,14 +6,15 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 
 ### Non-bypassable end-user route
 
-An end-user company workbook has exactly one producer:
-`scripts/run_user_flow.mjs` and the Build controller it invokes. After
-attachments are normalised, continue or resume that controller through its
-hash-bound run carrier. Never construct a workbook directly in chat, with
-ad-hoc Python/OpenPyXL, from a compact or generic template, through a
-lower-level emitter command, or by patching cells. If the controlled route
-cannot run, **BLOCK** and preserve the carrier; a smaller substitute is never a
-valid fallback.
+An end-user company workbook has exactly one top-level producer. The vNext
+candidate uses `scripts/run_excel_inflow_vnext.mjs`; it owns raw evidence,
+authority resolution and quality classification, then delegates the unchanged
+workbook stage to `scripts/run_user_flow.mjs`. The active v64 rollback invokes
+`run_user_flow.mjs` directly. Never sequence both routes by hand, and never
+construct a workbook directly in chat, with ad-hoc Python/OpenPyXL, from a
+compact or generic template, through a lower-level emitter command, or by
+patching cells. If the controlled route cannot run, **BLOCK** and preserve the
+carrier; a smaller substitute is never a valid fallback.
 
 Attach only the workbook path returned by a final `user-flow-run/1.0` result
 whose controller version matches the installed production manifest, whose
@@ -37,6 +38,63 @@ Deliver a model, not a populated form. Totals, ratios, roll-forwards, pro forma 
 Run one deterministic graph:
 
 `normalise evidence -> classify issuer rows -> compile semantic graph -> coverage gate -> solve economics -> compile row plan -> emit -> recalculate -> terminal patch -> verify -> render -> deliver`
+
+### vNext model-first control plane
+
+`scripts/run_excel_inflow_vnext.mjs` is the candidate end-to-end owner above
+that proven graph. It invokes the raw filings, broker and DCS transaction,
+pauses at the compiled model-decision boundary, seals one
+`evidence-resolution/2.0`, and only then delegates the unchanged workbook stage
+to `run_user_flow.mjs`. The v64 controller remains the rollback implementation;
+it is not rewritten or removed during vNext certification.
+
+The resolution artifact contains one content-addressed source index, one
+cross-lane observation ledger, one per-node authority graph, quarantines,
+blocker ownership and a quality receipt. Large source tables and PDFs remain in
+the run store and are referenced by hash rather than copied into the case.
+Filings own historical statements, DCS owns contractual debt hardcodes and
+broker research contributes only verified model-driving forecast cells.
+
+The model is built by default. Optional evidence uncertainty reduces authority
+through the declared forecast waterfall and produces `DEGRADED`; it does not
+stop delivery. A user interruption is permitted only when a material economic
+node remains unresolved after the complete waterfall. Internal work is hidden
+and resumable. A terminal block is limited to a fatal source/identity/opening-
+debt boundary, an underdetermined economic graph, or workbook integrity.
+
+The ordinary candidate command is:
+
+```text
+node scripts/run_excel_inflow_vnext.mjs \
+  --attachment-spec <attachment-evidence-controller.json> \
+  --out <run-folder> [--answers <answers.json>] \
+  [--python <python>] [--soffice <soffice>]
+```
+
+For a read-only inspection or fixture that already has a sealed evidence run,
+compile the same cross-lane resolution artifact directly with:
+
+```text
+node scripts/compile_evidence_resolution_v2.mjs <evidence-run.json> \
+  [--forecast-plan <forecast-plan.json>] \
+  [--attachment-state <attachment-state.json>] \
+  [--case-report <case-compile-report.json>] \
+  --out <evidence-resolution-v2.json>
+```
+
+The source-owned contract and adversarial test is runnable as:
+
+```text
+node scripts/run_evidence_resolution_v2_tests.mjs
+```
+
+The standalone compiler is diagnostic only. It cannot replace the vNext
+controller for a company run, and its output cannot author a workbook.
+
+`PASS_PENDING_MANUAL` may carry quality `VERIFIED` or `DEGRADED`. Both require
+zero workbook violations; degraded means only that optional evidence was
+quarantined or a lower, disclosed authority rung was selected. No degraded path
+may invent a value.
 
 The semantic graph is canonical; physical row numbers are compiled output. Preserve the issuer label, attach a semantic role and evidence class, and route unmatched material rows to one targeted question or a fail-closed stop. Never solve from workbook coordinates or add a cell-specific exception.
 
