@@ -1508,6 +1508,28 @@ function stripLabelIndentSpaces(rows) {
   }
 }
 
+function repairCompiledReportedDerivedParents(rows) {
+  for (const row of rows) {
+    const historical = (row.values ?? []).slice(0, 3);
+    if (
+      row.aggregation_authority !== "derived_from_children" ||
+      row.calculation?.operator !== "sum" ||
+      (row.calculation?.refs ?? []).length === 0 ||
+      !historical.some((value) => value !== null && value !== undefined)
+    ) {
+      continue;
+    }
+    row.reported_historical_values ??= historical;
+    row.historical_authority = "reported_total_reconciled";
+    const forecast = (row.values ?? []).slice(3, 6);
+    if (forecast.some((value) => value !== null && value !== undefined)) {
+      row.values = [null, null, null, ...forecast];
+    } else {
+      delete row.values;
+    }
+  }
+}
+
 /**
  * Insert — or adopt, where the company already reports one — a consolidated
  * line above a run of constituent rows, and re-point every parent subtotal at
@@ -1624,6 +1646,34 @@ function consolidateConstituents(rows, spec) {
     (!adoptedIssuerParent || !consolidated.aggregation_authority)
   ) {
     consolidated.aggregation_authority = spec.aggregation_authority;
+  }
+  // When a filed parent is standardized into a live sum of its visible
+  // children, retain the filed historical total as reconciliation evidence,
+  // not as a second value writer.  This is the general reported-parent to
+  // derived-parent bridge: the formula owns the workbook cells while the
+  // reported series remains available for an exact historical tie-out.
+  const historicalParentValues = (consolidated.values ?? []).slice(0, 3);
+  if (
+    adoptedIssuerParent &&
+    consolidated.aggregation_authority === "derived_from_children" &&
+    historicalParentValues.some(
+      (value) => value !== null && value !== undefined,
+    )
+  ) {
+    consolidated.reported_historical_values = historicalParentValues;
+    consolidated.historical_authority = "reported_total_reconciled";
+    const forecastValues = (consolidated.values ?? []).slice(3, 6);
+    if (forecastValues.some((value) => value !== null && value !== undefined)) {
+      consolidated.values = [null, null, null, ...forecastValues];
+    } else {
+      delete consolidated.values;
+    }
+  }
+  if (
+    consolidated.aggregation_authority === "derived_from_children" &&
+    consolidated.historical_authority !== "reported_total_reconciled"
+  ) {
+    consolidated.historical_authority = "derived_formula";
   }
 
   // A consolidated line is the parent of its workings, so present it before
@@ -1930,6 +1980,11 @@ function collapseEquivalentEbitOperatingProfit(rows) {
   operatingProfit.role_aliases = [
     ...new Set([...(operatingProfit.role_aliases ?? []), "ebit"]),
   ];
+  addUnique(operatingProfit, "source_line_ids", ebit.source_line_ids);
+  addUnique(operatingProfit, "projection_absorbed_row_ids", [
+    ...(ebit.projection_absorbed_row_ids ?? []),
+    ebit.row_id,
+  ]);
   rows.splice(rows.indexOf(ebit), 1);
 }
 
@@ -2844,6 +2899,7 @@ export function normaliseStatementRows(
   // return. The row's declared accounting identity is the authority; old
   // capture metadata may never override a protected bridge.
   restoreProtectedForecastBridges(rows);
+  repairCompiledReportedDerivedParents(rows);
   if (modelCase.statement_structure_compiled_version === "semantic-statements/1.0") {
     materializeStatementPresentationTree(rows, section);
     assignDisplayAndFormulaRoles(rows);

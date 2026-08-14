@@ -222,6 +222,21 @@ await test("sealed preview is deterministic, schema-valid and screen-safe", () =
   assert(schemaErrors.length === 0, schemaErrors.join("; "));
   const screen = renderBrokerPreviewScreen(first);
   assert(inspectScreen(screen).ok, inspectScreen(screen).violations.join("; "));
+  assert(screen.includes("STATUS: COMPLETE"), "ordinary broker receipt still requests a response");
+  assert(!screen.includes("NEXT ACTION"), "ordinary broker receipt exposes a confirmation action");
+  assert(screen.includes("continues automatically"), "ordinary broker receipt does not continue automatically");
+  const rejectedOverrideScreen = renderBrokerPreviewScreen(first, {
+    confirmationErrors: ["stale optional override"],
+  });
+  assert(
+    inspectScreen(rejectedOverrideScreen).ok,
+    inspectScreen(rejectedOverrideScreen).violations.join("; "),
+  );
+  assert(
+    !rejectedOverrideScreen.includes("NEXT ACTION") &&
+      rejectedOverrideScreen.includes("No response is required"),
+    "a rejected optional override recreated a broker confirmation stop",
+  );
   const selected = first.selection_cases.find(
     (candidate) => candidate.house_id === first.recommended_primary_house_id,
   );
@@ -291,7 +306,7 @@ await test("ordinary Stage 2 auto-selects a clean house without a user stop", ()
   );
 });
 
-await test("Stage-2 action receipt and run carrier preserve the confirmation", async () => {
+await test("automatic broker selection receipt and run carrier preserve the seal", async () => {
   const preview = compile();
   const accepted = confirmation(preview);
   const runRoot = await fs.mkdtemp(path.join(os.tmpdir(), "broker-preview-carrier."));
@@ -302,11 +317,11 @@ await test("Stage-2 action receipt and run carrier preserve the confirmation", a
   const receipt = createStageReceipt({
     runId: "broker-preview-carrier-test",
     stageId: "evidence_review",
-    status: "action_required",
+    status: "success",
     inputHashes: { preview: preview.preview_sha256 },
     outputHashes: { screen: "1".repeat(64) },
   });
-  assert(receipt.next_stage === "evidence_review", "Stage-2 action receipt is not resumable in place");
+  assert(receipt.next_stage === "decisions", "evidence review did not advance to model decisions");
   const workspaceToken = "workspace:broker-preview-carrier-test";
   const carrier = await writeRunCarrier({
     skillRoot: ROOT,
@@ -317,7 +332,7 @@ await test("Stage-2 action receipt and run carrier preserve the confirmation", a
     issuerIdentity: { name: "Preview Test plc" },
     evidencePath,
     brokerConfirmationPath: confirmationPath,
-    status: "AWAITING_BROKER_CONFIRMATION",
+    status: "EVIDENCE_REVIEW_COMPLETE",
   });
   const verified = await verifyRunCarrier({
     skillRoot: ROOT,

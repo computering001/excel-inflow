@@ -19,6 +19,26 @@ def workflow_contract() -> dict[str, Any]:
         raise ValueError("Workflow-state contract has the wrong schema version")
     if not isinstance(value.get("layers"), dict):
         raise ValueError("Workflow-state contract has no layer registry")
+    journey = value.get("visible_journey")
+    if (
+        not isinstance(journey, dict)
+        or journey.get("schema_version") != "visible-journey/1.0"
+        or not isinstance(journey.get("milestones"), list)
+        or len(journey["milestones"]) != 6
+    ):
+        raise ValueError(
+            "Workflow-state contract has no canonical six-milestone visible journey"
+        )
+    milestone_ids = [item.get("id") for item in journey["milestones"]]
+    if any(not item for item in milestone_ids) or len(set(milestone_ids)) != 6:
+        raise ValueError("Visible journey milestone ids must be unique")
+    for stage_id in (
+        "inputs", "evidence_review", "decisions", "build_checks", "delivery"
+    ):
+        if stage_id not in journey.get("checkpoints", {}):
+            raise ValueError(
+                f"Visible journey omits controller checkpoint {stage_id}"
+            )
     constitution = value.get("delivery_blocker_constitution")
     if not isinstance(constitution, dict) or constitution.get("schema_version") != "delivery-blocker-constitution/1.0":
         raise ValueError("Workflow-state contract has no delivery-blocker constitution")

@@ -213,5 +213,34 @@
       "additionalProperties": false
     },
     "summary": { "type": "object" }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "pipeline_status": { "const": "PASS_DEGRADED" } },
+        "required": ["pipeline_status"]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "type": "object",
+            "required": ["degraded_close_receipt"]
+          },
+          "artifact_sha256": {
+            "type": "object",
+            "required": ["degraded_close_receipt"]
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "degraded",
+              "quarantined_conflict_count",
+              "quarantined_surface_count"
+            ],
+            "properties": { "degraded": { "const": true } }
+          }
+        }
+      }
+    }
+  ]
 }

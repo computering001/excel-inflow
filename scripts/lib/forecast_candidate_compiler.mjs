@@ -108,6 +108,7 @@ function normaliseEvaluatedHistoricalValues(rows) {
   return sourceRows.map((row) => {
     const evaluated = evaluatedHistoricalValues(row, sourceRows);
     if (
+      row.historical_authority === "reported_total_reconciled" ||
       !row.calculation ||
       (row.calculation.refs ?? []).length === 0 ||
       !evaluated.every(finite)

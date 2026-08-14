@@ -4,12 +4,18 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createStageReceipt, verifyStageReceipt } from "./lib/flow_runtime.mjs";
+import {
+  createStageReceipt,
+  verifyStageReceipt,
+  visibleJourneyProgress,
+} from "./lib/flow_runtime.mjs";
+import { inspectScreen, renderStageStatus } from "./lib/flow_screens.mjs";
 import {
   assertDeliveryBlocker,
   assertWorkflowState,
   assertWorkflowTransition,
   normaliseUserFlowResult,
+  VISIBLE_JOURNEY_CONTRACT,
   WORKFLOW_STATE_CONTRACT,
 } from "./lib/workflow_state.mjs";
 
@@ -49,6 +55,42 @@ pass("canonical contract loads", () => {
     Object.keys(WORKFLOW_STATE_CONTRACT.delivery_blocker_constitution.fatal_reasons).length === 4,
     "delivery blocker constitution must have exactly four fatal reasons",
   );
+  assert(
+    VISIBLE_JOURNEY_CONTRACT.milestones.length === 6,
+    "visible journey must have exactly six milestones",
+  );
+});
+
+pass("one visible progress scale maps internal checkpoints without leaking stage numbers", () => {
+  const evidence = visibleJourneyProgress("evidence_review", "in progress");
+  assert(evidence.completed === 4 && evidence.next_milestone === "build", "evidence checkpoint is not positioned before Build");
+  const build = visibleJourneyProgress("build_checks", "in progress");
+  assert(build.completed === 4 && build.active_milestone === "build", "Build is not the fifth active milestone");
+  const buildComplete = visibleJourneyProgress("build_checks", "complete");
+  assert(buildComplete.completed === 5 && buildComplete.next_milestone === "deliver", "completed Build does not advance to Deliver");
+  const screen = renderStageStatus({
+    stageId: "evidence_review",
+    status: "in progress",
+    summary: "Evidence is being reconciled automatically. No response is required.",
+  });
+  assert(screen.includes("PROGRESS: 4 OF 6 COMPLETE - BUILD NEXT"), "canonical progress heading is absent");
+  assert(!/STAGE\s+\d+\s+OF\s+\d+/i.test(screen), "internal stage numbering leaked to the screen");
+});
+
+pass("screen response semantics reject contradictory or ambiguous actions", () => {
+  const contradictory = inspectScreen([
+    "STATUS: ACTION REQUIRED",
+    "No response is required.",
+    "NEXT ACTION",
+    "Reply CONFIRM.",
+  ].join("\n"));
+  assert(!contradictory.ok, "contradictory response instructions passed");
+  const missingAction = inspectScreen("STATUS: ACTION REQUIRED\nPlease wait.");
+  assert(!missingAction.ok, "action-required screen without a reply instrument passed");
+  const ambiguousProgress = inspectScreen("STATUS: IN PROGRESS\nPlease wait.");
+  assert(!ambiguousProgress.ok, "in-progress screen omitted its no-response contract");
+  const competingScale = inspectScreen("STAGE 2 OF 5 - EVIDENCE REVIEW");
+  assert(!competingScale.ok, "competing stage scale passed");
 });
 
 pass("broker defects degrade and cannot claim a delivery block", () => {
@@ -94,6 +136,46 @@ pass("valid internal and user-owned states are accepted", () => {
   assertWorkflowState("filings", {
     status: "NEEDS_EXTRACTION", blockerClass: "INTERNAL_WORK", userBlocking: false,
   });
+});
+
+pass("every internal evidence state has a declared route to a closed lane", () => {
+  for (const layer of ["broker", "dcs", "filings", "attachment"]) {
+    const declaration = WORKFLOW_STATE_CONTRACT.layers[layer];
+    const closed = new Set(["PASS", "PASS_DEGRADED"]);
+    for (const [state, contract] of Object.entries(declaration.states)) {
+      if (contract.user_blocking === true || closed.has(state)) continue;
+      const queue = [state];
+      const seen = new Set();
+      let reachesClosed = false;
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (seen.has(current)) continue;
+        seen.add(current);
+        if (closed.has(current)) {
+          reachesClosed = true;
+          break;
+        }
+        for (const next of declaration.transitions?.[current] ?? []) queue.push(next);
+      }
+      assert(reachesClosed, `${layer}.${state} has no declared path to a closed lane`);
+    }
+  }
+});
+
+pass("internal work can never become an action-required user message", () => {
+  const action = WORKFLOW_STATE_CONTRACT.layers.user_flow.states.ACTION_REQUIRED;
+  assert(
+    JSON.stringify(action.blocker_classes) === JSON.stringify(["USER_DECISION"]),
+    "ACTION_REQUIRED admits internal work",
+  );
+  const response = VISIBLE_JOURNEY_CONTRACT.response_contract.ACTION_REQUIRED;
+  assert(response.requires_explicit_reply === true, "ACTION_REQUIRED has no reply contract");
+  for (const status of ["IN_PROGRESS", "COMPLETE", "BLOCKED_INTERNAL"]) {
+    assert(
+      VISIBLE_JOURNEY_CONTRACT.response_contract[status].automatic_continuation === true,
+      `${status} is not automatic`,
+    );
+  }
 });
 
 rejects(

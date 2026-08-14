@@ -1797,6 +1797,15 @@
         "semantic_role": {
           "type": "string"
         },
+        "role_aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "description": "Additional semantic roles owned by this same visible row after the compiler proves and collapses an economically identical duplicate. Aliases are identities, not extra rows or extra writers."
+        },
         "operation_scope": {
           "enum": [
             "continuing",

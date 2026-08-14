@@ -62,6 +62,13 @@ function allStatementRows(modelCase) {
   ];
 }
 
+function rowHasRole(row, role) {
+  return (
+    row?.semantic_role === role ||
+    (Array.isArray(row?.role_aliases) && row.role_aliases.includes(role))
+  );
+}
+
 function classificationChecks(disclosure, section, rows) {
   const checks = [];
   const id = disclosure.source_line_id ?? "missing";
@@ -321,7 +328,7 @@ function requiredRoleChecks(modelCase) {
   for (const [section, requiredRoles] of Object.entries(sections)) {
     const present = new Set(
       (modelCase.statement_structure?.[section] ?? [])
-        .map((row) => row.semantic_role)
+        .flatMap((row) => [row.semantic_role, ...(row.role_aliases ?? [])])
         .filter(Boolean),
     );
     if (section === "cash_flow") {
@@ -715,7 +722,12 @@ function statementHierarchyChecks(modelCase) {
             ),
           );
         }
-        if ((parent.values ?? []).slice(0, 3).some((value) => value !== null && value !== undefined)) {
+        if (
+          parent.historical_authority !== "derived_formula" &&
+          (parent.values ?? []).slice(0, 3).some(
+            (value) => value !== null && value !== undefined,
+          )
+        ) {
           checks.push(
             result(
               `statement_hierarchy.${section}.${parentId}.derived_input`,
@@ -1885,14 +1897,14 @@ function brokerChecks(modelCase) {
   // weakening the gate for a case that simply omitted operating forecasts.
   const rows = normaliseStatementRows(modelCase, "income_statement");
   const byId = new Map(rows.map((row) => [row.row_id, row]));
-  const rowForRole = (role) => rows.find((row) => row.semantic_role === role);
+  const rowForRole = (role) => rows.find((row) => rowHasRole(row, role));
   const solvedRoles = new Set(["interest_income", "interest_expense"]);
   const visiting = new Set();
   const authorities = new Set();
   const resolvable = (rowId) => {
     const row = byId.get(rowId);
     if (!row) return false;
-    if (solvedRoles.has(row.semantic_role)) return true;
+    if ([row.semantic_role, ...(row.role_aliases ?? [])].some((role) => solvedRoles.has(role))) return true;
     if (visiting.has(rowId)) return false;
     if (row.broker_metric_id && populatedBrokerPeriods(row.broker_metric_id) === 3) {
       authorities.add(row.broker_metric_id);

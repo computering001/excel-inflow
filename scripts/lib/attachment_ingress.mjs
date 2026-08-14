@@ -33,6 +33,9 @@ const BROKER_SEMANTIC_REPORT_SCHEMA = schema("broker-semantic-verification-repor
 const BROKER_CANDIDATE_MANIFEST_SCHEMA = schema("broker-candidate-manifest.schema.json");
 const BROKER_SURFACE_CENSUS_SCHEMA = schema("broker-surface-census.schema.json");
 const BROKER_RUN_STATE_SCHEMA = schema("broker-run-state.schema.json");
+const BROKER_DEGRADED_CLOSE_RECEIPT_SCHEMA = schema(
+  "broker-degraded-close-receipt-v1.schema.json",
+);
 const BROKER_RUNTIME_MEMBERS = schema("broker-runtime-members.json");
 const DCS_SOURCE_TABLES_SCHEMA = schema("dcs-source-tables-v1.schema.json");
 const DCS_CANDIDATE_MANIFEST_SCHEMA = schema("dcs-candidate-manifest-v1.schema.json");
@@ -841,6 +844,17 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       );
     }
   }
+  const stateOwnedArtifact = async (artifactName, label) => {
+    const statePath = runState.json.artifacts?.[artifactName];
+    if (!statePath) throw new Error(`${label} is absent from the broker controller state.`);
+    const artifactPath = path.resolve(statePath);
+    const bytes = await fs.readFile(artifactPath);
+    const digest = sha256(bytes);
+    if (runState.json.artifact_sha256?.[artifactName] !== digest) {
+      throw new Error(`${label} is not hash-owned by the broker controller state.`);
+    }
+    return { path: artifactPath, bytes, sha256: digest, json: await readJsonFile(artifactPath, label) };
+  };
   const degradedClosureStages = new Set(
     (runState.json.checkpoints ?? [])
       .filter((checkpoint) => checkpoint.status === "PASS")
@@ -851,6 +865,36 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
         "house_local_authority_fallback",
       ].includes(stage)),
   );
+  const degradedCloseReceipt = brokerLaneDegraded
+    ? await stateOwnedArtifact(
+        "degraded_close_receipt",
+        "Broker degraded-close receipt",
+      )
+    : null;
+  if (degradedCloseReceipt) {
+    const receiptErrors = validateJsonSchema(
+      degradedCloseReceipt.json,
+      BROKER_DEGRADED_CLOSE_RECEIPT_SCHEMA,
+    );
+    if (receiptErrors.length > 0) {
+      throw new Error(
+        `Broker degraded-close receipt fails its contract: ${receiptErrors[0]}`,
+      );
+    }
+    if (
+      degradedCloseReceipt.json.run_id !== runState.json.run_id ||
+      degradedCloseReceipt.json.cache_key !== runState.json.cache_key ||
+      degradedCloseReceipt.json.broker_pack_sha256 !==
+        runState.json.artifact_sha256?.broker_pack ||
+      degradedCloseReceipt.json.source_tables_sha256 !== sourceTables.sha256 ||
+      degradedCloseReceipt.json.crosswalk_receipt_sha256 !== receipt.sha256 ||
+      degradedCloseReceipt.json.semantic_report_sha256 !== semanticReport?.sha256
+    ) {
+      throw new Error(
+        "Broker degraded-close receipt is detached from its closed run artifacts.",
+      );
+    }
+  }
   if (brokerLaneDegraded && degradedClosureStages.size === 0) {
     throw new Error(
       "Broker controller PASS_DEGRADED state has no recognised hash-bound degradation checkpoint.",
@@ -874,17 +918,6 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       "Broker period-header fallback is missing its recovery receipt.",
     );
   }
-  const stateOwnedArtifact = async (artifactName, label) => {
-    const statePath = runState.json.artifacts?.[artifactName];
-    if (!statePath) throw new Error(`${label} is absent from the broker controller state.`);
-    const artifactPath = path.resolve(statePath);
-    const bytes = await fs.readFile(artifactPath);
-    const digest = sha256(bytes);
-    if (runState.json.artifact_sha256?.[artifactName] !== digest) {
-      throw new Error(`${label} is not hash-owned by the broker controller state.`);
-    }
-    return { path: artifactPath, bytes, sha256: digest, json: await readJsonFile(artifactPath, label) };
-  };
   const periodRecoveryReceipt = degradedClosureStages.has("period_header_recovery")
     ? await stateOwnedArtifact("period_header_recovery_receipt", "Broker period-header recovery receipt")
     : null;
@@ -900,6 +933,15 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   const stateExtractionArtifact = runState.json.artifacts?.verified_bundle
     ? "verified_bundle"
     : "extraction_bundle";
+  if (
+    degradedCloseReceipt &&
+    degradedCloseReceipt.json.bundle_sha256 !==
+      runState.json.artifact_sha256?.[stateExtractionArtifact]
+  ) {
+    throw new Error(
+      "Broker degraded-close receipt is detached from the quarantined evidence bundle.",
+    );
+  }
   const declaredArtifactPaths = {
     [stateExtractionArtifact]: extraction.path,
     source_tables: sourceTables.path,
@@ -947,6 +989,7 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     "surface_census",
     "semantic_verification",
     "pack_compilation",
+    ...(brokerLaneDegraded ? ["degraded_delivery_close"] : []),
     // A degraded lane must carry at least one recognised, receipted closure.
     ...(brokerLaneDegraded ? [...degradedClosureStages] : []),
   ]);
@@ -976,6 +1019,9 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       : { vision: "verified_bundle" }),
     semantic_verification: "semantic_report",
     pack_compilation: "broker_pack",
+    ...(brokerLaneDegraded
+      ? { degraded_delivery_close: "degraded_close_receipt" }
+      : {}),
   };
   for (const checkpoint of runState.json.checkpoints ?? []) {
     if (checkpointStages.has(checkpoint.stage)) {
@@ -1476,6 +1522,9 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     ...(semanticReport
       ? { semantic_verification: structuredClone(semanticReport.json) }
       : {}),
+    ...(degradedCloseReceipt
+      ? { degraded_close_receipt: structuredClone(degradedCloseReceipt.json) }
+      : {}),
     workbook_table_projection: structuredClone(workbookTables),
   };
   return {
@@ -1488,6 +1537,9 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     crosswalk_receipt_sha256: receipt.sha256,
     ...(semanticReport
       ? { semantic_verification_sha256: semanticReport.sha256 }
+      : {}),
+    ...(degradedCloseReceipt
+      ? { degraded_close_receipt_sha256: degradedCloseReceipt.sha256 }
       : {}),
   };
 }

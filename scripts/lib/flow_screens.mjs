@@ -7,7 +7,12 @@
 // decisions without asserting on typography, and on typography without running
 // a solver.
 //
-import { SCREEN_CONTRACT, stageById } from "./flow_runtime.mjs";
+import {
+  SCREEN_CONTRACT,
+  stageById,
+  VISIBLE_MILESTONES,
+  visibleJourneyProgress,
+} from "./flow_runtime.mjs";
 import {
   forecastRowMateriality,
   resolveForecastAuthority,
@@ -41,6 +46,7 @@ export function inspectScreen(screen) {
     ? rendered.slice(8, -4)
     : rendered;
   const lines = body.split("\n");
+  const semanticBody = body.replace(/\s+/g, " ");
   const violations = [];
   if (SCREEN_CONTRACT.ascii_only && /[^\x00-\x7F]/.test(body)) {
     violations.push("screen contains non-ASCII characters");
@@ -55,6 +61,32 @@ export function inspectScreen(screen) {
   if (lines.length > SCREEN_CONTRACT.max_lines) {
     violations.push(
       `screen has ${lines.length} lines; limit is ${SCREEN_CONTRACT.max_lines}`,
+    );
+  }
+  if (/\bSTAGE\s+\d+\s+OF\s+\d+\b/i.test(semanticBody)) {
+    violations.push(
+      "screen exposes internal controller numbering beside the six-milestone journey",
+    );
+  }
+  const actionRequired = /STATUS:\s*ACTION REQUIRED/i.test(semanticBody);
+  const inProgress = /STATUS:\s*IN PROGRESS/i.test(semanticBody);
+  const hasActionInstrument =
+    /NEXT ACTION/i.test(semanticBody) ||
+    /\+--\[ REPLY \]/i.test(semanticBody) ||
+    /Answer the question cards below\./i.test(semanticBody);
+  if (actionRequired && !hasActionInstrument) {
+    violations.push("action-required screen has no explicit reply instrument");
+  }
+  const saysNoResponse = /no response is required/i.test(semanticBody);
+  if (inProgress && !saysNoResponse) {
+    violations.push("in-progress screen does not state that no response is required");
+  }
+  if (
+    saysNoResponse &&
+    (actionRequired || /NEXT ACTION/i.test(semanticBody) || /\+--\[ REPLY \]/i.test(semanticBody))
+  ) {
+    violations.push(
+      "screen says no response is required while also presenting a user action",
     );
   }
   return { ok: violations.length === 0, lines: lines.length, violations };
@@ -84,9 +116,16 @@ function finishScreen(lines, { summariseOverflow = false } = {}) {
 export function renderStageHeader(stageId, status) {
   const stage = stageById(stageId);
   if (!stage) throw new Error(`Unknown user-flow stage: ${stageId}`);
+  const progress = visibleJourneyProgress(stageId, status);
+  const suffix = progress.active_label
+    ? ` - ${progress.active_label.toUpperCase()} IN PROGRESS`
+    : progress.next_label
+      ? ` - ${progress.next_label.toUpperCase()} NEXT`
+      : "";
   return [
     RULE,
-    `   STAGE ${stage.number} OF 5 - ${stage.title}`,
+    `   PROGRESS: ${progress.completed} OF ${progress.total} COMPLETE${suffix}`,
+    `   CHECKPOINT: ${progress.checkpoint}`,
     `   STATUS: ${asciiText(status).toUpperCase()}`,
     RULE,
   ];
@@ -103,6 +142,47 @@ export function renderStageStatus({ stageId, status, summary, nextAction = null 
   return finishScreen(lines);
 }
 
+export function renderEvidenceReviewProgress(evidenceRun) {
+  const filingPeriods = evidenceRun?.filings?.historical_periods ?? [];
+  const fiscalLabels = filingPeriods.map((value) => {
+    const year = /^\d{4}/.exec(String(value ?? ""))?.[0];
+    return year ? `FY${year}` : String(value);
+  });
+  const brokerHouseCount = evidenceRun?.broker_pack?.houses?.length ?? 0;
+  const dcsCounts = evidenceRun?.dcs_evidence_receipt?.counts ??
+    evidenceRun?.case_evidence?.lanes?.dcs?.compiler_receipt?.counts ?? {};
+  const reportingCurrency =
+    evidenceRun?.case_source?.identity?.reporting_currency ??
+    evidenceRun?.filings?.reporting_currency ??
+    "not reported";
+  const units =
+    evidenceRun?.case_source?.identity?.units ??
+    evidenceRun?.filings?.units ??
+    "not reported";
+  const lines = [
+    ...renderStageHeader("evidence_review", "in progress"),
+    "",
+    `   ${evidenceRun?.company_name ?? evidenceRun?.filings?.entity_name ?? "Issuer"}`,
+    "",
+    "   INPUT PACK RECEIVED",
+    "",
+    `   Filing periods ........ ${fiscalLabels.join("-") || "not reported"}`,
+    `   Broker houses ......... ${brokerHouseCount}`,
+    "   FactSet debt export ... received",
+    `   Debt snapshot ......... ${filingPeriods.at(-1) ?? "not reported"}`,
+    `   Reporting basis ....... ${reportingCurrency} ${units}`,
+    `   FactSet debt rows ..... ${dcsCounts.source_rows ?? "not reported"}`,
+    `   FactSet populated cells ${dcsCounts.source_cells ?? "not reported"}`,
+    "",
+    "   The controller is reconciling the issuer, periods,",
+    "   statements, debt instruments and broker forecasts.",
+    "   It continues automatically; no response is required.",
+    "",
+    RULE,
+  ];
+  return finishScreen(lines);
+}
+
 function previewNumber(value) {
   if (!Number.isFinite(Number(value))) return "-";
   const number = Number(value);
@@ -112,7 +192,7 @@ function previewNumber(value) {
 }
 
 /**
- * Stage 2's one mandatory broker checkpoint. The compact screen is a readable
+ * The input-pack review's broker checkpoint. The compact screen is a readable
  * receipt; the adjacent JSON artifact carries every cell-addressed provenance
  * record and every alternate without forcing a 500-line chat response.
  */
@@ -132,7 +212,12 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     byMetric.set(value.metric_id, record);
   }
   const lines = [
-    ...renderStageHeader("evidence_review", "action required"),
+    ...renderStageHeader(
+      "evidence_review",
+      confirmationErrors.length > 0
+        ? "complete - optional override ignored"
+        : "complete",
+    ),
     "",
     "   SEALED BROKER PREVIEW",
     "",
@@ -179,7 +264,7 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     );
   }
   if (confirmationErrors.length > 0) {
-    lines.push("", "   CONFIRMATION NOT ACCEPTED");
+    lines.push("", "   OPTIONAL OVERRIDE NOT ACCEPTED");
     for (const error of confirmationErrors.slice(0, 4)) {
       for (const line of indented(error, 3, RULE_WIDTH - 3)) lines.push(line);
     }
@@ -187,12 +272,19 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
   lines.push(
     "",
     "   Full tables, exact source cells and alternates are in",
-    "   broker-preview.json. Confirmation selects a house; it",
-    "   cannot waive a conflict or promote quarantined evidence.",
-    "",
-    "   NEXT ACTION",
-    `   Reply CONFIRM ${selected?.house_id ?? (waterfallMode ? "FORECAST_WATERFALL" : "<house-id>")}${waterfallMode ? "." : ", or select one"}`,
-    ...(waterfallMode ? [] : ["   eligible alternate shown above."]),
+    "   broker-preview.json. The clean recommendation is accepted",
+    "   automatically and cannot promote quarantined evidence.",
+    ...(confirmationErrors.length > 0
+      ? [
+          "",
+          "   The automatic clean recommendation remains active.",
+          "   No response is required.",
+        ]
+      : [
+          "",
+          "   The controller continues automatically into the",
+          "   ordinary forecast waterfall and model decisions.",
+        ]),
     "",
     `   Preview hash: ${String(preview?.preview_sha256 ?? "").slice(0, 16)}...`,
     RULE,
@@ -202,7 +294,8 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
 
 // The welcome screen is reproduced verbatim from the user-flow document. It is a
 // constant rather than a template because there is nothing in it to vary: the
-// three inputs are fixed by the flow and the five stages are fixed by G1.
+// three inputs are fixed by the flow. Internal receipt stages are deliberately
+// absent: the user sees only the canonical six-milestone journey.
 export const WELCOME_SCREEN = finishScreen([
   ...renderStageHeader("inputs", "action required"),
   "",
@@ -217,11 +310,12 @@ export const WELCOME_SCREEN = finishScreen([
   "   HOW THIS GOES",
   RULE,
   "",
-  "   1  Provide the input pack                 <- you are here",
-  "   2  Evidence read; broker choice confirmed one stop",
-  "   3  Up to five real questions are asked    if needed",
-  "   4  The workbook is built and checked      no contact",
-  "   5  The model and concise findings arrive",
+  "   1  Company identified                     <- you are here",
+  "   2  Filings read or supplied",
+  "   3  Broker research read in one pass",
+  "   4  FactSet debt export reconciled",
+  "   5  Workbook built and checked              no contact",
+  "   6  Model and concise findings delivered",
   "",
   RULE,
   "   WHAT I NEED",
@@ -243,6 +337,9 @@ export const WELCOME_SCREEN = finishScreen([
   RULE,
   "   Currency, fiscal calendar and periods follow the company.",
   "   You will not be asked to confirm them.",
+  "",
+  "   NEXT ACTION",
+  "   Provide the company name and input pack.",
   RULE,
 ]);
 
@@ -252,9 +349,9 @@ export const WELCOME_SCREEN = finishScreen([
 // render-time gate (printable ASCII, width cap, line cap) as the rest.
 // ---------------------------------------------------------------------------
 
-export const RAIL_CHIPS = Object.freeze([
-  "Company", "Filings", "Brokers", "Debt", "Build", "Deliver",
-]);
+export const RAIL_CHIPS = Object.freeze(
+  VISIBLE_MILESTONES.map((item) => item.label),
+);
 
 function frameTop(title) {
   const left = "+=[ EXCEL INFLOW ]";
@@ -321,11 +418,11 @@ export const COMPANY_SCREEN = framedScreen({
     "Filings ............ pulled for you where the runtime",
     "                     has access; attach 3 full years",
     "                     to override",
-    "Broker research .... asked at the BROKERS stage",
-    "FactSet export ..... asked at the DEBT stage",
+    "Broker research .... requested at Brokers",
+    "FactSet export ..... requested at Debt",
     "",
     "Attach everything now if you prefer - the flow then",
-    "stops only at the two checkpoints and real questions.",
+    "stops only for a genuine model decision, if one remains.",
     "",
     "Currency, fiscal calendar and periods follow the",
     "company. You will not be asked to confirm them.",
@@ -652,7 +749,7 @@ export function renderForecastPlanScreen(modelCase, sealedPlan = null) {
     )) lines.push(`   ${part}`);
     for (const part of wrap(
       sealedPlan.status === "PASS"
-        ? "Reply continue to build, or amend an assumption first."
+        ? "The controller continues automatically into Build."
         : "Supply a compatible source or explicit assumption; no workbook has been built.",
       RULE_WIDTH - 3,
     )) lines.push(`   ${part}`);
@@ -723,7 +820,7 @@ export function renderForecastPlanScreen(modelCase, sealedPlan = null) {
   ));
   lines.push(
     "   Forecast totals and links calculate.",
-    "   Reply continue to build, or amend an assumption first.",
+    "   The controller continues automatically into Build.",
     "",
     RULE,
   );

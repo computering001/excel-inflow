@@ -11,6 +11,69 @@
     "USER_DECISION",
     "FATAL_SOURCE"
   ],
+  "visible_journey": {
+    "schema_version": "visible-journey/1.0",
+    "display_rule": "Only this six-milestone journey is user-visible. Five-stage controller ids and numbers are receipt metadata and must never appear as a competing progress scale.",
+    "milestones": [
+      { "id": "company", "label": "Company" },
+      { "id": "filings", "label": "Filings" },
+      { "id": "brokers", "label": "Brokers" },
+      { "id": "debt", "label": "Debt" },
+      { "id": "build", "label": "Build" },
+      { "id": "deliver", "label": "Deliver" }
+    ],
+    "checkpoints": {
+      "inputs": {
+        "label": "INPUT PACK",
+        "completed_milestones": 0,
+        "active_milestone": "company",
+        "next_milestone": "company"
+      },
+      "evidence_review": {
+        "label": "INPUT PACK REVIEW",
+        "completed_milestones": 4,
+        "active_milestone": null,
+        "next_milestone": "build"
+      },
+      "decisions": {
+        "label": "MODEL DECISIONS",
+        "completed_milestones": 4,
+        "active_milestone": null,
+        "next_milestone": "build"
+      },
+      "build_checks": {
+        "label": "BUILD AND CHECKS",
+        "completed_milestones": 4,
+        "active_milestone": "build",
+        "next_milestone": "deliver"
+      },
+      "delivery": {
+        "label": "DELIVERY",
+        "completed_milestones": 5,
+        "active_milestone": "deliver",
+        "next_milestone": null
+      }
+    },
+    "response_contract": {
+      "ACTION_REQUIRED": {
+        "requires_explicit_reply": true,
+        "automatic_continuation": false
+      },
+      "IN_PROGRESS": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true
+      },
+      "COMPLETE": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true
+      },
+      "BLOCKED_INTERNAL": {
+        "requires_explicit_reply": false,
+        "automatic_continuation": true,
+        "user_visible": false
+      }
+    }
+  },
   "delivery_blocker_constitution": {
     "schema_version": "delivery-blocker-constitution/1.0",
     "fatal_reasons": {
@@ -52,6 +115,7 @@
       "decision_graph_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
       "broker_selection_compile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
       "broker_preview_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
+      "broker_auto_selection_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workflow_integrity" },
       "case_recompile_blocked": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
       "forecast_authority_unresolved": { "fatal_reason": "equation_system_unsolved", "domain": "equation_graph" },
       "workbook_build_blocked": { "fatal_reason": "workbook_delivery_failed", "domain": "workbook_build" },
@@ -131,7 +195,7 @@
       "states": {
         "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PAUSED": { "blocker_classes": [null], "user_blocking": false, "stages": ["inputs", "evidence_review", "decisions", "build_checks"] },
-        "ACTION_REQUIRED": { "blocker_classes": ["INTERNAL_WORK", "USER_DECISION"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions"] },
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["inputs", "decisions"] },
         "BLOCKED": { "blocker_classes": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PASS_PENDING_MANUAL": { "blocker_classes": [null], "user_blocking": false, "stages": ["delivery"] }
       },
@@ -146,7 +210,7 @@
     "stage_receipt": {
       "states": {
         "success": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
-        "action_required": { "stages": ["evidence_review", "decisions"] },
+        "action_required": { "stages": ["decisions"] },
         "blocked": { "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "failed": { "stages": ["build_checks", "delivery"] }
       }

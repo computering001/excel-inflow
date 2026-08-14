@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { inspectScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
+import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { assessCoverage } from "./lib/coverage.mjs";
 import {
   DELIVERY_BLOCKED_OUTCOMES,
   DELIVERY_FATAL_REASONS,
@@ -82,7 +84,7 @@ async function test(name, callback) {
   }
 }
 
-await test("bare chat invocation is routed to the canonical Stage 1 screen", async () => {
+await test("bare chat invocation is routed to the canonical Company screen", async () => {
   const skillRoot = path.resolve(HERE, "..");
   const skillInstructions = await fs.readFile(path.join(skillRoot, "SKILL.md"), "utf8");
   const runtimeCore = await fs.readFile(
@@ -119,7 +121,7 @@ await test("bare chat invocation is routed to the canonical Stage 1 screen", asy
     );
     assert(
       flatText.includes("The bare trigger is presentation-only"),
-      `${name} permits deployment work before the Stage 1 screen`,
+      `${name} permits deployment work before the Company screen`,
     );
     assert(
       flatText.includes("Deployment certification belongs to the versioned installation transaction"),
@@ -127,7 +129,7 @@ await test("bare chat invocation is routed to the canonical Stage 1 screen", asy
     );
     assert(
       flatText.includes("emit progress prose"),
-      `${name} permits visible pre-Stage-1 status text`,
+      `${name} permits visible pre-Company status text`,
     );
     assert(
       flatText.includes("Strict fresh-chat isolation") &&
@@ -138,15 +140,20 @@ await test("bare chat invocation is routed to the canonical Stage 1 screen", asy
     );
   }
   const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
-  assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "bare trigger target is not canonical Stage 1 bytes");
+  assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "bare trigger target is not canonical Company bytes");
 });
 
-await test("production controller owns all five canonical presentation screens", async () => {
+await test("production controller owns one canonical six-milestone visible journey", async () => {
   const stages = ["inputs", "evidence_review", "decisions", "build_checks", "delivery"];
+  const expectedCompleted = [0, 4, 4, 4, 5];
   for (const [index, stage] of stages.entries()) {
     const result = await command("run_user_flow.mjs", ["--screen", stage]);
     const screen = result.stdout.replace(/\n$/, "");
-    assert(screen.includes(`STAGE ${index + 1} OF 5`), `${stage} header is missing`);
+    assert(
+      screen.includes(`PROGRESS: ${expectedCompleted[index]} OF 6 COMPLETE`),
+      `${stage} visible progress is missing`,
+    );
+    assert(!/STAGE\s+\d+\s+OF\s+\d+/i.test(screen), `${stage} leaks internal stage numbering`);
     assert(inspectScreen(screen).violations.length === 0, `${stage} screen violates the contract`);
   }
   const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
@@ -159,11 +166,16 @@ await test("successful ordinary transitions emit ASCII while JSON remains pure",
   const evidence = await visibleFlow(cleanEvidence, runDir, ["--stop-after", "evidence_review"]);
   const decisions = await visibleFlow(cleanEvidence, runDir, ["--stop-after", "decisions"]);
   const screens = [inputs.stdout, evidence.stdout, decisions.stdout].map((value) => value.replace(/\n$/, ""));
-  assert(screens[0].includes("STAGE 2 OF 5 - EVIDENCE REVIEW"), "stage-2 start screen is missing");
-  assert(screens[1].includes("STATUS: COMPLETE"), "stage-2 completion screen is missing");
-  assert(screens[2].includes("MATERIAL FORECAST PLAN"), "stage-3 forecast plan is missing");
+  assert(screens[0].includes("PROGRESS: 4 OF 6 COMPLETE - BUILD NEXT"), "input-pack review progress is missing");
+  assert(screens[0].includes("FactSet debt rows"), "FactSet row count is not explicitly labelled");
+  assert(screens[0].includes("FactSet populated cells"), "FactSet cell count is not explicitly labelled");
+  assert(!screens[0].includes("Source rows preserved"), "ambiguous cross-lane row count remains");
+  assert(screens[0].includes("continues automatically; no response is required"), "input-pack review does not declare automatic continuation");
+  assert(screens[1].includes("STATUS: COMPLETE"), "input-pack review completion screen is missing");
+  assert(screens[2].includes("MATERIAL FORECAST PLAN"), "forecast plan is missing");
   assert(screens[2].includes("totals and links calculate"), "forecast/calculation boundary is missing");
-  assert(screens[2].includes("Reply continue to build"), "pre-build review stop is missing");
+  assert(screens[2].includes("continues automatically into Build"), "automatic Build continuation is missing");
+  assert(!screens[2].includes("Reply continue to build"), "an undeclared pre-build stop remains");
   for (const screen of screens) {
     assert(inspectScreen(screen).violations.length === 0, "transition screen violates the contract");
     assert(!screen.includes('"schema_version"'), "machine JSON leaked into the visible route");
@@ -183,6 +195,43 @@ await test("no-question production path pauses after decisions", async () => {
   const result = await flow(cleanEvidence, path.join(out, "clean-run"), ["--stop-after", "decisions"]);
   assert(result.status === "PAUSED" && result.stage === "decisions", JSON.stringify(result));
   assert(result.reused_stages.length === 0, "first run unexpectedly reused a stage");
+  const modelCase = JSON.parse(await fs.readFile(
+    path.join(out, "clean-run", "stages", "decisions", "model-case.json"),
+    "utf8",
+  ));
+  const modelCaseSchema = JSON.parse(await fs.readFile(
+    path.join(HERE, "..", "assets", "model-case-v2.schema.json"),
+    "utf8",
+  ));
+  const schemaErrors = validateJsonSchema(modelCase, modelCaseSchema);
+  assert(schemaErrors.length === 0, `compiled decision case violates model-case schema: ${schemaErrors.join("; ")}`);
+  const coverage = assessCoverage(modelCase);
+  assert(
+    coverage.ready_to_build,
+    `compiled decision case fails build coverage: ${coverage.checks.filter((item) => item.status === "BLOCK").map((item) => item.id).join(", ")}`,
+  );
+  const aliasOwner = modelCase.statement_structure.income_statement.find(
+    (row) => Array.isArray(row.role_aliases) && row.role_aliases.length > 0,
+  );
+  assert(aliasOwner?.role_aliases.includes("ebit"), "collapsed EBIT identity has no typed role alias");
+  const mutated = structuredClone(modelCase);
+  const mutatedAliasOwner = mutated.statement_structure.income_statement.find(
+    (row) => row.row_id === aliasOwner.row_id,
+  );
+  mutatedAliasOwner.role_aliases.push(mutatedAliasOwner.role_aliases[0]);
+  assert(
+    validateJsonSchema(mutated, modelCaseSchema).some((error) => /unique/i.test(error)),
+    "duplicate role alias mutation passed the model-case schema",
+  );
+  const changeInDebt = modelCase.statement_structure.cash_flow.find(
+    (row) => row.semantic_role === "change_in_debt",
+  );
+  assert(
+    changeInDebt?.historical_authority === "derived_formula" &&
+      changeInDebt.calculation?.operator === "sum" &&
+      (changeInDebt.calculation?.refs ?? []).length > 0,
+    "compiler-created Change in Debt does not declare its historical formula authority",
+  );
 });
 
 await test("identical restart reuses all completed stages", async () => {

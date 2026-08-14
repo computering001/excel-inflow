@@ -1097,6 +1097,11 @@ for (const name of files) {
       });
       const certPlan = compileRowPlan(certified).statement_rows;
       const compPlan = compileRowPlan(compiled).statement_rows;
+      const compiledPlanRows = new Map(
+        ["income_statement", "cash_flow"].flatMap((section) =>
+          (compPlan[section] ?? []).map((row) => [row.row_id, row]),
+        ),
+      );
       // Case-level adjudications carry to their plan expression: a compiled
       // CASE row whose forecast slot is authority-materialized, or whose
       // legacy whole-row rule migrated to the schedule role / per-period
@@ -1199,6 +1204,28 @@ for (const name of files) {
               !(/\.values(\[\d+\])?$/.test(d.path) &&
                 compRow?.calculation &&
                 (d.actual === "(absent)" || d.actual === "null")) &&
+              // A legacy derived parent stored its filed historical total in
+              // the same `values` array as the formula cache.  The current
+              // compiler moves that exact three-period series into the typed
+              // reconciliation lane so the formula is the sole cell writer.
+              // This is a named authority migration only when the bytes equal
+              // the legacy historical values and the live parent is still an
+              // exact visible sum of children.
+              !(/\.reported_historical_values$/.test(d.path) &&
+                d.expected === "(absent)" &&
+                compiledPlanRows.get(id)?.historical_authority === "reported_total_reconciled" &&
+                compiledPlanRows.get(id)?.aggregation_authority === "derived_from_children" &&
+                compiledPlanRows.get(id)?.calculation?.operator === "sum" &&
+                (compiledPlanRows.get(id)?.calculation?.refs ?? []).length > 0 &&
+                (() => {
+                  const reconciled = compiledPlanRows.get(id)?.reported_historical_values;
+                  if (!Array.isArray(reconciled) || reconciled.length !== 3) return false;
+                  return reconciled.every((actualValue, period) => {
+                    const expectedValue = historicalFormulaValue(id, period);
+                    return Number.isFinite(expectedValue) && Number.isFinite(Number(actualValue)) &&
+                      Math.abs(Number(actualValue) - expectedValue) <= 1e-9;
+                  });
+                })()) &&
               // Case-level named classes at plan granularity.
               !planAuthorityMaterialised(id, d) &&
               !planCalcMigration(id, d) &&

@@ -7,7 +7,7 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 ### Non-bypassable end-user route
 
 An end-user company workbook has exactly one producer:
-`scripts/run_user_flow.mjs` and the Stage-4 controller it invokes. After
+`scripts/run_user_flow.mjs` and the Build controller it invokes. After
 attachments are normalised, continue or resume that controller through its
 hash-bound run carrier. Never construct a workbook directly in chat, with
 ad-hoc Python/OpenPyXL, from a compact or generic template, through a
@@ -16,11 +16,12 @@ cannot run, **BLOCK** and preserve the carrier; a smaller substitute is never a
 valid fallback.
 
 Attach only the workbook path returned by a final `user-flow-run/1.0` result
-whose controller is the currently shipped `five-stage` version, stage is
+whose controller version matches the installed production manifest, whose
+terminal internal checkpoint is
 `delivery`, status is `PASS_PENDING_MANUAL`, total violations are zero, and
 `live_delivery_attestation_sha256` is present. The matching
 `live-delivery-attestation/1.0` artifact must be `PASS` and must bind the
-workbook, Stage-4 receipt, active maximal/net-cash authority, design epoch, A:U
+workbook, Build receipt, active maximal/net-cash authority, design epoch, A:U
 topology and every required sidecar. The delivery screen must visibly show
 **BUILD IDENTITY**. Absence of any one of these facts means no workbook may be
 delivered.
@@ -69,7 +70,8 @@ unexplained grey forecast cells are forbidden. Every material historical line
 must either have its own executable forecast path or be a declared child of a
 visible parent whose forecast captures it in the same period.
 
-Stage 3 always emits the material forecast plan before build. For each
+The Model Decisions milestone always emits the material forecast plan before
+Build. For each
 independent row and forecast period it states the method, selected value and
 source or parent capture. Totals, ratios and schedule links are not forecast
 judgements and remain formula driven. A production build may not enter the
@@ -118,12 +120,13 @@ The model is flexible in semantic rows and instrument count, not in presentation
 the only admissible input is the text and attachments in that current user
 message in that current chat. A company name, attachment, project file, saved
 memory, prior chat, recent upload, run carrier or earlier run state is not a
-current input and must not be inferred or consumed. Emit the canonical Stage 1
+current input and must not be inferred or consumed. Emit the canonical Company
 screen and end the turn immediately. Do not advance company selection, retrieve
 filings, inspect attachments or resume a carrier in the same turn. Only a later
-user message in this chat, sent after the Stage 1 screen, may supply the company
+user message in this chat, sent after the Company screen, may supply the company
 or authorize a resume. If the invocation itself also names a company or carries
-attachments, still show Stage 1 and end the turn before processing them.
+attachments, still show the Company screen and end the turn before processing
+them.
 
 On the exact bare request `run excel inflow`, and on any equivalent request to
 start a new model, invoke the canonical production controller before asking a
@@ -156,11 +159,11 @@ canonical screen below EXACTLY, fence and all:
 |  Filings ............ pulled for you where the runtime
 |                       has access; attach 3 full years
 |                       to override
-|  Broker research .... asked at the BROKERS stage
-|  FactSet export ..... asked at the DEBT stage
+|  Broker research .... requested at Brokers
+|  FactSet export ..... requested at Debt
 |
 |  Attach everything now if you prefer - the flow then
-|  stops only at the two checkpoints and real questions.
+|  stops only for a genuine model decision, if one remains.
 |
 |  Currency, fiscal calendar and periods follow the
 |  company. You will not be asked to confirm them.
@@ -179,17 +182,16 @@ The entry screen asks for the COMPANY ONLY. Filings are auto-pulled where the
 runtime carries a filings library or public-filings access (user-supplied
 filings always take precedence; a company whose filings cannot be pulled or
 supplied blocks at intake). Broker research (3-10 houses) is requested at the
-BROKERS stage and the FactSet debt export - date toggle at LAST FISCAL YEAR
-END - at the DEBT stage. A user who attaches everything up front takes the
-fast path: the flow then stops only at the two checkpoints and genuine
-questions.
+Brokers milestone and the FactSet debt export - date toggle at LAST FISCAL
+YEAR END - at Debt. A user who attaches everything up front takes the fast
+path: the flow then stops only for a genuine model decision, if one remains.
 
 The bare trigger is presentation-only. Do not certify the installed release,
 inspect package bytes, emit progress prose, search for tools, read evidence or
-perform any other work before returning the Stage 1 screen. Deployment
+perform any other work before returning the Company screen. Deployment
 certification belongs to the versioned installation transaction, never to an
-ordinary end-user invocation. After Stage 1 is visible, intake and later stages
-may perform their declared checks and persist their normal receipts.
+ordinary end-user invocation. After the Company screen is visible, later
+milestones may perform their declared checks and persist their normal receipts.
 
 The entry screen collects the company only; the remaining pack arrives at
 its own stage as the screen states. Where the runtime carries a filings
@@ -264,28 +266,40 @@ mode, refinancing treatment or transaction timing. If more than five genuine
 decisions survive, persist the answers and present the next deterministic round;
 question cardinality alone is never evidence that the source pack is defective.
 
-The visible run has exactly five labelled stages:
+The visible run has exactly one six-milestone journey:
 
-1. `INPUTS` — receive the company, evidence pack and optional prior case;
-2. `EVIDENCE REVIEW` — validate, read and reconcile all broker work internally as one step;
-3. `DECISIONS` — zero to five genuinely unresolved modelling questions together, if any;
-4. `BUILD AND CHECKS` — solve, emit and validate without user contact; and
-5. `DELIVERY` — return the workbook, assumptions, findings and gate status.
+1. `COMPANY`;
+2. `FILINGS`;
+3. `BROKERS`;
+4. `DEBT`;
+5. `BUILD`; and
+6. `DELIVER`.
+
+The controller may retain its five internal receipt stages, but their numbers
+are machine metadata and never appear as a competing user-visible scale.
+Evidence review is shown as `PROGRESS: 4 OF 6 COMPLETE - BUILD NEXT` with
+`CHECKPOINT: INPUT PACK REVIEW`; it never carries an internal stage number.
 
 Use plain ASCII status screens no wider than 61 columns or 70 lines. Return each
 screen as exactly one fenced `text` block so spacing survives the chat renderer.
-Every screen states `STAGE n OF 5`, status and one unambiguous next action when
-user action is required. Do not expose raw logs, stack traces or internal file
-machinery. Preserve full detail in the stage artifact when the screen is a
-summary.
+Every screen states progress on the six-milestone journey, its checkpoint,
+status and one unambiguous next action when user action is required. A screen
+that says no response is required must continue automatically and may not also
+show a reply action. Internal work is never a user-visible terminal screen. Do
+not expose raw logs, stack traces or internal file machinery. Preserve full
+detail in the stage artifact when the screen is a summary. Return controller
+screen output verbatim and whole; never hand-compose, merge or relabel progress
+in chat. Count labels must name their source lane explicitly: for example,
+`FactSet debt-export rows` and `FactSet populated cells`, never the ambiguous
+`Source rows preserved`.
 
-Every stage writes a small hash-bound receipt containing run ID, controller
-version, stage number and ID, input and output hashes, prior-receipt hash,
+Every internal checkpoint writes a small hash-bound receipt containing run ID,
+controller version, checkpoint ID, input and output hashes, prior-receipt hash,
 status and next stage. Only a verified `success` receipt is resumable. A stale,
 foreign, failed, blocked or tampered receipt never skips work. State travels in
 the receipts and case files, never in chat history.
 
-Stage 4 has thirteen silent leaf checkpoints: semantic gates; plan; emit;
+The Build milestone has thirteen silent leaf checkpoints: semantic gates; plan; emit;
 LibreOffice recalculation; terminal patch; dynamic, style, cache, finance and
 semantic verification; verification aggregation; structural render; and
 publication. They do not create additional user messages. Each checkpoint
@@ -295,12 +309,12 @@ therefore restarts at the first incomplete or invalid checkpoint in the same
 chat instead of repeating the entire workbook build. No checkpoint is assumed
 to survive across chats.
 
-Invalidate from the earliest affected user stage: a new filing, debt export,
+Invalidate from the earliest affected user milestone: a new filing, debt export,
 broker pack or prior case restarts evidence review; a changed answer,
 assumption or transaction input restarts build and checks; a formatting-only
-change restarts rendering and visual checks inside stage 4; delivery wording
-alone restarts stage 5. Internal graph hashes continue to reuse unaffected work
-inside the selected stage.
+change restarts rendering and visual checks inside Build; delivery wording
+alone restarts Deliver. Internal graph hashes continue to reuse unaffected work
+inside the selected milestone.
 
 After answers, record them in `case-source.answers` and recompile; the model
 case is regenerated, never edited. Do not patch a workbook. Before delivery,
@@ -531,7 +545,7 @@ Keep total lease liability and any separately supplied interest-bearing lease ba
 The acquisition overlay uses enterprise value and entry EV/EBITDA to infer target EBITDA, plus a separately supplied absolute acquisition-debt amount, rate, close year and close month. It has no sources-and-uses, equity funding residual or EV-minus-debt RCF funding. Infer only approved operating metrics from visible ratios. Recompute pro forma amounts and ratios; never add ratios. Each adjustment is `pro forma - standalone`, so unchanged standalone debt, maturity, lease and cash-sweep legs cancel from the adjustment.
 
 For an ordinary production run, invoke only the resumable production shell
-shown under *User flow and evidence*. Its Stage 4 owns the semantic gates,
+shown under *User flow and evidence*. Its Build milestone owns the semantic gates,
 solver, plan, renderer, recalculation, terminal patch, independent per-run
 validation and structural render. Do not invoke the lower-level build commands
 or validators separately around it; that repeats work without strengthening the
@@ -549,7 +563,7 @@ python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook
 
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
 
-The model case is COMPILED, never written. Stage 3 authors exactly one
+The model case is COMPILED, never written. Model Decisions authors exactly one
 artifact: `case-source.json` under `assets/case-source.schema.json` —
 declarations only; the schema cannot express economic values or formula text,
 so transcription mistakes are structurally unwritable. The compiler projects
@@ -573,7 +587,7 @@ complete list, nothing serial.
 Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.
 
 An ordinary production company run invokes only `scripts/run_user_flow.mjs`.
-Stage 4 already runs the required per-run gates and returns their hash-bound
+The Build milestone already runs the required per-run gates and returns their hash-bound
 evidence. During an ordinary company run, do **not** run mutation suites, exact
 authority replays, double-build determinism, render self-tests or any package,
 installation or promotion procedure.
@@ -690,7 +704,7 @@ file fails in one line without opening Excel.
 
 When the compiled pack's `election_gauge` carries `candidate_attributed`
 entries — cash-flow line items one or two houses model, at or above the
-materiality floor against the headline anchor — Stage 2 asks about ALL of them
+materiality floor against the headline anchor — Model Decisions asks about ALL of them
 in one consolidated question, naming each concept, its house, and the computed
 ratio. The user's answer is recorded as `flex_elections` entries with
 `basis: attributed`, `source_house_id` and `confirmed_by_user: true`, and the

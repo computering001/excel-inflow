@@ -610,10 +610,23 @@ def main() -> int:
     broker_lane = lanes.get("broker") or {}
     if broker_lane.get("pipeline_status") == "PASS_DEGRADED":
         broker_summary = broker_lane.get("summary") or {}
+        degraded_receipt_raw = (broker_lane.get("artifacts") or {}).get(
+            "degraded_close_receipt"
+        )
+        degraded_receipt_path = (
+            Path(str(degraded_receipt_raw)) if degraded_receipt_raw else None
+        )
+        degraded_receipt_owned = bool(
+            degraded_receipt_path
+            and degraded_receipt_path.is_file()
+            and (broker_lane.get("artifact_sha256") or {}).get(
+                "degraded_close_receipt"
+            ) == sha256_file(degraded_receipt_path)
+        )
         quarantine_disclosed = bool(broker_summary.get("degraded")) and (
             "quarantined_conflict_count" in broker_summary
             or "quarantined_surface_count" in broker_summary
-        )
+        ) and degraded_receipt_owned
         if not quarantine_disclosed:
             # A degraded close without its quarantine receipt is an invalid
             # artifact closure, not an acceptable lane.

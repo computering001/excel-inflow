@@ -1,9 +1,16 @@
 import { canonicalise, hashValue } from "./run_store.mjs";
-import { assertWorkflowState } from "./workflow_state.mjs";
+import {
+  assertWorkflowState,
+  VISIBLE_JOURNEY_CONTRACT,
+} from "./workflow_state.mjs";
 
 export const FLOW_SCHEMA_VERSION = "debt-user-flow/1.0";
 export const FLOW_CONTROLLER_VERSION = "five-stage/2.4";
 export const STAGE_RECEIPT_SCHEMA_VERSION = "user-stage-receipt/1.0";
+
+export const VISIBLE_MILESTONES = Object.freeze(
+  VISIBLE_JOURNEY_CONTRACT.milestones.map((item) => Object.freeze({ ...item })),
+);
 
 export const STAGES = Object.freeze([
   Object.freeze({
@@ -17,7 +24,7 @@ export const STAGES = Object.freeze([
     number: 2,
     id: "evidence_review",
     title: "EVIDENCE REVIEW",
-    contact: "one broker-selection confirmation",
+    contact: "none unless a genuine model decision survives",
     artifact: "broker-preview.json, evidence-run.json and case-source.json",
   }),
   Object.freeze({
@@ -70,6 +77,39 @@ export function nextStageId(stageId) {
   return stage && stage.number < STAGES.length
     ? STAGES[stage.number].id
     : null;
+}
+
+export function visibleJourneyProgress(stageId, status = "in progress") {
+  const declaration = VISIBLE_JOURNEY_CONTRACT.checkpoints?.[stageId];
+  if (!declaration) {
+    throw new Error(`Visible journey has no checkpoint for ${stageId}`);
+  }
+  const normalisedStatus = String(status ?? "").trim().toLowerCase();
+  const completedStage = normalisedStatus === "complete";
+  let completed = Number(declaration.completed_milestones);
+  let activeMilestone = declaration.active_milestone;
+  let nextMilestone = declaration.next_milestone;
+  if (completedStage && stageId === "build_checks") {
+    completed = 5;
+    activeMilestone = null;
+    nextMilestone = "deliver";
+  } else if (completedStage && stageId === "delivery") {
+    completed = 6;
+    activeMilestone = null;
+    nextMilestone = null;
+  }
+  const next = VISIBLE_MILESTONES.find((item) => item.id === nextMilestone) ?? null;
+  const active = VISIBLE_MILESTONES.find((item) => item.id === activeMilestone) ?? null;
+  return Object.freeze({
+    schema_version: VISIBLE_JOURNEY_CONTRACT.schema_version,
+    checkpoint: declaration.label,
+    completed,
+    total: VISIBLE_MILESTONES.length,
+    active_milestone: active?.id ?? null,
+    active_label: active?.label ?? null,
+    next_milestone: next?.id ?? null,
+    next_label: next?.label ?? null,
+  });
 }
 
 // The earliest user stage that must be rerun after a targeted change. These

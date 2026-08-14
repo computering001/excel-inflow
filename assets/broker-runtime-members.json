@@ -32,6 +32,7 @@
     "assets/broker-table-engine-registry-v1.json",
     "assets/broker-table-engine-result.schema.json",
     "assets/broker-run-state.schema.json",
+    "assets/broker-degraded-close-receipt-v1.schema.json",
     "assets/broker-work-graph-v1.schema.json",
     "assets/workflow-state-contract-v1.json"
   ]

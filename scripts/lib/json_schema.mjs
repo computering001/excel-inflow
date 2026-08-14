@@ -29,6 +29,17 @@ function validDateString(value) {
   );
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function validateNode(value, schema, rootSchema, path, errors) {
   if (schema === true || schema == null) return;
   if (schema === false) {
@@ -91,6 +102,16 @@ function validateNode(value, schema, rootSchema, path, errors) {
     }
     if (schema.maxItems != null && value.length > schema.maxItems) {
       errors.push(`${path} must contain no more than ${schema.maxItems} item(s).`);
+    }
+    if (schema.uniqueItems === true) {
+      const seen = new Set();
+      for (let index = 0; index < value.length; index += 1) {
+        const canonical = canonicalJson(value[index]);
+        if (seen.has(canonical)) {
+          errors.push(`${path}[${index}] duplicates an earlier item; items must be unique.`);
+        }
+        seen.add(canonical);
+      }
     }
     const prefixCount = schema.prefixItems?.length ?? 0;
     for (let index = 0; index < Math.min(prefixCount, value.length); index += 1) {

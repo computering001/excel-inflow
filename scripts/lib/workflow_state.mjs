@@ -12,6 +12,35 @@ if (WORKFLOW_STATE_CONTRACT.schema_version !== "workflow-state-contract/1.0") {
   throw new Error("Workflow-state contract has the wrong schema version");
 }
 
+export const VISIBLE_JOURNEY_CONTRACT = Object.freeze(
+  structuredClone(WORKFLOW_STATE_CONTRACT.visible_journey),
+);
+
+if (
+  VISIBLE_JOURNEY_CONTRACT?.schema_version !== "visible-journey/1.0" ||
+  !Array.isArray(VISIBLE_JOURNEY_CONTRACT.milestones) ||
+  VISIBLE_JOURNEY_CONTRACT.milestones.length !== 6
+) {
+  throw new Error("Workflow-state contract has no canonical six-milestone visible journey");
+}
+if (
+  new Set(VISIBLE_JOURNEY_CONTRACT.milestones.map((item) => item.id)).size !==
+  VISIBLE_JOURNEY_CONTRACT.milestones.length
+) {
+  throw new Error("Visible journey milestone ids must be unique");
+}
+for (const stageId of [
+  "inputs",
+  "evidence_review",
+  "decisions",
+  "build_checks",
+  "delivery",
+]) {
+  if (!VISIBLE_JOURNEY_CONTRACT.checkpoints?.[stageId]) {
+    throw new Error(`Visible journey omits controller checkpoint ${stageId}`);
+  }
+}
+
 const USER_BLOCKERS = new Set(WORKFLOW_STATE_CONTRACT.user_blocking_classes);
 const DELIVERY_CONSTITUTION =
   WORKFLOW_STATE_CONTRACT.delivery_blocker_constitution;

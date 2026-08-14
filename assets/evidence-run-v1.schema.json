@@ -117,7 +117,8 @@
             "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "crosswalk_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-            "semantic_verification_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            "semantic_verification_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "degraded_close_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
           }
         },
         "dcs_evidence": {

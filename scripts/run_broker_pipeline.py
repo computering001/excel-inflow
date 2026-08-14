@@ -555,6 +555,88 @@ def seal_checkpoint(output: Path, sidecar: Path, input_digest: str) -> None:
     })
 
 
+def seal_degraded_delivery_close(
+    *,
+    output_root: Path,
+    run_id: str,
+    cache_key: str,
+    active_bundle_path: Path,
+    artifacts: dict[str, Any],
+    checkpoints: list[dict[str, Any]],
+    summary: dict[str, Any],
+) -> Path:
+    """Write the one atomic receipt that makes PASS_DEGRADED consumable.
+
+    Counts and checkpoint names are diagnostic metadata, not a receipt.  The
+    parent workflow may advance only when one file binds the exact quarantined
+    bundle, compiled pack, source tables, semantic report and crosswalk receipt
+    and independently proves that no unresolved selected candidate survives.
+    """
+    required = {
+        "broker_pack": artifacts.get("broker_pack"),
+        "source_tables": artifacts.get("source_tables"),
+        "broker_crosswalk_receipt": artifacts.get("broker_crosswalk_receipt"),
+        "broker_semantic_verification": artifacts.get("broker_semantic_verification"),
+    }
+    missing = [name for name, raw in required.items() if not raw or not Path(str(raw)).is_file()]
+    if missing:
+        raise ValueError(
+            "A degraded broker lane cannot close without compiled artifact(s): "
+            + ", ".join(sorted(missing))
+        )
+    crosswalk_receipt = read_json(
+        Path(str(required["broker_crosswalk_receipt"])),
+        "broker crosswalk receipt for degraded close",
+    )
+    coverage = crosswalk_receipt.get("coverage_summary") or {}
+    unresolved_selected = int(coverage.get("unresolved_selected_candidate_count") or 0)
+    terminal_quarantined = int(coverage.get("terminal_quarantined_candidate_count") or 0)
+    quarantined_conflicts = int(summary.get("quarantined_conflict_count") or 0)
+    quarantined_surfaces = int(summary.get("quarantined_surface_count") or 0)
+    if unresolved_selected != 0:
+        raise ValueError(
+            "A degraded broker lane still contains unresolved selected model candidates."
+        )
+    if quarantined_conflicts + quarantined_surfaces + terminal_quarantined < 1:
+        raise ValueError(
+            "PASS_DEGRADED requires at least one explicit quarantined cell, surface or candidate."
+        )
+    payload = {
+        "schema_version": "broker-degraded-close-receipt/1.0",
+        "status": "PASS",
+        "run_id": run_id,
+        "cache_key": cache_key,
+        "bundle_sha256": sha256_file(active_bundle_path),
+        "broker_pack_sha256": sha256_file(Path(str(required["broker_pack"]))),
+        "source_tables_sha256": sha256_file(Path(str(required["source_tables"]))),
+        "crosswalk_receipt_sha256": sha256_file(
+            Path(str(required["broker_crosswalk_receipt"]))
+        ),
+        "semantic_report_sha256": sha256_file(
+            Path(str(required["broker_semantic_verification"]))
+        ),
+        "checkpoint_set_sha256": sha256_bytes(canonical_bytes(checkpoints)),
+        "quarantined_conflict_count": quarantined_conflicts,
+        "quarantined_surface_count": quarantined_surfaces,
+        "terminal_quarantined_candidate_count": terminal_quarantined,
+        "unresolved_selected_candidate_count": unresolved_selected,
+        "model_consumption_added": 0,
+        "continuation_status": summary["continuation_status"],
+    }
+    receipt_path = output_root / "broker-degraded-close-receipt.json"
+    atomic_json(receipt_path, payload)
+    checkpoint(
+        checkpoints,
+        stage="degraded_delivery_close",
+        status="PASS",
+        input_digest=sha256_bytes(canonical_bytes(payload)),
+        output=receipt_path,
+        reused=False,
+    )
+    artifacts["degraded_close_receipt"] = str(receipt_path)
+    return receipt_path
+
+
 def artifact_path(bundle: dict[str, Any], document: dict[str, Any], artifact_id: str) -> Path | None:
     artifact = next((item for item in document.get("artifacts", []) if item.get("artifact_id") == artifact_id), None)
     if not artifact:
@@ -1856,6 +1938,16 @@ def main() -> int:
             int(exclusion_summary.get("preserved_candidate_count") or 0),
         )
         summary["degraded"] = True
+    if summary["degraded"]:
+        seal_degraded_delivery_close(
+            output_root=output_root,
+            run_id=run_id,
+            cache_key=cache_key,
+            active_bundle_path=active_bundle_path,
+            artifacts=artifacts,
+            checkpoints=checkpoints,
+            summary=summary,
+        )
     write_state(
         state_path, run_id=run_id,
         status="PASS_DEGRADED" if summary["degraded"] else "PASS",

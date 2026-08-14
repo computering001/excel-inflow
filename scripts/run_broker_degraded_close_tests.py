@@ -1257,12 +1257,33 @@ def main() -> int:
         # ...and only WITH its quarantine receipts (closure integrity, enforced
         # by the production gate).
         stripped = json.loads(Path(output_root / "broker-run-state.json").read_text("utf-8"))
-        stripped["summary"] = {"degraded": True}
+        stripped["artifacts"].pop("degraded_close_receipt", None)
+        stripped["artifact_sha256"].pop("degraded_close_receipt", None)
         stripped_path = output_root / "broker-run-state-stripped.json"
         write_json(stripped_path, stripped)
         refused = run_ingress(stripped_path)
         check(refused.get("ok") is False, "a receipt-stripped degraded close was accepted by the JS ingress")
-        check("quarantine receipts" in str(refused.get("message")), f"the stripped-closure refusal is unnamed: {refused.get('message')}")
+        check(
+            "degraded_close_receipt" in str(refused.get("message")),
+            f"the stripped-closure refusal is unnamed: {refused.get('message')}",
+        )
+        checks += 2
+
+        tampered_receipt = Path(artifacts_map["degraded_close_receipt"])
+        original_receipt_bytes = tampered_receipt.read_bytes()
+        tampered_payload = json.loads(original_receipt_bytes)
+        tampered_payload["model_consumption_added"] = 1
+        write_json(tampered_receipt, tampered_payload)
+        refused_receipt = run_ingress(output_root / "broker-run-state.json")
+        check(
+            refused_receipt.get("ok") is False,
+            "a byte-tampered degraded-close receipt was accepted by JS ingress",
+        )
+        check(
+            "hash-owned" in str(refused_receipt.get("message")),
+            f"the degraded-close receipt hash mutation was unnamed: {refused_receipt.get('message')}",
+        )
+        tampered_receipt.write_bytes(original_receipt_bytes)
         checks += 2
 
         tampered_graph = json.loads(

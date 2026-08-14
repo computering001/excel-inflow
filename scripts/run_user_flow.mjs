@@ -23,6 +23,7 @@ import {
 import {
   COMPANY_SCREEN,
   renderBrokerPreviewScreen,
+  renderEvidenceReviewProgress,
   renderDeliveryReport,
   renderFailure,
   renderForecastPlanScreen,
@@ -94,7 +95,7 @@ const PRESENTATION_SCREENS = Object.freeze({
   evidence_review: Object.freeze({
     status: "in progress",
     summary:
-      "Reading the supplied evidence and reconciling the issuer, periods, statements, debt and broker forecasts.",
+      "Reading the supplied evidence and reconciling the issuer, periods, statements, debt and broker forecasts. No response is required.",
   }),
   decisions: Object.freeze({
     status: "complete",
@@ -109,7 +110,7 @@ const PRESENTATION_SCREENS = Object.freeze({
   delivery: Object.freeze({
     status: "in progress",
     summary:
-      "The workbook cleared its automated build checks and the delivery package is being prepared.",
+      "The workbook cleared its automated build checks and the delivery package is being prepared. No response is required.",
   }),
 });
 
@@ -640,7 +641,7 @@ async function main() {
   if (options["stop-after"] === "inputs") {
     return finish({
       runDir,
-      screen: renderPresentationScreen("evidence_review"),
+      screen: renderEvidenceReviewProgress(evidenceRun),
       machine: options.json === true,
       result: {
         schema_version: "user-flow-run/1.0",
@@ -758,6 +759,19 @@ async function main() {
         brokerPreview,
         brokerConfirmation,
       );
+      if (!brokerConfirmationCheck.valid) {
+        // A malformed optional override must never resurrect a separate
+        // broker-confirmation stage. Keep the deterministic clean selection
+        // (or forecast-waterfall fallback) and preserve the rejected override
+        // only as an internal audit detail.
+        const rejectedErrors = [...(brokerConfirmationCheck.errors ?? [])];
+        brokerConfirmation = automaticBrokerPreviewConfirmation(brokerPreview);
+        brokerConfirmationCheck = verifyBrokerPreviewConfirmation(
+          brokerPreview,
+          brokerConfirmation,
+        );
+        brokerConfirmationCheck.rejected_optional_override_errors = rejectedErrors;
+      }
     }
     if (brokerConfirmationCheck?.valid) {
       await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
@@ -1035,20 +1049,24 @@ async function main() {
   }
   if (productionBrokerPreviewRequired && !brokerConfirmationCheck?.valid) {
     const confirmationErrors = brokerConfirmationCheck?.errors ?? [];
-    const previewScreen = renderBrokerPreviewScreen(brokerPreview, {
-      confirmationErrors,
+    const previewScreen = renderFailure({
+      stage: "evidence_review",
+      what_failed: "The controller could not seal its automatic broker selection.",
+      why: "This is an internal selection defect. The broker evidence remains preserved and no user response can repair it.",
+      what_would_fix_it: confirmationErrors,
     });
     await writeTextAtomic(brokerPreviewScreenPath, `${previewScreen}\n`);
     receipt2 = await persistStage({
       runDir,
       runId,
       stageId: "evidence_review",
-      status: "action_required",
+      status: "blocked",
       inputHashes: stage2Inputs,
       previousReceiptHash: receipt1.receipt_hash,
       outputs: stage2Outputs,
       detail: {
-        outcome: "broker_confirmation_required",
+        outcome: "broker_auto_selection_blocked",
+        blocker_class: "INTERNAL_WORK",
         preview_sha256: brokerPreview.preview_sha256,
         recommended_primary_house_id:
           brokerPreview.recommended_primary_house_id,
@@ -1057,7 +1075,7 @@ async function main() {
           : {}),
       },
     });
-    const carrier = await persistCurrentCarrier("AWAITING_BROKER_CONFIRMATION", {
+    const carrier = await persistCurrentCarrier("BLOCKED_INTERNAL", {
       broker_preview: brokerPreviewPath,
       broker_preview_screen: brokerPreviewScreenPath,
       broker_pack: brokerPackArtifactPath,
@@ -1075,10 +1093,10 @@ async function main() {
         schema_version: "user-flow-run/1.0",
         controller_version: FLOW_CONTROLLER_VERSION,
         run_id: runId,
-        status: "ACTION_REQUIRED",
+        status: "BLOCKED",
         stage: "evidence_review",
-        outcome: "broker_confirmation_required",
-        blocker_class: "USER_DECISION",
+        outcome: "broker_auto_selection_blocked",
+        blocker_class: "INTERNAL_WORK",
         broker_preview: brokerPreviewPath,
         broker_confirmation_template: brokerConfirmationTemplatePath,
         carrier: carrier.path,
