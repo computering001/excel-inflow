@@ -25,6 +25,19 @@ def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def safe_artifact_name(value: Any) -> str:
+    candidate = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "").strip())
+    return candidate.strip("-.") or "surface"
+
+
 def normalise(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
 
@@ -815,6 +828,174 @@ def physical_capture_receipt(
     return receipt, findings
 
 
+def pending_physical_findings(
+    findings: list[dict[str, Any]],
+    *,
+    document_id: Any,
+    surface_id: Any,
+) -> list[dict[str, Any]]:
+    """Return every canonical physical-capture instruction for one surface."""
+    return [
+        finding
+        for finding in findings
+        if finding.get("document_id") == document_id
+        and finding.get("surface_id") == surface_id
+        and finding.get("scope") == "physical_capture"
+        and finding.get("severity") in {"needs_vision", "needs_resolution"}
+    ]
+
+
+def ensure_late_promotion_tasks(
+    bundle: dict[str, Any],
+    findings: list[dict[str, Any]],
+    *,
+    fallback_artifact_root: Path,
+) -> list[dict[str, Any]]:
+    """Mint the task artifact that a canonical-stage promotion requires.
+
+    Extraction cannot create a task for a surface that initially passed.  If
+    canonical reconciliation later proves that the same rendered PDF/image
+    needs another read, this compiler owns that transition and therefore owns
+    the deterministic task.  Existing extraction-time tasks remain immutable;
+    only a missing late-promotion task is created here.
+    """
+    root_value = str(bundle.get("artifact_root") or "").strip()
+    artifact_root = Path(root_value).resolve() if root_value else fallback_artifact_root.resolve()
+    added_findings: list[dict[str, Any]] = []
+    for document in bundle.get("documents", []):
+        document_id = document.get("document_id")
+        artifacts = document.setdefault("artifacts", [])
+        artifacts_by_id = {str(item.get("artifact_id")): item for item in artifacts}
+        for surface in document.get("surfaces", []):
+            surface_id = surface.get("surface_id")
+            pending = pending_physical_findings(
+                findings,
+                document_id=document_id,
+                surface_id=surface_id,
+            )
+            if not pending:
+                continue
+            surface.setdefault("lane_status", {})["vision"] = "required"
+            surface["vision_reason"] = "canonical physical reconciliation requires an independently rendered grid"
+            document["extraction_status"] = "needs_vision"
+            task_artifacts = [
+                artifacts_by_id.get(str(ref))
+                for ref in surface.get("artifact_refs", [])
+                if (artifacts_by_id.get(str(ref)) or {}).get("kind") == "vision_task"
+            ]
+            if task_artifacts:
+                continue
+            image_artifact = next(
+                (
+                    artifacts_by_id.get(str(ref))
+                    for ref in surface.get("artifact_refs", [])
+                    if (artifacts_by_id.get(str(ref)) or {}).get("kind") == "page_image"
+                ),
+                None,
+            )
+            census_artifact = next(
+                (
+                    artifacts_by_id.get(str(ref))
+                    for ref in surface.get("artifact_refs", [])
+                    if (artifacts_by_id.get(str(ref)) or {}).get("kind") == "surface_census"
+                ),
+                None,
+            )
+            if (
+                surface.get("kind") not in {"pdf_page", "image_page"}
+                or image_artifact is None
+                or census_artifact is None
+            ):
+                added_findings.append({
+                    "id": "broker_canonical.late_promotion_not_renderable",
+                    "severity": "blocker",
+                    "scope": "controller_integrity",
+                    "model_linked": None,
+                    "document_id": document_id,
+                    "surface_id": surface_id,
+                    "message": (
+                        "Canonical reconciliation requested rendered recovery for a surface without a "
+                        "sealed page image and census. This is an internal compiler defect, not a request to replace the source."
+                    ),
+                })
+                continue
+            image_path = artifact_root / str(image_artifact.get("path") or "")
+            census_path = artifact_root / str(census_artifact.get("path") or "")
+            if (
+                not image_path.is_file()
+                or sha256_file(image_path) != image_artifact.get("sha256")
+                or not census_path.is_file()
+                or sha256_file(census_path) != census_artifact.get("sha256")
+            ):
+                added_findings.append({
+                    "id": "broker_canonical.late_promotion_image_integrity",
+                    "severity": "blocker",
+                    "scope": "controller_integrity",
+                    "model_linked": None,
+                    "document_id": document_id,
+                    "surface_id": surface_id,
+                    "message": (
+                        "The sealed page image or census needed by canonical late recovery is absent or hash-mismatched. "
+                        "This is an internal artifact-integrity failure."
+                    ),
+                })
+                continue
+            finding_projection = [
+                {
+                    "id": item.get("id"),
+                    "severity": item.get("severity"),
+                    "remedy": item.get("remedy"),
+                    "table_ids": item.get("table_ids"),
+                    "missing_native_tokens": item.get("missing_native_tokens"),
+                    "unowned_native_tokens": item.get("unowned_native_tokens"),
+                }
+                for item in pending
+            ]
+            authority_sha256 = hashlib.sha256(canonical_bytes({
+                "document_id": document_id,
+                "surface_id": surface_id,
+                "page_image_sha256": image_artifact.get("sha256"),
+                "source_census_sha256": census_artifact.get("sha256"),
+                "findings": finding_projection,
+            })).hexdigest()
+            task_id = f"{surface_id}-late-vision-{authority_sha256[:16]}"
+            relative_path = Path("late-vision") / f"{safe_artifact_name(surface_id)}-{authority_sha256[:16]}.task.json"
+            task_path = artifact_root / relative_path
+            task = {
+                "schema_version": "broker-vision-task/1.0",
+                "document_id": document_id,
+                "surface_id": surface_id,
+                "image_artifact_id": image_artifact.get("artifact_id"),
+                "reason": "late canonical physical-capture promotion",
+                "required_passes": 2,
+                "source_census_artifact_id": census_artifact.get("artifact_id"),
+                "uncovered_region_ids": [],
+                "region_crops": [],
+                "canonical_promotion_sha256": authority_sha256,
+                "canonical_finding_ids": sorted({str(item.get("id")) for item in pending}),
+                "instruction": (
+                    "Independently transcribe every visible table on this rendered surface as a grid with exact "
+                    "row labels, period headers, values, blanks, signs, units and continuations. Do not return a "
+                    "flat numeric inventory. If no analytical table is visible, certify verified_non_tabular with "
+                    "a specific reason. This task was promoted by canonical reconciliation and is internal work; "
+                    "do not request replacement research."
+                ),
+            }
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            task_path.write_bytes(canonical_bytes(task))
+            task_artifact = {
+                "artifact_id": task_id,
+                "kind": "vision_task",
+                "path": relative_path.as_posix(),
+                "sha256": sha256_file(task_path),
+            }
+            artifacts.append(task_artifact)
+            artifacts_by_id[task_id] = task_artifact
+            surface.setdefault("artifact_refs", []).append(task_id)
+    findings.extend(added_findings)
+    return added_findings
+
+
 def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     output = copy.deepcopy(bundle)
     all_findings: list[dict[str, Any]] = []
@@ -843,6 +1024,19 @@ def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[di
                 surface["vision_reason"] = (
                     "native physical-table lanes require one independently rendered grid"
                 )
+                document["extraction_status"] = "needs_vision"
+        # Table-lane overlap findings are created before the per-surface
+        # token receipt and can require resolution even when that receipt is
+        # otherwise complete. Project every pending canonical finding back to
+        # the owning surface so the controller cannot emit a taskless state.
+        for surface in document.get("surfaces", []):
+            if pending_physical_findings(
+                all_findings,
+                document_id=document.get("document_id"),
+                surface_id=surface.get("surface_id"),
+            ):
+                surface.setdefault("lane_status", {})["vision"] = "required"
+                surface["vision_reason"] = "canonical physical reconciliation remains pending"
                 document["extraction_status"] = "needs_vision"
         document["physical_capture_receipts"] = capture_receipts
     canonical_documents = [
@@ -878,10 +1072,18 @@ def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[di
         "evidence_only_surface_count": sum(
             1 for item in all_receipts if item.get("status") == "PASS_EVIDENCE_ONLY"
         ),
-        "pending_surface_ids": sorted(
-            item.get("surface_id") for item in all_receipts
-            if not item.get("physical_capture_complete")
-        ),
+        "pending_surface_ids": sorted({
+            *(
+                item.get("surface_id") for item in all_receipts
+                if not item.get("physical_capture_complete")
+            ),
+            *(
+                item.get("surface_id") for item in all_findings
+                if item.get("scope") == "physical_capture"
+                and item.get("severity") in {"needs_vision", "needs_resolution"}
+                and item.get("surface_id")
+            ),
+        }),
         "model_linked_accuracy_status": "PENDING_SEMANTIC_CROSSWALK",
     }
     return output, all_findings
@@ -896,6 +1098,11 @@ def main() -> int:
     output_path = Path(args.out).resolve()
     bundle = json.loads(input_path.read_text("utf-8"))
     compiled, findings = canonicalise_bundle(bundle)
+    ensure_late_promotion_tasks(
+        compiled,
+        findings,
+        fallback_artifact_root=input_path.parent,
+    )
     for document in compiled.get("documents", []):
         document["tables"] = copy.deepcopy(document.get("canonical_tables", []))
     # This is still the broker extraction bundle after canonical physical
@@ -909,7 +1116,10 @@ def main() -> int:
         compiled,
         source_bundle_sha256=compiled["source_bundle_sha256"],
     )
-    if compiled["candidate_manifest"].get("gate_status") == "BLOCKED":
+    if (
+        compiled["candidate_manifest"].get("gate_status") == "BLOCKED"
+        or any(item.get("severity") == "blocker" for item in findings)
+    ):
         compiled["gate_status"] = "BLOCKED"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(canonical_bytes(compiled))

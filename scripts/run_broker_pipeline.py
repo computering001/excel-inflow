@@ -528,6 +528,35 @@ def artifact_path(bundle: dict[str, Any], document: dict[str, Any], artifact_id:
     return target if target.is_file() else None
 
 
+def canonical_recovery_artifacts_valid(bundle_path: Path) -> bool:
+    """Prove cached canonical tasks/images still match their sealed ledger."""
+    try:
+        bundle = read_json(bundle_path, "cached canonical broker bundle")
+    except ValueError:
+        return False
+    for document in bundle.get("documents", []):
+        artifacts = {str(item.get("artifact_id")): item for item in document.get("artifacts", [])}
+        root = Path(str(bundle.get("artifact_root") or bundle_path.parent)).resolve()
+        for surface in document.get("surfaces", []):
+            if surface.get("lane_status", {}).get("vision") != "required":
+                continue
+            for kind in ("page_image", "surface_census", "vision_task"):
+                artifact = next(
+                    (
+                        artifacts.get(str(ref))
+                        for ref in surface.get("artifact_refs", [])
+                        if (artifacts.get(str(ref)) or {}).get("kind") == kind
+                    ),
+                    None,
+                )
+                if artifact is None:
+                    return False
+                target = root / str(artifact.get("path") or "")
+                if not target.is_file() or sha256_file(target) != artifact.get("sha256"):
+                    return False
+    return True
+
+
 def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
     for document in bundle.get("documents", []):
@@ -1129,7 +1158,10 @@ def main() -> int:
         canonical_input = sha256_bytes(canonical_bytes({
             "bundle": sha256_file(active_bundle_path), "runtime": runtime_digest,
         }))
-        canonical_reused = reusable(canonical_path, canonical_receipt, canonical_input)
+        canonical_reused = (
+            reusable(canonical_path, canonical_receipt, canonical_input)
+            and canonical_recovery_artifacts_valid(canonical_path)
+        )
         if not canonical_reused:
             run([
                 sys.executable,
@@ -1152,7 +1184,7 @@ def main() -> int:
         )
 
     physical_status = (active_bundle.get("physical_capture_receipt") or {}).get("status")
-    if physical_status == "NEEDS_VISION":
+    if physical_status in {"NEEDS_VISION", "NEEDS_RESOLUTION"}:
         tasks = vision_tasks(active_bundle, responses)
         responses_ready = bool(responses) and bool(tasks) and not any(
             task.get("missing_passes") for task in tasks
@@ -1281,11 +1313,17 @@ def main() -> int:
                 lane_degraded = True
 
     if physical_status in {"NEEDS_VISION", "NEEDS_RESOLUTION"}:
-        tasks = (
-            vision_tasks(active_bundle, responses)
-            if physical_status == "NEEDS_VISION"
-            else resolution_tasks(active_bundle)
-        )
+        transcription_tasks = vision_tasks(active_bundle, responses)
+        # A canonical overlap may be labelled NEEDS_RESOLUTION before the two
+        # independent rendered reads exist. Transcription is still the first
+        # remedy; targeted cell adjudication is valid only after the vision
+        # compiler has emitted a conflict manifest from those reads.
+        if any(task.get("missing_passes") for task in transcription_tasks):
+            tasks = transcription_tasks
+        elif physical_status == "NEEDS_RESOLUTION":
+            tasks = resolution_tasks(active_bundle) or transcription_tasks
+        else:
+            tasks = transcription_tasks
         if not tasks:
             tasks = physical_reconciliation_tasks(active_bundle)
         write_state(

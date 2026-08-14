@@ -22,6 +22,11 @@ Matrix coverage in this file:
 - unresolved broker cells remain visible and formula-prohibited;
 - broker uncertainty cannot emit a delivery block (constitution);
 - degraded close without its quarantine receipt is an invalid closure.
+- a native-pass page promoted only after canonical reconciliation may close
+  evidence-only without an extraction-time vision-task artifact, but only when
+  its image is hash-valid and every promotion finding is explicitly
+  non-model-linked;
+- model-linked or image-integrity mutations of that same page remain blocked.
 """
 
 from __future__ import annotations
@@ -352,6 +357,43 @@ def invoke(request_path: Path, output_root: Path, responses: Path, crosswalk: Pa
     return json.loads(state_path.read_text("utf-8"))
 
 
+def invoke_vision(
+    bundle_path: Path,
+    responses: Path,
+    output_path: Path,
+    *,
+    degrade_exhausted: bool,
+) -> subprocess.CompletedProcess[str]:
+    command = [
+        sys.executable,
+        str(HERE / "compile_broker_vision.py"),
+        str(bundle_path),
+        "--responses",
+        str(responses),
+        "--out",
+        str(output_path),
+    ]
+    if degrade_exhausted:
+        command.append("--degrade-exhausted")
+    return subprocess.run(command, cwd=HERE, text=True, capture_output=True, check=False)
+
+
+def invoke_canonical(bundle_path: Path, output_path: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(HERE / "compile_broker_canonical_tables.py"),
+            str(bundle_path),
+            "--out",
+            str(output_path),
+        ],
+        cwd=HERE,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
 def reference_only_crosswalk(bundle: dict[str, Any]) -> dict[str, Any]:
     """The degenerate valid review: preserve everything, consume nothing."""
     manifest = bundle.get("candidate_manifest") or {}
@@ -598,6 +640,326 @@ def main() -> int:
 
         responses = root / "responses"
         responses.mkdir()
+
+        # Production-accurate late promotion: extraction passed natively and
+        # wrote no task. Canonical token reconciliation must mint one complete,
+        # deterministic task before the controller asks the model host to read
+        # the rendered page. This is the primary repair; the taskless degraded
+        # close below remains only for old carriers and integrity-safe recovery.
+        minted_root = root / "canonical-late-promotion"
+        minted_artifacts = minted_root / "artifacts"
+        minted_artifacts.mkdir(parents=True)
+        minted_rows = [["Metric", "FY26E", "FY27E"], ["Revenue", "100", "110"]]
+        minted_document = build_house(
+            document_id="minted",
+            house_id="minted",
+            house_name="Minted Task House",
+            artifact_root=minted_artifacts,
+            vision_required=False,
+            clean_rows=minted_rows,
+        )
+        minted_surface = minted_document["surfaces"][0]
+        minted_image_path = minted_artifacts / "minted" / "page1.png"
+        minted_image_path.write_bytes(b"\x89PNG\r\n\x1a\ncanonical-late-promotion")
+        minted_document["artifacts"].append({
+            "artifact_id": "minted-image",
+            "kind": "page_image",
+            "path": str(minted_image_path.relative_to(minted_artifacts)),
+            "sha256": broker.sha256_file(minted_image_path),
+        })
+        minted_surface["artifact_refs"].append("minted-image")
+        minted_surface["image_count"] = 1
+        # A fragmented native token is present in the whole-surface/table
+        # census but absent from the structured table. This is the exact class
+        # that promoted Kepler p4 and Berenberg p7 only after extraction.
+        minted_surface["source_table_numeric_tokens"] = [
+            *minted_surface["source_table_numeric_tokens"],
+            "999",
+        ]
+        minted_input = {
+            "schema_version": "broker-extraction-bundle/1.0",
+            "run_id": "canonical-late-promotion-regression",
+            "created_at": "2026-08-14T00:00:00Z",
+            "extractor_version": "fixture/1.0",
+            "artifact_root": str(minted_artifacts),
+            "documents": [minted_document],
+            "summary": {},
+            "gate_status": "PASS",
+            "findings": [],
+        }
+        minted_input_path = minted_root / "input.json"
+        minted_output = minted_root / "canonical.json"
+        minted_output_repeat = minted_root / "canonical-repeat.json"
+        write_json(minted_input_path, minted_input)
+        minted_run = invoke_canonical(minted_input_path, minted_output)
+        check(minted_run.returncode == 2 and minted_output.is_file(), f"canonical late promotion did not request recovery: {minted_run.stderr[-1200:]}")
+        minted_bundle = json.loads(minted_output.read_text("utf-8"))
+        minted_closed_surface = minted_bundle["documents"][0]["surfaces"][0]
+        minted_tasks = [
+            artifact
+            for artifact in minted_bundle["documents"][0]["artifacts"]
+            if artifact.get("kind") == "vision_task"
+            and artifact.get("artifact_id") in minted_closed_surface.get("artifact_refs", [])
+        ]
+        check(minted_bundle["physical_capture_receipt"]["status"] == "NEEDS_VISION", "late token mismatch did not promote the surface")
+        check(minted_closed_surface["lane_status"]["vision"] == "required", "late promotion was not projected to the surface")
+        check(len(minted_tasks) == 1, "late promotion did not mint exactly one task")
+        minted_task_path = minted_artifacts / minted_tasks[0]["path"]
+        check(minted_task_path.is_file() and broker.sha256_file(minted_task_path) == minted_tasks[0]["sha256"], "minted task is absent or unsealed")
+        minted_task_payload = json.loads(minted_task_path.read_text("utf-8"))
+        check(minted_task_payload.get("reason") == "late canonical physical-capture promotion", "minted task does not name its authority")
+        check(minted_task_payload.get("canonical_finding_ids") == ["broker_canonical.physical_capture_reconciliation_required"], "minted task is not finding-bound")
+        repeat_run = invoke_canonical(minted_input_path, minted_output_repeat)
+        repeat_bundle = json.loads(minted_output_repeat.read_text("utf-8"))
+        repeat_task = next(
+            artifact
+            for artifact in repeat_bundle["documents"][0]["artifacts"]
+            if artifact.get("kind") == "vision_task"
+        )
+        check(repeat_run.returncode == 2 and repeat_task == minted_tasks[0], "late task is not deterministic across rebuilds")
+        check(broker.canonical_recovery_artifacts_valid(minted_output), "valid canonical recovery closure was rejected")
+        minted_task_bytes = minted_task_path.read_bytes()
+        minted_task_path.unlink()
+        check(not broker.canonical_recovery_artifacts_valid(minted_output), "missing referenced task did not invalidate cached canonical output")
+        repaired_run = invoke_canonical(minted_input_path, minted_output)
+        check(repaired_run.returncode == 2 and minted_task_path.read_bytes() == minted_task_bytes, "derived late task did not regenerate byte-identically")
+        checks += 10
+
+        # Canonical overlap is labelled NEEDS_RESOLUTION, but it still needs
+        # two independent reads before any targeted cell adjudication exists.
+        # The controller must therefore expose a real transcription task, not
+        # an empty/targeted task set that can never generate a conflict ledger.
+        overlap_input = json.loads(json.dumps(minted_input))
+        overlap_input["documents"][0]["tables"][0]["extraction_method"] = "vision_pass1"
+        overlap_table = json.loads(json.dumps(overlap_input["documents"][0]["tables"][0]))
+        overlap_table["table_id"] = "minted-rendered-conflict"
+        overlap_table["extraction_method"] = "vision_pass2"
+        overlap_table["rows"][1][1]["raw_text"] = "101"
+        overlap_table["rows"][1][1]["value"] = "101"
+        overlap_input["documents"][0]["tables"].append(overlap_table)
+        overlap_input_path = minted_root / "overlap-input.json"
+        overlap_output = minted_root / "overlap-canonical.json"
+        write_json(overlap_input_path, overlap_input)
+        overlap_run = invoke_canonical(overlap_input_path, overlap_output)
+        overlap_bundle = json.loads(overlap_output.read_text("utf-8"))
+        overlap_tasks = broker.vision_tasks(overlap_bundle, minted_root / "empty-responses")
+        check(overlap_run.returncode == 2 and overlap_bundle["physical_capture_receipt"]["status"] == "NEEDS_RESOLUTION", "rendered overlap did not enter the resolution state")
+        check(overlap_bundle["physical_capture_receipt"]["pending_surface_ids"] == ["minted.p1"], "overlap surface disappeared from the pending ledger")
+        check(len(overlap_tasks) == 1 and overlap_tasks[0]["task_path"], "overlap state has no concrete task artifact")
+        check(overlap_tasks[0]["missing_passes"] == [1, 2], "overlap skipped required independent transcription")
+        checks += 4
+
+        # Exact live ordering: one extraction-time surface is read first; only
+        # that compiler run discovers a second native-pass surface needs
+        # canonical recovery. The second task must already exist in the output
+        # state—this was the v60 Astra lifecycle break.
+        live_root = root / "late-after-initial-vision"
+        live_artifacts = live_root / "artifacts"
+        live_artifacts.mkdir(parents=True)
+        initial_document = build_house(
+            document_id="initial",
+            house_id="initial",
+            house_name="Initial Vision House",
+            artifact_root=live_artifacts,
+            vision_required=True,
+        )
+        promoted_document = build_house(
+            document_id="promoted",
+            house_id="promoted",
+            house_name="Promoted House",
+            artifact_root=live_artifacts,
+            vision_required=False,
+            clean_rows=minted_rows,
+        )
+        promoted_surface = promoted_document["surfaces"][0]
+        promoted_image_path = live_artifacts / "promoted" / "page1.png"
+        promoted_image_path.write_bytes(b"\x89PNG\r\n\x1a\nlive-late-promotion")
+        promoted_document["artifacts"].append({
+            "artifact_id": "promoted-image",
+            "kind": "page_image",
+            "path": str(promoted_image_path.relative_to(live_artifacts)),
+            "sha256": broker.sha256_file(promoted_image_path),
+        })
+        promoted_surface["artifact_refs"].append("promoted-image")
+        promoted_surface["image_count"] = 1
+        promoted_surface["source_table_numeric_tokens"] = [
+            *promoted_surface["source_table_numeric_tokens"],
+            "999",
+        ]
+        live_bundle_path = live_root / "input.json"
+        write_json(live_bundle_path, {
+            "schema_version": "broker-extraction-bundle/1.0",
+            "run_id": "late-after-initial-vision-regression",
+            "created_at": "2026-08-14T00:00:00Z",
+            "extractor_version": "fixture/1.0",
+            "artifact_root": str(live_artifacts),
+            "documents": [initial_document, promoted_document],
+            "summary": {},
+            "gate_status": "NEEDS_VISION",
+            "findings": [],
+        })
+        live_responses = live_root / "responses"
+        live_responses.mkdir()
+        initial_surface = initial_document["surfaces"][0]
+        initial_image = next(item for item in initial_document["artifacts"] if item["kind"] == "page_image")
+        for pass_index, producer in ((1, "live-alpha"), (2, "live-beta")):
+            write_json(
+                live_responses / f"{initial_surface['surface_id']}.pass{pass_index}.json",
+                vision_pass(
+                    document_id="initial",
+                    surface_id=initial_surface["surface_id"],
+                    image_sha256=initial_image["sha256"],
+                    pass_index=pass_index,
+                    producer=producer,
+                    disposition="verified_non_tabular",
+                ),
+            )
+        live_output = live_root / "after-initial.json"
+        live_run = invoke_vision(live_bundle_path, live_responses, live_output, degrade_exhausted=False)
+        check(live_run.returncode == 2 and live_output.is_file(), f"initial vision did not expose late promotion: {live_run.stderr[-1200:]}")
+        live_bundle = json.loads(live_output.read_text("utf-8"))
+        live_promoted = next(item for item in live_bundle["documents"] if item["document_id"] == "promoted")
+        live_promoted_surface = live_promoted["surfaces"][0]
+        live_task = next(
+            (
+                artifact for artifact in live_promoted["artifacts"]
+                if artifact.get("kind") == "vision_task"
+                and artifact.get("artifact_id") in live_promoted_surface.get("artifact_refs", [])
+            ),
+            None,
+        )
+        check(live_bundle.get("gate_status") == "NEEDS_VISION", "late promotion after initial vision did not remain resumable")
+        check(live_promoted_surface["lane_status"]["vision"] == "required", "live late surface was not activated")
+        check(live_task is not None, "live late surface repeated the v60 task_path:null defect")
+        check(
+            live_task is not None
+            and (live_artifacts / live_task["path"]).is_file()
+            and broker.sha256_file(live_artifacts / live_task["path"]) == live_task["sha256"],
+            "live late task is not byte-bound",
+        )
+        checks += 5
+
+        # Exact production seam: a page passed native extraction, so extraction
+        # emitted no vision_task. Canonical token reconciliation later promoted
+        # it to vision-required. A valid rendered page and an explicitly
+        # non-model-linked canonical finding are enough to close it as
+        # model-prohibited evidence after the bounded budget; the impossible
+        # extraction-time task must not stop the entire company model.
+        late_root = root / "late-promotion"
+        late_artifacts = late_root / "artifacts"
+        late_artifacts.mkdir(parents=True)
+        late_document = build_house(
+            document_id="late",
+            house_id="late",
+            house_name="Late Promotion House",
+            artifact_root=late_artifacts,
+            vision_required=True,
+        )
+        late_surface = late_document["surfaces"][0]
+        late_document["artifacts"] = [
+            item for item in late_document["artifacts"] if item["kind"] != "vision_task"
+        ]
+        late_surface["artifact_refs"] = [
+            item for item in late_surface["artifact_refs"] if not item.endswith("-task")
+        ]
+        late_bundle = {
+            "schema_version": "broker-extraction-bundle/1.0",
+            "run_id": "late-promotion-regression",
+            "created_at": "2026-08-14T00:00:00Z",
+            "extractor_version": "fixture/1.0",
+            "artifact_root": str(late_artifacts),
+            "documents": [late_document],
+            "summary": {},
+            "gate_status": "NEEDS_VISION",
+            "findings": [],
+            "canonical_findings": [{
+                "id": "broker_canonical.physical_capture_reconciliation_required",
+                "severity": "needs_vision",
+                "scope": "physical_capture",
+                "model_linked": False,
+                "document_id": "late",
+                "surface_id": late_surface["surface_id"],
+                "message": "Native token multiplicity requires a rendered recovery pass.",
+            }],
+        }
+        late_bundle_path = late_root / "late-bundle.json"
+        late_responses = late_root / "responses"
+        late_responses.mkdir()
+        write_json(late_bundle_path, late_bundle)
+        late_image = next(item for item in late_document["artifacts"] if item["kind"] == "page_image")
+        for pass_index, producer in ((1, "late-alpha"), (2, "late-beta")):
+            write_json(
+                late_responses / f"{late_surface['surface_id']}.pass{pass_index}.json",
+                vision_pass(
+                    document_id="late",
+                    surface_id=late_surface["surface_id"],
+                    image_sha256=late_image["sha256"],
+                    pass_index=pass_index,
+                    producer=producer,
+                    disposition="verified_non_tabular",
+                ),
+            )
+        late_output = late_root / "late-closed.json"
+        late_run = invoke_vision(
+            late_bundle_path,
+            late_responses,
+            late_output,
+            degrade_exhausted=True,
+        )
+        check(late_run.returncode == 0 and late_output.is_file(), f"taskless late promotion did not close: {late_run.stderr[-1200:]}")
+        late_closed = json.loads(late_output.read_text("utf-8"))
+        late_closed_surface = late_closed["documents"][0]["surfaces"][0]
+        late_quarantine = late_closed_surface.get("quarantine") or {}
+        check(late_closed.get("gate_status") == "PASS", "taskless late promotion did not reach PASS")
+        check(late_closed_surface.get("vision_disposition") == "quarantined_evidence_only", "taskless late promotion was not quarantined evidence-only")
+        check(late_quarantine.get("model_use") == "prohibited", "taskless late promotion remained model-eligible")
+        check(late_quarantine.get("task_artifact_status") == "late_promotion_absent", "taskless closure did not name its late-promotion basis")
+        check(late_quarantine.get("page_image_sha256") == late_image["sha256"], "taskless closure was not image-bound")
+        check(late_quarantine.get("finding_ids") == ["broker_canonical.physical_capture_reconciliation_required"], "taskless closure was not finding-bound")
+        check(len(late_quarantine.get("response_sha256s") or []) == 2, "taskless closure did not preserve both response hashes")
+        checks += 7
+
+        # Negative mutation: the identical page may not degrade when the
+        # canonical finding says it is model-linked.
+        linked_bundle = json.loads(json.dumps(late_bundle))
+        linked_bundle["canonical_findings"][0]["model_linked"] = True
+        linked_bundle_path = late_root / "late-model-linked.json"
+        linked_output = late_root / "late-model-linked-output.json"
+        write_json(linked_bundle_path, linked_bundle)
+        linked_run = invoke_vision(
+            linked_bundle_path,
+            late_responses,
+            linked_output,
+            degrade_exhausted=True,
+        )
+        linked_result = json.loads(linked_output.read_text("utf-8"))
+        check(linked_run.returncode != 0 and linked_result.get("gate_status") == "BLOCKED", "model-linked late promotion was degraded")
+        check(
+            any(item.get("id") == "broker_vision.task_missing" for item in linked_result.get("findings", [])),
+            "model-linked mutation did not fail at the taskless safety boundary",
+        )
+        checks += 2
+
+        # Integrity mutation: even a non-model-linked page may not degrade if
+        # its preserved page image is gone or changed.
+        late_image_path = late_artifacts / late_image["path"]
+        late_image_bytes = late_image_path.read_bytes()
+        late_image_path.unlink()
+        missing_image_output = late_root / "late-missing-image-output.json"
+        missing_image_run = invoke_vision(
+            late_bundle_path,
+            late_responses,
+            missing_image_output,
+            degrade_exhausted=True,
+        )
+        missing_image_result = json.loads(missing_image_output.read_text("utf-8"))
+        check(missing_image_run.returncode != 0 and missing_image_result.get("gate_status") == "BLOCKED", "missing page image was degraded")
+        check(
+            any(item.get("id") == "broker_vision.page_image_hash_mismatch" for item in missing_image_result.get("findings", [])),
+            "missing-image mutation did not fail at image integrity",
+        )
+        late_image_path.write_bytes(late_image_bytes)
+        checks += 2
 
         # First contact: the controller must ask for vision work, not block.
         state = invoke(request_path, output_root, responses, None)

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from compile_broker_candidate_manifest import compile_manifest
-from compile_broker_canonical_tables import canonicalise_bundle
+from compile_broker_canonical_tables import canonicalise_bundle, ensure_late_promotion_tasks
 
 
 NUMERIC_RE = re.compile(
@@ -228,6 +228,7 @@ def quarantine_surface_evidence_only(
     findings: list[dict[str, Any]],
     reason_id: str,
     message: str,
+    receipt_binding: dict[str, Any] | None = None,
 ) -> None:
     """Close one ambiguous surface as preserved, model-prohibited evidence.
 
@@ -242,6 +243,7 @@ def quarantine_surface_evidence_only(
         "model_use": "prohibited",
         "reason_id": reason_id,
         "scope": "surface",
+        **(receipt_binding or {}),
     }
     surface["lane_status"]["vision"] = "complete"
     surface["vision_reason"] = None
@@ -265,6 +267,40 @@ def quarantine_surface_evidence_only(
             "recovery was exhausted; no cell from it is model-eligible."
         ),
     })
+
+
+def late_promoted_non_model_linked_findings(
+    *,
+    findings: list[dict[str, Any]],
+    document_id: str,
+    surface_id: str,
+) -> list[dict[str, Any]] | None:
+    """Return the sealed late-promotion findings only when quarantine is safe.
+
+    A page may pass native extraction and be promoted to rendered recovery only
+    after canonical token reconciliation.  Such a page legitimately has no
+    extraction-time ``vision_task`` artifact.  The missing task is therefore
+    not an integrity failure when the canonical physical-capture ledger is
+    present and every finding that caused the promotion explicitly proves that
+    the page is not model-linked.  Unknown or positive linkage remains a hard
+    stop.
+    """
+    relevant = [
+        item
+        for item in findings
+        if item.get("document_id") == document_id
+        and item.get("surface_id") == surface_id
+        and (
+            item.get("scope") == "physical_capture"
+            or item.get("id") == "broker_canonical.physical_capture_reconciliation_required"
+        )
+        and item.get("severity") in {"blocker", "needs_resolution", "needs_vision"}
+    ]
+    if not relevant:
+        return None
+    if any(item.get("model_linked") is not False for item in relevant):
+        return None
+    return relevant
 
 
 def classify_surface_disposition(passes: list[dict[str, Any]]) -> tuple[str | None, str | None]:
@@ -828,8 +864,10 @@ def main() -> int:
             "additionally quarantines whole ambiguous surfaces (missing or "
             "disagreeing reads, structureless or empty transcriptions, invalid "
             "resolutions) as preserved evidence with model_use=prohibited. "
-            "Integrity failures (missing/hash-mismatched artifacts, non-independent "
-            "passes, broken bindings) are never degradable."
+            "Integrity failures (missing/hash-mismatched page images, non-independent "
+            "passes, broken bindings) are never degradable. A missing vision task "
+            "may close only for a taskless late promotion whose canonical findings "
+            "are all explicitly non-model-linked."
         ),
     )
     parser.add_argument("--out", required=True)
@@ -861,30 +899,80 @@ def main() -> int:
                 (artifact for artifact in document["artifacts"] if artifact["kind"] == "page_image" and artifact["artifact_id"] in surface["artifact_refs"]),
                 None,
             )
-            if not task_artifact or not image_artifact:
-                unresolved += 1
-                findings.append({"id": "broker_vision.task_or_image_missing", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The required hash-bound vision task or page image is missing."})
-                continue
             artifact_root = Path(str(bundle.get("artifact_root") or bundle_path.parent)).resolve()
-            image_path = artifact_root / image_artifact["path"]
-            task_path = artifact_root / task_artifact["path"]
-            if (
-                not image_path.is_file()
-                or sha256_file(image_path) != image_artifact["sha256"]
-                or not task_path.is_file()
-                or sha256_file(task_path) != task_artifact["sha256"]
-            ):
+            response_base = response_root / surface_id
+            pass_paths = [Path(str(response_base) + ".pass1.json"), Path(str(response_base) + ".pass2.json")]
+            resolution_path = Path(str(response_base) + ".resolution.json")
+            if not image_artifact:
                 unresolved += 1
-                findings.append({"id": "broker_vision.task_or_image_hash_mismatch", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The vision task or page image is missing or does not match the extraction bundle."})
+                findings.append({"id": "broker_vision.page_image_missing", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The required hash-bound page image is missing."})
+                continue
+            image_path = artifact_root / image_artifact["path"]
+            if not image_path.is_file() or sha256_file(image_path) != image_artifact["sha256"]:
+                unresolved += 1
+                findings.append({"id": "broker_vision.page_image_hash_mismatch", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The page image is missing or does not match the extraction bundle."})
+                continue
+            if not task_artifact:
+                late_findings = late_promoted_non_model_linked_findings(
+                    findings=[*findings, *bundle.get("canonical_findings", [])],
+                    document_id=document["document_id"],
+                    surface_id=surface_id,
+                )
+                if args.degrade_exhausted and late_findings is not None:
+                    # Preserve the original reconciliation ledger, but close
+                    # its work instruction now that the page has a terminal
+                    # evidence-only disposition. Leaving ``needs_vision`` on a
+                    # completed surface would re-arm the fixed-point forever.
+                    for item in late_findings:
+                        item["severity"] = "warning"
+                        item["message"] = (
+                            f"{str(item.get('message') or '').rstrip()} "
+                            "Closed by a hash-bound late-promotion evidence-only quarantine."
+                        ).strip()
+                    quarantine_surface_evidence_only(
+                        bundle=bundle,
+                        document=document,
+                        surface=surface,
+                        findings=findings,
+                        reason_id="late_promoted_non_model_linked_without_task",
+                        message=(
+                            "Canonical reconciliation promoted this native-pass page only after "
+                            "extraction, so no extraction-time vision task exists. Every promotion "
+                            "finding is explicitly non-model-linked."
+                        ),
+                        receipt_binding={
+                            "closure_basis": "late_promotion_non_model_linked",
+                            "task_artifact_status": "late_promotion_absent",
+                            "page_image_sha256": image_artifact["sha256"],
+                            "finding_ids": sorted({str(item.get("id")) for item in late_findings}),
+                            "response_sha256s": [
+                                sha256_file(path) for path in pass_paths if path.is_file()
+                            ],
+                        },
+                    )
+                    continue
+                unresolved += 1
+                findings.append({
+                    "id": "broker_vision.task_missing",
+                    "severity": "blocker",
+                    "document_id": document["document_id"],
+                    "surface_id": surface_id,
+                    "message": (
+                        "The hash-bound vision task is missing. A taskless late promotion may close "
+                        "only after bounded exhaustion when every physical finding is explicitly non-model-linked."
+                    ),
+                })
+                continue
+            task_path = artifact_root / task_artifact["path"]
+            if not task_path.is_file() or sha256_file(task_path) != task_artifact["sha256"]:
+                unresolved += 1
+                findings.append({"id": "broker_vision.task_hash_mismatch", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The vision task is missing or does not match the extraction bundle."})
                 continue
             task = json.loads(task_path.read_text("utf-8"))
             if task.get("document_id") != document["document_id"] or task.get("surface_id") != surface_id:
                 unresolved += 1
                 findings.append({"id": "broker_vision.task_binding_invalid", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "The vision task does not bind the document and surface."})
                 continue
-            response_base = response_root / surface_id
-            pass_paths = [Path(str(response_base) + ".pass1.json"), Path(str(response_base) + ".pass2.json")]
-            resolution_path = Path(str(response_base) + ".resolution.json")
             if not all(path.is_file() for path in pass_paths):
                 if args.degrade_exhausted:
                     quarantine_surface_evidence_only(
@@ -1214,6 +1302,11 @@ def main() -> int:
         document["extraction_status"] = "complete" if "required" not in states and "error" not in states else "needs_vision"
 
     bundle, canonical_findings = canonicalise_bundle(bundle)
+    ensure_late_promotion_tasks(
+        bundle,
+        canonical_findings,
+        fallback_artifact_root=bundle_path.parent,
+    )
     findings.extend(canonical_findings)
     # The verified bundle is the compatibility boundary consumed by the
     # existing pack compiler.  Expose only reconciled tables there while

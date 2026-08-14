@@ -94,6 +94,26 @@ carry the bundle toward `PASS`. A run may not proceed on the portion that
 happened to resolve while ordinary work remains, and may not substitute values
 assembled in conversation for the surfaces that did not resolve.
 
+A page that passed native extraction can be promoted to rendered recovery only
+after canonical token reconciliation. Such a page has no extraction-time
+`vision_task` by construction, so the canonical compiler must mint one
+deterministically from the sealed page image, census and complete canonical
+finding set. The same task path and bytes must recur after restart; a missing or
+changed referenced task invalidates the cached canonical checkpoint. Both
+`NEEDS_VISION` and pre-transcription `NEEDS_RESOLUTION` promotions begin with
+the two independent grid reads. Targeted cell adjudication is permitted only
+after those reads produce a conflict manifest.
+
+For a legacy carrier created before canonical task minting, bounded exhaustion
+may close a taskless late promotion only when the original page image is
+present and hash-valid and every canonical physical-capture finding is
+explicitly `model_linked: false`. The controller then seals an image-, finding-
+and response-bound quarantine receipt, sets `model_use=prohibited`, preserves
+the raw page and token census, removes the page from the pending set, and
+continues with surviving clean broker authority. A missing or mismatched page
+image, unknown linkage, any `model_linked: true` finding, or any selected
+mapping that touches the page remains fail-closed.
+
 When the finite budget is spent — vision attempts, fixed-point retries or an
 aggregate internal defect — the controller closes the lane itself as
 `PASS_DEGRADED`: the smallest defensible regions (a cell conflict, or a whole
