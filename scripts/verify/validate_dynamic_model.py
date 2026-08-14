@@ -550,6 +550,7 @@ def main(argv: List[str]) -> int:
     core_order = [name for name in sheets if name in core_sheets]
     evidence_contract_valid = (
         not evidence_sheets
+        or all(re.match(r"^B(?:0[1-9]|10)\s", name) for name in evidence_sheets)
         or (
             evidence_sheets[0] == "> Brokers"
             and all(name.startswith("B") for name in evidence_sheets[1:])
@@ -912,15 +913,39 @@ def main(argv: List[str]) -> int:
     ordinary_drawing_parts = sorted(
         set(drawing_relationships) | set(drawing_parts_by_name)
     )
+    permitted_broker_drawing_parts = sorted(
+        {
+            part
+            for sheet in workbook.sheets
+            if re.match(r"^B\d{2} .+", sheet.name)
+            for part in workbook.related_parts(sheet.part, REL_DRAWING)
+        }
+    )
+    unintended_drawing_parts = sorted(
+        set(ordinary_drawing_parts) - set(permitted_broker_drawing_parts)
+    )
+    invalid_broker_drawing_parts = []
+    for drawing_part in permitted_broker_drawing_parts:
+        drawing_xml = workbook.part(drawing_part)
+        picture_count = len(re.findall(r"<(?:\w+:)?pic\b", drawing_xml))
+        anchor_count = len(re.findall(r"<(?:\w+:)?oneCellAnchor\b", drawing_xml))
+        forbidden = re.findall(
+            r"<(?:\w+:)?(?:graphicFrame|sp|grpSp|twoCellAnchor|absoluteAnchor)\b",
+            drawing_xml,
+        )
+        if picture_count == 0 or picture_count != anchor_count or forbidden:
+            invalid_broker_drawing_parts.append(drawing_part)
     # DEFECT 0.12.  An empty package, or one whose sheets never resolved, yields
     # an empty result — which is the pass condition.  Both are asserted first.
     drawing_scan_visited = bool(workbook.names) and bool(worksheet_parts)
     checks.append(
         record(
             "no-unintended-drawings",
-            drawing_scan_visited and not ordinary_drawing_parts,
-            "No ordinary DrawingML shape or chart part is present in the "
-            "production workbook."
+            drawing_scan_visited
+            and not unintended_drawing_parts
+            and not invalid_broker_drawing_parts,
+            "No unintended DrawingML part is present; raster evidence is "
+            "permitted only on Bxx broker source-page sheets."
             if drawing_scan_visited
             else "The drawing-part scan listed ZERO zip entries or resolved ZERO "
             "worksheets — the check cannot pass on an empty visit.",
@@ -930,8 +955,12 @@ def main(argv: List[str]) -> int:
                 "drawing_relationships": drawing_relationships,
                 "drawing_parts_by_name": drawing_parts_by_name,
                 "drawing_parts": ordinary_drawing_parts,
+                "permitted_broker_drawing_parts": permitted_broker_drawing_parts,
+                "unintended_drawing_parts": unintended_drawing_parts,
+                "invalid_broker_drawing_parts": invalid_broker_drawing_parts,
             },
-            violations=len(ordinary_drawing_parts)
+            violations=len(unintended_drawing_parts)
+            + len(invalid_broker_drawing_parts)
             + (0 if drawing_scan_visited else 1),
         )
     )

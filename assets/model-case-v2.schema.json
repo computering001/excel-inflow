@@ -389,7 +389,7 @@
         },
         "source_mappings": {
           "type": "array",
-          "description": "Hash-bound, cell-addressed provenance for broker forecast values. The renderer uses it only to link the visible Brokers grid to evidence sheets; the resolved values must still equal broker_pack.metrics.",
+          "description": "Hash-bound, cell-addressed provenance for broker forecast values. The visible Brokers grid writes the resolved values as sealed inputs; Bxx remains image-only evidence.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -492,10 +492,45 @@
             }
           }
         },
+        "page_evidence": {
+          "type": "array",
+          "maxItems": 10,
+          "description": "Workbook-facing broker evidence. One Bxx sheet per house contains these immutable full-page images horizontally; the images never become calculation authority.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["house_id", "house_name", "source_id", "content_sha256", "pages"],
+            "properties": {
+              "house_id": { "type": "string", "minLength": 1 },
+              "house_name": { "type": "string", "minLength": 1 },
+              "source_id": { "type": "string", "minLength": 1 },
+              "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "published_date": { "type": "string", "format": "date" },
+              "file_name": { "type": "string", "minLength": 1 },
+              "pages": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["page_number", "surface_id", "width_points", "height_points", "artifact_path", "artifact_sha256"],
+                  "properties": {
+                    "page_number": { "type": "integer", "minimum": 1 },
+                    "surface_id": { "type": "string", "minLength": 1 },
+                    "width_points": { "type": "number", "exclusiveMinimum": 0 },
+                    "height_points": { "type": "number", "exclusiveMinimum": 0 },
+                    "artifact_path": { "type": "string", "minLength": 1 },
+                    "artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                  }
+                }
+              }
+            }
+          }
+        },
         "raw_tables": {
           "type": "array",
           "maxItems": 10,
-          "description": "Optional deterministic workbook projection of the immutable broker evidence. Each reviewed table for each house is carried as a values-only source block; evidence_only tables remain formula-ineligible. It never replaces broker_pack.metrics as the calculation authority.",
+          "description": "Legacy deterministic table projection retained for backward compatibility. Fresh workbooks use page_evidence; raw tables remain lossless run evidence and never replace broker_pack.metrics as calculation authority.",
           "items": {
             "type": "object",
             "additionalProperties": false,

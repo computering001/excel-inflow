@@ -211,6 +211,7 @@ class WorkbookFacts:
     sheets: dict[str, Sheet]
     styles: list[dict]
     defined_names: dict[str, str]
+    media_sha256: list[str]
 
 
 def _shared_strings(archive: zipfile.ZipFile) -> list[str]:
@@ -325,7 +326,17 @@ def read_workbook(path: Path) -> WorkbookFacts:
         names_node = workbook.find("m:definedNames", NS)
         for item in list(names_node or []):
             defined_names[item.get("name")] = item.text or ""
-        return WorkbookFacts(sheets=sheets, styles=styles, defined_names=defined_names)
+        media_sha256 = sorted(
+            hashlib.sha256(archive.read(name)).hexdigest()
+            for name in archive.namelist()
+            if name.startswith("xl/media/") and not name.endswith("/")
+        )
+        return WorkbookFacts(
+            sheets=sheets,
+            styles=styles,
+            defined_names=defined_names,
+            media_sha256=media_sha256,
+        )
 
 
 def expand_formula_references(formula: str | None, current_sheet: str) -> set[tuple[str, str]]:
@@ -1159,6 +1170,7 @@ def verify(facts: WorkbookFacts, contract: dict, model_ir: dict | None = None) -
         divider_sheet = broker_evidence.get("divider_sheet", "> Brokers")
         missing_sheets = sorted(
             name for name in [divider_sheet, broker_sheet_name, *source_sheets]
+            if name
             if name not in facts.sheets
         )
         if missing_sheets:
@@ -1178,6 +1190,17 @@ def verify(facts: WorkbookFacts, contract: dict, model_ir: dict | None = None) -
                     "OOXML_BROKER_EVIDENCE_NOT_VALUES_ONLY",
                     f"Broker source sheet {source_sheet_name} contains formulas.",
                     cells=source_formulas[:20],
+                )
+        if broker_evidence.get("mode") == "page_images":
+            expected_media = sorted(
+                item["sha256"] for item in broker_evidence.get("page_images", [])
+            )
+            if expected_media != facts.media_sha256:
+                block(
+                    "OOXML_BROKER_PAGE_IMAGE_MISMATCH",
+                    "Embedded broker page-image bytes do not equal the sealed page-image inventory.",
+                    expected=expected_media,
+                    actual=facts.media_sha256,
                 )
         expected = Counter(
             (item["sheet"], item["address"].replace("$", ""))

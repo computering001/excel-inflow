@@ -230,15 +230,14 @@ do not handcraft hashes or treat normalized JSON as proof of the original file.
 
 Restated figures replace superseded comparatives only when the filing clearly states the restated basis. Preserve predecessor history and calendarise only with an explicit bridge. Never splice differently scoped periods without a visible reconciliation.
 
-At the broker checkpoint, render the receipt screen and attach a broker
-preview built from the SEALED pack only. It names the recommended
-primary-eligible coherent house, shows every selected concept/period value and
-its exact source cells, lists eligible alternates, and links the full preserved
-raw/evidence-only inventory. The user confirms that house before any broker
-value is consumed. The confirmation is bound to the preview hash, may select
-only another primary-eligible coherent house, and can never waive a selected
-cell conflict. The preview is generated from sealed artifacts; it is never a
-hand-typed table and resume never re-extracts the reports.
+At the broker checkpoint, compile one internal receipt from the SEALED pack.
+It names the recommended primary-eligible coherent house, records every
+selected concept/period value and exact source cells, and retains eligible
+alternates and the complete evidence inventory. Accept the recommended clean
+house automatically; if none exists, select the ordinary forecast waterfall.
+An explicit override may choose only another clean coherent house and can never
+waive a selected-cell conflict. Do not expose OCR, vision, reconciliation,
+preview or confirmation as separate chat stages.
 
 Decisions are collected on native question cards: the ASCII screen is the
 receipt, the cards are the instrument. One checkpoint's cards form one
@@ -260,7 +259,7 @@ question cardinality alone is never evidence that the source pack is defective.
 The visible run has exactly five labelled stages:
 
 1. `INPUTS` — receive the company, evidence pack and optional prior case;
-2. `EVIDENCE REVIEW` — validate, read and reconcile, then require one sealed broker-primary confirmation;
+2. `EVIDENCE REVIEW` — validate, read and reconcile all broker work internally as one step;
 3. `DECISIONS` — zero to five genuinely unresolved modelling questions together, if any;
 4. `BUILD AND CHECKS` — solve, emit and validate without user contact; and
 5. `DELIVERY` — return the workbook, assumptions, findings and gate status.

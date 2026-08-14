@@ -117,6 +117,14 @@
       "script": "run_broker_preview_tests.mjs"
     },
     {
+      "id": "broker-page-evidence",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_broker_page_evidence_tests.mjs",
+      "arguments": ["$REPRESENTATIVE"],
+      "requires": ["REPRESENTATIVE"]
+    },
+    {
       "id": "internal-evidence-fixed-point",
       "phase": "workflow",
       "runtime": "python",

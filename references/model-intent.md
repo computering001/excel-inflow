@@ -181,14 +181,15 @@ Record a case-level materiality and grouping decision. Unless the user or disclo
 Allow forecast sources to vary by metric: direct company forecast, broker
 consensus, user input or visible inference. The production workbook always
 preserves the three calculation-authority sheets: `Operating Model`, `Brokers`
-and `Forward Curves`. When a PASS hash-bound full-table broker bundle is supplied,
-it may additionally contain the optional `> Brokers` divider and values-only
-`B01`-`B10` evidence sheets defined in `broker-extraction.md`.
+and `Forward Curves`. When a PASS hash-bound broker bundle is supplied, it may
+add `B01`-`B10` page-image evidence sheets defined in
+`broker-extraction.md`.
 `Brokers` retains the selected research metrics and selector; `Forward Curves`
 retains only the FX, benchmark and cash-yield inputs actually used and may
-otherwise be a clearly labelled minimal support sheet. Evidence sheets preserve
-the reviewed analytical and financial tables in vertical values-only blocks,
-while legal/disclosure material remains in the lossless run artifact only.
+otherwise be a clearly labelled minimal support sheet. Each evidence sheet
+preserves every source PDF page as a large hash-bound image, arranged
+horizontally from left to right. Lossless structured capture remains in the run
+artifact and does not dictate workbook layout.
 They never become calculation authorities: every
 selected broker figure links through `Brokers`, and `Operating Model` may not
 reference a `Bxx` sheet directly. Never fabricate observations merely to fill
@@ -197,16 +198,13 @@ source comment or equivalent adjacent support only for material
 hardcodes and judgemental assumptions; missing exact comment metadata is a
 forensic-parity issue, not a production-model failure.
 
-Before a broker case becomes forecast authority, Stage 2 must present one
-hash-bound preview generated from the sealed broker pack, source tables and
-crosswalk receipt. It identifies the recommended coherent eligible house,
-every selected concept-period value and its exact source cells, alternates,
-unavailable cells and quarantined evidence. The user may confirm that house or
-choose another eligible coherent house. A selected model-linked conflict always
-blocks; a conflict confined to an unselected cell remains preserved evidence
-and does not disable clean periods or houses. Confirmation never permits a
-named house to borrow a missing period from another house: the ordinary
-forecast waterfall resolves that period instead.
+Before broker evidence becomes forecast authority, Stage 2 compiles one
+hash-bound internal selection receipt from the pack, source tables and
+crosswalk. It automatically selects the recommended coherent house, or the
+ordinary forecast waterfall when no clean house exists. A selected conflict
+quarantines only that observation and returns the concept/period to the
+waterfall; an unused conflict never stops the build. A named house never borrows
+a missing period from another house.
 
 ## 8. Operating forecast and cash flow
 

@@ -36,15 +36,16 @@ raw document bytes
 -> broker-source-tables/1.0
 -> broker-crosswalk/1.2 + semantic coverage ledger + PASS receipt
 -> broker-pack/1.0
--> model-case broker source mappings
--> values-only broker evidence sheets
+-> model-case selected observations + broker source mappings
+-> hash-bound horizontal page-image evidence sheets
 -> Brokers sheet
 -> Operating Model
 ```
 
-Every boundary is content-hash-bound. The model case must preserve the source
-tables and crosswalk receipt exactly. A table cell must not be retyped into a
-later artifact without its table id, row, column and source reference.
+Every boundary is content-hash-bound. The evidence envelope preserves source
+tables and the crosswalk receipt exactly; the model case carries the selected
+projection and immutable page images. A value may not be retyped into a later
+artifact without its table id, row, column and source reference.
 
 ## Extraction waterfall
 
@@ -281,12 +282,11 @@ The compiler must prove:
 
 ## Workbook presentation
 
-When full broker evidence is supplied, extend the three core sheets with one
-optional evidence group:
+When broker PDF evidence is supplied, extend the three core sheets with one
+optional image-evidence group:
 
 ```text
 Operating Model
-> Brokers
 Brokers
 B01 <house name>
 ...
@@ -294,38 +294,32 @@ B10 <house name>
 Forward Curves
 ```
 
-`> Brokers` is a lightweight divider. Each `B01`-`B10` sheet presents the
-house's analytical and financial tables in clean vertical blocks with title,
-source location, units, publication date, filename and source hash. Preserve
-source row and column order, use two blank rows between blocks, keep numeric
-values as blue hardcodes and labels as black text, and never place tables side
-by side. It contains values only and must not be an economic calculation
-surface. Every reviewed tabular grid is rendered, including supplemental or
-third-party tables dispositioned `workbook_presentation=evidence_only`. That
-disposition means "preserved but prohibited from model formulas"; it does not
-mean hidden. Pure narrative or boilerplate remains in the lossless page artifact
-rather than being fabricated into a table. Every table used by a model mapping
-must be `analytical_table` and rendered.
+There is no divider sheet. Each `B01`-`B10` sheet embeds every page of that
+house's PDF as a large immutable image, left to right in source-page order.
+The source filename and SHA-256 appear above the images. These sheets are visual
+evidence only: they contain no calculations, no reconstructed tables and no
+cell-level model authority. Multi-page tables remain visually continuous
+because consecutive full pages are adjacent; repeated headers and continuation
+labels remain exactly as published.
 
-These are two deliberately different artifacts. `broker-source-tables/1.0`
-keeps the complete reviewed page inventory. `model_case.broker_pack.raw_tables`
-is the deterministic table projection of that inventory containing every
-reviewed table for every house. Their enclosing schemas differ, so do not equate
-top-level artifact hashes, but table membership must be complete. Never discard
-an evidence-only table or hand-select a narrower workbook subset. Attachment
-ingress compiles the projection and the evidence gate independently recomputes
-it from the per-table disposition ledger. A mapped source cell on an
-`evidence_only` table is a blocker.
+These are deliberately separate artifacts. `broker-source-tables/1.0` keeps
+the complete reviewed page/table inventory for validation. The model case
+carries only selected metric values, their source-cell mappings and the
+hash-bound full-page image inventory used for Bxx presentation. Attachment
+ingress verifies every image byte against the extraction artifact root. A
+mapped source cell on an `evidence_only` table remains prohibited, but unused
+tables never become workbook structure.
 
-The main `Brokers` sheet links mapped house estimates to those evidence cells.
+The main `Brokers` sheet writes mapped house estimates as blue sealed inputs
+with provenance retained in the evidence receipt.
 The Operating Model continues to link only to `Brokers`; it must never reference
 a raw evidence sheet directly. Evidence sheets are optional for legacy or
 synthetic cases with no full-table bundle, in which case the workbook retains
 the three core sheets exactly.
 
-The independent OOXML oracle proves the evidence sheets are values-only, every
-sealed source-cell reference is used by `Brokers`, and no other sheet bypasses
-that authority direction.
+The independent OOXML oracle proves the Bxx sheets contain no formulas, their
+embedded media hashes equal the sealed page inventory, and no calculation sheet
+references Bxx.
 
 ## Runtime commands
 
@@ -471,16 +465,14 @@ evidence rules because a layout-only report is difficult.
 
 ## Failure handling
 
-Stage 2 always pauses once on the sealed broker preview so the user confirms
-the recommended primary-eligible coherent house (or selects one eligible
-alternate) before consumption. This is a selection checkpoint, not a waiver:
-a stale preview hash, mixed-house period series, or selected quarantined cell
-is refused. Separately, block only when a material modelling authority is
-still absent after native extraction, two reads, targeted adjudication,
-cell-granular quarantine, primary-house selection and the semantic forecast
-waterfall. A conflict in an unused cell/table, a partial broker, or an
-unselected house cannot stop a complete eligible house. Present all surviving
-concept/period questions together; never stop once per document.
+Stage 2 is one automatic broker step. It internally accepts the recommended
+clean coherent house, or chooses the ordinary forecast waterfall when none is
+clean. Do not expose native extraction, OCR, vision, reconciliation, preview or
+confirmation as separate user stages. Quarantine a disputed selected
+observation and let that concept/period fall through the waterfall. A conflict
+in an unused cell/table, a partial broker or an unselected house cannot stop the
+model. Surface one consolidated Stage-3 question only if the complete waterfall
+still lacks a material model driver.
 
 If extraction fails, request the smallest corrected source: an unprotected PDF,
 the original spreadsheet, a higher-resolution page, or confirmation of one

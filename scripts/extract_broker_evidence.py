@@ -820,16 +820,20 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             vision_reason = "; ".join(reasons)
 
         artifact_refs = [text_ref, words_ref, census_ref, *image_refs]
-        if vision_required or table_bboxes or text_discovery_bboxes:
-            matrix = fitz.Matrix(render_dpi / 72.0, render_dpi / 72.0)
-            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-            page_image_ref = writer.write(
-                f"pages/page-{page_index + 1:04d}.png",
-                "page_image",
-                pixmap.tobytes("png"),
-            )
-            artifact_refs.append(page_image_ref)
-            if vision_required:
+        # Every PDF page is preserved once as a legible workbook-facing image,
+        # regardless of whether the page also needs OCR/vision adjudication.
+        # Physical capture and model consumption are deliberately separate:
+        # the image is the analyst's evidence tab; selected, cell-addressed
+        # observations remain the only values permitted to feed the model.
+        matrix = fitz.Matrix(render_dpi / 72.0, render_dpi / 72.0)
+        pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+        page_image_ref = writer.write(
+            f"pages/page-{page_index + 1:04d}.png",
+            "page_image",
+            pixmap.tobytes("png"),
+        )
+        artifact_refs.append(page_image_ref)
+        if vision_required:
                 # Give the two independent reads a high-resolution view of
                 # every region that may contain a table.  Whole-page renders
                 # remain useful for labels and continuation context, but are
@@ -1543,7 +1547,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("request", help="broker-extraction-request/1.0 JSON")
     parser.add_argument("--out", required=True, help="output directory outside the skill tree")
-    parser.add_argument("--render-dpi", type=int, default=120)
+    parser.add_argument("--render-dpi", type=int, default=150)
     args = parser.parse_args()
     request_path = Path(args.request).resolve()
     output_root = Path(args.out).resolve()

@@ -90,7 +90,11 @@ def main(argv=None):
     if args.command in ("patch", "build"):
         from . import patch as patch_stage
 
-        report["patch"] = patch_stage.apply(document, args.out)
+        report["patch"] = patch_stage.apply(
+            document,
+            args.out,
+            asset_root=Path(args.plan).resolve().parent,
+        )
     print(json.dumps({"status": "OK", "output": str(Path(args.out).resolve()), **report}, indent=2))
     return 0
 

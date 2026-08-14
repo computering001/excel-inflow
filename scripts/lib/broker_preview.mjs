@@ -245,18 +245,12 @@ function primarySelectionCase({ brokerPack, house, headlineAnchor, mappings, sou
     for (const periodIndex of PERIODS) {
       const value = house.estimates?.[metricId]?.[periodIndex];
       if (!finite(value)) {
-        if (metricId === "share_buybacks") {
-          fallbackPeriods.push({
-            metric_id: metricId,
-            period_index: periodIndex,
-            period: brokerPack.forecast_periods?.[periodIndex] ?? null,
-            reason: "The selected house publishes no value; the ordinary forecast waterfall remains in force.",
-          });
-          continue;
-        }
-        violations.push(
-          `${house.house_id} lacks ${metricId} for forecast period ${periodIndex + 1}.`,
-        );
+        fallbackPeriods.push({
+          metric_id: metricId,
+          period_index: periodIndex,
+          period: brokerPack.forecast_periods?.[periodIndex] ?? null,
+          reason: "The selected house publishes no clean value; the ordinary forecast waterfall remains in force for this concept-period.",
+        });
         continue;
       }
       const mapped = mappedValue({
@@ -267,7 +261,16 @@ function primarySelectionCase({ brokerPack, house, headlineAnchor, mappings, sou
         mappings,
         source,
       });
-      if (mapped.violation) violations.push(mapped.violation);
+      if (mapped.violation) {
+        fallbackPeriods.push({
+          metric_id: metricId,
+          period_index: periodIndex,
+          period: brokerPack.forecast_periods?.[periodIndex] ?? null,
+          reason: mapped.violation,
+          ...(mapped.provenance ? { provenance: mapped.provenance } : {}),
+        });
+        continue;
+      }
       selectedValues.push({
         selection_kind: "primary_house",
         metric_id: metricId,
@@ -327,7 +330,7 @@ function flexSelections({ brokerPack, mappings, source }) {
           mappings,
           source,
         });
-        if (mapped.violation) violations.push(mapped.violation);
+        if (mapped.violation) continue;
         selections.push({
           selection_kind: "attributed_flex",
           metric_id: metricId,
@@ -357,7 +360,6 @@ function flexSelections({ brokerPack, mappings, source }) {
               mappings,
               source,
             });
-            if (mapped.violation) violations.push(mapped.violation);
             return {
               house_id: house.house_id,
               house_name: house.house_name,
@@ -366,12 +368,8 @@ function flexSelections({ brokerPack, mappings, source }) {
               provenance: mapped.provenance,
             };
           });
-        if (contributors.length < 3 || contributors.some((item) => !item.selectable)) {
-          violations.push(
-            `Consensus flex election ${metricId} period ${periodIndex + 1} lacks three verified contributors.`,
-          );
-          continue;
-        }
+        const selectableContributors = contributors.filter((item) => item.selectable);
+        if (selectableContributors.length < 3) continue;
         selections.push({
           selection_kind: "consensus_flex",
           metric_id: metricId,
@@ -380,10 +378,10 @@ function flexSelections({ brokerPack, mappings, source }) {
           house_id: null,
           house_name: "Named-house mean",
           value:
-            contributors.reduce((sum, item) => sum + item.value, 0) /
-            contributors.length,
+            selectableContributors.reduce((sum, item) => sum + item.value, 0) /
+            selectableContributors.length,
           selectable: true,
-          contributors,
+          contributors: selectableContributors,
           alternates: [],
         });
       }
@@ -688,7 +686,10 @@ export function validateBrokerPreview(preview) {
     for (const metricId of [...requiredPrimaryHouseIds(), candidate.headline_anchor]) {
       for (const periodIndex of PERIODS) {
         const key = `primary_house|${metricId}|${periodIndex}`;
-        if (candidate.status === "PASS" && !primaryKeys.has(key)) {
+        const hasFallback = (candidate.fallback_periods ?? []).some(
+          (item) => item.metric_id === metricId && item.period_index === periodIndex,
+        );
+        if (candidate.status === "PASS" && !primaryKeys.has(key) && !hasFallback) {
           violations.push(
             `Selection case ${candidate.house_id} omits required coherent value ${metricId} period ${periodIndex + 1}.`,
           );
@@ -808,6 +809,86 @@ export function verifyBrokerPreviewConfirmation(preview, confirmation) {
     valid: errors.length === 0,
     errors: [...new Set(errors)],
     selection: errors.length === 0 ? selected : null,
+  };
+}
+
+export function automaticBrokerPreviewConfirmation(preview) {
+  const validation = validateBrokerPreview(preview);
+  if (preview?.status !== "PASS" || !validation.valid) return null;
+  return {
+    schema_version: BROKER_PREVIEW_CONFIRMATION_SCHEMA_VERSION,
+    preview_sha256: preview.preview_sha256,
+    selected_house_id:
+      preview.recommended_primary_house_id ?? "FORECAST_WATERFALL",
+    confirmed: true,
+  };
+}
+
+/**
+ * Project a sealed broker selection into compiler evidence without destroying
+ * the immutable source lane.  A whole-pack waterfall suppresses every broker
+ * observation.  A named-house selection suppresses only the exact
+ * concept-periods which the preview proved unavailable or quarantined; every
+ * other clean period from that same house remains usable.
+ */
+export function applyBrokerPreviewSelectionToCaseEvidence(
+  caseEvidence,
+  preview,
+  confirmation,
+) {
+  const verified = verifyBrokerPreviewConfirmation(preview, confirmation);
+  if (!verified.valid) {
+    throw new Error(`Broker confirmation is invalid: ${verified.errors.join("; ")}`);
+  }
+  const projected = structuredClone(caseEvidence);
+  projected.lanes = projected.lanes ?? {};
+  projected.lanes.controls = {
+    ...(projected.lanes.controls ?? {}),
+    broker_case: verified.selection.house_name,
+  };
+  const brokerPack = projected.lanes.broker_pack ?? {};
+  const metrics = brokerPack.metrics ?? {};
+  let suppressedObservationCount = 0;
+  if (verified.selection.house_id === "FORECAST_WATERFALL") {
+    brokerPack.metrics = Object.fromEntries(
+      Object.entries(metrics).map(([metricId, metric]) => [
+        metricId,
+        {
+          ...metric,
+          provider_consensus: [null, null, null],
+          brokers: Object.fromEntries(
+            Object.keys(metric.brokers ?? {}).map((houseName) => {
+              suppressedObservationCount += (metric.brokers?.[houseName] ?? [])
+                .filter((value) => value !== null && value !== undefined).length;
+              return [houseName, [null, null, null]];
+            }),
+          ),
+        },
+      ]),
+    );
+  } else {
+    for (const fallback of verified.selection.fallback_periods ?? []) {
+      const metric = metrics[fallback.metric_id];
+      const houseSeries = metric?.brokers?.[verified.selection.house_name];
+      if (!Array.isArray(houseSeries) || houseSeries.length !== 3) {
+        throw new Error(
+          `Broker evidence cannot quarantine ${verified.selection.house_name} ` +
+          `${fallback.metric_id} period ${fallback.period_index + 1}: the exact series is absent.`,
+        );
+      }
+      if (houseSeries[fallback.period_index] !== null &&
+          houseSeries[fallback.period_index] !== undefined) {
+        suppressedObservationCount += 1;
+      }
+      houseSeries[fallback.period_index] = null;
+    }
+    brokerPack.metrics = metrics;
+  }
+  projected.lanes.broker_pack = brokerPack;
+  return {
+    case_evidence: projected,
+    selection: verified.selection,
+    suppressed_observation_count: suppressedObservationCount,
   };
 }
 

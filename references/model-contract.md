@@ -298,12 +298,12 @@ sheets:
 - `Brokers`
 - `Forward Curves`
 
-A PASS hash-bound full-table broker bundle may add only the optional `> Brokers`
-divider and `B01`-`B10` values-only evidence sheets defined in
-`broker-extraction.md`. Those sheets preserve source tables for review. They
-must contain no formulas, `Operating Model` must never reference them directly,
-and every selected forecast still enters through `Brokers`. Without full-table
-evidence, the workbook remains exactly the three core sheets.
+A PASS hash-bound broker bundle may add only `B01`-`B10` page-image evidence
+sheets defined in `broker-extraction.md`. Each preserves every source PDF page
+horizontally and contains no formulas. `Operating Model` never references it
+directly; every selected forecast enters through `Brokers` as a sealed hardcode
+with exact provenance. Without page evidence, the workbook remains exactly the
+three core sheets.
 
 Do not add `Historical Support`, `Legacy Entity`, a central source register or a
 dedicated checks sheet. Normalize predecessor, merger and calendarisation inputs

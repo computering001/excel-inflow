@@ -1613,6 +1613,42 @@ def main() -> int:
         },
         **({"provider_consensus": crosswalk["provider_consensus"]} if crosswalk.get("provider_consensus") else {}),
     }
+    def workbook_pages(document: dict[str, Any]) -> list[dict[str, Any]]:
+        artifacts = {
+            item["artifact_id"]: item
+            for item in document.get("artifacts", [])
+            if item.get("kind") == "page_image"
+        }
+        # Compatibility for sealed pre-image fixtures. Fresh extraction always
+        # emits one page_image per PDF surface; once any page image is present,
+        # the document must be complete and gap-free.
+        if not artifacts:
+            return []
+        pages: list[dict[str, Any]] = []
+        for surface in sorted(
+            (item for item in document.get("surfaces", []) if item.get("kind") == "pdf_page"),
+            key=lambda item: int(item.get("ordinal", 0)),
+        ):
+            page_artifacts = [
+                artifacts[artifact_id]
+                for artifact_id in surface.get("artifact_refs", [])
+                if artifact_id in artifacts
+            ]
+            if len(page_artifacts) != 1:
+                raise ValueError(
+                    f"Broker PDF page {surface.get('surface_id')} must own exactly one page image; found {len(page_artifacts)}."
+                )
+            artifact = page_artifacts[0]
+            pages.append({
+                "page_number": int(surface["ordinal"]),
+                "surface_id": surface["surface_id"],
+                "width_points": float(surface["width"]),
+                "height_points": float(surface["height"]),
+                "artifact_path": artifact["path"],
+                "artifact_sha256": artifact["sha256"],
+            })
+        return pages
+
     broker_sources = {
         "schema_version": "broker-source-tables/1.0",
         "run_id": bundle["run_id"],
@@ -1624,6 +1660,7 @@ def main() -> int:
                 "content_sha256": document["raw_sha256"],
                 "published_date": document["published_date"],
                 "file_name": document["file_name"],
+                "pages": workbook_pages(document),
                 "tables": [
                     {
                         "table_id": table["table_id"],

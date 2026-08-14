@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   applyBrokerPreviewSelection,
+  applyBrokerPreviewSelectionToCaseEvidence,
+  automaticBrokerPreviewConfirmation,
   brokerPreviewSha256,
   compileBrokerPreview,
   compileBrokerPreviewFromFiles,
@@ -277,6 +279,18 @@ await test("confirmation is hash-bound and selects only an eligible coherent hou
   assert(modelCase.stage_three_answers["broker.preview_sha256"] === preview.preview_sha256, "selection seal was not recorded");
 });
 
+await test("ordinary Stage 2 auto-selects a clean house without a user stop", () => {
+  const preview = compile();
+  const automatic = automaticBrokerPreviewConfirmation(preview);
+  assert(automatic, "automatic selection was not produced");
+  const verified = verifyBrokerPreviewConfirmation(preview, automatic);
+  assert(verified.valid, verified.errors.join("; "));
+  assert(
+    automatic.selected_house_id === preview.recommended_primary_house_id,
+    "automatic selection did not use the sealed recommendation",
+  );
+});
+
 await test("Stage-2 action receipt and run carrier preserve the confirmation", async () => {
   const preview = compile();
   const accepted = confirmation(preview);
@@ -337,7 +351,7 @@ await test("mixed-house primary period mutation is rejected", () => {
   assert(!validation.valid && validation.violations.some((error) => /mixes/.test(error)), "mixed period passed");
 });
 
-await test("selected quarantined source cell demotes only its house and cannot be consumed", () => {
+await test("selected quarantined source cell falls through without poisoning its house", () => {
   const tables = clone(baseTables);
   const selectedHouse = pack.houses[0];
   const mapping = baseReceipt.mappings.find(
@@ -364,14 +378,70 @@ await test("selected quarantined source cell demotes only its house and cannot b
   ];
   const preview = compile({ tables });
   assert(preview.status === "PASS", JSON.stringify(preview.violations));
-  assert(
-    preview.selection_cases.find((candidate) => candidate.house_id === selectedHouse.house_id).status === "BLOCK",
-    "affected house remained selectable",
+  const affectedCase = preview.selection_cases.find(
+    (candidate) => candidate.house_id === selectedHouse.house_id,
   );
   assert(
-    preview.recommended_primary_house_id !== selectedHouse.house_id,
-    "preview still recommended the house containing the quarantined selected cell",
+    affectedCase.status === "PASS",
+    "one quarantined observation poisoned the whole house",
   );
+  assert(
+    preview.recommended_primary_house_id === selectedHouse.house_id,
+    "preview abandoned a house whose other observations remained clean",
+  );
+  assert(
+    affectedCase.fallback_periods.some(
+      (item) => item.metric_id === "revenue" && item.period_index === 0,
+    ),
+    "quarantined observation was not routed to the forecast waterfall",
+  );
+  assert(
+    !affectedCase.selected_values.some(
+      (item) => item.metric_id === "revenue" && item.period_index === 0,
+    ),
+    "quarantined observation remained selectable",
+  );
+  assert(
+    affectedCase.selected_values.some(
+      (item) => item.metric_id === "revenue" && item.period_index === 1,
+    ),
+    "clean period from affected house was discarded",
+  );
+  const caseEvidence = {
+    lanes: {
+      controls: { broker_case: "Consensus" },
+      broker_pack: {
+        metrics: Object.fromEntries(
+          Object.keys(pack.houses[0].estimates).map((metricId) => [
+            metricId,
+            {
+              provider_consensus: [1, 2, 3],
+              brokers: Object.fromEntries(
+                pack.houses.map((house) => [
+                  house.house_name,
+                  [...house.estimates[metricId]],
+                ]),
+              ),
+            },
+          ]),
+        ),
+      },
+    },
+  };
+  const projected = applyBrokerPreviewSelectionToCaseEvidence(
+    caseEvidence,
+    preview,
+    automaticBrokerPreviewConfirmation(preview),
+  );
+  const selectedRevenue = projected.case_evidence.lanes.broker_pack.metrics.revenue
+    .brokers[selectedHouse.house_name];
+  assert(selectedRevenue[0] === null, "quarantined observation leaked into compiler evidence");
+  assert(
+    selectedRevenue[1] === selectedHouse.estimates.revenue[1] &&
+      selectedRevenue[2] === selectedHouse.estimates.revenue[2],
+    "clean periods from affected house changed",
+  );
+  assert(projected.suppressed_observation_count === 1, "suppression was not cell-granular");
 });
 
 await test("unselected quarantined cell remains evidence-only without poisoning clean selections", () => {
@@ -415,6 +485,10 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
   assert(preview.selection_mode === "forecast_waterfall", "degraded pack did not select forecast waterfall");
   assert(preview.recommended_primary_house_id === null && preview.selected_value_count === 0, "degraded preview selected broker values");
   assert(validateBrokerPreview(preview).valid, validateBrokerPreview(preview).violations.join("; "));
+  assert(
+    automaticBrokerPreviewConfirmation(preview)?.selected_house_id === "FORECAST_WATERFALL",
+    "degraded Stage 2 did not auto-select the forecast waterfall",
+  );
   const accepted = confirmation(preview, "FORECAST_WATERFALL");
   const verified = verifyBrokerPreviewConfirmation(preview, accepted);
   assert(verified.valid && verified.selection.house_name === "Forecast Waterfall", verified.errors.join("; "));

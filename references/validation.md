@@ -89,7 +89,7 @@ Twenty-nine checks: `sheet-contract`, `coverage-gate`,
 
 **Proves:** the workbook contains the three approved calculation-authority
 sheets and, when declared by a PASS hash-bound broker bundle, no more than the
-optional values-only `> Brokers` / `B01`-`B10` evidence group; the
+optional image-only `B01`-`B10` evidence group; the
 period structure is three historical plus three forecast; every statement
 subtotal foots; the workbook agrees with the independently computed solution;
 debt, cash, RCF, interest, liquidity and leverage tie; standalone plus
@@ -672,12 +672,11 @@ Confirm:
 - expanded debt instruments inside the Debt Schedule and their interest rows
   inside the Interest Schedule;
 - the production workbook contains the three calculation-authority sheets
-  `Operating Model`, `Brokers` and `Forward Curves`; an optional `> Brokers` /
-  `B01`-`B10` evidence group is permitted only when hash-bound, values-only and
-  fully crosswalked through `Brokers`;
-- broker evidence tabs contain only tables declared for workbook presentation,
-  stacked vertically with two blank rows between blocks; evidence-only legal or
-  disclosure tables remain outside the workbook;
+  `Operating Model`, `Brokers` and `Forward Curves`; an optional `B01`-`B10`
+  evidence group is permitted only when every embedded page image is hash-bound
+  and every selected value is crosswalked through `Brokers`;
+- broker evidence tabs contain every source PDF page horizontally as large
+  images and no formulas or reconstructed tables;
 - no raw FactSet/DCS evidence sheet is present; selected DCS terms appear as
   blue hardcodes in the debt schedule and are checked against the external
   lossless receipt;

@@ -148,6 +148,25 @@
           "items": { "$ref": "#/definitions/comment" },
           "default": []
         },
+        "images": {
+          "type": "array",
+          "description": "Hash-bound raster evidence embedded without interpretation. Production permits these only on Bxx broker source-page sheets.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "anchor", "width_pixels", "height_pixels", "page_number"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "anchor": { "type": "string", "pattern": "^[A-Z]{1,3}[0-9]{1,7}$" },
+              "width_pixels": { "type": "number", "exclusiveMinimum": 0 },
+              "height_pixels": { "type": "number", "exclusiveMinimum": 0 },
+              "page_number": { "type": "integer", "minimum": 1 },
+              "surface_id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "default": []
+        },
         "page_margins": {
           "type": "object",
           "additionalProperties": false,

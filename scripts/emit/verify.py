@@ -216,6 +216,7 @@ def _compare_sheet(expected_plan, actual_plan, expected, actual, examples):
     sheet_channel("default_row_height", expected.get("default_row_height"), actual.get("default_row_height"))
     sheet_channel("page_margins", expected.get("page_margins"), actual.get("page_margins"))
     sheet_channel("merges", expected.get("merges", []), actual.get("merges", []))
+    sheet_channel("images", expected.get("images", []), actual.get("images", []))
 
     # Column widths, keyed by column index rather than by <col> run, because two
     # writers legitimately group runs differently for identical widths.

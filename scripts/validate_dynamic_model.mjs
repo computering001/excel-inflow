@@ -767,6 +767,7 @@ const unknownSheets = sheets.filter(
 const coreOrder = sheets.filter((name) => coreSheets.includes(name));
 const evidenceContractValid =
   evidenceSheets.length === 0 ||
+  evidenceSheets.every((name) => /^B(?:0[1-9]|10)\s/.test(name)) ||
   (evidenceSheets[0] === "> Brokers" &&
     evidenceSheets.slice(1).every((name) => /^B(?:0[1-9]|10)\s/.test(name)));
 checks.push(
@@ -1039,6 +1040,30 @@ const drawingPartsByName = Object.keys(zip.files).filter((name) =>
 const ordinaryDrawingParts = [
   ...new Set([...drawingRelationships, ...drawingPartsByName]),
 ];
+const permittedBrokerDrawingParts = new Set(
+  (
+    await Promise.all(
+      [...worksheetPartsByName.entries()]
+        .filter(([name]) => /^B\d{2} .+/.test(name))
+        .map(([, part]) => relatedParts(part, REL_DRAWING)),
+    )
+  ).flat(),
+);
+const unintendedDrawingParts = ordinaryDrawingParts.filter(
+  (part) => !permittedBrokerDrawingParts.has(part),
+);
+const invalidBrokerDrawingParts = [];
+for (const part of permittedBrokerDrawingParts) {
+  const xml = await zipText(part);
+  const pictureCount = (xml.match(/<(?:\w+:)?pic\b/g) ?? []).length;
+  const anchorCount = (xml.match(/<(?:\w+:)?oneCellAnchor\b/g) ?? []).length;
+  const forbidden = xml.match(
+    /<(?:\w+:)?(?:graphicFrame|sp|grpSp|twoCellAnchor|absoluteAnchor)\b/g,
+  ) ?? [];
+  if (pictureCount === 0 || pictureCount !== anchorCount || forbidden.length > 0) {
+    invalidBrokerDrawingParts.push(part);
+  }
+}
 // DEFECT 0.12. An empty zip listing, or a package whose sheets never resolved,
 // yields an empty filter result — which is the pass condition. Both the listing
 // and the worksheet set are asserted non-empty first.
@@ -1046,9 +1071,11 @@ const drawingScanVisited = zipEntryCount > 0 && worksheetParts.length > 0;
 checks.push(
   record(
     "no-unintended-drawings",
-    drawingScanVisited && ordinaryDrawingParts.length === 0,
+    drawingScanVisited &&
+      unintendedDrawingParts.length === 0 &&
+      invalidBrokerDrawingParts.length === 0,
     drawingScanVisited
-      ? "No ordinary DrawingML shape or chart part is present in the production workbook."
+      ? "No unintended DrawingML part is present; raster evidence is permitted only on Bxx broker source-page sheets."
       : "The drawing-part scan listed ZERO zip entries or resolved ZERO worksheets — the check cannot pass on an empty visit.",
     {
       zip_entries_scanned: zipEntryCount,
@@ -1056,6 +1083,9 @@ checks.push(
       drawing_relationships: drawingRelationships,
       drawing_parts_by_name: drawingPartsByName,
       drawing_parts: ordinaryDrawingParts,
+      permitted_broker_drawing_parts: [...permittedBrokerDrawingParts],
+      unintended_drawing_parts: unintendedDrawingParts,
+      invalid_broker_drawing_parts: invalidBrokerDrawingParts,
     },
   ),
 );

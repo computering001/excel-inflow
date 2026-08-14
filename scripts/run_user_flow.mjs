@@ -59,6 +59,8 @@ import {
 } from "./lib/forecast_behavior.mjs";
 import {
   applyBrokerPreviewSelection,
+  applyBrokerPreviewSelectionToCaseEvidence,
+  automaticBrokerPreviewConfirmation,
   compileBrokerPreview,
   validateBrokerPreview,
   verifyBrokerPreviewConfirmation,
@@ -743,52 +745,40 @@ async function main() {
         options["broker-confirmation"],
         "broker confirmation",
       );
+    } else if (brokerPreview.status === "PASS" && brokerPreviewValidation.valid) {
+      // Broker handling is one automatic evidence step. The deterministic
+      // recommendation is accepted internally; if no coherent house exists,
+      // the ordinary forecast waterfall is selected. A user confirmation is
+      // accepted only as an optional explicit override, never as a mandatory
+      // extra broker stage.
+      brokerConfirmation = automaticBrokerPreviewConfirmation(brokerPreview);
+    }
+    if (brokerConfirmation) {
       brokerConfirmationCheck = verifyBrokerPreviewConfirmation(
         brokerPreview,
         brokerConfirmation,
       );
-      if (brokerConfirmationCheck.valid) {
-        await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
-        stage2BrokerConfirmation = brokerConfirmationPath;
-        activeCaseEvidence = structuredClone(validation.handoff.case_evidence);
-        activeCaseEvidence.lanes = activeCaseEvidence.lanes ?? {};
-        activeCaseEvidence.lanes.controls = {
-          ...(activeCaseEvidence.lanes.controls ?? {}),
-          broker_case: brokerConfirmationCheck.selection.house_name,
-        };
-        if (
-          brokerConfirmationCheck.selection.house_id === "FORECAST_WATERFALL"
-        ) {
-          const brokerLane = activeCaseEvidence.lanes.broker_pack ?? {};
-          brokerLane.metrics = Object.fromEntries(
-            Object.entries(brokerLane.metrics ?? {}).map(([metricId, metric]) => [
-              metricId,
-              {
-                ...metric,
-                provider_consensus: [null, null, null],
-                brokers: Object.fromEntries(
-                  Object.keys(metric.brokers ?? {}).map((houseName) => [
-                    houseName,
-                    [null, null, null],
-                  ]),
-                ),
-              },
-            ]),
-          );
-          activeCaseEvidence.lanes.broker_pack = brokerLane;
-        }
-        brokerSelectedCompilation = compileCase(
-          validation.handoff.case_source,
-          activeCaseEvidence,
-        );
-        activeCaseCompileReport = brokerSelectedCompilation.report;
-        activeModelCase = brokerSelectedCompilation.model_case;
-        await writeJsonAtomic(brokerSelectedCaseEvidencePath, activeCaseEvidence);
-        await writeJsonAtomic(
-          brokerSelectedCompileReportPath,
-          activeCaseCompileReport,
-        );
-      }
+    }
+    if (brokerConfirmationCheck?.valid) {
+      await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
+      stage2BrokerConfirmation = brokerConfirmationPath;
+      const brokerProjection = applyBrokerPreviewSelectionToCaseEvidence(
+        validation.handoff.case_evidence,
+        brokerPreview,
+        brokerConfirmation,
+      );
+      activeCaseEvidence = brokerProjection.case_evidence;
+      brokerSelectedCompilation = compileCase(
+        validation.handoff.case_source,
+        activeCaseEvidence,
+      );
+      activeCaseCompileReport = brokerSelectedCompilation.report;
+      activeModelCase = brokerSelectedCompilation.model_case;
+      await writeJsonAtomic(brokerSelectedCaseEvidencePath, activeCaseEvidence);
+      await writeJsonAtomic(
+        brokerSelectedCompileReportPath,
+        activeCaseCompileReport,
+      );
     }
   }
   const stage2Inputs = {

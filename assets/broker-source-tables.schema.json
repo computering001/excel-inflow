@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://local.invalid/excel-inflow/broker-source-tables.schema.json",
-  "title": "Structured full-table broker evidence for workbook rendering",
+  "title": "Lossless broker source tables and workbook page evidence",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -56,6 +56,31 @@
             "type": "string",
             "minLength": 1
           },
+          "pages": {
+            "type": "array",
+            "description": "Hash-bound full-page images used only for the horizontal Bxx evidence sheet. They never become calculation authority.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "page_number",
+                "surface_id",
+                "width_points",
+                "height_points",
+                "artifact_path",
+                "artifact_sha256"
+              ],
+              "properties": {
+                "page_number": { "type": "integer", "minimum": 1 },
+                "surface_id": { "type": "string", "minLength": 1 },
+                "width_points": { "type": "number", "exclusiveMinimum": 0 },
+                "height_points": { "type": "number", "exclusiveMinimum": 0 },
+                "artifact_path": { "type": "string", "minLength": 1 },
+                "artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+              }
+            },
+            "default": []
+          },
           "tables": {
             "type": "array",
             "items": {
@@ -101,7 +126,7 @@
                     "analytical_table",
                     "evidence_only"
                   ],
-                  "description": "Controls only whether the table is rendered on a values-only Bxx sheet. Every table remains in this lossless run artifact."
+                    "description": "Controls model-use eligibility. Every table remains in this lossless run artifact; Bxx presentation uses full-page images instead of reconstructed tables."
                 },
                 "workbook_presentation_reason": {
                   "type": "string",

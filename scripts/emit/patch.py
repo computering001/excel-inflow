@@ -349,6 +349,47 @@ def _add_relationship(xml, rel_id, rel_type, target):
     return xml.replace("</Relationships>", entry + "</Relationships>")
 
 
+_DRAWING_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing"
+_IMAGE_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
+_A1 = re.compile(r"^([A-Z]{1,3})([0-9]+)$")
+
+
+def _column_index(label):
+    result = 0
+    for char in label:
+        result = result * 26 + ord(char) - 64
+    return result - 1
+
+
+def _broker_drawing_part(images):
+    anchors = []
+    for index, image in enumerate(images, start=1):
+        match = _A1.match(image["anchor"])
+        if not match:
+            raise ValueError(f"Invalid broker image anchor {image['anchor']!r}.")
+        column, row = _column_index(match.group(1)), int(match.group(2)) - 1
+        cx = int(round(float(image["width_pixels"]) * 9525))
+        cy = int(round(float(image["height_pixels"]) * 9525))
+        anchors.append(
+            f'<xdr:oneCellAnchor><xdr:from><xdr:col>{column}</xdr:col>'
+            f'<xdr:colOff>0</xdr:colOff><xdr:row>{row}</xdr:row><xdr:rowOff>0</xdr:rowOff>'
+            f'</xdr:from><xdr:ext cx="{cx}" cy="{cy}"/><xdr:pic>'
+            f'<xdr:nvPicPr><xdr:cNvPr id="{index}" name="Broker page {int(image["page_number"])}"/>'
+            f'<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>'
+            f'<xdr:blipFill><a:blip r:embed="rId{index}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
+            f'<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
+            f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>'
+            f'<xdr:clientData/></xdr:oneCellAnchor>'
+        )
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        + "".join(anchors) + "</xdr:wsDr>"
+    ).encode("utf8")
+
+
 # ---------------------------------------------------------------------------
 # The package audit
 # ---------------------------------------------------------------------------
@@ -538,7 +579,7 @@ def audit_package(members):
 # Entry point
 # ---------------------------------------------------------------------------
 
-def apply(plan, path, *, backup=None):
+def apply(plan, path, *, backup=None, asset_root=None):
     """
     Apply the terminal patches to the package at `path`, in place.
 
@@ -546,6 +587,7 @@ def apply(plan, path, *, backup=None):
     than trust it.
     """
     path = Path(path)
+    asset_root = Path(asset_root).resolve() if asset_root else path.parent.resolve()
     if backup:
         shutil.copyfile(path, backup)
 
@@ -564,6 +606,8 @@ def apply(plan, path, *, backup=None):
 
     content_type_overrides = []
     threaded_index = 0
+    drawing_index = 0
+    image_index = 0
 
     for spec in workbook_spec["sheets"]:
         part = parts.get(spec["name"])
@@ -584,6 +628,70 @@ def apply(plan, path, *, backup=None):
             "cached_values": cached,
             "corrected_literals": corrected,
         }
+
+        images = spec.get("images") or []
+        if images:
+            if not re.match(r"^B\d{2} .+", spec["name"]):
+                raise ValueError(
+                    f"Raster evidence is permitted only on Bxx sheets, not {spec['name']!r}."
+                )
+            drawing_index += 1
+            drawing_path = f"xl/drawings/drawing{drawing_index}.xml"
+            drawing_rels_path = f"xl/drawings/_rels/drawing{drawing_index}.xml.rels"
+            drawing_relationships = (
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            )
+            for local_index, image in enumerate(images, start=1):
+                image_path = Path(image["path"]).expanduser()
+                if not image_path.is_absolute():
+                    image_path = asset_root / image_path
+                image_path = image_path.resolve()
+                payload = image_path.read_bytes()
+                actual = hashlib.sha256(payload).hexdigest()
+                if actual != image["sha256"]:
+                    raise ValueError(
+                        f"Broker page image {image_path} does not match its declared SHA-256."
+                    )
+                image_index += 1
+                media_path = f"xl/media/brokerPage{image_index}.png"
+                members[media_path] = payload
+                content_type_overrides.append((f"/{media_path}", "image/png"))
+                drawing_relationships += (
+                    f'<Relationship Id="rId{local_index}" Type="{_IMAGE_REL}" '
+                    f'Target="../media/brokerPage{image_index}.png" />'
+                )
+            drawing_relationships += "</Relationships>"
+            members[drawing_path] = _broker_drawing_part(images)
+            members[drawing_rels_path] = drawing_relationships.encode("utf8")
+            content_type_overrides.append(
+                (f"/{drawing_path}", "application/vnd.openxmlformats-officedocument.drawing+xml")
+            )
+
+            rels_path = part.rsplit("/", 1)
+            rels_path = f"{rels_path[0]}/_rels/{rels_path[1]}.rels"
+            rels_xml = members.get(
+                rels_path,
+                b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
+            ).decode("utf8")
+            drawing_rel_id = f"rIdBrokerPages{drawing_index}"
+            rels_xml = _add_relationship(
+                rels_xml,
+                drawing_rel_id,
+                _DRAWING_REL,
+                f"../drawings/drawing{drawing_index}.xml",
+            )
+            members[rels_path] = rels_xml.encode("utf8")
+            sheet_xml = members[part].decode("utf8")
+            sheet_xml = sheet_xml.replace(
+                "</worksheet>",
+                '<drawing xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+                f'r:id="{drawing_rel_id}"/></worksheet>',
+            )
+            members[part] = sheet_xml.encode("utf8")
+            report["sheets"][spec["name"]]["images"] = len(images)
+            report["broker_page_images"] = report.get("broker_page_images", 0) + len(images)
 
         comments = spec.get("comments") or []
         if not comments:

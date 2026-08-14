@@ -1412,6 +1412,60 @@ function brokerEvidenceSheetName(index, houseName, used) {
 }
 
 function compileBrokerEvidenceLayout(modelCase) {
+  const pageHouses = modelCase.broker_pack?.page_evidence ?? [];
+  if (Array.isArray(pageHouses) && pageHouses.length > 0) {
+    const usedNames = new Set(["Operating Model", "Brokers", "Forward Curves"]);
+    const houseByName = new Map();
+    const mappingByKey = new Map();
+    for (const mapping of modelCase.broker_pack?.source_mappings ?? []) {
+      const key = `${mapping.house_id}|${mapping.metric_id}|${mapping.period_index}`;
+      if (mappingByKey.has(key)) throw new Error(`Broker source mapping ${key} is duplicated.`);
+      mappingByKey.set(key, mapping);
+    }
+    const sheets = pageHouses.map((house, houseIndex) => {
+      houseByName.set(house.house_name, house);
+      const pages = [...(house.pages ?? [])].sort(
+        (left, right) => Number(left.page_number) - Number(right.page_number),
+      );
+      if (pages.length === 0) {
+        throw new Error(`Broker house ${house.house_id} has no immutable page images.`);
+      }
+      return {
+        house,
+        pages,
+        name: brokerEvidenceSheetName(houseIndex, house.house_name, usedNames),
+        visibleEndRow: 6,
+      };
+    });
+    const consumedIds = new Set(consumedBrokerMetricIds(modelCase));
+    for (const sheet of sheets) {
+      for (const [metricId, metric] of Object.entries(modelCase.broker_pack?.metrics ?? {})) {
+        if (!consumedIds.has(metricId)) continue;
+        const values = metric.brokers?.[sheet.house.house_name] ?? [];
+        values.forEach((value, periodIndex) => {
+          if (value === null || value === undefined) return;
+          const key = `${sheet.house.house_id}|${metricId}|${periodIndex}`;
+          const mapping = mappingByKey.get(key);
+          if (!mapping || !(mapping.components ?? []).length) {
+            throw new Error(`Broker page-evidence value ${key} lacks exact source-cell provenance.`);
+          }
+          if (Math.abs(Number(mapping.value) - Number(value)) > 1e-6) {
+            throw new Error(`Broker page-evidence mapping ${key} does not equal its sealed metric value.`);
+          }
+        });
+      }
+    }
+    return {
+      mode: "page_images",
+      dividerName: null,
+      sheets,
+      mappingByKey,
+      houseByName,
+      tableCount: 0,
+      evidenceOnlyTableCount: 0,
+      quarantinedCellCount: 0,
+    };
+  }
   const houses = modelCase.broker_pack?.raw_tables ?? [];
   const mappings = modelCase.broker_pack?.source_mappings ?? [];
   if (!Array.isArray(houses) || houses.length === 0) return null;
@@ -1521,6 +1575,7 @@ function compileBrokerEvidenceLayout(modelCase) {
     mappingByKey.set(key, mapping);
   }
   return {
+    mode: "legacy_tables",
     dividerName: "> Brokers",
     sheets,
     cellMap,
@@ -1547,22 +1602,32 @@ function compileBrokerEvidenceLayout(modelCase) {
 function brokerEvidenceProofSpec(layout) {
   if (!layout) return null;
   const expectedSourceReferences = [];
-  for (const mapping of layout.mappingByKey.values()) {
-    for (const component of mapping.components ?? []) {
-      const physical = layout.cellMap.get(
-        `${component.table_id}|${component.row}|${component.column}`,
-      );
-      expectedSourceReferences.push({
-        sheet: physical.sheetName,
-        address: physical.address,
-      });
+  if (layout.mode === "legacy_tables") {
+    for (const mapping of layout.mappingByKey.values()) {
+      for (const component of mapping.components ?? []) {
+        const physical = layout.cellMap.get(
+          `${component.table_id}|${component.row}|${component.column}`,
+        );
+        expectedSourceReferences.push({
+          sheet: physical.sheetName,
+          address: physical.address,
+        });
+      }
     }
   }
   return {
+    mode: layout.mode,
     divider_sheet: layout.dividerName,
     broker_sheet: "Brokers",
     source_sheets: layout.sheets.map((sheet) => sheet.name),
     expected_source_references: expectedSourceReferences,
+    page_images: layout.mode === "page_images"
+      ? layout.sheets.flatMap((sheet) => sheet.pages.map((page) => ({
+          sheet: sheet.name,
+          page_number: page.page_number,
+          sha256: page.artifact_sha256,
+        })))
+      : [],
   };
 }
 
@@ -1583,6 +1648,9 @@ function brokerEvidenceFormula(layout, houseName, metricId, periodIndex, expecte
       `Broker source mapping for ${houseName}.${metricId}[${periodIndex}] resolves to ${mapping.value}, not ${expectedValue}.`,
     );
   }
+  // In image-evidence mode the verified number is written once on Brokers as
+  // a blue hardcode with sealed provenance; Bxx is deliberately visual-only.
+  if (layout.mode === "page_images") return null;
   const terms = (mapping.components ?? []).map((component) => {
     const physical = layout.cellMap.get(
       `${component.table_id}|${component.row}|${component.column}`,
@@ -1619,6 +1687,32 @@ function buildBrokerEvidenceDivider(workbook, layout) {
   sheet.getRange("A1:A8").format.columnWidth = 1;
   sheet.getRange("B1:B8").format.columnWidth = 72;
   return sheet;
+}
+
+function buildBrokerPageEvidenceSheets(workbook, layout) {
+  for (const sheetLayout of layout.sheets) {
+    const { house, pages } = sheetLayout;
+    const sheet = workbook.worksheets.add(sheetLayout.name);
+    sheet.showGridLines = false;
+    setValue(sheet, "B1", `${house.house_name} — source pages`);
+    styleFont(sheet, "B1", COLORS.black, { bold: true });
+    setValue(
+      sheet,
+      "B2",
+      `${house.file_name ?? "Broker report"} | source ${house.source_id} | SHA-256 ${house.content_sha256}`,
+    );
+    styleFont(sheet, "B2", COLORS.grey);
+    pages.forEach((page, index) => {
+      const startColumn = 2 + index * 20;
+      const address = `${columnName(startColumn)}3`;
+      setValue(sheet, address, `Page ${page.page_number}`);
+      styleFont(sheet, address, COLORS.grey, { bold: true });
+      for (let column = startColumn; column < startColumn + 18; column += 1) {
+        sheet.getRange(`${columnName(column)}1:${columnName(column)}6`).format.columnWidth = 9;
+      }
+    });
+    sheet.getRange("A1:A6").format.columnWidth = 1;
+  }
 }
 
 function buildBrokerEvidenceSheets(workbook, layout) {
@@ -1987,6 +2081,22 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         else {
           setValue(sheet, address, values[index]);
           styleInput(sheet, address);
+          if (brokerEvidence?.mode === "page_images") {
+            const house = brokerEvidence.houseByName.get(name);
+            const mapping = house
+              ? brokerEvidence.mappingByKey.get(`${house.house_id}|${metricId}|${index}`)
+              : null;
+            if (mapping && values[index] !== null && values[index] !== undefined) {
+              addCommentOnce(
+                workbook,
+                sheet,
+                address,
+                `Broker source: ${(mapping.components ?? [])
+                  .map((component) => component.source_ref)
+                  .join("; ")} | ${mapping.rationale}`,
+              );
+            }
+          }
         }
       }
       // The link goes down AFTER `styleInput`, which only ever touches D:F, so
@@ -11217,7 +11327,7 @@ function applyPlanChrome(workbook, rowPlan, brokerRows) {
  * one and where it came from, and a builder that silently shipped a formula
  * with no cache would be making the reader's first view of the model a blank.
  */
-export function synthesisePlan({
+export async function synthesisePlan({
   modelCase,
   rowPlan,
   outputPath,
@@ -11276,6 +11386,43 @@ export function synthesisePlan({
         stage: "shipped",
       },
     });
+  const pageLayout = compileBrokerEvidenceLayout(modelCase);
+  if (pageLayout?.mode === "page_images") {
+    const assetDirectoryName = `${path.basename(outputPath)}.broker-pages`;
+    const assetDirectory = path.join(path.dirname(outputPath), assetDirectoryName);
+    await fs.mkdir(assetDirectory, { recursive: true });
+    const sheetByName = new Map(
+      plan.workbook.sheets.map((sheet) => [sheet.name, sheet]),
+    );
+    for (const evidenceSheet of pageLayout.sheets) {
+      const planSheet = sheetByName.get(evidenceSheet.name);
+      if (!planSheet) throw new Error(`Broker page sheet ${evidenceSheet.name} is absent from the plan.`);
+      planSheet.images = [];
+      for (const [index, page] of evidenceSheet.pages.entries()) {
+        const extension = path.extname(page.artifact_path).toLowerCase() || ".png";
+        const assetName = `${page.artifact_sha256}${extension}`;
+        const copiedPath = path.join(assetDirectory, assetName);
+        try {
+          await fs.access(copiedPath);
+        } catch {
+          await fs.copyFile(page.artifact_path, copiedPath);
+        }
+        const widthPixels = 1200;
+        const heightPixels = Math.round(
+          widthPixels * Number(page.height_points) / Number(page.width_points),
+        );
+        planSheet.images.push({
+          path: path.join(assetDirectoryName, assetName),
+          sha256: page.artifact_sha256,
+          anchor: `${columnName(2 + index * 20)}4`,
+          width_pixels: widthPixels,
+          height_pixels: heightPixels,
+          page_number: Number(page.page_number),
+          surface_id: page.surface_id,
+        });
+      }
+    }
+  }
   return {
     plan,
     counts,
@@ -11460,23 +11607,28 @@ function emitWorkbook(makeWorkbook, modelCase, rowPlan) {
   }
   const brokerEvidence = compileBrokerEvidenceLayout(modelCase);
   const operatingModel = workbook.worksheets.add("Operating Model");
-  if (brokerEvidence) buildBrokerEvidenceDivider(workbook, brokerEvidence);
+  if (brokerEvidence?.mode === "legacy_tables") {
+    buildBrokerEvidenceDivider(workbook, brokerEvidence);
+  }
   const brokerRows = buildBrokersSheet(
     workbook,
     modelCase,
     rowPlan,
     brokerEvidence,
   );
-  if (brokerEvidence) buildBrokerEvidenceSheets(workbook, brokerEvidence);
+  if (brokerEvidence?.mode === "page_images") {
+    buildBrokerPageEvidenceSheets(workbook, brokerEvidence);
+  } else if (brokerEvidence) {
+    buildBrokerEvidenceSheets(workbook, brokerEvidence);
+  }
   const curveSheet = buildForwardCurvesSheet(workbook, modelCase);
   brokerRows.sheetOrder = brokerEvidence
     ? [
         "Operating Model",
-        brokerEvidence.dividerName,
         "Brokers",
         ...brokerEvidence.sheets.map((sheet) => sheet.name),
         "Forward Curves",
-      ]
+      ].filter(Boolean)
     : ["Operating Model", "Brokers", "Forward Curves"];
   configureOperatingModel(
     workbook,
@@ -11643,7 +11795,7 @@ async function main(packaging = null) {
   // never touches private workbook library. `python3 -m emit build <plan> --out
   // <workbook.xlsx>` turns it into the workbook.
   if (options["plan-only"]) {
-    const synthesis = synthesisePlan({
+    const synthesis = await synthesisePlan({
       modelCase,
       rowPlan,
       outputPath,
@@ -11798,7 +11950,7 @@ async function main(packaging = null) {
   // values come from the solver, and the six facts the package passes used to
   // add are recorded through the same selectors those passes use. This is the
   // plan a machine WITHOUT legacy workbook library can produce.
-  const synthesis = synthesisePlan({
+  const synthesis = await synthesisePlan({
     modelCase,
     rowPlan,
     outputPath,

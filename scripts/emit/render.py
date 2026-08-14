@@ -292,6 +292,7 @@ def render_plan(plan, path):
                 "conditional_formats": len(spec.get("conditional_formats", [])),
                 "data_validations": len(spec.get("data_validations", [])),
                 "comments": len(spec.get("comments", [])),
+                "images": len(spec.get("images", [])),
             }
         )
 

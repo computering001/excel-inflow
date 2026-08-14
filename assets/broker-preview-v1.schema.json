@@ -204,7 +204,8 @@
         "metric_id": { "type": "string", "minLength": 1 },
         "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
         "period": { "type": ["string", "null"], "format": "date" },
-        "reason": { "type": "string", "minLength": 1 }
+        "reason": { "type": "string", "minLength": 1 },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     },
     "selectionCase": {

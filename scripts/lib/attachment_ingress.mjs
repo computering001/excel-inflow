@@ -128,9 +128,8 @@ async function dcsRuntimeClosureSha256() {
 }
 
 /**
- * Project the reviewed broker-table inventory onto the values-only workbook
- * evidence sheets. Every table is carried so the Bxx tabs are a complete,
- * vertically stacked hardcoded representation of the reviewed grids.
+ * Preserve the reviewed broker-table inventory as a legacy compatibility
+ * projection. Fresh Bxx tabs use brokerWorkbookPageProjection instead.
  * `workbook_presentation=evidence_only` prohibits model consumption; it does
  * not delete the table from the workbook evidence tabs.
  */
@@ -139,6 +138,75 @@ function brokerWorkbookTableProjection(sourceTables) {
     ...structuredClone(house),
     tables: (house.tables ?? []).map((table) => structuredClone(table)),
   }));
+}
+
+async function brokerWorkbookPageProjection(sourceTables, extraction) {
+  const artifactRoot = path.resolve(
+    requireString(extraction?.artifact_root, "Broker extraction artifact_root"),
+  );
+  const artifacts = new Map(
+    (extraction?.documents ?? [])
+      .flatMap((document) => document.artifacts ?? [])
+      .filter((artifact) => artifact.kind === "page_image")
+      .map((artifact) => [artifact.path, artifact]),
+  );
+  const pdfSourceIds = new Set(
+    (extraction?.documents ?? [])
+      .filter((document) => (document.surfaces ?? []).some((surface) => surface.kind === "pdf_page"))
+      .map((document) => document.source_id),
+  );
+  const projection = [];
+  const declaredPageCount = (sourceTables?.houses ?? []).reduce(
+    (total, house) => total + (house.pages ?? []).length,
+    0,
+  );
+  // Legacy sealed fixtures predate full-page custody. They remain readable by
+  // the old values-only projection, while every newly compiled PDF pack takes
+  // the image-first path below.
+  if (declaredPageCount === 0) return projection;
+  for (const house of sourceTables?.houses ?? []) {
+    const pages = [];
+    for (const page of house.pages ?? []) {
+      const declared = artifacts.get(page.artifact_path);
+      if (!declared || declared.sha256 !== page.artifact_sha256) {
+        throw new Error(
+          `Broker page ${house.house_id}.${page.page_number} is not bound to the extraction artifact inventory.`,
+        );
+      }
+      const target = path.resolve(artifactRoot, page.artifact_path);
+      if (target !== artifactRoot && !target.startsWith(`${artifactRoot}${path.sep}`)) {
+        throw new Error(`Broker page image path ${page.artifact_path} escapes artifact_root.`);
+      }
+      const bytes = await fs.readFile(target);
+      if (sha256(bytes) !== page.artifact_sha256) {
+        throw new Error(
+          `Broker page ${house.house_id}.${page.page_number} does not match its immutable hash.`,
+        );
+      }
+      pages.push({ ...structuredClone(page), artifact_path: target });
+    }
+    if (pages.length === 0) {
+      if (pdfSourceIds.has(house.source_id)) {
+        throw new Error(
+          `Broker PDF house ${house.house_id} has no full-page evidence images.`,
+        );
+      }
+      // Non-PDF broker sources (for example a supplied XLSX estimate grid)
+      // remain in the lossless source-table artifact. Bxx is specifically a
+      // PDF page-image surface and must not fabricate a screenshot for them.
+      continue;
+    }
+    projection.push({
+      house_id: house.house_id,
+      house_name: house.house_name,
+      source_id: house.source_id,
+      content_sha256: house.content_sha256,
+      ...(house.published_date ? { published_date: house.published_date } : {}),
+      ...(house.file_name ? { file_name: house.file_name } : {}),
+      pages,
+    });
+  }
+  return projection;
 }
 
 function parseBrokerNumber(value, label) {
@@ -1267,6 +1335,10 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     evidence.broker_semantic_verification = semanticReport.json;
   }
   const workbookTables = brokerWorkbookTableProjection(sourceTables.json);
+  const workbookPages = await brokerWorkbookPageProjection(
+    sourceTables.json,
+    extraction.json,
+  );
   const workbookTableIds = new Set(
     workbookTables.flatMap((house) =>
       (house.tables ?? []).map((table) => table.table_id),
@@ -1299,6 +1371,9 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     compilerLanes.broker_pack ?? evidence.broker_pack ?? {},
   );
   compilerLanes.broker_pack.raw_tables = workbookTables;
+  if (workbookPages.length > 0) {
+    compilerLanes.broker_pack.page_evidence = workbookPages;
+  }
   compilerLanes.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
   );
