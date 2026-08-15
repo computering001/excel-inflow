@@ -970,12 +970,15 @@ function brokerConsumptionTierChecks(modelCase) {
   const elections = new Set(
     (modelCase.broker_pack?.flex_elections ?? []).map((item) => item.metric_id),
   );
+  const runScoped = new Set(
+    (modelCase.broker_pack?.run_scoped_concepts ?? []).map((item) => item.metric_id),
+  );
   const packMetrics = modelCase.broker_pack?.metrics ?? {};
   for (const section of ["income_statement", "cash_flow"]) {
     for (const row of modelCase.statement_structure?.[section] ?? []) {
       const metricId = row.broker_metric_id;
       if (!metricId) continue;
-      if (tier1.has(metricId) || elections.has(metricId)) continue;
+      if (tier1.has(metricId) || elections.has(metricId) || runScoped.has(metricId)) continue;
       // A metric the pack does not even carry is caught by the existing
       // pack-shape checks; this one is specifically about tier discipline.
       if (packMetrics[metricId] === undefined && Object.keys(packMetrics).length === 0) continue;

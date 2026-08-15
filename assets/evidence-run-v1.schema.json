@@ -312,7 +312,16 @@
         "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "attachment_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
         "text_extractable": { "type": "boolean" },
-        "status": { "enum": ["used", "superseded", "rejected"] },
+        "status": {
+          "enum": [
+            "used",
+            "evidence_only",
+            "quarantined",
+            "rejected_for_model_use",
+            "superseded",
+            "rejected"
+          ]
+        },
         "status_reason": { "type": "string" }
       }
     },
@@ -356,7 +365,7 @@
           "properties": {
             "path": { "type": "string", "minLength": 1 },
             "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-            "kind": { "enum": ["normalized_json", "explicit_extraction"] }
+            "kind": { "enum": ["normalized_json", "explicit_extraction", "raw_archive", "controller_owned_raw"] }
           }
         },
         "auxiliary_artifacts": {

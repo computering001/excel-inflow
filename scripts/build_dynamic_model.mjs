@@ -1315,8 +1315,11 @@ function consumedBrokerMetricIds(modelCase) {
   const elected = new Set(
     (modelCase.broker_pack?.flex_elections ?? []).map((item) => item.metric_id),
   );
+  const runScoped = new Set(
+    (modelCase.broker_pack?.run_scoped_concepts ?? []).map((item) => item.metric_id),
+  );
   return Object.keys(modelCase.broker_pack?.metrics ?? {}).filter(
-    (metricId) => tier1.has(metricId) || elected.has(metricId),
+    (metricId) => tier1.has(metricId) || elected.has(metricId) || runScoped.has(metricId),
   );
 }
 

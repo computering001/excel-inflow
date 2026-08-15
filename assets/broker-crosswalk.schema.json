@@ -127,6 +127,14 @@
         }
       }
     },
+    "run_scoped_concepts": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Reviewed, hash-bound insertion contracts for company-specific concepts in the run.* namespace. Runtime code validates the complete contract against run-scoped-broker-concept-v1.schema.json; omission is the ordinary closed-vocabulary path.",
+      "items": {
+        "type": "object"
+      }
+    },
     "mappings": {
       "type": "array",
       "minItems": 0,

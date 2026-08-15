@@ -61,7 +61,11 @@ function evaluatedHistoricalValues(row, rows) {
   const byId = new Map((rows ?? []).map((candidate) => [candidate.row_id, candidate]));
   const evaluate = (candidate, periodIndex, visiting = new Set()) => {
     const literal = candidate?.values?.[periodIndex];
-    if (!candidate?.calculation || visiting.has(candidate.row_id)) {
+    if (
+      !candidate?.calculation ||
+      (candidate.calculation.refs ?? []).length === 0 ||
+      visiting.has(candidate.row_id)
+    ) {
       return finite(literal) ? Number(literal) : null;
     }
     const nextVisiting = new Set(visiting).add(candidate.row_id);

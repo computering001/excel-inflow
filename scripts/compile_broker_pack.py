@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from broker_dynamic_concepts import validate_run_scoped_concepts
 from broker_terminal_recovery import validate_terminal_recovery_independently
 
 
@@ -931,6 +932,13 @@ def main() -> int:
         raise ValueError("Unsupported broker crosswalk schema.")
     if crosswalk.get("run_id") != bundle.get("run_id"):
         raise ValueError("The crosswalk run_id is not bound to the extraction bundle.")
+    run_scoped_concepts, run_scoped_errors = validate_run_scoped_concepts(
+        crosswalk.get("run_scoped_concepts"), run_id=bundle.get("run_id")
+    )
+    if run_scoped_errors:
+        raise ValueError(
+            "Invalid run-scoped broker concept contract: " + "; ".join(run_scoped_errors)
+        )
     bundle_sha256 = hashlib.sha256(Path(args.bundle).read_bytes()).hexdigest()
 
     documents_by_house: dict[str, dict[str, Any]] = {}
@@ -971,7 +979,7 @@ def main() -> int:
         raise ValueError("A production broker pack permits at most 10 distinct houses; zero broker authority is valid.")
     metrics = crosswalk.get("metrics") or {}
 
-    # ---------------------------------------------- the vocabulary is closed
+    # ----------------------------------------- vocabulary is closed by default
     #
     # Deciding that a row means `capex` is a judgment only a reader can make, and
     # the dictionary's definitions exist to inform it. What is not negotiable is
@@ -988,11 +996,12 @@ def main() -> int:
     # the granularity error the tiers exist to prevent.
     for metric_id in sorted(metrics):
         concept, _, qualifier = str(metric_id).partition("__")
-        if concept not in KNOWN_METRIC_IDS:
+        if concept not in KNOWN_METRIC_IDS and metric_id not in run_scoped_concepts:
             raise ValueError(
                 f"Metric {metric_id!r} resolves to concept {concept!r}, which is not in the broker "
-                "metric dictionary. Map it to an existing concept, or extend "
-                "assets/broker-metric-dictionary.json under review; ids may not be invented at runtime."
+                "metric dictionary and has no valid run-scoped insertion contract. Map it to an "
+                "existing concept, extend assets/broker-metric-dictionary.json under review, or "
+                "supply a reviewed run.* contract; uncontracted ids may not become model authority."
             )
         if qualifier and concept in CORE_METRIC_IDS:
             raise ValueError(
@@ -1228,7 +1237,7 @@ def main() -> int:
                 )
         elected_by_metric[metric_id] = election
     for metric_id, declaration in metrics.items():
-        if metric_id in TIER1_METRIC_IDS:
+        if metric_id in TIER1_METRIC_IDS or metric_id in run_scoped_concepts:
             continue
         # model_use is a crosswalk/1.2 field. Earlier schema generations have
         # no consumption vocabulary at all, so the tier rule cannot be read
@@ -1598,6 +1607,7 @@ def main() -> int:
         "units": crosswalk["units"],
         "forecast_periods": crosswalk["forecast_periods"],
         "metrics": metrics,
+        **({"run_scoped_concepts": list(run_scoped_concepts.values())} if run_scoped_concepts else {}),
         "flex_elections": flex_elections,
         "election_gauge": election_gauge,
         "houses": houses,
@@ -1723,6 +1733,7 @@ def main() -> int:
         "mappings": mapping_receipts,
         "table_reviews_sha256": hash_json(crosswalk["table_reviews"]),
         "coverage_ledger_sha256": hash_json(crosswalk["coverage_ledger"]),
+        **({"run_scoped_concepts_sha256": hash_json(list(run_scoped_concepts.values()))} if run_scoped_concepts else {}),
         **({"terminal_recovery_sha256": hash_json(crosswalk["terminal_recovery"])} if crosswalk.get("terminal_recovery") else {}),
         "coverage_summary": coverage_summary,
         "coverage_ledger": resolved_coverage,

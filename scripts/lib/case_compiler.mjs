@@ -39,6 +39,7 @@ import {
   validateForecastPlan,
   validateForecastPlanCaseParity,
 } from "./forecast_candidate_compiler.mjs";
+import { applyRunScopedBrokerConcepts } from "./run_scoped_broker_concepts.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CASE_SOURCE_SCHEMA = JSON.parse(
@@ -2942,6 +2943,7 @@ export function compileCase(caseSource, evidence = {}) {
   // stratum evaluates PBT and ETR.
   const forecastWaterfallSelected =
     modelCase.controls?.broker_case === "Forecast Waterfall";
+  applyRunScopedBrokerConcepts(modelCase, report);
   const derivedRowIds = applyDerivedStratum(modelCase, evidence);
   for (const rowId of applyDeclaredDerivedRows(modelCase, caseSource, report)) {
     derivedRowIds.add(rowId);

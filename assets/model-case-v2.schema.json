@@ -380,6 +380,14 @@
             "$ref": "#/$defs/brokerMetric"
           }
         },
+        "run_scoped_concepts": {
+          "type": "array",
+          "maxItems": 10,
+          "description": "Reviewed and hash-bound company-specific broker insertion contracts projected from the sealed broker lane.",
+          "items": {
+            "type": "object"
+          }
+        },
         "house_metadata": {
           "type": "object",
           "description": "Per-house publication and document metadata retained from the normalized broker input. This makes estimate freshness and selected-house substitution auditable without changing the numeric broker metric shape.",

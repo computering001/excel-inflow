@@ -47,10 +47,11 @@ The chain is:
 
 ```text
 raw document bytes
--> broker-extraction-bundle/1.0
--> broker-source-tables/1.0
--> broker-crosswalk/1.2 + semantic coverage ledger + PASS receipt
--> broker-pack/1.0
+-> hash-bound archive/capture lane (always retained)
+-> filings-derived model-demand graph
+-> selected-cell recovery and authority lane
+-> broker-crosswalk/1.2 + selected-cell semantic receipt
+-> broker-pack/1.0 (verified subset, possibly empty)
 -> model-case selected observations + broker source mappings
 -> hash-bound horizontal page-image evidence sheets
 -> Brokers sheet
@@ -82,11 +83,14 @@ paragraph. Crop the table, identify the grid, remove lines, OCR cells and retain
 row/column positions. Raw whole-page OCR is diagnostic only.
 
 Write one surface ledger entry for every PDF page, workbook sheet or text
-document. Retain native text and word geometry even when a table was found.
-Render a page when it has a material image, sparse native text, or at least six
-numeric tokens without a native table. Image-only or difficult pages are not
-rejected merely for lacking a text layer; they become unresolved vision tasks
-and block normalization until verified.
+document. Retain native text and word geometry even when a table was found,
+and render every supplied page for the immutable archive. After filings compile
+the model-demand and material-output-reachability graph, create recovery tasks
+only for candidate cells that can satisfy a demanded concept-period. Apply the
+native/vector/image waterfall cell by cell with bounded retries. An unresolved
+selected cell is quarantined locally and removed from authority; an unused page,
+row or cell remains archive evidence and never creates an OCR obligation or a
+delivery dependency.
 
 The deployment-host capability baseline proved all required lanes: Python/Node
 handoff, PDF metadata, native text and coordinates, vector tables, embedded
@@ -197,20 +201,23 @@ dividends, plus at least one supported headline anchor such as EBIT or Adjusted
 EBITDA. Preserve any additional usable broker metrics; the forecast-authority
 graph decides whether the model consumes them.
 
-The metric vocabulary is closed. `assets/broker-metric-dictionary.json` declares
-every id a crosswalk may emit, with a definition, unit class, statement family,
-leaf/subtotal flag, tier and overlap group. Read the definitions — they exist to
-inform the judgment, and their disambiguation notes name the confusions that
-matter (a margin is not the profit it derives from; an authorisation is not cash
-spent; an impairment addback in the cash-flow bridge is not the income-statement
-charge). Map by meaning, then record the meaning under a dictionary id. An id
-that is not in the dictionary is a blocking offence, not a naming preference: an
-invented id cannot be compared across houses, checked for double-counting or
-rendered in a standardised digest. Where one concept genuinely occurs more than
-once in a house — two reported segments, several impairment lines — add an
-instance qualifier after `__` (`revenue_component__segment_a`). Core drivers may
-never be instanced. Encountering a concept the dictionary lacks is a reason to
-extend the asset under review, never to improvise at runtime.
+The canonical vocabulary is closed by default.
+`assets/broker-metric-dictionary.json` declares every reusable id, with a
+definition, unit class, statement family, leaf/subtotal flag, tier and overlap
+group. Read the definitions and map by meaning. Where one canonical concept
+genuinely occurs more than once in a house, add an instance qualifier after
+`__`; core drivers may never be instanced.
+
+One narrow run-scoped exception supports genuinely company-specific concepts.
+An unknown id may exist only under the `run.*` namespace with a reviewed,
+hash-bound `run-scoped-broker-concept/1.0` contract. The contract binds the run,
+definition, section, unit/sign, materiality, forecast behavior, parent and exact
+placement anchor, additive status, double-count proof, and row relation. Active
+authority may bind only an already-established non-header company row and must
+be material. A broker-only new row may be inserted only as non-additive
+`reference_only` evidence; filings must establish any new additive company
+economics before broker authority can bind it. Invalid or stale contracts are
+rejected, never guessed, and never promoted into the reusable dictionary.
 
 Consumption is tiered, and the pack compiler enforces it. The nine Tier-1 ids
 (revenue, EBIT, adjusted EBITDA, D&A, effective tax rate, capex, aggregate
@@ -503,10 +510,13 @@ evidence rules because a layout-only report is difficult.
 
 ## Failure handling
 
-Stage 2 is one automatic broker step. It internally accepts the recommended
-clean coherent house, or chooses the ordinary forecast waterfall when none is
-clean. Do not expose native extraction, OCR, vision, reconciliation, preview or
-confirmation as separate user stages. Quarantine a disputed selected
+Stage 2 is one broker step. It may show one optional, hash-bound confirmation
+for the recommended clean coherent house. With no response it accepts that
+recommendation automatically; with no clean house it selects the ordinary
+forecast waterfall. A malformed or stale optional override is logged and the
+deterministic recommendation remains active. Do not expose native extraction,
+OCR, vision or reconciliation as separate user stages, and never create a
+second broker preview or confirmation round. Quarantine a disputed selected
 observation and let that concept/period fall through the waterfall. A conflict
 in an unused cell/table, a partial broker or an unselected house cannot stop the
 model. Surface one consolidated Stage-3 question only if the complete waterfall

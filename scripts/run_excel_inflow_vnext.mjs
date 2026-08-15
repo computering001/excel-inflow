@@ -19,6 +19,7 @@ import {
   authorityQualitySummary,
   validatePreBrokerDemandCoverage,
 } from "./lib/run_constitution_graph.mjs";
+import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -163,6 +164,18 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.screen) {
+    const screen = await run(process.execPath, [
+      path.join(HERE, "run_user_flow.mjs"),
+      "--screen",
+      String(options.screen),
+    ], { timeout: 30_000 });
+    if (screen.code !== 0) {
+      throw new Error(screen.stderr.trim() || `Unable to render ${options.screen} screen.`);
+    }
+    process.stdout.write(screen.stdout);
+    return;
+  }
   const out = path.resolve(String(options.out ?? ""));
   if (!options.out || (!options["attachment-spec"] && !options["evidence-run"])) {
     throw new Error(
@@ -196,14 +209,32 @@ async function main() {
 
   if (options["attachment-spec"]) {
     const attachmentOut = path.join(out, "evidence");
-    await run(pythonCommand, [
+    const attachmentArgs = [
       path.join(HERE, "run_attachment_evidence_pipeline.py"),
       path.resolve(String(options["attachment-spec"])),
       "--out",
       attachmentOut,
-    ], { timeout: 3_600_000, env: runtimeEnv });
+    ];
     const attachmentStatePath = path.join(attachmentOut, "attachment-evidence-run-state.json");
-    attachmentState = await readJson(attachmentStatePath, "attachment evidence state");
+    const brokerCircuitBreaker = await executeOptionalBrokerCircuitBreaker({
+      runPrimary: () => run(pythonCommand, attachmentArgs, {
+        timeout: 3_600_000,
+        env: runtimeEnv,
+      }),
+      readState: () => readJson(
+        attachmentStatePath,
+        "attachment evidence state",
+      ),
+      fingerprintState: () => fs.stat(attachmentStatePath)
+        .then((entry) => `${entry.mtimeMs}:${entry.size}`)
+        .catch(() => null),
+      runZeroAuthority: () => run(
+        pythonCommand,
+        [...attachmentArgs, "--force-zero-broker"],
+        { timeout: 3_600_000, env: runtimeEnv },
+      ),
+    });
+    attachmentState = brokerCircuitBreaker.state;
     artifacts.attachment_state = attachmentStatePath;
     checkpoints.push(await checkpoint("raw_evidence", attachmentState.pipeline_status, attachmentStatePath));
     if (attachmentState.pipeline_status !== "PASS") {
@@ -271,8 +302,30 @@ async function main() {
   }
   if (options.python) firstArgs.push("--python", String(options.python));
   if (options.soffice) firstArgs.push("--soffice", String(options.soffice));
-  await run(process.execPath, firstArgs, { timeout: 3_600_000, env: runtimeEnv });
+  const firstExecution = await run(process.execPath, firstArgs, {
+    timeout: 3_600_000,
+    env: runtimeEnv,
+  });
   const userFlowResultPath = path.join(userFlowOut, "user-flow-result.json");
+  if (
+    firstExecution.code !== 0 ||
+    !(await fs.stat(userFlowResultPath).then((entry) => entry.isFile()).catch(() => false))
+  ) {
+    return finish({
+      out,
+      runId,
+      status: "NEEDS_INTERNAL_WORK",
+      qualityMode: "INTERNAL_WORK",
+      blockerClass: "INTERNAL_WORK",
+      checkpoints,
+      artifacts,
+      summary: {
+        message: "The model decision delegate failed before writing a sealed result; no user re-upload is requested.",
+        delegate_exit_code: firstExecution.code,
+        delegate_error: String(firstExecution.stderr || firstExecution.stdout || "missing result artifact").slice(-2000),
+      },
+    });
+  }
   let userFlowResult = await readJson(userFlowResultPath, "user-flow decision result");
   artifacts.user_flow_result = userFlowResultPath;
   checkpoints.push(await checkpoint("model_decisions", userFlowResult.status, userFlowResultPath));
@@ -366,7 +419,40 @@ async function main() {
   ];
   if (options.python) resumeArgs.push("--python", String(options.python));
   if (options.soffice) resumeArgs.push("--soffice", String(options.soffice));
-  await run(process.execPath, resumeArgs, { timeout: 3_600_000, env: runtimeEnv });
+  const pausedResultSha256 = await sha256File(userFlowResultPath);
+  const resumeExecution = await run(process.execPath, resumeArgs, {
+    timeout: 3_600_000,
+    env: runtimeEnv,
+  });
+  const resumedResultSha256 = await fs.stat(userFlowResultPath)
+    .then((entry) => entry.isFile() ? sha256File(userFlowResultPath) : null)
+    .catch(() => null);
+  if (
+    resumeExecution.code !== 0 ||
+    !resumedResultSha256 ||
+    resumedResultSha256 === pausedResultSha256
+  ) {
+    return finish({
+      out,
+      runId,
+      status: "NEEDS_INTERNAL_WORK",
+      qualityMode: "INTERNAL_WORK",
+      blockerClass: "INTERNAL_WORK",
+      checkpoints: [
+        ...checkpoints,
+        await checkpoint("build_and_delivery", "BLOCKED", userFlowResultPath),
+      ],
+      artifacts,
+      summary: {
+        message: "The build delegate failed before writing a fresh sealed delivery result; no user re-upload is requested.",
+        delegate_exit_code: resumeExecution.code,
+        stale_result_rejected: resumedResultSha256 === pausedResultSha256,
+        delegate_error: String(
+          resumeExecution.stderr || resumeExecution.stdout || "missing fresh result artifact",
+        ).slice(-2000),
+      },
+    });
+  }
   userFlowResult = await readJson(userFlowResultPath, "user-flow delivery result");
   checkpoints.push(await checkpoint("build_and_delivery", userFlowResult.status, userFlowResultPath));
   if (userFlowResult.status !== "PASS_PENDING_MANUAL") {

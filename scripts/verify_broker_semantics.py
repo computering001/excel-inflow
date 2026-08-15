@@ -16,6 +16,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from broker_dynamic_concepts import validate_run_scoped_concepts
+
 DOMAIN_BY_LEGACY_ROLE = {
     "operating_forecast": "operating",
     "cash_flow_forecast": "cash_flow",
@@ -592,6 +594,11 @@ def verify_terminal_recovery_independently(
 
 def verify(bundle: dict[str, Any], crosswalk: dict[str, Any], *, bundle_sha256: str | None = None) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
+    run_scoped_concepts, run_scoped_errors = validate_run_scoped_concepts(
+        crosswalk.get("run_scoped_concepts"), run_id=bundle.get("run_id")
+    )
+    for message in run_scoped_errors:
+        add(findings, "SEM-RUN-SCOPED-CONTRACT", message)
     tables = table_index(bundle)
     manifest, manifest_findings = manifest_candidates(bundle)
     findings.extend(manifest_findings)
@@ -683,6 +690,14 @@ def verify(bundle: dict[str, Any], crosswalk: dict[str, Any], *, bundle_sha256: 
             and raw.get("disposition") != "quarantined_conflict"
         ):
             add(findings, "SEM-CUSTOM-NOT-REFERENCE", "Unknown numeric concepts must be retained as custom.* reference-only evidence.", cid)
+        if (
+            is_numeric
+            and raw.get("metric_id")
+            and raw.get("metric_id") not in run_scoped_concepts
+            and str(raw.get("metric_id")).startswith("run.")
+            and model_use in TERMINAL_SELECTED_MODEL_USES
+        ):
+            add(findings, "SEM-RUN-SCOPED-UNCONTRACTED", "A run.* metric cannot become selected model authority without a valid run-scoped insertion contract.", cid)
         # Semantic contradictions are tested against the extraction-owned
         # label, never the reviewer-owned copy, so coordinated crosswalk edits
         # cannot rewrite both sides of the assertion.

@@ -68,6 +68,14 @@
         "$ref": "#/$defs/metricDeclaration"
       }
     },
+    "run_scoped_concepts": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Hash-bound, run-local company-specific insertion contracts. These are executable only after independent validation; they do not extend the global broker dictionary.",
+      "items": {
+        "type": "object"
+      }
+    },
     "houses": {
       "type": "array",
       "minItems": 0,

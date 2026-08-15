@@ -8,7 +8,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { inspectScreen, renderBrokerIntakeScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
+import { COMPANY_SCREEN, inspectScreen, renderBrokerIntakeScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { canonicalBrokerIntakeJson, compileBrokerIntakeChoice } from "./lib/broker_intake_choice.mjs";
@@ -122,7 +122,7 @@ await test("bare chat invocation is routed to the canonical Company screen", asy
     const flatText = text.replace(/\s+/g, " ");
     assert(text.includes("run excel inflow"), `${name} does not declare the bare trigger`);
     assert(
-      text.includes("node scripts/run_user_flow.mjs --screen company"),
+      text.includes("node scripts/run_excel_inflow_vnext.mjs --screen company"),
       `${name} does not route the bare trigger to the production controller`,
     );
     assert(
@@ -160,6 +160,12 @@ await test("bare chat invocation is routed to the canonical Company screen", asy
   }
   const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
   assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "bare trigger target is not canonical Company bytes");
+});
+
+await test("vNext is the single public Company-screen controller", async () => {
+  const result = await command("run_excel_inflow_vnext.mjs", ["--screen", "company"]);
+  assert(result.stdout === `${COMPANY_SCREEN}\n`, "vNext did not render the canonical Company screen bytes");
+  assert(inspectScreen(result.stdout).ok, "vNext Company screen violates the screen contract");
 });
 
 await test("production controller owns one canonical six-milestone visible journey", async () => {

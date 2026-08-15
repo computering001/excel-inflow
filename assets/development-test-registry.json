@@ -84,6 +84,24 @@
     "runtime": "node",
     "script": "run_product_constitution_tests.mjs"
   },
+  {
+    "id": "delivery-constitution",
+    "phase": "workflow",
+    "runtime": "node",
+    "script": "run_delivery_constitution_tests.mjs"
+  },
+  {
+    "id": "controller-terminal-exits",
+    "phase": "workflow",
+    "runtime": "node",
+    "script": "run_controller_exit_inventory_tests.mjs"
+  },
+  {
+    "id": "broker-dynamic-concepts",
+    "phase": "evidence",
+    "runtime": "node",
+    "script": "run_broker_dynamic_concept_tests.mjs"
+  },
     {
       "id": "forecast-topology",
       "phase": "forecast",
@@ -247,12 +265,46 @@
       "script": "run_user_flow_tests.mjs"
     },
     {
+      "id": "stage4-content-addressed-resume",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_stage4_checkpoint_tests.mjs",
+      "arguments": [
+        "--cases", "$CASES",
+        "--python", "$PYTHON",
+        "--soffice", "$SOFFICE"
+      ],
+      "requires": ["CASES", "PYTHON", "SOFFICE"]
+    },
+    {
       "id": "degraded-broker-delivery",
       "phase": "workflow",
       "runtime": "node",
       "script": "run_degraded_broker_delivery_tests.mjs",
       "arguments": ["$CASES"],
       "requires": ["CASES"]
+    },
+    {
+      "id": "broker-exit-fault-injection",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_broker_exit_fault_injection_tests.mjs"
+    },
+    {
+      "id": "universal-broker-delivery-matrix",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_universal_broker_delivery_matrix.mjs",
+      "arguments": ["$DEGRADED_DELIVERY_REPORT", "$USABLE_BROKER_WORKBOOK"],
+      "requires": ["DEGRADED_DELIVERY_REPORT", "USABLE_BROKER_WORKBOOK"]
+    },
+    {
+      "id": "raw-input-black-box-canary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_raw_input_black_box_canary.mjs",
+      "arguments": ["$RAW_CANARY_EVIDENCE", "$PYTHON", "$SOFFICE"],
+      "requires": ["RAW_CANARY_EVIDENCE", "PYTHON", "SOFFICE"]
     },
     {
       "id": "case-compiler-equivalence",

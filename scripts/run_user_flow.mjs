@@ -73,10 +73,13 @@ import {
   applyBrokerPreviewSelectionToCaseEvidence,
   automaticBrokerPreviewConfirmation,
   compileBrokerForecastWaterfallFallback,
+  compileEmergencyZeroBrokerPreview,
   compileBrokerPreview,
+  projectZeroBrokerAuthorityCaseEvidence,
   validateBrokerPreview,
   verifyBrokerPreviewConfirmation,
 } from "./lib/broker_preview.mjs";
+import { assertBrokerFailureDegrades } from "./lib/delivery_constitution.mjs";
 import { compileCase } from "./lib/case_compiler.mjs";
 import {
   assertLiveDeliveryAttestation,
@@ -738,7 +741,7 @@ async function main() {
   const productionBrokerPreviewRequired = Boolean(
     evidenceRun.ingress?.broker_evidence ||
     evidenceRun.broker_pack?.recommended_primary_house_id ||
-    evidenceRun.broker_pack?.eligibility_summary,
+    (evidenceRun.broker_pack?.houses ?? []).length > 0,
   );
   let brokerPreview = null;
   let brokerPreviewValidation = null;
@@ -751,24 +754,37 @@ async function main() {
     const brokerBindingHashes = {
       broker_pack_sha256:
         brokerState.artifact_sha256?.broker_pack ??
-        hashValue(evidenceRun.broker_pack),
+        hashValue(evidenceRun.broker_pack ?? null),
       broker_source_tables_sha256:
         brokerIngress.source_tables_sha256 ??
         brokerState.artifact_sha256?.source_tables ??
-        hashValue(evidenceRun.broker_source_tables),
+        hashValue(evidenceRun.broker_source_tables ?? null),
       broker_crosswalk_receipt_sha256:
         brokerIngress.crosswalk_receipt_sha256 ??
         brokerState.artifact_sha256?.broker_crosswalk_receipt ??
-        hashValue(evidenceRun.broker_crosswalk_receipt),
+        hashValue(evidenceRun.broker_crosswalk_receipt ?? null),
     };
-    const fallbackBrokerPreview = (reasons) =>
-      compileBrokerForecastWaterfallFallback({
-        brokerPack: evidenceRun.broker_pack,
-        sourceTables: evidenceRun.broker_source_tables,
-        crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
-        bindingHashes: brokerBindingHashes,
-        reasons,
-      });
+    const fallbackBrokerPreview = (reasons) => {
+      assertBrokerFailureDegrades("broker_preview_failure");
+      try {
+        return compileBrokerForecastWaterfallFallback({
+          brokerPack: evidenceRun.broker_pack,
+          sourceTables: evidenceRun.broker_source_tables,
+          crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
+          bindingHashes: brokerBindingHashes,
+          reasons,
+        });
+      } catch (error) {
+        return compileEmergencyZeroBrokerPreview({
+          bindingHashes: brokerBindingHashes,
+          forecastPeriods: evidenceRun.broker_pack?.forecast_periods ?? [],
+          reasons: [
+            ...reasons,
+            `Forecast-waterfall preview compilation also failed internally: ${error.message}`,
+          ],
+        });
+      }
+    };
     try {
       brokerPreview = compileBrokerPreview({
         brokerPack: evidenceRun.broker_pack,
@@ -784,11 +800,11 @@ async function main() {
     await writeJsonAtomic(brokerPackArtifactPath, evidenceRun.broker_pack);
     await writeJsonAtomic(
       brokerSourceTablesArtifactPath,
-      evidenceRun.broker_source_tables,
+      evidenceRun.broker_source_tables ?? null,
     );
     await writeJsonAtomic(
       brokerCrosswalkReceiptArtifactPath,
-      evidenceRun.broker_crosswalk_receipt,
+      evidenceRun.broker_crosswalk_receipt ?? null,
     );
     brokerPreviewValidation = validateBrokerPreview(brokerPreview);
     if (brokerPreview.status !== "PASS" || !brokerPreviewValidation.valid) {
@@ -944,52 +960,65 @@ async function main() {
     brokerSelectedCompilation &&
     brokerSelectedCompilation.report?.status !== "clean"
   ) {
+    assertBrokerFailureDegrades("broker_semantic_failure");
     const blocks = (brokerSelectedCompilation.report?.findings ?? []).filter(
       (entry) => entry.severity === "BLOCK",
     );
-    await writeJsonAtomic(stage2Result, {
-      outcome: "case_recompile_blocked",
-      blocker_class: "INTERNAL_WORK",
-      findings: blocks,
-    });
-    receipt2 = await persistStage({
-      runDir,
-      runId,
-      stageId: "evidence_review",
-      status: "blocked",
-      inputHashes: stage2Inputs,
-      previousReceiptHash: receipt1.receipt_hash,
-      outputs: stage2Outputs,
-      detail: {
-        outcome: "case_recompile_blocked",
-        blocker_class: "INTERNAL_WORK",
-        block_count: blocks.length,
+    brokerPreview = compileEmergencyZeroBrokerPreview({
+      bindingHashes: {
+        broker_pack_sha256: hashValue(evidenceRun.broker_pack ?? null),
+        broker_source_tables_sha256: hashValue(evidenceRun.broker_source_tables ?? null),
+        broker_crosswalk_receipt_sha256: hashValue(evidenceRun.broker_crosswalk_receipt ?? null),
       },
+      forecastPeriods: evidenceRun.broker_pack?.forecast_periods ?? [],
+      reasons: [
+        "The broker-selected case failed compilation and was removed from model authority.",
+        ...blocks.map((entry) => entry.message),
+      ],
     });
-    return finish({
-      runDir,
-      screen: renderFailure({
-        stage: "evidence_review",
-        what_failed:
-          "The confirmed coherent broker house did not compile into a clean forecast authority graph.",
-        why:
-          "This is an internal evidence-to-model boundary defect. The sealed reports and confirmation remain preserved.",
-        what_would_fix_it: blocks.slice(0, 5).map((entry) => entry.message),
-      }),
-      machine: options.json === true,
-      result: {
-        schema_version: "user-flow-run/1.0",
-        controller_version: FLOW_CONTROLLER_VERSION,
-        run_id: runId,
-        status: "BLOCKED",
-        stage: "evidence_review",
-        outcome: "case_recompile_blocked",
-        blocker_class: "INTERNAL_WORK",
-        broker_preview: brokerPreviewPath,
-        receipt: receipt2,
-        reused_stages: reusedStages,
-      },
-    });
+    brokerPreviewValidation = validateBrokerPreview(brokerPreview);
+    brokerConfirmation = automaticBrokerPreviewConfirmation(brokerPreview);
+    brokerConfirmationCheck = verifyBrokerPreviewConfirmation(
+      brokerPreview,
+      brokerConfirmation,
+    );
+    await writeJsonAtomic(brokerPreviewPath, brokerPreview);
+    await writeTextAtomic(
+      brokerPreviewScreenPath,
+      `${renderBrokerPreviewScreen(brokerPreview)}\n`,
+    );
+    await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
+    stage2BrokerConfirmation = brokerConfirmationPath;
+    const zeroProjection = projectZeroBrokerAuthorityCaseEvidence(
+      validation.handoff.case_evidence,
+    );
+    activeCaseEvidence = zeroProjection.case_evidence;
+    const zeroCompilation = compileCase(
+      validation.handoff.case_source,
+      activeCaseEvidence,
+    );
+    if (zeroCompilation.report?.status === "clean") {
+      brokerSelectedCompilation = zeroCompilation;
+      activeCaseCompileReport = zeroCompilation.report;
+      activeModelCase = zeroCompilation.model_case;
+    } else {
+      // The mandatory evidence case already passed Stage 1. A later optional
+      // broker adapter must not be able to invalidate it. Remove broker wiring
+      // from that sealed model and let the executable forecast resolver select
+      // the next lawful rung during Stage 3.
+      brokerSelectedCompilation = null;
+      activeCaseCompileReport = validation.handoff.case_compile_report;
+      activeModelCase = applyBrokerPreviewSelection(
+        structuredClone(validation.handoff.model_case),
+        brokerPreview,
+        brokerConfirmation,
+      );
+    }
+    await writeJsonAtomic(brokerSelectedCaseEvidencePath, activeCaseEvidence);
+    await writeJsonAtomic(
+      brokerSelectedCompileReportPath,
+      activeCaseCompileReport,
+    );
   }
   const freshIntakeResult = runIntake({
     intake: validation.handoff.intake,
@@ -1111,18 +1140,27 @@ async function main() {
     productionBrokerPreviewRequired &&
     (brokerPreview.status !== "PASS" || !brokerPreviewValidation?.valid)
   ) {
-    throw new Error(
-      `Zero-broker fallback preview invariant failed: ${[
-        ...(brokerPreview.violations ?? []),
-        ...(brokerPreviewValidation?.violations ?? []),
-      ][0] ?? "unknown preview violation"}`,
-    );
+    assertBrokerFailureDegrades("broker_preview_failure");
+    brokerPreview = compileEmergencyZeroBrokerPreview({
+      bindingHashes: {
+        broker_pack_sha256: hashValue(evidenceRun.broker_pack ?? null),
+        broker_source_tables_sha256: hashValue(evidenceRun.broker_source_tables ?? null),
+        broker_crosswalk_receipt_sha256: hashValue(evidenceRun.broker_crosswalk_receipt ?? null),
+      },
+      forecastPeriods: evidenceRun.broker_pack?.forecast_periods ?? [],
+      reasons: ["The broker preview validator failed; zero broker authority was selected."],
+    });
+    brokerPreviewValidation = validateBrokerPreview(brokerPreview);
   }
   if (productionBrokerPreviewRequired && !brokerConfirmationCheck?.valid) {
-    const confirmationErrors = brokerConfirmationCheck?.errors ?? [];
-    throw new Error(
-      `Zero-broker automatic confirmation invariant failed: ${confirmationErrors[0] ?? "unknown confirmation violation"}`,
+    assertBrokerFailureDegrades("broker_preview_failure");
+    brokerConfirmation = automaticBrokerPreviewConfirmation(brokerPreview);
+    brokerConfirmationCheck = verifyBrokerPreviewConfirmation(
+      brokerPreview,
+      brokerConfirmation,
     );
+    await writeJsonAtomic(brokerConfirmationPath, brokerConfirmation);
+    stage2BrokerConfirmation = brokerConfirmationPath;
   }
   if (!receipt2) {
     receipt2 = await persistStage({
@@ -1711,7 +1749,13 @@ async function main() {
   const brokerPath = path.join(evidenceInputsDir, "broker-pack.json");
   const filingsPath = path.join(evidenceInputsDir, "filings.json");
   await writeJsonAtomic(dcsPath, validation.handoff.intake.export);
-  await writeJsonAtomic(brokerPath, validation.handoff.intake.broker_pack);
+  await writeJsonAtomic(
+    brokerPath,
+    // Stage-4 N0 validates the immutable source-shaped broker pack. The
+    // selected-cell projection belongs only in model_case/case_evidence; it is
+    // deliberately a different schema and must never masquerade as raw input.
+    validation.handoff.intake.broker_pack,
+  );
   await writeJsonAtomic(filingsPath, validation.handoff.intake.filings);
   const stage4Inputs = {
     stage3_receipt: receipt3.receipt_hash,

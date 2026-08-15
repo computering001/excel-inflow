@@ -279,6 +279,22 @@ assert(
   "A residual financing transaction was naively carried forward instead of reaching the event backstop.",
 );
 const materialized = materializeForecastPlan(base, plan);
+const materializedInterest = materialized.statement_structure.income_statement.find(
+  (candidate) => candidate.row_id === "interest_expense",
+);
+const materializedPreTax = materialized.statement_structure.income_statement.find(
+  (candidate) => candidate.row_id === "pre_tax_income",
+);
+const materializedEbit = materialized.statement_structure.income_statement.find(
+  (candidate) => candidate.row_id === "ebit",
+);
+assert(
+  JSON.stringify(materializedInterest.values.slice(0, 3)) === JSON.stringify([1, 2, 3]) &&
+    materializedPreTax.values.slice(0, 3).every(
+      (value, index) => value === materializedEbit.values[index] + materializedInterest.values[index],
+    ),
+  "A schedule-owned empty-ref historical row was evaluated as zero instead of retaining its filed values.",
+);
 const mixed = materialized.statement_structure.income_statement.find((candidate) => candidate.row_id === "mixed_line");
 assert(mixed.values[3] === 7 && mixed.values[4] === null && mixed.values[5] === null, "Mixed row values were globally blanked or hardcoded.");
 assert(mixed.forecast_treatment !== "uncalculated", "A global uncalculated flag erased a live mixed-period authority.");

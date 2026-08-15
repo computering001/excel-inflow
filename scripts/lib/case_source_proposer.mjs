@@ -231,6 +231,24 @@ function clone(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
+function evidenceBoundPolicies(declarations, caseEvidence) {
+  const policies = clone(declarations.policies ?? {});
+  const rcf = caseEvidence?.lanes?.policy_evidence?.rcf;
+  const rcfAuthorities = new Map(
+    (caseEvidence?.lanes?.instrument_term_authorities ?? [])
+      .filter((authority) => authority.instrument_id === rcf?.instrument_id)
+      .map((authority) => [authority.model_field, authority.output_value]),
+  );
+  // A field-level DCS authority is evidence, not a user-selectable modelling
+  // convention. A stale declaration from a template or resumed older runtime
+  // may not overwrite the raw export's exact contractual fee convention.
+  if (rcfAuthorities.has("commitment_fee_convention")) {
+    policies.rcf ??= {};
+    delete policies.rcf.commitment_fee_convention;
+  }
+  return policies;
+}
+
 /**
  * Compile the declarations-only case-source surface from the immutable filing
  * manifests. Every filed line is retained exactly once. High-confidence roles
@@ -321,7 +339,7 @@ export function proposeCaseSource({
     },
     ...(declarations.derived_rows ? { derived_rows: clone(declarations.derived_rows) } : {}),
     consumption: clone(declarations.consumption ?? {}),
-    policies: clone(declarations.policies ?? {}),
+    policies: evidenceBoundPolicies(declarations, caseEvidence),
     answers: clone(declarations.answers ?? []),
   };
 }

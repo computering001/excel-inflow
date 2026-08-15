@@ -76,4 +76,26 @@ assert.equal(new Set([
   ...result.statement_map.cash_flow,
 ].map((row) => row.row_id)).size, 15);
 
-console.log(JSON.stringify({ status: "PASS", checks: 22 }, null, 2));
+const dcsBoundEvidence = structuredClone(evidence);
+dcsBoundEvidence.lanes.policy_evidence = {
+  rcf: { instrument_id: "rcf", commitment_fee_convention: "bps_on_undrawn" },
+};
+dcsBoundEvidence.lanes.instrument_term_authorities = [{
+  instrument_id: "rcf",
+  model_field: "commitment_fee_convention",
+  output_value: "bps_on_undrawn",
+}];
+const dcsBound = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Universal Test plc", reporting_currency: "GBP" },
+    policies: { rcf: { commitment_fee_convention: "none" } },
+  },
+  caseEvidence: dcsBoundEvidence,
+});
+assert.equal(
+  dcsBound.policies.rcf.commitment_fee_convention,
+  undefined,
+  "A stale declaration overwrote exact DCS commitment-fee authority.",
+);
+
+console.log(JSON.stringify({ status: "PASS", checks: 23 }, null, 2));

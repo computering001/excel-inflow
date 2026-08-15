@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from delivery_constitution import assert_broker_failure_degrades
 from workflow_state import assert_state, assert_transition
 
 
@@ -185,15 +186,44 @@ def runtime_closure() -> str:
     return sha256_value(hashes)
 
 
-def run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        cwd=HERE,
-        text=True,
-        capture_output=True,
-        check=False,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-    )
+def run(
+    command: list[str], *, timeout_seconds: int | None = None
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            command,
+            cwd=HERE,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout_seconds,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout.decode() if isinstance(error.stdout, bytes) else error.stdout
+        stderr = error.stderr.decode() if isinstance(error.stderr, bytes) else error.stderr
+        return subprocess.CompletedProcess(
+            command,
+            124,
+            stdout or "",
+            (stderr or "")
+            + f"\ncontroller timeout after {timeout_seconds} seconds",
+        )
+
+
+def lane_timeout_budget(kind: str, request_path: Path) -> int:
+    """Derive a finite lane budget from the source inventory, never one blob size."""
+    request: dict[str, Any] = {}
+    try:
+        request = read_json(request_path, f"{kind} timeout request")
+    except (OSError, ValueError):
+        pass
+    document_count = len(request.get("documents") or [])
+    if kind == "broker":
+        return min(3600, 300 + 180 * max(1, document_count))
+    if kind == "filings":
+        return min(2400, 300 + 120 * max(1, document_count))
+    return min(1200, 180 + 30 * max(1, document_count))
 
 
 def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root: Path) -> list[str]:
@@ -245,7 +275,10 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             state_before = state_path.read_bytes()
         except OSError:
             state_before = None
-    completed = run(command)
+    completed = run(
+        command,
+        timeout_seconds=lane_timeout_budget(kind, request_path),
+    )
     # A lane state is trusted only when THIS invocation stands behind it: the
     # controller exited cleanly (0 = closed, 2 = typed non-terminal state), or
     # it rewrote the state file during this run. A crash that left yesterday's
@@ -290,7 +323,10 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             # breaker in the same attachment transaction. This preserves all
             # source bytes/page images, selects no disputed value, and prevents
             # an internal task packet from becoming a terminal chat response.
-            closed = run([*command, "--close-optional"])
+            closed = run(
+                [*command, "--close-optional"],
+                timeout_seconds=min(900, lane_timeout_budget(kind, request_path)),
+            )
             if closed.returncode in {0, 2} and state_path.is_file():
                 state = read_json(state_path, "broker optional-close state")
                 assert_state(
@@ -441,7 +477,7 @@ def broker_declaration_with_model_context(
 def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dict[str, Path]) -> dict[str, Any]:
     declarations: dict[str, Any] = {}
     broker = lanes.get("broker")
-    if broker:
+    if broker and not (broker.get("summary") or {}).get("fault_contained_to_zero_authority"):
         artifacts = broker.get("artifacts", {})
         extraction = artifacts.get("verified_bundle") or artifacts.get("extraction_bundle")
         declarations["broker_evidence"] = {
@@ -469,6 +505,144 @@ def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dic
         if missing:
             raise ValueError(f"PASS {lane} state omits owned artifacts: {', '.join(missing)}")
     return declarations
+
+
+def contain_optional_broker_failure(
+    *,
+    lane: dict[str, Any],
+    spec: dict[str, Any],
+    spec_path: Path,
+    output_root: Path,
+    reason_code: str = "broker_optional_close_failure",
+) -> dict[str, Any]:
+    """Close an internally failed broker adapter without consuming a value.
+
+    This boundary deliberately does not attempt to manufacture the broker
+    compiler's downstream receipts.  Those receipts prove selected authority;
+    a fault-contained lane selects nothing.  The raw uploads are instead
+    sealed directly and the attachment compiler archives them as rejected
+    model sources.
+    """
+    assert_broker_failure_degrades(reason_code)
+    broker = spec.get("broker") or {}
+    request_path = resolve(spec_path.parent, broker.get("request_path"))
+    documents: list[dict[str, Any]] = []
+    if request_path and request_path.is_file():
+        request = read_json(request_path, "fault-contained broker request")
+        for document in request.get("documents") or []:
+            source_path = resolve(request_path.parent, document.get("path"))
+            if source_path and source_path.is_file():
+                documents.append({
+                    "document_id": str(document.get("document_id") or ""),
+                    "file_name": source_path.name,
+                    "byte_length": source_path.stat().st_size,
+                    "raw_sha256": sha256_file(source_path),
+                })
+    documents.sort(key=lambda item: item["document_id"])
+    original_summary = lane.get("summary") or {}
+    receipt = {
+        "schema_version": "broker-archive-only-receipt/1.0",
+        "status": "PASS",
+        "run_id": str(spec.get("run_id") or ""),
+        "model_authority": "zero",
+        "delivery_owner": "DEGRADE",
+        "source_document_count": len(documents),
+        "documents": documents,
+        "contained_pipeline_status": lane.get("pipeline_status"),
+        "contained_terminal_reason": original_summary.get("terminal_reason"),
+        "reason_code": reason_code,
+        "reason": (
+            "The optional broker adapter did not close. Raw reports remain "
+            "hash-archived and every broker authority edge is removed."
+        ),
+    }
+    receipt["receipt_sha256"] = sha256_value(receipt)
+    receipt_path = output_root / "broker" / "broker-archive-only-receipt.json"
+    atomic_json(receipt_path, receipt)
+    return {
+        "schema_version": "broker-run-state/1.0",
+        "run_id": str(spec.get("run_id") or ""),
+        "pipeline_status": "PASS_DEGRADED",
+        "user_blocking": False,
+        "blocker_class": None,
+        "tasks": [],
+        "artifacts": {"broker_archive_only_receipt": str(receipt_path)},
+        "artifact_sha256": {
+            "broker_archive_only_receipt": sha256_file(receipt_path),
+        },
+        "checkpoints": [
+            {
+                "stage": "optional_broker_fault_containment",
+                "status": "PASS",
+                "output_sha256": sha256_file(receipt_path),
+            }
+        ],
+        "fixed_point": {
+            "status": "CLOSED",
+            "remaining_task_count": 0,
+        },
+        "summary": {
+            "degraded": True,
+            "fault_contained_to_zero_authority": True,
+            "quarantined_surface_count": 0,
+            "source_document_count": len(documents),
+            "contained_pipeline_status": lane.get("pipeline_status"),
+            "contained_terminal_reason": original_summary.get("terminal_reason"),
+        },
+    }
+
+
+def apply_broker_archive_only(
+    *,
+    resolved_ingress: dict[str, Any],
+    ingress_base: Path,
+    output_root: Path,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Remove every broker authority edge while retaining raw attachment bytes."""
+    evidence_path = resolve(ingress_base, resolved_ingress.get("evidence_run_path"))
+    if not evidence_path or not evidence_path.is_file():
+        raise FileNotFoundError("Attachment-ingress template evidence_run_path is absent")
+    evidence = read_json(evidence_path, "broker fault-containment evidence template")
+    broker_source_ids = {
+        str(source.get("source_id") or "")
+        for source in evidence.get("source_inventory") or []
+        if source.get("kind") == "user_broker_research"
+    }
+    for source in evidence.get("source_inventory") or []:
+        if source.get("source_id") in broker_source_ids:
+            source["status"] = "rejected_for_model_use"
+            source["status_reason"] = (
+                "Optional broker adapter failed internally; raw bytes are archived "
+                "but the source is prohibited from model use."
+            )
+    evidence["retrieval_log"] = [
+        item for item in evidence.get("retrieval_log") or []
+        if item.get("selected_source_id") not in broker_source_ids
+    ]
+    for field in (
+        "broker_pack",
+        "broker_source_tables",
+        "broker_crosswalk_receipt",
+        "broker_semantic_verification",
+    ):
+        evidence.pop(field, None)
+    lanes = (evidence.get("case_evidence") or {}).get("lanes")
+    if isinstance(lanes, dict):
+        lanes.pop("broker_pack", None)
+    ledger = evidence.get("forecast_observation_ledger")
+    if isinstance(ledger, dict) and isinstance(ledger.get("observations"), list):
+        ledger["observations"] = [
+            item for item in ledger["observations"]
+            if item.get("source_id") not in broker_source_ids
+        ]
+        if not ledger["observations"]:
+            evidence.pop("forecast_observation_ledger", None)
+            evidence.pop("forecast_observation_ledger_receipt", None)
+    resolved_path = output_root / "broker-archive-only-evidence-template.json"
+    atomic_json(resolved_path, evidence)
+    resolved_ingress["evidence_run_path"] = str(resolved_path)
+    resolved_ingress.pop("broker_evidence", None)
+    return resolved_ingress, {"broker_archive_only_evidence": str(resolved_path)}
 
 
 def apply_filings_lane(
@@ -528,6 +702,22 @@ def apply_filings_lane(
         if descriptor.get("adapter", {}).get("domain") != "document_extraction":
             continue
         attachment_id = str(descriptor.get("attachment_id") or "")
+        registry_entry = registry_documents.get(attachment_id)
+        if not isinstance(registry_entry, dict):
+            # document_extraction is also the lossless raw-input adapter for
+            # policy answers and other non-filing company evidence. Only
+            # attachments actually owned by the filings registry are replaced
+            # here; every other explicit extraction remains bound and is
+            # validated later by attachment ingress.
+            explicit_path = resolve(
+                ingress_base,
+                descriptor.get("adapter", {}).get("extraction_path"),
+            )
+            if not explicit_path or not explicit_path.is_file():
+                raise ValueError(
+                    f"Non-filing document attachment {attachment_id} has no explicit extraction"
+                )
+            continue
         if acquisition_registry is not None:
             source_entry = acquisition_registry.get("documents", {}).get(attachment_id)
             if not isinstance(source_entry, dict):
@@ -538,7 +728,6 @@ def apply_filings_lane(
             if sha256_file(acquired_path) != source_entry.get("raw_sha256"):
                 raise ValueError(f"Acquired filing object hash does not match for attachment {attachment_id}")
             descriptor["path"] = str(acquired_path)
-        registry_entry = registry_documents.get(attachment_id)
         extraction_path = Path(str((registry_entry or {}).get("path") or ""))
         if not extraction_path.is_file():
             raise ValueError(f"Filings lane has no extraction for attachment {attachment_id}")
@@ -557,6 +746,61 @@ def apply_filings_lane(
     if acquisition_registry_path.is_file():
         returned_artifacts["filings_source_registry"] = str(acquisition_registry_path)
     return resolved_ingress, returned_artifacts
+
+
+def apply_explicit_broker_skip(
+    *,
+    resolved_ingress: dict[str, Any],
+    ingress_base: Path,
+    output_root: Path,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Project a sealed user skip into the lawful zero-authority broker shape.
+
+    This is controller output, not a caller-authored normalized broker pack.
+    It exists because broker absence is a decision state while evidence-run and
+    model-case schemas still require an explicit broker lane.
+    """
+    evidence_path = resolve(ingress_base, resolved_ingress.get("evidence_run_path"))
+    if not evidence_path or not evidence_path.is_file():
+        raise FileNotFoundError("Explicit broker skip has no evidence template")
+    evidence = read_json(evidence_path, "explicit-skip evidence template")
+    filings = evidence.get("filings") or {}
+    forecast_periods = list(filings.get("forecast_periods") or [])
+    if len(forecast_periods) != 3:
+        raise ValueError("Explicit broker skip requires three filings-derived forecast periods")
+    evidence["broker_pack"] = {
+        "schema_version": "broker-pack/1.0",
+        "pack_kind": "broker_forecast_set",
+        "as_of": filings.get("historical_periods", [None])[-1],
+        "source_label": "Broker research explicitly skipped",
+        "reporting_currency": filings.get("reporting_currency"),
+        "units": filings.get("units"),
+        "forecast_periods": forecast_periods,
+        "metrics": {},
+        "houses": [],
+        "recommended_primary_house_id": None,
+        "eligibility_summary": {
+            "primary_eligible_house_count": 0,
+            "supplemental_eligible_house_count": 0,
+            "reference_only_house_count": 0,
+            "run_can_continue_without_broker_question": True,
+        },
+        "notes": "Sealed upload-or-skip receipt selected zero broker authority.",
+    }
+    lanes = evidence.setdefault("case_evidence", {}).setdefault("lanes", {})
+    lanes["broker_pack"] = {
+        "source_label": "Broker research explicitly skipped",
+        "forecast_periods": forecast_periods,
+        "metrics": {},
+        "house_metadata": {},
+        "source_mappings": [],
+        "house_digests": {},
+    }
+    lanes.setdefault("controls", {})["broker_case"] = "Forecast Waterfall"
+    resolved_path = output_root / "explicit-skip-evidence-template.json"
+    atomic_json(resolved_path, evidence)
+    resolved_ingress["evidence_run_path"] = str(resolved_path)
+    return resolved_ingress, {"explicit_broker_skip_projection": str(resolved_path)}
 
 
 CLOSED_LANE_STATUSES = {"PASS", "PASS_DEGRADED"}
@@ -773,6 +1017,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("spec")
     parser.add_argument("--out", required=True)
+    parser.add_argument("--force-zero-broker", action="store_true")
     args = parser.parse_args()
     spec_path = Path(args.spec).resolve()
     output_root = Path(args.out).resolve()
@@ -798,16 +1043,35 @@ def main() -> int:
     broker_intake_choice, broker_intake_choice_path = verify_broker_intake_choice(
         spec, spec_path
     )
-    if broker_intake_choice.get("runtime_closure_sha256") != runtime_hash:
-        raise ValueError(
-            "Broker intake choice runtime closure does not match this attachment controller"
-        )
+    # The upload-or-skip choice binds user intent, issuer identity, filing
+    # context and exact attachment bytes.  A runtime upgrade must invalidate
+    # derived broker work, but it must not erase that user decision or force a
+    # re-upload.  Retain the original closure for audit and let the component
+    # cache keys decide which descendants require recomputation.
+    broker_choice_runtime_migrated = (
+        broker_intake_choice.get("runtime_closure_sha256") != runtime_hash
+    )
     lanes: dict[str, dict[str, Any]] = {}
     state_paths: dict[str, Path] = {}
     checkpoints: list[dict[str, Any]] = []
     derived_artifacts: dict[str, str] = {
         "broker_intake_choice": str(broker_intake_choice_path),
     }
+    if broker_choice_runtime_migrated:
+        migration = {
+            "schema_version": "broker-intake-runtime-migration/1.0",
+            "status": "PASS",
+            "run_id": spec.get("run_id"),
+            "choice_receipt_sha256": broker_intake_choice.get("receipt_sha256"),
+            "recorded_runtime_closure_sha256": broker_intake_choice.get(
+                "runtime_closure_sha256"
+            ),
+            "current_runtime_closure_sha256": runtime_hash,
+            "effect": "preserve_user_choice_recompute_derived_broker_work",
+        }
+        migration_path = output_root / "broker-intake-runtime-migration.json"
+        atomic_json(migration_path, migration)
+        derived_artifacts["broker_intake_runtime_migration"] = str(migration_path)
     for kind in ("filings", "broker", "dcs"):
         if not spec.get(kind):
             continue
@@ -825,7 +1089,58 @@ def main() -> int:
             derived_artifacts["pre_broker_model_demand"] = str(
                 declaration.pop("model_demand_path")
             )
-        lanes[kind] = run_lane(kind, declaration, spec_path.parent, output_root)
+        try:
+            if kind == "broker" and args.force_zero_broker:
+                raise RuntimeError(
+                    "The top-level optional-broker circuit breaker requested zero authority"
+                )
+            lanes[kind] = run_lane(kind, declaration, spec_path.parent, output_root)
+        except Exception as error:
+            lanes[kind] = {
+                "schema_version": f"{kind}-run-state/1.0",
+                "pipeline_status": "BLOCKED_INTERNAL",
+                "user_blocking": False,
+                "blocker_class": "INTERNAL_WORK",
+                "tasks": [],
+                "artifacts": {},
+                "artifact_sha256": {},
+                "summary": {
+                    "terminal_reason": f"{kind}_controller_exception",
+                    "message": str(error),
+                },
+            }
+        if (
+            kind == "broker"
+            and lanes[kind].get("pipeline_status") not in CLOSED_LANE_STATUSES
+            and lanes[kind].get("blocker_class") == "INTERNAL_WORK"
+        ):
+            # The broker lane is optional. Its own negative-only close is the
+            # first remedy; if that controller boundary also fails, contain
+            # the adapter here. This is the final architectural circuit
+            # breaker: archive raw reports, select zero broker authority, and
+            # keep the mandatory filings/debt transaction alive.
+            lanes[kind] = contain_optional_broker_failure(
+                lane=lanes[kind],
+                spec=spec,
+                spec_path=spec_path,
+                output_root=output_root,
+                reason_code=(
+                    "broker_timeout"
+                    if "timeout" in str(
+                        (lanes[kind].get("summary") or {}).get("message") or ""
+                    ).lower()
+                    else "broker_controller_exception"
+                    if (lanes[kind].get("summary") or {}).get("terminal_reason")
+                    == "broker_controller_exception"
+                    else "broker_invalid_state"
+                    if (lanes[kind].get("summary") or {}).get("terminal_reason")
+                    == "invalid_lane_state"
+                    else "broker_optional_close_failure"
+                ),
+            )
+            derived_artifacts["broker_archive_only_receipt"] = lanes[kind][
+                "artifacts"
+            ]["broker_archive_only_receipt"]
         state_paths[kind] = output_root / kind / f"{kind}-run-state.json"
         checkpoints.append({
             "stage": kind,
@@ -849,10 +1164,29 @@ def main() -> int:
                 "degraded_close_receipt"
             ) == sha256_file(degraded_receipt_path)
         )
+        archive_only_receipt_raw = (broker_lane.get("artifacts") or {}).get(
+            "broker_archive_only_receipt"
+        )
+        archive_only_receipt_path = (
+            Path(str(archive_only_receipt_raw)) if archive_only_receipt_raw else None
+        )
+        archive_only_owned = bool(
+            archive_only_receipt_path
+            and archive_only_receipt_path.is_file()
+            and (broker_lane.get("artifact_sha256") or {}).get(
+                "broker_archive_only_receipt"
+            ) == sha256_file(archive_only_receipt_path)
+        )
         quarantine_disclosed = bool(broker_summary.get("degraded")) and (
             "quarantined_conflict_count" in broker_summary
             or "quarantined_surface_count" in broker_summary
-        ) and degraded_receipt_owned
+        ) and (
+            degraded_receipt_owned
+            or (
+                broker_summary.get("fault_contained_to_zero_authority") is True
+                and archive_only_owned
+            )
+        )
         if not quarantine_disclosed:
             # A degraded close without its quarantine receipt is an invalid
             # artifact closure, not an acceptable lane.
@@ -882,7 +1216,6 @@ def main() -> int:
         if not base_ingress_path or not base_ingress_path.is_file():
             raise FileNotFoundError("The internal attachment-ingress template is absent")
         resolved_ingress = read_json(base_ingress_path, "attachment-ingress template")
-        resolved_ingress.update(ingress_lane_declarations(lanes, state_paths))
         filings_artifacts: dict[str, str] = {}
         if "filings" in lanes:
             resolved_ingress, filings_artifacts = apply_filings_lane(
@@ -904,6 +1237,23 @@ def main() -> int:
                 raise ValueError(
                     "First-run raw filing attachments require the controller-owned filings lane"
                 )
+        broker_skip_artifacts: dict[str, str] = {}
+        if broker_intake_choice.get("intake_state") == "explicitly_skipped":
+            resolved_ingress, broker_skip_artifacts = apply_explicit_broker_skip(
+                resolved_ingress=resolved_ingress,
+                ingress_base=base_ingress_path.parent,
+                output_root=output_root,
+            )
+        broker_archive_artifacts: dict[str, str] = {}
+        if (lanes.get("broker", {}).get("summary") or {}).get(
+            "fault_contained_to_zero_authority"
+        ):
+            resolved_ingress, broker_archive_artifacts = apply_broker_archive_only(
+                resolved_ingress=resolved_ingress,
+                ingress_base=base_ingress_path.parent,
+                output_root=output_root,
+            )
+        resolved_ingress.update(ingress_lane_declarations(lanes, state_paths))
         resolved_path = output_root / "resolved-attachment-ingress.json"
         atomic_json(resolved_path, resolved_ingress)
         declarations_path = resolve(
@@ -927,6 +1277,8 @@ def main() -> int:
             "validation": str(compiled_root / "validation.json"),
             **derived_artifacts,
             **filings_artifacts,
+            **broker_archive_artifacts,
+            **broker_skip_artifacts,
         }
         checkpoints.append({
             "stage": "case_source_proposal",

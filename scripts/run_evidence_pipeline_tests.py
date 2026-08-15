@@ -104,7 +104,9 @@ def main() -> int:
         calls: list[list[str]] = []
         original_run = attachment.run
 
-        def fake_run(command: list[str]) -> subprocess.CompletedProcess[str]:
+        def fake_run(
+            command: list[str], *, timeout_seconds: int | None = None
+        ) -> subprocess.CompletedProcess[str]:
             calls.append(command)
             state_path = output / "broker" / "broker-run-state.json"
             state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -140,6 +142,48 @@ def main() -> int:
             "top attachment supervisor did not execute one normal pass then its circuit breaker",
         )
         checks += 2
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-failed-optional-close-") as temporary:
+        root = Path(temporary)
+        report = root / "house-a.pdf"
+        report.write_bytes(b"%PDF-1.4\narchive-only broker evidence\n")
+        request = root / "broker-request.json"
+        request.write_text(json.dumps({
+            "schema_version": "broker-extraction-request/1.0",
+            "run_id": "failed-optional-close",
+            "documents": [{
+                "document_id": "house-a",
+                "path": str(report),
+            }],
+        }), "utf-8")
+        spec_path = root / "spec.json"
+        spec = {
+            "run_id": "failed-optional-close",
+            "broker": {"request_path": str(request)},
+        }
+        spec_path.write_text(json.dumps(spec), "utf-8")
+        state = attachment.contain_optional_broker_failure(
+            lane={
+                "pipeline_status": "BLOCKED_INTERNAL",
+                "blocker_class": "INTERNAL_WORK",
+                "summary": {"terminal_reason": "optional_close_failed"},
+            },
+            spec=spec,
+            spec_path=spec_path,
+            output_root=root / "run",
+            reason_code="broker_optional_close_failure",
+        )
+        receipt = json.loads(Path(
+            state["artifacts"]["broker_archive_only_receipt"]
+        ).read_text("utf-8"))
+        assert_true(
+            state["pipeline_status"] == "PASS_DEGRADED"
+            and state["summary"]["fault_contained_to_zero_authority"] is True
+            and receipt["delivery_owner"] == "DEGRADE"
+            and receipt["model_authority"] == "zero"
+            and receipt["source_document_count"] == 1,
+            "failed broker optional-close did not become an owned archive-only zero-authority close",
+        )
+        checks += 1
     with tempfile.TemporaryDirectory(prefix="excel-inflow-broker-context-") as temporary:
         root = Path(temporary)
         broker_request = root / "broker-request.json"

@@ -653,6 +653,66 @@ export function compileBrokerForecastWaterfallFallback({
   return Object.freeze({ ...preview, preview_sha256: brokerPreviewSha256(preview) });
 }
 
+/**
+ * Last-resort control-plane breaker. Unlike the normal fallback compiler this
+ * function does not inspect source tables, candidates or semantic receipts.
+ * It can therefore close a preview compiler defect without granting authority
+ * to a single broker value. The content hashes still bind the preserved raw
+ * evidence products.
+ */
+export function compileEmergencyZeroBrokerPreview({
+  bindingHashes,
+  forecastPeriods = [],
+  reasons = [],
+}) {
+  const bindings = requireBindings(bindingHashes, {
+    brokerPack: {},
+    sourceTables: {},
+    crosswalkReceipt: {},
+  });
+  const preview = {
+    schema_version: BROKER_PREVIEW_SCHEMA_VERSION,
+    status: "PASS",
+    selection_mode: "forecast_waterfall",
+    ...bindings,
+    pack_recommended_primary_house_id: null,
+    recommended_primary_house_id: null,
+    recommended_primary_house_name: null,
+    headline_anchor: null,
+    headline_anchor_coverage: {},
+    forecast_periods: structuredClone(forecastPeriods),
+    primary_eligible_house_ids: [],
+    selection_cases: [],
+    selected_value_count: 0,
+    evidence_inventory: {
+      source_artifact: "broker-source-tables.json",
+      source_artifact_link: "broker-source-tables.json",
+      source_artifact_canonical_sha256: bindings.broker_source_tables_sha256,
+      raw_house_count: 0,
+      raw_table_count: 0,
+      analytical_table_count: 0,
+      evidence_only_table_count: 0,
+      raw_cell_count: 0,
+      quarantined_cell_count: 0,
+      houses: [],
+    },
+    evidence_only_quarantine: {
+      terminal_quarantined_candidate_count: 0,
+      unresolved_selected_candidate_count: 0,
+      unresolved_candidate_count: 0,
+      quarantined_candidates: [],
+      note:
+        "The broker control plane failed closed to zero authority; raw reports remain preserved outside model authority.",
+    },
+    forecast_waterfall_reasons: [...new Set([
+      ...reasons.map((reason) => String(reason)).filter(Boolean),
+      "The emergency optional-broker circuit breaker selected zero broker authority.",
+    ])].sort(),
+    violations: [],
+  };
+  return Object.freeze({ ...preview, preview_sha256: brokerPreviewSha256(preview) });
+}
+
 export function validateBrokerPreview(preview) {
   const violations = [];
   if (preview?.schema_version !== BROKER_PREVIEW_SCHEMA_VERSION) {
@@ -948,6 +1008,63 @@ export function applyBrokerPreviewSelectionToCaseEvidence(
   return {
     case_evidence: projected,
     selection: verified.selection,
+    suppressed_observation_count: suppressedObservationCount,
+  };
+}
+
+/** Remove every broker writer while preserving the broker evidence lane. */
+export function projectZeroBrokerAuthorityCaseEvidence(caseEvidence) {
+  const projected = structuredClone(caseEvidence);
+  projected.lanes = projected.lanes ?? {};
+  projected.lanes.controls = {
+    ...(projected.lanes.controls ?? {}),
+    broker_case: "Forecast Waterfall",
+  };
+  const brokerPack = projected.lanes.broker_pack;
+  let suppressedObservationCount = 0;
+  if (brokerPack && typeof brokerPack === "object") {
+    brokerPack.recommended_primary_house_id = null;
+    brokerPack.metrics = Object.fromEntries(
+      Object.entries(brokerPack.metrics ?? {}).map(([metricId, metric]) => [
+        metricId,
+        {
+          ...metric,
+          provider_consensus: [null, null, null],
+          brokers: Object.fromEntries(
+            Object.entries(metric.brokers ?? {}).map(([houseName, series]) => {
+              suppressedObservationCount += (series ?? []).filter(
+                (value) => value !== null && value !== undefined,
+              ).length;
+              return [houseName, [null, null, null]];
+            }),
+          ),
+        },
+      ]),
+    );
+    brokerPack.source_mappings = [];
+    brokerPack.selected_observations = [];
+  }
+  for (const ledger of [
+    projected.forecast_observation_ledger,
+    projected.lanes.forecast_observation_ledger,
+  ]) {
+    if (Array.isArray(ledger?.observations)) {
+      ledger.observations = ledger.observations.filter(
+        (observation) =>
+          !String(observation?.source_kind ?? observation?.evidence_kind ?? "")
+            .toLowerCase()
+            .includes("broker"),
+      );
+    }
+  }
+  return {
+    case_evidence: projected,
+    selection: {
+      house_id: "FORECAST_WATERFALL",
+      house_name: "Forecast Waterfall",
+      status: "PASS",
+      selected_values: [],
+    },
     suppressed_observation_count: suppressedObservationCount,
   };
 }

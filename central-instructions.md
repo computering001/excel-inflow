@@ -8,8 +8,9 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 An end-user company workbook has exactly one top-level producer. The vNext
 candidate uses `scripts/run_excel_inflow_vnext.mjs`; it owns raw evidence,
 authority resolution and quality classification, then delegates the unchanged
-workbook stage to `scripts/run_user_flow.mjs`. The active v64 rollback invokes
-`run_user_flow.mjs` directly. Never sequence both routes by hand, and never
+workbook stage internally to `scripts/run_user_flow.mjs`. The v64 implementation
+is an internal rollback delegate, not a second end-user entry point. Never
+sequence both routes by hand, and never
 construct a workbook directly in chat, with ad-hoc Python/OpenPyXL, from a
 compact or generic template, through a lower-level emitter command, or by
 patching cells. If the controlled route cannot run, **BLOCK** and preserve the
@@ -187,7 +188,7 @@ start a new model, invoke the canonical production controller before asking a
 question:
 
 ```text
-node scripts/run_user_flow.mjs --screen company
+node scripts/run_excel_inflow_vnext.mjs --screen company
 ```
 
 That command's stdout IS a fenced code block (it begins with ```text and ends
@@ -518,6 +519,28 @@ broker-derived and partial-period evidence, distinct metric definitions and
 supplemental checks remain evidence rather than disappearing or being forced
 into annual consensus.
 
+Compile the filings-derived model-demand and material-output-reachability graph
+before broker semantics. Archive every raw broker file and render every page,
+but create OCR/vision work only for selected candidate cells that can satisfy a
+demanded concept-period. Retries are bounded and cell-local; an exhausted cell
+is quarantined and its authority edge removed while clean sibling cells and
+houses survive. Archive-only files require no semantic pack.
+
+Reusable broker metric ids remain dictionary-owned. A genuinely
+company-specific concept may use the `run.*` namespace only with a reviewed,
+hash-bound `run-scoped-broker-concept/1.0` contract covering definition,
+unit/sign, materiality, forecast behavior, parent/placement, additive status,
+double-count proof and row relation. Active authority may bind only an existing
+company row established upstream. A new broker-only row is permitted solely as
+non-additive `reference_only` evidence; filings must establish new additive
+economics first.
+
+Keep the central `Brokers` sheet compact: selected values, periods, house,
+definition and cell-level provenance only. `B01`-`B10` are screenshot-only
+evidence sheets with full pages arranged horizontally in source order. They
+contain no formulas or reconstructed tables, and no calculation sheet may
+reference them.
+
 Derive broker-house eligibility after the cell ledger closes. A complete
 primary-eligible house may support the model even if other supplied houses are
 partial or contain quarantined cells. Keep the chosen house coherent; another
@@ -661,7 +684,7 @@ complete list, nothing serial.
 ## Validation and certification
 Every gate fails closed. A missing dependency, absent sidecar, unresolvable row, formula error, external link, non-zero acyclic cache disagreement, unsupported function, failed conversion, missing required evidence or unreviewed native Excel control is a failure or `BLOCKED`, never a warning or pass. A pixel baseline is required only by an explicitly invoked exact-pixel release replay; it is not required by an ordinary structural company render.
 
-An ordinary production company run invokes only `scripts/run_user_flow.mjs`.
+An ordinary production company run invokes only `scripts/run_excel_inflow_vnext.mjs`.
 The Build milestone already runs the required per-run gates and returns their hash-bound
 evidence. During an ordinary company run, do **not** run mutation suites, exact
 authority replays, double-build determinism, render self-tests or any package,
@@ -671,6 +694,16 @@ The standalone commands below are available only for read-only diagnosis, a
 targeted source repair, frozen-cohort work or explicit release certification.
 Select only the command required by that mode; this is a catalogue, not an
 ordinary-run sequence:
+
+The runtime gate list is executable policy in
+`assets/delivery-constitution-v1.json`: identity/period/unit closure, mandatory
+filings and debt, selected-cell provenance, forecast reachability, equation
+determinacy and convergence, debt/cash/RCF/interest identities, OOXML/cache
+integrity and basic structural render. Release certification is a separate
+superset over frozen cohorts and installed packages. Unused broker enrichment,
+pixel baselines, full mutation cohorts and installation/native-Excel checks may
+fail a release candidate, but they are never injected into a live company run
+and cannot convert optional broker evidence into a delivery blocker.
 
 Do not create a pixel baseline from an attached raw authority workbook in the
 deployment host. The raw workbook has no semantic row-map sidecar and may carry
@@ -687,6 +720,12 @@ node scripts/run_forecast_observation_tests.mjs
 node scripts/run_forecast_behavior_tests.mjs
 node scripts/run_product_constitution_tests.mjs
 node scripts/run_run_constitution_graph_tests.mjs
+node scripts/run_delivery_constitution_tests.mjs
+node scripts/run_controller_exit_inventory_tests.mjs
+node scripts/run_broker_dynamic_concept_tests.mjs
+node scripts/run_broker_exit_fault_injection_tests.mjs
+node scripts/run_universal_broker_delivery_matrix.mjs <degraded-delivery-report.json> <usable-broker-workbook.xlsx>
+node scripts/run_raw_input_black_box_canary.mjs <raw-canary-evidence.json> <python> <soffice>
 node scripts/run_equation_graph_tests.mjs
 node scripts/run_fixed_point_constitution_tests.mjs --manifest <fixed-point-cases.json>
 node scripts/test_release_convergence_seam.mjs

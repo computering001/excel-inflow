@@ -754,7 +754,23 @@ async function compileAttachment({ descriptor, sourceById, specDir, evidence }) 
 
   let normalized = null;
   let normalizedArtifact = null;
-  if (domain === "document_extraction") {
+  const archiveOnlyBroker =
+    domain === "broker_pack" &&
+    sourceIds.every((sourceId) =>
+      ["evidence_only", "quarantined", "rejected_for_model_use", "rejected"]
+        .includes(sourceById.get(sourceId)?.status),
+    );
+  const controllerOwnedRawDcs = domain === "factset_dcs" && !adapter.normalized_path;
+  if (archiveOnlyBroker || controllerOwnedRawDcs) {
+    // Optional broker processing may fail even though the uploaded PDF is
+    // readable.  In that state the attachment remains hash-preserved, but it
+    // has no normalized facts and therefore no possible model authority.
+    normalizedArtifact = {
+      path: path.basename(rawPath),
+      sha256: rawSha256,
+      kind: controllerOwnedRawDcs ? "controller_owned_raw" : "raw_archive",
+    };
+  } else if (domain === "document_extraction") {
     const extractionPath = resolved(specDir, adapter.extraction_path, `Attachment ${attachmentId}.adapter.extraction_path`);
     const extractionBytes = await fs.readFile(extractionPath);
     const extraction = await readJsonFile(extractionPath, `Extraction for attachment ${attachmentId}`);
@@ -1778,8 +1794,9 @@ export async function compileDcsEvidence({
     throw new Error("DCS evidence artifacts are not bound to the supplied raw export bytes.");
   }
   const projectionCompatibilityView = structuredClone(projection.json.dcs_export);
+  const suppliedDcsExport = evidence.dcs_export ?? null;
   const normalizedByInstrument = new Map(
-    (evidence.dcs_export?.instruments ?? []).map((instrument) => [
+    (suppliedDcsExport?.instruments ?? []).map((instrument) => [
       instrument.instrument_id,
       instrument,
     ]),
@@ -1794,8 +1811,9 @@ export async function compileDcsEvidence({
     }
   }
   if (
-    canonicalJson(projection.json.dcs_export) !== canonicalJson(evidence.dcs_export) &&
-    canonicalJson(projectionCompatibilityView) !== canonicalJson(evidence.dcs_export)
+    suppliedDcsExport &&
+    canonicalJson(projection.json.dcs_export) !== canonicalJson(suppliedDcsExport) &&
+    canonicalJson(projectionCompatibilityView) !== canonicalJson(suppliedDcsExport)
   ) {
     throw new Error("DCS projection does not exactly reproduce evidence-run.dcs_export.");
   }
@@ -1828,6 +1846,70 @@ export async function compileDcsEvidence({
       instrument,
     ]),
   );
+  if (modelInstruments.size === 0) {
+    compilerLanes.instruments = (projection.json.dcs_export.instruments ?? []).map(
+      (projected, index) => {
+        const benchmarkResolved = projected.benchmark_curve?.resolved ?? [0, 0, 0];
+        const fixedRate = Number(projected.coupon_rate ?? projected.all_in_rate ?? 0);
+        const openingBalance = Number(
+          projected.outstanding_amount ?? projected.drawn_amount ?? 0,
+        );
+        return {
+          instrument_id: projected.instrument_id,
+          display_order: projected.instrument_type === "rcf" ? 99 : index + 1,
+          name: projected.description,
+          class: projected.instrument_type,
+          currency: projected.currency,
+          opening_balance: openingBalance,
+          maturity_date: projected.maturity_date,
+          maturity_precision: projected.maturity_precision,
+          maturity_treatment: projected.maturity_treatment ?? "contractual",
+          scheduled_amortisation: [0, 0, 0],
+          new_issuance: [0, 0, 0],
+          rate_type: projected.rate_type,
+          ...(projected.rate_type === "fixed"
+            ? { coupon_or_all_in_rate: [fixedRate, fixedRate, fixedRate] }
+            : projected.rate_type === "floating"
+              ? {
+                  benchmark: projected.reference_rate ?? "Unspecified benchmark",
+                  benchmark_rate: benchmarkResolved,
+                  spread_bps: Number(projected.margin_bps ?? 0),
+                }
+              : {}),
+          facility_capacity: projected.instrument_type === "rcf"
+            ? Number(projected.facility_limit ?? 0)
+            : null,
+          include_in_gross_debt: true,
+          include_in_net_debt: true,
+          cash_interest: true,
+          source_line_ids: projected.source_row ? [projected.source_row] : [],
+          other_non_cash_movement: [0, 0, 0],
+          balance_basis: projected.balance_basis ?? "native_principal",
+        };
+      },
+    );
+    for (const instrument of compilerLanes.instruments) {
+      modelInstruments.set(instrument.instrument_id, instrument);
+    }
+    const projectedRcf = (projection.json.dcs_export.instruments ?? []).find(
+      (instrument) => instrument.instrument_type === "rcf",
+    );
+    if (projectedRcf) {
+      const authorityByField = new Map(
+        (projection.json.term_authorities ?? [])
+          .filter((authority) => authority.instrument_id === projectedRcf.instrument_id)
+          .map((authority) => [authority.model_field, authority.output_value]),
+      );
+      compilerLanes.policy_evidence ??= {};
+      compilerLanes.policy_evidence.rcf = {
+        instrument_id: projectedRcf.instrument_id,
+        capacity: Number(projectedRcf.facility_limit ?? 0),
+        opening_draw: Number(projectedRcf.drawn_amount ?? projectedRcf.outstanding_amount ?? 0),
+        commitment_fee_convention: authorityByField.get("commitment_fee_convention") ?? "none",
+        commitment_fee_value: Number(authorityByField.get("commitment_fee_value") ?? 0),
+      };
+    }
+  }
   for (const projected of projection.json.dcs_export.instruments ?? []) {
     const instrument = modelInstruments.get(projected.instrument_id);
     if (!instrument) {
@@ -1938,12 +2020,16 @@ export async function compileAttachmentIngress({ specPath }) {
   // route produces an evidence run that every gate downstream will certify
   // faithfully, because each of them measures fidelity to the input rather than
   // the provenance of the input.
-  const hasBrokerAttachment = [...sourceAttachment.values()].some(
-    (entry) => entry.adapter?.domain === "broker_pack",
+  const hasUsedBrokerAttachment = [...sourceAttachment.values()].some(
+    (entry) =>
+      entry.adapter?.domain === "broker_pack" &&
+      entry.source_ids.some(
+        (sourceId) => sourceById.get(sourceId)?.status === "used",
+      ),
   );
   const referenceParity =
     (evidence.case_source?.identity?.execution_profile ?? "production_model") === "reference_parity";
-  if (hasBrokerAttachment && !spec.broker_evidence && !referenceParity) {
+  if (hasUsedBrokerAttachment && !spec.broker_evidence && !referenceParity) {
     throw new Error(
       "broker_ingress_incoherent: a broker research attachment requires a PASS broker_evidence bundle; a separately normalized broker pack is not proof that the documents were read.",
     );
