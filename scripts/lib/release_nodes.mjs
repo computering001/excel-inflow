@@ -187,15 +187,24 @@ export function runReleaseN0N9({ modelCase, dcsExport = null, brokerPack = null,
   // N5 -- deterministic broker anchor
   let anchor;
   try { anchor = M.N5.selectBrokerAnchor(modelCase); } catch (error) { anchor = { supported: false, error: error.message }; }
-  const forecastWaterfall = modelCase.controls?.broker_case === "Forecast Waterfall";
+  const brokerAuthorityUnavailable =
+    Object.values(anchor?.counts_by_period ?? {}).flat().every((count) => Number(count) === 0);
+  const forecastWaterfall =
+    modelCase.controls?.broker_case === "Forecast Waterfall" || brokerAuthorityUnavailable;
   const anchorResolved = anchor.supported === true || forecastWaterfall;
   gates.push(gate("N5", [anchorResolved
     ? passed(
         "anchor-resolves",
         forecastWaterfall
-          ? "Broker authority is explicitly disabled; the sealed forecast waterfall owns forecast selection."
+          ? brokerAuthorityUnavailable
+            ? "No usable broker authority exists; the sealed forecast waterfall owns forecast selection."
+            : "Broker authority is explicitly disabled; the sealed forecast waterfall owns forecast selection."
           : `Anchor: ${anchor.label ?? (anchor.anchors ?? []).join(" + ")}.`,
-        { ...anchor, resolution_mode: forecastWaterfall ? "forecast_waterfall" : "broker_anchor" },
+        {
+          ...anchor,
+          resolution_mode: forecastWaterfall ? "forecast_waterfall" : "broker_anchor",
+          broker_authority_unavailable: brokerAuthorityUnavailable,
+        },
       )
     : failed("anchor-resolves", anchor.error ?? "Broker anchor does not resolve.", anchor)], { anchor }));
   if (!anchorResolved) return { status: "STOPPED", gates, outputs, node_order: RELEASE_NODE_ORDER };

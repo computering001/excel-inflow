@@ -40,14 +40,49 @@ function duplicateValues(values) {
   return sorted(duplicates, (value) => value);
 }
 
+const FORMULA_AUTHORITY_METHODS = new Set([
+  "accounting_identity",
+  "driver_formula",
+  "roll_forward",
+  "historical_average",
+  "historical_trend",
+  "seasonal_run_rate",
+  "carry_forward",
+  "schedule_link",
+  "actual_plus_remainder",
+  "full_year_authority_less_reported",
+]);
+
+function periodFormulaRefs(row) {
+  const authorities = row.forecast_period_authorities ?? [];
+  return (row.forecast_period_calculations ?? []).flatMap((calculation, index) => {
+    const authority = authorities[index];
+    if (
+      authority &&
+      !FORMULA_AUTHORITY_METHODS.has(authority.method) &&
+      authority.source_kind !== "formula" &&
+      authority.source_kind !== "schedule"
+    ) {
+      return [];
+    }
+    return calculation?.refs ?? [];
+  });
+}
+
 export function canonicalStatementDependencies(row) {
+  const hasFormulaAuthority = (row.forecast_period_authorities ?? [])
+    .filter(Boolean)
+    .some(
+      (authority) =>
+        FORMULA_AUTHORITY_METHODS.has(authority.method) ||
+        authority.source_kind === "formula" ||
+        authority.source_kind === "schedule",
+    );
   const declared = [...new Set([
     ...(row.dependency_refs ?? []),
     ...(row.calculation?.refs ?? []),
-    ...(row.forecast_calculation?.refs ?? []),
-    ...(row.forecast_period_calculations ?? []).flatMap(
-      (calculation) => calculation?.refs ?? [],
-    ),
+    ...(hasFormulaAuthority ? row.forecast_calculation?.refs ?? [] : []),
+    ...periodFormulaRefs(row),
   ])].sort(portableCompare);
   if (
     declared.length === 0 &&
@@ -137,8 +172,31 @@ function historicalWriter(row) {
   if (authority) return authority;
   if (row.row_type === "header") return "presentation_only";
   if (row.calculation) return "derived_formula";
+  if (
+    row.semantic_role === "non_balancing_cash_bucket_movement" ||
+    row.row_id === "non_balancing_cash_bucket_movement"
+  ) {
+    // This compiler-owned reconciliation is generated from the visible cash
+    // bucket roll-forward in historical columns.  It intentionally has no
+    // source-row calculation refs, but it still has one deterministic writer.
+    return "compiler_semantic_formula";
+  }
   if (row.row_type === "uncalculated") return "not_applicable";
   if (row.row_type === "input") return "source_input";
+  if (
+    (row.values ?? [])
+      .slice(0, 3)
+      .some((value) =>
+        value !== null &&
+        value !== undefined &&
+        Number.isFinite(Number(value)),
+      )
+  ) {
+    // A filed subtotal remains source-owned even when its presentation row
+    // type is `subtotal` rather than `input` (for example a reported working-
+    // capital parent with optional supporting children).
+    return "source_input";
+  }
   return null;
 }
 

@@ -813,12 +813,30 @@ export function normalisedCashBuckets(modelCase) {
     }));
   }
   const cash = modelCase.cash_policy ?? {};
+  const filedEndingCash = (
+    modelCase.statement_structure?.cash_flow ?? []
+  ).find(
+    (row) =>
+      row.semantic_role === "ending_cash" || row.row_id === "ending_cash",
+  )?.values;
+  const filedHistoricalCash = [0, 1, 2].map((index) => {
+    const value = filedEndingCash?.[index];
+    return value !== null && value !== undefined && Number.isFinite(Number(value))
+      ? Number(value)
+      : Number(cash.historical_year_end_cash?.[index] ?? 0);
+  });
   return [
     {
       bucket_id: "legacy_unrestricted",
       label: "Cash and cash equivalents",
-      historical_year_end: asSeries3(cash.historical_year_end_cash, 0),
-      opening_balance: Number(cash.opening_cash ?? 0),
+      // Legacy cases carry the last historical balance twice: once on the
+      // filed cash-flow statement and once in cash_policy.  The filed row is
+      // the visible/source-owned authority; cash_policy is only a compatibility
+      // carrier.  Prefer the complete filed series so the solver, FY1 opening
+      // formula, interest income and net-debt outputs cannot diverge when a
+      // stale carrier value survives a migration or synthetic overlay.
+      historical_year_end: filedHistoricalCash,
+      opening_balance: filedHistoricalCash[2],
       forecast_treatment: "balancing",
       forecast_values: null,
       available_for_liquidity: true,
@@ -2195,63 +2213,19 @@ export function solveCase(
     // not exist to derive from. This mirrors `acquisitionDerivedDrivers` in the
     // emitter arm for arm; if the two ladders ever part, the cell says one
     // number and its cache says another.
-    if (
-      acquisitionActive &&
-      forecastIndex > closeIndex &&
-      Math.abs(previousEbitda) <= ACQUISITION_NEAR_ZERO
-    ) {
-      throw new Error(
-        `Acquisition target growth cannot be inferred in ${period.date}: prior standalone EBITDA is zero or unavailable.`,
-      );
-    }
-    const standaloneEbitdaGrowth =
-      Math.abs(previousEbitda) <= ACQUISITION_NEAR_ZERO
-        ? 0
-        : ebitda / previousEbitda - 1;
-    const targetEbitdaGrowth = isV2 ? standaloneEbitdaGrowth : 0;
-    // Entry EBITDA is the close-period base.  Thereafter the target compounds
-    // each successive standalone EBITDA growth rate exactly once.  This is the
-    // numeric twin of acquisitionFullEbitdaFormula; it intentionally avoids
-    // the old `current growth ^ elapsed years` shortcut, which drifted whenever
-    // the forecast growth rates differed by year.
-    const targetEbitda = !acquisitionActive
-      ? 0
-      : acquisitionCloses
-        ? baseTargetEbitda
-        : Number(priorTargetEbitda ?? baseTargetEbitda) *
-          (1 + targetEbitdaGrowth);
-    if (acquisitionActive && Math.abs(revenue) <= ACQUISITION_NEAR_ZERO) {
-      throw new Error(
-        `Acquisition target ratios cannot be inferred in ${period.date}: standalone revenue is zero or unavailable.`,
-      );
-    }
-    const targetMargin =
-      Math.abs(revenue) <= ACQUISITION_NEAR_ZERO ? 0 : ebitda / revenue;
-    // A margin of floating-point noise is not a denominator; guarded here
-    // exactly as the revenue cell guards it, so neither can produce 1e19.
-    const targetRevenue =
-      targetMargin > ACQUISITION_NEAR_ZERO ? targetEbitda / targetMargin : 0;
-    const targetDa =
-      Math.abs(revenue) <= ACQUISITION_NEAR_ZERO
-        ? 0
-        : targetRevenue * (da / revenue);
-    const targetAdjustments = isV2
-      ? 0
-      : revenue === 0
-        ? 0
-        : targetRevenue * (adjustments / revenue);
-    const targetEbit = targetEbitda - targetDa - targetAdjustments;
-    const targetCapex =
-      Math.abs(revenue) <= ACQUISITION_NEAR_ZERO
-        ? 0
-        : targetRevenue * (capexRequirement / revenue);
-    const targetWorkingCapital = isV2
-      ? targetRevenue *
-        (revenue === 0 ? 0 : changeInWorkingCapital / revenue)
-      : -targetRevenue *
-        (revenue === 0
-          ? 0
-          : Math.abs(changeInWorkingCapital / revenue));
+    // Target operating amounts are derived inside the solve iteration, after
+    // the issuer's declared standalone statement graph has resolved.  The
+    // visible workbook uses those resolved statement rows (not preliminary
+    // broker/metric leaves) for EBITDA growth, margin, D&A, capex and working
+    // capital.  Keeping these variables outside the loop preserves their final
+    // values for the result record while preventing a formula/cache split on
+    // issuers whose displayed EBITDA is itself a bridge calculation.
+    let targetEbitda = 0;
+    let targetRevenue = 0;
+    let targetDa = 0;
+    let targetEbit = 0;
+    let targetCapex = 0;
+    let targetWorkingCapital = 0;
     const acquisitionDebtAddition = acquisitionCloses ? acquisitionDebtAmount : 0;
     const acquisitionDebtProceeds = 0;
     // The lightweight overlay intentionally has no sources-and-uses,
@@ -2398,6 +2372,62 @@ export function solveCase(
       ebitda = Number(
         operatingGraph.resolveRole("adjusted_ebitda") ?? suppliedEbitda,
       );
+
+      if (
+        acquisitionActive &&
+        forecastIndex > closeIndex &&
+        Math.abs(previousEbitda) <= ACQUISITION_NEAR_ZERO
+      ) {
+        throw new Error(
+          `Acquisition target growth cannot be inferred in ${period.date}: prior standalone EBITDA is zero or unavailable.`,
+        );
+      }
+      if (acquisitionActive && Math.abs(revenue) <= ACQUISITION_NEAR_ZERO) {
+        throw new Error(
+          `Acquisition target ratios cannot be inferred in ${period.date}: standalone revenue is zero or unavailable.`,
+        );
+      }
+      const standaloneEbitdaGrowth =
+        Math.abs(previousEbitda) <= ACQUISITION_NEAR_ZERO
+          ? 0
+          : ebitda / previousEbitda - 1;
+      const targetEbitdaGrowth = isV2 ? standaloneEbitdaGrowth : 0;
+      // Entry EBITDA is the close-period base. Thereafter the target compounds
+      // each successive RESOLVED standalone EBITDA growth rate exactly once —
+      // the numeric twin of acquisitionFullEbitdaFormula.
+      targetEbitda = !acquisitionActive
+        ? 0
+        : acquisitionCloses
+          ? baseTargetEbitda
+          : Number(priorTargetEbitda ?? baseTargetEbitda) *
+            (1 + targetEbitdaGrowth);
+      const targetMargin =
+        Math.abs(revenue) <= ACQUISITION_NEAR_ZERO ? 0 : ebitda / revenue;
+      targetRevenue =
+        targetMargin > ACQUISITION_NEAR_ZERO
+          ? targetEbitda / targetMargin
+          : 0;
+      targetDa =
+        Math.abs(revenue) <= ACQUISITION_NEAR_ZERO
+          ? 0
+          : targetRevenue * (da / revenue);
+      const targetAdjustments = isV2
+        ? 0
+        : revenue === 0
+          ? 0
+          : targetRevenue * (adjustments / revenue);
+      targetEbit = targetEbitda - targetDa - targetAdjustments;
+      targetCapex =
+        Math.abs(revenue) <= ACQUISITION_NEAR_ZERO
+          ? 0
+          : targetRevenue * (capexRequirement / revenue);
+      targetWorkingCapital = isV2
+        ? targetRevenue *
+          (revenue === 0 ? 0 : changeInWorkingCapital / revenue)
+        : -targetRevenue *
+          (revenue === 0
+            ? 0
+            : Math.abs(changeInWorkingCapital / revenue));
 
       const totalEbit = baseEbit + targetEbit * acquisitionTiming;
       const totalDa = da + targetDa * acquisitionTiming;

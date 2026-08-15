@@ -275,7 +275,10 @@ def broker_declaration_with_model_context(
     if not request_path or not request_path.is_file():
         return declaration
     request = read_json(request_path, "broker request")
-    if isinstance(request.get("model_context"), dict):
+    if (
+        isinstance(request.get("model_context"), dict)
+        and isinstance(request["model_context"].get("model_demand_graph"), dict)
+    ):
         return declaration
     ingress_path = resolve(spec_path.parent, spec.get("attachment_ingress_path"))
     if not ingress_path or not ingress_path.is_file():
@@ -286,10 +289,7 @@ def broker_declaration_with_model_context(
         return declaration
     evidence = read_json(evidence_path, "base evidence-run template")
     filings = evidence.get("filings") or {}
-    if (
-        (len(filings.get("forecast_periods") or []) != 3)
-        and isinstance(filings_state, dict)
-    ):
+    if isinstance(filings_state, dict):
         bundle_path = Path(str((filings_state.get("artifacts") or {}).get("filings_bundle") or ""))
         if bundle_path.is_file():
             bundle = read_json(bundle_path, "filings evidence bundle for broker model context")
@@ -303,15 +303,73 @@ def broker_declaration_with_model_context(
         or not filings.get("units")
     ):
         return declaration
+    demand_nodes: list[dict[str, Any]] = []
+    for section in ("income_statement", "cash_flow"):
+        for row in filings.get(section) or []:
+            source_line_id = str(row.get("source_line_id") or "").strip()
+            label = str(row.get("label") or "").strip()
+            values = row.get("values") or []
+            if not source_line_id or not label or not any(value is not None for value in values):
+                continue
+            definition_sha = sha256_value({
+                "section": section,
+                "source_line_id": source_line_id,
+                "label": label,
+                "parent_label": row.get("parent_label"),
+                "units": filings["units"],
+            })
+            for index, period_end in enumerate(forecast):
+                demand_nodes.append({
+                    "node_id": f"{section}.{source_line_id}.fy{index + 1}",
+                    "section": section,
+                    "source_line_id": source_line_id,
+                    "label": label,
+                    "parent_label": row.get("parent_label"),
+                    "period_end": period_end,
+                    "material": row.get("material") is True,
+                    "has_historical_value": True,
+                    "allowed_authorities": [
+                        "company_guidance",
+                        "selected_broker",
+                        "historical_inference",
+                        "parent_capture",
+                        "user_assumption",
+                        "explicit_zero",
+                    ],
+                    "definition_signature_sha256": definition_sha,
+                })
+    demand_nodes.sort(key=lambda item: item["node_id"])
+    demand_body = {
+        "schema_version": "pre-broker-model-demand/1.0",
+        "run_id": str(request.get("run_id") or spec.get("run_id") or "unknown"),
+        "as_of": historical[-1],
+        "reporting_currency": filings["reporting_currency"],
+        "units": filings["units"],
+        "forecast_periods": forecast,
+        "nodes": demand_nodes,
+        "counts": {
+            "source_rows": len({item["source_line_id"] for item in demand_nodes}),
+            "forecast_nodes": len(demand_nodes),
+            "material_nodes": sum(1 for item in demand_nodes if item["material"]),
+        },
+    }
+    demand_graph = {
+        **demand_body,
+        "graph_sha256": sha256_value(demand_body),
+    }
     request["model_context"] = {
         "as_of": historical[-1],
         "reporting_currency": filings["reporting_currency"],
         "units": filings["units"],
         "forecast_periods": forecast,
+        "model_demand_graph": demand_graph,
     }
+    demand_path = output_root / "internal-requests" / "pre-broker-model-demand.json"
+    atomic_json(demand_path, demand_graph)
     derived_path = output_root / "internal-requests" / "broker-extraction-request.json"
     atomic_json(derived_path, request)
     declaration["request_path"] = str(derived_path)
+    declaration["model_demand_path"] = str(demand_path)
     return declaration
 
 
@@ -674,6 +732,7 @@ def main() -> int:
     lanes: dict[str, dict[str, Any]] = {}
     state_paths: dict[str, Path] = {}
     checkpoints: list[dict[str, Any]] = []
+    derived_artifacts: dict[str, str] = {}
     for kind in ("filings", "broker", "dcs"):
         if not spec.get(kind):
             continue
@@ -687,6 +746,10 @@ def main() -> int:
             if kind == "broker"
             else spec[kind]
         )
+        if kind == "broker" and declaration.get("model_demand_path"):
+            derived_artifacts["pre_broker_model_demand"] = str(
+                declaration.pop("model_demand_path")
+            )
         lanes[kind] = run_lane(kind, declaration, spec_path.parent, output_root)
         state_paths[kind] = output_root / kind / f"{kind}-run-state.json"
         checkpoints.append({
@@ -787,6 +850,7 @@ def main() -> int:
             "attachment_manifest": str(compiled_root / "attachment-manifest.json"),
             "evidence_run": str(compiled_root / "evidence-run.json"),
             "validation": str(compiled_root / "validation.json"),
+            **derived_artifacts,
             **filings_artifacts,
         }
         checkpoints.append({

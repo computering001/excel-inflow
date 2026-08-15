@@ -349,8 +349,11 @@ export async function compileLiveDeliveryAttestation({
   }
   invariant(topology.formula_count > 0, "topology.formulas", "Workbook contains no formulas.", violations);
   const brokerEvidence = proofContract?.broker_evidence;
-  if ((modelCase?.broker_pack?.raw_tables ?? []).length > 0) {
-    invariant(Boolean(brokerEvidence), "broker.proof_contract", "Broker source tables exist but the workbook proof contract has no broker evidence surface.", violations);
+  if (
+    (modelCase?.broker_pack?.raw_tables ?? []).length > 0 ||
+    (modelCase?.broker_pack?.page_evidence ?? []).length > 0
+  ) {
+    invariant(Boolean(brokerEvidence), "broker.proof_contract", "Broker evidence exists but the workbook proof contract has no broker evidence surface.", violations);
     for (const name of brokerEvidence?.source_sheets ?? []) {
       invariant(topology.sheet_names.includes(name), "broker.source_sheet", `Declared broker source sheet ${name} is absent.`, violations);
     }

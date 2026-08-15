@@ -344,9 +344,29 @@ export function compileModelIrV3({
     }
   }
 
-  const dependencyByRow = new Map(
-    statementNodes.map((node) => [node.row_id, new Set(node.dependencies ?? [])]),
-  );
+  const uniqueFormulaMembershipPath = (childId, parentId, section) => {
+    const parentsByChild = new Map();
+    for (const candidate of statementNodes.filter((item) => item.section === section)) {
+      for (const dependency of candidate.dependencies ?? []) {
+        const parents = parentsByChild.get(dependency) ?? [];
+        parents.push(candidate.row_id);
+        parentsByChild.set(dependency, parents);
+      }
+    }
+    const paths = [];
+    const queue = [[childId]];
+    while (queue.length > 0 && paths.length < 2) {
+      const path = queue.shift();
+      const current = path.at(-1);
+      for (const next of parentsByChild.get(current) ?? []) {
+        if (path.includes(next)) continue;
+        const candidate = [...path, next];
+        if (next === parentId) paths.push(candidate);
+        else queue.push(candidate);
+      }
+    }
+    return paths.length === 1 ? paths[0] : null;
+  };
   const scheduleOwnedRoles = new Set([
     "interest_income",
     "interest_expense",
@@ -362,12 +382,30 @@ export function compileModelIrV3({
   ]);
   for (const node of statementNodes.filter((item) => item.forecast_capture_parent_id)) {
     const parent = statementById.get(node.forecast_capture_parent_id);
-    const parentDependencies = dependencyByRow.get(node.forecast_capture_parent_id) ?? new Set();
     const mode = node.forecast_capture_mode;
-    const formulaProven = mode === "formula_membership" && parentDependencies.has(node.row_id);
     const parentAuthorities = authority.filter(
       (item) => item.display_id === node.forecast_capture_parent_id,
     );
+    const membershipPath = mode === "formula_membership"
+      ? uniqueFormulaMembershipPath(
+          node.row_id,
+          node.forecast_capture_parent_id,
+          node.section,
+        )
+      : null;
+    const formulaProven =
+      mode === "formula_membership" &&
+      Boolean(membershipPath) &&
+      parentAuthorities.length === 3 &&
+      authority
+        .filter((item) => item.display_id === node.row_id)
+        .every(
+          (item) =>
+            item.status === "resolved" &&
+            item.producer_type === "CapturedBy" &&
+            JSON.stringify(item.capture_certificate?.membership_path ?? null) ===
+              JSON.stringify(membershipPath),
+        );
     const semanticScopeProven =
       mode === "semantic_scope" &&
       parent?.section === node.section &&

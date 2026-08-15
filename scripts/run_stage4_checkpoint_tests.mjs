@@ -181,7 +181,7 @@ assert(
   [
     "recalculate", "terminal_patch", "verify_dynamic", "verify_style",
     "verify_cache", "verify_finance", "verify_semantic", "verify_aggregate",
-    "render", "publish",
+    "render_sheet_01", "render_sheet_02", "render_sheet_03", "render", "publish",
   ].every((id) => recoveredBuild.checkpointing.executed.includes(id)),
   `Recovery did not restart at recalculation: ${JSON.stringify(recoveredBuild.checkpointing)}`,
 );
@@ -212,12 +212,59 @@ assert(
   `Missing published output did not invalidate only emit and publish: ${JSON.stringify(repairedBuild.checkpointing)}`,
 );
 assert(
-  repairedBuild.checkpointing.reused.length === 11 &&
+  repairedBuild.checkpointing.reused.length ===
+      repairedBuild.checkpointing.order.length - 2 &&
     !repairedBuild.checkpointing.reused.includes("emit") &&
     !repairedBuild.checkpointing.reused.includes("publish"),
   `Unaffected checkpoints were not retained: ${JSON.stringify(repairedBuild.checkpointing)}`,
 );
 assert(await sha256(workbook) === recoveredWorkbookHash, "Targeted checkpoint repair changed the delivered workbook.");
+
+// Damage one render leaf as well as the published workbook.  The controller
+// must rerun that sheet, the aggregate render index and publication, while
+// retaining every other rendered sheet and every economic validator.
+const renderLeaf = repairedBuild.checkpointing.order.find(
+  (id) => id === "render_sheet_02",
+);
+assert(renderLeaf, "Expected a second visible-sheet render checkpoint.");
+const renderLeafOutput = path.join(
+  buildDir,
+  ".stage4",
+  "work",
+  renderLeaf,
+  "render-evidence-index.json",
+);
+await fs.rename(renderLeafOutput, `${renderLeafOutput}.missing-output-test`);
+await fs.rename(workbook, `${workbook}.render-leaf-test`);
+const renderLeafRepair = await flow(evidence, runDir, [
+  "--python", python,
+  "--soffice", soffice,
+]);
+assert(
+  renderLeafRepair.status === "PASS_PENDING_MANUAL",
+  `Render-leaf repair did not deliver: ${JSON.stringify(renderLeafRepair)}`,
+);
+const renderLeafBuild = JSON.parse(
+  await fs.readFile(
+    path.join(runDir, "stages", "build_checks", "build-result.json"),
+    "utf8",
+  ),
+);
+const expectedLeafExecutions = [renderLeaf, "render", "publish"];
+assert(
+  renderLeafBuild.checkpointing.executed.join(",") ===
+    expectedLeafExecutions.join(","),
+  `One damaged render leaf reran unrelated work: ${JSON.stringify(renderLeafBuild.checkpointing)}`,
+);
+assert(
+  ["render_sheet_01", "render_sheet_03", "verify_dynamic", "verify_finance"]
+    .every((id) => renderLeafBuild.checkpointing.reused.includes(id)),
+  `Unaffected render/economic leaves were not retained: ${JSON.stringify(renderLeafBuild.checkpointing)}`,
+);
+assert(
+  await sha256(workbook) === recoveredWorkbookHash,
+  "Render-leaf repair changed the delivered workbook.",
+);
 
 const finalReuse = await flow(evidence, runDir, [
   "--python", python,
@@ -237,6 +284,7 @@ const report = {
     { id: "resume-from-last-internal-success", status: "PASS", reused: recoveredBuild.checkpointing.reused },
     { id: "internal-scratch-loss-does-not-invalidate-published-closure", status: "PASS", reused: scratchReuse.reused_stages },
     { id: "missing-published-output-targeted-invalidation", status: "PASS", executed: repairedBuild.checkpointing.executed },
+    { id: "single-render-leaf-targeted-invalidation", status: "PASS", executed: renderLeafBuild.checkpointing.executed },
     { id: "delivered-workbook-identity-after-repair", status: "PASS", sha256: recoveredWorkbookHash },
     { id: "five-user-stage-final-reuse", status: "PASS", reused: finalReuse.reused_stages },
   ],

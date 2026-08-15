@@ -270,7 +270,7 @@ function observationCandidates(observationInput, row, forecastIndex, windowStart
   return candidates;
 }
 
-function formulaCandidate(row, behavior, forecastIndex) {
+function formulaCandidate(row, behavior, forecastIndex, rows = []) {
   if (isScheduleOwnedForecastRole(row.semantic_role)) return { method: "schedule_link", origin: "semantic_schedule", source_kind: "schedule", ownership: "absolute", formula_spec: { operator: "schedule_link", semantic_role: row.semantic_role } };
   if (row.semantic_role === "effective_tax_rate") return null;
   // A historical aggregate formula is evidence of membership, not a stronger
@@ -299,6 +299,23 @@ function formulaCandidate(row, behavior, forecastIndex) {
     ? row.forecast_period_calculations[forecastIndex] ?? null
     : row.forecast_calculation ?? row.calculation;
   if (!calculation) return null;
+  if (
+    behavior === "captured_detail" &&
+    (calculation.refs ?? []).some((reference) => {
+      const dependency = rows.find((candidate) => candidate.row_id === reference);
+      const authority = dependency?.forecast_period_authorities?.[forecastIndex];
+      return Boolean(
+        dependency?.forecast_capture_parent_id ||
+        ["not_separately_forecast", "not_applicable"].includes(authority?.method),
+      );
+    })
+  ) {
+    // A formula whose input is deliberately absent is not executable evidence.
+    // The certified aggregate capture remains the correct authority; keeping
+    // the intermediate formula live would display a partial subtotal that no
+    // longer represents the selected parent forecast.
+    return null;
+  }
   // Formula shape, not a broad row label, determines ownership.  A
   // prior-period rule is a forecast mechanism even when the row was emitted
   // as a calculation row; treating it as an accounting identity made it
@@ -689,7 +706,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         if (declared) candidates.push(declared);
         const broker = brokerCandidate(modelCase, row, forecastIndex);
         if (broker) candidates.push(broker);
-        const formula = formulaCandidate(row, behavior, forecastIndex);
+        const formula = formulaCandidate(row, behavior, forecastIndex, sectionRows);
         if (formula) candidates.push(formula);
         const derivedDisplay = derivedDisplayCandidate(row);
         if (derivedDisplay) candidates.push(derivedDisplay);
@@ -1091,6 +1108,45 @@ export function materializeForecastPlan(modelCase, plan) {
     delete row.formula_authority;
   }
   return next;
+}
+
+/**
+ * Materialise only from the sealed selected-authority contract.
+ *
+ * The candidate ledger is intentionally projected from the contract rather
+ * than accepted from the pre-contract forecast plan.  This makes the contract
+ * the economic writer: changing an unselected candidate or the original plan
+ * after sealing cannot change the model, while changing the contract hash or
+ * any selected state necessarily does.
+ */
+export function materializeSelectedAuthorityContract(modelCase, contract) {
+  if (contract?.schema_version !== "selected-authority-contract/1.0") {
+    throw new Error("A selected-authority-contract/1.0 artifact is required for materialisation.");
+  }
+  const forecastAuthorities = (contract.authorities ?? []).filter(
+    (authority) => authority.selected_state !== null,
+  );
+  if (forecastAuthorities.some((authority) => !authority.selected_state)) {
+    throw new Error("Every forecast authority must carry its complete selected state.");
+  }
+  const states = forecastAuthorities.map((authority) =>
+    structuredClone(authority.selected_state));
+  const candidateLedger = forecastAuthorities
+    .filter((authority) => authority.selected_candidate !== null)
+    .map((authority) => structuredClone(authority.selected_candidate));
+  const unresolvedMaterialCount = states.filter(
+    (state) => state.status === "BLOCKED",
+  ).length;
+  const sealedPlan = {
+    schema_version: "forecast-plan/2.0",
+    case_id: contract.case_id,
+    forecast_periods: [...new Set(states.map((state) => state.period_end))],
+    states,
+    candidate_ledger: candidateLedger,
+    status: unresolvedMaterialCount === 0 ? "PASS" : "BLOCKED",
+    unresolved_material_count: unresolvedMaterialCount,
+  };
+  return materializeForecastPlan(modelCase, sealedPlan);
 }
 
 export function validateForecastPlanCaseParity(modelCase, plan) {

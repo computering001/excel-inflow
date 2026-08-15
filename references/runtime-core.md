@@ -239,7 +239,7 @@ screen is shown.
 The entry screen asks for the COMPANY ONLY. Filings are auto-pulled where the
 runtime carries a filings library or public-filings access (user-supplied
 filings always take precedence; a company whose filings cannot be pulled or
-supplied blocks at intake). Broker research (3-10 houses) is requested at the
+supplied blocks at intake). Broker research (0-10 houses) is optional at the
 Brokers milestone and the FactSet debt export - date toggle at LAST FISCAL
 YEAR END - at Debt. A user who attaches everything up front takes the fast
 path: the flow then stops only for a genuine model decision, if one remains.

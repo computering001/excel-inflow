@@ -111,7 +111,10 @@ export async function writeRunCarrier({
   });
   const snapshotDirectory = path.join(canonicalRunRoot, "carrier");
   await fs.mkdir(snapshotDirectory, { recursive: true });
-  const evidenceSnapshot = await snapshotFile(evidencePath, path.join(snapshotDirectory, "evidence-run.json"));
+  const canonicalEvidence = await canonicalPathThroughExistingAncestor(evidencePath);
+  const evidenceSnapshot = isEqualToOrInside(canonicalEvidence, canonicalRunRoot)
+    ? canonicalEvidence
+    : await snapshotFile(evidencePath, path.join(snapshotDirectory, "evidence-run.json"));
   let answersSnapshot = null;
   if (answersPath) {
     const extension = path.extname(answersPath).toLowerCase() === ".json" ? ".json" : ".txt";

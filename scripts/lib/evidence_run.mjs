@@ -32,6 +32,7 @@ const DCS_PROJECTION_SCHEMA = assetSchema("dcs-projection-v1.schema.json");
 const DCS_EVIDENCE_RECEIPT_SCHEMA = assetSchema("dcs-evidence-receipt-v1.schema.json");
 const DCS_INDEPENDENT_REPORT_SCHEMA = assetSchema("dcs-independent-verification-v1.schema.json");
 const BROKER_SEMANTIC_REPORT_SCHEMA = assetSchema("broker-semantic-verification-report.schema.json");
+const ARTIFACT_REFERENCE_SCHEMA = assetSchema("content-addressed-artifact-ref-v1.schema.json");
 
 function canonicalCompactSha256(value) {
   return createHash("sha256")
@@ -372,12 +373,12 @@ function validateSourceInventory(run, findings) {
     );
   }
   const brokerCount = count("user_broker_research");
-  if (brokerCount < 3 || brokerCount > 10) {
+  if (brokerCount > 10) {
     findings.push(
       finding(
         "evidence.source.broker_count",
         "BLOCK",
-        `Used broker research sources must be between 3 and 10; found ${brokerCount}.`,
+        `At most 10 used broker research sources are permitted; found ${brokerCount}. Broker research is optional and zero sources is valid.`,
       ),
     );
   }
@@ -1720,33 +1721,71 @@ function validateBrokerIngressCoherence(run, findings) {
 function validateBrokerSourceTables(run, findings) {
   const evidenceTables = run.broker_source_tables ?? null;
   const modelTables = run.model_case?.broker_pack?.raw_tables ?? null;
-  if (!evidenceTables && !modelTables) return;
-  if (!evidenceTables || !Array.isArray(modelTables)) {
+  const pageEvidence = run.model_case?.broker_pack?.page_evidence ?? null;
+  if (!evidenceTables && !modelTables && !pageEvidence) return;
+  if (!evidenceTables) {
     findings.push(
       finding(
         "evidence.broker_source_tables.envelope_mismatch",
         "BLOCK",
-        "Full-table broker evidence must exist in both the evidence envelope and model case.",
+        "The broker archive is absent from the evidence envelope.",
       ),
     );
     return;
   }
-  // Every reviewed table enters the values-only Bxx sheets. Evidence-only is a
-  // consumption prohibition, not a presentation deletion. Recompute the full
-  // table projection independently rather than accepting a caller-selected
-  // subset.
+  if (Array.isArray(modelTables) && Array.isArray(pageEvidence)) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.duplicate_model_projection",
+        "BLOCK",
+        "The model case duplicates broker raw tables and page evidence instead of referencing one workbook-facing archive.",
+      ),
+    );
+  }
+  if (!Array.isArray(modelTables) && !Array.isArray(pageEvidence)) {
+    findings.push(
+      finding(
+        "evidence.broker_source_tables.model_projection_missing",
+        "BLOCK",
+        "The model case has neither a complete page-image archive nor the legacy table projection.",
+      ),
+    );
+  }
   const expectedWorkbookTables = (evidenceTables.houses ?? []).map((house) => ({
     ...structuredClone(house),
     tables: (house.tables ?? []).map((table) => structuredClone(table)),
   }));
-  if (hashValue(expectedWorkbookTables) !== hashValue(modelTables)) {
+  if (
+    Array.isArray(modelTables) &&
+    hashValue(expectedWorkbookTables) !== hashValue(modelTables)
+  ) {
     findings.push(
       finding(
         "evidence.broker_source_tables.model_case_mismatch",
         "BLOCK",
-        "The model case does not equal the deterministic full-table projection of the broker evidence inventory.",
+        "The legacy model-case table projection does not equal the deterministic broker archive projection.",
       ),
     );
+  }
+  if (Array.isArray(pageEvidence)) {
+    const archiveSources = new Set(
+      (evidenceTables.houses ?? []).map((house) => house.source_id),
+    );
+    const pageSources = (pageEvidence ?? []).map((house) => house.source_id);
+    if (
+      pageSources.length !== archiveSources.size ||
+      new Set(pageSources).size !== pageSources.length ||
+      pageSources.some((sourceId) => !archiveSources.has(sourceId)) ||
+      pageEvidence.some((house) => !(house.pages ?? []).length)
+    ) {
+      findings.push(
+        finding(
+          "evidence.broker_source_tables.page_archive_incomplete",
+          "BLOCK",
+          "The workbook-facing broker page archive does not cover every preserved house exactly once.",
+        ),
+      );
+    }
   }
   // The digest is the audit face of each house tab, so it gets the raw-tables
   // treatment: re-derive the projection from the pack itself and demand exact
@@ -1798,40 +1837,15 @@ function validateBrokerSourceTables(run, findings) {
       ),
     );
   }
-  const sourceTableCount = (evidenceTables.houses ?? []).reduce(
-    (count, house) => count + (house.tables ?? []).length,
-    0,
-  );
-  const candidateCount =
-    receipt?.coverage_summary?.candidate_manifest_count ??
-    receipt?.coverage_summary?.detected_forecast_candidate_count ??
-    null;
-  const evidenceOnlyEmptyAuthority =
-    candidateCount === 0 &&
-    receipt?.coverage_summary?.mapping_count === 0 &&
-    Array.isArray(receipt?.mappings) &&
-    receipt.mappings.length === 0 &&
-    Array.isArray(receipt?.coverage_ledger) &&
-    receipt.coverage_ledger.length === 0 &&
-    (evidenceTables.houses ?? []).every((house) =>
-      (house.tables ?? []).every(
-        (table) => table.workbook_presentation === "evidence_only",
-      ),
-    );
   if (
-    receipt?.coverage_summary?.unresolved_candidate_count !== 0 ||
-    receipt?.coverage_summary?.semantic_quality_violation_count !== 0 ||
-    receipt?.coverage_summary?.table_count !== sourceTableCount ||
-    receipt?.coverage_summary?.table_count !==
-      receipt?.coverage_summary?.table_review_count ||
-    !Array.isArray(receipt?.coverage_ledger) ||
-    (receipt.coverage_ledger.length === 0 && !evidenceOnlyEmptyAuthority)
+    receipt?.coverage_summary?.unresolved_selected_candidate_count > 0 ||
+    receipt?.coverage_summary?.semantic_quality_violation_count > 0
   ) {
     findings.push(
       finding(
-        "evidence.broker_source_tables.semantic_coverage_incomplete",
+        "evidence.broker_source_tables.selected_semantic_coverage_incomplete",
         "BLOCK",
-        "Full-table broker evidence requires complete semantic coverage and zero unresolved forecast candidates; a zero-entry ledger is valid only when the independently reviewed pack has zero candidates, zero mappings and evidence-only presentation throughout.",
+        "A broker candidate selected for model use remains semantically unresolved.",
       ),
     );
   }
@@ -1882,7 +1896,7 @@ function validateBrokerSourceTables(run, findings) {
   const sourceIds = new Set();
   const tableIds = new Set();
   const workbookTableIds = new Set(
-    expectedWorkbookTables.flatMap((house) =>
+    (evidenceTables.houses ?? []).flatMap((house) =>
       (house.tables ?? []).map((table) => table.table_id),
     ),
   );
@@ -1961,6 +1975,86 @@ function validateBrokerSourceTables(run, findings) {
         "The broker source-table gate visited zero cells.",
       ),
     );
+  }
+}
+
+function validateContentAddressedLaneReferences(run, findings) {
+  const lanes = run.case_evidence?.lanes ?? {};
+  const checks = [
+    {
+      lane: "broker_evidence",
+      ingress: run.ingress?.broker_evidence,
+      forbidden: [
+        "extraction_bundle", "source_tables", "crosswalk",
+        "crosswalk_receipt", "semantic_verification", "workbook_table_projection",
+      ],
+      bindings: {
+        extraction_bundle: "extraction_bundle_sha256",
+        source_tables: "source_tables_sha256",
+        crosswalk: "crosswalk_sha256",
+        crosswalk_receipt: "crosswalk_receipt_sha256",
+        semantic_verification: "semantic_verification_sha256",
+        degraded_close_receipt: "degraded_close_receipt_sha256",
+      },
+    },
+    {
+      lane: "dcs",
+      ingress: run.ingress?.dcs_evidence,
+      forbidden: [
+        "source_tables", "candidate_manifest", "crosswalk", "projection",
+        "compiler_receipt", "independent_verification", "dcs_export", "term_authorities",
+      ],
+      bindings: {
+        source_tables: "source_tables_sha256",
+        candidate_manifest: "candidate_manifest_sha256",
+        crosswalk: "crosswalk_sha256",
+        projection: "projection_sha256",
+        compiler_receipt: "evidence_receipt_sha256",
+        independent_verification: "independent_verification_sha256",
+      },
+    },
+  ];
+  for (const check of checks) {
+    const lane = lanes[check.lane];
+    if (!lane || !check.ingress) continue;
+    for (const field of check.forbidden) {
+      if (Object.hasOwn(lane, field)) {
+        findings.push(
+          finding(
+            `evidence.artifact_ref.${check.lane}.duplicate.${field}`,
+            "BLOCK",
+            `${check.lane} embeds ${field} instead of carrying one content-addressed reference.`,
+          ),
+        );
+      }
+    }
+    const refs = lane.artifact_refs;
+    if (!refs || typeof refs !== "object" || Array.isArray(refs)) {
+      findings.push(
+        finding(
+          `evidence.artifact_ref.${check.lane}.missing`,
+          "BLOCK",
+          `${check.lane} has no content-addressed artifact reference ledger.`,
+        ),
+      );
+      continue;
+    }
+    for (const [name, ingressField] of Object.entries(check.bindings)) {
+      const expected = check.ingress?.[ingressField];
+      const ref = refs[name];
+      if (!expected && !ref) continue;
+      const schemaErrors = validateJsonSchema(ref, ARTIFACT_REFERENCE_SCHEMA);
+      if (schemaErrors.length > 0 || ref?.sha256 !== expected) {
+        findings.push(
+          finding(
+            `evidence.artifact_ref.${check.lane}.${name}`,
+            "BLOCK",
+            `${check.lane}.${name} is absent, malformed or detached from the ingress hash.`,
+            schemaErrors,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -2696,6 +2790,7 @@ export function validateEvidenceRun(run) {
 
   const sourceIds = validateSourceInventory(run, findings);
   validateAttachmentIngress(run, findings);
+  validateContentAddressedLaneReferences(run, findings);
   const modelCase = run.model_case ?? {};
   const caseErrors = validateCaseShape(modelCase);
   for (const message of caseErrors) {

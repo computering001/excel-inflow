@@ -98,7 +98,7 @@ export const ANCHOR_METRICS = Object.freeze([
   "depreciation_and_amortisation",
 ]);
 
-export const MIN_BROKER_HOUSES = 3;
+export const MIN_BROKER_HOUSES = 0;
 export const MAX_BROKER_HOUSES = 10;
 
 // ---------------------------------------------------------------------------
@@ -935,20 +935,7 @@ function contributes(series) {
 function checkBrokerHouses(pack, findings) {
   const houses = Array.isArray(pack.houses) ? pack.houses : [];
 
-  if (houses.length < MIN_BROKER_HOUSES) {
-    findings.push(
-      finding(
-        "broker_house_count_below_minimum",
-        SEVERITY.ERROR,
-        "out_of_range",
-        REMEDY.RE_SUPPLY,
-        "broker_pack.houses",
-        `Broker set contains ${houses.length} contributor${houses.length === 1 ? "" : "s"}, minimum ${MIN_BROKER_HOUSES}. ` +
-          `Three is the fewest that lets a disagreement between houses be settled by majority; with ${houses.length} the forecast anchor cannot resolve.`,
-        { house_count: houses.length, minimum: MIN_BROKER_HOUSES },
-      ),
-    );
-  } else if (houses.length > MAX_BROKER_HOUSES) {
+  if (houses.length > MAX_BROKER_HOUSES) {
     findings.push(
       finding(
         "broker_house_count_above_maximum",

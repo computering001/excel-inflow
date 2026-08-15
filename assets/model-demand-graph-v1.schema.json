@@ -14,12 +14,17 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["node_id", "node_kind", "section", "concept_id", "period_end", "required", "material", "authority_class", "allowed_authorities", "reachable_outputs"],
+        "required": ["node_id", "node_kind", "section", "concept_id", "source_line_ids", "period_end", "required", "material", "authority_class", "allowed_authorities", "reachable_outputs"],
         "properties": {
           "node_id": { "type": "string", "minLength": 1 },
           "node_kind": { "enum": ["forecast_state", "contractual_term"] },
           "section": { "type": "string", "minLength": 1 },
           "concept_id": { "type": "string", "minLength": 1 },
+          "source_line_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
           "instrument_id": { "type": "string", "minLength": 1 },
           "period_end": { "type": ["string", "null"], "format": "date" },
           "required": { "type": "boolean" },

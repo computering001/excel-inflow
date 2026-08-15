@@ -11,7 +11,7 @@
     "model_context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["as_of", "reporting_currency", "units", "forecast_periods"],
+      "required": ["as_of", "reporting_currency", "units", "forecast_periods", "model_demand_graph"],
       "properties": {
         "as_of": { "type": "string", "format": "date" },
         "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
@@ -21,6 +21,22 @@
           "minItems": 3,
           "maxItems": 3,
           "items": { "type": "string", "format": "date" }
+        },
+        "model_demand_graph": {
+          "type": "object",
+          "description": "The complete filings-derived demand graph compiled before broker extraction and independently re-bound to the final model-demand graph.",
+          "required": ["schema_version", "forecast_periods", "nodes", "graph_sha256"],
+          "properties": {
+            "schema_version": { "const": "pre-broker-model-demand/1.0" },
+            "forecast_periods": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": { "type": "string", "format": "date" }
+            },
+            "nodes": { "type": "array" },
+            "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
         }
       }
     },

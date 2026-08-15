@@ -3682,7 +3682,7 @@ function configureOperatingModel(
       // identity; the balancing bucket consumes that answer downstream.
       return explicitCashBuckets
         ? cashFlowCashFormula(column)
-        : endingCashStatementFormula(column);
+        : null;
     }
     if (definition.semantic_role === "non_balancing_cash_bucket_movement") {
       const index = HISTORICAL_COLUMNS.indexOf(column);
@@ -3740,8 +3740,21 @@ function configureOperatingModel(
         isSelfCarry(definition, definition.calculation) &&
         values[index] !== null &&
         values[index] !== undefined;
+      // A legacy (single-bucket) historical closing-cash balance is a filed
+      // observation, not an amount the workbook is entitled to replace with
+      // a reconstructed cash-flow identity.  Reported cash-flow components
+      // can differ from the filed balance by presentation, translation or
+      // source rounding.  Forecast closing cash remains a live formula and
+      // FY1 opening cash links to this sourced historical balance, so the
+      // solver and workbook share one opening-cash authority.
+      const sourcedHistoricalEndingCash =
+        !explicitCashBuckets &&
+        definition.semantic_role === "ending_cash" &&
+        values[index] !== null &&
+        values[index] !== undefined;
       const generic =
         !historicalSelfCarry &&
+        !sourcedHistoricalEndingCash &&
         (definition.historical_authority === "derived_formula" ||
           definition.historical_authority === "reported_total_reconciled" ||
           definition.row_type === "calculation" ||

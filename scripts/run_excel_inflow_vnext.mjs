@@ -15,7 +15,10 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
-import { authorityQualitySummary } from "./lib/run_constitution_graph.mjs";
+import {
+  authorityQualitySummary,
+  validatePreBrokerDemandCoverage,
+} from "./lib/run_constitution_graph.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -23,6 +26,9 @@ const CONTROLLER_VERSION = "excel-inflow-vnext/1.0";
 let ACTIVE_RUNTIME_CLOSURE = null;
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
+);
+const PRE_BROKER_DEMAND_SCHEMA = JSON.parse(
+  await fs.readFile(path.join(ROOT, "assets", "pre-broker-model-demand-v1.schema.json"), "utf8"),
 );
 
 function parseArgs(argv) {
@@ -220,6 +226,14 @@ async function main() {
     }
     evidencePath = attachmentState.artifacts?.evidence_run;
     if (!evidencePath) throw new Error("PASS attachment state has no evidence_run artifact.");
+    if (attachmentState.lane_states?.broker && attachmentState.lane_states?.filings) {
+      const preBrokerDemandPath = attachmentState.artifacts?.pre_broker_model_demand;
+      if (!preBrokerDemandPath) {
+        throw new Error("PASS raw evidence omitted the filings-derived pre-broker demand artifact.");
+      }
+      artifacts.pre_broker_model_demand = preBrokerDemandPath;
+      checkpoints.push(await checkpoint("pre_broker_demand", "PASS", preBrokerDemandPath));
+    }
   } else {
     evidencePath = path.resolve(String(options["evidence-run"]));
     if (options["attachment-state"]) {
@@ -296,6 +310,34 @@ async function main() {
     authorityContractPath,
     "selected authority contract",
   );
+  const modelDemandGraph = await readJson(demandGraphPath, "model demand graph");
+  if (artifacts.pre_broker_model_demand) {
+    const preBrokerDemand = await readJson(
+      artifacts.pre_broker_model_demand,
+      "pre-broker model demand",
+    );
+    const schemaErrors = validateJsonSchema(preBrokerDemand, PRE_BROKER_DEMAND_SCHEMA);
+    const coverage = validatePreBrokerDemandCoverage(preBrokerDemand, modelDemandGraph);
+    if (schemaErrors.length > 0 || !coverage.valid) {
+      return finish({
+        out,
+        runId,
+        status: "NEEDS_INTERNAL_WORK",
+        qualityMode: "INTERNAL_WORK",
+        blockerClass: "INTERNAL_WORK",
+        checkpoints: [
+          ...checkpoints,
+          await checkpoint("pre_broker_demand_binding", "BLOCKED", demandGraphPath),
+        ],
+        artifacts,
+        summary: {
+          message: "The filings-derived demand graph did not survive intact into final authority resolution.",
+          violations: [...schemaErrors, ...coverage.errors],
+        },
+      });
+    }
+    checkpoints.push(await checkpoint("pre_broker_demand_binding", "PASS", demandGraphPath));
+  }
   const runGraph = await readJson(runGraphPath, "run constitution graph");
   const qualitySummary = authorityQualitySummary(authorityContract);
   artifacts.forecast_plan = forecastPlanPath;

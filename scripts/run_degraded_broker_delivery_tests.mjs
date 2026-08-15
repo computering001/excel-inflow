@@ -14,6 +14,7 @@ import {
   verifyBrokerPreviewConfirmation,
 } from "./lib/broker_preview.mjs";
 import { compileCase } from "./lib/case_compiler.mjs";
+import { runIntake } from "./lib/intake.mjs";
 
 const exec = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -125,6 +126,30 @@ await command(process.execPath, [
   cleanEvidencePath,
 ]);
 const cleanEvidence = await readJson(cleanEvidencePath);
+for (const houseCount of [0, 1, 2]) {
+  const partialPack = structuredClone(cleanEvidence.broker_pack);
+  partialPack.houses = partialPack.houses.slice(0, houseCount);
+  const intake = runIntake({
+    companyName: cleanEvidence.company_name,
+    dcsExport: cleanEvidence.dcs_export,
+    brokerPack: partialPack,
+    expected: {
+      last_historical_period_end:
+        cleanEvidence.filings.historical_periods.at(-1),
+      forecast_period_ends: cleanEvidence.filings.forecast_periods,
+      reporting_currency: cleanEvidence.filings.reporting_currency,
+      units: cleanEvidence.filings.units,
+      reported_gross_debt: cleanEvidence.filings.reported_gross_debt,
+      issuer_name: cleanEvidence.company_name,
+    },
+  });
+  assert(
+    intake.ok && intake.summary.house_count === houseCount,
+    `${houseCount}-house optional broker intake blocked: ${intake.errors
+      .map((finding) => finding.message)
+      .join("; ")}`,
+  );
+}
 cleanEvidence.case_evidence.lanes.controls = {
   ...cleanEvidence.case_evidence.lanes.controls,
   broker_case: "Forecast Waterfall",
@@ -252,6 +277,57 @@ assert(
   "delivered workbook claims model-linked broker mappings",
 );
 
+// 5. Prove the stronger boundary as well: broker research may be absent, not
+// merely present-but-quarantined.  The same fully evidenced company/debt case
+// must still reach delivery through non-broker forecast authorities.
+const zeroBrokerCase = structuredClone(compiled.model_case);
+zeroBrokerCase.controls = {
+  ...(zeroBrokerCase.controls ?? {}),
+  broker_case: "Consensus",
+};
+zeroBrokerCase.broker_pack = {
+  source_label: "No broker authority supplied",
+  forecast_periods: structuredClone(zeroBrokerCase.periods.slice(3).map((item) => item.date)),
+  metrics: {},
+  house_metadata: {},
+  source_mappings: [],
+  house_digests: {},
+};
+for (const section of ["income_statement", "cash_flow"]) {
+  for (const row of zeroBrokerCase.statement_structure?.[section] ?? []) {
+    delete row.broker_metric_id;
+    if (row.forecast_treatment === "broker") row.forecast_treatment = "historical_average";
+  }
+}
+const zeroBrokerCasePath = path.join(out, "zero-broker-model-case.json");
+await writeJson(zeroBrokerCasePath, zeroBrokerCase);
+const zeroBrokerBuildRoot = path.join(out, "zero-broker-delivered-build");
+const zeroBrokerStage4 = await command(
+  process.execPath,
+  [
+    path.join(HERE, "orchestrate_release.mjs"),
+    zeroBrokerCasePath,
+    "--out",
+    zeroBrokerBuildRoot,
+    "--case-only",
+    "--python",
+    python,
+    "--soffice",
+    soffice,
+    "--json",
+  ],
+  {
+    timeout: 1200000,
+    env: { PYTHONPATH: selectedPythonPath },
+  },
+);
+const zeroBrokerBuildResult = JSON.parse(zeroBrokerStage4.stdout);
+assert(
+  zeroBrokerBuildResult.status === "PASS_PENDING_MANUAL" &&
+    zeroBrokerBuildResult.total_violations === 0,
+  `zero-broker build did not deliver: ${JSON.stringify(zeroBrokerBuildResult).slice(0, 2000)}`,
+);
+
 const report = {
   schema_version: "degraded-broker-delivery-test/1.0",
   status: "PASS",
@@ -266,6 +342,9 @@ const report = {
   broker_preview_selected_value_count: preview.selected_value_count,
   case_compile_status: compiled.report.status,
   stage4_status: buildResult.status,
+  zero_broker_stage4_status: zeroBrokerBuildResult.status,
+  zero_broker_workbook: path.resolve(zeroBrokerBuildResult.workbook),
+  optional_broker_intake_house_counts: [0, 1, 2],
   workbook,
   workbook_bytes: workbookStat.size,
   total_violations: buildResult.total_violations,

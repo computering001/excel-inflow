@@ -123,6 +123,12 @@
       "script": "run_broker_degraded_close_tests.py"
     },
     {
+      "id": "broker-demand-selection",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_demand_selection_tests.py"
+    },
+    {
       "id": "broker-carrier-migration",
       "phase": "evidence",
       "runtime": "python",

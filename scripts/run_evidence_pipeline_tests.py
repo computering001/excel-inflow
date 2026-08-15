@@ -159,6 +159,18 @@ def main() -> int:
                 "forecast_periods": ["2026-12-31", "2027-12-31", "2028-12-31"],
                 "reporting_currency": "GBP",
                 "units": "millions",
+                "income_statement": [{
+                    "source_line_id": "is.revenue",
+                    "label": "Revenue",
+                    "values": [100, 110, 120],
+                    "material": True,
+                }],
+                "cash_flow": [{
+                    "source_line_id": "cf.capex",
+                    "label": "Capital expenditure",
+                    "values": [-10, -11, -12],
+                    "material": True,
+                }],
             },
         }), "utf-8")
         spec_path = root / "spec.json"
@@ -174,14 +186,29 @@ def main() -> int:
             filings_state={"artifacts": {"filings_bundle": str(filings_bundle)}},
         )
         derived = json.loads(Path(declaration["request_path"]).read_text("utf-8"))
+        context = derived["model_context"]
         assert_true(
-            derived["model_context"] == {
+            {
+                key: context[key]
+                for key in ("as_of", "reporting_currency", "units", "forecast_periods")
+            } == {
                 "as_of": "2025-12-31",
                 "reporting_currency": "GBP",
                 "units": "millions",
                 "forecast_periods": ["2026-12-31", "2027-12-31", "2028-12-31"],
             },
             "broker optional-close request did not inherit the sealed filings basis",
+        )
+        demand = context["model_demand_graph"]
+        assert_true(
+            demand["schema_version"] == "pre-broker-model-demand/1.0"
+            and demand["counts"] == {
+                "source_rows": 2,
+                "forecast_nodes": 6,
+                "material_nodes": 6,
+            }
+            and Path(declaration["model_demand_path"]).is_file(),
+            "broker request was not bound to a filings-derived demand graph before extraction",
         )
         checks += 1
     assert_true(vision.transcription_structure(table_passes[0]["tables"][0])["is_grid"], "labelled period grid was not recognized")
