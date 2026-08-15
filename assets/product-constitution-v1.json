@@ -36,6 +36,12 @@
     "unresolved"
   ],
   "broker_rules": {
+    "visible_intake_checkpoint_required": true,
+    "valid_intake_states_before_debt": ["supplied", "explicitly_skipped"],
+    "zero_files_implies_skip": false,
+    "explicit_skip_phrase": "continue without brokers",
+    "minimum_supplied_reports": 1,
+    "maximum_supplied_reports": 10,
     "one_coherent_house": true,
     "cross_house_period_fallback": false,
     "selected_cell_provenance_required": true,

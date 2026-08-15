@@ -4,12 +4,13 @@
   "title": "Single production owner for raw attachment evidence",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "attachment_ingress_path", "case_source_declarations_path"],
+  "required": ["schema_version", "run_id", "attachment_ingress_path", "case_source_declarations_path", "broker_intake_choice_path"],
   "properties": {
     "schema_version": { "const": "attachment-evidence-controller/1.0" },
     "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
     "attachment_ingress_path": { "type": "string", "minLength": 1 },
     "case_source_declarations_path": { "type": "string", "minLength": 1 },
+    "broker_intake_choice_path": { "type": "string", "minLength": 1 },
     "filings": { "$ref": "#/$defs/filingsLane" },
     "broker": { "$ref": "#/$defs/brokerLane" },
     "dcs": { "$ref": "#/$defs/dcsLane" }

@@ -117,6 +117,12 @@
       "script": "run_evidence_pipeline_tests.py"
     },
     {
+      "id": "broker-intake-choice",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_broker_intake_tests.mjs"
+    },
+    {
       "id": "broker-degraded-close",
       "phase": "evidence",
       "runtime": "python",

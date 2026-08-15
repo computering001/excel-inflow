@@ -211,6 +211,73 @@ def main() -> int:
             "broker request was not bound to a filings-derived demand graph before extraction",
         )
         checks += 1
+    with tempfile.TemporaryDirectory(prefix="excel-inflow-broker-intake-binding-") as temporary:
+        root = Path(temporary)
+        report = root / "house-a.pdf"
+        report.write_bytes(b"%PDF broker intake binding\n")
+        report_sha = hashlib.sha256(report.read_bytes()).hexdigest()
+        broker_request = root / "broker-request.json"
+        broker_request.write_text(json.dumps({
+            "schema_version": "broker-extraction-request/1.0",
+            "run_id": "broker-intake-binding",
+            "documents": [{
+                "document_id": "house-a",
+                "house_id": "house_a",
+                "house_name": "House A",
+                "source_id": "house-a-source",
+                "path": str(report),
+                "media_type": "application/pdf",
+                "published_date": "2026-08-15",
+                "expected_sha256": report_sha,
+            }],
+        }), "utf-8")
+        issuer = {"name": "Example plc", "lei": None, "ticker": "EXM"}
+        choice_body = {
+            "schema_version": "broker-intake-choice/1.0",
+            "run_id": "broker-intake-binding",
+            "issuer_identity": issuer,
+            "issuer_identity_sha256": attachment.sha256_value(issuer),
+            "intake_state": "supplied",
+            "processing_state": "not_started",
+            "authority_state": "not_resolved",
+            "choice": "use_supplied_brokers",
+            "choice_phrase": None,
+            "attachments": [{
+                "attachment_id": "house-a",
+                "file_name": report.name,
+                "media_type": "application/pdf",
+                "byte_length": report.stat().st_size,
+                "sha256": report_sha,
+            }],
+            "filings_receipt_sha256": "1" * 64,
+            "runtime_closure_sha256": "2" * 64,
+            "recorded_at": "2026-08-15T08:00:00.000Z",
+        }
+        choice = {**choice_body, "receipt_sha256": attachment.sha256_value(choice_body)}
+        choice_path = root / "broker-intake-choice.json"
+        choice_path.write_text(json.dumps(choice), "utf-8")
+        spec_path = root / "spec.json"
+        spec = {
+            "run_id": "broker-intake-binding",
+            "broker_intake_choice_path": str(choice_path),
+            "broker": {"request_path": str(broker_request)},
+        }
+        spec_path.write_text(json.dumps(spec), "utf-8")
+        verified_choice, verified_path = attachment.verify_broker_intake_choice(spec, spec_path)
+        assert_true(
+            verified_choice["intake_state"] == "supplied" and verified_path == choice_path.resolve(),
+            "top attachment controller did not bind the supplied broker choice",
+        )
+        tampered = json.loads(json.dumps(choice))
+        tampered["attachments"][0]["sha256"] = "0" * 64
+        choice_path.write_text(json.dumps(tampered), "utf-8")
+        try:
+            attachment.verify_broker_intake_choice(spec, spec_path)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("tampered broker intake choice passed the attachment boundary")
+        checks += 2
     assert_true(vision.transcription_structure(table_passes[0]["tables"][0])["is_grid"], "labelled period grid was not recognized")
     checks += 1
 

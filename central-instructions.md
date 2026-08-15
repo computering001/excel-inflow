@@ -235,10 +235,33 @@ screen is shown.
 The entry screen asks for the COMPANY ONLY. Filings are auto-pulled where the
 runtime carries a filings library or public-filings access (user-supplied
 filings always take precedence; a company whose filings cannot be pulled or
-supplied blocks at intake). Broker research (3-10 houses) is requested at the
-Brokers milestone and the FactSet debt export - date toggle at LAST FISCAL
+supplied blocks at intake). Broker research is optional, but the Brokers
+milestone is not optional: it must close through either 1-10 supplied reports
+or the exact recorded choice `continue without brokers`. Zero attachments,
+silence, a missing picker or an unavailable research library never implies
+skip. The FactSet debt export - date toggle at LAST FISCAL
 YEAR END - at Debt. A user who attaches everything up front takes the fast
 path: the flow then stops only for a genuine model decision, if one remains.
+
+After filings close, invoke the installed Brokers checkpoint before requesting
+the FactSet export:
+
+```text
+node scripts/run_broker_intake.mjs <broker-intake-request.json> --out <run-folder>/broker-intake
+```
+
+With no attachments and no exact skip phrase, the command returns
+`ACTION_REQUIRED`, writes no choice receipt and its canonical screen is the
+entire visible reply. With 1-10 attachments it verifies and hashes every file,
+mints `broker-intake-choice/1.0` with `intake_state=supplied`, and broker
+processing proceeds internally. With the exact phrase it mints
+`intake_state=explicitly_skipped` and `authority_state=zero`, then advances to
+Debt. The attachment controller and run carrier independently revalidate and
+retain that receipt. They refuse a broker lane without a supplied receipt, a
+skip receipt beside broker files, changed attachment bytes, another run ID or
+an implicit legacy skip. Broker extraction, OCR, reconciliation, house
+selection and fallback remain one internal non-blocking step after upload; do
+not introduce a second preview or confirmation interaction.
 
 The bare trigger is presentation-only. Do not certify the installed release,
 inspect package bytes, emit progress prose, search for tools, read evidence or

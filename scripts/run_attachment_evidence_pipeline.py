@@ -27,6 +27,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "attachment-evidence-runtime-members.json"
 USER_BLOCKERS = {"USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"}
+BROKER_SKIP_PHRASE = "continue without brokers"
 
 
 def canonical_bytes(value: Any) -> bytes:
@@ -74,6 +75,70 @@ def resolve(base: Path, value: str | None) -> Path | None:
         return None
     target = Path(value)
     return target.resolve() if target.is_absolute() else (base / target).resolve()
+
+
+def verify_broker_intake_choice(spec: dict[str, Any], spec_path: Path) -> tuple[dict[str, Any], Path]:
+    choice_path = resolve(spec_path.parent, spec.get("broker_intake_choice_path"))
+    if choice_path is None or not choice_path.is_file():
+        raise ValueError(
+            "The visible Brokers milestone has no sealed upload-or-skip choice. "
+            "Run scripts/run_broker_intake.mjs and do not infer skip from zero files."
+        )
+    choice = read_json(choice_path, "broker intake choice")
+    if choice.get("schema_version") != "broker-intake-choice/1.0":
+        raise ValueError("Broker intake choice has the wrong schema version")
+    if choice.get("run_id") != spec.get("run_id"):
+        raise ValueError("Broker intake choice belongs to another run")
+    body = {key: value for key, value in choice.items() if key != "receipt_sha256"}
+    if choice.get("receipt_sha256") != sha256_value(body):
+        raise ValueError("Broker intake choice self-hash does not bind its payload")
+    issuer = choice.get("issuer_identity")
+    if not isinstance(issuer, dict) or not str(issuer.get("name") or "").strip():
+        raise ValueError("Broker intake choice omits issuer identity")
+    if choice.get("issuer_identity_sha256") != sha256_value(issuer):
+        raise ValueError("Broker intake choice issuer identity hash does not match")
+    for field in ("filings_receipt_sha256", "runtime_closure_sha256"):
+        value = choice.get(field)
+        if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+            raise ValueError(f"Broker intake choice {field} is not sha256")
+    attachments = choice.get("attachments")
+    if not isinstance(attachments, list) or len(attachments) > 10:
+        raise ValueError("Broker intake choice attachments are invalid")
+    intake_state = choice.get("intake_state")
+    broker = spec.get("broker")
+    if intake_state == "explicitly_skipped":
+        if attachments or choice.get("choice_phrase") != BROKER_SKIP_PHRASE or broker:
+            raise ValueError("Explicit broker skip conflicts with supplied broker evidence")
+        if choice.get("authority_state") != "zero":
+            raise ValueError("Explicit broker skip did not seal zero broker authority")
+    elif intake_state == "supplied":
+        if not broker or not (1 <= len(attachments) <= 10):
+            raise ValueError("Supplied broker choice requires one broker lane and 1-10 attachments")
+        request_path = resolve(spec_path.parent, broker.get("request_path"))
+        if request_path is None or not request_path.is_file():
+            raise ValueError("Supplied broker choice points at an absent broker request")
+        request = read_json(request_path, "broker request for intake binding")
+        documents = request.get("documents")
+        if not isinstance(documents, list) or len(documents) != len(attachments):
+            raise ValueError("Broker intake choice attachment count does not match broker request")
+        chosen = {str(item.get("attachment_id")): item for item in attachments}
+        if len(chosen) != len(attachments):
+            raise ValueError("Broker intake choice has duplicate attachment ids")
+        for document in documents:
+            document_id = str(document.get("document_id") or "")
+            selected = chosen.get(document_id)
+            source_path = resolve(request_path.parent, document.get("path"))
+            if selected is None or source_path is None or not source_path.is_file():
+                raise ValueError(f"Broker intake choice does not bind document {document_id}")
+            actual_sha = sha256_file(source_path)
+            if selected.get("sha256") != actual_sha:
+                raise ValueError(f"Broker intake choice hash does not match document {document_id}")
+            expected = document.get("expected_sha256")
+            if expected is not None and expected != actual_sha:
+                raise ValueError(f"Broker request expected hash does not match document {document_id}")
+    else:
+        raise ValueError("Broker intake choice is neither supplied nor explicitly skipped")
+    return choice, choice_path
 
 
 def runtime_closure() -> str:
@@ -720,19 +785,29 @@ def main() -> int:
         not spec.get("run_id")
         or not spec.get("attachment_ingress_path")
         or not spec.get("case_source_declarations_path")
+        or not spec.get("broker_intake_choice_path")
     ):
         raise ValueError(
             "Attachment evidence controller spec lacks run_id, attachment_ingress_path "
-            "or case_source_declarations_path"
+            "case_source_declarations_path or broker_intake_choice_path"
         )
     if not any(spec.get(lane) for lane in ("filings", "broker", "dcs")):
         raise ValueError("Attachment evidence controller spec declares no evidence lane")
     spec_hash = sha256_file(spec_path)
     runtime_hash = runtime_closure()
+    broker_intake_choice, broker_intake_choice_path = verify_broker_intake_choice(
+        spec, spec_path
+    )
+    if broker_intake_choice.get("runtime_closure_sha256") != runtime_hash:
+        raise ValueError(
+            "Broker intake choice runtime closure does not match this attachment controller"
+        )
     lanes: dict[str, dict[str, Any]] = {}
     state_paths: dict[str, Path] = {}
     checkpoints: list[dict[str, Any]] = []
-    derived_artifacts: dict[str, str] = {}
+    derived_artifacts: dict[str, str] = {
+        "broker_intake_choice": str(broker_intake_choice_path),
+    }
     for kind in ("filings", "broker", "dcs"):
         if not spec.get(kind):
             continue

@@ -126,6 +126,16 @@
     }
   },
   "layers": {
+    "broker_intake": {
+      "states": {
+        "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true },
+        "COMPLETE": { "blocker_classes": [null], "user_blocking": false }
+      },
+      "transitions": {
+        "ACTION_REQUIRED": ["ACTION_REQUIRED", "COMPLETE"],
+        "COMPLETE": ["COMPLETE"]
+      }
+    },
     "broker": {
       "states": {
         "NEEDS_VISION": { "blocker_classes": ["INTERNAL_WORK"], "user_blocking": false },
@@ -210,7 +220,7 @@
     },
     "user_flow": {
       "states": {
-        "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
+        "SCREEN": { "blocker_classes": [null], "user_blocking": false, "stages": ["company", "brokers", "inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
         "PAUSED": { "blocker_classes": [null], "user_blocking": false, "stages": ["inputs", "evidence_review", "decisions", "build_checks"] },
         "ACTION_REQUIRED": { "blocker_classes": ["USER_DECISION"], "user_blocking": true, "stages": ["inputs", "decisions"] },
         "BLOCKED": { "blocker_classes": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE"], "user_blocking": null, "stages": ["inputs", "evidence_review", "decisions", "build_checks", "delivery"] },
