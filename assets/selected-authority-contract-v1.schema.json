@@ -16,7 +16,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["node_id", "method", "selected_candidate_id", "selected_state", "selected_candidate", "source_bindings", "fallback_trace", "status"],
+        "required": ["node_id", "method", "selected_candidate_id", "selected_state", "selected_candidate", "source_bindings", "fallback_trace", "producer_witness", "status"],
         "properties": {
           "node_id": { "type": "string", "minLength": 1 },
           "method": { "type": "string", "minLength": 1 },
@@ -31,6 +31,17 @@
           },
           "source_bindings": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
           "fallback_trace": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "producer_witness": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["producer_kind", "producer_id", "executable", "reason"],
+            "properties": {
+              "producer_kind": { "type": "string", "minLength": 1 },
+              "producer_id": { "type": ["string", "null"] },
+              "executable": { "type": "boolean" },
+              "reason": { "type": ["string", "null"] }
+            }
+          },
           "status": { "enum": ["SELECTED", "STRUCTURAL", "CAPTURED", "INPUT_REQUIRED"] }
         }
       }
@@ -51,13 +62,14 @@
     "counts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["demand_nodes", "selected", "structural", "captured", "unresolved", "fallbacks"],
+      "required": ["demand_nodes", "selected", "structural", "captured", "unresolved", "missing_producers", "fallbacks"],
       "properties": {
         "demand_nodes": { "type": "integer", "minimum": 0 },
         "selected": { "type": "integer", "minimum": 0 },
         "structural": { "type": "integer", "minimum": 0 },
         "captured": { "type": "integer", "minimum": 0 },
         "unresolved": { "type": "integer", "minimum": 0 },
+        "missing_producers": { "type": "integer", "minimum": 0 },
         "fallbacks": { "type": "integer", "minimum": 0 }
       }
     },

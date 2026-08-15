@@ -96,10 +96,29 @@ function resolveHistoricalStatementSeries(modelCase, section) {
       cache.set(rowId, Number(stated));
       return Number(stated);
     }
+    // A null carried by a source-owned three-column face-statement row is a
+    // printed dash, not missing evidence: native extraction only admits the
+    // row after resolving all three period positions. It contributes zero to
+    // a reported subtotal. Rows without source_input authority remain absent.
+    if (
+      row.historical_authority === "source_input" &&
+      Array.isArray(row.values) &&
+      row.values.length >= 3 &&
+      (stated === null || stated === undefined)
+    ) {
+      cache.set(rowId, 0);
+      return 0;
+    }
 
     const calculation = row.calculation;
     if (!calculation || !Array.isArray(calculation.refs)) return null;
-    if (calculation.refs.length === 0) return null;
+    if (calculation.refs.length === 0) {
+      if (calculation.operator === "sum") {
+        cache.set(rowId, 0);
+        return 0;
+      }
+      return null;
+    }
 
     const nextVisiting = new Set(visiting);
     nextVisiting.add(rowId);

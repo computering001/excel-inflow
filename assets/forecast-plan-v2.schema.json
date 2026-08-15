@@ -16,7 +16,7 @@
     "state": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["state_id", "row_id", "section", "forecast_index", "period_end", "behavior", "producer_type", "method", "material", "selected_candidate_id", "render_state", "status"],
+      "required": ["state_id", "row_id", "section", "forecast_index", "period_end", "behavior", "producer_type", "method", "material", "selected_candidate_id", "producer_witness", "render_state", "status"],
       "properties": {
         "state_id": { "type": "string", "minLength": 1 },
         "row_id": { "type": "string", "minLength": 1 },
@@ -31,6 +31,17 @@
         "value": { "type": ["number", "null"] },
         "formula_spec": { "type": ["object", "null"] },
         "source_bindings": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "producer_witness": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["producer_kind", "producer_id", "executable", "reason"],
+          "properties": {
+            "producer_kind": { "type": "string", "minLength": 1 },
+            "producer_id": { "type": ["string", "null"] },
+            "executable": { "type": "boolean" },
+            "reason": { "type": ["string", "null"] }
+          }
+        },
         "render_state": { "enum": ["formula", "link", "input", "zero", "blank_grey", "block"] },
         "status": { "enum": ["RESOLVED", "BLOCKED"] },
         "rationale": { "type": "string" }

@@ -705,6 +705,12 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
             )
             task_path = artifact_path(bundle, document, task_id) if task_id else None
             task_payload = read_json(task_path, "broker vision task") if task_path else {}
+            source_surface_digest = sha256_bytes(canonical_bytes({
+                "schema_version": "broker-source-surface/1.0",
+                "document_id": document.get("document_id"),
+                "raw_sha256": document.get("raw_sha256"),
+                "surface_id": surface_id,
+            }))
             crop_paths = []
             for crop in task_payload.get("region_crops", []):
                 crop_target = artifact_path(bundle, document, str(crop.get("image_artifact_id") or ""))
@@ -722,6 +728,7 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
                 "surface_id": surface_id,
                 "missing_passes": missing_passes,
                 "image_path": str(artifact_path(bundle, document, image_id)) if image_id else None,
+                "image_sha256": source_surface_digest,
                 "region_crops": crop_paths,
                 "task_path": str(task_path) if task_path else None,
                 "selected_cell_contract": task_payload.get("selected_cell_contract"),
@@ -818,6 +825,57 @@ def physical_reconciliation_tasks(bundle: dict[str, Any]) -> list[dict[str, Any]
             ),
         })
     return tasks
+
+
+def rebase_crosswalk_table_reviews(
+    bundle: dict[str, Any],
+    crosswalk: dict[str, Any],
+    model_context: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Rebase derived table inventory without changing selected-cell decisions.
+
+    Native extraction may legitimately repartition unselected archive tables
+    across runtime/process versions. A reviewed crosswalk's mappings are the
+    preserved user/model-host decision; its all-table review inventory is a
+    derived descendant and must be rebuilt against the active canonical
+    bundle. Reviews for mapped tables are retained when the table identity is
+    still present. No mapping, metric or coverage decision is authored here.
+    """
+    shell = compile_reference_only_crosswalk(bundle, model_context)
+    active_reviews = {
+        str(item.get("table_id") or ""): item
+        for item in shell.get("table_reviews") or []
+    }
+    reviewed = {
+        str(item.get("table_id") or ""): item
+        for item in crosswalk.get("table_reviews") or []
+    }
+    mapped_table_ids = {
+        str(source.get("table_id") or "")
+        for mapping in crosswalk.get("mappings") or []
+        for source in mapping.get("sources") or []
+    }
+    rebased_reviews = []
+    for table_id, generated in sorted(active_reviews.items()):
+        rebased_reviews.append(
+            copy.deepcopy(reviewed[table_id])
+            if table_id in mapped_table_ids and table_id in reviewed
+            else copy.deepcopy(generated)
+        )
+    rebased = copy.deepcopy(crosswalk)
+    rebased["table_reviews"] = rebased_reviews
+    receipt = {
+        "schema_version": "broker-crosswalk-table-rebase-receipt/1.0",
+        "status": "PASS",
+        "preserved_mapping_count": len(rebased.get("mappings") or []),
+        "preserved_mapped_table_review_count": sum(
+            1 for table_id in mapped_table_ids if table_id in active_reviews and table_id in reviewed
+        ),
+        "dropped_stale_table_review_count": len(set(reviewed) - set(active_reviews)),
+        "active_table_review_count": len(rebased_reviews),
+        "missing_mapped_table_ids": sorted(mapped_table_ids - set(active_reviews)),
+    }
+    return rebased, receipt
 
 
 def period_header_tasks(bundle: dict[str, Any], bundle_path: Path) -> list[dict[str, Any]]:
@@ -1700,6 +1758,40 @@ def main() -> int:
             )
             return 2
 
+    if isinstance(request.get("model_context"), dict):
+        supplied_crosswalk = read_json(crosswalk, "broker crosswalk")
+        rebased_crosswalk, rebase_receipt = rebase_crosswalk_table_reviews(
+            active_bundle,
+            supplied_crosswalk,
+            request["model_context"],
+        )
+        if rebase_receipt["missing_mapped_table_ids"]:
+            # Preserve the decision artifact unchanged so the independent
+            # semantic/pack gates can name the selected-cell defect. Rebase is
+            # never allowed to make a missing selected source appear valid.
+            rebased_crosswalk = supplied_crosswalk
+        elif rebased_crosswalk != supplied_crosswalk:
+            source_crosswalk_digest = sha256_file(crosswalk)
+            rebased_path = output_root / f"rebased-crosswalk-{key}-{source_crosswalk_digest[:12]}.json"
+            rebase_receipt_path = output_root / f"rebased-crosswalk-{key}-{source_crosswalk_digest[:12]}.receipt.json"
+            atomic_json(rebased_path, rebased_crosswalk)
+            atomic_json(rebase_receipt_path, {
+                **rebase_receipt,
+                "source_crosswalk_sha256": source_crosswalk_digest,
+                "rebased_crosswalk_sha256": sha256_file(rebased_path),
+            })
+            crosswalk = rebased_path
+            artifacts["crosswalk"] = str(crosswalk)
+            artifacts["crosswalk_table_rebase_receipt"] = str(rebase_receipt_path)
+            checkpoint(
+                checkpoints,
+                stage="crosswalk_table_rebase",
+                status="PASS",
+                input_digest=source_crosswalk_digest,
+                output=rebased_path,
+                reused=False,
+            )
+
     crosswalk_digest = sha256_file(crosswalk)
     record_task_execution_attempt(
         attempts,
@@ -1750,6 +1842,62 @@ def main() -> int:
     if semantic.get("status") != "PASS":
         source_crosswalk = read_json(crosswalk, "broker crosswalk")
         recovery_analysis = analyse_terminal_recovery(active_bundle, source_crosswalk, semantic)
+        # Findings confined to candidates that are neither selected nor
+        # potential model drivers require no further semantic authorship. The
+        # controller can seal their negative-consumption disposition now,
+        # bound to this run's candidate manifest, and preserve every selected
+        # mapping. Deferring this safe close previously let a fresh external
+        # crosswalk fall through to the global zero-authority breaker merely
+        # because native archive candidates varied across processes.
+        if recovery_analysis["can_recover"]:
+            terminal_review = automatic_negative_consumption_review(
+                bundle=active_bundle,
+                crosswalk_sha256=crosswalk_digest,
+                semantic_report_sha256=sha256_file(semantic_path),
+                semantic_report=semantic,
+                bundle_sha256=sha256_file(active_bundle_path),
+            )
+            recovered_crosswalk, recovery_receipt = apply_terminal_review(
+                bundle=active_bundle,
+                crosswalk=source_crosswalk,
+                semantic_report=semantic,
+                review=terminal_review,
+                bundle_sha256=sha256_file(active_bundle_path),
+                crosswalk_sha256=crosswalk_digest,
+                semantic_report_sha256=sha256_file(semantic_path),
+            )
+            recovered_path = output_root / f"terminal-crosswalk-{key}-{crosswalk_digest[:12]}.json"
+            recovery_receipt_path = output_root / f"terminal-crosswalk-{key}-{crosswalk_digest[:12]}.receipt.json"
+            atomic_json(recovered_path, recovered_crosswalk)
+            atomic_json(recovery_receipt_path, recovery_receipt)
+            crosswalk = recovered_path
+            crosswalk_digest = sha256_file(crosswalk)
+            artifacts["crosswalk"] = str(crosswalk)
+            artifacts["terminal_recovery_receipt"] = str(recovery_receipt_path)
+            semantic_path = output_root / f"semantic-{key}-{crosswalk_digest[:12]}.json"
+            semantic_input = sha256_bytes(canonical_bytes({
+                "bundle": sha256_file(active_bundle_path),
+                "crosswalk": crosswalk_digest,
+                "runtime": runtime_digest,
+            }))
+            run([
+                sys.executable, str(HERE / "verify_broker_semantics.py"),
+                str(active_bundle_path), str(crosswalk), "--out", str(semantic_path),
+            ], {0, 1})
+            semantic = read_json(semantic_path, "terminally recovered broker semantic report")
+            artifacts["semantic_report"] = str(semantic_path)
+            checkpoint(
+                checkpoints,
+                stage="terminal_materiality_recovery",
+                status="PASS" if semantic.get("status") == "PASS" else "NEEDS_WORK",
+                input_digest=semantic_input,
+                output=semantic_path,
+                reused=False,
+            )
+            lane_degraded = True
+            recovery_analysis = analyse_terminal_recovery(
+                active_bundle, recovered_crosswalk, semantic
+            )
         # A candidate-local semantic failure may already touch a selected
         # mapping. The old recovery correctly refused to call that cell
         # "unconsumed" but had no transition to make it unconsumed. Exclude

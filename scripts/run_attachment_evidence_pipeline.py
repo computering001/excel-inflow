@@ -11,6 +11,7 @@ request for the user to re-upload unchanged evidence.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -1130,6 +1132,7 @@ def main() -> int:
         broker_intake_choice.get("runtime_closure_sha256") != runtime_hash
     )
     lanes: dict[str, dict[str, Any]] = {}
+    lane_duration_ms: dict[str, int] = {}
     state_paths: dict[str, Path] = {}
     checkpoints: list[dict[str, Any]] = []
     derived_artifacts: dict[str, str] = {
@@ -1150,31 +1153,16 @@ def main() -> int:
         migration_path = output_root / "broker-intake-runtime-migration.json"
         atomic_json(migration_path, migration)
         derived_artifacts["broker_intake_runtime_migration"] = str(migration_path)
-    for kind in ("filings", "broker", "dcs"):
-        if not spec.get(kind):
-            continue
-        declaration = (
-            broker_declaration_with_model_context(
-                spec=spec,
-                spec_path=spec_path,
-                output_root=output_root,
-                filings_state=lanes.get("filings"),
-            )
-            if kind == "broker"
-            else spec[kind]
-        )
-        if kind == "broker" and declaration.get("model_demand_path"):
-            derived_artifacts["pre_broker_model_demand"] = str(
-                declaration.pop("model_demand_path")
-            )
+    def execute_lane(kind: str, declaration: dict[str, Any]) -> tuple[dict[str, Any], int]:
+        started = time.monotonic()
         try:
             if kind == "broker" and args.force_zero_broker:
                 raise RuntimeError(
                     "The top-level optional-broker circuit breaker requested zero authority"
                 )
-            lanes[kind] = run_lane(kind, declaration, spec_path.parent, output_root)
+            state = run_lane(kind, declaration, spec_path.parent, output_root)
         except Exception as error:
-            lanes[kind] = {
+            state = {
                 "schema_version": f"{kind}-run-state/1.0",
                 "pipeline_status": "BLOCKED_INTERNAL",
                 "user_blocking": False,
@@ -1187,6 +1175,47 @@ def main() -> int:
                     "message": str(error),
                 },
             }
+        return state, round((time.monotonic() - started) * 1000)
+
+    # Filings is the executable model-demand producer and therefore closes
+    # first.  Once its period and row graph exists, optional broker work and
+    # mandatory debt extraction are independent.  Run those two lanes
+    # concurrently but publish their checkpoints in the visible journey order
+    # Filings -> Brokers -> Debt.  This removes optional broker wall time from
+    # the mandatory critical path without changing economic authority.
+    if spec.get("filings"):
+        lanes["filings"], lane_duration_ms["filings"] = execute_lane(
+            "filings", spec["filings"]
+        )
+
+    concurrent_declarations: dict[str, dict[str, Any]] = {}
+    if spec.get("broker"):
+        broker_declaration = broker_declaration_with_model_context(
+            spec=spec,
+            spec_path=spec_path,
+            output_root=output_root,
+            filings_state=lanes.get("filings"),
+        )
+        if broker_declaration.get("model_demand_path"):
+            derived_artifacts["pre_broker_model_demand"] = str(
+                broker_declaration.pop("model_demand_path")
+            )
+        concurrent_declarations["broker"] = broker_declaration
+    if spec.get("dcs"):
+        concurrent_declarations["dcs"] = spec["dcs"]
+    if concurrent_declarations:
+        with ThreadPoolExecutor(max_workers=len(concurrent_declarations)) as executor:
+            futures = {
+                kind: executor.submit(execute_lane, kind, declaration)
+                for kind, declaration in concurrent_declarations.items()
+            }
+            for kind in ("broker", "dcs"):
+                if kind in futures:
+                    lanes[kind], lane_duration_ms[kind] = futures[kind].result()
+
+    for kind in ("filings", "broker", "dcs"):
+        if kind not in lanes:
+            continue
         if (
             kind == "broker"
             and lanes[kind].get("pipeline_status") not in CLOSED_LANE_STATUSES
@@ -1224,6 +1253,7 @@ def main() -> int:
             "stage": kind,
             "status": lanes[kind].get("pipeline_status"),
             "state_sha256": sha256_file(state_paths[kind]) if state_paths[kind].is_file() else None,
+            "duration_ms": lane_duration_ms.get(kind),
         })
     status, blocker, user_blocking = classify(lanes)
     broker_lane = lanes.get("broker") or {}
@@ -1285,7 +1315,13 @@ def main() -> int:
             state_path, spec=spec, spec_hash=spec_hash, runtime_hash=runtime_hash,
             status=status, blocker=blocker, user_blocking=user_blocking,
             lanes=lanes, checkpoints=checkpoints, artifacts={}, tasks=tasks,
-            summary={"lane_statuses": {kind: state.get("pipeline_status") for kind, state in lanes.items()}},
+            summary={
+                "lane_statuses": {kind: state.get("pipeline_status") for kind, state in lanes.items()},
+                "performance": {
+                    "lane_duration_ms": lane_duration_ms,
+                    "broker_and_debt_execution": "concurrent_after_filings",
+                },
+            },
         )
         return 2
 
@@ -1381,6 +1417,10 @@ def main() -> int:
                     if state.get("pipeline_status") == "PASS_DEGRADED"
                 ),
                 "evidence_run_sha256": sha256_file(Path(artifacts["evidence_run"])),
+                "performance": {
+                    "lane_duration_ms": lane_duration_ms,
+                    "broker_and_debt_execution": "concurrent_after_filings",
+                },
             },
         )
         return 0

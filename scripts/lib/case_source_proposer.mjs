@@ -36,6 +36,19 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "profit after tax",
       "profit after taxation",
     ],
+    owners_of_parent: [
+      "owners of the parent",
+      "equity holders of the parent",
+      "shareholders of the parent",
+      "attributable to owners of the parent",
+      "attributable to equity holders of the parent",
+    ],
+    non_controlling_interests: [
+      "non controlling interests",
+      "non-controlling interests",
+      "attributable to non controlling interests",
+      "attributable to non-controlling interests",
+    ],
   }),
   cash_flow: Object.freeze({
     cash_flow_net_income: [
@@ -413,6 +426,9 @@ export function proposeCaseSource({
         : {}),
       ...(filings.consolidation_level
         ? { consolidation_level: filings.consolidation_level }
+        : {}),
+      ...(filings.accounting_framework
+        ? { accounting_framework: filings.accounting_framework }
         : {}),
     };
   }

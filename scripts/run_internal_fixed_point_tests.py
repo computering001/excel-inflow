@@ -16,6 +16,7 @@ from broker_terminal_recovery import (
     analyse_terminal_recovery,
     apply_terminal_review,
     automatic_negative_consumption_review,
+    bundle_authority_hash,
     canonical_hash,
     validate_terminal_recovery_independently,
 )
@@ -188,7 +189,7 @@ def main() -> int:
     }
     semantic = {"findings": [{"code": "SEM-DEFINITION-EVIDENCE", "candidate_id": candidate_b}]}
     bindings = {
-        "bundle_sha256": "6" * 64,
+        "bundle_sha256": bundle_authority_hash(bundle),
         "source_crosswalk_sha256": "7" * 64,
         "semantic_report_sha256": "8" * 64,
     }
@@ -313,7 +314,16 @@ def main() -> int:
     _entries, bundle_binding_errors = validate_terminal_recovery_independently(
         bundle, recovered, bundle_sha256="0" * 64
     )
-    check(any("bundle bytes" in error for error in bundle_binding_errors), "terminal recovery accepted different verified bundle bytes")
+    check(not bundle_binding_errors, "path/timestamp-only bundle bytes incorrectly invalidated stable authority")
+    mutated_authority_bundle = json.loads(json.dumps(bundle))
+    mutated_authority_bundle["candidate_manifest"]["candidates"][1]["label"] = "Mutated authority"
+    _entries, content_binding_errors = validate_terminal_recovery_independently(
+        mutated_authority_bundle, recovered
+    )
+    check(
+        any("stable broker authority content" in error for error in content_binding_errors),
+        "terminal recovery accepted changed candidate authority content",
+    )
     extra_field_review = json.loads(json.dumps(review))
     extra_field_review["invented_value"] = 123
     try:

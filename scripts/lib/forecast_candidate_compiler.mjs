@@ -3,11 +3,20 @@ import crypto from "node:crypto";
 import {
   forecastRowMateriality,
   isScheduleOwnedForecastRole,
+  isStructuredSemanticEvent,
   resolveForecastAuthority,
   selectForecastAuthority,
 } from "./forecast_authority.mjs";
 import { observationsForConcept } from "./forecast_observation.mjs";
-import { resolveBrokerForecastSelection, selectBrokerAnchor } from "./broker_anchor.mjs";
+import {
+  resolveAnchorPlanDecision,
+  resolveBrokerForecastSelection,
+  selectBrokerAnchor,
+} from "./broker_anchor.mjs";
+import {
+  SCHEDULE_PRODUCER_BY_ROLE,
+  attachForecastProducerWitness,
+} from "./forecast_producer_contract.mjs";
 
 const FORMULA_METHODS = new Set(["accounting_identity", "driver_formula", "roll_forward", "historical_average", "historical_trend", "seasonal_run_rate", "carry_forward"]);
 const OBSERVATION_METHOD = Object.freeze({
@@ -54,7 +63,12 @@ function producerAndRender(method) {
 }
 
 function historicalValues(row) {
-  return (row?.values ?? []).slice(0, 3).map((value) => finite(value) ? Number(value) : null);
+  const values = (row?.values ?? []).slice(0, 3);
+  const printedFaceSeries =
+    row?.historical_authority === "source_input" && values.length === 3;
+  return values.map((value) =>
+    finite(value) ? Number(value) : printedFaceSeries ? 0 : null,
+  );
 }
 
 function evaluatedHistoricalValues(row, rows) {
@@ -66,7 +80,13 @@ function evaluatedHistoricalValues(row, rows) {
       (candidate.calculation.refs ?? []).length === 0 ||
       visiting.has(candidate.row_id)
     ) {
-      return finite(literal) ? Number(literal) : null;
+      return finite(literal)
+        ? Number(literal)
+        : candidate?.historical_authority === "source_input" &&
+            Array.isArray(candidate?.values) &&
+            candidate.values.length >= 3
+          ? 0
+          : null;
     }
     const nextVisiting = new Set(visiting).add(candidate.row_id);
     const operands = (candidate.calculation.refs ?? []).map((rowId) =>
@@ -202,7 +222,9 @@ function historicalCandidate(row, behavior, forecastIndex) {
 }
 
 function eventZeroCandidate(modelCase, row, behavior) {
-  if (behavior !== "non_recurring_event") return null;
+  if (behavior !== "non_recurring_event" || !isStructuredSemanticEvent(row)) {
+    return null;
+  }
   const lastHistoricalDate = (modelCase.periods ?? [])
     .filter((period) => period.status === "historical")
     .map((period) => period.date)
@@ -275,7 +297,40 @@ function observationCandidates(observationInput, row, forecastIndex, windowStart
 }
 
 function formulaCandidate(row, behavior, forecastIndex, rows = []) {
-  if (isScheduleOwnedForecastRole(row.semantic_role)) return { method: "schedule_link", origin: "semantic_schedule", source_kind: "schedule", ownership: "absolute", formula_spec: { operator: "schedule_link", semantic_role: row.semantic_role } };
+  if (row.semantic_role === "opening_cash") {
+    const endingCash = rows.find(
+      (candidate) => candidate.semantic_role === "ending_cash",
+    );
+    return endingCash
+      ? {
+          method: "roll_forward",
+          origin: "temporal_cash_roll_forward",
+          source_kind: "formula",
+          ownership: "absolute",
+          formula_spec: {
+            operator: "prior_period",
+            refs: [endingCash.row_id],
+            temporal_edge: true,
+          },
+          note:
+            "Opening cash is produced from the preceding period's ending cash; FY1 crosses the historical/forecast boundary.",
+        }
+      : null;
+  }
+  if (isScheduleOwnedForecastRole(row.semantic_role)) {
+    const producerId = SCHEDULE_PRODUCER_BY_ROLE[row.semantic_role] ?? null;
+    return {
+      method: "schedule_link",
+      origin: "semantic_schedule",
+      source_kind: "schedule",
+      ownership: "absolute",
+      formula_spec: {
+        operator: "schedule_link",
+        semantic_role: row.semantic_role,
+        producer_id: producerId,
+      },
+    };
+  }
   if (row.semantic_role === "effective_tax_rate") return null;
   // A historical aggregate formula is evidence of membership, not a stronger
   // line-level forecast. Once the topology compiler has certified the row as
@@ -497,16 +552,30 @@ function certifiedMembershipPath(row, targetId, rows) {
 }
 
 function semanticStatementBandPath(row, targetId, rows, section) {
-  if (section !== "income_statement") return null;
   const rowIndex = rows.indexOf(row);
+  const target = rows.find((candidate) => candidate.row_id === targetId);
+  if (!target || rowIndex < 0) return null;
+  if (section === "cash_flow") {
+    const headerByTotalRole = {
+      cash_from_investing: "investing_activities",
+      cash_from_financing: "financing_activities",
+    };
+    const headerId = headerByTotalRole[target.semantic_role];
+    const headerIndex = headerId
+      ? rows.findIndex((candidate) => candidate.row_id === headerId)
+      : -1;
+    const targetIndex = rows.indexOf(target);
+    return headerIndex >= 0 && rowIndex > headerIndex && rowIndex < targetIndex
+      ? [row.row_id, targetId]
+      : null;
+  }
+  if (section !== "income_statement") return null;
   const revenueIndex = rows.findIndex(
     (candidate) => candidate.semantic_role === "revenue",
   );
   const ebitIndex = rows.findIndex(
     (candidate) => candidate.semantic_role === "ebit",
   );
-  const target = rows.find((candidate) => candidate.row_id === targetId);
-  if (!target || rowIndex < 0) return null;
   if (target.semantic_role === "revenue" && rowIndex < revenueIndex) {
     return [row.row_id, targetId];
   }
@@ -650,6 +719,46 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
     // be section-qualified rather than inheriting whichever entry was last.
     if (section) behaviorByRow.set(`${section}\u0000${entry.row_id}`, entry);
   }
+  // Compile the complete headline bridge decision before any row candidate is
+  // ranked.  Selecting the broker headline alone is insufficient when a
+  // disclosed bridge contains an inverse residual (Adjusted EBITDA less every
+  // other bridge term): the residual and the subtotal otherwise define each
+  // other and produce a rank-deficient formula cycle.  The anchor decision is
+  // the upstream economic authority, so it removes the inverse residual from
+  // the derived headline formula and quarantines only that residual as
+  // captured detail.  No workbook/presentation pass is allowed to discover
+  // or repair this later.
+  const incomeRows = rowsBySection?.income_statement ?? [];
+  const anchorDecision = resolveAnchorPlanDecision(modelCase, incomeRows);
+  const anchorResidualPlugIds = new Set(
+    anchorDecision.status === "applied"
+      ? anchorDecision.residualPlugRowIds ?? []
+      : [],
+  );
+  if (
+    anchorDecision.status === "applied" &&
+    anchorDecision.selection?.derived === "adjusted_ebitda"
+  ) {
+    const derivedHeadline = anchorDecision.bridge.ebitdaRow;
+    derivedHeadline.forecast_calculation = {
+      operator: derivedHeadline.calculation.operator,
+      refs: (derivedHeadline.calculation.refs ?? []).filter(
+        (reference) => !anchorResidualPlugIds.has(reference),
+      ),
+    };
+    delete derivedHeadline.forecast_period_calculations;
+    delete derivedHeadline.broker_metric_id;
+    for (const row of incomeRows) {
+      if (!anchorResidualPlugIds.has(row.row_id)) continue;
+      delete row.forecast_calculation;
+      delete row.forecast_period_calculations;
+      row.values = [...(row.values ?? []).slice(0, 3), null, null, null];
+      row.forecast_capture_parent_id = derivedHeadline.row_id;
+      row.forecast_capture_mode = "formula_membership";
+      row.forecast_capture_note =
+        "The inverse bridge residual is represented by the authoritative headline and is not forecast as an independent plug.";
+    }
+  }
   // TIER 1 — THE ANCHOR IS ALWAYS CONSUMED, AND IT OUTRANKS ITS OWN IDENTITY.
   //
   // The headline anchor row is usually a calculation (Adjusted EBITDA as a
@@ -666,7 +775,6 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
   // unsupported anchors deliberately fall through unchanged — the equation
   // cycle gates then block the build rather than let a cache-pinned identity
   // loop ship.
-  const incomeRows = rowsBySection?.income_statement ?? [];
   const anchorSelection = selectBrokerAnchor(modelCase, incomeRows);
   const anchorOwnedRoles = new Set(
     anchorSelection.supported &&
@@ -688,7 +796,9 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
       if (row.row_type === "header") continue;
       const behaviorEntry = behaviorByRow.get(`${section}\u0000${row.row_id}`);
       const declaredCalculation = row.forecast_calculation ?? row.calculation;
-      const behavior = behaviorEntry?.behavior ?? (
+      const behavior = anchorResidualPlugIds.has(row.row_id)
+        ? "captured_detail"
+        : behaviorEntry?.behavior ?? (
         isScheduleOwnedForecastRole(row.semantic_role)
           ? "schedule_owned"
           : ["prior_period", "prior_period_scaled_by"].includes(
@@ -699,7 +809,11 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               ? "accounting_identity"
               : "recurring_flow"
       );
-      const allowedMethods = new Set(behaviorEntry?.allowed_methods ?? []);
+      const allowedMethods = new Set(
+        anchorResidualPlugIds.has(row.row_id)
+          ? ["not_separately_forecast"]
+          : behaviorEntry?.allowed_methods ?? [],
+      );
       const evidenceMaterial = forecastRowMateriality(modelCase, row);
       const historyMaterial = historicalValues(row).some((value) => value !== null && Math.abs(value) > 1e-9);
       const material = typeof evidenceMaterial === "boolean" ? evidenceMaterial : historyMaterial;
@@ -707,8 +821,24 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         const stateId = `${section}.${row.row_id}.fy${forecastIndex + 1}`;
         let candidates = [];
         const declared = declaredCandidate(row, forecastIndex);
-        if (declared) candidates.push(declared);
         const broker = brokerCandidate(modelCase, row, forecastIndex);
+        if (
+          declared?.method === "broker_consensus" &&
+          broker &&
+          finite(broker.value)
+        ) {
+          // The declaration selects the authority class; the resolved broker
+          // candidate supplies its executable cell value and exact metric
+          // binding. Keeping them as two equal-ranked candidates selected the
+          // declaration shell first and produced a broker link with no value.
+          Object.assign(declared, {
+            value: Number(broker.value),
+            source_id: broker.source_id,
+            source_bindings: structuredClone(broker.source_bindings ?? []),
+            broker_metric_id: broker.broker_metric_id,
+          });
+        }
+        if (declared) candidates.push(declared);
         if (broker) candidates.push(broker);
         const formula = formulaCandidate(row, behavior, forecastIndex, sectionRows);
         if (formula) candidates.push(formula);
@@ -742,6 +872,37 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         if (behavior === "captured_detail" && row.forecast_capture_parent_id) {
           candidates.push(captureCandidate(modelCase, row, sectionRows, forecastIndex, material, section));
         }
+        if (declared) {
+          const executableTwin = candidates.find(
+            (candidate) =>
+              candidate !== declared &&
+              candidate.method === declared.method &&
+              (finite(candidate.value) ||
+                candidate.formula_spec ||
+                candidate.capture_certificate),
+          );
+          if (executableTwin) {
+            for (const field of [
+              "value",
+              "formula_spec",
+              "source_id",
+              "source_bindings",
+              "broker_metric_id",
+              "partial_period",
+              "guidance_range",
+              "capture_certificate",
+              "zero_basis",
+              "as_of_date",
+            ]) {
+              if (
+                (declared[field] === undefined || declared[field] === null) &&
+                executableTwin[field] !== undefined
+              ) {
+                declared[field] = structuredClone(executableTwin[field]);
+              }
+            }
+          }
+        }
         if (candidates.length === 0) candidates.push({ method: "unresolved", origin: "compiler", source_kind: "none", reason: "No compatible forecast candidate exists." });
 
         const compatible = candidates.filter((candidate) =>
@@ -754,6 +915,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           "forecast_observation",
           "row_broker_selection",
           "semantic_schedule",
+          "temporal_cash_roll_forward",
           "declared_formula",
         ].includes(candidate.origin));
         if (behaviorEntry?.blocking && !hasStrongAuthority) {
@@ -771,6 +933,18 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           section === "income_statement" &&
           anchorOwnedRoles.has(row.semantic_role) &&
           Boolean(broker);
+        // The consumption doctrine deliberately stamps a broker treatment on
+        // consumable calculation totals (revenue, capex, working capital,
+        // etc.). That is an explicit authority selection, not merely another
+        // observation competing with the historical identity. Honour it just
+        // like the Tier-1 headline anchor: the broker owns the total and its
+        // detailed formula members are captured. If the selected broker value
+        // is unavailable, `broker` is null and the accounting identity remains
+        // the safe fallback.
+        const declaredBrokerOwned =
+          (declared?.method === "broker_consensus" ||
+            row.forecast_treatment === "broker") &&
+          Boolean(broker) && finite(broker.value);
         const absoluteFormula =
           formula?.ownership === "absolute"
             ? formula
@@ -799,6 +973,8 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         const rankedIndependent = selectForecastAuthority(compatible);
         let owner = invalidCapture ?? (anchorOwned
           ? broker
+          : declaredBrokerOwned
+            ? (declared?.method === "broker_consensus" ? declared : broker)
           : absoluteFormula && compatible.includes(absoluteFormula)
             ? absoluteFormula
             : rankedIndependent ??
@@ -838,6 +1014,8 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               ? `Method ${candidate.method} is not permitted for behavior ${behavior}.`
               : anchorOwned
                 ? "The broker anchor is Tier-1 consumed and outranks the identity formula on the anchor row."
+                : declaredBrokerOwned
+                  ? "The declared broker consumption owns this total; its accounting identity remains the fallback when broker evidence is unavailable."
                 : absoluteFormula
                   ? "Formula or schedule ownership outranks independent-input candidates."
                   : `Stronger compatible candidate ${selected.method} selected.`,
@@ -850,7 +1028,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           (material || selectedRecord.origin === "invalid_capture_candidate")
             ? "BLOCKED"
             : "RESOLVED";
-        states.push({
+        const state = {
           state_id: stateId,
           row_id: row.row_id,
           section,
@@ -867,7 +1045,14 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           render_state: renderState,
           status,
           rationale: selectedRecord.note ?? selectedRecord.reason ?? `Selected ${selectedRecord.method}.`,
-        });
+        };
+        const witnessedState = attachForecastProducerWitness(state, selectedRecord);
+        witnessedState.status = witnessedState.producer_witness.executable
+          ? state.status
+          : material
+            ? "BLOCKED"
+            : state.status;
+        states.push(witnessedState);
       }
     }
   }
@@ -894,6 +1079,9 @@ export function validateForecastPlan(plan, rowsBySection) {
     const selected = (plan.candidate_ledger ?? []).filter((candidate) => candidate.state_id === state.state_id && candidate.selected);
     if (selected.length !== 1) errors.push(`${state.state_id} must have exactly one selected candidate; found ${selected.length}.`);
     if (selected[0]?.candidate_id !== state.selected_candidate_id) errors.push(`${state.state_id} selected candidate does not match the state.`);
+    if (!state.producer_witness?.executable && state.material && state.status !== "BLOCKED") {
+      errors.push(`${state.state_id} is material but has no executable producer witness.`);
+    }
     if (state.render_state === "blank_grey" && !["captured", "not_applicable"].includes(state.producer_type)) errors.push(`${state.state_id} may be blank grey only when captured or not applicable.`);
     if (["formula", "schedule", "broker_link", "source_assumption", "explicit_zero"].includes(state.producer_type) && state.render_state === "blank_grey") errors.push(`${state.state_id} has a live producer but is grey.`);
   }
@@ -928,7 +1116,7 @@ function authorityFromState(state, candidate) {
 }
 
 function calculationFromState(state) {
-  if (["driver_formula", "roll_forward"].includes(state.method)) {
+  if (["accounting_identity", "driver_formula", "roll_forward"].includes(state.method)) {
     return state.formula_spec ? structuredClone(state.formula_spec) : null;
   }
   if (!["historical_average", "historical_trend", "seasonal_run_rate", "carry_forward"].includes(state.method)) return null;
@@ -1052,6 +1240,10 @@ export function materializeForecastPlan(modelCase, plan) {
         );
       }
       if (state.producer_type === "captured") {
+        row.forecast_capture_parent_id = candidate.capture_certificate.parent_row_id;
+        row.forecast_capture_mode = candidate.capture_certificate.mode;
+        row.forecast_capture_note =
+          candidate.note ?? `Captured by ${candidate.capture_certificate.parent_row_id}.`;
         row.forecast_capture_certificates ??= [null, null, null];
         row.forecast_capture_certificates[state.forecast_index] =
           structuredClone(candidate.capture_certificate);

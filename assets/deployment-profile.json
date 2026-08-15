@@ -264,6 +264,7 @@
     "lib/forecast_behavior.mjs",
     "lib/forecast_candidate_compiler.mjs",
     "lib/forecast_observation.mjs",
+    "lib/forecast_producer_contract.mjs",
     "lib/delivery_constitution.mjs",
     "lib/fixed_point_constitution.mjs",
     "lib/filings_acquisition.mjs",
@@ -610,6 +611,7 @@
     "compile_broker_vision.py",
     "compile_broker_pack.py",
     "broker_dynamic_concepts.py",
+    "broker_numeric.py",
     "delivery_constitution.py",
     "compile_broker_candidate_manifest.py",
     "compile_broker_canonical_tables.py",
@@ -811,6 +813,10 @@
     "broker_dynamic_concepts.py": {
       "may_import_third_party": [],
       "reason": "The run-scoped broker concept validator is stdlib-only and independently enforces the one-run insertion contract shared by compiler and semantic verifier."
+    },
+    "broker_numeric.py": {
+      "may_import_third_party": [],
+      "reason": "Shared broker numeric parsing is stdlib-only and provides one deterministic locale-aware value grammar to extraction, period recovery and terminal reconciliation."
     },
     "delivery_constitution.py": {
       "may_import_third_party": [],

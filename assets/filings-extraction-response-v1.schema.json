@@ -42,6 +42,7 @@
       "required": ["entity_name", "reporting_currency", "units", "fiscal_calendar_kind", "historical_periods", "forecast_periods", "reported_gross_debt", "reported_cash"],
       "properties": {
         "entity_name": { "type": "string", "minLength": 1 },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
         "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
         "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },

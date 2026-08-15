@@ -235,6 +235,9 @@ export function compileModelIrV3({
         material: item.material ?? null,
         candidates: item.candidates ?? [],
         capture_certificate: item.capture_certificate ?? null,
+        formula_operator: item.formula_operator ?? null,
+        formula_refs: item.formula_refs ?? [],
+        period_relation: item.period_relation ?? "same_period",
       };
     }),
   );
@@ -845,13 +848,15 @@ export function workbookSemanticProofContract(
         `${edge.consumer_display_id}\u0000${forecastIndex}`,
       );
       if (authority?.producer_type !== "Derived") continue;
-      const selfRollForward = edge.consumer_display_id === edge.dependency_display_id;
+      const priorPeriod =
+        authority.period_relation === "prior_period" &&
+        (authority.formula_refs ?? []).includes(edge.dependency_display_id);
       requiredFormulaPaths.push({
         consumer_display_id: edge.consumer_display_id,
         dependency_display_id: edge.dependency_display_id,
         consumer_cell: `${forecastColumns[forecastIndex]}${consumer.row}`,
-        dependency_cell: `${selfRollForward ? priorColumns[forecastIndex] : forecastColumns[forecastIndex]}${dependency.row}`,
-        period_relation: selfRollForward ? "prior_period" : "same_period",
+        dependency_cell: `${priorPeriod ? priorColumns[forecastIndex] : forecastColumns[forecastIndex]}${dependency.row}`,
+        period_relation: priorPeriod ? "prior_period" : "same_period",
       });
     }
   }

@@ -677,7 +677,7 @@ export function compileStatementTopology(modelCase, section, rows) {
           valid &&
           row?.row_type !== "header" &&
           Boolean(row?.semantic_role) &&
-          requiredBy === "debt_overlay_contract";
+          ["debt_overlay_contract", "company_model_contract"].includes(requiredBy);
       } else if (
         node.projection_origin === "dependency_closure" ||
         node.projection_origin === "downstream_dependency"

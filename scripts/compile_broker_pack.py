@@ -15,6 +15,7 @@ from typing import Any
 
 from broker_dynamic_concepts import validate_run_scoped_concepts
 from broker_terminal_recovery import validate_terminal_recovery_independently
+from broker_numeric import parse_broker_number
 
 
 NUMBER = re.compile(r"^\s*(\()?\s*[-+]?[$€£¥]?\s*(\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.(\d+))?\s*(%)?\s*\)?\s*$")
@@ -881,22 +882,9 @@ def validate_coverage(
 
 
 def parse_number(value: Any, label: str) -> float:
-    if isinstance(value, bool) or value is None:
-        raise ValueError(f"{label} is not numeric.")
-    if isinstance(value, (int, float)):
-        number = float(value)
-    else:
-        text = str(value).strip()
-        match = NUMBER.fullmatch(text)
-        if not match:
-            raise ValueError(f"{label}={value!r} is not an unambiguous numeric cell.")
-        negative = bool(match.group(1)) or text.startswith("-")
-        cleaned = re.sub(r"[$€£¥,%() ]", "", text)
-        number = float(cleaned)
-        if negative:
-            number = -abs(number)
-        if match.group(4):
-            number /= 100.0
+    number = parse_broker_number(value)
+    if number is None:
+        raise ValueError(f"{label}={value!r} is not an unambiguous numeric cell.")
     if not math.isfinite(number):
         raise ValueError(f"{label} is not finite.")
     return number

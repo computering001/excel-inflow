@@ -80,6 +80,30 @@ assert.equal(new Set([
   ...result.statement_map.cash_flow,
 ].map((row) => row.row_id)).size, 15);
 
+const attributionIncome = manifest("income_statement", [
+  { source_line_id: "is.net", ordinal: 1, raw_label: "Profit for the period", values: [100, 110, 120], material: true },
+  { source_line_id: "is.owners", ordinal: 2, raw_label: "Owners of the parent", values: [94, 103, 112], material: true },
+  { source_line_id: "is.nci", ordinal: 3, raw_label: "Non-controlling interests", values: [6, 7, 8], material: true },
+]);
+const attributionEvidence = structuredClone(evidence);
+attributionEvidence.face_statement_manifests.income_statement = [attributionIncome];
+const attributionSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Attribution Test plc", reporting_currency: "GBP" },
+  },
+  caseEvidence: attributionEvidence,
+});
+assert.equal(
+  attributionSource.statement_map.income_statement[1].role,
+  "owners_of_parent",
+  "The proposer did not preserve parent-owner attribution as a semantic output.",
+);
+assert.equal(
+  attributionSource.statement_map.income_statement[2].role,
+  "non_controlling_interests",
+  "The proposer did not preserve non-controlling attribution as a semantic output.",
+);
+
 const dcsBoundEvidence = structuredClone(evidence);
 dcsBoundEvidence.lanes.policy_evidence = {
   rcf: { instrument_id: "rcf", commitment_fee_convention: "bps_on_undrawn" },
@@ -157,4 +181,4 @@ assert.deepEqual(
   "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 34 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 36 }, null, 2));

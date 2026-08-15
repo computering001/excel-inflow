@@ -43,6 +43,45 @@ DECORATION_RE = re.compile(
     re.I,
 )
 
+ACCOUNTING_FRAMEWORK_PATTERNS = {
+    "ifrs": [
+        re.compile(
+            r"(?:financial statements|accounts).{0,160}(?:prepared|drawn up|comply).{0,160}"
+            r"(?:international financial reporting standards|ifrs accounting standards|"
+            r"international accounting standards)",
+            re.I | re.S,
+        ),
+        re.compile(
+            r"prepared.{0,160}in accordance with.{0,160}(?:international financial reporting standards|"
+            r"ifrs accounting standards|(?:uk[- ]adopted )?international accounting standards)",
+            re.I | re.S,
+        ),
+    ],
+    "us_gaap": [
+        re.compile(
+            r"(?:financial statements|accounts).{0,160}(?:prepared|presented).{0,160}"
+            r"(?:accounting principles generally accepted in (?:the )?united states|u\.?s\.? gaap)",
+            re.I | re.S,
+        ),
+        re.compile(
+            r"prepared.{0,160}in accordance with.{0,160}"
+            r"(?:accounting principles generally accepted in (?:the )?united states|u\.?s\.? gaap)",
+            re.I | re.S,
+        ),
+    ],
+}
+
+
+def detect_accounting_framework(lines: list[dict[str, Any]]) -> str | None:
+    """Read a preparation-basis declaration; never default from a mention."""
+    text = " ".join(str(line.get("text") or "") for line in lines)
+    matches = {
+        framework
+        for framework, patterns in ACCOUNTING_FRAMEWORK_PATTERNS.items()
+        if any(pattern.search(text) for pattern in patterns)
+    }
+    return next(iter(matches)) if len(matches) == 1 else None
+
 
 def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict[str, Any]]:
     """Project a face-statement capture onto the operating-model surface.
@@ -447,6 +486,7 @@ def main() -> int:
     findings = []
     used_ids: set[str] = set()
     selected = {section: False for section in HEADINGS}
+    detected_frameworks: set[str] = set()
     for declaration in request["documents"]:
         target = Path(declaration["path"])
         if not target.is_absolute():
@@ -456,6 +496,9 @@ def main() -> int:
         disposition = "reviewed_supplemental"
         if target.suffix.lower() == ".pdf":
             lines = pdf_lines(target)
+            detected_framework = detect_accounting_framework(lines)
+            if detected_framework:
+                detected_frameworks.add(detected_framework)
             for section in HEADINGS:
                 if selected[section]:
                     continue
@@ -490,11 +533,14 @@ def main() -> int:
     for section, found in selected.items():
         if not found:
             findings.append({"code": "SELECTED_AUTHORITY_MISSING", "section": section})
+    filing_facts = dict(request["filing_facts"])
+    if "accounting_framework" not in filing_facts and len(detected_frameworks) == 1:
+        filing_facts["accounting_framework"] = next(iter(detected_frameworks))
     response = {
         "schema_version": "filings-extraction-response/1.0",
         "run_id": request["run_id"],
         "documents": documents,
-        "filing_facts": request["filing_facts"],
+        "filing_facts": filing_facts,
     }
     output = Path(args.out).resolve()
     output.mkdir(parents=True, exist_ok=True)

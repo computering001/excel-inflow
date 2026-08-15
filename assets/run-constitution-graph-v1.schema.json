@@ -39,12 +39,13 @@
     "counts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nodes", "edges", "selected_paths", "orphan_selected_authorities"],
+      "required": ["nodes", "edges", "selected_paths", "orphan_selected_authorities", "missing_material_producers"],
       "properties": {
         "nodes": { "type": "integer", "minimum": 0 },
         "edges": { "type": "integer", "minimum": 0 },
         "selected_paths": { "type": "integer", "minimum": 0 },
         "orphan_selected_authorities": { "type": "integer", "minimum": 0 }
+        ,"missing_material_producers": { "type": "integer", "minimum": 0 }
       }
     },
     "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }

@@ -689,7 +689,6 @@ const DEFAULT_CASH_FLOW_ROWS = [
         "cash_from_operations",
         "cash_from_investing",
         "cash_from_financing",
-        "fx_effect_on_cash",
       ],
     },
     style_role: "total",
@@ -2021,7 +2020,9 @@ function collapseEquivalentEbitOperatingProfit(rows) {
   const ebit = rows.find((row) => row.semantic_role === "ebit");
   if (!operatingProfit || !ebit || operatingProfit === ebit) return;
   const historyOf = (row) =>
-    (row.values ?? []).slice(0, 3).map((value) => Number(value));
+    (row.values ?? row.reported_historical_values ?? [])
+      .slice(0, 3)
+      .map((value) => Number(value));
   const left = historyOf(operatingProfit);
   const right = historyOf(ebit);
   const identical =
@@ -2458,6 +2459,8 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
   const requiredOutputRoles = new Set([
     "adjusted_ebitda",
     "depreciation_and_amortisation",
+    "owners_of_parent",
+    "non_controlling_interests",
   ]);
   for (const row of rows.slice(netIncomeIndex + 1)) {
     if (
@@ -2466,7 +2469,12 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
     ) {
       required.add(row.row_id);
       row.projection_origin = "required_economic_output";
-      row.projection_required_by = "debt_overlay_contract";
+      row.projection_required_by = [
+        "owners_of_parent",
+        "non_controlling_interests",
+      ].includes(row.semantic_role)
+        ? "company_model_contract"
+        : "debt_overlay_contract";
     }
   }
   for (const row of modelCase.statement_structure?.cash_flow ?? []) {
@@ -2892,6 +2900,61 @@ function applyDefaultForecastWaterfall(modelCase, rows) {
   if (modelCase.forecast_authority_contract_version === "waterfall_v1") return;
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   for (const row of rows) {
+    if (row.semantic_role === "opening_cash" || row.row_id === "opening_cash") {
+      const endingCash = rows.find(
+        (candidate) =>
+          candidate.semantic_role === "ending_cash" ||
+          candidate.row_id === "ending_cash",
+      );
+      if (endingCash) {
+        row.forecast_treatment = "formula";
+        row.forecast_calculation = {
+          operator: "prior_period",
+          refs: [endingCash.row_id],
+          temporal_edge: true,
+        };
+      }
+      continue;
+    }
+    if (row.semantic_role === "ending_cash" || row.row_id === "ending_cash") {
+      const openingCash = rows.find(
+        (candidate) =>
+          candidate.semantic_role === "opening_cash" ||
+          candidate.row_id === "opening_cash",
+      );
+      const netChange = rows.find(
+        (candidate) =>
+          candidate.semantic_role === "net_change_in_cash" ||
+          candidate.row_id === "net_change_in_cash",
+      );
+      const fx = rows.find(
+        (candidate) =>
+          candidate.semantic_role === "fx_effect_on_cash" ||
+          candidate.row_id === "fx_effect_on_cash",
+      );
+      if (openingCash && netChange) {
+        row.forecast_treatment = "formula";
+        row.forecast_calculation = {
+          operator: "sum",
+          refs: [openingCash.row_id, netChange.row_id, ...(fx ? [fx.row_id] : [])],
+        };
+      }
+      continue;
+    }
+    // A filed identity remains an identity in the legacy compatibility path.
+    // The former fallback ignored `calculation` and converted every such row
+    // into a self carry-forward, erasing statement detail and disconnecting
+    // subtotals from their constituents.
+    if (
+      (row.calculation?.refs ?? []).length > 0 &&
+      !row.broker_metric_id &&
+      !["broker", "hardcode", "zero", "uncalculated"].includes(
+        row.forecast_treatment,
+      )
+    ) {
+      row.forecast_treatment = "formula";
+      continue;
+    }
     if (
       row.row_type === "header" ||
       row.operation_scope === "not_applicable" ||
@@ -2952,6 +3015,13 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
     "net_change_in_cash",
     "ending_cash",
   ]);
+  const sameRule = (left, right) =>
+    Boolean(
+      left &&
+      right &&
+      left.operator === right.operator &&
+      JSON.stringify(left.refs ?? []) === JSON.stringify(right.refs ?? []),
+    );
   for (const parent of rows) {
     // Change in Debt is the visible sum of four live schedule producers:
     // issuance, mandatory repayment, RCF draw and RCF repayment.  Capturing
@@ -2960,6 +3030,24 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
     // components.
     if (parent.semantic_role === "change_in_debt") continue;
     const refs = parent.calculation?.refs ?? [];
+    // A per-period materialisation of the row's own accounting identity is
+    // not a direct forecast of an aggregate.  It preserves the formula in
+    // each forecast column; it does not transfer authority away from the
+    // visible components.  Treating it as a direct parent used to turn any
+    // source subtotal with `style_role: subsection` into a collapsible family
+    // (for example cash-before-financing or a D&A bridge), reordering issuer
+    // rows and in some cases creating a false capture cycle.
+    const executableAccountingIdentity =
+      Boolean(parent.calculation && refs.length > 0) &&
+      (parent.forecast_period_calculations ?? []).length === 3 &&
+      (parent.forecast_period_calculations ?? []).every((rule) =>
+        sameRule(rule, parent.calculation),
+      );
+    const hasCertifiedCapturedChildren = rows.some(
+      (candidate) =>
+        candidate.forecast_capture_parent_id === parent.row_id &&
+        candidate.forecast_capture_mode,
+    );
     const hasDirectForecast =
       parent.broker_metric_id ||
       parent.forecast_calculation ||
@@ -2973,6 +3061,7 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
       );
     const aggregationParent =
       !accountingIdentityParents.has(parent.semantic_role) &&
+      (!executableAccountingIdentity || hasCertifiedCapturedChildren) &&
       (hasDirectForecast ||
         parent.forecast_capture_mode === "formula_membership");
     if (

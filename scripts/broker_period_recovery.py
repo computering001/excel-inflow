@@ -209,7 +209,7 @@ def recover_period_headers(
         for table in sorted(document.get("canonical_tables", []), key=lambda item: str(item.get("canonical_table_id") or item.get("table_id")))
     ]
     output["canonical_tables_sha256"] = canonical_hash(canonical_tables)
-    output["candidate_manifest"] = compile_manifest(output, source_bundle_sha256=bundle_sha256)
+    output["candidate_manifest"] = compile_manifest(output)
     output.setdefault("findings", []).extend(findings)
     output.setdefault("summary", {})["quarantined_conflict_count"] = sum(
         1 for document in output.get("documents", []) for table in document.get("tables", [])

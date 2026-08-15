@@ -217,6 +217,18 @@ const SUPPLIED_FORECAST_TREATMENTS = new Set([
   "uncalculated",
 ]);
 
+const STANDALONE_ONLY_FORECAST_OPERATORS = new Set([
+  "prior_period",
+  "prior_period_scaled_by",
+  "historical_average",
+  "historical_trend",
+  "linear_historical_trend",
+]);
+
+function isStandaloneOnlyForecastRule(rule) {
+  return Boolean(rule && STANDALONE_ONLY_FORECAST_OPERATORS.has(rule.operator));
+}
+
 function forecastRule(row, forecastIndex = null) {
   if (
     forecastIndex !== null &&
@@ -610,7 +622,14 @@ function declaredStatementPeriod(
   for (const definition of definitions) {
     const role =
       definition.acquisition_driver_role ?? definition.semantic_role;
-    if (role && semanticOverrides.has(role)) {
+    const activeRule = forecastRule(definition, forecastIndex);
+    // `cash_flow_da` can be a visible issuer aggregate that adds disclosed
+    // cash-flow-only D&A (for example discontinued operations) to the income
+    // statement D&A schedule.  The schedule summary is therefore only a leaf
+    // input; it must not replace that aggregate or its downstream CFO.
+    const visibleCashFlowDaAggregate =
+      role === "cash_flow_da" && activeRule?.operator === "sum";
+    if (role && semanticOverrides.has(role) && !visibleCashFlowDaAggregate) {
       values.set(definition.row_id, Number(semanticOverrides.get(role)));
     }
   }
@@ -624,8 +643,9 @@ function declaredStatementPeriod(
   // downstream subtotal/link resolve from that shared value.
   if (acquisitionBaseValues) {
     for (const definition of definitions) {
+      const periodRule = definition.forecast_period_calculations?.[forecastIndex] ?? null;
       if (
-        Array.isArray(definition.forecast_period_calculations) &&
+        isStandaloneOnlyForecastRule(periodRule) &&
         acquisitionBaseValues.has(definition.row_id)
       ) {
         values.set(
@@ -1764,13 +1784,28 @@ export function solveCase(
       forecastIndex === 0
         ? metricValue(modelCase, "revenue", 2, 0)
         : results[forecastIndex - 1].standalone_revenue;
-    const revenue = metricValue(
+    // Evidence resolution writes the visible statement authority graph. The
+    // economic solver must consume that graph before consulting legacy
+    // operating-metric fallbacks, otherwise a formula-owned revenue total can
+    // display the sum of its detailed forecast rows while the debt/cash engine
+    // silently continues on last actual revenue.
+    const declaredStatementGraph = declaredStatementPeriod(
       modelCase,
-      "revenue",
       periodIndex,
-      previousRevenue *
-        (1 + forecastAssumption(modelCase, "revenue_growth", forecastIndex, 0)),
+      new Map(),
+      previousStatementValues,
+      acquisitionBaseValues,
     );
+    const declaredRevenue = declaredStatementGraph.resolveRole("revenue");
+    const revenue = declaredRevenue === null
+      ? metricValue(
+          modelCase,
+          "revenue",
+          periodIndex,
+          previousRevenue *
+            (1 + forecastAssumption(modelCase, "revenue_growth", forecastIndex, 0)),
+        )
+      : declaredRevenue;
     const adjustments = metricValue(
       modelCase,
       "recurring_disclosed_adjustments",
@@ -1791,8 +1826,9 @@ export function solveCase(
     // does, or the cache it writes would contradict the formula beneath it.
     const derivedMetric = anchorPlan?.selection?.derived ?? null;
     const bridgeAddbacks = anchorPlan?.addbackTotals?.[forecastIndex] ?? 0;
-    const brokerEbitda = () =>
-      metricValue(
+    const brokerEbitda = () => {
+      const declared = declaredStatementGraph.resolveRole("adjusted_ebitda");
+      return declared === null ? metricValue(
         modelCase,
         "adjusted_ebitda",
         periodIndex,
@@ -1803,21 +1839,27 @@ export function solveCase(
             forecastIndex,
             0,
           ),
+      ) : declared;
+    };
+    const brokerDa = () => {
+      const declared = declaredStatementGraph.resolveRole(
+        "depreciation_and_amortisation",
       );
-    const brokerDa = () =>
-      metricValue(
+      return declared === null ? metricValue(
         modelCase,
         "depreciation_and_amortisation",
         periodIndex,
         revenue *
           forecastAssumption(modelCase, "da_to_revenue", forecastIndex, 0),
-      );
+      ) : declared;
+    };
     let ebitda;
     let da;
     let baseEbit;
     if (derivedMetric === "adjusted_ebitda") {
       da = brokerDa();
-      baseEbit = metricValue(modelCase, "ebit", periodIndex, 0);
+      baseEbit = declaredStatementGraph.resolveRole("ebit") ??
+        metricValue(modelCase, "ebit", periodIndex, 0);
       ebitda = baseEbit + da + bridgeAddbacks;
     } else {
       ebitda = brokerEbitda();
@@ -1825,7 +1867,7 @@ export function solveCase(
       baseEbit =
         derivedMetric === "ebit"
           ? ebitda - da - bridgeAddbacks
-          : metricValue(
+          : declaredStatementGraph.resolveRole("ebit") ?? metricValue(
               modelCase,
               "ebit",
               periodIndex,
@@ -1841,14 +1883,7 @@ export function solveCase(
     const suppliedDa = da;
     const suppliedEbit = baseEbit;
     const previousEbitda = priorStandaloneEbitda;
-    const declaredCashFlowGraph = declaredStatementPeriod(
-      modelCase,
-      periodIndex,
-      new Map(),
-      previousStatementValues,
-      acquisitionBaseValues,
-    );
-    const declaredCapex = declaredCashFlowGraph.resolveRole("capex");
+    const declaredCapex = declaredStatementGraph.resolveRole("capex");
     const capexRequirement = Math.abs(
       declaredCapex === null
         ? metricValue(
@@ -1878,7 +1913,7 @@ export function solveCase(
     // aggregate metric unconditionally here would overwrite the latter's live
     // workbook formula with an unrelated broker cache on every recalculation.
     const declaredWorkingCapital =
-      declaredCashFlowGraph.resolveRole("change_in_working_capital");
+      declaredStatementGraph.resolveRole("change_in_working_capital");
     const changeInWorkingCapital =
       declaredWorkingCapital === null
         ? workingCapitalFallback
@@ -1918,7 +1953,10 @@ export function solveCase(
       previousStatementValues,
       acquisitionBaseValues,
     );
-    const taxRate =
+    const declaredTaxRate = declaredStatementGraph.resolveRole(
+      "effective_tax_rate",
+    );
+    const taxRate = declaredTaxRate ??
       brokerForecastValue(
         modelCase,
         "effective_tax_rate",

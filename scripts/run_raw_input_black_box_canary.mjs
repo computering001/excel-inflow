@@ -15,8 +15,20 @@ const root = path.resolve(here, "..");
 const cleanPath = path.resolve(process.argv[2] ?? "");
 const python = path.resolve(process.argv[3] ?? process.env.EXCEL_INFLOW_TEST_PYTHON ?? "python3");
 const soffice = path.resolve(process.argv[4] ?? process.env.SOFFICE_BIN ?? "soffice");
+const optionTokens = process.argv.slice(5);
+const options = {};
+for (let index = 0; index < optionTokens.length; index += 1) {
+  if (!optionTokens[index].startsWith("--")) continue;
+  const key = optionTokens[index].slice(2);
+  const next = optionTokens[index + 1];
+  options[key] = next && !next.startsWith("--") ? optionTokens[++index] : true;
+}
 if (!process.argv[2]) {
-  throw new Error("Usage: node scripts/run_raw_input_black_box_canary.mjs <clean-evidence-fixture.json> <python> <soffice>");
+  throw new Error(
+    "Usage: node scripts/run_raw_input_black_box_canary.mjs " +
+    "<clean-evidence-fixture.json> <python> <soffice> " +
+    "[--real-filings-request <request.json> --expected-income-rows <n> --expected-cash-rows <n>]",
+  );
 }
 const clean = JSON.parse(await fs.readFile(cleanPath, "utf8"));
 const runId = "raw_black_box_canary";
@@ -36,37 +48,78 @@ const commandEnv = {
 // extraction response. The public filings controller must discover and bind
 // both face statements itself.
 const pdfRows = path.join(input, "filing-rows-for-pdf-generation.json");
-const rawFilingRows = {
-  income_statement: structuredClone(
-    clean.filings.face_statement_manifests.income_statement.flatMap((item) => item.rows),
-  ),
-  cash_flow: structuredClone(
-    clean.filings.face_statement_manifests.cash_flow.flatMap((item) => item.rows),
-  ),
-};
+let rawFilingRows = null;
+let rawStatementCounts;
+let annualReport;
+let filingFacts;
+let companyName = clean.company_name;
+let rawFilingKind = "generated_complete_face_statements";
 const restate = (section, sourceLineId, values) => {
   const row = rawFilingRows[section].find((item) => item.source_line_id === sourceLineId);
   if (!row) throw new Error(`Raw canary fixture lacks ${section}.${sourceLineId}`);
   row.values = values;
 };
-for (const [sourceLineId, values] of Object.entries({
-  "is.interest_expense": [-5, -5, -5],
-  "is.pre_tax_income": [145, 145, 145],
-  "is.net_income": [114, 114, 114],
-})) restate("income_statement", sourceLineId, values);
-for (const [sourceLineId, values] of Object.entries({
-  "cf.cash_flow_net_income": [114, 114, 114],
-  "cf.cash_flow_profit_before_tax": [145, 145, 145],
-  "cf.net_finance_result": [-5, -5, -5],
-  "cf.cash_generated_from_operations": [190, 190, 190],
-  "cf.cash_from_operations": [164, 164, 164],
-  "cf.net_change_in_cash": [0, 0, 0],
-  "cf.ending_cash": [370, 380, 390],
-  "cf.free_cash_flow": [64, 64, 64],
-})) restate("cash_flow", sourceLineId, values);
-await writeJson(pdfRows, rawFilingRows);
-const annualReport = path.join(input, "annual-report.pdf");
-await exec(python, ["-c", [
+if (options["real-filings-request"]) {
+  const realRequestPath = path.resolve(String(options["real-filings-request"]));
+  const realRequest = JSON.parse(await fs.readFile(realRequestPath, "utf8"));
+  if (realRequest.schema_version !== "filings-extraction-request/1.0") {
+    throw new Error("Real filings canary request has the wrong schema version.");
+  }
+  if (!Array.isArray(realRequest.documents) || realRequest.documents.length !== 1) {
+    throw new Error("Real filings canary requires exactly one annual-report document.");
+  }
+  annualReport = path.resolve(path.dirname(realRequestPath), realRequest.documents[0].path);
+  filingFacts = structuredClone(realRequest.filing_facts);
+  if (options["historical-gross-debt"]) {
+    const historicalGrossDebt = String(options["historical-gross-debt"])
+      .split(",")
+      .map((value) => Number(value.trim()));
+    if (historicalGrossDebt.length !== 3 || !historicalGrossDebt.every(Number.isFinite)) {
+      throw new Error("--historical-gross-debt requires three comma-separated numbers.");
+    }
+    filingFacts.historical_gross_debt = historicalGrossDebt;
+  }
+  companyName = filingFacts.entity_name;
+  rawFilingKind = "real_uploaded_annual_report";
+  rawStatementCounts = {
+    income_statement: Number(options["expected-income-rows"]),
+    cash_flow: Number(options["expected-cash-rows"]),
+  };
+  if (!Object.values(rawStatementCounts).every((value) => Number.isInteger(value) && value > 0)) {
+    throw new Error("Real filings canary requires positive expected statement row counts.");
+  }
+} else {
+  rawFilingRows = {
+    income_statement: structuredClone(
+      clean.filings.face_statement_manifests.income_statement.flatMap((item) => item.rows),
+    ),
+    cash_flow: structuredClone(
+      clean.filings.face_statement_manifests.cash_flow.flatMap((item) => item.rows),
+    ),
+  };
+  for (const [sourceLineId, values] of Object.entries({
+    "is.interest_expense": [-5, -5, -5],
+    "is.pre_tax_income": [145, 145, 145],
+    "is.net_income": [114, 114, 114],
+  })) restate("income_statement", sourceLineId, values);
+  for (const [sourceLineId, values] of Object.entries({
+    "cf.cash_flow_net_income": [114, 114, 114],
+    "cf.cash_flow_profit_before_tax": [145, 145, 145],
+    "cf.net_finance_result": [-5, -5, -5],
+    "cf.cash_generated_from_operations": [190, 190, 190],
+    "cf.cash_from_operations": [164, 164, 164],
+    "cf.fx_effect_on_cash": [0, 0, 0],
+    "cf.net_change_in_cash": [0, 0, 0],
+    "cf.ending_cash": [370, 380, 390],
+    "cf.free_cash_flow": [64, 64, 64],
+  })) restate("cash_flow", sourceLineId, values);
+  rawStatementCounts = {
+    income_statement: rawFilingRows.income_statement.length,
+    cash_flow: rawFilingRows.cash_flow.length,
+  };
+  await writeJson(pdfRows, rawFilingRows);
+  annualReport = path.join(input, "annual-report.pdf");
+  await exec(python, ["-c", [
   "import json,pymupdf,sys",
   "data=json.load(open(sys.argv[2]))",
   "def depths(rows):",
@@ -97,22 +150,22 @@ await exec(python, ["-c", [
   "p.insert_text((40,85),'Cash and cash equivalents',fontsize=7)",
   "p.insert_text((390,85),'370',fontsize=7); p.insert_text((450,85),'380',fontsize=7); p.insert_text((510,85),'390',fontsize=7)",
   "doc.save(sys.argv[1]); doc.close()",
-].join("\n"), annualReport, pdfRows], { env: commandEnv, maxBuffer: 32 * 1024 * 1024 });
+  ].join("\n"), annualReport, pdfRows], { env: commandEnv, maxBuffer: 32 * 1024 * 1024 });
+  filingFacts = Object.fromEntries(
+    [
+      "entity_name", "entity_identifiers", "entity_aliases", "consolidation_level",
+      "reporting_currency", "units", "fiscal_calendar_kind", "historical_periods",
+      "forecast_periods", "reported_gross_debt", "historical_gross_debt", "reported_cash",
+      "reported_gross_interest", "reported_lease_liability", "fiscal_label",
+      "maximum_residual_percentage", "restricted_cash", "leverage_basis",
+      "minimum_operating_cash", "announced_acquisition",
+    ]
+      .filter((key) => clean.filings[key] !== undefined)
+      .map((key) => [key, structuredClone(clean.filings[key])]),
+  );
+  filingFacts.historical_gross_debt = [80, 80, 80];
+}
 const annualHash = sha256(await fs.readFile(annualReport));
-
-const filingFacts = Object.fromEntries(
-  [
-    "entity_name", "entity_identifiers", "entity_aliases", "consolidation_level",
-    "reporting_currency", "units", "fiscal_calendar_kind", "historical_periods",
-    "forecast_periods", "reported_gross_debt", "historical_gross_debt", "reported_cash",
-    "reported_gross_interest", "reported_lease_liability", "fiscal_label",
-    "maximum_residual_percentage", "restricted_cash", "leverage_basis",
-    "minimum_operating_cash", "announced_acquisition",
-  ]
-    .filter((key) => clean.filings[key] !== undefined)
-    .map((key) => [key, structuredClone(clean.filings[key])]),
-);
-filingFacts.historical_gross_debt = [80, 80, 80];
 const filingsRequest = path.join(input, "filings-request.json");
 await writeJson(filingsRequest, {
   schema_version: "filings-extraction-request/1.0",
@@ -131,9 +184,11 @@ await writeJson(filingsRequest, {
 // Raw FactSet-shaped CSV bytes. No normalized DCS JSON is supplied to ingress;
 // the DCS controller must capture, crosswalk, verify and project these cells.
 const dcsCsv = path.join(input, "factset-dcs.csv");
+const grossDebt = Number(filingFacts.reported_gross_debt);
+if (!Number.isFinite(grossDebt) || grossDebt <= 0) throw new Error("Canary filing facts lack positive gross debt.");
 await fs.writeFile(dcsCsv, [
   "Security Description,Security Type,CCY,Amount Outstanding,Maturity Date,Coupon Rate,Reference Rate,Margin Bps,Balance Basis,Facility Size,Amount Drawn,Committed,Fee Convention,Commitment Fee Bps,Issue Date,Clean Price,YTW,OAS",
-  "5.000% senior notes due Jun-2033,bond,USD,80,2033-06-30,0.05,,,native_principal,,,,,,2025-01-02,100,0.05,100",
+  `5.000% senior notes due Jun-2033,bond,${filingFacts.reporting_currency},${grossDebt},2033-06-30,0.05,,,native_principal,,,,,,2025-01-02,100,0.05,100`,
   "Committed revolving credit facility,RCF,USD,0,2030-06-30,,SOFR 3M,60,native_principal,100,0,yes,bps_on_undrawn,25,2024-01-02,100,0.03,75",
 ].join("\n") + "\n");
 const dcsHash = sha256(await fs.readFile(dcsCsv));
@@ -145,7 +200,7 @@ await writeJson(dcsRequest, {
   expected_sha256: dcsHash,
   adapter_metadata: {
     as_of: "2025-12-31",
-    entity_name: clean.company_name,
+    entity_name: companyName,
     reporting_currency: clean.filings.reporting_currency,
     units: clean.filings.units,
     system: "FactSet DCS",
@@ -187,18 +242,18 @@ const evidenceTemplate = {
   run_id: runId,
   created_at: "2026-08-15T12:00:00.000Z",
   mode: "first_run",
-  company_name: clean.company_name,
+  company_name: companyName,
   source_inventory: [
     {
       source_id: "annual_report", kind: "company_annual_report", name: "Annual report",
       origin: "uploaded", media_type: "application/pdf", publication_date: "2026-03-01",
-      as_of_date: "2025-12-31", entity_name: clean.company_name,
+      as_of_date: "2025-12-31", entity_name: companyName,
       content_sha256: annualHash, text_extractable: true, status: "used",
     },
     {
       source_id: "factset_export", kind: "user_factset_export", name: "FactSet DCS export",
       origin: "uploaded", media_type: "text/csv", publication_date: null,
-      as_of_date: "2025-12-31", entity_name: clean.company_name,
+      as_of_date: "2025-12-31", entity_name: companyName,
       content_sha256: dcsHash, text_extractable: true, status: "used",
     },
     ...policyArtifacts.map(({ sourceId, rawSha256 }) => ({
@@ -209,7 +264,7 @@ const evidenceTemplate = {
       media_type: "application/json",
       publication_date: null,
       as_of_date: "2025-12-31",
-      entity_name: clean.company_name,
+      entity_name: companyName,
       content_sha256: rawSha256,
       text_extractable: true,
       status: "used",
@@ -260,7 +315,7 @@ await writeJson(evidenceTemplatePath, evidenceTemplate);
 const declarations = {
   identity: {
     case_id: runId,
-    issuer_name: clean.company_name,
+    issuer_name: companyName,
     reporting_currency: filingFacts.reporting_currency,
     units: "millions",
     fiscal_year_end: "12-31",
@@ -282,7 +337,7 @@ const declarations = {
     },
   },
   answers: [
-    { question_id: "derived.cash.minimum_cash", round: "derived", answer: 100 },
+    { question_id: "derived.cash.minimum_cash", round: "derived", answer: Math.min(1000, Number(filingFacts.reported_cash ?? 100)) },
     { question_id: "derived.cash.eligible", round: "derived", answer: 1 },
     { question_id: "derived.cash.yield", round: "derived", answer: [0.025, 0.025, 0.025] },
     {
@@ -345,7 +400,7 @@ const brokerRequest = path.join(input, "broker-intake-request.json");
 await writeJson(brokerRequest, {
   schema_version: "broker-intake-request/1.0",
   run_id: runId,
-  issuer_identity: { name: clean.company_name },
+  issuer_identity: { name: companyName },
   filings_receipt_path: brokerReceiptSeed,
   attachments: [],
   reply: "continue without brokers",
@@ -412,10 +467,6 @@ const [compiledEvidence, compiledCaseSource, rowMap, deliveryAttestation] = awai
 ]);
 const manifestRowCount = (manifests, section) =>
   (manifests?.[section] ?? []).reduce((total, manifest) => total + (manifest.rows?.length ?? 0), 0);
-const rawStatementCounts = {
-  income_statement: rawFilingRows.income_statement.length,
-  cash_flow: rawFilingRows.cash_flow.length,
-};
 const compiledManifestCounts = {
   income_statement: manifestRowCount(compiledEvidence.case_evidence?.face_statement_manifests, "income_statement"),
   cash_flow: manifestRowCount(compiledEvidence.case_evidence?.face_statement_manifests, "cash_flow"),
@@ -461,14 +512,59 @@ if (
 if (deliveryAttestation.status !== "PASS" || deliveryAttestation.violations?.length !== 0) {
   throw new Error("Delivered raw-input workbook lacks a clean live-delivery attestation.");
 }
-if (rowMap.authority_profile !== "net_cash" || Number(rowMap.visible_end_row) !== 140) {
-  throw new Error(
-    `Small net-cash case did not preserve its 140-row authority surface: ${rowMap.visible_end_row}.`,
+if (rawFilingKind === "generated_complete_face_statements") {
+  if (rowMap.authority_profile !== "net_cash" || Number(rowMap.visible_end_row) !== 140) {
+    throw new Error(
+      `Small net-cash case did not preserve its 140-row authority surface: ${rowMap.visible_end_row}.`,
+    );
+  }
+} else {
+  const visibleBySection = Object.fromEntries(
+    ["income_statement", "cash_flow"].map((section) => [
+      section,
+      new Set(
+        (rowMap.statement_rows?.[section] ?? [])
+          .filter((row) => Number.isInteger(row.row))
+          .map((row) => row.row_id),
+      ),
+    ]),
   );
+  const missingFiledRows = [];
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const entry of compiledEvidence.case_source?.statement_map?.[section] ?? []) {
+      if (entry.disposition === "keep" && !visibleBySection[section].has(entry.row_id)) {
+        missingFiledRows.push(`${section}.${entry.row_id}`);
+      }
+    }
+  }
+  const requiredModelRows = [
+    ["income_statement", "adjusted_ebitda"],
+    ["income_statement", "depreciation_and_amortisation"],
+    ["cash_flow", "change_in_working_capital"],
+    ["cash_flow", "capex"],
+    ["cash_flow", "ending_cash"],
+  ];
+  const missingRequiredRows = requiredModelRows
+    .filter(([section, rowId]) => !visibleBySection[section].has(rowId))
+    .map(([section, rowId]) => `${section}.${rowId}`);
+  if (
+    rowMap.authority_profile !== "maximal" ||
+    Number(rowMap.visible_end_row) <= 140 ||
+    visibleBySection.income_statement.size < rawStatementCounts.income_statement ||
+    visibleBySection.cash_flow.size < rawStatementCounts.cash_flow ||
+    missingFiledRows.length > 0 ||
+    missingRequiredRows.length > 0
+  ) {
+    throw new Error(
+      "Real Astra canary collapsed its maximal statement surface: " +
+      JSON.stringify({ missingFiledRows, missingRequiredRows }),
+    );
+  }
 }
 console.log(JSON.stringify({
   schema_version: "raw-input-black-box-canary/1.0",
   status: "PASS",
+  raw_filing_kind: rawFilingKind,
   public_entrypoint: "scripts/run_excel_inflow_vnext.mjs",
   preauthored_statement_map: false,
   preauthored_compiler_lanes: false,

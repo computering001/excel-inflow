@@ -151,7 +151,10 @@ def _formula_graph_from_model_ir(model_ir: dict) -> dict:
             authority = authority_by_period.get((consumer_id, forecast_index)) or {}
             if authority.get("producer_type") != "Derived":
                 continue
-            self_roll_forward = consumer_id == dependency_id
+            prior_period = (
+                authority.get("period_relation") == "prior_period"
+                and dependency_id in (authority.get("formula_refs") or [])
+            )
             required_paths.append(
                 {
                     "consumer_display_id": consumer_id,
@@ -162,13 +165,13 @@ def _formula_graph_from_model_ir(model_ir: dict) -> dict:
                     % (
                         (
                             prior_columns[forecast_index]
-                            if self_roll_forward
+                            if prior_period
                             else forecast_columns[forecast_index]
                         ),
                         dependency["row"],
                     ),
                     "period_relation": (
-                        "prior_period" if self_roll_forward else "same_period"
+                        "prior_period" if prior_period else "same_period"
                     ),
                 }
             )

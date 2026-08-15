@@ -18,6 +18,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from broker_numeric import canonical_numeric_token
+
 from compile_broker_candidate_manifest import compile_manifest
 
 
@@ -94,19 +96,7 @@ def nonblank_count(table: dict[str, Any]) -> int:
 
 
 def numeric_token(value: Any) -> str | None:
-    raw = str(value or "").strip()
-    if not re.fullmatch(r"\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?[%x]?\)?", raw, re.I):
-        return None
-    negative = raw.startswith("(") and raw.endswith(")")
-    suffix = "%" if "%" in raw else ("x" if raw.lower().endswith("x") else "")
-    cleaned = re.sub(r"[$€£¥,%xX() ]", "", raw)
-    try:
-        number = float(cleaned)
-    except ValueError:
-        return raw
-    if negative:
-        number = -abs(number)
-    return (str(int(number)) if number.is_integer() else format(number, ".15g")) + suffix
+    return canonical_numeric_token(value)
 
 
 def table_numeric_tokens(table: dict[str, Any]) -> list[str]:
@@ -1123,7 +1113,6 @@ def main() -> int:
     compiled["gate_status"] = compiled["physical_capture_receipt"]["status"]
     compiled["candidate_manifest"] = compile_manifest(
         compiled,
-        source_bundle_sha256=compiled["source_bundle_sha256"],
     )
     if (
         compiled["candidate_manifest"].get("gate_status") == "BLOCKED"

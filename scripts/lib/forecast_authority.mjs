@@ -1,4 +1,5 @@
 import { resolveBrokerForecastSelection } from "./broker_anchor.mjs";
+import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
 
 /**
  * Forecast authority is selected per row AND per forecast period.  It is not a
@@ -74,26 +75,7 @@ const MATERIALITY_REQUIRED_METHODS = new Set([
   "not_applicable",
 ]);
 
-const SCHEDULE_OWNED_ROLES = new Set([
-  "interest_income",
-  "interest_expense",
-  "cash_interest_paid",
-  "cash_interest_received",
-  "net_finance_addback",
-  "debt_issuance",
-  "debt_repayment",
-  "change_in_debt",
-  "rcf_draw",
-  "rcf_repayment",
-  "lease_principal",
-  "opening_cash",
-  "ending_cash",
-  "net_change_in_cash",
-  "non_balancing_cash_bucket_movement",
-  // Computed by the solver from the debt schedule (PIK, fee amortisation) —
-  // schedule-owned exactly like the RCF legs.
-  "non_cash_interest_addback",
-]);
+const SCHEDULE_OWNED_ROLES = new Set(Object.keys(SCHEDULE_PRODUCER_BY_ROLE));
 
 const STRUCTURAL_EVENT_ROLES = new Set([
   "acquisition_cost",
@@ -107,16 +89,21 @@ const STRUCTURAL_EVENT_ROLES = new Set([
   "discontinued_operation",
 ]);
 
+export function isStructuredSemanticEvent(row) {
+  return (
+    ["debt_issuance_cost", "other_cash_debt_movement"].includes(
+      row?.movement_type,
+    ) || STRUCTURAL_EVENT_ROLES.has(row?.semantic_role)
+  );
+}
+
 function validSemanticEventZeroBackstop(row, authority) {
   return (
     authority?.zero_basis === "semantic_event_nonrecurrence" &&
     authority?.source_kind === "historical_inference" &&
     authority?.source_id === `semantic-event-backstop:${row?.row_id}` &&
     Boolean(authority?.as_of_date) &&
-    (["debt_issuance_cost", "other_cash_debt_movement"].includes(
-      row?.movement_type,
-    ) ||
-      STRUCTURAL_EVENT_ROLES.has(row?.semantic_role))
+    isStructuredSemanticEvent(row)
   );
 }
 
@@ -842,12 +829,27 @@ export function validateForecastAuthorities(modelCase, rows = []) {
                       revenueIndex >= 0 &&
                       rowIndex > revenueIndex &&
                       rowIndex < ebitIndex));
+                const cashHeaderByParentRole = {
+                  cash_from_investing: "investing_activities",
+                  cash_from_financing: "financing_activities",
+                };
+                const cashHeaderId = cashHeaderByParentRole[parent.semantic_role];
+                const cashHeaderIndex = cashHeaderId
+                  ? sectionRows.findIndex((candidate) => candidate.row_id === cashHeaderId)
+                  : -1;
+                const parentIndex = sectionRows.indexOf(parent);
+                const inCashFlowBand =
+                  section === "cash_flow" &&
+                  cashHeaderIndex >= 0 &&
+                  rowIndex > cashHeaderIndex &&
+                  rowIndex < parentIndex;
                 return formulaPathValid ||
                 row.parent_row_id === captureParentId ||
                 (parent.calculation?.refs ?? []).filter(
                   (reference) => reference === row.row_id,
                 ).length === 1 ||
-                inStatementBand;
+                inStatementBand ||
+                inCashFlowBand;
               })()
               ) {
                 errors.push(

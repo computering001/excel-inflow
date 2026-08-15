@@ -318,6 +318,7 @@
         "publication_date": { "type": ["string", "null"] },
         "as_of_date": { "type": ["string", "null"] },
         "entity_name": { "type": "string", "minLength": 1 },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
         "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
         "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
@@ -538,6 +539,7 @@
       ],
       "properties": {
         "entity_name": { "type": "string", "minLength": 1 },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
         "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
         "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
         "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },

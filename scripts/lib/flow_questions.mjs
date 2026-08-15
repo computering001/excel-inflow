@@ -514,6 +514,12 @@ const KINDS = [
     kind: "lease_in_leverage",
     detect(context) {
       const { intake, draftCase } = context;
+      // A typed model control is already an answered policy decision. Asking
+      // the user to restate it makes a resumable run stop on a question whose
+      // economic mutation has already been applied.
+      if (typeof draftCase.lease_policy?.include_in_leverage === "boolean") {
+        return [];
+      }
       if (
         intake.filings?.leverage_basis !== null &&
         intake.filings?.leverage_basis !== undefined
@@ -563,6 +569,14 @@ const KINDS = [
     kind: "minimum_cash_floor",
     detect(context) {
       const { intake, draftCase } = context;
+      if (
+        Object.prototype.hasOwnProperty.call(
+          draftCase.cash_policy ?? {},
+          "minimum_cash_override",
+        )
+      ) {
+        return [];
+      }
       if (
         intake.filings?.minimum_operating_cash !== null &&
         intake.filings?.minimum_operating_cash !== undefined

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { validateJsonSchema } from "./json_schema.mjs";
+import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
 
 const SCHEMA = JSON.parse(fs.readFileSync(
   new URL("../../assets/forecast-behavior-map-v1.schema.json", import.meta.url),
@@ -69,15 +70,7 @@ export const ALLOWED_METHODS_BY_BEHAVIOR = Object.freeze({
   not_applicable: Object.freeze(["not_applicable"]),
 });
 
-const SCHEDULE_ROLES = new Set([
-  "interest_income", "interest_expense", "cash_interest_paid",
-  "cash_interest_received", "net_finance_addback", "debt_issuance", "debt_repayment",
-  "change_in_debt", "opening_debt", "ending_debt", "gross_debt",
-  "net_debt", "rcf_draw", "rcf_repayment", "ending_rcf",
-  "lease_principal", "lease_interest", "lease_liability",
-  "opening_cash", "ending_cash", "net_change_in_cash",
-  "liquidity", "liquidity_shortfall", "commitment_fee",
-]);
+const SCHEDULE_ROLES = new Set(Object.keys(SCHEDULE_PRODUCER_BY_ROLE));
 
 const IDENTITY_ROLES = new Set([
   "revenue", "gross_profit", "operating_profit", "ebit", "ebitda",
@@ -98,6 +91,7 @@ const LUMPY_ROLES = new Set([
 ]);
 
 const DRIVER_ROLES = new Set([
+  "opening_cash",
   "change_in_working_capital", "cash_taxes", "tax_expense",
   "depreciation_and_amortisation", "depreciation", "amortisation",
   "cost_of_sales", "selling_general_administrative_expense",
@@ -230,6 +224,30 @@ function classifySignals(modelCase, row, section, rows) {
     return result;
   }
 
+  // A structured driver role outranks incidental words in the filed label.
+  // In particular, a combined recurring D&A line may read “depreciation,
+  // amortisation and impairment”; the word impairment must not turn the
+  // entire recurring bridge into a one-off event and zero its forecast.
+  if (DRIVER_ROLES.has(role)) {
+    add("row_semantics", "structured_forecast_driver_role", "driver_linked_flow", 0.96);
+    return result;
+  }
+
+  // A declared forecast roll-forward is temporal authority and outranks an
+  // empty or historical same-row identity. This is particularly important at
+  // the cash boundary: opening cash reads the preceding period's ending cash,
+  // and must never be rejected because its filed historical shell is a
+  // calculation row.
+  if ([...operators].some((operator) => DRIVER_OPERATORS.has(operator))) {
+    add(
+      "calculation_topology",
+      "explicit_temporal_roll_forward",
+      "driver_linked_flow",
+      0.99,
+    );
+    return result;
+  }
+
   const rowTypeIdentity = rules.some((rule) =>
     IDENTITY_OPERATORS.has(normalise(rule?.operator).replaceAll(" ", "_")),
   );
@@ -252,13 +270,27 @@ function classifySignals(modelCase, row, section, rows) {
     // rows that otherwise used to repeat the latest filed cash flow forever.
     add("movement_type", "discrete_financing_transaction", "non_recurring_event", 0.97);
   }
-  if (includesAny(descriptor, [
+  const structuredEvent =
+    NON_RECURRING_ROLES.has(role) ||
+    ["debt issuance cost", "other cash debt movement"].includes(
+      normalise(row?.movement_type),
+    );
+  if (!structuredEvent && includesAny(descriptor, [
     "acquisition", "business combination", "merger", "litigation", "legal settlement",
     "restructuring", "impairment", "exceptional", "one off", "one time",
     "non recurring", "discontinued operation", "debt issuance cost",
     "financing transaction cost", "transaction fee",
   ])) {
-    add("source_evidence", "event_or_one_off_descriptor", "non_recurring_event", 0.9);
+    // Event-like wording is not evidence that the cash flow ends. Without a
+    // structured semantic role or movement declaration, keep it visible as a
+    // lumpy line and use the evidenced historical waterfall. Only the
+    // structured branches above may activate the zero-event backstop.
+    add(
+      "source_evidence",
+      "event_like_descriptor_without_structured_nonrecurrence_authority",
+      "lumpy_discretionary_flow",
+      0.9,
+    );
   }
 
   if (includesAny(normalise(row?.movement_type), ["seasonal", "seasonality"]) ||

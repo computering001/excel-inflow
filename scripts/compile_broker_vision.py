@@ -15,6 +15,7 @@ from typing import Any
 from compile_broker_candidate_manifest import compile_manifest
 from compile_broker_canonical_tables import canonicalise_bundle, ensure_late_promotion_tasks
 from broker_terminal_recovery import normalized_label
+from broker_numeric import canonical_numeric_token
 
 
 NUMERIC_RE = re.compile(
@@ -33,6 +34,25 @@ INDEPENDENT_RESPONSE_BINDING_FIELDS = {
     "surface_disposition",
     "tables",
 }
+
+
+def source_surface_sha256(document: dict[str, Any], surface_id: str) -> str:
+    """Stable identity of the immutable source page behind a render.
+
+    PDF rasterisation can vary in antialiasing bytes across processes while
+    the raw report and page ordinal remain identical. Model-host responses are
+    therefore bound to raw document content + surface identity; the concrete
+    PNG is still independently checked against its extraction artifact.
+    """
+    payload = {
+        "schema_version": "broker-source-surface/1.0",
+        "document_id": document.get("document_id"),
+        "raw_sha256": document.get("raw_sha256"),
+        "surface_id": surface_id,
+    }
+    return hashlib.sha256(
+        (json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+    ).hexdigest()
 
 
 def vision_schema_contract_errors(schema: dict[str, Any]) -> list[str]:
@@ -586,22 +606,7 @@ def bounded_quarantine_decisions(manifest: dict[str, Any]) -> dict[str, dict[str
 
 
 def numeric_token(value: Any) -> str | None:
-    if value is None or isinstance(value, bool):
-        return None
-    text = str(value).strip()
-    if not NUMERIC_RE.fullmatch(text):
-        return None
-    negative = text.startswith("(") and text.endswith(")")
-    suffix = "%" if "%" in text else ("x" if text.lower().endswith("x") else "")
-    cleaned = re.sub(r"[$€£¥,%xX() ]", "", text)
-    try:
-        number = float(cleaned)
-    except ValueError:
-        return text
-    if negative:
-        number = -abs(number)
-    base = str(int(number)) if number.is_integer() else format(number, ".15g")
-    return base + suffix
+    return canonical_numeric_token(value)
 
 
 def make_cell(
@@ -1052,7 +1057,10 @@ def main() -> int:
                 result.get("schema_version") == "broker-vision-result/1.0"
                 and result.get("document_id") == document["document_id"]
                 and result.get("surface_id") == surface_id
-                and result.get("image_sha256") == image_artifact["sha256"]
+                and result.get("image_sha256") in {
+                    image_artifact["sha256"],
+                    source_surface_sha256(document, surface_id),
+                }
                 and result.get("pass_index") == index
                 and str(result.get("producer_id") or "").strip()
                 and str(result.get("producer_fingerprint") or "").strip()
@@ -1170,7 +1178,10 @@ def main() -> int:
                             resolution.get("schema_version") in {"broker-vision-result/1.0", "broker-vision-result/1.1"}
                             and resolution.get("document_id") == document["document_id"]
                             and resolution.get("surface_id") == surface_id
-                            and resolution.get("image_sha256") == image_artifact["sha256"]
+                            and resolution.get("image_sha256") in {
+                                image_artifact["sha256"],
+                                source_surface_sha256(document, surface_id),
+                            }
                             and resolution.get("pass_index") == "resolution"
                             and str(resolution.get("producer_id") or "").strip()
                             and resolution.get("method") == "reviewed_resolution"
@@ -1380,7 +1391,6 @@ def main() -> int:
         recompute_ledger(document)
     bundle["candidate_manifest"] = compile_manifest(
         bundle,
-        source_bundle_sha256=hashlib.sha256(bundle_path.read_bytes()).hexdigest(),
     )
     findings.extend(bundle["candidate_manifest"].get("findings", []))
     table_count = sum(len(document.get("canonical_tables") or document["tables"]) for document in bundle["documents"])

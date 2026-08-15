@@ -20,6 +20,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from broker_numeric import parse_broker_number
+
 
 MAPPED_DISPOSITIONS = {"mapped_metric", "mapped_guidance"}
 SELECTED_MODEL_USES = {"active_input", "derived_input"}
@@ -192,7 +194,7 @@ def _unit_scale(value: Any) -> tuple[str | None, str | None]:
     currency = next((code for code in ("usd", "gbp", "eur", "jpy", "chf") if code in text), None)
     if any(token in text for token in ("billion", "billions", "bn")):
         scale = "billions"
-    elif any(token in text for token in ("million", "millions", "mn", "mm")) or re.search(r"(?:usd|gbp|eur|jpy|chf|[$£€¥])m$", text):
+    elif any(token in text for token in ("million", "millions", "mio", "mn", "mm")) or re.search(r"(?:usd|gbp|eur|jpy|chf|[$£€¥])m$", text):
         scale = "millions"
     elif any(token in text for token in ("thousand", "thousands")) or text.endswith("k"):
         scale = "thousands"
@@ -232,25 +234,7 @@ def _cell_numeric(table: dict[str, Any], row: int, column: int) -> float | None:
         value = table["rows"][row - 1][column - 1].get("value")
     except (IndexError, KeyError, TypeError):
         return None
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)):
-        number = float(value)
-    else:
-        text = str(value).strip()
-        match = re.fullmatch(
-            r"\s*(\()?\s*[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?\s*(%)?\s*\)?\s*",
-            text,
-        )
-        if not match:
-            return None
-        negative = bool(match.group(1)) or text.lstrip().startswith("-")
-        number = float(re.sub(r"[$€£¥,%() ]", "", text))
-        if negative:
-            number = -abs(number)
-        if match.group(2):
-            number /= 100.0
-    return number if math.isfinite(number) else None
+    return parse_broker_number(value)
 
 
 def _metric_axes(metric: dict[str, Any]) -> tuple[str, str]:
@@ -534,6 +518,7 @@ def compile_reference_only_crosswalk(
     forecast_periods = list(model_context.get("forecast_periods") or [])
     if len(forecast_periods) != 3:
         raise ValueError("Reference-only broker fallback requires exactly three forecast periods.")
+    forecast_years = [int(str(value)[:4]) for value in forecast_periods]
 
     manifest_candidates = list((bundle.get("candidate_manifest") or {}).get("candidates") or [])
     candidates_by_table: dict[str, list[dict[str, Any]]] = {}
@@ -554,10 +539,19 @@ def compile_reference_only_crosswalk(
                     if column > 0:
                         period_cells[(column, basis)] = str(item.get("period_label") or "")
             period_columns = []
-            for ordinal, ((column, basis), label) in enumerate(sorted(period_cells.items())):
-                value: dict[str, Any] = {"column": column, "period_basis": basis}
-                if ordinal < 3:
-                    value["period_index"] = ordinal
+            for (column, basis), label in sorted(period_cells.items()):
+                year = _period_year(label, forecast_years)
+                # A table review declares only columns that can participate in
+                # this run's three forecast periods. Historical and terminal
+                # columns remain in the immutable table but are not false
+                # forecast declarations requiring an invented period_index.
+                if year not in forecast_years:
+                    continue
+                value: dict[str, Any] = {
+                    "column": column,
+                    "period_basis": basis,
+                    "period_index": forecast_years.index(year),
+                }
                 if label:
                     value["period_label"] = label
                 period_columns.append(value)
@@ -636,6 +630,15 @@ def canonical_bytes(value: Any) -> bytes:
 
 def canonical_hash(value: Any) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
+
+
+def bundle_authority_hash(bundle: dict[str, Any]) -> str:
+    """Stable broker-authority identity, excluding paths and timestamps."""
+    return canonical_hash({
+        "schema_version": "broker-authority-content/1.0",
+        "run_id": bundle.get("run_id"),
+        "candidate_manifest_sha256": canonical_hash(bundle.get("candidate_manifest")),
+    })
 
 
 def candidate_index(bundle: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -764,7 +767,7 @@ def automatic_negative_consumption_review(
     return {
         "schema_version": "broker-terminal-materiality-review/1.0",
         "run_id": bundle.get("run_id"),
-        "bundle_sha256": bundle_sha256,
+        "bundle_sha256": bundle_authority_hash(bundle),
         "candidate_manifest_sha256": canonical_hash(bundle.get("candidate_manifest")),
         "source_crosswalk_sha256": crosswalk_sha256,
         "semantic_report_sha256": semantic_report_sha256,
@@ -1022,7 +1025,7 @@ def apply_terminal_review(
         raise ValueError("Terminal materiality review reviewed_at must be a string or null.")
     expected_bindings = {
         "run_id": bundle.get("run_id"),
-        "bundle_sha256": bundle_sha256,
+        "bundle_sha256": bundle_authority_hash(bundle),
         "candidate_manifest_sha256": canonical_hash(bundle.get("candidate_manifest")),
         "source_crosswalk_sha256": crosswalk_sha256,
         "semantic_report_sha256": semantic_report_sha256,
@@ -1125,8 +1128,8 @@ def validate_terminal_recovery_independently(
         errors.append("terminal quarantine has an unsupported schema version")
     if terminal.get("run_id") != bundle.get("run_id"):
         errors.append("terminal quarantine is not bound to the bundle run_id")
-    if bundle_sha256 is not None and terminal.get("bundle_sha256") != bundle_sha256:
-        errors.append("terminal quarantine is not bound to the verified bundle bytes")
+    if terminal.get("bundle_sha256") != bundle_authority_hash(bundle):
+        errors.append("terminal quarantine is not bound to stable broker authority content")
     if terminal.get("candidate_manifest_sha256") != canonical_hash(bundle.get("candidate_manifest")):
         errors.append("terminal quarantine is not bound to the immutable candidate manifest")
     if terminal.get("bounded_review_status") != "exhausted":

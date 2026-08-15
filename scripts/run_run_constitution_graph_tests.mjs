@@ -71,6 +71,9 @@ for (const section of ["income_statement", "cash_flow"]) {
         material: true,
         selected_candidate_id: candidateId,
         source_bindings: structural ? [] : ["filing-2025"],
+        formula_spec: structural
+          ? { operator: "sum", refs: [row.row_id === "ebit" ? "revenue" : "capex"] }
+          : { operator: "historical_average", refs: [row.row_id] },
         status: "RESOLVED",
       });
       candidateLedger.push({
@@ -79,6 +82,9 @@ for (const section of ["income_statement", "cash_flow"]) {
         method: structural ? "accounting_identity" : "historical_average",
         selected: true,
         source_bindings: structural ? [] : ["filing-2025"],
+        formula_spec: structural
+          ? { operator: "sum", refs: [row.row_id === "ebit" ? "revenue" : "capex"] }
+          : { operator: "historical_average", refs: [row.row_id] },
       });
     }
   }
@@ -163,6 +169,40 @@ const constitution = compileRunConstitutionGraph({
 assert.equal(validateRunConstitutionGraph(constitution).valid, true);
 assert.equal(constitution.counts.orphan_selected_authorities, 0);
 assert.ok(constitution.counts.selected_paths > 0);
+assert.equal(constitution.counts.missing_material_producers, 0);
+
+// Exact live-family mutation: a schedule-labelled cash state cannot be
+// resolved merely because the semantic label exists. It needs a registered
+// schedule producer; net change in cash is in fact an accounting identity.
+const producerlessPlan = structuredClone(forecastPlan);
+const failedState = producerlessPlan.states.find(
+  (state) => state.state_id === "cash_flow.ending_cash.fy1",
+);
+const failedCandidate = producerlessPlan.candidate_ledger.find(
+  (candidate) => candidate.candidate_id === failedState.selected_candidate_id,
+);
+failedState.method = "schedule_link";
+failedState.formula_spec = {
+  operator: "schedule_link",
+  semantic_role: "net_change_in_cash",
+};
+delete failedState.producer_witness;
+failedCandidate.method = "schedule_link";
+failedCandidate.formula_spec = structuredClone(failedState.formula_spec);
+const failedAuthority = compileSelectedAuthorityContract({
+  modelCase,
+  forecastPlan: producerlessPlan,
+  modelDemandGraph: demand,
+  evidenceRun,
+});
+assert.equal(failedAuthority.counts.missing_producers, 1);
+assert.equal(
+  validateSelectedAuthorityContract(failedAuthority, {
+    modelDemandGraph: demand,
+    forecastPlan: producerlessPlan,
+  }).valid,
+  false,
+);
 
 const tamperedDemand = structuredClone(demand);
 tamperedDemand.nodes[0].material = !tamperedDemand.nodes[0].material;

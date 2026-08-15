@@ -292,6 +292,11 @@ function primarySelectionCase({ brokerPack, house, headlineAnchor, mappings, sou
       });
     }
   }
+  if (selectedValues.length === 0) {
+    violations.push(
+      "The coherent house has no provenance-clean selected value; retain the forecast waterfall.",
+    );
+  }
   return {
     house_id: house.house_id,
     house_name: house.house_name,
@@ -458,10 +463,26 @@ export function compileBrokerPreview({
   const mappings = mappingIndex(crosswalkReceipt);
   const { selected: headlineAnchor, coverage: headlineCoverage } =
     globalHeadlineAnchor(brokerPack);
+  // A coherent house may publish only part of the model-demand surface.  The
+  // missing concept-periods already carry explicit waterfall records inside
+  // primarySelectionCase; excluding a supplemental house here discarded its
+  // clean selected cells wholesale and recreated the old "evidence only"
+  // failure.  A complete headline anchor plus at least one provenance-clean
+  // value is sufficient for optional coherent-house selection.
   const packPrimary = (brokerPack?.houses ?? []).filter(
     (house) => house.eligibility === "primary_eligible",
   );
-  const cases = packPrimary.map((house) =>
+  const packSelectable = (brokerPack?.houses ?? []).filter((house) => {
+    if (!["primary_eligible", "supplemental_eligible"].includes(house.eligibility)) {
+      return false;
+    }
+    if ((house.missing_primary_metrics ?? []).includes("ebit_or_adjusted_ebitda")) {
+      return false;
+    }
+    const anchor = headlineAnchorForHouse(house, headlineAnchor);
+    return Boolean(anchor) && complete(house, anchor);
+  });
+  const cases = packSelectable.map((house) =>
     primarySelectionCase({
       brokerPack,
       house,
@@ -507,10 +528,7 @@ export function compileBrokerPreview({
     );
   }
   if (!headlineAnchor) waterfallReasons.push("No broker headline anchor is available.");
-  if (packPrimary.length === 0) waterfallReasons.push("The sealed pack has no primary-eligible house.");
-  if (!packRecommended) {
-    waterfallReasons.push("The sealed pack does not declare recommended_primary_house_id.");
-  }
+  if (packSelectable.length === 0) waterfallReasons.push("The sealed pack has no selectable coherent house.");
   if (packRecommended && !packPrimary.some((house) => house.house_id === packRecommended)) {
     topViolations.push(
       `Pack-recommended house ${packRecommended} is not primary_eligible.`,
@@ -552,7 +570,7 @@ export function compileBrokerPreview({
     topViolations.push("Broker crosswalk receipt mapping_count is stale.");
   }
   if (!finalRecommended) {
-    waterfallReasons.push("No primary-eligible house has a complete selectable coherent series.");
+    waterfallReasons.push("No house has a complete headline anchor and at least one provenance-clean selected value.");
   }
   if (packRecommended && !finalValidCases.some((item) => item.house_id === packRecommended)) {
     waterfallReasons.push(

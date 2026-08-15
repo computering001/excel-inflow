@@ -25,6 +25,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const CONTROLLER_VERSION = "excel-inflow-vnext/1.0";
 let ACTIVE_RUNTIME_CLOSURE = null;
+let ACTIVE_PERFORMANCE = null;
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
@@ -103,6 +104,7 @@ async function writeJson(target, value) {
 
 function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000 } = {}) {
   return new Promise((resolve, reject) => {
+    const started = Date.now();
     const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
@@ -118,7 +120,7 @@ function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve({ code, stdout, stderr });
+      resolve({ code, stdout, stderr, duration_ms: Date.now() - started });
     });
   });
 }
@@ -134,6 +136,9 @@ async function checkpoint(id, status, target = null) {
 }
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
+  if (ACTIVE_PERFORMANCE) {
+    ACTIVE_PERFORMANCE.total_duration_ms = Date.now() - ACTIVE_PERFORMANCE.started_epoch_ms;
+  }
   const artifactHashes = {};
   for (const [name, target] of Object.entries(artifacts)) {
     if (await fs.stat(target).then((entry) => entry.isFile()).catch(() => false)) {
@@ -152,7 +157,7 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
     checkpoints,
     artifacts,
     artifact_sha256: artifactHashes,
-    summary,
+    summary: ACTIVE_PERFORMANCE ? { ...summary, performance: ACTIVE_PERFORMANCE } : summary,
   };
   const errors = validateJsonSchema(state, STATE_SCHEMA);
   if (errors.length > 0) throw new Error(`vNext state failed schema: ${errors[0]}`);
@@ -163,6 +168,12 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
 }
 
 async function main() {
+  ACTIVE_PERFORMANCE = {
+    schema_version: "excel-inflow-performance/1.0",
+    started_at: new Date().toISOString(),
+    started_epoch_ms: Date.now(),
+    stages: {},
+  };
   const options = parseArgs(process.argv.slice(2));
   if (options.screen) {
     const screen = await run(process.execPath, [
@@ -208,6 +219,7 @@ async function main() {
   let attachmentState = null;
 
   if (options["attachment-spec"]) {
+    const attachmentStarted = Date.now();
     const attachmentOut = path.join(out, "evidence");
     const attachmentArgs = [
       path.join(HERE, "run_attachment_evidence_pipeline.py"),
@@ -235,6 +247,10 @@ async function main() {
       ),
     });
     attachmentState = brokerCircuitBreaker.state;
+    ACTIVE_PERFORMANCE.stages.evidence_resolution_ms = Date.now() - attachmentStarted;
+    if (attachmentState.summary?.performance) {
+      ACTIVE_PERFORMANCE.evidence_lanes = attachmentState.summary.performance;
+    }
     artifacts.attachment_state = attachmentStatePath;
     checkpoints.push(await checkpoint("raw_evidence", attachmentState.pipeline_status, attachmentStatePath));
     if (attachmentState.pipeline_status !== "PASS") {
@@ -306,6 +322,9 @@ async function main() {
     timeout: 3_600_000,
     env: runtimeEnv,
   });
+  ACTIVE_PERFORMANCE.stages.model_decisions_ms =
+    (ACTIVE_PERFORMANCE.stages.model_decisions_ms ?? 0) +
+    Number(firstExecution.duration_ms ?? 0);
   const userFlowResultPath = path.join(userFlowOut, "user-flow-result.json");
   if (
     firstExecution.code !== 0 ||
@@ -424,6 +443,7 @@ async function main() {
     timeout: 3_600_000,
     env: runtimeEnv,
   });
+  ACTIVE_PERFORMANCE.stages.build_and_delivery_ms = resumeExecution.duration_ms;
   const resumedResultSha256 = await fs.stat(userFlowResultPath)
     .then((entry) => entry.isFile() ? sha256File(userFlowResultPath) : null)
     .catch(() => null);

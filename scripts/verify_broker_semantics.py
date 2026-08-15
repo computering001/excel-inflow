@@ -16,6 +16,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from broker_numeric import parse_broker_number
+
 from broker_dynamic_concepts import validate_run_scoped_concepts
 
 DOMAIN_BY_LEGACY_ROLE = {
@@ -112,26 +114,17 @@ def canonical_line_hash(value: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def bundle_authority_hash(bundle: dict[str, Any]) -> str:
+    """Independent stable identity for terminal broker authority."""
+    return canonical_line_hash({
+        "schema_version": "broker-authority-content/1.0",
+        "run_id": bundle.get("run_id"),
+        "candidate_manifest_sha256": canonical_line_hash(bundle.get("candidate_manifest")),
+    })
+
+
 def number(value: Any) -> float | None:
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value) if math.isfinite(float(value)) else None
-    text = str(value).strip()
-    if not re.search(r"\d", text):
-        return None
-    negative = text.startswith("-") or (text.startswith("(") and text.endswith(")"))
-    percent = "%" in text
-    cleaned = re.sub(r"[$€£¥,%()\s]", "", text)
-    try:
-        parsed = float(cleaned)
-    except ValueError:
-        return None
-    if negative:
-        parsed = -abs(parsed)
-    if percent:
-        parsed /= 100.0
-    return parsed if math.isfinite(parsed) else None
+    return parse_broker_number(value)
 
 
 def slug(label: Any) -> str:
@@ -545,8 +538,8 @@ def verify_terminal_recovery_independently(
         errors.append("terminal quarantine has an unsupported schema version")
     if terminal.get("run_id") != bundle.get("run_id"):
         errors.append("terminal quarantine is not bound to the bundle run_id")
-    if bundle_sha256 is not None and terminal.get("bundle_sha256") != bundle_sha256:
-        errors.append("terminal quarantine is not bound to the verified bundle bytes")
+    if terminal.get("bundle_sha256") != bundle_authority_hash(bundle):
+        errors.append("terminal quarantine is not bound to stable broker authority content")
     if terminal.get("candidate_manifest_sha256") != canonical_line_hash(bundle.get("candidate_manifest")):
         errors.append("terminal quarantine is not bound to the immutable candidate manifest")
     if terminal.get("bounded_review_status") != "exhausted":

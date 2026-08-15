@@ -46,6 +46,7 @@ function usage() {
     "  [--fixed-point-cases-manifest <external-case-manifest.json>]",
     "  [--degraded-delivery-report <report.json>] [--usable-broker-workbook <workbook.xlsx>]",
     "  [--raw-canary-evidence <evidence-run.json>] [--python <python>] [--soffice <path>]",
+    "  [--real-filings-request <raw-annual-report-request.json>]",
     "  [--out <report-directory>]",
     "  [--concurrency <1-4>] [--timeout-ms <milliseconds>]",
   ].join("\n");
@@ -92,6 +93,9 @@ function substitutions(options) {
       : null,
     RAW_CANARY_EVIDENCE: options["raw-canary-evidence"]
       ? path.resolve(options["raw-canary-evidence"])
+      : null,
+    REAL_FILINGS_REQUEST: options["real-filings-request"]
+      ? path.resolve(options["real-filings-request"])
       : null,
     PYTHON: options.python ? path.resolve(options.python) : null,
     SOFFICE: options.soffice ? path.resolve(options.soffice) : null,

@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from broker_numeric import parse_broker_number
+
 
 PERIOD_PATTERNS = [
     ("annual", re.compile(r"^(?:fy|cy)?\s*(?:19|20)\d{2}[eaf]?$", re.I)),
@@ -55,8 +57,7 @@ def period_kind(label: str) -> str | None:
 def is_numeric_cell(cell: dict[str, Any]) -> bool:
     if cell.get("value_kind") == "number":
         return True
-    raw = text(cell.get("raw_text"))
-    return bool(re.fullmatch(r"\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?[%x]?\)?", raw, re.I))
+    return parse_broker_number(cell.get("raw_text")) is not None
 
 
 def row_label(row: list[dict[str, Any]]) -> str:

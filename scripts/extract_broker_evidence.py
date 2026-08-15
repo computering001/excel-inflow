@@ -876,10 +876,15 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             demand_contract,
             opaque_image=bool(sparse and material_image),
         )
-        unselected_house_recovery = (
-            vision_required and descriptor.get("house_id") != vision_house_id
-        )
-        archive_only = not selected_targets or unselected_house_recovery
+        # The preview/selection contract chooses at most one coherent house
+        # for model authority.  Every other supplied report is still retained
+        # page-for-page, but it must be archive-only regardless of whether its
+        # native lane happens to look complete.  Restricting this only to pages
+        # that already needed vision let canonical reconciliation later re-arm
+        # OCR for an unselected house, expanding optional work after selection
+        # and breaking the one-house runtime/performance invariant.
+        unselected_house = descriptor.get("house_id") != vision_house_id
+        archive_only = not selected_targets or unselected_house
         if archive_only:
             # The raw PDF, native text, geometry, census and page image remain
             # preserved.  What closes is only model-facing reconciliation for
@@ -1040,7 +1045,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             "vision_reason": vision_reason,
             "model_demand_status": (
                 "selected_cell_recovery_required" if vision_required
-                else "archive_only_unselected_house" if unselected_house_recovery
+                else "archive_only_unselected_house" if unselected_house
                 else "archive_only_not_demanded" if archive_only
                 else "native_candidate"
             ),

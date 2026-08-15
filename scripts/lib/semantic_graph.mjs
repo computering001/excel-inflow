@@ -295,6 +295,9 @@ function semanticForecastAuthorities(modelCase, row) {
   if (row.row_type === "header") return [];
   return [0, 1, 2].map((forecastIndex) => {
     const authority = resolveForecastAuthority(modelCase, row, forecastIndex);
+    const formula = Array.isArray(row.forecast_period_calculations)
+      ? row.forecast_period_calculations[forecastIndex] ?? null
+      : row.forecast_calculation ?? row.calculation ?? null;
     return {
       forecast_index: forecastIndex,
       method: authority.method,
@@ -316,6 +319,14 @@ function semanticForecastAuthorities(modelCase, row) {
       candidates: forecastCandidateLedger(modelCase, row, forecastIndex),
       capture_certificate:
         row.forecast_capture_certificates?.[forecastIndex] ?? null,
+      formula_operator:
+        authority.mechanism === "formula" ? formula?.operator ?? null : null,
+      formula_refs:
+        authority.mechanism === "formula" ? [...(formula?.refs ?? [])] : [],
+      period_relation:
+        authority.mechanism === "formula" && formula?.operator === "prior_period"
+          ? "prior_period"
+          : "same_period",
     };
   });
 }

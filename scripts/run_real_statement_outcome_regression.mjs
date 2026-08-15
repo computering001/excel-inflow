@@ -56,6 +56,7 @@ for (const label of [
   "Research and development expense", "Selling, general and administrative expense",
   "Other operating income and expense", "Operating profit", "Finance income",
   "Finance expense", "Profit before tax", "Taxation", "Profit for the period",
+  "Owners of the Parent", "Non-controlling interests",
 ]) assert(incomeLabels.has(label), `compiled model lost ${label}`);
 
 const cashIds = new Set(
@@ -80,8 +81,8 @@ const rowMap = JSON.parse(await fs.readFile(`${workbookPath}.row-map.json`, "utf
 const visibleIncome = rowMap.statement_rows.income_statement.filter((row) => Number.isInteger(row.row));
 const visibleCash = rowMap.statement_rows.cash_flow.filter((row) => Number.isInteger(row.row));
 const visibleIncomeData = visibleIncome.filter((row) => row.row_type !== "header");
-assert.equal(visibleIncome.length, 25, "normalisation collapsed the real Astra income face");
-assert.equal(visibleIncomeData.length, 24, "normalisation collapsed the real Astra income data rows");
+assert.equal(visibleIncome.length, 28, "normalisation collapsed the real Astra income face");
+assert.equal(visibleIncomeData.length, 26, "normalisation collapsed the real Astra income data rows");
 assert.equal(visibleCash.length, 55, "normalisation collapsed the real Astra cash-flow face");
 assert(visibleIncomeData.length > 14 && visibleCash.length > 30, "shadow-model topology was accepted");
 
@@ -90,7 +91,7 @@ console.log(JSON.stringify({
   status: "PASS",
   extracted_rows: { income_statement: 20, cash_flow: 45 },
   compiled_rows: { income_statement: 28, cash_flow: 55 },
-  visible_rows: { income_statement: 25, income_statement_data: 24, cash_flow: 55 },
+  visible_rows: { income_statement: 28, income_statement_data: 26, cash_flow: 55 },
   shadow_model_14_30_rejected: true,
   violations: 0,
   root: temporary,

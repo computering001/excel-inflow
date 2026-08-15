@@ -489,18 +489,25 @@ function dependencyChecks(modelCase) {
     const visiting = new Set();
     const visited = new Set();
     const cycleNodes = new Set();
+    const stack = [];
     function visit(id) {
       if (visiting.has(id)) {
+        const start = stack.indexOf(id);
+        for (const member of stack.slice(start >= 0 ? start : 0)) {
+          cycleNodes.add(member);
+        }
         cycleNodes.add(id);
         return;
       }
       if (visited.has(id)) return;
       visiting.add(id);
+      stack.push(id);
       const definition = definitions.get(id);
       for (const reference of referencesForDefinition(definition)) {
         visit(reference);
       }
       visiting.delete(id);
+      stack.pop();
       visited.add(id);
     }
     for (const id of definitions.keys()) visit(id);
@@ -535,6 +542,25 @@ function dependencyChecks(modelCase) {
   );
   for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
     cycleCheck("forecast", (definition) => {
+      const periodAuthority =
+        definition?.forecast_period_authorities?.[forecastIndex] ?? null;
+      if (
+        periodAuthority &&
+        ![
+          "accounting_identity",
+          "driver_formula",
+          "roll_forward",
+          "historical_average",
+          "historical_trend",
+          "seasonal_run_rate",
+          "carry_forward",
+          "schedule_link",
+          "actual_plus_remainder",
+        ].includes(periodAuthority.method) &&
+        !["formula", "schedule"].includes(periodAuthority.source_kind)
+      ) {
+        return [];
+      }
       if (Array.isArray(definition?.forecast_period_calculations)) {
         return intraPeriodRefs(
           definition.forecast_period_calculations[forecastIndex],

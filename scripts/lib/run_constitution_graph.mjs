@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 
 import { validateJsonSchema } from "./json_schema.mjs";
+import { forecastProducerWitness } from "./forecast_producer_contract.mjs";
 
 const ROOT = new URL("../../", import.meta.url);
 const DEMAND_SCHEMA = JSON.parse(
@@ -136,6 +137,12 @@ function forecastPeriods(modelCase) {
 
 function rowAuthorityClass(row) {
   const method = row?.forecast_treatment;
+  if (row?.semantic_role === "opening_cash" || row?.row_id === "opening_cash") {
+    return "identity";
+  }
+  if (row?.forecast_calculation || row?.calculation || (row?.forecast_period_calculations ?? []).some(Boolean)) {
+    return "identity";
+  }
   if (method === "schedule_link" || row?.historical_authority === "schedule_link") return "schedule";
   if (method === "not_separately_forecast") return "captured";
   if (["calculation", "subtotal"].includes(row?.row_type) || row?.forecast_calculation) return "identity";
@@ -156,7 +163,20 @@ function rowDependencies(row) {
     ...(row?.forecast_calculation?.refs ?? []),
     ...(row?.calculation?.refs ?? []),
   ];
+  if (
+    declared.length === 0 &&
+    (row?.semantic_role === "opening_cash" || row?.row_id === "opening_cash")
+  ) {
+    return ["ending_cash"];
+  }
   return [...new Set(declared.filter((value) => typeof value === "string" && value))].sort();
+}
+
+function dependencyRule(row, forecastIndex) {
+  if (Array.isArray(row?.forecast_period_calculations)) {
+    return row.forecast_period_calculations[forecastIndex] ?? null;
+  }
+  return row?.forecast_calculation ?? row?.calculation ?? null;
 }
 
 export function compileModelDemandGraph(modelCase) {
@@ -195,11 +215,17 @@ export function compileModelDemandGraph(modelCase) {
       if (!row?.row_id || row.row_type === "header") continue;
       for (let index = 0; index < periods.length; index += 1) {
         const to = `${section}.${row.row_id}.fy${index + 1}`;
-        for (const dependency of rowDependencies(row)) {
+        const rule = dependencyRule(row, index);
+        const dependencies = rowDependencies(row);
+        for (const dependency of dependencies) {
+          const temporal = rule?.operator === "prior_period" ||
+            (row.semantic_role === "opening_cash" && dependency === "ending_cash");
+          if (temporal && index === 0) continue;
+          const dependencyIndex = temporal ? index : index + 1;
           const candidates = [
-            `${section}.${dependency}.fy${index + 1}`,
-            `income_statement.${dependency}.fy${index + 1}`,
-            `cash_flow.${dependency}.fy${index + 1}`,
+            `${section}.${dependency}.fy${dependencyIndex}`,
+            `income_statement.${dependency}.fy${dependencyIndex}`,
+            `cash_flow.${dependency}.fy${dependencyIndex}`,
           ];
           const from = candidates.find((candidate) => rowNodeIds.has(candidate));
           if (from && from !== to) edges.push({ from, to, kind: "depends_on" });
@@ -330,6 +356,12 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
         selected_candidate: null,
         source_bindings: [],
         fallback_trace: [],
+        producer_witness: {
+          producer_kind: "contractual_source",
+          producer_id: demand.node_id,
+          executable: true,
+          reason: null,
+        },
         status: "SELECTED",
       });
       continue;
@@ -341,7 +373,8 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
     const selectedCandidate = candidates.find(
       (candidate) => candidate.candidate_id === state?.selected_candidate_id,
     ) ?? null;
-    const status = !state || state.status !== "RESOLVED"
+    const producerWitness = state?.producer_witness ?? forecastProducerWitness(state, selectedCandidate);
+    const status = !state || state.status !== "RESOLVED" || (demand.required && !producerWitness.executable)
       ? "INPUT_REQUIRED"
       : method === "not_separately_forecast"
         ? "CAPTURED"
@@ -357,12 +390,15 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
       source_bindings: [...new Set(state?.source_bindings ?? [])].sort(),
       fallback_trace: rejected.map((candidate) =>
         `${candidate.candidate_id}:${candidate.rejection_reason ?? "not_selected"}`),
+      producer_witness: structuredClone(producerWitness),
       status,
     });
   }
   authorities.sort((left, right) => left.node_id.localeCompare(right.node_id));
   const quarantines = demandQuarantines(evidenceRun);
   const unresolved = authorities.filter((authority) => authority.status === "INPUT_REQUIRED").length;
+  const missingProducers = authorities.filter((authority) =>
+    !authority.producer_witness?.executable).length;
   const fallbackCount = authorities.filter((authority) =>
     FALLBACK_METHODS.has(authority.method) || authority.fallback_trace.length > 0).length;
   const qualityMode = unresolved > 0
@@ -385,6 +421,7 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
       structural: authorities.filter((authority) => authority.status === "STRUCTURAL").length,
       captured: authorities.filter((authority) => authority.status === "CAPTURED").length,
       unresolved,
+      missing_producers: missingProducers,
       fallbacks: fallbackCount,
     },
   };
@@ -419,6 +456,11 @@ export function compileRunConstitutionGraph({
     if (authority.selected_candidate_id && nodes.has(authority.selected_candidate_id)) {
       edges.push({ from: authority.selected_candidate_id, to: authority.node_id, kind: "selected_for" });
     }
+    if (authority.producer_witness?.executable && authority.producer_witness.producer_id) {
+      const producerId = `producer.${authority.producer_witness.producer_id}`;
+      addNode(producerId, "physical_state", "executable");
+      edges.push({ from: producerId, to: authority.node_id, kind: "projects_to" });
+    }
   }
   for (const edge of modelDemandGraph.edges) edges.push({ ...edge, kind: "depends_on" });
   for (const output of REACHABLE_OUTPUTS) addNode(`economic.${output}`, "economic_state", "declared");
@@ -439,9 +481,15 @@ export function compileRunConstitutionGraph({
   ])).values()].sort((left, right) =>
     left.to.localeCompare(right.to) || left.from.localeCompare(right.from) || left.kind.localeCompare(right.kind));
   const selectedAuthorities = selectedAuthorityContract.authorities.filter((authority) =>
-    authority.selected_candidate_id !== null && authority.status === "SELECTED");
+    authority.selected_candidate_id !== null && ["SELECTED", "STRUCTURAL"].includes(authority.status));
   const orphanSelected = selectedAuthorities.filter((authority) =>
-    !uniqueEdges.some((edge) => edge.kind === "selected_for" && edge.to === authority.node_id)).length;
+    !authority.producer_witness?.executable ||
+    !uniqueEdges.some((edge) => edge.kind === "projects_to" && edge.to === authority.node_id)).length;
+  const requiredDemandIds = new Set(modelDemandGraph.nodes
+    .filter((node) => node.required && node.material)
+    .map((node) => node.node_id));
+  const missingMaterialProducers = selectedAuthorityContract.authorities.filter((authority) =>
+    requiredDemandIds.has(authority.node_id) && !authority.producer_witness?.executable).length;
   const sortedNodes = [...nodes.values()].sort((left, right) => left.node_id.localeCompare(right.node_id));
   const body = {
     schema_version: "run-constitution-graph/1.0",
@@ -456,6 +504,7 @@ export function compileRunConstitutionGraph({
       edges: uniqueEdges.length,
       selected_paths: selectedAuthorities.length - orphanSelected,
       orphan_selected_authorities: orphanSelected,
+      missing_material_producers: missingMaterialProducers,
     },
   };
   return Object.freeze({ ...body, graph_sha256: digest(body) });
@@ -508,6 +557,9 @@ export function validateSelectedAuthorityContract(contract, { modelDemandGraph, 
       }
       continue;
     }
+    if (demand?.required && !authority.producer_witness?.executable) {
+      errors.push(`${authority.node_id} has no executable producer witness.`);
+    }
     if (!authority.selected_state || authority.selected_state.state_id !== authority.node_id) {
       errors.push(`${authority.node_id} does not own its complete resolved forecast state.`);
     }
@@ -533,6 +585,9 @@ export function validateRunConstitutionGraph(graph) {
   }
   if (graph?.counts?.orphan_selected_authorities !== 0) {
     errors.push("Run constitution graph contains an orphan selected authority.");
+  }
+  if (graph?.counts?.missing_material_producers !== 0) {
+    errors.push("Run constitution graph contains a required material state without an executable producer.");
   }
   return { valid: errors.length === 0, errors };
 }

@@ -279,6 +279,68 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
     childrenByParent.get(parent).push(line.source_line_id);
   }
+  // Some native filings expose subtotal typography but no machine-readable
+  // parent links. Recover only identities proved by all three reported
+  // periods: the shortest contiguous preceding run whose signed values add to
+  // the reported line. This reconstructs issuer equations such as revenue,
+  // gross profit, operating profit and cash-flow activity totals without a
+  // caption dictionary or issuer exception. Three-period equality makes a
+  // coincidental grouping fail closed.
+  const numericSeries = (line, { allowPrintedBlank = false } = {}) => {
+    const values = line?.values;
+    if (!Array.isArray(values) || values.length !== 3) return null;
+    if (!allowPrintedBlank && values.some((value) => value === null || value === undefined)) {
+      return null;
+    }
+    if (!values.some((value) => value !== null && value !== undefined)) return null;
+    const numbers = values.map((value) => Number(value ?? 0));
+    return numbers.every(Number.isFinite) ? numbers : null;
+  };
+  for (let parentIndex = 2; parentIndex < lines.length; parentIndex += 1) {
+    const parentLine = lines[parentIndex].row;
+    if (childrenByParent.has(parentLine.source_line_id)) continue;
+    const candidateParentRow = rowsBySourceLine.get(parentLine.source_line_id);
+    // Numeric coincidence is proof of additivity, not proof that a line is a
+    // subtotal.  Restrict reconstruction to a visibly marked subtotal or a
+    // recognised model-total identity; otherwise a constant FX/event line can
+    // accidentally equal an earlier run and acquire half the statement as
+    // children after recipe ordering.
+    if (!parentLine.is_subtotal && !totalStyle(candidateParentRow ?? {})) continue;
+    const target = numericSeries(parentLine);
+    if (!target) continue;
+    if (target.every((value) => Math.abs(value) <= 0.51)) continue;
+    const maximumChildren = Math.min(parentIndex, 64);
+    for (let count = 2; count <= maximumChildren; count += 1) {
+      const candidates = lines
+        .slice(parentIndex - count, parentIndex)
+        .map((entry) => entry.row);
+      const series = candidates.map((candidate) =>
+        numericSeries(candidate, { allowPrintedBlank: true }),
+      );
+      if (series.some((values) => values === null)) break;
+      const matches = target.every((value, period) =>
+        Math.abs(
+          series.reduce((sum, values) => sum + values[period], 0) - value,
+        ) <= 0.51,
+      );
+      if (!matches) continue;
+      const parentRowId = candidateParentRow?.row_id;
+      const wouldReverseExistingIdentity = Boolean(
+        parentRowId && candidates.some((candidate) =>
+          [
+            ...(rowsBySourceLine.get(candidate.source_line_id)?.calculation?.refs ?? []),
+            ...(entriesById.get(candidate.source_line_id)?.derive_as?.refs ?? []),
+          ].includes(parentRowId),
+        ),
+      );
+      if (wouldReverseExistingIdentity) continue;
+      childrenByParent.set(
+        parentLine.source_line_id,
+        candidates.map((candidate) => candidate.source_line_id),
+      );
+      break;
+    }
+  }
   for (const [parentLineId, childLineIds] of childrenByParent) {
     const parentRow = rowsBySourceLine.get(parentLineId);
     if (!parentRow) continue;
@@ -365,6 +427,8 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     }
     parentRow.row_type = "calculation";
     parentRow.calculation = { operator: "sum", refs };
+    parentRow.reported_historical_values = [...filed];
+    parentRow.historical_authority = "reported_total_reconciled";
     delete parentRow.values;
     parentRow.style_role = totalStyle(parentRow) ? "total" : "subsection";
     // The DERIVED variant: a total summed live from its filed members
@@ -407,7 +471,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
   for (const row of rows) {
     if (row.row_type === "header") continue;
     if (row.row_type === "calculation") {
-      row.historical_authority = "derived_formula";
+      row.historical_authority ??= "derived_formula";
       continue;
     }
     // A filed dash/null is still source-owned history.  Historical authority
@@ -716,6 +780,12 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // stratum recipes consume it instead of prose doctrine.
   const role = (id) => roleIndex.get(id) ?? rowIdIndex.get(id) ?? null;
   const packHas = (metricId) => Boolean(modelCase.broker_pack?.metrics?.[metricId]);
+  const operatingMetricHistory = (metricId) => {
+    const values = modelCase.operating_metrics?.[metricId]?.values ?? [];
+    return values.slice(0, 3).every((value) => value !== null && Number.isFinite(Number(value)))
+      ? values.slice(0, 3).map(Number)
+      : null;
+  };
   const insertAfter = (rows, anchorId, newRows) => {
     const index = rows.findIndex((row) => row.row_id === anchorId);
     if (index < 0) return false;
@@ -836,6 +906,10 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       /equity holders|owners of the parent|non-controlling/i.test(row.label ?? ""),
   );
   const owners = role("owners_of_parent") ?? attributionRows[0] ?? null;
+  const nonControllingInterests =
+    role("non_controlling_interests") ??
+    attributionRows.find((row) => /non-controlling/i.test(row.label ?? "")) ??
+    null;
   if (owners && !isRows.some((row) => row.row_id === "attribution_header")) {
     insertBefore(isRows, owners.row_id, [{
       row_id: "attribution_header",
@@ -843,9 +917,60 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       row_type: "header",
       style_role: "subsection",
     }]);
-    for (const row of new Set([owners, role("non_controlling_interests"), ...attributionRows])) {
+    for (const row of new Set([owners, nonControllingInterests, ...attributionRows])) {
       if (row) row.indent = Math.max(1, Number(row.indent ?? 0));
     }
+  }
+  // Profit attributable to owners is the residual after the separately
+  // presented non-controlling interest. Preserve both filed historical rows,
+  // but make their forecast relationship an executable accounting identity
+  // instead of allowing two independent trend writers to drift away from the
+  // issuer's consolidated profit.
+  const attributionHistory = (row, visiting = new Set()) => {
+    if (!row || visiting.has(row.row_id)) return null;
+    const literal = row.values ?? row.reported_historical_values;
+    if (
+      Array.isArray(literal) && literal.slice(0, 3).length === 3 &&
+      literal.slice(0, 3).every((value) => value !== null && Number.isFinite(Number(value)))
+    ) return literal.slice(0, 3).map(Number);
+    const refs = row.calculation?.refs ?? [];
+    if (refs.length === 0) return null;
+    const next = new Set(visiting).add(row.row_id);
+    const inputs = refs.map((ref) => attributionHistory(rowIdIndex.get(ref), next));
+    if (inputs.some((values) => values === null)) return null;
+    return [0, 1, 2].map((period) => {
+      const values = inputs.map((series) => series[period]);
+      switch (row.calculation.operator) {
+        case "sum": return values.reduce((sum, value) => sum + value, 0);
+        case "subtract": return values.slice(1).reduce((value, item) => value - item, values[0]);
+        case "link": return values[0];
+        case "negate": return -values[0];
+        case "negate_sum": return -values.reduce((sum, value) => sum + value, 0);
+        default: return Number.NaN;
+      }
+    });
+  };
+  const ownersHistory = attributionHistory(owners);
+  const nciHistory = attributionHistory(nonControllingInterests);
+  const attributionProfitCandidates = [
+    role("net_income"),
+    role("profit_continuing"),
+  ].filter((row, index, rows) => row && rows.indexOf(row) === index);
+  const profitBasis = attributionProfitCandidates.find((candidate) => {
+    const profitHistory = attributionHistory(candidate);
+    return ownersHistory && nciHistory && profitHistory &&
+      [0, 1, 2].every((period) =>
+        Math.abs(
+          ownersHistory[period] - (profitHistory[period] - nciHistory[period]),
+        ) <= 0.51,
+      );
+  });
+  if (owners && nonControllingInterests && profitBasis) {
+    owners.forecast_treatment = "formula";
+    owners.forecast_calculation = {
+      operator: "subtract",
+      refs: [profitBasis.row_id, nonControllingInterests.row_id],
+    };
   }
 
   // Cross-statement recipes on mapped CF adjustment lines: the filed finance
@@ -901,10 +1026,16 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   if (
     operatingProfit &&
     !role("adjusted_ebitda") &&
-    (packHas("adjusted_ebitda") || packHas("depreciation_and_amortisation"))
+    (
+      cfDaGroupValues ||
+      operatingMetricHistory("depreciation_and_amortisation") ||
+      packHas("adjusted_ebitda") ||
+      packHas("depreciation_and_amortisation")
+    )
   ) {
-    const daValues = cfDaGroupValues
-      ? [...cfDaGroupValues, null, null, null]
+    const historicalDa = cfDaGroupValues ?? operatingMetricHistory("depreciation_and_amortisation");
+    const daValues = historicalDa
+      ? [...historicalDa, null, null, null]
       : [null, null, null, null, null, null];
     const bridgeRows = [
       {
@@ -1252,7 +1383,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     // together at the first child's position (filed order within the block),
     // with the aggregate closing it.
     const firstIndex = rows.findIndex((row) => childIds.includes(row.row_id));
-    if (firstIndex >= 0) {
+    if (firstIndex >= 0 && !aggregate.preserve_source_positions) {
       const block = childIds
         .map((id) => rows.find((row) => row.row_id === id))
         .filter(Boolean);
@@ -1271,7 +1402,12 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     if (aggregate.indent_children) {
       for (const childId of childIds) {
         const child = rows.find((row) => row.row_id === childId);
-        if (child) child.indent = Math.max(1, Number(child.indent ?? 0));
+        if (child) {
+          child.indent = Math.max(1, Number(child.indent ?? 0));
+          if (aggregate.child_economic_class) {
+            child.economic_class ??= aggregate.child_economic_class;
+          }
+        }
       }
     }
     for (const parent of rows) {
@@ -1304,6 +1440,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       label: "Change in working capital",
       role: "change_in_working_capital",
       indent_children: true,
+      child_economic_class: "working_capital",
     }, wcChildren);
   }
   const CAPEX_MEMBER_IDS = new Set([
@@ -1319,6 +1456,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       label: "Capital expenditure",
       role: "capex",
       min_children: 1,
+      preserve_source_positions: true,
     }, capexChildren);
   }
 
@@ -1409,11 +1547,11 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   const openingCash = role("opening_cash");
   const fxRow = role("fx_effect_on_cash");
   if (endingCash2 && openingCash && netChange) {
-    const hadFx = Boolean(
-      fxRow &&
-        (endingCash2.calculation?.refs?.includes(fxRow.row_id) ??
-          cfRows.includes(fxRow)),
-    );
+    // Net change is the sum of operating, investing and financing activities;
+    // translation sits outside that subtotal. Whenever the filed statement
+    // carries an FX/translation row it is therefore an explicit roll-forward
+    // dependency, even if the legacy ending-cash shell had no refs yet.
+    const hadFx = Boolean(fxRow);
     endingCash2.row_type = "calculation";
     endingCash2.calculation = {
       operator: "sum",
@@ -2243,6 +2381,41 @@ export function compileForecastCaptureTopology(
         }
       }
 
+      // A filed cash-flow total owns the otherwise-unmapped detail printed in
+      // its visible section band. This is deliberately one hop and
+      // statement-local: rows following the compiler-owned Investing or
+      // Financing header up to the corresponding filed total are captured by
+      // that total. Rows already participating in a formula aggregate (for
+      // example PP&E + intangible purchases -> capex) keep their own economic
+      // graph and are not captured here.
+      if (
+        !selectedPath &&
+        section === "cash_flow" &&
+        (parentsByChild.get(row.row_id) ?? []).length === 0
+      ) {
+        const rowIndex = rows.indexOf(row);
+        const bands = [
+          ["investing_activities", "cash_from_investing"],
+          ["financing_activities", "cash_from_financing"],
+        ];
+        for (const [headerId, totalRole] of bands) {
+          const headerIndex = rows.findIndex((candidate) => candidate.row_id === headerId);
+          const totalIndex = rows.findIndex((candidate) => candidate.semantic_role === totalRole);
+          const total = totalIndex >= 0 ? rows[totalIndex] : null;
+          if (
+            total &&
+            headerIndex >= 0 &&
+            mayResolveAsAggregate(total) &&
+            rowIndex > headerIndex &&
+            rowIndex < totalIndex
+          ) {
+            selectedPath = [row.row_id, total.row_id];
+            statementBandCapture = true;
+            break;
+          }
+        }
+      }
+
       if (!selectedPath || selectedPath.at(-1) === row.row_id) continue;
       const targetId = selectedPath.at(-1);
       // Captured rows are intentionally blank in forecast. Their membership
@@ -2430,8 +2603,22 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
         : { operator: "link", refs: [ebit.row_id] },
     );
   }
+  const formulaReaches = (row, targetId, seen = new Set()) => {
+    if (!row || seen.has(row.row_id)) return false;
+    seen.add(row.row_id);
+    for (const reference of row.calculation?.refs ?? []) {
+      if (reference === targetId) return true;
+      if (formulaReaches(rowsById.get(reference), targetId, seen)) return true;
+    }
+    return false;
+  };
+  // The compiler-owned EBITDA bridge normally reaches EBIT through the
+  // `bridge_operating_profit` link rather than naming EBIT directly. Treat
+  // that transitive dependency as the same identity edge. Otherwise the
+  // inverse `EBIT = EBITDA - D&A` recipe is added on top of
+  // `EBITDA = EBIT + D&A`, creating a zero-broker forecast cycle.
   const adjRefsIncludeEbit = Boolean(
-    ebit && adjustedEbitda?.calculation?.refs?.includes(ebit.row_id),
+    ebit && formulaReaches(adjustedEbitda, ebit.row_id),
   );
   if (
     ebit && adjustedEbitda && da &&
@@ -2759,6 +2946,20 @@ function synchronizeDerivedHistoricalForecastCaches(modelCase) {
     if (!row.calculation || (row.calculation.refs ?? []).length === 0) continue;
     const history = [0, 1, 2].map((index) => evaluate(row, index));
     if (!history.every((value) => value !== null && Number.isFinite(value))) continue;
+    // Additive/link identities are formula-owned on the workbook face. Their
+    // reported figures are reconciliation evidence, never a parallel cached
+    // value writer on the sealed model row. Ratio/growth helpers retain their
+    // evaluated history because historical-inference forecast rules consume
+    // that basis directly.
+    if (
+      ["sum", "subtract", "link", "negate", "negate_sum"].includes(
+        row.calculation.operator,
+      ) &&
+      row.historical_authority === "reported_total_reconciled"
+    ) {
+      delete row.values;
+      continue;
+    }
     row.values ??= [null, null, null, null, null, null];
     history.forEach((value, index) => { row.values[index] = value; });
     for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {

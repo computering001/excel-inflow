@@ -110,7 +110,10 @@
         },
         "capture_certificate": {
           "type": ["object", "null"]
-        }
+        },
+        "formula_operator": { "$ref": "#/$defs/nullableString" },
+        "formula_refs": { "type": "array", "items": { "type": "string" } },
+        "period_relation": { "enum": ["same_period", "prior_period"] }
       }
     },
     "calculationPlane": {

@@ -1229,6 +1229,18 @@ function forecastCalculationForIndex(definition, forecastIndex) {
   return definition.forecast_calculation ?? null;
 }
 
+const STANDALONE_ONLY_FORECAST_OPERATORS = new Set([
+  "prior_period",
+  "prior_period_scaled_by",
+  "historical_average",
+  "historical_trend",
+  "linear_historical_trend",
+]);
+
+function isStandaloneOnlyForecastRule(rule) {
+  return Boolean(rule && STANDALONE_ONLY_FORECAST_OPERATORS.has(rule.operator));
+}
+
 // ONE CELL, ONE THREAD.
 //
 // Seven places attach a threaded comment, and two of them speak about the same
@@ -4001,7 +4013,10 @@ function configureOperatingModel(
           `${adjustmentColumn}${definition.row}`,
           adjustmentLink,
         );
-      } else if (periodRulesDeclared) {
+      } else if (
+        periodRulesDeclared &&
+        isStandaloneOnlyForecastRule(periodForecastCalculation)
+      ) {
         // Period-specific rules describe the source workbook's standalone
         // forecast direction; they never create a transaction adjustment by
         // themselves. Pro forma therefore remains standalone plus zero here.
@@ -4159,20 +4174,16 @@ function configureOperatingModel(
           `${proFormaColumn}${definition.row}`,
           `=${prior}`,
         );
-      } else if (
-        definition.forecast_treatment === "broker" &&
-        definition.broker_metric_id
-      ) {
+      } else if (definition.semantic_role === "ending_cash") {
+        // Cash closure is a basis-level identity. It must remain visibly
+        // connected to the pro-forma cash-flow rows even when the sealed
+        // forecast plan also carries the same period formula; a generic
+        // Standalone + Adjustment link hides every component path from the
+        // workbook constitution and was the source of N13 parity failures.
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
-          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
-        );
-      } else if (periodRulesDeclared) {
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${definition.row}`,
-          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
+          endingCashStatementFormula(proFormaColumn),
         );
       } else if (
         definition.semantic_role === "net_change_in_cash" &&
@@ -4182,23 +4193,6 @@ function configureOperatingModel(
           sheet,
           `${proFormaColumn}${definition.row}`,
           cashReconciliationFormula(proFormaColumn),
-        );
-      } else if (periodForecastCalculation) {
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${definition.row}`,
-          genericFormula(
-            rowPlan,
-            definition,
-            proFormaColumn,
-            periodForecastCalculation,
-          ) ?? `=${column}${definition.row}`,
-        );
-      } else if (definition.semantic_role === "ending_cash") {
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${definition.row}`,
-          endingCashStatementFormula(proFormaColumn),
         );
       } else if (
         definition.semantic_role === "non_balancing_cash_bucket_movement"
@@ -4210,13 +4204,46 @@ function configureOperatingModel(
           nonBalancingBucketMovementFormula(proFormaColumn, prior),
         );
       } else if (
-        definition.semantic_role === "net_change_in_cash" &&
-        explicitCashBuckets
+        definition.forecast_treatment === "broker" &&
+        definition.broker_metric_id
       ) {
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
-          cashReconciliationFormula(proFormaColumn),
+          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
+        );
+      } else if (periodRulesDeclared) {
+        const structuralFormula = !isStandaloneOnlyForecastRule(
+          periodForecastCalculation,
+        )
+          ? genericFormula(
+              rowPlan,
+              definition,
+              proFormaColumn,
+              periodForecastCalculation,
+            )
+          : null;
+        // Accounting identities must be rebuilt on the pro-forma basis so
+        // every component remains reachable from ending cash. Only genuine
+        // observation/temporal mechanisms are presented as standalone plus
+        // adjustment because they do not define a same-period constituent
+        // graph.
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          structuralFormula ??
+            `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
+        );
+      } else if (periodForecastCalculation) {
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          genericFormula(
+            rowPlan,
+            definition,
+            proFormaColumn,
+            periodForecastCalculation,
+          ) ?? `=${column}${definition.row}`,
         );
       } else if (definition.semantic_role === "rcf_draw") {
         applyFormula(
@@ -10081,8 +10108,8 @@ function statementSolverValues(
     // that emitted the workbook formula. Link, schedule, circular and other
     // specialised formulas retain their explicit semantic cache authority.
     const visibleAggregateOwnsCache =
-      solverRole === "cash_from_financing" &&
-      activeCalculation?.operator === "sum";
+      activeCalculation?.operator === "sum" &&
+      ["cash_from_financing", "cash_flow_da"].includes(solverRole);
     let value = solverRole && !visibleAggregateOwnsCache
       ? semantic.get(solverRole)
       : undefined;
@@ -10096,8 +10123,9 @@ function statementSolverValues(
   // zero-adjustment value rather than an acquisition-scaled cache.
   if (acquisitionBaseValues) {
     for (const definition of definitions) {
+      const periodRule = definition.forecast_period_calculations?.[forecastIndex] ?? null;
       if (
-        hasForecastPeriodCalculations(definition) &&
+        isStandaloneOnlyForecastRule(periodRule) &&
         acquisitionBaseValues.has(definition.row_id)
       ) {
         valuesById.set(
@@ -10282,8 +10310,9 @@ function solverFormulaCaches(
       // Period-specific forecast rules reproduce the source workbook's
       // standalone dependency direction. They do not create a transaction
       // rule: adjustment is zero and pro forma equals standalone.
-      const standaloneOnlyPeriodRule =
-        hasForecastPeriodCalculations(definition);
+      const standaloneOnlyPeriodRule = isStandaloneOnlyForecastRule(
+        definition.forecast_period_calculations?.[index] ?? null,
+      );
       const proFormaValue = standaloneOnlyPeriodRule
         ? standaloneValue
         : proFormaValues.get(definition.row_id) ?? 0;
