@@ -8,9 +8,10 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { inspectScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
+import { inspectScreen, renderBrokerIntakeScreen, WELCOME_SCREEN } from "./lib/flow_screens.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { assessCoverage } from "./lib/coverage.mjs";
+import { canonicalBrokerIntakeJson, compileBrokerIntakeChoice } from "./lib/broker_intake_choice.mjs";
 import {
   DELIVERY_BLOCKED_OUTCOMES,
   DELIVERY_FATAL_REASONS,
@@ -70,6 +71,24 @@ await command("run_evidence_run_tests.mjs", [
   "--emit-clean", cleanEvidence,
   "--emit-acquisition-question", acquisitionEvidence,
 ]);
+const cleanEvidencePayload = JSON.parse(await fs.readFile(cleanEvidence, "utf8"));
+const brokerChoiceFilingsReceipt = path.join(out, "broker-choice-filings-receipt.json");
+await fs.writeFile(brokerChoiceFilingsReceipt, '{"status":"PASS"}\n');
+const compiledBrokerSkip = await compileBrokerIntakeChoice({
+  schema_version: "broker-intake-request/1.0",
+  run_id: cleanEvidencePayload.run_id,
+  issuer_identity: { name: cleanEvidencePayload.company_name ?? "Test issuer" },
+  filings_receipt_path: brokerChoiceFilingsReceipt,
+  runtime_closure_sha256: "a".repeat(64),
+  attachments: [],
+  reply: "continue without brokers",
+  recorded_at: "2026-08-15T08:00:00.000Z",
+});
+const brokerSkipChoicePath = path.join(out, "broker-intake-choice.json");
+await fs.writeFile(
+  brokerSkipChoicePath,
+  canonicalBrokerIntakeJson(compiledBrokerSkip.choice_receipt),
+);
 
 const tests = [];
 async function test(name, callback) {
@@ -158,6 +177,12 @@ await test("production controller owns one canonical six-milestone visible journ
   }
   const welcome = await command("run_user_flow.mjs", ["--screen", "inputs"]);
   assert(welcome.stdout === `${WELCOME_SCREEN}\n`, "production welcome differs from canonical bytes");
+  const brokers = await command("run_user_flow.mjs", ["--screen", "brokers"]);
+  const expectedBrokers = renderBrokerIntakeScreen("the selected company");
+  assert(brokers.stdout === `${expectedBrokers}\n`, "Brokers checkpoint differs from canonical bytes");
+  assert(brokers.stdout.includes("STATUS: ACTION REQUIRED"), "Brokers checkpoint is not action-required");
+  assert(brokers.stdout.includes("continue without brokers"), "Brokers checkpoint omits explicit skip");
+  assert(!brokers.stdout.includes("no response is required"), "Brokers checkpoint falsely claims no response");
 });
 
 await test("successful ordinary transitions emit ASCII while JSON remains pure", async () => {
@@ -250,6 +275,20 @@ await test("run carrier references the canonical evidence snapshot without copyi
     duplicateExists = false;
   }
   assert(!duplicateExists, "carrier copied the full evidence envelope a second time");
+});
+
+await test("run carrier preserves a sealed broker choice and never infers zero files as skip", async () => {
+  const runDir = path.join(out, "broker-choice-carrier-run");
+  const result = await flow(cleanEvidence, runDir, [
+    "--broker-intake-choice", brokerSkipChoicePath,
+    "--stop-after", "decisions",
+  ]);
+  assert(result.status === "PAUSED", JSON.stringify(result));
+  const carrier = JSON.parse(await fs.readFile(path.join(runDir, "run-carrier.json"), "utf8"));
+  assert(carrier.broker_intake_state === "choice_recorded", "carrier lost broker choice state");
+  assert(carrier.files?.broker_intake_choice, "carrier omitted broker choice receipt");
+  const ordinaryCarrier = JSON.parse(await fs.readFile(path.join(out, "clean-run", "run-carrier.json"), "utf8"));
+  assert(ordinaryCarrier.broker_intake_state === "awaiting_choice", "legacy zero-file carrier was silently classified as skip");
 });
 
 await test("identical restart reuses all completed stages", async () => {

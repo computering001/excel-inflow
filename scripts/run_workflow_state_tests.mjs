@@ -48,7 +48,7 @@ function rejects(name, callback, pattern) {
 
 pass("canonical contract loads", () => {
   assert(WORKFLOW_STATE_CONTRACT.schema_version === "workflow-state-contract/1.0", "wrong schema");
-  for (const layer of ["broker", "dcs", "filings", "attachment", "user_flow", "stage_receipt"]) {
+  for (const layer of ["broker_intake", "broker", "dcs", "filings", "attachment", "user_flow", "stage_receipt"]) {
     assert(WORKFLOW_STATE_CONTRACT.layers[layer], `layer registry omits ${layer}`);
   }
   assert(
@@ -59,6 +59,31 @@ pass("canonical contract loads", () => {
     VISIBLE_JOURNEY_CONTRACT.milestones.length === 6,
     "visible journey must have exactly six milestones",
   );
+});
+
+pass("broker intake requires an explicit choice before completion", () => {
+  assertWorkflowState("broker_intake", {
+    status: "ACTION_REQUIRED",
+    blockerClass: "USER_DECISION",
+    userBlocking: true,
+  });
+  assertWorkflowTransition("broker_intake", "ACTION_REQUIRED", "COMPLETE");
+  assertWorkflowState("broker_intake", {
+    status: "COMPLETE",
+    blockerClass: null,
+    userBlocking: false,
+  });
+  let rejected = false;
+  try {
+    assertWorkflowState("broker_intake", {
+      status: "COMPLETE",
+      blockerClass: "USER_DECISION",
+      userBlocking: true,
+    });
+  } catch {
+    rejected = true;
+  }
+  assert(rejected, "completed broker intake accepted a still-pending user decision");
 });
 
 pass("one visible progress scale maps internal checkpoints without leaking stage numbers", () => {

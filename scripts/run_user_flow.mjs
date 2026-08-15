@@ -22,6 +22,7 @@ import {
 } from "./lib/workflow_state.mjs";
 import {
   COMPANY_SCREEN,
+  renderBrokerIntakeScreen,
   renderBrokerPreviewScreen,
   renderEvidenceReviewProgress,
   renderDeliveryReport,
@@ -47,6 +48,7 @@ import {
   verifyRunCarrier,
   writeRunCarrier,
 } from "./lib/run_carrier.mjs";
+import { verifyBrokerIntakeChoice } from "./lib/broker_intake_choice.mjs";
 import {
   compileForecastPlan,
   forecastPlanSha256,
@@ -135,11 +137,12 @@ function renderPresentationScreen(stageId) {
   // rest of the pack is collected at its own stage. "inputs" remains the
   // fast-path pack screen and the id older transcripts reference.
   if (stageId === "company") return COMPANY_SCREEN;
+  if (stageId === "brokers") return renderBrokerIntakeScreen("the selected company");
   if (stageId === "inputs") return WELCOME_SCREEN;
   const declaration = PRESENTATION_SCREENS[stageId];
   if (!declaration) {
     throw new Error(
-      `--screen must be one of company, inputs, evidence_review, decisions, build_checks or delivery; got ${stageId}`,
+      `--screen must be one of company, brokers, inputs, evidence_review, decisions, build_checks or delivery; got ${stageId}`,
     );
   }
   return renderStageStatus({ stageId, ...declaration });
@@ -165,6 +168,8 @@ const STAGE_RUNTIME_MEMBERS = Object.freeze({
     "scripts/lib/process_tree.mjs",
     "scripts/lib/runtime_isolation.mjs",
     "scripts/lib/run_carrier.mjs",
+    "scripts/lib/broker_intake_choice.mjs",
+    "assets/broker-intake-choice-v1.schema.json",
     "assets/evidence-run-v1.schema.json",
     "assets/case-source.schema.json",
     "assets/forecast-observation-ledger-v1.schema.json",
@@ -431,11 +436,11 @@ async function main() {
     throw new Error(
       "Usage: run_user_flow.mjs <evidence-run.json> --out <run-dir> or " +
         "run_user_flow.mjs --carrier <run-carrier.json> --out <run-dir> " +
-        "[--broker-confirmation <confirmation.json>] [--answers <answers.txt|json>] " +
+        "[--broker-intake-choice <choice.json>] [--broker-confirmation <confirmation.json>] [--answers <answers.txt|json>] " +
         "[--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
         "[--stop-after <stage>] [--json], or " +
-        "run_user_flow.mjs --screen <company|inputs|evidence_review|decisions|build_checks|delivery>",
+        "run_user_flow.mjs --screen <company|brokers|inputs|evidence_review|decisions|build_checks|delivery>",
     );
   }
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });
@@ -513,6 +518,9 @@ async function main() {
     if (!options["broker-confirmation"] && verifiedCarrier.files.broker_confirmation) {
       options["broker-confirmation"] = verifiedCarrier.files.broker_confirmation;
     }
+    if (!options["broker-intake-choice"] && verifiedCarrier.files.broker_intake_choice) {
+      options["broker-intake-choice"] = verifiedCarrier.files.broker_intake_choice;
+    }
     if (options["run-id"] && options["run-id"] !== verifiedCarrier.carrier.run_id) {
       throw new Error("--run-id does not match the verified run carrier.");
     }
@@ -545,6 +553,20 @@ async function main() {
   ACTIVE_RUN_GUARD = { runDir, identity, lease, integrity };
   const reusedStages = [];
   const runtimeDigests = stageRuntimeDigests(integrity);
+  let brokerIntakeChoicePath = null;
+  if (typeof options["broker-intake-choice"] === "string") {
+    brokerIntakeChoicePath = path.resolve(options["broker-intake-choice"]);
+    const brokerIntakeChoice = await readJson(
+      brokerIntakeChoicePath,
+      "broker intake choice",
+    );
+    const verifiedChoice = verifyBrokerIntakeChoice(brokerIntakeChoice, {
+      run_id: runId,
+    });
+    if (!verifiedChoice.valid) {
+      throw new Error(`Broker intake choice is invalid: ${verifiedChoice.errors[0]}`);
+    }
+  }
 
   // Stage 1 — validate the complete evidence envelope.
   const stage1Dir = path.join(runDir, "stages", "inputs");
@@ -567,6 +589,7 @@ async function main() {
       issuerIdentity,
       evidencePath: stage1Evidence,
       answersPath: typeof options.answers === "string" ? path.resolve(options.answers) : null,
+      brokerIntakeChoicePath,
       brokerConfirmationPath: stage2BrokerConfirmation,
       status,
       artifacts,
@@ -574,6 +597,9 @@ async function main() {
   }
   const stage1Inputs = {
     evidence_run: await hashFile(evidencePath),
+    ...(brokerIntakeChoicePath
+      ? { broker_intake_choice: await hashFile(brokerIntakeChoicePath) }
+      : {}),
     runtime: runtimeDigests.inputs,
   };
   const stage1Outputs = {

@@ -226,6 +226,11 @@ async function main() {
     }
     evidencePath = attachmentState.artifacts?.evidence_run;
     if (!evidencePath) throw new Error("PASS attachment state has no evidence_run artifact.");
+    const brokerIntakeChoicePath = attachmentState.artifacts?.broker_intake_choice;
+    if (!brokerIntakeChoicePath) {
+      throw new Error("PASS attachment state has no sealed Brokers upload-or-skip choice.");
+    }
+    artifacts.broker_intake_choice = brokerIntakeChoicePath;
     if (attachmentState.lane_states?.broker && attachmentState.lane_states?.filings) {
       const preBrokerDemandPath = attachmentState.artifacts?.pre_broker_model_demand;
       if (!preBrokerDemandPath) {
@@ -261,6 +266,9 @@ async function main() {
     "--json",
   ];
   if (options.answers) firstArgs.push("--answers", path.resolve(String(options.answers)));
+  if (artifacts.broker_intake_choice) {
+    firstArgs.push("--broker-intake-choice", path.resolve(artifacts.broker_intake_choice));
+  }
   if (options.python) firstArgs.push("--python", String(options.python));
   if (options.soffice) firstArgs.push("--soffice", String(options.soffice));
   await run(process.execPath, firstArgs, { timeout: 3_600_000, env: runtimeEnv });

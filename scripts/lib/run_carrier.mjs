@@ -95,6 +95,7 @@ export async function writeRunCarrier({
   issuerIdentity,
   evidencePath,
   answersPath = null,
+  brokerIntakeChoicePath = null,
   brokerConfirmationPath = null,
   status,
   artifacts = {},
@@ -121,6 +122,13 @@ export async function writeRunCarrier({
     answersSnapshot = await snapshotFile(answersPath, path.join(snapshotDirectory, `answers${extension}`));
   }
   let brokerConfirmationSnapshot = null;
+  let brokerIntakeChoiceSnapshot = null;
+  if (brokerIntakeChoicePath) {
+    brokerIntakeChoiceSnapshot = await snapshotFile(
+      brokerIntakeChoicePath,
+      path.join(snapshotDirectory, "broker-intake-choice.json"),
+    );
+  }
   if (brokerConfirmationPath) {
     brokerConfirmationSnapshot = await snapshotFile(
       brokerConfirmationPath,
@@ -132,6 +140,14 @@ export async function writeRunCarrier({
   await addExistingFile(files, "run_identity", canonicalRunRoot, identity.path);
   await addExistingFile(files, "evidence_run", canonicalRunRoot, evidenceSnapshot);
   if (answersSnapshot) await addExistingFile(files, "answers", canonicalRunRoot, answersSnapshot);
+  if (brokerIntakeChoiceSnapshot) {
+    await addExistingFile(
+      files,
+      "broker_intake_choice",
+      canonicalRunRoot,
+      brokerIntakeChoiceSnapshot,
+    );
+  }
   if (brokerConfirmationSnapshot) {
     await addExistingFile(
       files,
@@ -185,6 +201,9 @@ export async function writeRunCarrier({
     run_identity_hash: identity.identity.identity_hash,
     issuer_identity: normalisedIssuer,
     issuer_identity_hash: sha256Bytes(canonicalJson(normalisedIssuer)),
+    broker_intake_state: brokerIntakeChoiceSnapshot
+      ? "choice_recorded"
+      : "awaiting_choice",
     files: canonicalise(files),
     new_chat_policy: "Use this carrier and the matching workspace/session token; never use chat memory or Stage-4 internals as state.",
   };
@@ -250,6 +269,16 @@ export async function verifyRunCarrier({
   if (carrier.issuer_identity_hash !== sha256Bytes(canonicalJson(issuerIdentity))) {
     throw new Error("Run carrier issuer identity hash does not match.");
   }
+  const brokerIntakeState = carrier.broker_intake_state ?? "awaiting_choice";
+  if (!["awaiting_choice", "choice_recorded"].includes(brokerIntakeState)) {
+    throw new Error("Run carrier broker intake state is invalid.");
+  }
+  if (brokerIntakeState === "choice_recorded" && !carrier.files?.broker_intake_choice) {
+    throw new Error("Run carrier claims a broker choice without its sealed receipt.");
+  }
+  if (brokerIntakeState === "awaiting_choice" && carrier.files?.broker_intake_choice) {
+    throw new Error("Run carrier has a broker choice receipt but still claims awaiting choice.");
+  }
   if (!carrier.files || typeof carrier.files !== "object" || Array.isArray(carrier.files)) {
     throw new Error("Run carrier files must be an object.");
   }
@@ -274,5 +303,14 @@ export async function verifyRunCarrier({
   if (identity.identity.identity_hash !== carrier.run_identity_hash) {
     throw new Error("Run carrier identity hash does not match the immutable run identity.");
   }
-  return { carrier, carrier_path: canonicalCarrier, run_root: canonicalRunRoot, files, identity };
+  return {
+    carrier,
+    carrier_path: canonicalCarrier,
+    run_root: canonicalRunRoot,
+    files,
+    identity,
+    broker_intake_state: brokerIntakeState,
+    legacy_broker_intake_migration:
+      carrier.broker_intake_state === undefined ? "awaiting_choice" : null,
+  };
 }

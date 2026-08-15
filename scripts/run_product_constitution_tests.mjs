@@ -21,6 +21,12 @@ assert.deepEqual(product.visible_milestones, [
 ]);
 assert.equal(product.evidence_lanes.broker.criticality, "optional");
 assert.equal(product.evidence_lanes.broker.full_document_semantic_closure_required, false);
+assert.equal(product.broker_rules.visible_intake_checkpoint_required, true);
+assert.equal(product.broker_rules.zero_files_implies_skip, false);
+assert.deepEqual(product.broker_rules.valid_intake_states_before_debt, [
+  "supplied", "explicitly_skipped",
+]);
+assert.equal(product.broker_rules.explicit_skip_phrase, "continue without brokers");
 
 const causalMatrix = [
   [{ unresolved: false, reachable_to_material_output: true, alternative_authority_path: false }, "LOG"],

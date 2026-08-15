@@ -327,7 +327,7 @@ export const WELCOME_SCREEN = finishScreen([
   "       Set the date toggle to LAST FISCAL YEAR END before",
   "       exporting - not today's date.",
   "",
-  "   3   BROKER RESEARCH             minimum 3, maximum 10",
+  "   3   BROKER RESEARCH             optional, 1 to 10",
   "       Three is the minimum for a meaningful consensus",
   "       for one EBIT/EBITDA anchor plus the D&A bridge.",
   "",
@@ -430,6 +430,39 @@ export const COMPANY_SCREEN = framedScreen({
   reply: ["company name (e.g. AstraZeneca)"],
 });
 
+// The Brokers milestone is an explicit upload-or-skip checkpoint. Broker
+// evidence is optional, but absence is not consent to skip it. This screen is
+// therefore ACTION REQUIRED and must never be paired with "no response is
+// required" wording.
+export function renderBrokerIntakeScreen(issuerName = "the company") {
+  return framedScreen({
+    title: "BROKERS",
+    states: { Company: "done", Filings: "done", Brokers: "active" },
+    lines: [
+      String(issuerName),
+      "",
+      "STATUS: ACTION REQUIRED",
+      "",
+      "BROKER RESEARCH - CHOOSE ONE PATH",
+      "",
+      "Attach 1 to 10 broker reports now. PDF is preferred,",
+      "with one report per house where possible.",
+      "",
+      "The reports improve forecast authority but are optional.",
+      "Extraction, OCR and reconciliation stay internal. Any",
+      "unusable value is dropped through the forecast waterfall;",
+      "it does not stop the model.",
+      "",
+      "Or continue with company evidence and historical drivers.",
+      "Missing files never count as a decision to skip.",
+    ],
+    reply: [
+      "attach 1-10 broker reports",
+      "or type exactly: continue without brokers",
+    ],
+  });
+}
+
 // The three stage-1 inputs, in the order the welcome screen presents them, so a
 // caller can drive intake off the same declaration the screen is rendered from
 // rather than off a second hand-written list.
@@ -456,7 +489,7 @@ export const REQUIRED_INPUTS = Object.freeze([
     id: "broker_research",
     label: "BROKER RESEARCH",
     kind: "upload_set",
-    minimum: 3,
+    minimum: 1,
     maximum: 10,
   }),
 ]);

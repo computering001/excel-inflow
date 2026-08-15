@@ -13,7 +13,7 @@
 
 ## Product outcome
 
-Convert three to ten broker documents into two distinct products without
+Convert one to ten broker documents into two distinct products without
 conflating them:
 
 1. a lossless, hash-bound source-table bundle that preserves every extracted
