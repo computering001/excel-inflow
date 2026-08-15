@@ -1149,12 +1149,171 @@ function markForecastCapturedBy(
 
 function clearCompiledForecastOverride(row) {
   delete row.forecast_period_authorities;
+  clearForecastCaptureMetadata(row);
+}
+
+function clearForecastCaptureMetadata(row) {
   delete row.forecast_capture_parent_id;
   delete row.forecast_capture_mode;
   delete row.forecast_capture_note;
   delete row.forecast_capture_certificates;
   if (row.formula_authority === "intentionally_blank") {
     delete row.formula_authority;
+  }
+}
+
+const SEALED_FORMULA_METHODS = new Set([
+  "accounting_identity",
+  "driver_formula",
+  "roll_forward",
+  "historical_average",
+  "historical_trend",
+  "seasonal_run_rate",
+  "carry_forward",
+  "schedule_link",
+  "actual_plus_remainder",
+  "full_year_authority_less_reported",
+]);
+const SEALED_ABSENCE_METHODS = new Set([
+  "not_separately_forecast",
+  "not_applicable",
+  "unresolved",
+]);
+
+/**
+ * Reconcile old compiled cases against the sealed per-period authority before
+ * the fast path returns.  Earlier compilers could leave capture metadata on a
+ * row after selecting a live driver formula, or leave a cross-section formula
+ * on a row whose sealed authority had become a direct user/broker input.  The
+ * per-period authority is the writer contract, so stale scalar hints and stale
+ * formula edges must yield to it deterministically.
+ */
+function reconcileSealedForecastAuthorities(rows) {
+  const rowsById = new Map(rows.map((row) => [row.row_id, row]));
+  for (const row of rows) {
+    const authorities = row.forecast_period_authorities;
+    if (!Array.isArray(authorities) || authorities.length !== 3) continue;
+    const live = authorities.filter(
+      (authority) => authority && !SEALED_ABSENCE_METHODS.has(authority.method),
+    );
+    if (live.length === 0) continue;
+
+    const formulaIndexes = authorities
+      .map((authority, index) =>
+        authority && SEALED_FORMULA_METHODS.has(authority.method) ? index : null,
+      )
+      .filter((index) => index !== null);
+    const certifiedCapture =
+      row.forecast_capture_parent_id &&
+      [0, 1, 2].every((forecastIndex) =>
+        (row.forecast_capture_certificates ?? []).some(
+          (certificate) =>
+            certificate?.forecast_index === forecastIndex &&
+            certificate?.parent_row_id === row.forecast_capture_parent_id,
+        ),
+      );
+    const everyFormulaConsumesAbsentDetail =
+      formulaIndexes.length > 0 &&
+      formulaIndexes.every((forecastIndex) => {
+        const calculation = row.forecast_period_calculations?.[forecastIndex] ??
+          row.forecast_calculation;
+        return (calculation?.refs ?? []).some((reference) => {
+          const dependency = rowsById.get(reference);
+          const dependencyAuthority =
+            dependency?.forecast_period_authorities?.[forecastIndex];
+          return Boolean(
+            dependency?.forecast_capture_parent_id ||
+            ["not_separately_forecast", "not_applicable"].includes(
+              dependencyAuthority?.method,
+            ),
+          );
+        });
+      });
+    if (certifiedCapture && everyFormulaConsumesAbsentDetail) {
+      row.forecast_period_authorities = authorities.map((authority) =>
+        authority && SEALED_FORMULA_METHODS.has(authority.method)
+          ? {
+              method: "not_separately_forecast",
+              source_kind: "none",
+              material: authority.material ?? true,
+              note:
+                row.forecast_capture_note ??
+                `Forecast detail is represented by ${row.forecast_capture_parent_id}.`,
+            }
+          : authority,
+      );
+      row.forecast_treatment = "uncalculated";
+      row.formula_authority = "intentionally_blank";
+      delete row.forecast_calculation;
+      delete row.forecast_period_calculations;
+      if (Array.isArray(row.values)) {
+        row.values = [...row.values.slice(0, 3), null, null, null];
+      }
+      continue;
+    }
+
+    const calculations = Array.isArray(row.forecast_period_calculations)
+      ? [...row.forecast_period_calculations]
+      : [null, null, null];
+    let hasFormula = false;
+    let hasDirect = false;
+    for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+      const method = authorities[forecastIndex]?.method;
+      if (!method || SEALED_ABSENCE_METHODS.has(method)) continue;
+      if (SEALED_FORMULA_METHODS.has(method)) {
+        hasFormula = true;
+      } else {
+        hasDirect = true;
+        calculations[forecastIndex] = null;
+      }
+    }
+
+    clearForecastCaptureMetadata(row);
+    if (calculations.some(Boolean)) {
+      row.forecast_period_calculations = calculations;
+    } else {
+      delete row.forecast_period_calculations;
+      if (hasDirect) delete row.forecast_calculation;
+    }
+    if (hasFormula) {
+      row.forecast_treatment = "formula";
+    } else if (live.every((authority) => authority.method === "broker_consensus")) {
+      row.forecast_treatment = "broker";
+    } else if (live.every((authority) => authority.method === "explicit_zero")) {
+      row.forecast_treatment = "zero";
+    } else {
+      row.forecast_treatment = "hardcode";
+    }
+  }
+}
+
+function migrateMultiHopCaptureCertificates(rows) {
+  for (const row of rows) {
+    if (row.forecast_capture_mode !== "formula_membership") continue;
+    const certificates = row.forecast_capture_certificates ?? [];
+    if (
+      certificates.length !== 3 ||
+      !certificates.every(
+        (certificate) =>
+          Array.isArray(certificate?.membership_path) &&
+          certificate.membership_path.length > 2,
+      )
+    ) {
+      continue;
+    }
+    // Current capture doctrine treats a blank child beneath a directly
+    // forecast aggregate as semantic scope.  A multi-hop historical formula
+    // path remains useful lineage, but it is not a physical forecast path and
+    // may contain cancelling or parallel bridge routes.  Migrate old compiled
+    // artifacts to the current proof mode without discarding that lineage.
+    row.forecast_capture_mode = "semantic_scope";
+    row.forecast_capture_certificates = certificates.map((certificate) => ({
+      ...certificate,
+      mode: "semantic_scope",
+      proof:
+        `Section-local semantic scope retained with historical membership path: ` +
+        certificate.membership_path.join(" -> ") + ".",
+    }));
   }
 }
 
@@ -2899,6 +3058,8 @@ export function normaliseStatementRows(
   // return. The row's declared accounting identity is the authority; old
   // capture metadata may never override a protected bridge.
   restoreProtectedForecastBridges(rows);
+  migrateMultiHopCaptureCertificates(rows);
+  reconcileSealedForecastAuthorities(rows);
   repairCompiledReportedDerivedParents(rows);
   if (modelCase.statement_structure_compiled_version === "semantic-statements/1.0") {
     materializeStatementPresentationTree(rows, section);

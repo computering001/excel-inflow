@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,408 @@ def core_driver_labels() -> set[str]:
 
 
 CORE_DRIVER_LABELS = core_driver_labels()
+
+
+def _metric_dictionary() -> dict[str, Any]:
+    path = Path(__file__).resolve().parent.parent / "assets" / "broker-metric-dictionary.json"
+    value = json.loads(path.read_text("utf-8"))
+    if value.get("schema_version") != "broker-metric-dictionary/1.0":
+        raise ValueError("Demand-selected broker mapping requires broker-metric-dictionary/1.0.")
+    return value
+
+
+def _auto_exact_aliases(dictionary: dict[str, Any]) -> dict[str, str]:
+    """Return only unambiguous exact aliases for core concepts.
+
+    This is intentionally not fuzzy semantic classification.  The immutable
+    source row and a filings-derived model-demand row must independently land
+    on the same exact dictionary alias before the controller may propose it.
+    """
+    core = set((dictionary.get("consumption") or {}).get("core") or [])
+    by_alias: dict[str, set[str]] = {}
+    for metric in dictionary.get("metrics") or []:
+        metric_id = str(metric.get("id") or "")
+        if metric_id not in core:
+            continue
+        counter = {
+            normalized_label(value)
+            for value in metric.get("counter_examples") or []
+            if normalized_label(value)
+        }
+        for value in [metric.get("display_label"), *(metric.get("examples") or [])]:
+            alias = normalized_label(value)
+            if alias and alias not in counter:
+                by_alias.setdefault(alias, set()).add(metric_id)
+    return {
+        alias: next(iter(metric_ids))
+        for alias, metric_ids in by_alias.items()
+        if len(metric_ids) == 1
+    }
+
+
+def _period_year(label: Any, forecast_years: list[int]) -> int | None:
+    text = re.sub(r"\s+", "", str(label or "").upper())
+    for year in forecast_years:
+        short = str(year)[-2:]
+        if (
+            re.search(rf"(?<!\d){year}[EFA]?(?!\d)", text)
+            or re.search(rf"(?<![A-Z0-9])(?:FY|CY)'?{short}[EFA]?(?!\d)", text)
+            or re.search(rf"(?<!\d)'{short}[EFA]?(?!\d)", text)
+            or re.search(rf"(?:FY|CY)?(?:19|20)?\d{{2}}/{short}[EFA]?(?!\d)", text)
+        ):
+            return year
+    return None
+
+
+def _candidate_period_columns(
+    candidate: dict[str, Any], forecast_periods: list[str]
+) -> dict[int, int]:
+    years = [int(str(value)[:4]) for value in forecast_periods]
+    result: dict[int, int] = {}
+    for item in candidate.get("period_indexes") or []:
+        if not isinstance(item, dict) or item.get("period_kind") != "annual":
+            continue
+        year = _period_year(item.get("period_label"), years)
+        if year not in years:
+            continue
+        column = int(item.get("column") or 0)
+        if column > 0:
+            result[years.index(year)] = column
+    return result
+
+
+def _unit_scale(value: Any) -> tuple[str | None, str | None]:
+    text = re.sub(r"[^a-z0-9%£$€¥]+", "", str(value or "").casefold())
+    currency = next((code for code in ("usd", "gbp", "eur", "jpy", "chf") if code in text), None)
+    if any(token in text for token in ("billion", "billions", "bn")):
+        scale = "billions"
+    elif any(token in text for token in ("million", "millions", "mn", "mm")) or re.search(r"(?:usd|gbp|eur|jpy|chf|[$£€¥])m$", text):
+        scale = "millions"
+    elif any(token in text for token in ("thousand", "thousands")) or text.endswith("k"):
+        scale = "thousands"
+    elif text in {"units", "unit"}:
+        scale = "units"
+    else:
+        scale = None
+    return currency.upper() if currency else None, scale
+
+
+def _unit_multiplier(
+    candidate: dict[str, Any], metric: dict[str, Any], model_context: dict[str, Any]
+) -> float | None:
+    if metric.get("unit_class") == "percent":
+        return 1.0
+    source_currency, source_scale = _unit_scale(candidate.get("units"))
+    target_currency = str(model_context.get("reporting_currency") or "")
+    target_scale = str(model_context.get("units") or "")
+    if source_currency and source_currency != target_currency:
+        return None
+    factors = {"units": 1.0, "thousands": 1_000.0, "millions": 1_000_000.0, "billions": 1_000_000_000.0}
+    if source_scale not in factors or target_scale not in factors:
+        return None
+    return factors[source_scale] / factors[target_scale]
+
+
+def _bundle_tables(bundle: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        str(table.get("canonical_table_id") or table.get("table_id") or ""): table
+        for document in bundle.get("documents") or []
+        for table in (document.get("canonical_tables") or document.get("tables") or [])
+    }
+
+
+def _cell_numeric(table: dict[str, Any], row: int, column: int) -> float | None:
+    try:
+        value = table["rows"][row - 1][column - 1].get("value")
+    except (IndexError, KeyError, TypeError):
+        return None
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    else:
+        text = str(value).strip()
+        match = re.fullmatch(
+            r"\s*(\()?\s*[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?\s*(%)?\s*\)?\s*",
+            text,
+        )
+        if not match:
+            return None
+        negative = bool(match.group(1)) or text.lstrip().startswith("-")
+        number = float(re.sub(r"[$€£¥,%() ]", "", text))
+        if negative:
+            number = -abs(number)
+        if match.group(2):
+            number /= 100.0
+    return number if math.isfinite(number) else None
+
+
+def _metric_axes(metric: dict[str, Any]) -> tuple[str, str]:
+    metric_id = str(metric.get("id") or "")
+    if metric_id == "effective_tax_rate":
+        return "tax", "tax"
+    if metric.get("statement_family") == "cash_flow":
+        return "cash_flow", "cash_flow_forecast"
+    return "operating", "operating_forecast"
+
+
+def compile_demand_selected_crosswalk(
+    bundle: dict[str, Any],
+    model_context: dict[str, Any],
+    *,
+    bundle_sha256: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Compile a conservative selected-cell crosswalk from sealed demand.
+
+    Only an exact dictionary alias present independently in the immutable
+    broker row and the filings-derived demand graph is eligible.  Ambiguous
+    duplicates, units, signs or periods are not guessed; they remain sealed in
+    terminal non-consumption and the normal forecast waterfall continues.
+    """
+    graph = model_context.get("model_demand_graph") if isinstance(model_context, dict) else None
+    if not isinstance(graph, dict) or graph.get("schema_version") != "pre-broker-model-demand/1.0":
+        raise ValueError("Demand-selected broker mapping requires pre-broker-model-demand/1.0.")
+    graph_body = {key: value for key, value in graph.items() if key != "graph_sha256"}
+    if graph.get("graph_sha256") != canonical_hash(graph_body):
+        raise ValueError("Pre-broker model-demand graph hash does not match its payload.")
+    forecast_periods = list(model_context.get("forecast_periods") or [])
+    if graph.get("forecast_periods") != forecast_periods:
+        raise ValueError("Pre-broker model demand and broker forecast periods differ.")
+
+    dictionary = _metric_dictionary()
+    metrics_by_id = {str(item.get("id")): item for item in dictionary.get("metrics") or []}
+    aliases = _auto_exact_aliases(dictionary)
+    demanded_metric_ids = {
+        aliases[label]
+        for node in graph.get("nodes") or []
+        if "selected_broker" in (node.get("allowed_authorities") or [])
+        and (label := normalized_label(node.get("label"))) in aliases
+    }
+    shell = compile_reference_only_crosswalk(bundle, model_context)
+    candidates = candidate_index(bundle)
+    tables = _bundle_tables(bundle)
+    proposals: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    rejected: list[dict[str, Any]] = []
+    for candidate_id, candidate in sorted(candidates.items()):
+        metric_id = aliases.get(normalized_label(candidate.get("label")))
+        if not metric_id or metric_id not in demanded_metric_ids:
+            continue
+        if (
+            candidate.get("authority_status") != "verified"
+            or candidate.get("period_basis") != "annual_forecast"
+            or not candidate.get("numeric")
+        ):
+            rejected.append({"candidate_id": candidate_id, "reason": "candidate_not_verified_annual_numeric"})
+            continue
+        metric = metrics_by_id[metric_id]
+        multiplier = _unit_multiplier(candidate, metric, model_context)
+        if multiplier is None:
+            rejected.append({"candidate_id": candidate_id, "reason": "source_units_not_model_compatible"})
+            continue
+        period_columns = _candidate_period_columns(candidate, forecast_periods)
+        table = tables.get(str(candidate.get("table_id") or ""))
+        values = {
+            period_index: _cell_numeric(table, int(candidate.get("row") or 0), column)
+            for period_index, column in period_columns.items()
+        } if table else {}
+        if not values or any(value is None for value in values.values()):
+            rejected.append({"candidate_id": candidate_id, "reason": "period_cell_not_unambiguously_numeric"})
+            continue
+        sign_convention = "as_reported"
+        if metric_id in {"capex", "dividends", "share_buybacks"}:
+            nonzero_signs = {1 if float(value) > 0 else -1 for value in values.values() if abs(float(value)) > 1e-12}
+            if len(nonzero_signs) > 1:
+                rejected.append({"candidate_id": candidate_id, "reason": "outflow_row_has_mixed_signs"})
+                continue
+            if nonzero_signs == {1}:
+                multiplier *= -1.0
+            sign_convention = "outflow_negative"
+        # Change in working capital is already defined as the published cash
+        # movement, so its sign is preserved exactly as reported.  Unlike
+        # capex/dividends/buybacks there is no lawful magnitude-to-outflow
+        # conversion: a positive release and a negative investment are both
+        # economically meaningful observations.
+        normalized_values = {
+            period_index: round(float(value) * multiplier, 12)
+            for period_index, value in values.items()
+        }
+        proposals.setdefault((str(candidate.get("house_id") or ""), metric_id), []).append({
+            "candidate": candidate,
+            "period_columns": period_columns,
+            "values": normalized_values,
+            "multiplier": multiplier,
+            "sign_convention": sign_convention,
+        })
+
+    selected: list[dict[str, Any]] = []
+    for (_house_id, _metric_id), group in sorted(proposals.items()):
+        conflict = False
+        for left_index, left in enumerate(group):
+            for right in group[left_index + 1:]:
+                overlap = set(left["values"]) & set(right["values"])
+                if any(abs(left["values"][index] - right["values"][index]) > 1e-9 for index in overlap):
+                    conflict = True
+        if conflict:
+            rejected.extend({
+                "candidate_id": item["candidate"]["candidate_id"],
+                "reason": "same_house_metric_rows_conflict",
+            } for item in group)
+            continue
+        occupied: set[int] = set()
+        for item in sorted(
+            group,
+            key=lambda value: (-len(value["period_columns"]), str(value["candidate"]["candidate_id"])),
+        ):
+            available = set(item["period_columns"]) - occupied
+            if not available:
+                rejected.append({
+                    "candidate_id": item["candidate"]["candidate_id"],
+                    "reason": "exact_duplicate_candidate_not_selected",
+                })
+                continue
+            item["selected_periods"] = sorted(available)
+            selected.append(item)
+            occupied.update(available)
+
+    ledger: list[dict[str, Any]] = []
+    mappings: list[dict[str, Any]] = []
+    active_metric_ids: set[str] = set()
+    selected_candidate_ids: set[str] = set()
+    for item in selected:
+        candidate = item["candidate"]
+        candidate_id = str(candidate["candidate_id"])
+        metric_id = aliases[normalized_label(candidate.get("label"))]
+        metric = metrics_by_id[metric_id]
+        domain, semantic_role = _metric_axes(metric)
+        active_metric_ids.add(metric_id)
+        selected_candidate_ids.add(candidate_id)
+        mapping_ids = []
+        for period_index in item["selected_periods"]:
+            mapping_id = re.sub(
+                r"[^a-z0-9_.-]+", ".",
+                f"auto.{candidate.get('house_id')}.{metric_id}.{period_index}.{candidate_id[-8:]}".casefold(),
+            ).strip(".")
+            mapping_ids.append(mapping_id)
+            mappings.append({
+                "mapping_id": mapping_id,
+                "house_id": candidate.get("house_id"),
+                "metric_id": metric_id,
+                "definition_id": f"dict.{metric_id}",
+                "period_index": period_index,
+                "sources": [{
+                    "table_id": candidate.get("table_id"),
+                    "row": int(candidate.get("row") or 0),
+                    "column": int(item["period_columns"][period_index]),
+                    "coefficient": float(item["multiplier"]),
+                }],
+                "rationale": "Exact demanded broker row and forecast-period cell selected by the bounded controller.",
+                "review_status": "auto_exact",
+            })
+        fingerprint = {
+            "concept_id": metric_id,
+            "measurement_basis": "adjusted" if metric_id.startswith("adjusted_") else "reported",
+            "restatement_basis": "not_applicable",
+            "cash_flow_basis": "cash_flow" if domain == "cash_flow" else "not_applicable",
+            "lease_basis": "not_applicable",
+            "units": model_context["units"],
+            "currency": model_context["reporting_currency"],
+            "period_basis": "annual_forecast",
+            "sign_convention": item["sign_convention"],
+            "accounting_basis": "ifrs",
+            "operating_scope": "continuing",
+        }
+        ledger.append({
+            "candidate_id": candidate_id,
+            "house_id": candidate.get("house_id"),
+            "table_id": candidate.get("table_id"),
+            "row": int(candidate.get("row") or 0),
+            "label": candidate.get("label"),
+            "period_basis": "annual_forecast",
+            "period_indexes": sorted(item["period_columns"]),
+            "source_cells": [
+                {"row": int(cell.get("row") or 0), "column": int(cell.get("column") or 0)}
+                for cell in candidate.get("source_cells") or []
+            ],
+            "parent_candidate_id": candidate.get("parent_candidate_id"),
+            "economic_domain": domain,
+            "definition_id": f"dict.{metric_id}",
+            "concept_id": metric_id,
+            "model_use": "active_input",
+            "definition_fingerprint": fingerprint,
+            "evidence_kind": "broker_estimate",
+            "definition_evidence": (
+                "Exact immutable source-row label, compatible table units and explicit annual headers "
+                "match a filings-derived model-demand concept."
+            ),
+            "review_status": "reviewed",
+            "rationale": "Controller selected only exact demanded cells; unresolved periods retain the ordinary waterfall.",
+            "disposition": "mapped_metric",
+            "metric_id": metric_id,
+            "mapping_ids": mapping_ids,
+        })
+        shell["metrics"][metric_id].update({
+            "economic_domain": domain,
+            "semantic_role": semantic_role,
+            "concept_id": metric_id,
+            "evidence_kind": "broker_estimate",
+            "model_use": "active_input",
+            "definition_fingerprint": fingerprint,
+            "sign_convention": item["sign_convention"],
+        })
+
+    shell["coverage_ledger"] = ledger
+    shell["mappings"] = mappings
+    unselected_ids = sorted(set(candidates) - selected_candidate_ids)
+    if unselected_ids:
+        synthetic = {
+            "schema_version": "broker-semantic-verification-report/1.0",
+            "status": "BLOCKED",
+            "total_violation_count": len(unselected_ids),
+            "candidate_manifest_sha256": canonical_hash(bundle.get("candidate_manifest")),
+            "crosswalk_sha256": canonical_hash(shell),
+            "candidate_count": len(candidates),
+            "coverage_entry_count": len(ledger),
+            "terminal_quarantined_candidate_count": 0,
+            "unresolved_selected_candidate_count": 0,
+            "findings": [{
+                "code": "AUTO-EXACT-NOT-SELECTED",
+                "candidate_id": candidate_id,
+                "message": "Candidate is preserved but was not safe for deterministic selected-cell authority.",
+            } for candidate_id in unselected_ids],
+        }
+        synthetic_sha = canonical_hash(synthetic)
+        review = automatic_negative_consumption_review(
+            bundle=bundle,
+            crosswalk_sha256=canonical_hash(shell),
+            semantic_report_sha256=synthetic_sha,
+            semantic_report=synthetic,
+            bundle_sha256=bundle_sha256,
+        )
+        review["producer_id"] = "broker-controller-demand-selected/1.0"
+        shell, terminal_receipt = apply_terminal_review(
+            bundle=bundle,
+            crosswalk=shell,
+            semantic_report=synthetic,
+            review=review,
+            bundle_sha256=bundle_sha256,
+            crosswalk_sha256=canonical_hash(shell),
+            semantic_report_sha256=synthetic_sha,
+        )
+    else:
+        terminal_receipt = None
+    receipt = {
+        "schema_version": "broker-demand-selected-crosswalk-receipt/1.0",
+        "status": "PASS",
+        "model_demand_graph_sha256": graph["graph_sha256"],
+        "bundle_sha256": bundle_sha256,
+        "selected_crosswalk_sha256": canonical_hash(shell),
+        "selected_candidate_count": len(selected_candidate_ids),
+        "selected_mapping_count": len(mappings),
+        "active_metric_ids": sorted(active_metric_ids),
+        "rejected_candidates": sorted(rejected, key=lambda value: (value["candidate_id"], value["reason"])),
+        "terminal_recovery": terminal_receipt,
+    }
+    return shell, receipt
 
 
 def compile_reference_only_crosswalk(
@@ -128,21 +531,24 @@ def compile_reference_only_crosswalk(
     dictionary_path = Path(__file__).resolve().parent.parent / "assets" / "broker-metric-dictionary.json"
     dictionary = json.loads(dictionary_path.read_text("utf-8"))
     metric_by_id = {str(item.get("id")): item for item in dictionary.get("metrics") or []}
-    required_ids = set((dictionary.get("consumption") or {}).get("required_for_primary_house") or [])
-    required_ids.add("ebit")
+    # Keep the complete core vocabulary available even when the final selected
+    # set is sparse.  Declaration is not consumption; mappings below are the
+    # only authority edges.  This lets an exact EBITDA or buyback row be used
+    # without manufacturing a second crosswalk shape.
+    required_ids = set((dictionary.get("consumption") or {}).get("core") or [])
     metrics: dict[str, dict[str, Any]] = {}
     for metric_id in sorted(required_ids):
         source = metric_by_id[metric_id]
         unit_class = str(source.get("unit_class") or "currency")
         unit_kind = "percent_decimal" if unit_class in {"percent", "percent_decimal"} else "currency"
-        domain = "cash_flow" if source.get("statement_family") == "cash_flow" else "operating"
+        domain, semantic_role = _metric_axes(source)
         metrics[metric_id] = {
             "definition_id": f"dict.{metric_id}",
             "label": source.get("display_label") or metric_id.replace("_", " ").title(),
             "unit_kind": unit_kind,
             "concept_id": metric_id,
             "economic_domain": domain,
-            "semantic_role": "operating_forecast",
+            "semantic_role": semantic_role,
             "evidence_kind": "broker_estimate",
             "model_use": "reference_only",
             "definition_fingerprint": {

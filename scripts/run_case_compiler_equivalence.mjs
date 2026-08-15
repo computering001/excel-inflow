@@ -1147,6 +1147,30 @@ for (const name of files) {
           ),
         );
       };
+      const planAuthorityTreatmentMigration = (id, d) => {
+        if (d.path !== `${id}.forecast_treatment`) return false;
+        const authorities = compiledCaseRows.get(id)?.forecast_period_authorities;
+        if (!Array.isArray(authorities) || authorities.length !== 3) return false;
+        const methods = authorities.map((authority) => authority?.method ?? null);
+        if (d.actual === '"zero"') {
+          return methods.every((method) => method === "explicit_zero");
+        }
+        if (d.actual === '"formula"') {
+          return methods.every((method) =>
+            ["schedule_link", "formula", "driver_formula", "actual_plus_remainder"].includes(method),
+          );
+        }
+        if (d.actual === '"hardcode"') {
+          return authorities.every((authority) =>
+            authority &&
+            Number.isFinite(Number(authority.value)) &&
+            !["explicit_zero", "schedule_link", "formula", "driver_formula"].includes(
+              authority.method,
+            ),
+          );
+        }
+        return false;
+      };
       let named = 0;
       let hard = 0;
       for (const section of ["income_statement", "cash_flow"]) {
@@ -1229,6 +1253,11 @@ for (const name of files) {
               // Case-level named classes at plan granularity.
               !planAuthorityMaterialised(id, d) &&
               !planCalcMigration(id, d) &&
+              // A legacy scalar forecast_treatment is superseded by the three
+              // sealed period authorities.  Name the migration only when all
+              // three methods independently imply the compiled treatment;
+              // mixed or unexplained treatment changes remain hard diffs.
+              !planAuthorityTreatmentMigration(id, d) &&
               // A treatment upgraded from legacy uncalculated to formula is
               // named only when the compiled case actually carries the wiring
               // (a rule or schedule role) that earns the formula treatment.

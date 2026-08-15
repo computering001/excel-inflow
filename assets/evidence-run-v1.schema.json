@@ -29,7 +29,8 @@
     "company_name": { "type": "string", "minLength": 1 },
     "source_inventory": {
       "type": "array",
-      "minItems": 5,
+      "minItems": 2,
+      "description": "At minimum the controlled run carries company filing evidence and one debt export. Broker research is optional and therefore cannot determine this lower bound.",
       "items": { "$ref": "#/$defs/source" }
     },
     "retrieval_log": {

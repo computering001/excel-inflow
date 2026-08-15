@@ -57,6 +57,27 @@ function canonicalCompactSha256(value) {
   return sha256(Buffer.from(`${JSON.stringify(canonicalise(value))}\n`, "utf8"));
 }
 
+function compactControllerState(state) {
+  return Object.fromEntries(
+    [
+      "schema_version", "run_id", "pipeline_status", "user_blocking",
+      "blocker_class", "runtime_closure_sha256", "cache_key",
+      "artifact_sha256", "fixed_point", "summary",
+    ]
+      .filter((key) => state?.[key] !== undefined)
+      .map((key) => [key, structuredClone(state[key])]),
+  );
+}
+
+function contentAddressedReference(artifact, kind) {
+  return {
+    schema_version: "content-addressed-artifact-ref/1.0",
+    kind,
+    sha256: artifact.sha256,
+    byte_length: artifact.bytes.length,
+  };
+}
+
 function verifyClosedBrokerWorkGraph(runState) {
   const graph = runState?.work_graph;
   if (!graph || typeof graph !== "object" || Array.isArray(graph)) {
@@ -1489,9 +1510,21 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   compilerLanes.broker_pack = structuredClone(
     compilerLanes.broker_pack ?? evidence.broker_pack ?? {},
   );
-  compilerLanes.broker_pack.raw_tables = workbookTables;
-  if (workbookPages.length > 0) {
+  const pageHouseIds = new Set(workbookPages.map((house) => house.house_id));
+  const completePageArchive =
+    workbookPages.length === packHouses.size &&
+    [...packHouses.keys()].every((houseId) => pageHouseIds.has(houseId)) &&
+    workbookPages.every((house) => (house.pages ?? []).length > 0);
+  if (completePageArchive) {
+    delete compilerLanes.broker_pack.raw_tables;
     compilerLanes.broker_pack.page_evidence = workbookPages;
+  } else {
+    // Non-page sources retain the legacy values-only projection until their
+    // adapter can render a complete immutable page archive. Never carry both:
+    // the calculation case owns one presentation reference, while the full
+    // source tables remain once in the evidence run.
+    delete compilerLanes.broker_pack.page_evidence;
+    compilerLanes.broker_pack.raw_tables = workbookTables;
   }
   compilerLanes.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
@@ -1514,18 +1547,35 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     compilerLanes.broker_pack.house_digests = houseDigests;
   }
   compilerLanes.broker_evidence = {
-    controller_state: structuredClone(runState.json),
-    extraction_bundle: structuredClone(extraction.json),
-    source_tables: structuredClone(sourceTables.json),
-    crosswalk: structuredClone(crosswalk.json),
-    crosswalk_receipt: structuredClone(receipt.json),
+    controller_state: compactControllerState(runState.json),
+    artifact_refs: {
+      extraction_bundle: contentAddressedReference(extraction, "broker_extraction_bundle"),
+      source_tables: contentAddressedReference(sourceTables, "broker_source_tables"),
+      crosswalk: contentAddressedReference(crosswalk, "broker_crosswalk"),
+      crosswalk_receipt: contentAddressedReference(receipt, "broker_crosswalk_receipt"),
+      ...(semanticReport
+        ? {
+            semantic_verification: contentAddressedReference(
+              semanticReport,
+              "broker_semantic_verification",
+            ),
+          }
+        : {}),
+      ...(degradedCloseReceipt
+        ? {
+            degraded_close_receipt: contentAddressedReference(
+              degradedCloseReceipt,
+              "broker_degraded_close_receipt",
+            ),
+          }
+        : {}),
+    },
     ...(semanticReport
-      ? { semantic_verification: structuredClone(semanticReport.json) }
+      ? { semantic_status: semanticReport.json.status }
       : {}),
     ...(degradedCloseReceipt
-      ? { degraded_close_receipt: structuredClone(degradedCloseReceipt.json) }
+      ? { degraded_close_status: degradedCloseReceipt.json.status }
       : {}),
-    workbook_table_projection: structuredClone(workbookTables),
   };
   return {
     broker_run_state_sha256: runState.sha256,
@@ -1812,15 +1862,18 @@ export async function compileDcsEvidence({
     }
   }
   compilerLanes.dcs = {
-    controller_state: structuredClone(runState.json),
-    source_tables: structuredClone(sourceTables.json),
-    candidate_manifest: structuredClone(manifest.json),
-    crosswalk: structuredClone(crosswalk.json),
-    projection: structuredClone(projection.json),
-    compiler_receipt: structuredClone(receipt.json),
-    independent_verification: structuredClone(independent.json),
-    dcs_export: structuredClone(projection.json.dcs_export),
-    term_authorities: structuredClone(projection.json.term_authorities),
+    controller_state: compactControllerState(runState.json),
+    artifact_refs: {
+      source_tables: contentAddressedReference(sourceTables, "dcs_source_tables"),
+      candidate_manifest: contentAddressedReference(manifest, "dcs_candidate_manifest"),
+      crosswalk: contentAddressedReference(crosswalk, "dcs_crosswalk"),
+      projection: contentAddressedReference(projection, "dcs_projection"),
+      compiler_receipt: contentAddressedReference(receipt, "dcs_evidence_receipt"),
+      independent_verification: contentAddressedReference(
+        independent,
+        "dcs_independent_verification",
+      ),
+    },
     instrument_authority_contract_version: "dcs_evidence_v1",
   };
   return {

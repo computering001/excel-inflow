@@ -16,11 +16,19 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["node_id", "method", "selected_candidate_id", "source_bindings", "fallback_trace", "status"],
+        "required": ["node_id", "method", "selected_candidate_id", "selected_state", "selected_candidate", "source_bindings", "fallback_trace", "status"],
         "properties": {
           "node_id": { "type": "string", "minLength": 1 },
           "method": { "type": "string", "minLength": 1 },
           "selected_candidate_id": { "type": ["string", "null"] },
+          "selected_state": {
+            "description": "The complete resolved forecast state owned by this contract. Null only for contractual debt terms, which are materialised by the instrument authority compiler.",
+            "type": ["object", "null"]
+          },
+          "selected_candidate": {
+            "description": "The complete selected candidate needed to materialise provenance, formula and capture semantics without consulting the pre-contract candidate ledger.",
+            "type": ["object", "null"]
+          },
           "source_bindings": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
           "fallback_trace": { "type": "array", "items": { "type": "string", "minLength": 1 } },
           "status": { "enum": ["SELECTED", "STRUCTURAL", "CAPTURED", "INPUT_REQUIRED"] }

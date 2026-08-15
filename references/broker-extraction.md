@@ -295,7 +295,7 @@ linear components and does not execute.
 
 The compiler must prove:
 
-- three to ten distinct houses;
+- zero to ten distinct houses; a zero-house pack is an explicit no-broker-authority result and the forecast waterfall continues;
 - exactly three forecast periods;
 - no duplicate house/metric/period writer;
 - every referenced source cell exists and belongs to the same house;

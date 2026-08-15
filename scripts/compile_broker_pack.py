@@ -967,8 +967,8 @@ def main() -> int:
             print(json.dumps({"status": "BLOCKED", "total_violation_count": total}, sort_keys=True))
             return 2
 
-    if not 3 <= len(documents_by_house) <= 10:
-        raise ValueError("A production broker pack requires 3-10 distinct houses.")
+    if len(documents_by_house) > 10:
+        raise ValueError("A production broker pack permits at most 10 distinct houses; zero broker authority is valid.")
     metrics = crosswalk.get("metrics") or {}
 
     # ---------------------------------------------- the vocabulary is closed

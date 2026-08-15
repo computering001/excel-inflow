@@ -179,6 +179,7 @@ export function compileModelDemandGraph(modelCase) {
           node_kind: "forecast_state",
           section,
           concept_id: row.semantic_role ?? row.row_id,
+          source_line_ids: [...new Set(row.source_line_ids ?? [])].sort(),
           period_end: periods[index],
           required: material && authorityClass !== "captured",
           material,
@@ -213,6 +214,7 @@ export function compileModelDemandGraph(modelCase) {
       node_kind: "contractual_term",
       section: "debt_schedule",
       concept_id: authority.model_field,
+      source_line_ids: [],
       instrument_id: authority.instrument_id,
       period_end: null,
       required: true,
@@ -240,6 +242,49 @@ export function compileModelDemandGraph(modelCase) {
     },
   };
   return Object.freeze({ ...body, graph_sha256: digest(body) });
+}
+
+export function validatePreBrokerDemandCoverage(preBrokerDemand, modelDemandGraph) {
+  const errors = [];
+  if (preBrokerDemand?.schema_version !== "pre-broker-model-demand/1.0") {
+    errors.push("Pre-broker demand has the wrong schema version.");
+    return { valid: false, errors, matched_nodes: 0 };
+  }
+  const preBody = withoutHash(preBrokerDemand, "graph_sha256");
+  if (preBrokerDemand.graph_sha256 !== digest(preBody)) {
+    errors.push("Pre-broker demand has a stale canonical graph hash.");
+  }
+  if (
+    JSON.stringify(preBrokerDemand.forecast_periods ?? []) !==
+    JSON.stringify(modelDemandGraph?.forecast_periods ?? [])
+  ) {
+    errors.push("Pre-broker and final model demand use different forecast periods.");
+  }
+  const preKeys = new Set((preBrokerDemand.nodes ?? []).map(
+    (node) => `${node.section}\0${node.source_line_id}\0${node.period_end}`,
+  ));
+  const finalKeys = new Set();
+  for (const node of modelDemandGraph?.nodes ?? []) {
+    if (node.node_kind !== "forecast_state") continue;
+    for (const sourceLineId of node.source_line_ids ?? []) {
+      finalKeys.add(`${node.section}\0${sourceLineId}\0${node.period_end}`);
+    }
+  }
+  for (const key of preKeys) {
+    if (!finalKeys.has(key)) {
+      errors.push(`Filed model demand disappeared before final authority resolution: ${key.replaceAll("\0", ".")}.`);
+    }
+  }
+  for (const key of finalKeys) {
+    if (!preKeys.has(key)) {
+      errors.push(`Final filed demand was absent from the pre-broker graph: ${key.replaceAll("\0", ".")}.`);
+    }
+  }
+  return {
+    valid: errors.length === 0,
+    errors,
+    matched_nodes: [...preKeys].filter((key) => finalKeys.has(key)).length,
+  };
 }
 
 function demandQuarantines(evidenceRun) {
@@ -281,6 +326,8 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
         node_id: demand.node_id,
         method: "contractual_source",
         selected_candidate_id: demand.node_id,
+        selected_state: null,
+        selected_candidate: null,
         source_bindings: [],
         fallback_trace: [],
         status: "SELECTED",
@@ -291,6 +338,9 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
     const candidates = candidatesByState.get(demand.node_id) ?? [];
     const rejected = candidates.filter((candidate) => !candidate.selected);
     const method = state?.method ?? "unresolved";
+    const selectedCandidate = candidates.find(
+      (candidate) => candidate.candidate_id === state?.selected_candidate_id,
+    ) ?? null;
     const status = !state || state.status !== "RESOLVED"
       ? "INPUT_REQUIRED"
       : method === "not_separately_forecast"
@@ -302,6 +352,8 @@ export function compileSelectedAuthorityContract({ modelCase, forecastPlan, mode
       node_id: demand.node_id,
       method,
       selected_candidate_id: state?.selected_candidate_id ?? null,
+      selected_state: state ? structuredClone(state) : null,
+      selected_candidate: selectedCandidate ? structuredClone(selectedCandidate) : null,
       source_bindings: [...new Set(state?.source_bindings ?? [])].sort(),
       fallback_trace: rejected.map((candidate) =>
         `${candidate.candidate_id}:${candidate.rejection_reason ?? "not_selected"}`),
@@ -445,6 +497,28 @@ export function validateSelectedAuthorityContract(contract, { modelDemandGraph, 
   if (new Set(authorityIds).size !== authorityIds.length) errors.push("Selected-authority contract has duplicate node writers.");
   if (modelDemandGraph && (authorityIds.length !== demandIds.size || authorityIds.some((id) => !demandIds.has(id)))) {
     errors.push("Selected-authority contract does not cover the exact model-demand node set.");
+  }
+  for (const authority of contract?.authorities ?? []) {
+    const demand = (modelDemandGraph?.nodes ?? []).find(
+      (node) => node.node_id === authority.node_id,
+    );
+    if (demand?.node_kind === "contractual_term") {
+      if (authority.selected_state !== null || authority.selected_candidate !== null) {
+        errors.push(`${authority.node_id} is contractual and must not carry a forecast state or candidate.`);
+      }
+      continue;
+    }
+    if (!authority.selected_state || authority.selected_state.state_id !== authority.node_id) {
+      errors.push(`${authority.node_id} does not own its complete resolved forecast state.`);
+    }
+    if (
+      authority.selected_candidate_id !== null &&
+      (!authority.selected_candidate ||
+        authority.selected_candidate.candidate_id !== authority.selected_candidate_id ||
+        authority.selected_candidate.state_id !== authority.node_id)
+    ) {
+      errors.push(`${authority.node_id} does not own the selected candidate required for materialisation.`);
+    }
   }
   return { valid: errors.length === 0, errors };
 }

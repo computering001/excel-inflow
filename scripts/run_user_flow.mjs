@@ -50,7 +50,7 @@ import {
 import {
   compileForecastPlan,
   forecastPlanSha256,
-  materializeForecastPlan,
+  materializeSelectedAuthorityContract,
   validateForecastPlan,
   validateForecastPlanCaseParity,
 } from "./lib/forecast_candidate_compiler.mjs";
@@ -299,7 +299,13 @@ function stage4OuterTimeout(modelCase, explicit) {
     ...(modelCase?.statement_structure?.income_statement ?? []),
     ...(modelCase?.statement_structure?.cash_flow ?? []),
   ].length;
-  const brokerHouses = Object.keys(modelCase?.broker_pack?.raw_tables ?? {}).length;
+  const brokerHouses = Math.max(
+    (modelCase?.broker_pack?.houses ?? []).length,
+    (modelCase?.broker_pack?.page_evidence ?? []).length,
+    Array.isArray(modelCase?.broker_pack?.raw_tables)
+      ? modelCase.broker_pack.raw_tables.length
+      : Object.keys(modelCase?.broker_pack?.raw_tables ?? {}).length,
+  );
   const instruments = (modelCase?.instruments ?? []).length;
   // The inner controller owns leaf-level dynamic timeouts and resumable
   // checkpoints. The outer shell must outlive the worst single inner leaf,
@@ -1527,7 +1533,10 @@ async function main() {
         },
       });
     }
-    answeredCase = materializeForecastPlan(planningCase, forecastPlan);
+    answeredCase = materializeSelectedAuthorityContract(
+      planningCase,
+      selectedAuthorityContract,
+    );
     answeredCase.model_demand_graph_sha256 = modelDemandGraph.graph_sha256;
     answeredCase.selected_authority_contract_sha256 =
       selectedAuthorityContract.contract_sha256;

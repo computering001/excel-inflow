@@ -25,6 +25,7 @@ from broker_terminal_recovery import (
     analyse_terminal_recovery,
     apply_terminal_review,
     automatic_negative_consumption_review,
+    compile_demand_selected_crosswalk,
     compile_reference_only_crosswalk,
     degrade_all_broker_authority,
     degrade_finding_houses,
@@ -1049,6 +1050,21 @@ def main() -> int:
     request = read_json(request_path, "broker extraction request")
     if request.get("schema_version") != "broker-extraction-request/1.0":
         raise ValueError("The broker extraction request has the wrong schema version.")
+    model_context = request.get("model_context")
+    if isinstance(model_context, dict):
+        demand_graph = model_context.get("model_demand_graph")
+        if not isinstance(demand_graph, dict):
+            raise ValueError("Broker model_context lacks the pre-broker model-demand graph.")
+        if demand_graph.get("schema_version") != "pre-broker-model-demand/1.0":
+            raise ValueError("Broker model_context carries the wrong demand-graph version.")
+        demand_body = {
+            key: value for key, value in demand_graph.items()
+            if key != "graph_sha256"
+        }
+        if demand_graph.get("graph_sha256") != sha256_bytes(canonical_bytes(demand_body)):
+            raise ValueError("Broker model_context demand graph has a stale canonical hash.")
+        if demand_graph.get("forecast_periods") != model_context.get("forecast_periods"):
+            raise ValueError("Broker model_context period basis differs from its demand graph.")
     run_id = str(request.get("run_id") or "")
     request_digest = sha256_file(request_path)
     runtime_digest, _runtime_members = runtime_closure()
@@ -1623,30 +1639,44 @@ def main() -> int:
     crosswalk = Path(args.crosswalk).resolve() if args.crosswalk else None
     if not crosswalk or not crosswalk.is_file():
         if isinstance(request.get("model_context"), dict):
-            reference_shell = compile_reference_only_crosswalk(
-                active_bundle, request["model_context"]
+            bundle_digest = sha256_file(active_bundle_path)
+            selected_crosswalk, selection_receipt = compile_demand_selected_crosswalk(
+                active_bundle,
+                request["model_context"],
+                bundle_sha256=bundle_digest,
             )
-            shell_hash = sha256_bytes(canonical_bytes(reference_shell))
-            zero_crosswalk, zero_receipt, zero_semantic = degrade_all_broker_authority(
-                bundle=active_bundle,
-                crosswalk=reference_shell,
-                bundle_sha256=sha256_file(active_bundle_path),
-                source_crosswalk_sha256=shell_hash,
-                reason=(
-                    "No model-host semantic crosswalk was available; preserve all broker "
-                    "evidence and continue with zero broker model authority."
-                ),
-            )
-            crosswalk = output_root / f"zero-authority-crosswalk-{key}-{shell_hash[:12]}.json"
-            zero_receipt_path = output_root / f"zero-authority-crosswalk-{key}-{shell_hash[:12]}.receipt.json"
-            zero_semantic_path = output_root / f"zero-authority-terminal-semantic-{key}-{shell_hash[:12]}.json"
-            atomic_json(crosswalk, zero_crosswalk)
-            atomic_json(zero_receipt_path, zero_receipt)
-            atomic_json(zero_semantic_path, zero_semantic)
-            artifacts["crosswalk"] = str(crosswalk)
-            artifacts["zero_authority_receipt"] = str(zero_receipt_path)
-            artifacts["terminal_recovery_receipt"] = str(zero_receipt_path)
-            lane_degraded = True
+            shell_hash = sha256_bytes(canonical_bytes(selected_crosswalk))
+            if selected_crosswalk.get("mappings"):
+                crosswalk = output_root / f"demand-selected-crosswalk-{key}-{shell_hash[:12]}.json"
+                selection_receipt_path = output_root / f"demand-selected-crosswalk-{key}-{shell_hash[:12]}.receipt.json"
+                atomic_json(crosswalk, selected_crosswalk)
+                atomic_json(selection_receipt_path, selection_receipt)
+                artifacts["crosswalk"] = str(crosswalk)
+                artifacts["demand_selected_crosswalk_receipt"] = str(selection_receipt_path)
+                if (selected_crosswalk.get("terminal_recovery") or {}).get("quarantined_candidates"):
+                    artifacts["terminal_recovery_receipt"] = str(selection_receipt_path)
+                    lane_degraded = True
+            else:
+                zero_crosswalk, zero_receipt, zero_semantic = degrade_all_broker_authority(
+                    bundle=active_bundle,
+                    crosswalk=selected_crosswalk,
+                    bundle_sha256=bundle_digest,
+                    source_crosswalk_sha256=shell_hash,
+                    reason=(
+                        "No source row met the exact demand, period and unit contract; preserve all "
+                        "broker evidence and continue with zero broker model authority."
+                    ),
+                )
+                crosswalk = output_root / f"zero-authority-crosswalk-{key}-{shell_hash[:12]}.json"
+                zero_receipt_path = output_root / f"zero-authority-crosswalk-{key}-{shell_hash[:12]}.receipt.json"
+                zero_semantic_path = output_root / f"zero-authority-terminal-semantic-{key}-{shell_hash[:12]}.json"
+                atomic_json(crosswalk, zero_crosswalk)
+                atomic_json(zero_receipt_path, zero_receipt)
+                atomic_json(zero_semantic_path, zero_semantic)
+                artifacts["crosswalk"] = str(crosswalk)
+                artifacts["zero_authority_receipt"] = str(zero_receipt_path)
+                artifacts["terminal_recovery_receipt"] = str(zero_receipt_path)
+                lane_degraded = True
             checkpoint(
                 checkpoints, stage="semantic_crosswalk", status="PASS",
                 input_digest=sha256_file(active_bundle_path), output=crosswalk, reused=False,
@@ -1661,6 +1691,7 @@ def main() -> int:
                     "task_kind": "semantic_crosswalk_review",
                     "verified_bundle": str(active_bundle_path),
                     "candidate_manifest_sha256": sha256_bytes(canonical_bytes(active_bundle.get("candidate_manifest"))),
+                    "model_demand_graph": request.get("model_context", {}).get("model_demand_graph"),
                     "instruction": "Author a selected-cell crosswalk only for model-demand nodes. Unselected rows remain preserved evidence and never block delivery.",
                 }],
                 summary={"candidate_count": len(active_bundle.get("candidate_manifest", {}).get("candidates", []))},
@@ -2005,6 +2036,9 @@ def main() -> int:
         "primary_eligible_house_count": eligibility.get("primary_eligible_house_count", 0),
         "supplemental_eligible_house_count": eligibility.get("supplemental_eligible_house_count", 0),
         "recommended_primary_house_id": pack.get("recommended_primary_house_id"),
+        "model_demand_graph_sha256": (
+            (request.get("model_context") or {}).get("model_demand_graph") or {}
+        ).get("graph_sha256"),
         "continuation_status": (
             "PRIMARY_AUTHORITY_AVAILABLE"
             if eligibility.get("run_can_continue_without_broker_question")

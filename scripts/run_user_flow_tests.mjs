@@ -234,6 +234,24 @@ await test("no-question production path pauses after decisions", async () => {
   );
 });
 
+await test("run carrier references the canonical evidence snapshot without copying it", async () => {
+  const runDir = path.join(out, "clean-run");
+  const carrier = JSON.parse(
+    await fs.readFile(path.join(runDir, "run-carrier.json"), "utf8"),
+  );
+  assert(
+    carrier.files?.evidence_run?.path === "stages/inputs/evidence-run.json",
+    `carrier points at a duplicate evidence payload: ${carrier.files?.evidence_run?.path}`,
+  );
+  let duplicateExists = true;
+  try {
+    await fs.access(path.join(runDir, "carrier", "evidence-run.json"));
+  } catch {
+    duplicateExists = false;
+  }
+  assert(!duplicateExists, "carrier copied the full evidence envelope a second time");
+});
+
 await test("identical restart reuses all completed stages", async () => {
   const result = await flow(cleanEvidence, path.join(out, "clean-run"), ["--stop-after", "decisions"]);
   assert(

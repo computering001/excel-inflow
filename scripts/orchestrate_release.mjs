@@ -130,6 +130,32 @@ async function workbookExecutionPolicy(workbook) {
   };
 }
 
+async function visibleWorkbookSheets(python, workbook) {
+  const probe = await command(python.path, [
+    "-c",
+    [
+      "import json,sys",
+      "from openpyxl import load_workbook",
+      "book=load_workbook(sys.argv[1], read_only=True, data_only=False)",
+      "print(json.dumps([sheet.title for sheet in book.worksheets if sheet.sheet_state == 'visible']))",
+      "book.close()",
+    ].join(";"),
+    workbook,
+  ], { timeout: 60_000 });
+  if (!probe.ok) {
+    throw new Error(`Visible-sheet inventory failed: ${(probe.stderr || probe.stdout).slice(-2000)}`);
+  }
+  const sheets = JSON.parse(probe.stdout.trim());
+  if (!Array.isArray(sheets) || sheets.length === 0 || sheets.some((item) => typeof item !== "string" || !item)) {
+    throw new Error("Visible-sheet inventory returned no usable sheet names.");
+  }
+  return sheets;
+}
+
+function renderLeafId(index) {
+  return `render_sheet_${String(index + 1).padStart(2, "0")}`;
+}
+
 async function resolveSoffice(explicit) {
   const candidates = [
     explicit,
@@ -928,43 +954,108 @@ async function main() {
   const rowMap = await json(`${patchedWorkbook}.row-map.json`);
   const baselineCase = { maximal: "standard-maximal", net_cash: "standard-net-cash" }[rowMap.authority_profile];
   if (!baselineCase) return fail("N14 is BLOCKED: the row map does not resolve to an approved reusable visual authority.", { authority_profile: rowMap.authority_profile ?? null });
+  const visibleSheets = await visibleWorkbookSheets(python, patchedWorkbook);
+  const renderLeafIds = [];
+  const renderLeafDirectories = [];
+  for (let index = 0; index < visibleSheets.length; index += 1) {
+    const sheetName = visibleSheets[index];
+    const leafId = renderLeafId(index);
+    const leafDir = store.workDir(leafId);
+    const leafIndex = path.join(leafDir, "render-evidence-index.json");
+    step = await checkpoint({
+      id: leafId,
+      recipe: "release-structural-render-sheet/1.0",
+      inputs: {
+        workbook: await hashFile(patchedWorkbook),
+        row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
+        verify_receipt: checkpointReceipts.verify_aggregate,
+        code: source.render,
+        render_mode: hashValue("structural-only-no-pixel-baseline"),
+        baseline_case: hashValue(baselineCase),
+        sheet: hashValue(sheetName),
+        python: python.identity,
+        soffice: soffice.identity,
+      },
+      outputs: { render_directory: { path: leafDir, kind: "directory" } },
+      action: async (workDir) => {
+        const rendered = await command(python.path, [
+          path.join(HERE, "render", "check_render.py"),
+          patchedWorkbook,
+          "--out", workDir,
+          "--sheet", sheetName,
+          "--baseline-case", baselineCase,
+          "--structural-only",
+          "--soffice", soffice.path,
+          "--timeout", String(Math.max(60, Math.floor(executionPolicy.timeout_ms / 1000))),
+        ], { timeout: executionPolicy.timeout_ms + 60_000 });
+        if (!rendered.ok) {
+          return fail(`N14 render validation failed for ${sheetName}.`, {
+            stdout: rendered.stdout.slice(-4000),
+            stderr: rendered.stderr.slice(-4000),
+          });
+        }
+        const indexReport = await json(leafIndex);
+        const entry = (indexReport.cases ?? [])[0];
+        if (
+          (indexReport.cases ?? []).length !== 1 ||
+          entry?.verdict !== "PASS" ||
+          JSON.stringify(entry?.sheets_examined ?? []) !== JSON.stringify([sheetName])
+        ) {
+          return fail(`N14 render evidence did not prove exactly ${sheetName}.`, {
+            cases: indexReport.cases ?? [],
+          });
+        }
+        return {
+          status: "PASS",
+          detail: {
+            sheet: sheetName,
+            page_count: entry.page_count_total ?? entry.page_count ?? null,
+            execution: executionPolicy,
+          },
+        };
+      },
+    });
+    if (!step.ok) return step.result;
+    renderLeafIds.push(leafId);
+    renderLeafDirectories.push({ id: leafId, sheet: sheetName, path: leafDir });
+  }
   const renderDir = store.workDir("render");
   const renderIndex = path.join(renderDir, "render-evidence-index.json");
   step = await checkpoint({
     id: "render",
-    recipe: "release-structural-render/1.0",
+    recipe: "release-structural-render-aggregate/2.0",
     inputs: {
-      workbook: await hashFile(patchedWorkbook),
-      row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
-      verify_receipt: checkpointReceipts.verify_aggregate,
-      code: source.render,
-      render_mode: hashValue("structural-only-no-pixel-baseline"),
-      baseline_case: hashValue(baselineCase),
-      python: python.identity,
-      soffice: soffice.identity,
+      ...Object.fromEntries(renderLeafIds.map((id) => [id, checkpointReceipts[id]])),
+      visible_sheets: hashValue(visibleSheets),
     },
     outputs: { render_directory: { path: renderDir, kind: "directory" } },
     action: async (workDir) => {
-      const rendered = await command(python.path, [
-        path.join(HERE, "render", "check_render.py"),
-        patchedWorkbook,
-        "--out", workDir,
-        "--baseline-case", baselineCase,
-        "--structural-only",
-        "--soffice", soffice.path,
-        "--timeout", String(Math.max(60, Math.floor(executionPolicy.timeout_ms / 1000))),
-      ], { timeout: executionPolicy.timeout_ms + 60000 });
-      if (!rendered.ok) return fail("N14 render validation failed or was blocked.", { stdout: rendered.stdout.slice(-4000), stderr: rendered.stderr.slice(-4000) });
-      const index = await json(renderIndex);
-      if ((index.cases ?? []).length === 0 || index.cases.some((entry) => entry.verdict !== "PASS")) {
-        return fail("N14 render evidence did not return PASS for every visible sheet.", { cases: index.cases ?? [] });
+      const cases = [];
+      for (const leaf of renderLeafDirectories) {
+        const target = path.join(workDir, leaf.id);
+        await fs.cp(leaf.path, target, { recursive: true });
+        const leafIndex = await json(path.join(target, "render-evidence-index.json"));
+        const entry = (leafIndex.cases ?? [])[0];
+        if (!entry || entry.verdict !== "PASS") {
+          return fail(`N14 aggregate found a non-PASS render leaf for ${leaf.sheet}.`, {
+            entry: entry ?? null,
+          });
+        }
+        cases.push({ ...entry, evidence_root: leaf.id });
       }
+      await writeIsolationJson(renderIndex, {
+        schema: "render-evidence-index/2",
+        aggregation: "per-visible-sheet-resumable/1.0",
+        visible_sheets: visibleSheets,
+        cases,
+      });
       return {
         status: "PASS",
         detail: {
           baseline_case: baselineCase,
           mode: "structural-only-no-pixel-baseline",
-          cases: index.cases.length,
+          cases: cases.length,
+          sheets: visibleSheets,
           execution: executionPolicy,
         },
       };
@@ -1114,7 +1205,11 @@ async function main() {
     checkpointing: {
       controller: RELEASE_CHECKPOINT_CONTROLLER,
       workspace_bound_resume: true,
-      order: CHECKPOINT_ORDER,
+      order: [
+        ...CHECKPOINT_ORDER.slice(0, CHECKPOINT_ORDER.indexOf("render")),
+        ...renderLeafIds,
+        ...CHECKPOINT_ORDER.slice(CHECKPOINT_ORDER.indexOf("render")),
+      ],
       reused: reusedCheckpoints,
       executed: executedCheckpoints,
       receipts: checkpointReceipts,
