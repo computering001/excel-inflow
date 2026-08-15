@@ -112,8 +112,10 @@ Release begins only after the frozen local cohort is clean. Run, in order:
 9. exact release manifest and closure digest, recorded only when steps 7-8 are
    bound to that digest and pass;
 10. versioned candidate installation without overwriting rollback;
-11. fresh-session installed identity and behavior parity;
-12. representative installed workbook creation and native Excel review; and
+11. fresh-session installed identity and active-pointer verification, without
+    starting a company run or building a workbook;
+12. explicitly authorised installed behaviour parity and any native Excel
+    review as a separate post-install gate; and
 13. one explicit production promotion.
 
 ## Development gate selection

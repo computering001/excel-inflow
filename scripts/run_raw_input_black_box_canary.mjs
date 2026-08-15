@@ -9,9 +9,17 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { validateJsonSchema } from "./lib/json_schema.mjs";
+
 const exec = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
+const realFilingExpectationsSchema = JSON.parse(
+  await fs.readFile(
+    path.join(root, "assets", "real-filing-canary-expectations-v1.schema.json"),
+    "utf8",
+  ),
+);
 const cleanPath = path.resolve(process.argv[2] ?? "");
 const python = path.resolve(process.argv[3] ?? process.env.EXCEL_INFLOW_TEST_PYTHON ?? "python3");
 const soffice = path.resolve(process.argv[4] ?? process.env.SOFFICE_BIN ?? "soffice");
@@ -27,7 +35,8 @@ if (!process.argv[2]) {
   throw new Error(
     "Usage: node scripts/run_raw_input_black_box_canary.mjs " +
     "<clean-evidence-fixture.json> <python> <soffice> " +
-    "[--real-filings-request <request.json> --expected-income-rows <n> --expected-cash-rows <n>]",
+    "[--real-filings-request <request.json> " +
+    "--real-filings-expectations <run-scoped-expectations.json>]",
   );
 }
 const clean = JSON.parse(await fs.readFile(cleanPath, "utf8"));
@@ -54,6 +63,8 @@ let annualReport;
 let filingFacts;
 let companyName = clean.company_name;
 let rawFilingKind = "generated_complete_face_statements";
+let realFilingExpectations = null;
+let realFilingExpectationsSha256 = null;
 const restate = (section, sourceLineId, values) => {
   const row = rawFilingRows[section].find((item) => item.source_line_id === sourceLineId);
   if (!row) throw new Error(`Raw canary fixture lacks ${section}.${sourceLineId}`);
@@ -62,6 +73,25 @@ const restate = (section, sourceLineId, values) => {
 if (options["real-filings-request"]) {
   const realRequestPath = path.resolve(String(options["real-filings-request"]));
   const realRequest = JSON.parse(await fs.readFile(realRequestPath, "utf8"));
+  if (!options["real-filings-expectations"]) {
+    throw new Error(
+      "Real filings canary requires --real-filings-expectations so company-specific " +
+      "assertions remain outside the company-neutral runtime and test registry.",
+    );
+  }
+  const expectationsPath = path.resolve(String(options["real-filings-expectations"]));
+  const expectationsBytes = await fs.readFile(expectationsPath);
+  realFilingExpectations = JSON.parse(expectationsBytes.toString("utf8"));
+  realFilingExpectationsSha256 = sha256(expectationsBytes);
+  const expectationErrors = validateJsonSchema(
+    realFilingExpectations,
+    realFilingExpectationsSchema,
+  );
+  if (expectationErrors.length > 0) {
+    throw new Error(
+      `Real filings canary expectations are invalid: ${expectationErrors.join("; ")}`,
+    );
+  }
   if (realRequest.schema_version !== "filings-extraction-request/1.0") {
     throw new Error("Real filings canary request has the wrong schema version.");
   }
@@ -70,23 +100,23 @@ if (options["real-filings-request"]) {
   }
   annualReport = path.resolve(path.dirname(realRequestPath), realRequest.documents[0].path);
   filingFacts = structuredClone(realRequest.filing_facts);
-  if (options["historical-gross-debt"]) {
-    const historicalGrossDebt = String(options["historical-gross-debt"])
-      .split(",")
-      .map((value) => Number(value.trim()));
-    if (historicalGrossDebt.length !== 3 || !historicalGrossDebt.every(Number.isFinite)) {
-      throw new Error("--historical-gross-debt requires three comma-separated numbers.");
-    }
-    filingFacts.historical_gross_debt = historicalGrossDebt;
+  const historicalGrossDebt = realFilingExpectations.historical_gross_debt;
+  if (
+    !Array.isArray(historicalGrossDebt) ||
+    historicalGrossDebt.length !== 3 ||
+    !historicalGrossDebt.every(Number.isFinite)
+  ) {
+    throw new Error("Real filings canary expectations require three historical gross-debt values.");
   }
+  filingFacts.historical_gross_debt = historicalGrossDebt;
   companyName = filingFacts.entity_name;
   rawFilingKind = "real_uploaded_annual_report";
   rawStatementCounts = {
-    income_statement: Number(options["expected-income-rows"]),
-    cash_flow: Number(options["expected-cash-rows"]),
+    income_statement: Number(realFilingExpectations.source_statement_rows?.income_statement),
+    cash_flow: Number(realFilingExpectations.source_statement_rows?.cash_flow),
   };
   if (!Object.values(rawStatementCounts).every((value) => Number.isInteger(value) && value > 0)) {
-    throw new Error("Real filings canary requires positive expected statement row counts.");
+    throw new Error("Real filings canary expectations require positive source statement row counts.");
   }
 } else {
   rawFilingRows = {
@@ -547,16 +577,17 @@ if (rawFilingKind === "generated_complete_face_statements") {
   const missingRequiredRows = requiredModelRows
     .filter(([section, rowId]) => !visibleBySection[section].has(rowId))
     .map(([section, rowId]) => `${section}.${rowId}`);
+  const minimumVisibleRows = realFilingExpectations.minimum_visible_rows ?? rawStatementCounts;
   if (
     rowMap.authority_profile !== "maximal" ||
     Number(rowMap.visible_end_row) <= 140 ||
-    visibleBySection.income_statement.size < rawStatementCounts.income_statement ||
-    visibleBySection.cash_flow.size < rawStatementCounts.cash_flow ||
+    visibleBySection.income_statement.size < Number(minimumVisibleRows.income_statement) ||
+    visibleBySection.cash_flow.size < Number(minimumVisibleRows.cash_flow) ||
     missingFiledRows.length > 0 ||
     missingRequiredRows.length > 0
   ) {
     throw new Error(
-      "Real Astra canary collapsed its maximal statement surface: " +
+      "Real-filing canary collapsed its maximal statement surface: " +
       JSON.stringify({ missingFiledRows, missingRequiredRows }),
     );
   }
@@ -565,6 +596,13 @@ console.log(JSON.stringify({
   schema_version: "raw-input-black-box-canary/1.0",
   status: "PASS",
   raw_filing_kind: rawFilingKind,
+  real_filing_expectations: realFilingExpectations
+    ? {
+        schema_version: realFilingExpectations.schema_version,
+        fixture_id: realFilingExpectations.fixture_id,
+        sha256: realFilingExpectationsSha256,
+      }
+    : null,
   public_entrypoint: "scripts/run_excel_inflow_vnext.mjs",
   preauthored_statement_map: false,
   preauthored_compiler_lanes: false,

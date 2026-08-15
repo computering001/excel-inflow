@@ -323,14 +323,16 @@
         "$SOFFICE",
         "--real-filings-request",
         "$REAL_FILINGS_REQUEST",
-        "--expected-income-rows",
-        "20",
-        "--expected-cash-rows",
-        "45",
-        "--historical-gross-debt",
-        "27494,28843,27819"
+        "--real-filings-expectations",
+        "$REAL_FILINGS_EXPECTATIONS"
       ],
-      "requires": ["RAW_CANARY_EVIDENCE", "PYTHON", "SOFFICE", "REAL_FILINGS_REQUEST"]
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE",
+        "REAL_FILINGS_REQUEST",
+        "REAL_FILINGS_EXPECTATIONS"
+      ]
     },
     {
       "id": "case-compiler-equivalence",

@@ -772,16 +772,24 @@ must be locatable, and clipping, overlap, fonts, pagination, alignment and
 conditional formatting remain fail-closed. Do not pixel-diff arbitrary company
 labels and values against the example company's pixels.
 
-Installed parity is transitive and non-vacuous: first validate each physical
-authority against the portable design contract; then prove the frozen local
-canary against that authority; then require the installed host to produce the
-same canonical workbook package and a PASS structural render with the same
-visible sheets and pagination. Canonical identity covers semantic row maps,
-formula and value content, styles, comments and every non-volatile package
-relationship after masking the closed set of producer-assigned relationship
-identifiers. Raw archive-byte identity may be reported only when the producer
-is itself byte-deterministic; it is never substituted for canonical parity.
-This is the deployment-host gate and needs no PNG upload.
+Installation verification and installed behaviour proof are separate gates.
+Before activation, the deployment host verifies only the immutable source
+commit and tree, every retrieved blob, compiled package membership and closure,
+the versioned install destination, the active pointer and the retained rollback.
+It must not start a company run, ingest an issuer filing, build a workbook or
+alter a canary. The complete cohort, raw-input black-box canary and clean-root
+workbook smoke belong to the source-owned local release gate that produced the
+immutable candidate.
+
+Installed behaviour proof is a later, explicitly authorised fresh-session run.
+It exercises the ordinary public controller and its per-run validation gates;
+it is never smuggled into installation. When the requested hand-off is the
+`run excel inflow` prompt, open a fresh chat, enter that exact prompt without
+submitting it, and stop. Canonical workbook identity, when an installed run is
+authorised, covers semantic row maps, formula and value content, styles,
+comments and every non-volatile package relationship after masking the closed
+set of producer-assigned relationship identifiers. Raw archive-byte identity
+may be reported only when the producer is itself byte-deterministic.
 
 Exact pixel comparison remains a separate **local** release-certification gate.
 It replays the two frozen shipping-path profiles against a matching independently
