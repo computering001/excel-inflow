@@ -863,13 +863,19 @@ export function statementAuthorityChecks(modelCase) {
         historicalValues.every(
           (value) => value !== null && value !== undefined && finite(value),
         );
+      const hasFiledSeries =
+        historicalValues.length === 3 &&
+        historicalValues.every(
+          (value) => value === null || (value !== undefined && finite(value)),
+        ) &&
+        historicalValues.some((value) => value !== null && finite(value));
       const refs = row.calculation?.refs ?? [];
-      if (authority === "source_input" && !hasThreeValues) {
+      if (authority === "source_input" && !hasFiledSeries) {
         checks.push(
           result(
             `${id}.source_input`,
             "BLOCK",
-            `${row.label} declares source_input but does not carry three filed historical values.`,
+            `${row.label} declares source_input but does not carry a three-period filed series (reported dashes may remain null).`,
           ),
         );
       }

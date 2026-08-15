@@ -891,6 +891,30 @@
         }
       }
     },
+    "broker_archive": {
+      "description": "Presentation-only custody for broker uploads. It may render Bxx evidence sheets but is never a source of model authority.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version"],
+      "properties": {
+        "schema_version": { "const": "broker-archive/1.0" },
+        "page_evidence": {
+          "$ref": "#/properties/broker_pack/properties/page_evidence"
+        },
+        "raw_tables": {
+          "$ref": "#/properties/broker_pack/properties/raw_tables"
+        },
+        "raw_documents": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      },
+      "anyOf": [
+        { "required": ["page_evidence"] },
+        { "required": ["raw_tables"] },
+        { "required": ["raw_documents"] }
+      ]
+    },
     "instruments": {
       "type": "array",
       "items": {

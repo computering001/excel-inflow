@@ -167,14 +167,18 @@ Require all of the following before `PASS`:
 - every detected table is retained separately rather than flattened into one
   arbitrary matrix;
 - every cell retains raw text, typed value, row, column and source reference;
-- native table numeric-token recall is 100%; missing and duplicate tokens are
-  empty;
-- every material raster/table page has two economically agreeing passes or a
+- each model-selected native table has a closed physical receipt; missing and
+  duplicate tokens outside selected authority remain disclosed archive census,
+  not a model gate;
+- every selected raster/table cell has two economically agreeing passes or a
   reviewed resolution bound to the page-image and exact conflict-manifest hash;
 - blanks, dashes, zeros, parentheses, percentages and multiples remain
   distinct;
 - table continuations, landscape pages, units and footnotes are preserved; and
-- a gate that visited zero pages, tables or cells cannot report success.
+- an archive gate that visited zero supplied pages, or an authority gate that
+  claims selected cells while visiting zero selected cells, cannot report
+  success. A lawful zero-authority close records zero selected cells while
+  proving that all supplied pages remain archived.
 
 Numeric recall is a completeness test, not a truth test. The semantic mapping
 still needs definition, units, period and sign review. Conversely, a clean
@@ -245,6 +249,14 @@ image is the audit surface, while the structured mapping is calculation
 authority. An unmapped EPS, valuation table or product row cannot stop a debt
 model that does not consume it.
 
+Demand-driven recovery is also house-bounded. Choose at most one deterministic
+coherent house for optional OCR/vision (latest supplied publication, stable
+house/document tie-break). Already clean native cells from other houses remain
+eligible, but ambiguous pages from those houses close archive-only rather than
+opening parallel recovery fronts. If the selected house cannot close within
+the finite cell budget, remove its broker authority and continue through the
+forecast waterfall; do not reconstruct every report before building.
+
 Each house's digest is compiled from these mappings automatically — dictionary
 order, the broker's verbatim caption, per-period values, verification grades and
 source locations — and preserved exactly from pack to case to workbook, where
@@ -308,8 +320,8 @@ The compiler must prove:
 - every referenced source cell exists and belongs to the same house;
 - the compiled value equals its declared components, constant and multiplier;
 - every normalized estimate retains publication and document metadata; and
-- every extracted table has exactly one semantic review;
-- every detected forecast candidate has exactly one reviewed disposition;
+- every model-selected table has a semantic review;
+- every selected forecast candidate has exactly one reviewed disposition;
 - every mapping is owned by at least one candidate and no model-selected
   candidate is unresolved;
 - a bounded-review terminal quarantine may close only immutable candidates
@@ -485,9 +497,9 @@ requires the existing independent dual-read, source-binding, period, unit and
 semantic gates. The skill does not bundle their model weights or compiled
 dependencies and must continue correctly when neither is installed.
 
-Pass the resulting broker pack, source tables, crosswalk and receipt into the
-attachment ingress `broker_evidence` declaration before compiling the evidence
-run. Do not hand-edit `model_case.broker_pack.raw_tables` or
+Pass the resulting broker pack, archive bundle, selected-cell crosswalk and
+receipt into attachment ingress before compiling the evidence run. Do not
+hand-edit `model_case.broker_pack`, `model_case.broker_archive` or
 `source_mappings`.
 
 ### External real-layout regression cohort

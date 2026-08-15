@@ -821,6 +821,49 @@ for (const name of files) {
       (counterpart.forecast_period_calculations ?? []).some(linksBack)
     );
   };
+  // Evidence-strengthening migration: older certified cases either omitted a
+  // filed row's provenance key or left it as an empty array. The compiler now
+  // mints the three historical receipts from the same sealed manifest and
+  // source-coverage edge that minted the row. This is justified only for an
+  // addition; any changed or removed certified receipt remains a hard diff.
+  // Broker selected-cell provenance is outside this rule.
+  const isFilingProvenanceStrengthening = (diff) => {
+    const match = /^provenance\.(.+)$/.exec(diff.path);
+    if (!match || !(diff.certifiedAbsent === true || diff.expected === "[]")) {
+      return false;
+    }
+    const rowId = match[1];
+    const entries = compiled.provenance?.[rowId];
+    if (!Array.isArray(entries) || entries.length !== 3) return false;
+    const periods = entries.map((entry) => Number(entry?.period_index)).sort();
+    if (JSON.stringify(periods) !== JSON.stringify([0, 1, 2])) return false;
+    for (const section of ["income_statement", "cash_flow"]) {
+      const row = (compiled.statement_structure?.[section] ?? []).find(
+        (candidate) => candidate.row_id === rowId,
+      );
+      // A later role recipe may turn the filed row into a visible link or
+      // ratio, but the source-coverage edge remains the proof that the added
+      // historical receipt came from this sealed disclosure.
+      if (!row) continue;
+      const disclosure = (compiled.source_coverage?.[section] ?? []).find(
+        (candidate) => (candidate.mapped_row_ids ?? []).includes(rowId),
+      );
+      const source = (evidence.face_statement_manifests?.[section] ?? [])
+        .flatMap((manifest) => (manifest.rows ?? []).map((line) => ({ manifest, line })))
+        .find(({ line }) => line.source_line_id === disclosure?.source_line_id);
+      if (!source) return false;
+      return entries.every((entry) =>
+        entry &&
+        entry.document === source.manifest.source_id &&
+        entry.source_label === source.line.raw_label &&
+        typeof entry.publication_date === "string" && entry.publication_date.length > 0 &&
+        typeof entry.page_or_note === "string" && entry.page_or_note.length > 0 &&
+        typeof entry.units === "string" && entry.units.length > 0 &&
+        entry.transformation === "Directly mapped from the sealed face-statement manifest."
+      );
+    }
+    return false;
+  };
   const isJustifiedAll = (diff) =>
     isJustified(diff) ||
     isFixtureReceipt(diff) ||
@@ -828,7 +871,8 @@ for (const name of files) {
     isDerivedHistoricalMaterialization(diff) ||
     isAuthorityMaterialisedValue(diff) ||
     isRelocatedLinkRule(diff) ||
-    isLinkDirectionSwap(diff);
+    isLinkDirectionSwap(diff) ||
+    isFilingProvenanceStrengthening(diff);
   const justified = allDiffs.filter(isJustifiedAll);
   // Presentation is compiler-owned convention, verified post-canonicalisation
   // by the plan clause; sealed-level presentation drift in the hand-authored

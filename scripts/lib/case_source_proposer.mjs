@@ -8,8 +8,8 @@ const CORE_ROLE_ALIASES = Object.freeze({
   income_statement: Object.freeze({
     revenue: ["revenue", "revenues", "turnover", "net sales", "total revenue"],
     gross_profit: ["gross profit"],
-    operating_profit: ["operating profit", "operating income"],
     ebit: ["ebit", "earnings before interest and tax", "earnings before interest and taxes"],
+    operating_profit: ["operating profit", "operating income"],
     adjusted_ebitda: ["adjusted ebitda", "core ebitda", "underlying ebitda"],
     depreciation_and_amortisation: [
       "depreciation and amortisation",
@@ -17,6 +17,8 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "depreciation amortization and impairment",
       "depreciation and amortization",
     ],
+    interest_income: ["finance income", "interest income"],
+    interest_expense: ["finance expense", "interest expense", "finance costs"],
     pre_tax_income: [
       "profit before tax",
       "profit before taxation",
@@ -51,17 +53,23 @@ const CORE_ROLE_ALIASES = Object.freeze({
     ],
     cash_from_operations: [
       "net cash from operating activities",
+      "net cash inflow from operating activities",
+      "net cash outflow from operating activities",
       "net cash provided by operating activities",
       "cash flow from operating activities",
     ],
     cash_generated_from_operations: ["cash generated from operations"],
     cash_from_investing: [
       "net cash from investing activities",
+      "net cash inflow from investing activities",
+      "net cash outflow from investing activities",
       "net cash used in investing activities",
       "cash flow from investing activities",
     ],
     cash_from_financing: [
       "net cash from financing activities",
+      "net cash inflow from financing activities",
+      "net cash outflow from financing activities",
       "net cash used in financing activities",
       "cash flow from financing activities",
     ],
@@ -72,15 +80,18 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "increase in cash and cash equivalents",
       "decrease in cash and cash equivalents",
       "net increase decrease in cash and cash equivalents",
+      "net increase decrease in cash and cash equivalents in the period",
     ],
     opening_cash: [
       "cash and cash equivalents at beginning of year",
       "cash and cash equivalents at beginning of period",
+      "cash and cash equivalents at the beginning of the period",
       "cash and cash equivalents at start of year",
     ],
     ending_cash: [
       "cash and cash equivalents at end of year",
       "cash and cash equivalents at end of period",
+      "cash and cash equivalents at the end of the period",
       "cash and cash equivalents at year end",
       "ending cash",
     ],
@@ -103,20 +114,72 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "repayments of lease liabilities",
       "lease principal payments",
       "lease principal repayment",
+      "repayment of obligations under leases",
     ],
     capex: [
       "capital expenditure",
       "capital expenditures",
-      "purchase of property plant and equipment",
-      "purchases of property plant and equipment",
-      "additions to property plant and equipment",
     ],
     dividends: ["dividends paid", "dividend paid"],
+    debt_issuance: [
+      "issue of loans and borrowings",
+      "proceeds from loans and borrowings",
+      "proceeds from issue of debt",
+      "debt issuance",
+    ],
+    debt_repayment: [
+      "repayment of loans and borrowings",
+      "repayments of loans and borrowings",
+      "repayment of debt",
+      "debt repayment",
+    ],
+    fx_effect_on_cash: [
+      "exchange rate effects",
+      "effect of exchange rate changes on cash and cash equivalents",
+      "effects of exchange rate changes on cash and cash equivalents",
+    ],
     share_buybacks: [
       "purchase of own shares",
       "purchases of own shares",
       "repurchase of shares",
       "share repurchases",
+    ],
+  }),
+});
+
+// Canonical structural ids are narrower than semantic roles. They let the
+// compiler recognise issuer-specific members of a required aggregate without
+// pretending that an individual member (for example PP&E purchases) is the
+// aggregate itself (total capex). Matching is exact after punctuation and
+// whitespace normalisation, so unfamiliar rows remain visible as filed.
+const CANONICAL_ROW_ID_ALIASES = Object.freeze({
+  cash_flow: Object.freeze({
+    receivables_movement: [
+      "increase in trade and other receivables",
+      "decrease in trade and other receivables",
+      "movement in trade and other receivables",
+      "increase in receivables",
+      "decrease in receivables",
+    ],
+    inventory_movement: [
+      "increase in inventories",
+      "decrease in inventories",
+      "movement in inventories",
+    ],
+    payables_provisions_movement: [
+      "increase in trade and other payables and provisions",
+      "decrease in trade and other payables and provisions",
+      "movement in trade and other payables and provisions",
+    ],
+    ppe_purchases: [
+      "purchase of property plant and equipment",
+      "purchases of property plant and equipment",
+      "additions to property plant and equipment",
+    ],
+    intangible_purchases: [
+      "purchase of intangible assets",
+      "purchases of intangible assets",
+      "additions to intangible assets",
     ],
   }),
 });
@@ -140,6 +203,14 @@ function sanitizeRowId(value, used) {
   }
   used.add(candidate);
   return candidate;
+}
+
+function canonicalRowId(section, label) {
+  const target = normalise(label);
+  for (const [rowId, aliases] of Object.entries(CANONICAL_ROW_ID_ALIASES[section] ?? {})) {
+    if (aliases.some((alias) => normalise(alias) === target)) return rowId;
+  }
+  return null;
 }
 
 function coreRole(section, label) {
@@ -206,8 +277,44 @@ function proposeSection(caseEvidence, section, used) {
     roleBySource.set(row.source_line_id, role);
     rowIdBySource.set(
       row.source_line_id,
-      sanitizeRowId(role ?? row.raw_label ?? row.source_line_id, used),
+      sanitizeRowId(
+        canonicalRowId(section, row.raw_label) ?? role ?? row.raw_label ?? row.source_line_id,
+        used,
+      ),
     );
+  }
+
+  // A filed operating-profit line is the model's EBIT authority when the
+  // issuer prints no distinct EBIT line. If both are printed, preserve both
+  // semantic nodes; collapsing them creates duplicate visible authority and
+  // destroys the reported reconciliation surface.
+  if (
+    section === "income_statement" &&
+    ![...roleBySource.values()].includes("ebit")
+  ) {
+    const operatingProfit = [...roleBySource.entries()].find(
+      ([, role]) => role === "operating_profit",
+    );
+    if (operatingProfit) {
+      roleBySource.set(operatingProfit[0], "ebit");
+    }
+  }
+  if (
+    section === "cash_flow" &&
+    ![...roleBySource.values()].includes("cash_flow_net_income")
+  ) {
+    const preTaxRoot = [...roleBySource.entries()].find(
+      ([, role]) => role === "cash_flow_profit_before_tax",
+    );
+    if (preTaxRoot) {
+      roleBySource.set(preTaxRoot[0], "cash_flow_net_income");
+      const previousRowId = rowIdBySource.get(preTaxRoot[0]);
+      if (previousRowId) used.delete(previousRowId);
+      rowIdBySource.set(
+        preTaxRoot[0],
+        sanitizeRowId("cash_flow_net_income", used),
+      );
+    }
   }
 
   return lines.map(({ row }) => {
@@ -344,4 +451,227 @@ export function proposeCaseSource({
   };
 }
 
-export default { proposeCaseSource };
+function firstMappedHistoricalSeries({ caseSource, caseEvidence, roles, absolute = false }) {
+  const roleSet = new Set(roles);
+  for (const section of SECTIONS) {
+    const mappings = new Map(
+      (caseSource?.statement_map?.[section] ?? [])
+        .filter((entry) => roleSet.has(entry?.role) || roleSet.has(entry?.row_id))
+        .map((entry) => [entry.source_line_id, entry]),
+    );
+    for (const { row } of manifestRows(caseEvidence, section)) {
+      if (!mappings.has(row.source_line_id)) continue;
+      const values = (row.values ?? []).slice(0, 3).map((value) =>
+        value === null || value === "" || !Number.isFinite(Number(value))
+          ? null
+          : absolute ? Math.abs(Number(value)) : Number(value),
+      );
+      if (values.some((value) => value !== null)) return values;
+    }
+  }
+  return [null, null, null];
+}
+
+function firstMappedHistoricalRecord({ caseSource, caseEvidence, roles }) {
+  const roleSet = new Set(roles);
+  for (const section of SECTIONS) {
+    const mapped = new Set(
+      (caseSource?.statement_map?.[section] ?? [])
+        .filter((entry) => roleSet.has(entry?.role) || roleSet.has(entry?.row_id))
+        .map((entry) => entry.source_line_id),
+    );
+    for (const { manifest, row } of manifestRows(caseEvidence, section)) {
+      if (mapped.has(row.source_line_id)) return { manifest, row };
+    }
+  }
+  return null;
+}
+
+function addSeries(left, right) {
+  return [0, 1, 2].map((index) =>
+    left?.[index] !== null && left?.[index] !== undefined &&
+      right?.[index] !== null && right?.[index] !== undefined &&
+      Number.isFinite(Number(left[index])) && Number.isFinite(Number(right[index]))
+      ? Number(left[index]) + Number(right[index])
+      : null,
+  );
+}
+
+function runtimeMetric(values, note) {
+  return {
+    values: [...values.slice(0, 3), null, null, null],
+    forecast_method: "derived_compatible",
+    source_kind: "company_reported",
+    note,
+  };
+}
+
+/**
+ * Project the minimum production evidence lanes from sealed upstream evidence.
+ *
+ * A first-run host is allowed to declare identity, policy choices and answers;
+ * it is not allowed to smuggle in a model-ready operating case.  This writer
+ * therefore derives statement-backed history, periods, cash and reconciliation
+ * lanes after the filing manifests and DCS projection have been validated.  It
+ * only fills absent runtime-owned lanes, preserving any independently sealed
+ * richer evidence already present on a rebuild.
+ */
+export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
+  if (!evidence?.case_evidence?.face_statement_manifests) {
+    throw new Error("Runtime evidence writing requires sealed face-statement manifests.");
+  }
+  const filings = evidence.filings ?? {};
+  const caseEvidence = evidence.case_evidence;
+  const lanes = caseEvidence.lanes ??= {};
+  const historicalPeriods = filings.historical_periods ?? [];
+  const forecastPeriods = filings.forecast_periods ?? [];
+  if (historicalPeriods.length !== 3 || forecastPeriods.length !== 3) {
+    throw new Error("Runtime evidence writing requires exactly three historical and three forecast periods.");
+  }
+
+  lanes.periods ??= [
+    ...historicalPeriods.map((date) => ({ date, status: "historical" })),
+    ...forecastPeriods.map((date) => ({ date, status: "forecast" })),
+  ];
+  lanes.modules ??= {
+    multi_currency: false,
+    historical_normalisation: false,
+    acquisition: false,
+  };
+  lanes.controls = {
+    broker_case: "Forecast Waterfall",
+    circularity: 1,
+    debt_maturities_roll: 1,
+    ...(lanes.controls ?? {}),
+  };
+  lanes.source_coverage_review ??= {
+    status: "complete",
+    reviewed_at: historicalPeriods.at(-1),
+    review_evidence:
+      "Compiler-owned coverage review of the complete sealed income-statement and cash-flow face-statement manifests.",
+  };
+
+  const revenue = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["revenue"],
+  });
+  const ebit = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["ebit", "operating_profit"],
+  });
+  const reportedAdjustedEbitda = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["adjusted_ebitda"],
+  });
+  const da = firstMappedHistoricalSeries({
+    caseSource,
+    caseEvidence,
+    roles: ["depreciation_and_amortisation", "cash_flow_da", "is_da_expense"],
+    absolute: true,
+  });
+  const adjustedEbitda = reportedAdjustedEbitda.some((value) => value !== null)
+    ? reportedAdjustedEbitda
+    : addSeries(ebit, da);
+  const workingCapital = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["change_in_working_capital"],
+  });
+  const capex = firstMappedHistoricalSeries({
+    caseSource,
+    caseEvidence,
+    roles: ["capex", "ppe_purchases", "intangible_purchases"],
+    absolute: true,
+  });
+  const tax = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["tax_expense", "cash_taxes"], absolute: true,
+  });
+  lanes.operating_metrics ??= {
+    revenue: runtimeMetric(revenue, "Historical values projected from the sealed filed revenue authority; forecasts are written by the authority resolver."),
+    adjusted_ebitda: runtimeMetric(adjustedEbitda, "Historical adjusted EBITDA is reported when present, otherwise the visible EBIT plus D&A bridge; forecasts are written by the authority resolver."),
+    depreciation_and_amortisation: runtimeMetric(da, "Historical D&A projected from the sealed filed statement authority; forecasts are written by the authority resolver."),
+    change_in_working_capital: runtimeMetric(workingCapital, "Historical working-capital movement projected from the sealed cash-flow authority; forecasts are written by the authority resolver."),
+    capex: runtimeMetric(capex, "Historical capex projected on the model outflow basis from the sealed cash-flow authority; forecasts are written by the authority resolver."),
+    tax: runtimeMetric(tax, "Historical tax projected on the model expense basis from the sealed statement authority; forecasts are written by the authority resolver."),
+  };
+  lanes.provenance ??= {};
+  const sourceInventory = new Map(
+    (evidence.source_inventory ?? []).map((source) => [source.source_id, source]),
+  );
+  const provenanceRoles = {
+    revenue: ["revenue"],
+    adjusted_ebitda: reportedAdjustedEbitda.some((value) => value !== null)
+      ? ["adjusted_ebitda"] : ["ebit", "operating_profit"],
+    depreciation_and_amortisation: [
+      "depreciation_and_amortisation", "cash_flow_da", "is_da_expense",
+    ],
+    change_in_working_capital: ["change_in_working_capital"],
+    capex: ["capex", "ppe_purchases", "intangible_purchases"],
+    tax: ["tax_expense", "cash_taxes"],
+  };
+  for (const [metricId, roles] of Object.entries(provenanceRoles)) {
+    if (lanes.provenance[metricId]) continue;
+    const record = firstMappedHistoricalRecord({ caseSource, caseEvidence, roles });
+    if (!record) continue;
+    const source = sourceInventory.get(record.manifest.source_id) ?? {};
+    lanes.provenance[metricId] = [0, 1, 2].map((periodIndex) => ({
+      period_index: periodIndex,
+      document: record.manifest.source_id,
+      publication_date: source.publication_date ?? "not supplied in filing metadata",
+      page_or_note: record.row.page_or_note ?? record.manifest.page_or_note,
+      units: [caseSource.identity.reporting_currency, caseSource.identity.units]
+        .filter(Boolean).join(" "),
+      source_label: record.row.raw_label,
+      transformation: metricId === "adjusted_ebitda" && roles[0] !== "adjusted_ebitda"
+        ? "Compiler-owned historical EBIT plus D&A bridge from sealed filed authorities."
+        : "Directly projected from the sealed face-statement authority.",
+    }));
+  }
+
+  const endingCash = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["ending_cash"], absolute: true,
+  });
+  if (!endingCash.every((value) => value !== null && Number.isFinite(Number(value)))) {
+    throw new Error(
+      "The sealed cash-flow statement does not establish all three historical ending-cash balances required by the model.",
+    );
+  }
+  lanes.policy_evidence ??= {};
+  lanes.policy_evidence.cash ??= {
+    opening_cash: Number(endingCash[2]),
+    historical_year_end_cash: endingCash.map(Number),
+  };
+  lanes.policy_evidence.lease ??= {
+    opening_liability: Number(filings.reported_lease_liability ?? 0),
+  };
+
+  const historicalGrossDebt = Array.isArray(filings.historical_gross_debt) &&
+      filings.historical_gross_debt.length === 3 &&
+      filings.historical_gross_debt.every((value) => Number.isFinite(Number(value)))
+    ? filings.historical_gross_debt.map(Number)
+    : null;
+  lanes.debt_reconciliation ??= {
+    reported_opening_gross_debt: historicalGrossDebt ?? Number(filings.reported_gross_debt ?? 0),
+    maximum_residual_percentage: Number(filings.maximum_residual_percentage ?? 0.05),
+    note: "Compiler-owned projection of the filed opening gross-debt authority.",
+  };
+  const filedInterest = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["interest_expense"], absolute: true,
+  });
+  if (filedInterest.every((value) => value !== null && Number.isFinite(Number(value)))) {
+    lanes.historical_interest_reconciliation ??= {
+      reported_interest_basis: "identified_components_only",
+      identified_interest: filedInterest.map(Number),
+      maximum_plug_percentage: 0.1,
+    };
+  }
+  lanes.historical_supplement ??= {
+    prior_cash_and_cash_equivalents: endingCash.slice(0, 2).map(Number),
+    ...(historicalGrossDebt
+      ? { prior_gross_debt_excluding_leases: historicalGrossDebt.slice(0, 2) }
+      : {}),
+  };
+  lanes.broker_pack ??= evidence.broker_pack ?? {
+    source_label: "Forecast Waterfall — zero broker authority",
+    forecast_periods: forecastPeriods,
+    metrics: {},
+  };
+  return evidence;
+}
+
+export default { proposeCaseSource, writeRuntimeEvidenceLanes };

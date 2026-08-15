@@ -724,7 +724,8 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
                 "image_path": str(artifact_path(bundle, document, image_id)) if image_id else None,
                 "region_crops": crop_paths,
                 "task_path": str(task_path) if task_path else None,
-                "instruction": (
+                "selected_cell_contract": task_payload.get("selected_cell_contract"),
+                "instruction": task_payload.get("instruction") or (
                     "Complete two independent grid-preserving table reads. Use native text, coordinates, "
                     "vector geometry, high-resolution crops and cell OCR as corroborating lanes. Do not "
                     "return a flat numeric list and do not request replacement research."

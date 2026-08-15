@@ -600,6 +600,7 @@
     "migrate_broker_run_state.py",
     "broker_terminal_recovery.py",
     "broker_work_graph.py",
+    "archive_broker_pages.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
@@ -669,6 +670,7 @@
       "provision": "native",
       "required_at": "runtime",
       "used_by_packages": [
+        "archive_broker_pages.py",
         "extract_broker_evidence.py",
         "extract_filing_statements.py",
         "render"
@@ -757,9 +759,15 @@
       "may_import_third_party": [],
       "reason": "The Python workflow-state helper is stdlib-only and enforces the same typed transition and blocker-ownership contract as the JavaScript controller layer."
     },
+    "archive_broker_pages.py": {
+      "may_import_third_party": [
+        "fitz"
+      ],
+      "reason": "The archive-only broker page renderer uses deferred native PyMuPDF to create screenshot evidence. It has no semantic or selected-cell authority, and callers degrade safely when rendering is unavailable."
+    },
     "run_attachment_evidence_pipeline.py": {
       "may_import_third_party": [],
-      "reason": "The top-level evidence controller is stdlib-only and sequences sealed subordinate lanes without sharing their extraction implementation."
+      "reason": "The top-level evidence controller is stdlib-only and sequences sealed subordinate lanes; optional archive rendering is delegated to archive_broker_pages rather than sharing extraction implementation."
     },
     "run_dcs_pipeline.py": {
       "may_import_third_party": [],

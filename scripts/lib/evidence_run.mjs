@@ -1534,9 +1534,14 @@ function validateDebtMapping(run, findings) {
     }
   }
 
-  const reported = Number(run.filings?.reported_gross_debt);
+  const filingReportedRaw = run.filings?.reported_gross_debt;
+  const caseReportedRaw =
+    run.model_case?.debt_reconciliation?.reported_opening_gross_debt;
+  const reported = Number(
+    Array.isArray(filingReportedRaw) ? filingReportedRaw.at(-1) : filingReportedRaw,
+  );
   const caseReported = Number(
-    run.model_case?.debt_reconciliation?.reported_opening_gross_debt,
+    Array.isArray(caseReportedRaw) ? caseReportedRaw.at(-1) : caseReportedRaw,
   );
   if (!approximate(reported, caseReported)) {
     findings.push(

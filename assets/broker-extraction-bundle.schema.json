@@ -36,6 +36,32 @@
     "tool_versions": {
       "type": "object"
     },
+    "selected_cell_demand_contract": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "model_demand_graph_sha256",
+        "forecast_periods",
+        "targets",
+        "contract_sha256"
+      ]
+    },
+    "selected_cell_recovery_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "policy",
+        "selected_house_id",
+        "maximum_recovery_house_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "broker-selected-house-recovery/1.0" },
+        "policy": { "const": "latest_supplied_house_then_zero_authority" },
+        "selected_house_id": { "type": "string", "minLength": 1 },
+        "maximum_recovery_house_count": { "const": 1 }
+      }
+    },
     "canonical_tables_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
@@ -405,6 +431,12 @@
           "type": "integer",
           "minimum": 0
         },
+        "embedded_image_inventory": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
         "artifact_refs": {
           "type": "array",
           "items": {
@@ -470,6 +502,19 @@
             "null"
           ]
         },
+        "model_demand_status": {
+          "enum": [
+            "selected_cell_recovery_required",
+            "archive_only_not_demanded",
+            "archive_only_unselected_house",
+            "native_candidate"
+          ]
+        },
+        "selected_demand_metric_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
         "whole_surface_numeric_token_count": {
           "type": [
             "integer",
@@ -513,6 +558,9 @@
               "candidate_count": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "message": {
+                "type": "string"
               }
             }
           }
@@ -533,7 +581,8 @@
           "enum": [
             "analytical_tables",
             "verified_non_tabular",
-            "quarantined_evidence_only"
+            "quarantined_evidence_only",
+            null
           ]
         },
         "vision_non_tabular_reasons": {
@@ -648,6 +697,7 @@
         "extraction_method": {
           "enum": [
             "native_pdf_table",
+            "native_pdf_columnar",
             "native_pdf_lines",
             "native_pdf_lines_strict",
             "native_pdf_text",
@@ -691,8 +741,12 @@
             "discovery_only",
             "bounded_native",
             "rendered_authority",
-            "native_structured_authority"
+            "native_structured_authority",
+            "archive_only"
           ]
+        },
+        "model_use": {
+          "const": "prohibited"
         },
         "verification_basis": {
           "enum": [

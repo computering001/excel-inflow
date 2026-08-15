@@ -1216,9 +1216,11 @@ def main() -> int:
             '    sourceAttachment,\n'
             '  });\n'
             '  const lane = evidence.case_evidence.lanes.broker_pack ?? {};\n'
+            '  const archive = evidence.case_evidence.lanes.broker_archive ?? {};\n'
             '  console.log(JSON.stringify({\n'
             '    ok: true,\n'
-            '    raw_table_house_count: (lane.raw_tables ?? []).length,\n'
+            '    archive_house_count: (archive.page_evidence ?? archive.raw_documents ?? []).length,\n'
+            '    authority_has_presentation: Boolean(lane.raw_tables || lane.page_evidence),\n'
             '    mapping_count: (lane.source_mappings ?? []).length,\n'
             '    controller_status: evidence.case_evidence.lanes.broker_evidence?.controller_state?.pipeline_status ?? null,\n'
             '  }));\n'
@@ -1255,8 +1257,9 @@ def main() -> int:
         accepted = run_ingress(output_root / "broker-run-state.json")
         check(accepted.get("ok") is True, f"the JS ingress refused the lawful degraded close: {accepted.get('message')}")
         check(accepted.get("controller_status") == "PASS_DEGRADED", "the degraded controller state was not projected into case evidence")
-        check(int(accepted.get("raw_table_house_count", 0)) == 5, "ingress did not preserve every house in raw_tables")
-        checks += 3
+        check(int(accepted.get("archive_house_count", 0)) == 5, "ingress did not preserve every house in broker_archive")
+        check(accepted.get("authority_has_presentation") is False, "broker authority retained archive presentation fields")
+        checks += 4
 
         # ...and only WITH its quarantine receipts (closure integrity, enforced
         # by the production gate).

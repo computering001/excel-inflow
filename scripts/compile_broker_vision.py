@@ -14,6 +14,7 @@ from typing import Any
 
 from compile_broker_candidate_manifest import compile_manifest
 from compile_broker_canonical_tables import canonicalise_bundle, ensure_late_promotion_tasks
+from broker_terminal_recovery import normalized_label
 
 
 NUMERIC_RE = re.compile(
@@ -728,6 +729,68 @@ def accepted_tables(
     return compiled
 
 
+def restrict_result_to_selected_cells(
+    result: dict[str, Any], task: dict[str, Any]
+) -> dict[str, Any]:
+    """Discard model-irrelevant OCR rows before consensus/reconciliation.
+
+    The unmodified response file remains hash-bound evidence on disk.  This
+    projection is the model-facing authority surface: period header rows plus
+    rows whose printed label matches the upstream selected-cell discovery
+    contract.  OCR cannot widen its own mandate by returning the rest of the
+    page.
+    """
+    contract = task.get("selected_cell_contract")
+    if not isinstance(contract, dict) or contract.get("schema_version") != "broker-selected-cell-task/1.0":
+        return result
+    aliases = {
+        normalized_label(alias)
+        for target in contract.get("targets") or []
+        for alias in [
+            *(target.get("discovery_aliases") or []),
+            *(target.get("demand_labels") or []),
+        ]
+        if normalized_label(alias)
+    }
+    projected = copy.deepcopy(result)
+    projected_tables = []
+    strict_period = re.compile(
+        r"^(?:(?:fy|cy)\s*(?:19|20)?\d{2}[eaf]?|(?:19|20)\d{2}(?:\s*/\s*\d{2,4})?[eaf]?|"
+        r"(?:q[1-4]|[1-4]q|h[12]|[12]h)\s*(?:fy|cy)?\s*(?:19|20)?\d{2}[eaf]?|"
+        r"\d{1,2}\s*/\s*\d{2}[eaf]?|[a-z]{3,9}[-\s]\d{2,4}[eaf]?|ltm|ttm|ntm)$",
+        re.IGNORECASE,
+    )
+    for table in projected.get("tables") or []:
+        header_rows = []
+        selected_rows = []
+        for row in table.get("rows") or []:
+            values = [str(value or "").strip() for value in row]
+            if any(strict_period.fullmatch(re.sub(r"\s+", " ", value)) for value in values if value):
+                header_rows.append(row)
+                continue
+            label = next(
+                (
+                    normalized_label(value)
+                    for value in values
+                    if value and numeric_token(value) is None and not is_period_header(value)
+                ),
+                "",
+            )
+            if label in aliases:
+                selected_rows.append(row)
+        if not selected_rows:
+            continue
+        kept = [*header_rows, *selected_rows]
+        table["rows"] = kept
+        # Row filtering invalidates positional bbox matrices.  Table/page
+        # bboxes and source-response hashes retain the exact visual binding;
+        # selected values still receive cell addresses in the projected grid.
+        table.pop("cell_bboxes", None)
+        projected_tables.append(table)
+    projected["tables"] = projected_tables
+    return projected
+
+
 def transcription_structure(table: dict[str, Any]) -> dict[str, Any]:
     """Report whether a transcribed table is a GRID or merely a bag of numbers.
 
@@ -1007,6 +1070,7 @@ def main() -> int:
                 unresolved += 1
                 findings.append({"id": "broker_vision.passes_not_independent", "severity": "blocker", "document_id": document["document_id"], "surface_id": surface_id, "message": "Pass 1 and pass 2 must have distinct producer IDs and execution fingerprints; renaming one producer is not independence."})
                 continue
+            passes = [restrict_result_to_selected_cells(result, task) for result in passes]
             disposition, disposition_error = classify_surface_disposition(passes)
             if disposition_error and args.degrade_exhausted:
                 quarantine_surface_evidence_only(

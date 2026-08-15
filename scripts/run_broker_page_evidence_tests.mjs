@@ -39,7 +39,9 @@ const images = [
 ];
 const imageHashes = await Promise.all(images.map(async (image) => sha256(await fs.readFile(image))));
 const names = Object.keys(Object.values(modelCase.broker_pack.metrics)[0].brokers);
-modelCase.broker_pack.page_evidence = names.map((houseName, index) => ({
+modelCase.broker_archive = {
+  schema_version: "broker-archive/1.0",
+  page_evidence: names.map((houseName, index) => ({
   house_id: `house_${index + 1}`,
   house_name: houseName,
   source_id: `broker_${index + 1}`,
@@ -53,7 +55,10 @@ modelCase.broker_pack.page_evidence = names.map((houseName, index) => ({
     artifact_path: images[imageIndex],
     artifact_sha256: imageHashes[imageIndex],
   })),
-}));
+  })),
+};
+delete modelCase.broker_pack.page_evidence;
+delete modelCase.broker_pack.raw_tables;
 modelCase.broker_pack.source_mappings = names.flatMap((houseName, houseIndex) =>
   Object.entries(modelCase.broker_pack.metrics).flatMap(([metricId, metric]) =>
     (metric.brokers?.[houseName] ?? []).flatMap((value, periodIndex) =>

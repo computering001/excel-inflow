@@ -1841,14 +1841,24 @@ export function solveCase(
     const suppliedDa = da;
     const suppliedEbit = baseEbit;
     const previousEbitda = priorStandaloneEbitda;
+    const declaredCashFlowGraph = declaredStatementPeriod(
+      modelCase,
+      periodIndex,
+      new Map(),
+      previousStatementValues,
+      acquisitionBaseValues,
+    );
+    const declaredCapex = declaredCashFlowGraph.resolveRole("capex");
     const capexRequirement = Math.abs(
-      metricValue(
-        modelCase,
-        "capex",
-        periodIndex,
-        revenue *
-          forecastAssumption(modelCase, "capex_to_revenue", forecastIndex, 0),
-      ),
+      declaredCapex === null
+        ? metricValue(
+            modelCase,
+            "capex",
+            periodIndex,
+            revenue *
+              forecastAssumption(modelCase, "capex_to_revenue", forecastIndex, 0),
+          )
+        : declaredCapex,
     );
     const workingCapitalFallback = metricValue(
       modelCase,
@@ -1867,13 +1877,8 @@ export function solveCase(
     // a derived parent resolves through its contributing children. Reading the
     // aggregate metric unconditionally here would overwrite the latter's live
     // workbook formula with an unrelated broker cache on every recalculation.
-    const declaredWorkingCapital = declaredStatementPeriod(
-      modelCase,
-      periodIndex,
-      new Map(),
-      previousStatementValues,
-      acquisitionBaseValues,
-    ).resolveRole("change_in_working_capital");
+    const declaredWorkingCapital =
+      declaredCashFlowGraph.resolveRole("change_in_working_capital");
     const changeInWorkingCapital =
       declaredWorkingCapital === null
         ? workingCapitalFallback

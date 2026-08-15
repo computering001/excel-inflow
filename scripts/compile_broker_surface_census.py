@@ -56,7 +56,7 @@ def compile_census(bundle: dict[str, Any], bundle_root: Path) -> dict[str, Any]:
             lanes = census.get("table_discovery_lanes") or []
             if surface.get("kind") in {"pdf_page", "workbook_sheet"} and not lanes:
                 findings.append({"id": "broker_census.discovery_lanes_missing", "severity": "blocker", **context, "message": "No table-discovery lane was recorded."})
-            material = [
+            raw_material = [
                 region for region in census.get("uncovered_numeric_regions", [])
                 if region.get("material")
                 and region.get("disposition") not in {
@@ -64,6 +64,16 @@ def compile_census(bundle: dict[str, Any], bundle_root: Path) -> dict[str, Any]:
                     "quarantined_evidence_only"
                 }
             ]
+            # The immutable census inventories the physical page.  It is not
+            # itself a model requirement.  A pre-broker demand exclusion
+            # preserves those regions in the raw PDF/render while closing
+            # their semantic work frontier; otherwise an irrelevant valuation
+            # page can recreate a global OCR blocker after demand selection.
+            material = (
+                []
+                if str(surface.get("model_demand_status") or "").startswith("archive_only_")
+                else raw_material
+            )
             if material and surface.get("lane_status", {}).get("vision") not in {"required", "complete"}:
                 findings.append({"id": "broker_census.material_region_unresolved", "severity": "blocker", **context, "message": "A material uncovered numeric region has no vision disposition."})
             surfaces.append({
@@ -75,6 +85,11 @@ def compile_census(bundle: dict[str, Any], bundle_root: Path) -> dict[str, Any]:
                 "discovery_lane_count": len(lanes),
                 "uncovered_numeric_region_count": len(census.get("uncovered_numeric_regions", [])),
                 "material_uncovered_region_count": len(material),
+                "archive_only_unreconciled_region_count": (
+                    len(raw_material)
+                    if str(surface.get("model_demand_status") or "").startswith("archive_only_")
+                    else 0
+                ),
                 "vision_status": surface.get("lane_status", {}).get("vision"),
                 "census_sha256": artifact.get("sha256"),
             })
@@ -91,6 +106,9 @@ def compile_census(bundle: dict[str, Any], bundle_root: Path) -> dict[str, Any]:
             "whole_surface_numeric_token_count": sum(int(item["whole_surface_numeric_token_count"] or 0) for item in surfaces),
             "uncovered_numeric_region_count": sum(item["uncovered_numeric_region_count"] for item in surfaces),
             "material_uncovered_region_count": sum(item["material_uncovered_region_count"] for item in surfaces),
+            "archive_only_unreconciled_region_count": sum(
+                item["archive_only_unreconciled_region_count"] for item in surfaces
+            ),
             "unresolved_surface_count": unresolved,
             "finding_count": len(findings),
         },

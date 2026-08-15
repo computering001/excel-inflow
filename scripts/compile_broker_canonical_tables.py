@@ -359,7 +359,8 @@ def has_rendered_authority(table: dict[str, Any]) -> bool:
 
 def is_discovery_only(table: dict[str, Any]) -> bool:
     return (
-        table.get("authority_role") == "discovery_only"
+        table.get("authority_role") in {"discovery_only", "archive_only"}
+        or table.get("model_use") == "prohibited"
         or str(table.get("extraction_method") or "") == "native_pdf_text"
     )
 
@@ -743,6 +744,7 @@ def physical_capture_receipt(
     verified_non_tabular = surface.get("vision_disposition") == "verified_non_tabular"
     quarantined_evidence_only = (
         surface.get("vision_disposition") == "quarantined_evidence_only"
+        or str(surface.get("model_demand_status") or "").startswith("archive_only_")
     )
     findings: list[dict[str, Any]] = []
 
@@ -750,7 +752,11 @@ def physical_capture_receipt(
         # Physical preservation is COMPLETE (bytes, renders, raw fragments all
         # sealed); model authority is separately prohibited by the quarantine.
         status = "PASS_EVIDENCE_ONLY"
-        basis = "bounded_quarantine_after_exhaustion"
+        basis = (
+            "pre_broker_demand_exclusion"
+            if str(surface.get("model_demand_status") or "").startswith("archive_only_")
+            else "bounded_quarantine_after_exhaustion"
+        )
         findings.append({
             "id": "broker_canonical.surface_quarantined_evidence_only",
             "severity": "warning",
@@ -759,7 +765,10 @@ def physical_capture_receipt(
             "document_id": document_id,
             "surface_id": surface_id,
             "message": (
-                "Bounded reconciliation was exhausted; the surface is preserved as "
+                "The surface is preserved page-for-page as evidence-only and contributes no "
+                "model-eligible table under the bounded pre-broker selected-house demand policy."
+                if str(surface.get("model_demand_status") or "").startswith("archive_only_")
+                else "Bounded reconciliation was exhausted; the surface is preserved as "
                 "evidence-only and contributes no model-eligible table."
             ),
         })

@@ -72,6 +72,7 @@ export const PASSTHROUGH_LANES = Object.freeze([
   "acquisition",
   "fx",
   "historical_entities",
+  "broker_archive",
   "broker_pack",
   "provenance",
   "stage_three_answers",
@@ -409,8 +410,10 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
       row.historical_authority = "derived_formula";
       continue;
     }
-    const historicals = (row.values ?? []).slice(0, 3);
-    if (historicals.length === 3 && historicals.every((value) => Number.isFinite(Number(value)) && value !== null)) {
+    // A filed dash/null is still source-owned history.  Historical authority
+    // names who owns the cell; it does not turn a printed blank into zero or
+    // require every comparative to exist before provenance can be declared.
+    if (["input", "uncalculated"].includes(row.row_type)) {
       row.historical_authority = "source_input";
     }
   }
@@ -548,6 +551,98 @@ function compileSourceCoverage({ section, lines, entriesById, rowsBySourceLine, 
     }
     return disclosure;
   });
+}
+
+/**
+ * Mint selected-row historical provenance from the same sealed manifests and
+ * period-authority surface that minted the rows. Provenance is therefore not
+ * an authored parallel model and cannot disappear merely because a first-run
+ * row id differs from a template. Richer explicit entries remain intact; the
+ * compiler fills only absent periods.
+ */
+function compileFilingProvenance({
+  existing = {},
+  manifestsBySection,
+  sourceCoverage,
+  statementStructure,
+  filingProvenance = {},
+  identity = {},
+}) {
+  const output = clone(existing ?? {});
+  const authorityBySectionPeriod = new Map();
+  for (const section of FACE_STATEMENT_SECTIONS) {
+    for (const authority of filingProvenance?.period_authority?.[section] ?? []) {
+      authorityBySectionPeriod.set(`${section}\u0000${authority.period}`, authority);
+    }
+  }
+  const documentBySource = new Map();
+  for (const document of filingProvenance?.documents ?? []) {
+    for (const key of [document.source_id, document.document_id, document.attachment_id]) {
+      if (key && !documentBySource.has(key)) documentBySource.set(key, document);
+    }
+  }
+  const manifestLineBySectionSource = new Map();
+  for (const section of FACE_STATEMENT_SECTIONS) {
+    for (const manifest of manifestsBySection?.[section] ?? []) {
+      for (const line of manifest.rows ?? []) {
+        manifestLineBySectionSource.set(
+          `${section}\u0000${line.source_line_id}`,
+          { manifest, line },
+        );
+      }
+    }
+  }
+  const units = [identity.reporting_currency, identity.units]
+    .filter(Boolean)
+    .join(" ") || "as reported";
+
+  for (const section of FACE_STATEMENT_SECTIONS) {
+    const rowsById = new Map(
+      (statementStructure?.[section] ?? []).map((row) => [row.row_id, row]),
+    );
+    for (const disclosure of sourceCoverage?.[section] ?? []) {
+      const source = manifestLineBySectionSource.get(
+        `${section}\u0000${disclosure.source_line_id}`,
+      );
+      if (!source) continue;
+      for (const rowId of disclosure.mapped_row_ids ?? []) {
+        const row = rowsById.get(rowId);
+        if (!row || row.historical_authority !== "source_input") continue;
+        const current = new Map(
+          (output[rowId] ?? []).map((entry) => [Number(entry.period_index), entry]),
+        );
+        for (let periodIndex = 0; periodIndex < 3; periodIndex += 1) {
+          if (current.has(periodIndex)) continue;
+          const period = source.manifest.periods?.[periodIndex] ?? null;
+          const authority = authorityBySectionPeriod.get(`${section}\u0000${period}`) ?? {};
+          const document = documentBySource.get(source.manifest.source_id) ?? {};
+          current.set(periodIndex, {
+            period_index: periodIndex,
+            document:
+              authority.source_id ??
+              document.source_id ??
+              source.manifest.source_id,
+            publication_date:
+              authority.filing_date ??
+              document.filing_date ??
+              document.publication_date ??
+              "not supplied in filing metadata",
+            page_or_note:
+              source.line.page_or_note ??
+              source.manifest.page_or_note ??
+              "face statement",
+            units,
+            source_label: source.line.raw_label,
+            transformation: "Directly mapped from the sealed face-statement manifest.",
+          });
+        }
+        output[rowId] = [...current.values()].sort(
+          (left, right) => Number(left.period_index) - Number(right.period_index),
+        );
+      }
+    }
+  }
+  return output;
 }
 
 /**
@@ -2853,6 +2948,14 @@ export function compileCase(caseSource, evidence = {}) {
   for (const lane of PASSTHROUGH_LANES) {
     if (lanes[lane] !== undefined) modelCase[lane] = clone(lanes[lane]);
   }
+  modelCase.provenance = compileFilingProvenance({
+    existing: modelCase.provenance,
+    manifestsBySection,
+    sourceCoverage,
+    statementStructure,
+    filingProvenance: evidence.filing_provenance,
+    identity: caseSource.identity,
+  });
   // Legacy DCS lanes predate the balance-basis declaration.  The default is
   // NAMED here — a visible finding, never a silent mask — and disappears once
   // the lane itself carries the declaration.

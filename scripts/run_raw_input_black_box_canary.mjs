@@ -37,8 +37,12 @@ const commandEnv = {
 // both face statements itself.
 const pdfRows = path.join(input, "filing-rows-for-pdf-generation.json");
 const rawFilingRows = {
-  income_statement: clean.filings.face_statement_manifests.income_statement.flatMap((item) => item.rows),
-  cash_flow: clean.filings.face_statement_manifests.cash_flow.flatMap((item) => item.rows),
+  income_statement: structuredClone(
+    clean.filings.face_statement_manifests.income_statement.flatMap((item) => item.rows),
+  ),
+  cash_flow: structuredClone(
+    clean.filings.face_statement_manifests.cash_flow.flatMap((item) => item.rows),
+  ),
 };
 const restate = (section, sourceLineId, values) => {
   const row = rawFilingRows[section].find((item) => item.source_line_id === sourceLineId);
@@ -86,14 +90,29 @@ await exec(python, ["-c", [
   "  p.insert_text((40+12*level[row['source_line_id']],y),row['raw_label'],fontsize=7)",
   "  for x,value in zip((390,450,510),row['values']): p.insert_text((x,y),'-' if value is None else str(value),fontsize=7)",
   "  y+=11",
+  "p=doc.new_page(); p.insert_text((40,35),'Historical debt and cash summary',fontsize=9)",
+  "p.insert_text((390,50),'2023',fontsize=7); p.insert_text((450,50),'2024',fontsize=7); p.insert_text((510,50),'2025',fontsize=7)",
+  "p.insert_text((40,70),'Gross debt excluding leases',fontsize=7)",
+  "p.insert_text((390,70),'80',fontsize=7); p.insert_text((450,70),'80',fontsize=7); p.insert_text((510,70),'80',fontsize=7)",
+  "p.insert_text((40,85),'Cash and cash equivalents',fontsize=7)",
+  "p.insert_text((390,85),'370',fontsize=7); p.insert_text((450,85),'380',fontsize=7); p.insert_text((510,85),'390',fontsize=7)",
   "doc.save(sys.argv[1]); doc.close()",
 ].join("\n"), annualReport, pdfRows], { env: commandEnv, maxBuffer: 32 * 1024 * 1024 });
 const annualHash = sha256(await fs.readFile(annualReport));
 
-const filingFacts = structuredClone(clean.filings);
-delete filingFacts.face_statement_manifests;
-delete filingFacts.income_statement;
-delete filingFacts.cash_flow;
+const filingFacts = Object.fromEntries(
+  [
+    "entity_name", "entity_identifiers", "entity_aliases", "consolidation_level",
+    "reporting_currency", "units", "fiscal_calendar_kind", "historical_periods",
+    "forecast_periods", "reported_gross_debt", "historical_gross_debt", "reported_cash",
+    "reported_gross_interest", "reported_lease_liability", "fiscal_label",
+    "maximum_residual_percentage", "restricted_cash", "leverage_basis",
+    "minimum_operating_cash", "announced_acquisition",
+  ]
+    .filter((key) => clean.filings[key] !== undefined)
+    .map((key) => [key, structuredClone(clean.filings[key])]),
+);
+filingFacts.historical_gross_debt = [80, 80, 80];
 const filingsRequest = path.join(input, "filings-request.json");
 await writeJson(filingsRequest, {
   schema_version: "filings-extraction-request/1.0",
@@ -134,79 +153,160 @@ await writeJson(dcsRequest, {
   },
 });
 
-// Policy answers are first-class raw inputs too. They are not filings or
-// broker material, but their bytes must still be present in the attachment
-// transaction because forecast-period authorities cite their source IDs.
+// Two explicit policy sources support formula-driven zero assumptions that
+// are not facts contained in either mandatory file. They carry decisions only
+// and contain no normalized statement rows or forecast-authority objects.
 const policyArtifacts = [];
-for (const source of clean.source_inventory.filter((item) => item.kind === "user_answer")) {
-  const rawPath = path.join(input, `${source.source_id.replaceAll(/[^a-z0-9_.-]+/gi, "-")}.json`);
-  const payload = {
+for (const [sourceId, assumption] of [
+  ["policy.acquisitions_default", { acquisitions_net_of_cash: [0, 0, 0] }],
+  ["policy.fx_translation", { fx_effect_on_cash: [0, 0, 0] }],
+]) {
+  const attachmentId = `policy-${sourceId.replaceAll(/[^a-z0-9]+/gi, "-")}`;
+  const rawPath = path.join(input, `${attachmentId}.json`);
+  await writeJson(rawPath, {
     schema_version: "raw-policy-answer/1.0",
-    source_id: source.source_id,
-    forecast_authorities: Object.values(clean.case_evidence.lanes.operating_metrics ?? {})
-      .flatMap((metric) => metric.forecast_period_authorities ?? [])
-      .filter((authority) => authority.source_id === source.source_id),
-  };
-  await writeJson(rawPath, payload);
+    source_id: sourceId,
+    assumption,
+  });
   const rawSha256 = sha256(await fs.readFile(rawPath));
-  const attachmentId = `policy-${source.source_id.replaceAll(/[^a-z0-9]+/gi, "-")}`;
   const extractionPath = path.join(input, `${attachmentId}-extraction.json`);
   await writeJson(extractionPath, {
     attachment_id: attachmentId,
     raw_sha256: rawSha256,
-    source_ids: [source.source_id],
+    source_ids: [sourceId],
   });
-  policyArtifacts.push({ source, rawPath, rawSha256, attachmentId, extractionPath });
+  policyArtifacts.push({ sourceId, assumption, attachmentId, rawPath, rawSha256, extractionPath });
 }
 
-const evidenceTemplate = structuredClone(clean);
-evidenceTemplate.run_id = runId;
-evidenceTemplate.mode = "first_run";
-evidenceTemplate.case_source = {};
-delete evidenceTemplate.model_case;
-delete evidenceTemplate.dcs_export;
-delete evidenceTemplate.broker_pack;
-delete evidenceTemplate.broker_source_tables;
-delete evidenceTemplate.broker_crosswalk_receipt;
-delete evidenceTemplate.broker_semantic_verification;
-for (const key of [
-  "broker_pack", "instruments", "instrument_term_authorities",
-  "instrument_authority_contract_version",
-]) delete evidenceTemplate.case_evidence.lanes[key];
-evidenceTemplate.case_evidence.lanes.controls = {
-  ...evidenceTemplate.case_evidence.lanes.controls,
-  broker_case: "Forecast Waterfall",
+// This template is intentionally constructed from scratch. It contains no
+// operating metrics, forecast assumptions, instruments, provenance, authored
+// statement map, normalized DCS projection or broker pack. Those are runtime
+// descendants of the raw filing and DCS bytes.
+const evidenceTemplate = {
+  schema_version: "evidence-run/1.0",
+  run_id: runId,
+  created_at: "2026-08-15T12:00:00.000Z",
+  mode: "first_run",
+  company_name: clean.company_name,
+  source_inventory: [
+    {
+      source_id: "annual_report", kind: "company_annual_report", name: "Annual report",
+      origin: "uploaded", media_type: "application/pdf", publication_date: "2026-03-01",
+      as_of_date: "2025-12-31", entity_name: clean.company_name,
+      content_sha256: annualHash, text_extractable: true, status: "used",
+    },
+    {
+      source_id: "factset_export", kind: "user_factset_export", name: "FactSet DCS export",
+      origin: "uploaded", media_type: "text/csv", publication_date: null,
+      as_of_date: "2025-12-31", entity_name: clean.company_name,
+      content_sha256: dcsHash, text_extractable: true, status: "used",
+    },
+    ...policyArtifacts.map(({ sourceId, rawSha256 }) => ({
+      source_id: sourceId,
+      kind: "user_answer",
+      name: `Explicit policy answer ${sourceId}`,
+      origin: "generated",
+      media_type: "application/json",
+      publication_date: null,
+      as_of_date: "2025-12-31",
+      entity_name: clean.company_name,
+      content_sha256: rawSha256,
+      text_extractable: true,
+      status: "used",
+    })),
+  ],
+  retrieval_log: [{
+    fact_id: "latest_audited_filing",
+    selected_source_id: "annual_report",
+    precedence_rank: 1,
+    reason: "Uploaded complete annual report supplies the selected statements.",
+    supersedes_source_ids: [],
+  }],
+  filings: {},
+  dcs_export: {},
+  // Required envelope only. The explicit-skip controller, not this raw input,
+  // owns the zero-authority broker projection used by the compiler.
+  broker_pack: {},
+  forecast_context: {
+    contract_version: "forecast-evidence/1.0",
+    reviewed_at: filingFacts.historical_periods[2],
+    public_results_source_ids: ["annual_report"],
+    latest_public_results_source_id: "annual_report",
+    guidance_status: "reviewed_none",
+    guidance_source_ids: [],
+    guidance_review_note: "The raw canary supplies no separate company guidance artifact.",
+  },
+  case_source: {},
+  case_evidence: { face_statement_manifests: {}, lanes: {} },
+  decisions: {
+    restatements: filingFacts.historical_periods.map((period) => ({
+      period,
+      basis: "as_reported",
+      source_ids: ["annual_report"],
+      bridge_status: "not_required",
+      reason: "The canary annual report supplies a consistent three-period comparative statement.",
+    })),
+    groupings: [],
+    manual_debt_supplements: [],
+    stated_assumptions: [],
+  },
 };
-evidenceTemplate.source_inventory = [
-  {
-    source_id: "annual_report", kind: "company_annual_report", name: "Annual report",
-    origin: "uploaded", media_type: "application/pdf", publication_date: "2026-03-01",
-    as_of_date: "2025-12-31", entity_name: clean.company_name,
-    content_sha256: annualHash, text_extractable: true, status: "used",
-  },
-  {
-    source_id: "factset_export", kind: "user_factset_export", name: "FactSet DCS export",
-    origin: "uploaded", media_type: "text/csv", publication_date: null,
-    as_of_date: "2025-12-31", entity_name: clean.company_name,
-    content_sha256: dcsHash, text_extractable: true, status: "used",
-  },
-  ...policyArtifacts.map(({ source, rawSha256 }) => ({
-    ...structuredClone(source),
-    content_sha256: rawSha256,
-  })),
-];
-evidenceTemplate.retrieval_log = [{
-  fact_id: "latest_audited_filing",
-  selected_source_id: "annual_report",
-  precedence_rank: 1,
-  reason: "Uploaded complete annual report supplies the selected statements.",
-  supersedes_source_ids: [],
-}];
 const evidenceTemplatePath = path.join(input, "evidence-template.json");
 await writeJson(evidenceTemplatePath, evidenceTemplate);
 
-const declarations = structuredClone(clean.case_source);
-declarations.identity.case_id = runId;
+// These are decisions, not model state. The proposer must author the entire
+// statement map from the sealed manifests and the runtime writer must author
+// every compiler evidence lane.
+const declarations = {
+  identity: {
+    case_id: runId,
+    issuer_name: clean.company_name,
+    reporting_currency: filingFacts.reporting_currency,
+    units: "millions",
+    fiscal_year_end: "12-31",
+    presentation_profile: "crh_dynamic",
+    execution_profile: "production_model",
+  },
+  policies: {
+    cash: {
+      minimum_cash_question_id: "derived.cash.minimum_cash",
+      eligible_cash_question_id: "derived.cash.eligible",
+      cash_yield_question_id: "derived.cash.yield",
+    },
+    lease: {
+      mode: "exclude",
+      include_in_gross_debt: false,
+      include_in_net_debt: false,
+      include_in_leverage: false,
+      forecast_basis_question_id: "derived.lease.forecast_basis",
+    },
+  },
+  answers: [
+    { question_id: "derived.cash.minimum_cash", round: "derived", answer: 100 },
+    { question_id: "derived.cash.eligible", round: "derived", answer: 1 },
+    { question_id: "derived.cash.yield", round: "derived", answer: [0.025, 0.025, 0.025] },
+    {
+      question_id: "derived.lease.forecast_basis",
+      round: "derived",
+      answer: {
+        principal_repayment: [0, 0, 0],
+        additions: [0, 0, 0],
+        effective_rate: [0, 0, 0],
+      },
+    },
+  ],
+};
+for (const forbidden of ["statement_map", "derived_rows", "consumption"]) {
+  if (Object.hasOwn(declarations, forbidden)) {
+    throw new Error(`Raw canary declarations illegally contain ${forbidden}.`);
+  }
+}
+if (Object.keys(evidenceTemplate.case_evidence.lanes).length !== 0) {
+  throw new Error("Raw canary evidence template illegally contains pre-authored compiler lanes.");
+}
+if (Object.keys(evidenceTemplate.broker_pack).length !== 0) {
+  throw new Error("Raw canary evidence template illegally contains a pre-authored broker pack.");
+}
 const declarationsPath = path.join(input, "case-source-declarations.json");
 await writeJson(declarationsPath, declarations);
 const ingressPath = path.join(input, "attachment-ingress.json");
@@ -224,13 +324,17 @@ await writeJson(ingressPath, {
       expected_sha256: dcsHash, media_type: "text/csv",
       adapter: { domain: "factset_dcs", format: "csv" },
     },
-    ...policyArtifacts.map(({ source, rawPath, rawSha256, attachmentId, extractionPath }) => ({
+    ...policyArtifacts.map(({ sourceId, attachmentId, rawPath, rawSha256, extractionPath }) => ({
       attachment_id: attachmentId,
-      source_ids: [source.source_id],
+      source_ids: [sourceId],
       path: rawPath,
       expected_sha256: rawSha256,
       media_type: "application/json",
-      adapter: { domain: "document_extraction", format: "json", extraction_path: extractionPath },
+      adapter: {
+        domain: "document_extraction",
+        format: "json",
+        extraction_path: extractionPath,
+      },
     })),
   ],
 });
@@ -297,13 +401,86 @@ const state = JSON.parse(
 if (state.lane_states?.filings?.pipeline_status !== "PASS" || state.lane_states?.dcs?.pipeline_status !== "PASS") {
   throw new Error("Raw-input canary did not close both mandatory evidence lanes.");
 }
+const userFlow = JSON.parse(
+  await fs.readFile(path.join(runRoot, "model", "user-flow-result.json"), "utf8"),
+);
+const [compiledEvidence, compiledCaseSource, rowMap, deliveryAttestation] = await Promise.all([
+  fs.readFile(state.artifacts.evidence_run, "utf8").then(JSON.parse),
+  fs.readFile(state.artifacts.case_source, "utf8").then(JSON.parse),
+  fs.readFile(`${path.resolve(userFlow.workbook)}.row-map.json`, "utf8").then(JSON.parse),
+  fs.readFile(path.resolve(userFlow.live_delivery_attestation), "utf8").then(JSON.parse),
+]);
+const manifestRowCount = (manifests, section) =>
+  (manifests?.[section] ?? []).reduce((total, manifest) => total + (manifest.rows?.length ?? 0), 0);
+const rawStatementCounts = {
+  income_statement: rawFilingRows.income_statement.length,
+  cash_flow: rawFilingRows.cash_flow.length,
+};
+const compiledManifestCounts = {
+  income_statement: manifestRowCount(compiledEvidence.case_evidence?.face_statement_manifests, "income_statement"),
+  cash_flow: manifestRowCount(compiledEvidence.case_evidence?.face_statement_manifests, "cash_flow"),
+};
+const compiledStatementMapCounts = {
+  income_statement: compiledCaseSource.statement_map?.income_statement?.length ?? 0,
+  cash_flow: compiledCaseSource.statement_map?.cash_flow?.length ?? 0,
+};
+for (const section of ["income_statement", "cash_flow"]) {
+  if (
+    compiledManifestCounts[section] !== rawStatementCounts[section] ||
+    compiledStatementMapCounts[section] !== rawStatementCounts[section]
+  ) {
+    throw new Error(
+      `Raw statement topology was not preserved for ${section}: ` +
+      `${rawStatementCounts[section]} raw, ${compiledManifestCounts[section]} sealed, ` +
+      `${compiledStatementMapCounts[section]} mapped.`,
+    );
+  }
+}
+const lanes = compiledEvidence.case_evidence?.lanes ?? {};
+for (const lane of [
+  "periods", "modules", "controls", "operating_metrics", "instruments",
+  "debt_reconciliation", "provenance", "source_coverage_review", "broker_pack",
+]) {
+  if (!Object.hasOwn(lanes, lane)) {
+    throw new Error(`Runtime evidence writer did not author the ${lane} lane.`);
+  }
+}
+if (
+  Object.keys(lanes.operating_metrics ?? {}).length === 0 ||
+  (lanes.instruments ?? []).length !== 2 ||
+  (compiledEvidence.dcs_projection?.term_authorities ?? []).length === 0
+) {
+  throw new Error("Runtime evidence writer did not project operating and DCS authority from the raw sources.");
+}
+if (
+  Object.keys(lanes.broker_pack?.metrics ?? {}).length !== 0 ||
+  !String(lanes.broker_pack?.source_label ?? "").includes("explicitly skipped")
+) {
+  throw new Error("Explicit broker skip did not compile to zero broker model authority.");
+}
+if (deliveryAttestation.status !== "PASS" || deliveryAttestation.violations?.length !== 0) {
+  throw new Error("Delivered raw-input workbook lacks a clean live-delivery attestation.");
+}
+if (rowMap.authority_profile !== "net_cash" || Number(rowMap.visible_end_row) !== 140) {
+  throw new Error(
+    `Small net-cash case did not preserve its 140-row authority surface: ${rowMap.visible_end_row}.`,
+  );
+}
 console.log(JSON.stringify({
   schema_version: "raw-input-black-box-canary/1.0",
   status: "PASS",
   public_entrypoint: "scripts/run_excel_inflow_vnext.mjs",
+  preauthored_statement_map: false,
+  preauthored_compiler_lanes: false,
   preauthored_broker_crosswalk: false,
   preauthored_broker_pack: false,
   preauthored_dcs_projection: false,
+  raw_statement_rows: rawStatementCounts,
+  compiled_statement_map_rows: compiledStatementMapCounts,
+  runtime_operating_metric_count: Object.keys(lanes.operating_metrics).length,
+  runtime_instrument_count: lanes.instruments.length,
+  authority_profile: rowMap.authority_profile,
+  visible_end_row: rowMap.visible_end_row,
   filings_lane_status: state.lane_states.filings.pipeline_status,
   dcs_lane_status: state.lane_states.dcs.pipeline_status,
   broker_state: "explicitly_skipped",

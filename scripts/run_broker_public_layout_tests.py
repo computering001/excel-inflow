@@ -22,6 +22,7 @@ from typing import Any
 
 
 HERE = Path(__file__).resolve().parent
+FORECAST_PERIODS = ["2027-12-31", "2028-12-31", "2029-12-31"]
 
 
 def sha256_file(path: Path) -> str:
@@ -37,6 +38,58 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise AssertionError(f"Expected one JSON object at {path}.")
     return value
+
+
+def canonical_hash(value: object) -> str:
+    payload = (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def model_context() -> dict[str, Any]:
+    labels = [
+        "Revenue", "EBIT", "Adjusted EBITDA", "Depreciation and amortisation",
+        "Effective tax rate", "Capital expenditure", "Change in working capital",
+        "Dividends paid", "Share buybacks",
+    ]
+    nodes = [
+        {
+            "node_id": f"public.{metric_index}.fy{period_index + 1}",
+            "section": "cash_flow" if label in {
+                "Capital expenditure", "Change in working capital", "Dividends paid", "Share buybacks",
+            } else "income_statement",
+            "source_line_id": f"public.{metric_index}",
+            "label": label,
+            "parent_label": None,
+            "period_end": period,
+            "material": True,
+            "has_historical_value": True,
+            "allowed_authorities": ["selected_broker", "historical_inference"],
+            "definition_signature_sha256": "b" * 64,
+        }
+        for metric_index, label in enumerate(labels)
+        for period_index, period in enumerate(FORECAST_PERIODS)
+    ]
+    body = {
+        "schema_version": "pre-broker-model-demand/1.0",
+        "run_id": "public_broker_layout_corpus_20260812",
+        "as_of": "2026-12-31",
+        "reporting_currency": "USD",
+        "units": "millions",
+        "forecast_periods": FORECAST_PERIODS,
+        "nodes": nodes,
+        "counts": {
+            "source_rows": len(labels),
+            "forecast_nodes": len(nodes),
+            "material_nodes": len(nodes),
+        },
+    }
+    return {
+        "as_of": "2026-12-31",
+        "reporting_currency": "USD",
+        "units": "millions",
+        "forecast_periods": FORECAST_PERIODS,
+        "model_demand_graph": {**body, "graph_sha256": canonical_hash(body)},
+    }
 
 
 def pdf_page_count(path: Path) -> int:
@@ -113,14 +166,15 @@ def main() -> int:
     request = {
         "schema_version": "broker-extraction-request/1.0",
         "run_id": "public_broker_layout_corpus_20260812",
+        "model_context": model_context(),
         "documents": request_documents,
     }
     request_path = output_root / "broker-extraction-request.json"
     request_path.write_text(json.dumps(request, indent=2, sort_keys=True) + "\n", "utf-8")
 
     first_code, first_state = invoke(request_path, output_root / "controller")
-    assert first_code == 2
-    assert first_state["pipeline_status"] in {"NEEDS_VISION", "NEEDS_CROSSWALK"}
+    assert first_code in {0, 2}
+    assert first_state["pipeline_status"] in {"NEEDS_VISION", "NEEDS_CROSSWALK", "PASS", "PASS_DEGRADED"}
     assert first_state["user_blocking"] is False
 
     extraction_path = Path(first_state["artifacts"]["extraction_bundle"])
@@ -183,9 +237,10 @@ def main() -> int:
         assert all(task["task_kind"] == "independent_table_transcription" for task in first_state["tasks"])
         assert all(task["region_crops"] for task in first_state["tasks"])
         assert all(crop["dpi"] >= 300 for task in first_state["tasks"] for crop in task["region_crops"])
+        assert all(task.get("selected_cell_contract") for task in first_state["tasks"])
 
     second_code, second_state = invoke(request_path, output_root / "controller")
-    assert second_code == 2
+    assert second_code == first_code
     assert second_state["pipeline_status"] == first_state["pipeline_status"]
     extract_checkpoint = next(item for item in second_state["checkpoints"] if item["stage"] == "extract")
     census_checkpoint = next(item for item in second_state["checkpoints"] if item["stage"] == "surface_census")

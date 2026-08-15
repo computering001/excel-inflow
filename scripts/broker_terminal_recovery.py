@@ -103,6 +103,59 @@ def _auto_exact_aliases(dictionary: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def compile_broker_demand_contract(model_context: dict[str, Any]) -> dict[str, Any]:
+    """Compile the only concepts/periods broker recovery is allowed to inspect.
+
+    This contract is deliberately a *discovery* boundary, not semantic
+    authority.  Dictionary examples may be used to find a potentially useful
+    row, but the later selected-cell crosswalk still has to prove the exact
+    immutable row, periods, units and values independently.  Keeping this
+    small contract upstream of OCR prevents the archive census from becoming
+    an instruction to transcribe an entire research pack.
+    """
+    graph = model_context.get("model_demand_graph") if isinstance(model_context, dict) else None
+    if not isinstance(graph, dict) or graph.get("schema_version") != "pre-broker-model-demand/1.0":
+        raise ValueError("Broker recovery requires pre-broker-model-demand/1.0.")
+    graph_body = {key: value for key, value in graph.items() if key != "graph_sha256"}
+    if graph.get("graph_sha256") != canonical_hash(graph_body):
+        raise ValueError("Pre-broker model-demand graph hash does not match its payload.")
+    forecast_periods = list(model_context.get("forecast_periods") or [])
+    if graph.get("forecast_periods") != forecast_periods or len(forecast_periods) != 3:
+        raise ValueError("Broker demand contract requires the graph's three forecast periods.")
+
+    dictionary = _metric_dictionary()
+    aliases = _auto_exact_aliases(dictionary)
+    demanded: dict[str, set[str]] = {}
+    for node in graph.get("nodes") or []:
+        if "selected_broker" not in (node.get("allowed_authorities") or []):
+            continue
+        label = normalized_label(node.get("label"))
+        metric_id = aliases.get(label)
+        if metric_id:
+            demanded.setdefault(metric_id, set()).add(label)
+
+    discovery_by_metric: dict[str, set[str]] = {metric_id: set() for metric_id in demanded}
+    for alias, metric_id in aliases.items():
+        if metric_id in discovery_by_metric:
+            discovery_by_metric[metric_id].add(alias)
+    targets = [
+        {
+            "metric_id": metric_id,
+            "demand_labels": sorted(demanded[metric_id]),
+            "discovery_aliases": sorted(discovery_by_metric[metric_id]),
+            "forecast_periods": forecast_periods,
+        }
+        for metric_id in sorted(demanded)
+    ]
+    body = {
+        "schema_version": "broker-selected-cell-demand/1.0",
+        "model_demand_graph_sha256": graph["graph_sha256"],
+        "forecast_periods": forecast_periods,
+        "targets": targets,
+    }
+    return {**body, "contract_sha256": canonical_hash(body)}
+
+
 def _period_year(label: Any, forecast_years: list[int]) -> int | None:
     text = re.sub(r"\s+", "", str(label or "").upper())
     for year in forecast_years:
@@ -232,14 +285,12 @@ def compile_demand_selected_crosswalk(
     if graph.get("forecast_periods") != forecast_periods:
         raise ValueError("Pre-broker model demand and broker forecast periods differ.")
 
+    demand_contract = compile_broker_demand_contract(model_context)
     dictionary = _metric_dictionary()
     metrics_by_id = {str(item.get("id")): item for item in dictionary.get("metrics") or []}
     aliases = _auto_exact_aliases(dictionary)
     demanded_metric_ids = {
-        aliases[label]
-        for node in graph.get("nodes") or []
-        if "selected_broker" in (node.get("allowed_authorities") or [])
-        and (label := normalized_label(node.get("label"))) in aliases
+        str(item["metric_id"]) for item in demand_contract.get("targets") or []
     }
     shell = compile_reference_only_crosswalk(bundle, model_context)
     candidates = candidate_index(bundle)

@@ -123,6 +123,12 @@
       "script": "run_case_source_proposer_tests.mjs"
     },
     {
+      "id": "historical-normalisation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_historical_normalisation_tests.mjs"
+    },
+    {
       "id": "case-authorship-boundary",
       "phase": "evidence",
       "runtime": "node",

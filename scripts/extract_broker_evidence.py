@@ -24,6 +24,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
+from broker_terminal_recovery import compile_broker_demand_contract, normalized_label
+
 
 VERSION = "broker-evidence-extractor/1.1"
 PDF_LANE_TIMEOUT_SECONDS = float(os.environ.get("BROKER_PDF_LANE_TIMEOUT_SECONDS", "0.5"))
@@ -43,6 +45,61 @@ SUPPORTED = {
     "image/png",
     "image/jpeg",
 }
+
+
+def demand_targets_for_surface(
+    text: str,
+    tables: list[dict[str, Any]],
+    demand_contract: dict[str, Any],
+    *,
+    opaque_image: bool = False,
+) -> list[dict[str, Any]]:
+    """Return only model-demand concepts plausibly visible on one surface.
+
+    Native text and table labels are discovery evidence only.  An opaque image
+    cannot be searched safely, so it receives the same bounded target list,
+    but never a whole-page table-transcription instruction.
+    """
+    targets = list(demand_contract.get("targets") or [])
+    if opaque_image:
+        return targets
+    haystack = f" {normalized_label(text)} "
+    table_labels = {
+        normalized_label(cell.get("raw_text"))
+        for table in tables
+        for row in table.get("rows") or []
+        for cell in row[:2]
+        if normalized_label(cell.get("raw_text"))
+    }
+    selected = []
+    for target in targets:
+        aliases = {
+            normalized_label(value)
+            for value in target.get("discovery_aliases") or []
+            if normalized_label(value)
+        }
+        if any(alias in table_labels or f" {alias} " in haystack for alias in aliases):
+            selected.append(target)
+    return selected
+
+
+def selected_cell_instruction(targets: list[dict[str, Any]]) -> str:
+    concepts = ", ".join(
+        f"{item['metric_id']} ({'/'.join(item.get('demand_labels') or [])})"
+        for item in targets
+    )
+    periods = ", ".join(
+        str(value) for value in ((targets[0].get("forecast_periods") or []) if targets else [])
+    )
+    return (
+        f"Recover only the requested model-demand cells: {concepts}. Required periods: {periods}. "
+        "For each visible requested concept, return its exact printed row label, exact period headers, "
+        "units and only the requested period values in a small grid with cell bboxes. Preserve blanks, "
+        "dashes, parentheses, signs and footnote markers. Do not transcribe unrelated rows, tables, "
+        "valuation data, narrative numbers or a whole-page numeric inventory. If none of the requested "
+        "concepts is visible, return no tables and set surface_disposition to verified_non_tabular with "
+        "non_tabular_reason 'no requested model-demand concept visible'. Each pass decides independently."
+    )
 
 
 def normalise_text(value: Any) -> str:
@@ -529,7 +586,8 @@ def native_cell_bbox(native_table: Any, row_index: int, column_index: int) -> li
 
 
 def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
-                render_dpi: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str], str]:
+                render_dpi: int, demand_contract: dict[str, Any],
+                vision_house_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str], str]:
     try:
         import fitz  # type: ignore
     except Exception as error:  # pragma: no cover - environment-specific
@@ -556,6 +614,15 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
     for page_index in range(document.page_count):
         page = document.load_page(page_index)
         surface_id = f"{descriptor['document_id']}.p{page_index + 1}"
+        fallback_text = page.get_text("text", sort=True) or ""
+        selected_targets = demand_targets_for_surface(
+            fallback_text,
+            [],
+            demand_contract,
+            opaque_image=not bool(fallback_text.strip()),
+        )
+        if descriptor.get("house_id") != vision_house_id:
+            selected_targets = []
         text = page.get_text("text", sort=True) or ""
         words = page.get_text("words", sort=True) or []
         text_ref = writer.write_text(f"pages/page-{page_index + 1:04d}.txt", "native_text", text)
@@ -802,6 +869,29 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             or overlapping_native_lanes
         )
         vision_reason = None
+        surface_tables = [table for table in tables if table.get("surface_id") == surface_id]
+        selected_targets = demand_targets_for_surface(
+            text,
+            surface_tables,
+            demand_contract,
+            opaque_image=bool(sparse and material_image),
+        )
+        unselected_house_recovery = (
+            vision_required and descriptor.get("house_id") != vision_house_id
+        )
+        archive_only = not selected_targets or unselected_house_recovery
+        if archive_only:
+            # The raw PDF, native text, geometry, census and page image remain
+            # preserved.  What closes is only model-facing reconciliation for
+            # a page that contains no demanded concept discoverable from its
+            # readable text/tables.  Those tables are explicitly barred from
+            # the candidate manifest so canonical capture cannot re-arm work.
+            for table in surface_tables:
+                table["authority_role"] = "archive_only"
+                table["model_use"] = "prohibited"
+            vision_required = False
+            vision_reason = None
+
         if vision_required:
             unresolved = True
             reasons = []
@@ -899,37 +989,13 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                     "source_census_artifact_id": census_ref,
                     "uncovered_region_ids": [region["region_id"] for region in material_uncovered],
                     "region_crops": region_crops,
-                    # TRANSCRIBE THE TABLE, DO NOT INVENTORY THE PAGE.
-                    #
-                    # This instruction used to open "Inventory the complete
-                    # page first", and that is exactly what came back: tables
-                    # titled "Observed page numeric evidence" whose single row
-                    # listed every numeric token on the page in reading order,
-                    # with no row labels and no period headers. Such a dump
-                    # satisfies every completeness test we had — it trivially
-                    # contains 100% of the page's numbers, and two independent
-                    # passes dump identically, so it certified as a verified
-                    # dual read — while being analytically worthless. A real
-                    # broker Key-financials appendix (fifty rows across ten
-                    # periods) came out as eight orphan numbers. The recall
-                    # census already lives in its own artifact; what vision is
-                    # for is STRUCTURE, so the instruction now demands it and
-                    # forbids the dump.
-                    "instruction": (
-                        "Transcribe each visible table on this page as a grid. For every table: put the "
-                        "row label in the first column of each row exactly as printed, put the period or "
-                        "column headings in a header row exactly as printed, and place each value in the "
-                        "column of its heading. Preserve blanks, dashes, parentheses, negatives, "
-                        "percentages, units, footnote markers, captions, bboxes and table continuations. "
-                        "Return every table, including any already visible to native extraction, and do "
-                        "not normalize, rename or aggregate metrics. Do NOT return a flat list of the "
-                        "page's numbers as a table: a row of values without its labels and period "
-                        "headings is not a transcription and will be rejected. If a region is genuinely "
-                        "not tabular, return no tables, set surface_disposition to verified_non_tabular, "
-                        "and give a specific non_tabular_reason. Otherwise set surface_disposition to "
-                        "analytical_tables. The two independent passes must make this classification "
-                        "separately; never invent a table merely to close the numeric census."
-                    ),
+                    "selected_cell_contract": {
+                        "schema_version": "broker-selected-cell-task/1.0",
+                        "model_demand_graph_sha256": demand_contract["model_demand_graph_sha256"],
+                        "demand_contract_sha256": demand_contract["contract_sha256"],
+                        "targets": selected_targets,
+                    },
+                    "instruction": selected_cell_instruction(selected_targets),
                 }
                 task_ref = writer.write_json(
                     f"vision/page-{page_index + 1:04d}.task.json",
@@ -972,6 +1038,15 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 for info in image_infos
             ],
             "vision_reason": vision_reason,
+            "model_demand_status": (
+                "selected_cell_recovery_required" if vision_required
+                else "archive_only_unselected_house" if unselected_house_recovery
+                else "archive_only_not_demanded" if archive_only
+                else "native_candidate"
+            ),
+            "selected_demand_metric_ids": sorted({
+                str(item.get("metric_id")) for item in selected_targets
+            }),
         })
 
     return surfaces, tables, source_table_tokens, captured_table_tokens, "needs_vision" if unresolved else "complete"
@@ -1114,7 +1189,9 @@ def extract_xlsx(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter)
     return surfaces, tables, source_tokens, captured_tokens, "complete"
 
 
-def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str], str]:
+def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
+                  demand_contract: dict[str, Any],
+                  vision_house_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str], str]:
     """Preserve a standalone broker-table image and emit a bound vision task.
 
     No OCR output is accepted here.  The image remains NEEDS_VISION until
@@ -1155,6 +1232,11 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
         "material_uncovered_region_count": 1,
     }
     census_ref = writer.write_json("census/image-0001.json", "surface_census", census)
+    selected_targets = demand_targets_for_surface(
+        "", [], demand_contract, opaque_image=True
+    )
+    if descriptor.get("house_id") != vision_house_id:
+        selected_targets = []
     task = {
         "schema_version": "broker-vision-task/1.0",
         "document_id": descriptor["document_id"],
@@ -1162,19 +1244,19 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
         "image_artifact_id": image_ref,
         "source_census_artifact_id": census_ref,
         "uncovered_region_ids": ["full-image"],
-        # Same doctrine as the page instruction above: structure, not inventory.
-        "instruction": (
-            "Transcribe each visible table in this image as a grid. For every table: put the row label "
-            "in the first column of each row exactly as printed, put the period or column headings in a "
-            "header row exactly as printed, and place each value in the column of its heading. Preserve "
-            "labels, blanks, signs, units, periods, footnote markers, captions, bboxes and column "
-            "positions, and do not normalize metrics. Do NOT return a flat list of the image's numbers "
-            "as a table: a row of values without its labels and period headings is not a transcription "
-            "and will be rejected."
-        ),
+        "selected_cell_contract": {
+            "schema_version": "broker-selected-cell-task/1.0",
+            "model_demand_graph_sha256": demand_contract["model_demand_graph_sha256"],
+            "demand_contract_sha256": demand_contract["contract_sha256"],
+            "targets": selected_targets,
+        },
+        "instruction": selected_cell_instruction(selected_targets),
         "required_independent_passes": 2,
     }
-    task_ref = writer.write_json("vision/image-0001.task.json", "vision_task", task)
+    task_ref = (
+        writer.write_json("vision/image-0001.task.json", "vision_task", task)
+        if selected_targets else None
+    )
     surface = {
         "surface_id": surface_id,
         "kind": "image_page",
@@ -1187,22 +1269,33 @@ def extract_image(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter
         "numeric_token_count": 0,
         "table_count": 0,
         "image_count": 1,
-        "artifact_refs": [image_ref, census_ref, task_ref],
+        "artifact_refs": [image_ref, census_ref, *([task_ref] if task_ref else [])],
         "lane_status": {
             "native_text": "empty",
             "geometry": "unsupported",
             "tables": "none",
             "images": "pass",
-            "vision": "required",
+            "vision": "required" if selected_targets else "not_required",
         },
         "surface_census_artifact_id": census_ref,
         "whole_surface_numeric_token_count": None,
         "source_table_numeric_tokens": [],
         "uncovered_numeric_regions": census["uncovered_numeric_regions"],
         "table_discovery_lanes": census["table_discovery_lanes"],
-        "vision_reason": "Standalone image requires two-pass cell-addressed table transcription.",
+        "vision_reason": (
+            "Standalone image requires two-pass cell-addressed table transcription."
+            if selected_targets else None
+        ),
+        "vision_disposition": None if selected_targets else "quarantined_evidence_only",
+        "model_demand_status": (
+            "selected_cell_recovery_required" if selected_targets
+            else "archive_only_unselected_house"
+        ),
+        "selected_demand_metric_ids": sorted({
+            str(item.get("metric_id")) for item in selected_targets
+        }),
     }
-    return [surface], [], [], [], "needs_vision"
+    return [surface], [], [], [], "needs_vision" if selected_targets else "complete"
 
 
 def rectangular_rows(raw_rows: list[list[Any]], source_name: str, surface_id: str,
@@ -1326,7 +1419,8 @@ def build_ledger(source_tokens: list[str], captured_tokens: list[str]) -> dict[s
     }
 
 
-def extract_document(root: Path, request_dir: Path, descriptor: dict[str, Any], render_dpi: int) -> dict[str, Any]:
+def extract_document(root: Path, request_dir: Path, descriptor: dict[str, Any], render_dpi: int,
+                     demand_contract: dict[str, Any], vision_house_id: str) -> dict[str, Any]:
     media_type = descriptor["media_type"]
     if media_type not in SUPPORTED:
         raise RuntimeError(f"Unsupported media type {media_type!r}.")
@@ -1340,14 +1434,18 @@ def extract_document(root: Path, request_dir: Path, descriptor: dict[str, Any], 
         raise RuntimeError(f"{descriptor['document_id']} expected_sha256 does not match its bytes.")
     writer = ArtifactWriter(root, descriptor["document_id"])
     if media_type == "application/pdf":
-        surfaces, tables, source_tokens, captured_tokens, status = extract_pdf(source_path, descriptor, writer, render_dpi)
+        surfaces, tables, source_tokens, captured_tokens, status = extract_pdf(
+            source_path, descriptor, writer, render_dpi, demand_contract, vision_house_id
+        )
     elif media_type in {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel.sheet.macroEnabled.12",
     }:
         surfaces, tables, source_tokens, captured_tokens, status = extract_xlsx(source_path, descriptor, writer)
     elif media_type in {"image/png", "image/jpeg"}:
-        surfaces, tables, source_tokens, captured_tokens, status = extract_image(source_path, descriptor, writer)
+        surfaces, tables, source_tokens, captured_tokens, status = extract_image(
+            source_path, descriptor, writer, demand_contract, vision_house_id
+        )
     else:
         surfaces, tables, source_tokens, captured_tokens, status = extract_delimited_or_text(source_path, descriptor, writer)
     ledger = build_ledger(source_tokens, captured_tokens)
@@ -1375,6 +1473,8 @@ def extract_readable_pdf_fallback(
     descriptor: dict[str, Any],
     render_dpi: int,
     primary_error: Exception,
+    demand_contract: dict[str, Any],
+    vision_house_id: str,
 ) -> dict[str, Any]:
     """Preserve every readable PDF page when structured extraction crashes.
 
@@ -1450,15 +1550,19 @@ def extract_readable_pdf_fallback(
                 "bbox": census["uncovered_numeric_regions"][0]["bbox"],
                 "dpi": dpi,
             }],
-            "instruction": (
-                "Transcribe every visible table as a hardcoded grid with exact row labels and period headers. "
-                "Preserve blanks, signs, units and footnotes. If no analytical table is visible, independently "
-                "certify verified_non_tabular. This is an internal recovery pass; do not request a replacement PDF."
-            ),
+            "selected_cell_contract": {
+                "schema_version": "broker-selected-cell-task/1.0",
+                "model_demand_graph_sha256": demand_contract["model_demand_graph_sha256"],
+                "demand_contract_sha256": demand_contract["contract_sha256"],
+                "targets": selected_targets,
+            },
+            "instruction": selected_cell_instruction(selected_targets),
         }
-        task_ref = writer.write_json(
-            f"vision/page-{page_index + 1:04d}.task.json", "vision_task", task
-        )
+        task_ref = None
+        if selected_targets:
+            task_ref = writer.write_json(
+                f"vision/page-{page_index + 1:04d}.task.json", "vision_task", task
+            )
         surfaces.append({
             "surface_id": surface_id,
             "kind": "pdf_page",
@@ -1471,20 +1575,30 @@ def extract_readable_pdf_fallback(
             "numeric_token_count": 0,
             "table_count": 0,
             "image_count": 1,
-            "artifact_refs": [image_ref, census_ref, task_ref],
+            "artifact_refs": [image_ref, census_ref, *([task_ref] if task_ref else [])],
             "lane_status": {
                 "native_text": "error",
                 "geometry": "error",
                 "tables": "error",
                 "images": "pass",
-                "vision": "required",
+                "vision": "required" if selected_targets else "not_required",
             },
             "surface_census_artifact_id": census_ref,
             "whole_surface_numeric_token_count": 0,
             "source_table_numeric_tokens": [],
             "uncovered_numeric_regions": census["uncovered_numeric_regions"],
             "table_discovery_lanes": census["table_discovery_lanes"],
-            "vision_reason": task["reason"],
+            "vision_reason": task["reason"] if selected_targets else None,
+            "vision_disposition": None if selected_targets else "quarantined_evidence_only",
+            "model_demand_status": (
+                "selected_cell_recovery_required" if selected_targets
+                else "archive_only_unselected_house"
+                if descriptor.get("house_id") != vision_house_id
+                else "archive_only_not_demanded"
+            ),
+            "selected_demand_metric_ids": sorted({
+                str(item.get("metric_id")) for item in selected_targets
+            }),
         })
     raw_hash = sha256_file(source_path)
     return {
@@ -1501,7 +1615,11 @@ def extract_readable_pdf_fallback(
         "tables": [],
         "numeric_ledger": build_ledger([], []),
         "artifacts": writer.records,
-        "extraction_status": "needs_vision",
+        "extraction_status": (
+            "needs_vision"
+            if any(surface.get("lane_status", {}).get("vision") == "required" for surface in surfaces)
+            else "complete"
+        ),
         "internal_recovery": {
             "strategy": "rendered_page_fallback",
             "primary_error": str(primary_error),
@@ -1553,13 +1671,30 @@ def main() -> int:
     output_root = Path(args.out).resolve()
     request = json.loads(request_path.read_text("utf-8"))
     validate_request(request)
+    demand_contract = compile_broker_demand_contract(request.get("model_context") or {})
+    vision_house_id = str(sorted(
+        request["documents"],
+        key=lambda item: (
+            str(item.get("published_date") or ""),
+            str(item.get("house_id") or ""),
+            str(item.get("document_id") or ""),
+        ),
+        reverse=True,
+    )[0]["house_id"])
     output_root.mkdir(parents=True, exist_ok=True)
 
     documents: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
     for descriptor in request["documents"]:
         try:
-            documents.append(extract_document(output_root, request_path.parent, descriptor, args.render_dpi))
+            documents.append(extract_document(
+                output_root,
+                request_path.parent,
+                descriptor,
+                args.render_dpi,
+                demand_contract,
+                vision_house_id,
+            ))
         except Exception as error:
             try:
                 if descriptor.get("media_type") != "application/pdf":
@@ -1575,7 +1710,13 @@ def main() -> int:
                 if expected and (not source_path.is_file() or sha256_file(source_path) != expected):
                     raise
                 recovered = extract_readable_pdf_fallback(
-                    output_root, request_path.parent, descriptor, args.render_dpi, error
+                    output_root,
+                    request_path.parent,
+                    descriptor,
+                    args.render_dpi,
+                    error,
+                    demand_contract,
+                    vision_house_id,
                 )
                 documents.append(recovered)
                 findings.append({
@@ -1648,6 +1789,13 @@ def main() -> int:
         "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         "extractor_version": VERSION,
         "tool_versions": tool_versions(),
+        "selected_cell_demand_contract": demand_contract,
+        "selected_cell_recovery_policy": {
+            "schema_version": "broker-selected-house-recovery/1.0",
+            "policy": "latest_supplied_house_then_zero_authority",
+            "selected_house_id": vision_house_id,
+            "maximum_recovery_house_count": 1,
+        },
         "artifact_root": str(output_root),
         "documents": documents,
         "summary": {

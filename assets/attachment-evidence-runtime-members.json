@@ -16,6 +16,7 @@
     "assets/broker-degraded-close-receipt-v1.schema.json",
     "assets/delivery-constitution-v1.json",
     "assets/run-scoped-broker-concept-v1.schema.json",
+    "scripts/archive_broker_pages.py",
     "scripts/run_attachment_evidence_pipeline.py",
     "scripts/delivery_constitution.py",
     "scripts/run_broker_intake.mjs",

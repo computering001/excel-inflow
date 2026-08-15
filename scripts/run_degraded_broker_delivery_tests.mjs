@@ -60,7 +60,7 @@ async function command(executable, args, options = {}) {
 // 1. Drive the real broker controller through persistent cell/surface conflict
 // exhaustion. It must close PASS_DEGRADED and preserve every source table.
 const brokerRoot = path.join(out, "broker-controller");
-await command("python3", [
+await command(python, [
   path.join(HERE, "run_broker_degraded_close_tests.py"),
   "--out",
   brokerRoot,

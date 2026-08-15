@@ -69,6 +69,15 @@ function inferExactContiguousTotalDependencies(modelCase) {
   for (const section of ["income_statement", "cash_flow"]) {
     const rows = modelCase.statement_structure?.[section] ?? [];
     const byId = new Map(rows.map((row) => [row.row_id, row]));
+    const reaches = (fromId, targetId, visiting = new Set()) => {
+      if (fromId === targetId) return true;
+      if (visiting.has(fromId)) return false;
+      const next = new Set(visiting).add(fromId);
+      const row = byId.get(fromId);
+      return (row?.calculation?.refs ?? []).some((reference) =>
+        reaches(reference, targetId, next),
+      );
+    };
     const memo = new Map();
     const resolve = (rowId, visiting = new Set()) => {
       if (memo.has(rowId)) return memo.get(rowId);
@@ -93,6 +102,13 @@ function inferExactContiguousTotalDependencies(modelCase) {
       for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
         const candidate = rows[cursor];
         if (candidate.row_type === "header") break;
+        // A numerically reconciling suffix is not a valid definition when one
+        // of its members already depends (directly or transitively) on the
+        // total being inferred. Accepting that inverse identity creates a
+        // cycle despite perfect historical arithmetic—for example reported
+        // Adjusted EBITDA = operating profit + D&A beside an operating-profit
+        // total that happens to equal Adjusted EBITDA - D&A.
+        if (reaches(candidate.row_id, total.row_id)) break;
         const values = resolve(candidate.row_id);
         if (!values || candidate.number_format === "percentage") continue;
         refs.unshift(candidate.row_id);

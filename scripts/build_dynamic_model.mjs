@@ -1415,7 +1415,8 @@ function brokerEvidenceSheetName(index, houseName, used) {
 }
 
 function compileBrokerEvidenceLayout(modelCase) {
-  const pageHouses = modelCase.broker_pack?.page_evidence ?? [];
+  const archive = modelCase.broker_archive ?? modelCase.broker_pack ?? {};
+  const pageHouses = archive.page_evidence ?? [];
   if (Array.isArray(pageHouses) && pageHouses.length > 0) {
     const usedNames = new Set(["Operating Model", "Brokers", "Forward Curves"]);
     const houseByName = new Map();
@@ -1469,7 +1470,7 @@ function compileBrokerEvidenceLayout(modelCase) {
       quarantinedCellCount: 0,
     };
   }
-  const houses = modelCase.broker_pack?.raw_tables ?? [];
+  const houses = archive.raw_tables ?? [];
   const mappings = modelCase.broker_pack?.source_mappings ?? [];
   if (!Array.isArray(houses) || houses.length === 0) return null;
   if (!Array.isArray(mappings) || mappings.length === 0) {

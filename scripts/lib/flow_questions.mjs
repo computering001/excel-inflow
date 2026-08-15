@@ -139,7 +139,7 @@ function applyCommercialPaperBackstop(modelCase, backstopped) {
   return modelCase;
 }
 
-function applyRefinancingIntent(modelCase, row, intent) {
+export function applyRefinancingIntent(modelCase, row, intent) {
   const instrument = instrumentOf(modelCase, row.instrument_id);
   if (!instrument) return modelCase;
   const normalised = String(intent ?? "").toLowerCase();
@@ -332,6 +332,11 @@ const KINDS = [
     kind: "refinance_at_maturity",
     detect(context) {
       const { intake, draftCase } = context;
+      // Contractual maturity treatment is an execution toggle on the model,
+      // not an intake ambiguity.  Source-backed refinancing still overrides
+      // the default through applyExplicitSourcePolicies, but absent/ask/
+      // unclear/unknown evidence must never create one question per bond.
+      if (draftCase?.controls?.debt_maturities_roll !== undefined) return [];
       const years = forecastYears(draftCase);
       const lastYear = years[years.length - 1];
       return exportInstruments(intake)

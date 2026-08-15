@@ -64,6 +64,11 @@ await exec("python3", ["-c", [
   "  return memo[key]",
   " return {row['source_line_id']:depth(row) for row in rows}",
   "doc=fitz.open()",
+  "for page_no in range(6):",
+  " p=doc.new_page(); p.insert_text((40,35),'Financial review and cash flows',fontsize=9)",
+  " p.insert_text((40,55),'Discussion of income statement and statement of cash flows performance',fontsize=7)",
+  " p.insert_text((390,75),'2023',fontsize=7); p.insert_text((450,75),'2024',fontsize=7); p.insert_text((510,75),'2025',fontsize=7)",
+  " p.insert_text((40,95),'Narrative reference only',fontsize=7); p.insert_text((390,95),'1',fontsize=7)",
   "for section,title in [('income_statement','Consolidated Income Statement'),('cash_flow','Consolidated Cash Flow Statement')]:",
   " level=depths(data[section])",
   " p=doc.new_page(); p.insert_text((40,35),title,fontsize=9)",
@@ -140,6 +145,16 @@ assert(
   "native raw filing extraction did not pass without a caller-authored response",
 );
 checks += 1;
+const nativeBundle = JSON.parse(await fs.readFile(state.artifacts.filings_bundle, "utf8"));
+assert(
+  nativeBundle.filings.income_statement.length === clean.filings.income_statement.length,
+  "native extraction selected a prose mention or shortened the income statement",
+);
+assert(
+  nativeBundle.filings.cash_flow.length === clean.filings.cash_flow.length,
+  "native extraction selected a prose mention or shortened the cash-flow statement",
+);
+checks += 2;
 
 // Exercise the top controller's raw-filings handoff before supplying any
 // caller-authored response: raw registry -> resolved evidence -> proposer ->

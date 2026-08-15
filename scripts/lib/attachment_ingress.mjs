@@ -1531,17 +1531,27 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     workbookPages.length === packHouses.size &&
     [...packHouses.keys()].every((houseId) => pageHouseIds.has(houseId)) &&
     workbookPages.every((house) => (house.pages ?? []).length > 0);
+  const brokerArchive = {
+    schema_version: "broker-archive/1.0",
+  };
   if (completePageArchive) {
-    delete compilerLanes.broker_pack.raw_tables;
-    compilerLanes.broker_pack.page_evidence = workbookPages;
+    brokerArchive.page_evidence = workbookPages;
   } else {
-    // Non-page sources retain the legacy values-only projection until their
-    // adapter can render a complete immutable page archive. Never carry both:
-    // the calculation case owns one presentation reference, while the full
-    // source tables remain once in the evidence run.
-    delete compilerLanes.broker_pack.page_evidence;
-    compilerLanes.broker_pack.raw_tables = workbookTables;
+    // A non-PDF source may still be valid selected-cell authority, but Bxx is
+    // screenshot-only. Preserve raw custody without projecting tables into a
+    // source tab. The compact Brokers sheet remains the only analytical face.
+    brokerArchive.raw_documents = [...packHouses.values()].map((house) => ({
+      house_id: house.house_id,
+      house_name: house.house_name,
+      source_id: house.source_id,
+      content_sha256: house.content_sha256,
+      file_name: house.file_name,
+      ...(house.published_date ? { published_date: house.published_date } : {}),
+    }));
   }
+  compilerLanes.broker_archive = brokerArchive;
+  delete compilerLanes.broker_pack.page_evidence;
+  delete compilerLanes.broker_pack.raw_tables;
   compilerLanes.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
   );
@@ -1794,7 +1804,14 @@ export async function compileDcsEvidence({
     throw new Error("DCS evidence artifacts are not bound to the supplied raw export bytes.");
   }
   const projectionCompatibilityView = structuredClone(projection.json.dcs_export);
-  const suppliedDcsExport = evidence.dcs_export ?? null;
+  // `dcs_export` is required by the evidence-run envelope, but a first-run
+  // raw attachment transaction carries only an empty placeholder. Treat an
+  // object as a caller-supplied normalized assertion only when it actually
+  // contains an instrument register; the validated DCS controller projection
+  // is the sole writer otherwise.
+  const suppliedDcsExport = Array.isArray(evidence.dcs_export?.instruments)
+    ? evidence.dcs_export
+    : null;
   const normalizedByInstrument = new Map(
     (suppliedDcsExport?.instruments ?? []).map((instrument) => [
       instrument.instrument_id,

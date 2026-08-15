@@ -14,16 +14,98 @@ from typing import Any
 
 HEADINGS = {
     "income_statement": re.compile(
-        r"(?:income statement|statement of (?:income|operations|profit or loss)|"
+        r"(?:income statement|statement of (?:comprehensive income|income|operations|profit or loss)|"
         r"statement of profit or loss|consolidated results)", re.I,
     ),
     "cash_flow": re.compile(r"(?:cash flow statement|statement of cash flows|cash flows)", re.I),
+}
+STRICT_HEADINGS = {
+    "income_statement": re.compile(
+        r"^\s*(?:consolidated\s+)?(?:income statement|statement of\s+"
+        r"(?:comprehensive income|income|operations|profit or loss(?: and other comprehensive income)?))\s*"
+        r"(?:\(continued\)|continued)?\s*$",
+        re.I,
+    ),
+    "cash_flow": re.compile(
+        r"^\s*(?:consolidated\s+)?(?:cash flow statement|statement of cash flows?)\s*"
+        r"(?:\(continued\)|continued)?\s*$",
+        re.I,
+    ),
 }
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 NUMBER_RE = re.compile(
     r"^\s*(?P<open>\()?\s*(?:[$€£¥])?\s*(?P<sign>[-+])?\s*"
     r"(?P<number>(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?)\s*%?\s*(?P<close>\))?\s*$"
 )
+DECORATION_RE = re.compile(
+    r"^(?:for (?:the )?(?:year|period) ended\b|financial statements?\b.*(?:annual report|form 10-k|form 20-f)\b|"
+    r"annual report\b.*(?:financial statements?|form 10-k|form 20-f)\b)",
+    re.I,
+)
+
+
+def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict[str, Any]]:
+    """Project a face-statement capture onto the operating-model surface.
+
+    The raw PDF remains the immutable archive.  A combined statement of
+    comprehensive income, however, contains three different surfaces: the
+    profit-and-loss statement, OCI, and per-share/share-count supplements.
+    Only the first is an operating statement.  Profit attribution remains in
+    scope because it reconciles reported net income.  This is a structural
+    contract over visible section headings, not an issuer- or OCR exception.
+
+    Cash-flow statements need no economic pruning; only a valueless Notes
+    column caption is decoration rather than a filed cash-flow row.
+    """
+    scoped: list[dict[str, Any]] = []
+    in_profit_attribution = False
+    past_profit_attribution = False
+    in_oci = False
+
+    for row in rows:
+        label = str(row.get("raw_label") or "").strip()
+        normalised = re.sub(r"\s+", " ", label).lower().rstrip(".")
+        has_values = any(value is not None for value in row.get("values", []))
+
+        if normalised in {"note", "notes"} and not has_values:
+            continue
+        if section != "income_statement":
+            scoped.append(row)
+            continue
+
+        if normalised.startswith("other comprehensive income"):
+            in_oci = True
+            in_profit_attribution = False
+            continue
+        if normalised == "profit attributable to":
+            in_oci = False
+            in_profit_attribution = True
+            continue
+        if normalised.startswith("total comprehensive income attributable to"):
+            in_profit_attribution = False
+            past_profit_attribution = True
+            continue
+
+        if in_oci or past_profit_attribution:
+            continue
+        if re.match(
+            r"^(?:basic|diluted) earnings per\b|^weighted average number of\b|"
+            r"^diluted weighted average number of\b|^dividends? declared\b",
+            normalised,
+        ):
+            past_profit_attribution = True
+            continue
+        if re.match(r"^all activities were in respect of continuing operations", normalised):
+            continue
+        # In a combined statement, the two numeric children immediately below
+        # “Profit attributable to” are part of the P&L.  A later comprehensive
+        # attribution block has already tripped the stop above.
+        if in_profit_attribution or not in_oci:
+            scoped.append(row)
+
+    for ordinal, row in enumerate(scoped, start=1):
+        row["ordinal"] = ordinal
+    return scoped
 
 
 def canonical(value: Any) -> bytes:
@@ -106,20 +188,56 @@ def numeric_runs(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return runs
 
 
-def statement_window(lines: list[dict[str, Any]], section: str) -> tuple[int, int] | None:
-    candidates = [index for index, line in enumerate(lines) if HEADINGS[section].search(line["text"])]
+def statement_window(
+    lines: list[dict[str, Any]], section: str, periods: list[str],
+) -> tuple[int, int] | None:
+    """Select one actual face-statement surface, never the first prose mention.
+
+    Annual reports refer to cash flows and income statements hundreds of times
+    before the audited accounts.  A face statement must therefore have an
+    anchored title, all three requested year columns on the same page, and a
+    meaningful three-value row surface.  Selection is page-local so notes,
+    governance and remuneration prose cannot expand the statement window.
+    """
+    page_ranges: dict[int, tuple[int, int]] = {}
+    for index, line in enumerate(lines):
+        page = int(line["page"])
+        if page not in page_ranges:
+            page_ranges[page] = (index, index + 1)
+        else:
+            page_ranges[page] = (page_ranges[page][0], index + 1)
+
+    candidates: list[tuple[int, int, int]] = []
+    requested_years = {str(period)[:4] for period in periods}
+    for heading_index, line in enumerate(lines):
+        if not STRICT_HEADINGS[section].fullmatch(line["text"]):
+            continue
+        _, page_end = page_ranges[int(line["page"])]
+        local = lines[heading_index:page_end]
+        observed_years = {
+            word["text"].strip("(),")
+            for candidate in local[:20]
+            for word in candidate["words"]
+            if YEAR_RE.fullmatch(word["text"].strip("(),"))
+        }
+        if not requested_years.issubset(observed_years):
+            continue
+        columns = year_columns(local, periods)
+        if len(columns) != 3:
+            continue
+        resolved_rows = 0
+        for candidate in local[1:]:
+            runs = numeric_runs(candidate["words"])
+            if len(runs) >= 3 and len(nearest_values(runs, columns)) == 3:
+                resolved_rows += 1
+        if resolved_rows < 5:
+            continue
+        # Exact title + complete period surface dominates; row count breaks
+        # ties when an issuer repeats a face statement elsewhere in the file.
+        candidates.append((1000 + resolved_rows, heading_index, page_end))
     if not candidates:
         return None
-    start = candidates[0]
-    end = len(lines)
-    for index in range(start + 1, len(lines)):
-        line = lines[index]
-        if any(pattern.search(line["text"]) for name, pattern in HEADINGS.items() if name != section):
-            end = index
-            break
-        if re.match(r"^notes?\s+to\s+", line["text"], re.I):
-            end = index
-            break
+    _, start, end = max(candidates, key=lambda item: (item[0], item[1]))
     return start, end
 
 
@@ -210,7 +328,7 @@ def extract_statement(
     lines: list[dict[str, Any]], section: str, source_id: str,
     raw_sha256: str, periods: list[str], used_ids: set[str],
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    bounds = statement_window(lines, section)
+    bounds = statement_window(lines, section, periods)
     if not bounds:
         return None, [{"code": "HEADING_NOT_FOUND", "section": section}]
     start, end = bounds
@@ -221,14 +339,25 @@ def extract_statement(
         return None, [{"code": "PERIOD_COLUMNS_UNRESOLVED", "section": section, "page": window[0]["page"]}]
     rows = []
     base_x = min((line["x0"] for line in window[1:] if line["text"]), default=0)
+    data_left = min(columns) - 20
     for line in window[1:]:
         if not line["text"] or all(YEAR_RE.fullmatch(word["text"].strip("(),")) for word in line["words"]):
             continue
-        runs = numeric_runs(line["words"])
-        first_number_x = min((run["x0"] for run in runs), default=float("inf"))
-        label_words = [word["text"] for word in line["words"] if word["x0"] < first_number_x]
-        label = " ".join(label_words).strip(" :")
+        if DECORATION_RE.search(line["text"]):
+            continue
+        # Only the three period columns are values.  A leading dash is often a
+        # list bullet and the separate Notes column is not a historical value.
+        # Neither may truncate or contaminate the issuer's printed label.
+        runs = [run for run in numeric_runs(line["words"]) if run["x1"] >= data_left]
+        label_words = [
+            word["text"]
+            for word in line["words"]
+            if word["x0"] < data_left and parse_number(word["text"]) is None
+        ]
+        label = " ".join(label_words).strip(" :–—-")
         if not label or HEADINGS[section].search(label):
+            continue
+        if DECORATION_RE.search(label):
             continue
         values = nearest_values(runs, columns) if runs else [None, None, None]
         if len(values) != 3:
@@ -263,6 +392,7 @@ def extract_statement(
             "hierarchy_level": hierarchy,
             "is_subtotal": is_subtotal_label(label),
         })
+    rows = model_statement_scope(rows, section)
     if not rows:
         return None, findings + [{"code": "NO_STATEMENT_ROWS", "section": section}]
     infer_parent_links(rows)

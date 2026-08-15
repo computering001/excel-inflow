@@ -4202,9 +4202,15 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
 
   // There is no hidden support block any more. Every mechanical row the model
   // needs — balance roll-forward, interest, repayment — is emitted on the face
-  // of the schedule it belongs to, so the last allocated row IS the last row of
-  // the model.
-  const visibleEndRow = cursor - 1;
+  // of the schedule it belongs to. A very small dynamic case can nevertheless
+  // occupy fewer rows than the immutable authority surface (notably the
+  // two-instrument net-cash profile). Keep those trailing authority rows as
+  // visible blank presentation space: delivery attests the measured minimum
+  // surface, while every economic row still has exactly one visible owner.
+  const visibleEndRow = Math.max(
+    cursor - 1,
+    Number(authority.authority_rows.visible_end),
+  );
 
   return {
     schema_version: 2,

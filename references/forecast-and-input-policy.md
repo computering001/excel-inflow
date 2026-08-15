@@ -112,6 +112,11 @@ semantic row.  Deterministic code compiles that declaration into exactly one of
 formula, cross-sheet broker link, visible hardcode, formula-driven zero,
 intentional blank or fail-closed unresolved.
 
+In the production controller, `selected-authority-contract/1.0` is the
+executable resolver and sole forecast writer. The pre-resolution forecast plan
+is a candidate ledger, not economic authority; the model case is materialised
+again from the sealed selected states, and parity is checked before Build.
+
 Authority is immutable once declared for a period. A presentation capture or
 compiler fallback may never erase a direct broker link, sourced formula, user
 assumption or supplied value. The compiler records every eligible candidate,

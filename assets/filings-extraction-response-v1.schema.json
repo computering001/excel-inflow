@@ -51,6 +51,7 @@
         "historical_periods": { "$ref": "#/$defs/periods3" },
         "forecast_periods": { "$ref": "#/$defs/periods3" },
         "reported_gross_debt": { "type": "number", "minimum": 0 },
+        "historical_gross_debt": { "$ref": "#/$defs/series3" },
         "reported_cash": { "type": "number", "minimum": 0 },
         "reported_gross_interest": { "type": ["number", "null"] },
         "reported_lease_liability": { "type": ["number", "null"], "minimum": 0 },
@@ -79,6 +80,12 @@
       "minItems": 3,
       "maxItems": 3,
       "items": { "type": "string", "format": "date" }
+    },
+    "series3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number", "minimum": 0 }
     }
   }
 }

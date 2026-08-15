@@ -14,12 +14,14 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
+from archive_broker_pages import archive_pdf_pages
 from delivery_constitution import assert_broker_failure_degrades
 from workflow_state import assert_state, assert_transition
 
@@ -598,7 +600,7 @@ def apply_broker_archive_only(
     ingress_base: Path,
     output_root: Path,
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Remove every broker authority edge while retaining raw attachment bytes."""
+    """Remove broker authority while retaining raw files and visible PDF pages."""
     evidence_path = resolve(ingress_base, resolved_ingress.get("evidence_run_path"))
     if not evidence_path or not evidence_path.is_file():
         raise FileNotFoundError("Attachment-ingress template evidence_run_path is absent")
@@ -608,9 +610,13 @@ def apply_broker_archive_only(
         for source in evidence.get("source_inventory") or []
         if source.get("kind") == "user_broker_research"
     }
+    source_by_id = {
+        str(source.get("source_id") or ""): source
+        for source in evidence.get("source_inventory") or []
+    }
     for source in evidence.get("source_inventory") or []:
         if source.get("source_id") in broker_source_ids:
-            source["status"] = "rejected_for_model_use"
+            source["status"] = "evidence_only"
             source["status_reason"] = (
                 "Optional broker adapter failed internally; raw bytes are archived "
                 "but the source is prohibited from model use."
@@ -619,16 +625,83 @@ def apply_broker_archive_only(
         item for item in evidence.get("retrieval_log") or []
         if item.get("selected_source_id") not in broker_source_ids
     ]
+    previous_pack = evidence.get("broker_pack") or {}
     for field in (
-        "broker_pack",
         "broker_source_tables",
         "broker_crosswalk_receipt",
         "broker_semantic_verification",
     ):
         evidence.pop(field, None)
+    forecast_periods = (
+        previous_pack.get("forecast_periods")
+        or (evidence.get("filings") or {}).get("forecast_periods")
+        or ((evidence.get("case_evidence") or {}).get("lanes") or {}).get("periods", {}).get("forecast")
+        or []
+    )
+    zero_pack = {
+        "source_label": "Forecast Waterfall — zero broker authority",
+        "forecast_periods": forecast_periods,
+        "metrics": {},
+    }
+    evidence["broker_pack"] = zero_pack
+
+    raw_documents: list[dict[str, Any]] = []
+    page_evidence: list[dict[str, Any]] = []
+    archive_root = output_root / "broker" / "archive-pages"
+    for index, descriptor in enumerate(resolved_ingress.get("attachments") or [], start=1):
+        if (descriptor.get("adapter") or {}).get("domain") != "broker_pack":
+            continue
+        raw_path = resolve(ingress_base, descriptor.get("path"))
+        if not raw_path or not raw_path.is_file():
+            continue
+        source_ids = [str(value) for value in descriptor.get("source_ids") or []]
+        source_id = source_ids[0] if source_ids else f"broker_archive_{index}"
+        source = source_by_id.get(source_id) or {}
+        content_sha256 = sha256_file(raw_path)
+        house_name = str(source.get("name") or raw_path.stem).strip() or f"Broker {index}"
+        house_id = re.sub(r"[^a-z0-9_]+", "_", source_id.lower()).strip("_") or f"broker_{index}"
+        raw_documents.append({
+            "attachment_id": str(descriptor.get("attachment_id") or f"broker-{index}"),
+            "house_id": house_id,
+            "house_name": house_name,
+            "source_id": source_id,
+            "file_name": raw_path.name,
+            "byte_length": raw_path.stat().st_size,
+            "content_sha256": content_sha256,
+        })
+        media_type = str(descriptor.get("media_type") or "").lower()
+        if media_type != "application/pdf" and raw_path.suffix.lower() != ".pdf":
+            continue
+        try:
+            house_root = archive_root / f"{index:02d}-{house_id}"
+            pages = archive_pdf_pages(raw_path, house_root, source_id=source_id)
+            if pages:
+                page_house = {
+                    "house_id": house_id,
+                    "house_name": house_name,
+                    "source_id": source_id,
+                    "content_sha256": content_sha256,
+                    "file_name": raw_path.name,
+                    "pages": pages,
+                }
+                publication_date = source.get("publication_date")
+                if isinstance(publication_date, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", publication_date):
+                    page_house["published_date"] = publication_date
+                page_evidence.append(page_house)
+        except Exception:
+            # Raw custody is mandatory; page rendering is best-effort for an
+            # unreadable/corrupt optional document and must not become a model
+            # delivery gate.
+            continue
+
     lanes = (evidence.get("case_evidence") or {}).get("lanes")
     if isinstance(lanes, dict):
-        lanes.pop("broker_pack", None)
+        lanes["broker_pack"] = zero_pack
+        lanes["broker_archive"] = {
+            "schema_version": "broker-archive/1.0",
+            "raw_documents": raw_documents,
+            **({"page_evidence": page_evidence} if page_evidence else {}),
+        }
     ledger = evidence.get("forecast_observation_ledger")
     if isinstance(ledger, dict) and isinstance(ledger.get("observations"), list):
         ledger["observations"] = [
@@ -688,9 +761,14 @@ def apply_filings_lane(
     if evidence.get("mode") == "first_run" and "model_case" in evidence:
         raise ValueError("A first-run evidence template may not carry caller-authored model_case")
     evidence["filings"] = bundle.get("filings")
-    evidence.setdefault("case_evidence", {})["face_statement_manifests"] = bundle.get("filings", {}).get(
+    case_evidence = evidence.setdefault("case_evidence", {})
+    case_evidence["face_statement_manifests"] = bundle.get("filings", {}).get(
         "face_statement_manifests", {}
     )
+    case_evidence["filing_provenance"] = {
+        "documents": bundle.get("documents", []),
+        "period_authority": bundle.get("filings", {}).get("period_authority", {}),
+    }
     evidence["case_source"] = {}
     evidence.pop("model_case", None)
     resolved_evidence_path = output_root / "resolved-evidence-template.json"

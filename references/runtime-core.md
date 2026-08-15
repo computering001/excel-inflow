@@ -44,17 +44,22 @@ Run one deterministic graph:
 
 `scripts/run_excel_inflow_vnext.mjs` is the candidate end-to-end owner above
 that proven graph. It invokes the raw filings, broker and DCS transaction,
-pauses at the compiled model-decision boundary, seals one
-`evidence-resolution/2.0`, and only then delegates the unchanged workbook stage
-to `run_user_flow.mjs`. The v64 controller remains the rollback implementation;
-it is not rewritten or removed during vNext certification.
+pauses at the compiled model-decision boundary, seals one model-demand graph,
+one `selected-authority-contract/1.0` and one run-constitution graph, and only
+then delegates the unchanged workbook stage to `run_user_flow.mjs`. The v64
+controller remains the rollback implementation; it is not rewritten or removed
+during vNext certification.
 
-The resolution artifact contains one content-addressed source index, one
-cross-lane observation ledger, one per-node authority graph, quarantines,
-blocker ownership and a quality receipt. Large source tables and PDFs remain in
-the run store and are referenced by hash rather than copied into the case.
-Filings own historical statements, DCS owns contractual debt hardcodes and
-broker research contributes only verified model-driving forecast cells.
+The selected-authority contract is the executable evidence resolver and the
+sole upstream forecast writer. It is compiled from the complete candidate
+ledger, then projects the sealed forecast plan into the model case; a plan
+authored or changed elsewhere cannot write workbook economics. The joined
+run-constitution graph carries source-to-observation-to-authority reachability,
+quarantines, blocker ownership and a quality receipt. Large source tables and
+PDFs remain in the run store and are referenced by hash rather than copied into
+the case. Filings own historical statements, DCS owns contractual debt
+hardcodes and broker research contributes only verified model-driving forecast
+cells.
 
 The model is built by default. Optional evidence uncertainty reduces authority
 through the declared forecast waterfall and produces `DEGRADED`; it does not
@@ -89,8 +94,10 @@ The source-owned contract and adversarial test is runnable as:
 node scripts/run_evidence_resolution_v2_tests.mjs
 ```
 
-The standalone compiler is diagnostic only. It cannot replace the vNext
-controller for a company run, and its output cannot author a workbook.
+The standalone `evidence-resolution/2.0` compiler is a read-only audit
+projection over sealed inputs. It cannot replace the executable
+`selected-authority-contract/1.0` resolver in a company run, and its output
+cannot become a second workbook writer.
 
 `PASS_PENDING_MANUAL` may carry quality `VERIFIED` or `DEGRADED`. Both require
 zero workbook violations; degraded means only that optional evidence was
@@ -497,13 +504,13 @@ The tool refuses on any request, source-hash, receipt or vintage mismatch,
 re-homes only receipt-verified checkpoints, writes a migration receipt beside
 the state, and never asks the user to re-upload unchanged sources.
 
-Do not force the complete broker-page inventory (page images, OCR lanes and
-narrative regions) into the workbook carrier. `broker-source-tables/1.0` remains
-the lossless run artifact; attachment ingress deterministically projects every
-reviewed tabular grid into `model_case.broker_pack.raw_tables`. Evidence-only
-tables render as hardcoded source evidence but remain prohibited from model
-formulas. Every supplied house remains represented and every mapped cell must
-land on an analytical table.
+Do not force the complete broker-page inventory into model authority. Raw
+files, page renders and capture ledgers remain lossless run artifacts.
+Attachment ingress projects page images and raw-document custody into the
+separate `broker_archive` lane; only selected-cell mappings and values enter
+`broker_pack`. Archive-only material needs no semantic pack. Every supplied
+house remains represented in the archive, while every mapped model cell lands
+on a selected analytical table with exact cell provenance.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves
@@ -511,10 +518,11 @@ two independent hash-bound economic cell transcriptions agree or records one
 conflict-manifest-bound targeted resolution. A `NEEDS_RESOLUTION` result is an
 internal Stage-2 checkpoint: resolve it once before any user-facing stop.
 Structural differences with identical economic observations do not block;
-unresolved economic cells become quarantined evidence. The pack compiler accepts only reviewed, cell-addressed
-mappings. Before it can pass, every extracted table is reviewed and every
-nonblank annual or partial-period candidate row has one reasoned semantic
-disposition; a missing row or unowned mapping blocks. Coverage count alone is
+unresolved economic cells become quarantined evidence. The pack compiler
+accepts only reviewed, cell-addressed mappings. Before it can pass, every
+selected candidate cell has one reasoned semantic disposition; unused rows,
+tables and pages remain archive-only. A missing selected mapping removes that
+authority edge. Coverage count alone is
 not enough: the semantic-quality gate also rejects numeric rows called unusable,
 model-relevant rows discarded as irrelevant, non-equivalent duplicates,
 broker-derived values described as company guidance, incompatible definition
@@ -526,9 +534,11 @@ into annual consensus.
 Compile the filings-derived model-demand and material-output-reachability graph
 before broker semantics. Archive every raw broker file and render every page,
 but create OCR/vision work only for selected candidate cells that can satisfy a
-demanded concept-period. Retries are bounded and cell-local; an exhausted cell
-is quarantined and its authority edge removed while clean sibling cells and
-houses survive. Archive-only files require no semantic pack.
+demanded concept-period. Open at most one deterministic coherent-house recovery
+frontier; other reports remain archived and do not multiply optional OCR work.
+Retries are bounded and cell-local. If recovery does not yield one coherent
+house, close at zero broker authority and continue. Archive-only files require
+no semantic pack.
 
 Reusable broker metric ids remain dictionary-owned. A genuinely
 company-specific concept may use the `run.*` namespace only with a reviewed,

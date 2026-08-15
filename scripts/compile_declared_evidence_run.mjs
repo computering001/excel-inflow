@@ -15,7 +15,10 @@ import {
   compileAttachmentIngress,
   INGRESS_COMPILER_VERSION,
 } from "./lib/attachment_ingress.mjs";
-import { proposeCaseSource } from "./lib/case_source_proposer.mjs";
+import {
+  proposeCaseSource,
+  writeRuntimeEvidenceLanes,
+} from "./lib/case_source_proposer.mjs";
 import { validateEvidenceRun } from "./lib/evidence_run.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +52,10 @@ async function main() {
     declarations,
     caseEvidence: compiled.evidence.case_evidence,
     filings: compiled.evidence.filings,
+  });
+  writeRuntimeEvidenceLanes({
+    evidence: compiled.evidence,
+    caseSource: compiled.evidence.case_source,
   });
   const validation = validateEvidenceRun(compiled.evidence);
   await fs.mkdir(out, { recursive: true });

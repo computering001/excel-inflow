@@ -39,6 +39,7 @@ import {
 import { entityStop } from "./flow_entity.mjs";
 import {
   applyExplicitSourcePolicies,
+  applyRefinancingIntent,
   applyRecordedAnswers,
   planQuestions,
   pruneDecisionGraph,
@@ -291,9 +292,13 @@ export function runIntake({
   // explicitly ambiguous export value (ask/unclear/unknown) remains a real
   // question.
   for (const instrument of intake?.export?.instruments ?? []) {
-    const intent = instrument.refinancing_intent;
-    if (intent !== null && intent !== undefined) continue;
-    resolved.set(`refinance_at_maturity:${instrument.instrument_id}`, "repaid");
+    const intent = String(instrument.refinancing_intent ?? "").toLowerCase();
+    if (["refinanced", "repaid"].includes(intent)) continue;
+    if (!["", "ask", "unclear", "unknown"].includes(intent)) continue;
+    const questionId = `refinance_at_maturity:${instrument.instrument_id}`;
+    workingCase = applyRefinancingIntent(workingCase, instrument, "repaid");
+    workingCase.stage_three_answers[questionId] = "repaid";
+    resolved.set(questionId, "repaid");
   }
   const plan = planQuestions({
     draftCase: workingCase,

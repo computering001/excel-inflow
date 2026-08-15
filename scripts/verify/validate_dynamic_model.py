@@ -1625,7 +1625,14 @@ def main(argv: List[str]) -> int:
             and pro_forma_actual_value is None
             and not text
             and declared_actual is None
-            and definition.get("historical_authority") == "schedule_link"
+            and (
+                definition.get("historical_authority") == "schedule_link"
+                or (
+                    definition.get("formula_authority") == "compiler"
+                    and definition.get("movement_type") in {"rcf_draw", "rcf_repayment"}
+                    and not definition.get("historical_dependency_refs")
+                )
+            )
         )
         if structurally_blank_schedule:
             continue
