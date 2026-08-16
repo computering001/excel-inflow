@@ -1,0 +1,283 @@
+name: Excel Inflow final acceptance v3
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-final-acceptance-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create isolated runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y libreoffice python3-venv
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-input --upgrade pip
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-input openpyxl pymupdf pillow
+          echo "PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
+          echo "SOFFICE=$(command -v libreoffice)" >> "$GITHUB_ENV"
+          node --version
+          "$RUNNER_TEMP/venv/bin/python" --version
+          libreoffice --version
+          git rev-parse HEAD
+          git rev-parse 'HEAD^{tree}'
+          test -z "$(git status --porcelain)"
+
+      - name: Validate source syntax, contracts and private-path hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" -m compileall -q scripts
+          "$PYTHON" - <<'PY'
+          import json
+          from pathlib import Path
+          errors=[]
+          for path in sorted(Path('.').rglob('*.json')):
+              if '.git' in path.parts or 'node_modules' in path.parts:
+                  continue
+              try:
+                  json.loads(path.read_text('utf-8'))
+              except Exception as exc:
+                  errors.append(f'{path}: {exc}')
+          if errors:
+              raise SystemExit('\n'.join(errors))
+          print('all JSON contracts parse')
+          PY
+          if grep -R --line-number --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=audit \
+              -E '/Users/[^/]+/|archiepjod|archiepjod@gmail.com' \
+              scripts assets references SKILL.md central-instructions.md; then
+            echo 'Private developer path or identity leaked into runtime source.' >&2
+            exit 1
+          fi
+          if grep -R --line-number --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=audit \
+              'latest_supplied_house_then_zero_authority' .; then
+            echo 'Legacy publication-date-first broker policy remains.' >&2
+            exit 1
+          fi
+          if grep -R --line-number --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=audit \
+              'archive-only regardless of whether its native lane happens to look complete' .; then
+            echo 'Legacy blanket native-house suppression remains.' >&2
+            exit 1
+          fi
+          test -z "$(find scripts -maxdepth 1 -type f \( -name 'apply_excel_inflow_repair_stage*.py' -o -name 'fix_stage*.py' -o -name 'run_repair_stage*_stage_v*.py' \) -print -quit)"
+
+      - name: Resolve committed fixture custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" - <<'PY' > "$RUNNER_TEMP/fixtures.env"
+          import json
+          from pathlib import Path
+
+          root=Path('.').resolve()
+          model_cases=[]
+          evidence=[]
+          fixed=[]
+          clean_named=[]
+          for path in root.rglob('*.json'):
+              if '.git' in path.parts or 'node_modules' in path.parts or 'generated' in path.parts:
+                  continue
+              try:
+                  obj=json.loads(path.read_text('utf-8'))
+              except Exception:
+                  continue
+              if not isinstance(obj, dict):
+                  continue
+              schema=str(obj.get('schema_version') or obj.get('schemaVersion') or '')
+              if schema.startswith('model-case/') and isinstance(obj.get('periods'), list):
+                  model_cases.append(path)
+              if schema.startswith('evidence-run/'):
+                  evidence.append(path)
+              if 'fixed-point' in schema and isinstance(obj.get('cases') or obj.get('fixtures') or obj.get('entries'), list):
+                  fixed.append(path)
+              if 'clean' in path.name.lower() and 'evidence' in path.name.lower():
+                  clean_named.append(path)
+
+          if len(model_cases) < 2:
+              raise SystemExit(f'Need maximal and net-cash model cases; found {len(model_cases)}')
+          parents={}
+          for path in model_cases:
+              parents.setdefault(path.parent, []).append(path)
+          cases_parent=max(parents, key=lambda p: len(parents[p]))
+          if len(parents[cases_parent]) < 2:
+              raise SystemExit('No single committed case cohort contains at least two cases')
+          representative=max(model_cases, key=lambda p: p.stat().st_size)
+          clean_fixture=(max(clean_named, key=lambda p: p.stat().st_size) if clean_named else None)
+          if clean_fixture is None:
+              if not evidence:
+                  raise SystemExit('No clean evidence fixture or evidence-run fixture found')
+              clean_fixture=max(evidence, key=lambda p: p.stat().st_size)
+          if not fixed:
+              fixed=[p for p in root.rglob('*.json') if 'fixed' in p.name.lower() and 'point' in p.name.lower()]
+          if not fixed:
+              raise SystemExit('No fixed-point cohort manifest found')
+          fixed_manifest=max(fixed, key=lambda p: p.stat().st_size)
+
+          for name,path in {
+              'CASES': cases_parent,
+              'REPRESENTATIVE': representative,
+              'RAW_CANARY_EVIDENCE': clean_fixture,
+              'FIXED_POINT_CASES_MANIFEST': fixed_manifest,
+          }.items():
+              print(f'{name}={path.resolve()}')
+          PY
+          cat "$RUNNER_TEMP/fixtures.env"
+          cat "$RUNNER_TEMP/fixtures.env" >> "$GITHUB_ENV"
+
+      - name: Execute complete portable registry
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/development-gate"
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases "$CASES" \
+            --representative "$REPRESENTATIVE" \
+            --fixed-point-cases-manifest "$FIXED_POINT_CASES_MANIFEST" \
+            --raw-canary-evidence "$RAW_CANARY_EVIDENCE" \
+            --python "$PYTHON" \
+            --soffice "$SOFFICE" \
+            --concurrency 2 \
+            --timeout-ms 3600000 \
+            --out "$RUNNER_TEMP/development-gate"
+          "$PYTHON" - <<'PY'
+          import json, os
+          from pathlib import Path
+          path=Path(os.environ['RUNNER_TEMP'])/'development-gate'/'development-gate-report.json'
+          report=json.loads(path.read_text('utf-8'))
+          bad=[row for row in report.get('results',[]) if row.get('status')!='PASS']
+          if report.get('status')!='PASS' or bad:
+              raise SystemExit(json.dumps({'counts':report.get('counts'),'bad':[row.get('id') for row in bad]},sort_keys=True))
+          print(json.dumps(report.get('counts'),sort_keys=True))
+          PY
+
+      - name: Prove all raw broker terminal states deliver correctly
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            "$RAW_CANARY_EVIDENCE" "$PYTHON" "$SOFFICE" \
+            > "$RUNNER_TEMP/universal-broker-delivery-matrix.out"
+          cat "$RUNNER_TEMP/universal-broker-delivery-matrix.out"
+          "$PYTHON" - <<'PY'
+          import json, os
+          from pathlib import Path
+          text=(Path(os.environ['RUNNER_TEMP'])/'universal-broker-delivery-matrix.out').read_text('utf-8')
+          decoder=json.JSONDecoder()
+          objects=[]
+          for index,char in enumerate(text):
+              if char!='{':
+                  continue
+              try:
+                  value,end=decoder.raw_decode(text[index:])
+              except Exception:
+                  continue
+              if isinstance(value,dict):
+                  objects.append(value)
+          passing=[value for value in objects if value.get('status')=='PASS']
+          if not passing:
+              raise SystemExit('Universal matrix emitted no PASS receipt')
+          receipt=passing[-1]
+          required=('explicit_skip','failed_optional_close','usable')
+          encoded=json.dumps(receipt,sort_keys=True)
+          missing=[item for item in required if item not in encoded]
+          if missing:
+              raise SystemExit(f'Universal matrix receipt lacks required broker states: {missing}')
+          print(json.dumps(receipt,sort_keys=True))
+          PY
+
+      - name: Re-run long content-addressed resume and invalidation proof
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases "$CASES" \
+            --python "$PYTHON" \
+            --soffice "$SOFFICE" \
+            > "$RUNNER_TEMP/stage4-checkpoint-proof.out"
+          cat "$RUNNER_TEMP/stage4-checkpoint-proof.out"
+
+      - name: Verify tests did not mutate committed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          test -z "$(git status --porcelain)"
+
+      - name: Compile immutable acceptance receipt
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/final-acceptance"
+          "$PYTHON" - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          temp=Path(os.environ['RUNNER_TEMP'])
+          files=[
+              temp/'development-gate'/'development-gate-report.json',
+              temp/'universal-broker-delivery-matrix.out',
+              temp/'stage4-checkpoint-proof.out',
+          ]
+          artifacts={}
+          for path in files:
+              if not path.is_file():
+                  raise SystemExit(f'Missing {path}')
+              artifacts[path.name]={
+                  'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+                  'bytes':path.stat().st_size,
+              }
+          body={
+              'schema_version':'excel-inflow-final-acceptance/3.0',
+              'status':'PASS',
+              'repository':'computering001/excel-inflow',
+              'branch':'agent/excel-inflow-end-to-end-repair',
+              'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+              'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+              'clean_checkout':not subprocess.check_output(['git','status','--porcelain'],text=True).strip(),
+              'artifacts':artifacts,
+          }
+          canonical=json.dumps(body,sort_keys=True,separators=(',',':')).encode()
+          body['receipt_sha256']=hashlib.sha256(canonical).hexdigest()
+          path=temp/'final-acceptance'/'final-acceptance-receipt.json'
+          path.write_text(json.dumps(body,indent=2,sort_keys=True)+'\n','utf-8')
+          print(path.read_text('utf-8'))
+          PY
+
+      - name: Upload all evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-final-acceptance-v3-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtures.env
+            ${{ runner.temp }}/development-gate
+            ${{ runner.temp }}/universal-broker-delivery-matrix.out
+            ${{ runner.temp }}/stage4-checkpoint-proof.out
+            ${{ runner.temp }}/final-acceptance
+          retention-days: 14
+          if-no-files-found: warn
