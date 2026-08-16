@@ -1,0 +1,209 @@
+name: Finalize reviewed Excel Inflow repair
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-reviewed-repair-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reviewed-excel-inflow-repair
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    if: ${{ !startsWith(github.event.head_commit.message || '', 'Publish proven reviewed Excel Inflow repair') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install exact portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+          node --version
+          python3 --version
+          soffice --version
+
+      - name: Apply bounded reviewed repairs and run the full portable matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run_reviewed_auto_finalize.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report_path=Path('audit/reviewed-portable-gate/reviewed-portable-gate.json')
+          receipt_path=Path('audit/reviewed-portable-gate/finalization-receipt.json')
+          report=json.loads(report_path.read_text('utf-8'))
+          receipt=json.loads(receipt_path.read_text('utf-8'))
+          assert report['status']=='PASS', report
+          assert report['fail_count']==0, report
+          assert report['silently_skipped_count']==0, report
+          assert receipt['status']=='PASS', receipt
+          PY
+
+      - name: Install permanent fail-closed CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .github/workflows/reviewed-repair-ci.yml <<'YAML'
+          name: Excel Inflow reviewed repair CI
+
+          on:
+            push:
+              branches:
+                - agent/excel-inflow-reviewed-repair-v2
+            pull_request:
+
+          permissions:
+            contents: read
+
+          jobs:
+            portable-gate:
+              runs-on: ubuntu-latest
+              timeout-minutes: 150
+              steps:
+                - uses: actions/checkout@v4
+                - name: Install portable runtime
+                  run: |
+                    sudo apt-get update
+                    sudo apt-get install -y libreoffice
+                    python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+                - name: Run reviewed portable gate
+                  run: |
+                    python3 scripts/run_reviewed_portable_gate.py \
+                      --python "$(command -v python3)" \
+                      --soffice "$(command -v soffice)" \
+                      --out audit/reviewed-portable-gate
+                    python3 - <<'PY'
+                    import json
+                    from pathlib import Path
+                    report=json.loads(Path('audit/reviewed-portable-gate/reviewed-portable-gate.json').read_text('utf-8'))
+                    assert report['status']=='PASS', report
+                    assert report['fail_count']==0, report
+                    assert report['silently_skipped_count']==0, report
+                    PY
+                - uses: actions/upload-artifact@v4
+                  if: always()
+                  with:
+                    name: reviewed-portable-gate
+                    path: audit/reviewed-portable-gate
+                    if-no-files-found: error
+          YAML
+
+      - name: Remove bootstrap machinery and prove source hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/apply_reviewed_core_repair.py
+          rm -f scripts/apply_reviewed_followup.py
+          rm -f scripts/apply_broker_tier1_demand_repair.py
+          rm -f scripts/run_reviewed_auto_finalize.py
+          rm -f .github/workflows/apply-reviewed-repair.yml
+          rm -f .github/workflows/apply-reviewed-repair-followup.yml
+          rm -f .github/workflows/apply-reviewed-demand-followup.yml
+          rm -f .github/workflows/reviewed-auto-finalize.yml
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          failures=[]
+          for path in Path('scripts').rglob('*'):
+              if not path.is_file() or path.suffix not in {'.py','.mjs','.js','.json'}:
+                  continue
+              text=path.read_text('utf-8')
+              if re.search(r'/Users/|[A-Za-z]:\\\\Users\\\\',text):
+                  failures.append(f'author-machine path: {path}')
+              if path.name.startswith('repair_') and path.name.endswith('_integration.py'):
+                  failures.append(f'bootstrap patcher retained: {path}')
+          broker=Path('scripts/extract_broker_evidence.py').read_text('utf-8')
+          if 'return select_recovery_house_id(' in broker:
+              failures.append('recursive broker recovery selector')
+          if 'archive_only = not selected_targets or unselected_house\n' in broker:
+              failures.append('blanket broker-house suppression')
+          acquisition=Path('references/acquisition.md').read_text('utf-8')
+          if re.search(r'zero direct transaction cash-flow effect',acquisition,re.I):
+              failures.append('obsolete zero-cash acquisition constitution')
+          canary=Path('scripts/run_raw_input_black_box_canary.mjs').read_text('utf-8')
+          if 'preauthored_broker_crosswalk: false' in canary:
+              failures.append('false black-box boundary claim')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          PY
+          git diff --check
+          git diff --stat > audit/reviewed-portable-gate/final-diffstat.txt
+
+      - name: Commit the proven product tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Excel Inflow reviewed repair"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish proven reviewed Excel Inflow repair"
+          git push origin HEAD:agent/excel-inflow-reviewed-repair-v2
+
+      - name: Open or update draft pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/pr-body.md <<'MD'
+          ## Product repair
+
+          This branch repairs the complete evidence-to-workbook path without removing the broker circuit breaker or weakening the debt, cash, RCF, interest, lease, circularity, provenance, cache or package-integrity contracts.
+
+          ### Repaired seams
+
+          - source-visible issuer arithmetic owns statement aggregation before caption heuristics;
+          - all supplied houses retain native-clean eligibility;
+          - one expensive recovery frontier is selected by demanded native coverage and readability, with publication date only as a final tie-break;
+          - the broker demand contract includes the intended core Adjusted EBITDA, D&A, effective tax rate, capex and working-capital surface;
+          - exactly one supported EBIT/Adjusted EBITDA headline authority enters, with D&A as the bridge;
+          - acquisition and other structured discrete events cannot recur through historical averages;
+          - the acquisition case has visible consideration, acquisition-debt proceeds and residual cash/RCF funding rather than a free cash-generative target;
+          - the local semantic canary is labelled as simulated rather than an installed-host black box;
+          - run carrier/telemetry and portable test custody are bound into the source-owned flow;
+          - the universal matrix is invoked through the executable interface it actually owns.
+
+          ## Validation
+
+          GitHub commits the product tree only after `scripts/run_reviewed_portable_gate.py` returns PASS with zero failed tests and zero silently skipped selected tests. The matrix includes source-arithmetic mutations, broker fault/selection/recovery tests, DCS proof, forecast behavior/topology, acquisition solver and real workbook build/recalculation/finance proof, carrier identity, equation graph, instrument state, opening debt, user flow, case equivalence, degraded delivery and Stage-4 resume.
+
+          ## Explicit release-only evidence
+
+          Installed Rogo model-host usable-broker consumption, native Excel Off/On/Off/On restoration, human visual review and the joined end-user performance cohort remain release-attestation requirements. This PR does not mislabel local source tests as those host proofs and does not alter the live route.
+          MD
+          if gh pr view agent/excel-inflow-reviewed-repair-v2 --json number >/dev/null 2>&1; then
+            gh pr edit agent/excel-inflow-reviewed-repair-v2 \
+              --title "Complete reviewed Excel Inflow end-to-end repair" \
+              --body-file /tmp/pr-body.md
+          else
+            gh pr create \
+              --draft \
+              --base agent/broker-delivery-constitution-v350 \
+              --head agent/excel-inflow-reviewed-repair-v2 \
+              --title "Complete reviewed Excel Inflow end-to-end repair" \
+              --body-file /tmp/pr-body.md
+          fi
+
+      - name: Upload proof artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: excel-inflow-reviewed-final-proof
+          path: audit/reviewed-portable-gate
+          retention-days: 30
+          if-no-files-found: error
