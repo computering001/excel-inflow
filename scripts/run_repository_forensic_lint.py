@@ -466,6 +466,57 @@ def main() -> int:
                 path=rel(carrier),
             ))
 
+    # Policy ownership register.  Compatibility views are legitimate only when
+    # they declare the canonical owner that generated or delegated them.
+    product_policy = ROOT / "assets" / "product-constitution-v1.json"
+    delivery_policy = ROOT / "assets" / "delivery-constitution-v1.json"
+    workflow_policy = ROOT / "assets" / "workflow-state-contract-v1.json"
+    policy_values = {}
+    for policy_path in (product_policy, delivery_policy, workflow_policy):
+        if policy_path.is_file():
+            try:
+                policy_values[policy_path] = load_json(policy_path)
+            except Exception:
+                pass
+    if product_policy in policy_values and delivery_policy in policy_values:
+        delivery_value = policy_values[delivery_policy]
+        delegated = any(key in delivery_value for key in (
+            "generated_from", "canonical_owner", "source_constitution_sha256"
+        ))
+        if not delegated:
+            findings.append(finding(
+                "DUPLICATE_PRODUCT_DELIVERY_POLICY_OWNER",
+                "WARN",
+                "Product and delivery constitutions are both manually authored policy owners.",
+                paths=[rel(product_policy), rel(delivery_policy)],
+            ))
+    if workflow_policy in policy_values and product_policy in policy_values:
+        workflow_value = policy_values[workflow_policy]
+        delegated = any(key in workflow_value for key in (
+            "generated_from", "canonical_owner", "source_constitution_sha256"
+        ))
+        if not delegated and any(key in workflow_value for key in (
+            "delivery_blocker_constitution", "vnext_quality_modes", "visible_journey"
+        )):
+            findings.append(finding(
+                "WORKFLOW_STATE_OWNS_PRODUCT_POLICY",
+                "WARN",
+                "Workflow-state metadata still owns delivery or quality policy rather than projecting it.",
+                path=rel(workflow_policy),
+            ))
+    taxonomy_path = ROOT / "assets" / "statement-semantic-taxonomy.v1.json"
+    if taxonomy_path.is_file() and registry_role_path is not None:
+        taxonomy_value = load_json(taxonomy_path)
+        if not any(key in taxonomy_value for key in (
+            "generated_from", "canonical_owner", "source_registry_sha256"
+        )):
+            findings.append(finding(
+                "SEMANTIC_TAXONOMY_MANUAL_COMPATIBILITY_VIEW",
+                "WARN",
+                "The legacy statement taxonomy remains manually maintained beside the canonical role registry.",
+                paths=[rel(taxonomy_path), rel(registry_role_path)],
+            ))
+
     # Maintainability register: visible, but not allowed to masquerade as correctness.
     line_counts = {rel(path): bodies[path].count("\n") + 1 for path in files}
     for path,count in sorted(line_counts.items(), key=lambda item: item[1], reverse=True):
