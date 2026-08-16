@@ -1,0 +1,113 @@
+name: Excel Inflow funded acquisition repair
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/acquisition-execution-map/acquisition-execution-map.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excel-inflow-acquisition-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Require passing stage two and acquisition map
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          stage=json.loads(Path('audit/generated/repair-stage2/stage2-gate.json').read_text())
+          mapping=json.loads(Path('audit/generated/acquisition-execution-map/acquisition-execution-map.json').read_text())
+          assert stage['status'] == 'PASS'
+          assert mapping['report_sha256']
+          assert len(mapping['files']) >= 8
+          PY
+
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+
+      - name: Apply funded-acquisition repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/acquisition-repair
+          mkdir -p audit/generated/acquisition-repair
+          python3 scripts/run_acquisition_repair_stage.py --out audit/generated/acquisition-repair
+
+      - name: Run independent acquisition gate
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/run_acquisition_repair_gate.py \
+            --out audit/generated/acquisition-repair \
+            --timeout 900 \
+            2>&1 | tee audit/generated/acquisition-repair/workflow.log
+
+      - name: Preserve failure diagnostics without source mutation
+        if: steps.gate.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -R audit/generated/acquisition-repair /tmp/acquisition-repair-failure
+          git reset --hard HEAD
+          rm -rf audit/generated/acquisition-repair-failure
+          mkdir -p audit/generated
+          cp -R /tmp/acquisition-repair-failure audit/generated/acquisition-repair-failure
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/acquisition-repair-failure
+          git commit -m "Record funded-acquisition repair failure"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          exit 1
+
+      - name: Commit passing acquisition repair
+        if: steps.gate.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/acquisition-repair/acquisition-gate.json').read_text())
+          assert report['status'] == 'PASS'
+          assert report['counts']['FAIL'] == 0
+          assert report['counts']['TIMEOUT'] == 0
+          PY
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add scripts assets references SKILL.md central-instructions.md audit/generated/acquisition-repair
+          git commit -m "Implement funded acquisition cash and debt mechanics"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+
+      - name: Upload acquisition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-acquisition-repair
+          path: audit/generated/acquisition-repair*
+          retention-days: 14
+          if-no-files-found: warn
