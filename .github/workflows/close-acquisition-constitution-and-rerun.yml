@@ -1,0 +1,88 @@
+name: Close acquisition constitution and rerun convergence
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/close-acquisition-constitution-and-rerun.yml
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  close-and-rerun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Start from latest settled repair tip
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git reset --hard origin/agent/excel-inflow-end-to-end-repair
+      - name: Replace the governing acquisition section with funded semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          section='''## Funded acquisition overlay\n\nThe canonical acquisition mode is `funded_transaction`; `references/acquisition.md` is the detailed authority.  Transaction enterprise value creates one purchase-consideration investing cash outflow at close.  The separately supplied acquisition debt creates one financing cash inflow at close and one persistent dedicated debt balance.  Remaining consideration is funded from existing cash and, if required, the ordinary RCF waterfall.  The model never invents an equity plug.\n\nThe target operating contribution remains lightweight and formula-driven.  Target EBITDA equals transaction value divided by entry EV/EBITDA.  Target revenue and every visible operating component derive from the corresponding standalone forecast ratios so gross profit, operating expenses, EBIT, D&A and EBITDA form an intuitive visible bridge.  Close-year operating contribution and interest use `(13 - close month) / 12`; later years use full-year amounts.\n\nThe case does not introduce a target balance sheet, purchase accounting, synergies, fees, target net debt/cash, funding percentage, multiple financing tranches, acquisition amortisation or an acquisition maturity.  Off state preserves standalone economics exactly.  On state must prove consideration, debt proceeds, debt balance, cash/RCF funding, interest, liquidity and leverage each enter once.\n\n'''
+          path=Path('references/model-intent.md')
+          if not path.is_file():
+              raise SystemExit('references/model-intent.md is absent')
+          text=path.read_text('utf-8')
+          matches=list(re.finditer(r'^(?P<hashes>#{2,4})\s+[^\n]*acquisition[^\n]*$',text,flags=re.I|re.M))
+          if not matches:
+              text += '\n\n' + section
+          else:
+              target=matches[-1]
+              level=len(target.group('hashes'))
+              end_match=re.search(rf'^#{{1,{level}}}\s+[^\n]+$',text[target.end():],flags=re.M)
+              end=target.end()+end_match.start() if end_match else len(text)
+              heading_section=section.replace('## ', '#'*level+' ',1)
+              text=text[:target.start()]+heading_section+text[end:]
+          path.write_text(text,'utf-8')
+
+          # Non-governing duplicated instruction surfaces point to the same authority
+          # and may not retain the retired zero-cash wording.
+          replacements={
+              'zero direct transaction cash-flow effect':'one funded transaction cash-flow effect at close',
+              'zero direct cash-flow effect':'funded transaction cash-flow effects at close',
+              'no consideration row':'one consideration row',
+              'no financing-proceeds row':'one financing-proceeds row',
+              'no financing proceeds row':'one financing proceeds row',
+          }
+          for name in ('SKILL.md','central-instructions.md','references/runtime-core.md'):
+              item=Path(name)
+              if not item.is_file():
+                  continue
+              body=item.read_text('utf-8')
+              for old,new in replacements.items():
+                  body=re.sub(re.escape(old),new,body,flags=re.I)
+              item.write_text(body,'utf-8')
+          PY
+          rm -f .github/workflows/close-acquisition-constitution-and-rerun.yml
+          git config user.name 'excel-inflow-convergence-bot'
+          git config user.email 'excel-inflow-convergence-bot@users.noreply.github.com'
+          git add -A -- references/model-intent.md references/runtime-core.md SKILL.md central-instructions.md .github/workflows/close-acquisition-constitution-and-rerun.yml
+          git commit -m 'Unify acquisition policy around funded transaction economics'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+      - name: Re-dispatch serialized convergence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run excel-inflow-converge-repair.yml \
+            --ref agent/excel-inflow-end-to-end-repair
