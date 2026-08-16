@@ -1,0 +1,72 @@
+name: Excel Inflow architecture hygiene report
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths-ignore:
+      - audit/generated/architecture-hygiene.json
+      - audit/generated/architecture-hygiene-status.txt
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-architecture-hygiene-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run blueprint-mapped architecture audit
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/run_source_arithmetic_and_architecture_hygiene_tests.py
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          test -f audit/generated/architecture-hygiene.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/architecture-hygiene.json').read_text('utf-8'))
+          codes=sorted({item['code'] for item in report.get('findings',[])})
+          Path('audit/generated/architecture-hygiene-status.txt').write_text(
+              f"status={report.get('status')}\n"
+              f"checks={report.get('checks')}\n"
+              f"finding_count={report.get('finding_count')}\n"
+              f"warning_count={report.get('warning_count')}\n"
+              f"codes={','.join(codes)}\n",
+              'utf-8',
+          )
+          print(report)
+          PY
+
+      - name: Persist exact audit receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name excel-inflow-repair-bot
+          git config user.email 312638569+computering001@users.noreply.github.com
+          git add audit/generated/architecture-hygiene.json audit/generated/architecture-hygiene-status.txt
+          if ! git diff --cached --quiet; then
+            status=$(sed -n 's/^status=//p' audit/generated/architecture-hygiene-status.txt)
+            codes=$(sed -n 's/^codes=//p' audit/generated/architecture-hygiene-status.txt)
+            git commit -m "Record architecture hygiene ${status}: ${codes:-none}"
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          fi
+
+      - name: Enforce audit result
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.audit.outputs.code }}" = "0"
