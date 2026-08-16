@@ -1,0 +1,165 @@
+{
+  "schema_version": "excel-inflow-product-target/1.0",
+  "purpose": "Single audit target for the Excel Inflow repair. It describes the user outcome and economic contracts the implementation must satisfy; executable artifacts may implement this target but may not redefine it silently.",
+  "product": {
+    "definition": "A flexible, company-specific, formula-driven corporate debt-overlay operating model, not a generic three-statement, ratings, valuation or populated-template product.",
+    "primary_question": "How do the issuer's operating outlook and cash generation translate into debt balances, interest, liquidity and leverage across three historical and three forecast years?",
+    "period_contract": {
+      "historical_years": 3,
+      "forecast_years": 3,
+      "standalone_forecast_required": true,
+      "optional_acquisition_case_required": true
+    },
+    "normal_profile": "maximal",
+    "simple_net_cash_profile_allowed": true
+  },
+  "user_journey": {
+    "visible_sequence": ["company", "filings", "brokers", "debt", "build", "deliver"],
+    "single_progress_scale": true,
+    "internal_work_never_presented_as_user_decision": true,
+    "ask_only_when": [
+      "a material economic node remains unresolved after evidence and deterministic fallbacks",
+      "plausible resolutions materially change debt, liquidity, interest, leverage or acquisition outputs"
+    ],
+    "toggleable_questions_prohibited": true,
+    "normal_runtime_slo_minutes": {"lower": 28, "upper": 35},
+    "production_runtime_guardrail_minutes": 45
+  },
+  "evidence": {
+    "filings": {
+      "criticality": "mandatory",
+      "owns": ["issuer identity", "period basis", "historical statement topology", "reported historical values"],
+      "company_specific_rows_preserved": true,
+      "source_visible_arithmetic_precedes_taxonomy": true
+    },
+    "dcs": {
+      "criticality": "mandatory_for_live_debt_terms",
+      "owns": ["instrument identity", "currency", "opening balance", "maturity", "pricing", "facility capacity"],
+      "opening_debt_reconciliation_strict": true
+    },
+    "broker": {
+      "criticality": "optional",
+      "archive_every_supplied_report": true,
+      "archive_failure_never_blocks_delivery": true,
+      "all_native_clean_houses_evaluated_before_recovery_selection": true,
+      "publication_date_is_late_tiebreak_only": true,
+      "maximum_expensive_recovery_frontiers": 1,
+      "one_coherent_house_for_model_authority": true,
+      "cross_house_period_mixing_prohibited": true,
+      "unverified_cells_prohibited": true,
+      "exact_selected_cell_provenance_required": true,
+      "tier_1_metrics": [
+        "revenue",
+        "ebit",
+        "adjusted_ebitda",
+        "depreciation_and_amortisation",
+        "effective_tax_rate",
+        "capex",
+        "change_in_working_capital",
+        "dividends",
+        "share_buybacks"
+      ],
+      "headline_anchor_rule": "Use exactly one of EBIT or Adjusted EBITDA as the broker headline anchor based on coherent-house coverage and compatibility; derive the other through D&A. Tie-break to EBIT.",
+      "usable_broker_obligation": "A readable, definition-compatible, complete native or recovered house must contribute authority; delivery safety does not excuse avoidable zero authority."
+    }
+  },
+  "workbook": {
+    "calculation_authority_sheets": ["Operating Model", "Brokers", "Forward Curves"],
+    "principal_blocks": [
+      "Control",
+      "Income Statement and Adjusted EBITDA bridge",
+      "Cash Flow and Free Cash Flow Metrics",
+      "Debt Schedule, Leverage and Liquidity",
+      "Cash Sweep and RCF Waterfall",
+      "Interest Schedule"
+    ],
+    "historical_forecast_geometry": {"standalone": "G:L", "acquisition_adjustments": "N:P", "pro_forma": "R:U"},
+    "provenance_colours": {"hardcode": "blue", "formula": "black", "internal_link": "green", "external_link": "red", "not_calculated": "grey"},
+    "broker_evidence_tabs": "B01-B10 screenshot-only, horizontally arranged, immutable evidence with no calculation dependency",
+    "external_links_on_delivery": 0,
+    "formula_driven_forecasts": true,
+    "company_specific_statement_depth_required": true
+  },
+  "economic_engine": {
+    "one_writer_per_forecast_node": true,
+    "selected_authority_contract_is_sole_upstream_forecast_writer": true,
+    "cash_rcf_interest_fixed_point_strict": true,
+    "circularity_off_interest_zero_but_debt_cash_rcf_live": true,
+    "instrument_period_debt_state_strict": true,
+    "debt_cash_rcf_lease_interest_liquidity_leverage_identities_strict": true,
+    "raw_attachment_hashes_and_content_addressed_resume_strict": true,
+    "discrete_event_policy": "A discrete acquisition, disposal, restructuring, litigation, exceptional or other non-recurring event cannot receive historical average, trend or carry-forward authority without specific forward evidence.",
+    "recurrence_and_variability_are_independent": true
+  },
+  "acquisition": {
+    "mode": "funded_transaction",
+    "scope": "lightweight debt-overlay transaction case",
+    "controls": [
+      "adjustment columns on/off",
+      "transaction enterprise value",
+      "acquisition debt amount",
+      "entry EV/EBITDA",
+      "incremental debt rate",
+      "close year",
+      "close month"
+    ],
+    "consideration_cash_outflow_once": true,
+    "debt_proceeds_cash_inflow_once": true,
+    "residual_consideration_funded_by_existing_cash_then_existing_rcf_mechanics": true,
+    "acquisition_debt_persists_after_close": true,
+    "operating_contribution_timed_by_close_month": true,
+    "interest_timed_and_priced_on_average_balance": true,
+    "prohibited_expansion": [
+      "automatic equity plug",
+      "full sources and uses",
+      "purchase accounting",
+      "synergies",
+      "fees",
+      "target balance sheet",
+      "multiple acquisition financing tranches",
+      "acquisition amortisation or maturity inputs"
+    ]
+  },
+  "validation": {
+    "delivery_safety_and_model_usefulness_are_independent_obligations": true,
+    "economic_intent_tests_required": true,
+    "positive_tests_have_targeted_mutations": true,
+    "real_issuer_expanded_and_contracted_shapes_required": true,
+    "usable_broker_test_must_inspect_workbook_consumption": true,
+    "raw_pdf_installed_host_canary_must_not_preauthor_semantics": true,
+    "native_excel_toggle_restoration_is_release_gate_not_automatic_runtime_pass": true,
+    "pass_pending_manual_is_not_release_pass": true,
+    "missing_external_custody_is_blocked_not_green": true
+  },
+  "runtime_and_release": {
+    "user_submission_to_visible_response_trace_required": true,
+    "nested_controller_spans_bound_to_same_trace": true,
+    "source_repository_commit_tree_and_closure_persisted_in_carrier": true,
+    "installed_package_identity_persisted": true,
+    "development_package_not_promotable": true,
+    "certified_immutable_closure_required_for_promotion": true,
+    "installation_identity_does_not_substitute_for_behavioral_certification": true
+  },
+  "flexibility": {
+    "issuer_name_branches_prohibited": true,
+    "broker_house_name_branches_prohibited": true,
+    "new_company_rows_may_be_preserved_without_dictionary_exception": true,
+    "source_arithmetic_survives_caption_changes": true,
+    "semantic_roles_have_one_canonical_registry": true,
+    "behavior_policy_is_role_and_evidence_driven_not_caption_regex_driven": true,
+    "new_optional_evidence_cannot_expand_user_blockers": true,
+    "portable_repository_owned_test_fixtures_required": true
+  },
+  "engineering_quality": {
+    "single_authority_per_policy_question": true,
+    "generated_views_may_duplicate_data_but_not_author_policy": true,
+    "no_hidden_absolute_paths": true,
+    "no_stale_registry_interfaces": true,
+    "no_broad_exception_swallowing_at_economic_boundaries": true,
+    "subprocess_exit_codes_owned_and_checked": true,
+    "release_manifests_generated_not_hand_reconciled": true,
+    "oversized_modules_require_named_decomposition_plan": true,
+    "unused_or_unreachable_runtime_members_removed": true,
+    "test_harness_must_not_simulate_the_seam_it_claims_to_certify": true
+  }
+}
