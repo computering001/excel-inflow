@@ -1,0 +1,128 @@
+name: Publish verified Excel Inflow repair PR
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository metadata
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-execution-base
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Wait for the fail-closed final verification commit
+        shell: bash
+        env:
+          REPAIR_BRANCH: agent/excel-inflow-end-to-end-repair
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/excel-inflow-publish
+          found=''
+          for attempt in $(seq 1 240); do
+            git fetch origin "$REPAIR_BRANCH" --quiet
+            if git show "origin/$REPAIR_BRANCH:audit/final/verification.json" \
+              > /tmp/excel-inflow-publish/verification.json 2>/dev/null; then
+              if jq -e '.status == "PASS_DEVELOPMENT_CANDIDATE" and .user_ready_for_candidate_route == true and .production_promotion_ready == false' \
+                /tmp/excel-inflow-publish/verification.json >/dev/null; then
+                found='true'
+                break
+              fi
+            fi
+            sleep 15
+          done
+          test "$found" = true
+
+      - name: Re-check the cleaned verified tree
+        shell: bash
+        env:
+          REPAIR_BRANCH: agent/excel-inflow-end-to-end-repair
+          VERIFIED_BRANCH: agent/excel-inflow-v360-verified
+        run: |
+          set -euo pipefail
+          git checkout -B "$VERIFIED_BRANCH" "origin/$REPAIR_BRANCH"
+          test -s audit/final/verification.json
+          jq -e '.status == "PASS_DEVELOPMENT_CANDIDATE"' audit/final/verification.json
+          jq -e '.packageMode == "development" and .skillVersion == "3.6.0" and .certification.certifiedClosureSha256 == null' release-manifest.json
+          forbidden=(
+            .audit-trigger .audit-trigger-v2 .repair-trigger .custody-trigger
+            .acquisition-trigger .acquisition-solver-trigger .acquisition-workbook-trigger
+            .raw-canary-trigger .telemetry-trigger .broker-headline-trigger
+            .finalize-trigger .finalize-trigger-v2 .publish-coordinator-trigger
+            .github/workflows/repair-workspace-export.yml
+            scripts/forensic_repair.py
+            scripts/repair_acquisition_integration.py
+            scripts/repair_acquisition_plan_integration.py
+            scripts/repair_telemetry_integration.py
+            scripts/repair_broker_headline_integration.py
+          )
+          for target in "${forbidden[@]}"; do
+            test ! -e "$target" || { echo "Temporary repair artifact survived: $target" >&2; exit 1; }
+          done
+          git diff --check "origin/agent/broker-delivery-constitution-v350...HEAD"
+          git push --force-with-lease origin "HEAD:$VERIFIED_BRANCH"
+
+      - name: Open or update the draft repair PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_BRANCH: agent/excel-inflow-v360-verified
+          BASE_BRANCH: agent/broker-delivery-constitution-v350
+        run: |
+          set -euo pipefail
+          current_closure=$(jq -r '.current_closure_sha256' audit/final/verification.json)
+          gate_counts=$(jq -c '.portable_development_gate' audit/final/verification.json)
+          cat > /tmp/excel-inflow-publish/pr-body.md <<EOF
+          ## What changed
+
+          This repairs Excel Inflow end to end against the zero-context master blueprint while preserving the hard broker-failure delivery invariant and the debt/cash/RCF/interest fixed point.
+
+          Key changes include source-arithmetic filing topology, quality-first broker-house eligibility, complete Tier-1 broker demand, one coherent EBIT/Adjusted EBITDA headline, discrete-event forecast policy, a funded acquisition transaction case, joined user-visible telemetry, portable test custody, source/install identity and honest installed-host certification boundaries.
+
+          ## Verification
+
+          - Final status: \`PASS_DEVELOPMENT_CANDIDATE\u0060
+          - Skill version: \`3.6.0\u0060
+          - Package mode: \`development\u0060
+          - Current closure: \`$current_closure\u0060
+          - Portable gate counts: \`$gate_counts\u0060
+          - No local FAIL or BLOCKED result in graph, workflow, evidence, forecast, economics, cohort or proof phases.
+          - Universal broker matrix rerun after cleanup.
+          - Acquisition solver and emitted-workbook proofs rerun after cleanup.
+
+          ## Deliberately not claimed
+
+          This PR is not a production certification. Native Excel restoration, human visual review, installed-Rogo raw-broker semantics and the installed-host performance cohort remain explicit external release gates. The manifest therefore retains a null certified closure.
+          EOF
+          existing=$(gh pr list --state open --head "$VERIFIED_BRANCH" --base "$BASE_BRANCH" --json number,url --jq '.[0].url // empty')
+          if test -n "$existing"; then
+            gh pr edit "$existing" --title 'Repair Excel Inflow economic usefulness and runtime delivery' --body-file /tmp/excel-inflow-publish/pr-body.md
+            echo "$existing" | tee /tmp/excel-inflow-publish/pr-url.txt
+          else
+            gh pr create --draft \
+              --base "$BASE_BRANCH" \
+              --head "$VERIFIED_BRANCH" \
+              --title 'Repair Excel Inflow economic usefulness and runtime delivery' \
+              --body-file /tmp/excel-inflow-publish/pr-body.md \
+              | tee /tmp/excel-inflow-publish/pr-url.txt
+          fi
+
+      - name: Upload publication receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-publication-receipt
+          path: /tmp/excel-inflow-publish
+          retention-days: 30
+          if-no-files-found: warn
