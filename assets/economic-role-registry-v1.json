@@ -1,0 +1,96 @@
+{
+  "schema_version": "economic-role-registry/1.0",
+  "purpose": "One executable owner for forecast-relevant economic role metadata emitted by filing taxonomy or case compilation.",
+  "roles": {
+    "acquisition": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "acquisition_cost": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "acquisitions_net_of_cash": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "acquisition_of_subsidiaries_net_of_cash_acquired": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "business_combination": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "business_combinations_net_of_cash_acquired": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "disposal": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "asset_disposal": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "asset_sale": {
+      "sections": ["cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "litigation": {
+      "sections": ["income_statement", "cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "legal_settlement": {
+      "sections": ["income_statement", "cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "restructuring": {
+      "sections": ["income_statement", "cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "impairment_loss": {
+      "sections": ["income_statement", "cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "exceptional_item": {
+      "sections": ["income_statement", "cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    },
+    "discontinued_operation": {
+      "sections": ["income_statement", "cash_flow"],
+      "recurrence": "discrete_event",
+      "variability": "lumpy",
+      "structured_event": true
+    }
+  }
+}
