@@ -1,0 +1,95 @@
+name: Harden source arithmetic inference
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install test runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF jsonschema
+
+      - name: Exclude zero-only arithmetic evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('scripts/extract_filing_statements.py'); content=path.read_text('utf8')
+          old='''def _series_sum_matches(parent: list[float], children: list[list[float]]) -> bool:
+    if len(children) < 2:
+        return False
+    calculated = [sum(series[index] for series in children) for index in range(3)]
+'''
+          new='''def _series_sum_matches(parent: list[float], children: list[list[float]]) -> bool:
+    if len(children) < 2:
+        return False
+    # A zero-only shell carries no arithmetic information. It may be an empty
+    # template, an unavailable disclosure or a printed dash family; it cannot
+    # establish economic ownership merely because 0 = 0 + 0.
+    if max([abs(value) for value in parent] + [abs(value) for series in children for value in series], default=0.0) <= 1e-12:
+        return False
+    calculated = [sum(series[index] for series in children) for index in range(3)]
+'''
+          if new not in content:
+            if old not in content: raise SystemExit('source arithmetic function drifted')
+            content=content.replace(old,new,1)
+            path.write_text(content,'utf8')
+          test=Path('scripts/run_source_arithmetic_topology_tests.py'); source=test.read_text('utf8')
+          block='''
+zero_only = [
+    row("is.a", "A", [0, 0, 0], 1), row("is.b", "B", [0, 0, 0], 1),
+    row("is.parent", "Zero shell", [0, 0, 0], 0),
+]
+infer_source_arithmetic_links(zero_only)
+assert not any(item.get("parent_source_line_id") for item in zero_only)
+'''
+          if 'zero_only =' not in source:
+            source=source.replace("print('{\"status\":\"PASS\",\"checks\":4}')",block+"\nprint('{\"status\":\"PASS\",\"checks\":5}')")
+            test.write_text(source,'utf8')
+          PY
+          git diff --check
+
+      - name: Run topology, compiler and portable cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run_source_arithmetic_topology_tests.py
+          node scripts/run_statement_classifier_tests.mjs fixtures/portable/representative-model-case.json
+          node scripts/run_layered_graph_constitution_tests.mjs fixtures/portable/representative-model-case.json
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_case_compiler_equivalence.mjs fixtures/portable/cases
+          node scripts/run_stage4_checkpoint_tests.mjs --cases fixtures/portable/cases --python "$(command -v python3)" --soffice "$(command -v soffice)"
+
+      - name: Persist hardening
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-topology-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/extract_filing_statements.py scripts/run_source_arithmetic_topology_tests.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Harden filing source arithmetic against zero shells [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
