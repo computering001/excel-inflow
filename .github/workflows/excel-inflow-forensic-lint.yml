@@ -1,0 +1,37 @@
+name: Excel Inflow forensic architecture lint
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  pull_request:
+    branches:
+      - agent/broker-delivery-constitution-v350
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forensic-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run repository-wide forensic lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/forensic-lint"
+          python3 scripts/run_repository_forensic_lint.py \
+            --out "$RUNNER_TEMP/forensic-lint/repository-forensic-lint.json"
+      - name: Upload forensic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-forensic-lint-${{ github.sha }}
+          path: ${{ runner.temp }}/forensic-lint
+          retention-days: 14
+          if-no-files-found: warn
