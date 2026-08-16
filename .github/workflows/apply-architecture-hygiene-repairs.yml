@@ -1,0 +1,58 @@
+name: Apply deterministic architecture hygiene repairs
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/architecture-hygiene.json
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-architecture-auto-repair-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply only declared safe repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply_architecture_hygiene_repairs.py
+          python3 scripts/run_source_arithmetic_and_architecture_hygiene_tests.py
+
+      - name: Remove the temporary auto-repair machinery after PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/architecture-hygiene.json').read_text('utf-8'))
+          if report.get('status') != 'PASS':
+              raise SystemExit('Architecture audit is not PASS after safe repair.')
+          Path('scripts/apply_architecture_hygiene_repairs.py').unlink(missing_ok=True)
+          Path('.github/workflows/apply-architecture-hygiene-repairs.yml').unlink(missing_ok=True)
+          PY
+
+      - name: Commit the repaired architecture atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name excel-inflow-repair-bot
+          git config user.email 312638569+computering001@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Close blueprint-mapped architecture hygiene findings"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
