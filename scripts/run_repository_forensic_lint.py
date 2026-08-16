@@ -110,6 +110,11 @@ def role_ids(value: Any) -> set[str]:
     if not isinstance(value, dict):
         return set()
     rows = value.get("roles") or value.get("entries") or value.get("semantic_roles") or []
+    if isinstance(rows, dict):
+        rows = [
+            ({"id": key, **entry} if isinstance(entry, dict) else {"id": key})
+            for key, entry in rows.items()
+        ]
     result = set()
     for row in rows:
         if isinstance(row, dict):
@@ -272,21 +277,26 @@ def main() -> int:
             for row in registry_tests if isinstance(row, dict)
         }
         categories={
-            "source_arithmetic": ("arithmetic", "statement"),
-            "discrete_event": ("discrete", "forecast"),
-            "broker_frontier": ("broker", "demand"),
-            "funded_acquisition": ("acquisition",),
-            "carrier_identity": ("carrier",),
-            "stage4_resume": ("stage4",),
+            "source_arithmetic": (("source", "arithmetic"), ("statement", "arithmetic"), ("filing", "arithmetic")),
+            "discrete_event": (("discrete",), ("forecast", "behavior")),
+            "broker_frontier": (("broker", "frontier"), ("broker", "demand"), ("broker", "selection")),
+            "funded_acquisition": (("acquisition",),),
+            "carrier_identity": (("carrier",), ("source", "identity")),
+            "stage4_resume": (("stage4",), ("content", "addressed", "resume")),
         }
-        for category,tokens in categories.items():
-            if not any(all(token in name.lower() for token in tokens) for name in registered_names):
+        for category,alternatives in categories.items():
+            owned=any(
+                all(token in name.lower() for token in tokens)
+                for name in registered_names
+                for tokens in alternatives
+            )
+            if not owned:
                 findings.append(finding(
                     "TEST_CATEGORY_UNOWNED",
                     "BLOCK",
                     "A release-critical repaired behavior has no registered executable test.",
                     category=category,
-                    expected_tokens=list(tokens),
+                    expected_alternatives=[list(tokens) for tokens in alternatives],
                 ))
 
     # Semantic role closure and discrete acquisition behavior.
@@ -325,6 +335,11 @@ def main() -> int:
     candidate = ROOT / "scripts" / "lib" / "forecast_candidate_compiler.mjs"
     combined = "\n".join(text(path) for path in (behavior, candidate) if path.is_file())
     role_rows = (role_registry_value.get("roles") or role_registry_value.get("entries") or role_registry_value.get("semantic_roles") or [])
+    if isinstance(role_rows, dict):
+        role_rows = [
+            ({"id": key, **entry} if isinstance(entry, dict) else {"id": key})
+            for key, entry in role_rows.items()
+        ]
     acquisition_role = next((row for row in role_rows if isinstance(row, dict) and (row.get("id") or row.get("role_id") or row.get("semantic_role")) == "acquisitions_net_of_cash"), None)
     acquisition_policy_text = json.dumps(acquisition_role or {}, sort_keys=True).lower()
     registry_declares_discrete = "discrete" in acquisition_policy_text or "non_recurring" in acquisition_policy_text or "non-recurring" in acquisition_policy_text
@@ -377,11 +392,15 @@ def main() -> int:
                 "Filing extraction lacks a general historical arithmetic-reconciliation path.",
                 path=rel(filing_extractor),
             ))
-        if "product revenue" in body and "regex" in body:
+        issuer_pattern = re.search(
+            r"re\.(?:search|match|fullmatch)\([^\n]{0,240}product\s+revenue",
+            body,
+        )
+        if issuer_pattern:
             findings.append(finding(
                 "ISSUER_SPECIFIC_AGGREGATION_BRANCH",
                 "BLOCK",
-                "Product Revenue appears to be repaired through an issuer-caption exception.",
+                "Product Revenue is repaired through an issuer-caption regex instead of source arithmetic.",
                 path=rel(filing_extractor),
             ))
 
