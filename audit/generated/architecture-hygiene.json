@@ -1,6 +1,6 @@
 {
   "checks": 191,
-  "finding_count": 48,
+  "finding_count": 49,
   "findings": [
     {
       "code": "BROKER-OLD-POLICY",
@@ -96,6 +96,11 @@
       "code": "PRIVATE-PATH",
       "message": "/Users/",
       "path": "scripts/run_filings_pipeline_tests.mjs"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": "scripts/apply_architecture_hygiene_repairs.py"
     },
     {
       "code": "BROKER-OLD-POLICY",
@@ -246,6 +251,7 @@
   "new_broker_policy_paths": [
     ".github/workflows/excel-inflow-finalize-repair-source.yml",
     ".github/workflows/excel-inflow-ultimate-finalize.yml",
+    "scripts/apply_architecture_hygiene_repairs.py",
     "scripts/run_final_candidate_audit.py",
     "scripts/run_final_clean_checkout_gate.py",
     "scripts/run_raw_broker_native_integration_test.py",
