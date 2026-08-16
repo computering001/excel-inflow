@@ -1,0 +1,79 @@
+name: Excel Inflow candidate CI
+
+on:
+  pull_request:
+    branches:
+      - agent/broker-delivery-constitution-v350
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: excel-inflow-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+      - name: Syntax and contract checks
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: python3
+          EXCEL_INFLOW_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q scripts
+          while IFS= read -r file; do node --check "$file"; done < <(find scripts -type f \( -name '*.mjs' -o -name '*.js' -o -name '*.cjs' \) | sort)
+          node scripts/run_test_registry_interface_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_run_constitution_graph_tests.mjs
+          node scripts/run_workflow_state_pairing_tests.mjs
+      - name: Economic and evidence repairs
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: python3
+        run: |
+          set -euo pipefail
+          python3 scripts/run_filing_arithmetic_topology_tests.py
+          python3 scripts/run_raw_filing_arithmetic_integration_test.py
+          python3 scripts/run_broker_native_eligibility_tests.py
+          python3 scripts/run_raw_broker_native_integration_test.py
+          node scripts/run_discrete_event_forecast_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_statement_role_equivalence_tests.mjs
+          node scripts/run_funded_acquisition_policy_tests.mjs
+          python3 scripts/run_funded_acquisition_source_tests.py
+      - name: Workflow, debt and delivery sentinels
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: python3
+          EXCEL_INFLOW_SOURCE_COMMIT: ${{ github.sha }}
+          EXCEL_INFLOW_SOURCE_TREE: 0000000000000000000000000000000000000000
+        run: |
+          set -euo pipefail
+          node scripts/run_workflow_state_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+          node scripts/run_controller_exit_inventory_tests.mjs
+          node scripts/run_equation_graph_tests.mjs
+          node scripts/run_opening_debt_reconciliation_tests.mjs
+          node scripts/run_broker_exit_fault_injection_tests.mjs
+          node scripts/run_run_carrier_source_identity_tests.mjs
+          node scripts/run_user_visible_runtime_trace_tests.mjs
