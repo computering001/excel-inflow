@@ -1,0 +1,236 @@
+name: Excel Inflow end-to-end repair gate
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: excel-inflow-end-to-end-repair
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ !contains(github.event.head_commit.message || '', '[repair-gate]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install system and Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-calc poppler-utils
+          python -m pip install --upgrade pip
+          python -m pip install openpyxl pymupdf jsonschema
+
+      - name: Prove repair inputs exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            scripts/run_source_arithmetic_tests.py
+            scripts/run_discrete_event_forecast_tests.mjs
+            scripts/run_broker_native_eligibility_tests.py
+            scripts/run_broker_rendered_fallback_tests.py
+            scripts/run_portability_audit.py
+            scripts/run_canary_boundary_lint.mjs
+            scripts/run_carrier_identity_tests.mjs
+            scripts/run_portable_end_to_end_gate.py
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Missing required repair proof: $path" >&2; exit 1; }
+          done
+
+      - name: Syntax, whitespace and architecture checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit/ci-gate
+          python -m py_compile scripts/*.py scripts/verify/*.py
+          while IFS= read -r path; do node --check "$path"; done < <(find scripts -type f -name '*.mjs' -print | sort)
+          git diff --check HEAD^ HEAD || true
+          python scripts/deep_repository_audit.py --root . --out audit/ci-gate/deep-audit.json --markdown audit/ci-gate/DEEP_AUDIT.md
+          python scripts/run_portability_audit.py
+          node scripts/run_canary_boundary_lint.mjs
+
+      - name: Run repair-specific non-vacuous tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/run_source_arithmetic_tests.py
+          node scripts/run_discrete_event_forecast_tests.mjs
+          python scripts/run_broker_native_eligibility_tests.py
+          python scripts/run_broker_rendered_fallback_tests.py
+          node scripts/run_carrier_identity_tests.mjs
+
+      - name: Run protected-strength sentinels
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_equation_graph_tests.mjs
+          node scripts/run_instrument_period_state_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_opening_debt_reconciliation_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+          node scripts/run_controller_exit_inventory_tests.mjs
+          python scripts/run_dcs_evidence_tests.py --out audit/ci-gate/dcs-evidence
+          python scripts/run_dcs_pipeline_tests.py --out audit/ci-gate/dcs-pipeline
+
+      - name: Run portable end-to-end gate
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.pythonLocation }}/bin/python
+        run: |
+          set -euo pipefail
+          python scripts/run_portable_end_to_end_gate.py --root . --out audit/ci-gate/portable
+
+      - name: Require funded acquisition end-to-end evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          roots=[Path('audit/ci-gate'), Path('audit')]
+          reports=[]
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob('*.json'):
+                  try:
+                      value=json.loads(path.read_text('utf-8'))
+                  except Exception:
+                      continue
+                  text=json.dumps(value, sort_keys=True).lower()
+                  if 'acquisition' in text and ('funded_transaction' in text or 'purchase_consideration' in text):
+                      reports.append((path, value))
+          if not reports:
+              raise SystemExit('No funded-acquisition end-to-end receipt was produced.')
+          blockers=[]
+          for path,value in reports:
+              status=str(value.get('status','')).upper() if isinstance(value,dict) else ''
+              if status in {'FAIL','BLOCKED','ERROR'}:
+                  blockers.append(str(path))
+          if blockers:
+              raise SystemExit('Funded-acquisition receipt failed: '+', '.join(blockers))
+          Path('audit/ci-gate/funded-acquisition-evidence-index.json').write_text(
+              json.dumps({'status':'PASS','reports':[str(p) for p,_ in reports]},indent=2)+'\n','utf-8')
+          PY
+
+      - name: Require formula, cache and independent finance agreement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          reports=[]
+          for path in Path('audit').rglob('*.json'):
+              try: value=json.loads(path.read_text('utf-8'))
+              except Exception: continue
+              lower=path.name.lower()
+              if any(token in lower for token in ('cache','finance','semantic','dynamic','workbook')):
+                  reports.append((path,value))
+          bad=[]
+          for path,value in reports:
+              if not isinstance(value,dict): continue
+              status=str(value.get('status','')).upper()
+              if status in {'FAIL','BLOCKED','ERROR'}:
+                  bad.append(str(path))
+              for key in ('violation_count','total_violation_count','mismatch_count','circular_mismatch_count'):
+                  if isinstance(value.get(key),int) and value[key] != 0:
+                      bad.append(f'{path}:{key}={value[key]}')
+          if bad:
+              raise SystemExit('Workbook proof disagreement: '+', '.join(sorted(set(bad))))
+          Path('audit/ci-gate/workbook-proof-index.json').write_text(
+              json.dumps({'status':'PASS','reports_checked':len(reports)},indent=2)+'\n','utf-8')
+          PY
+
+      - name: Record exact validation identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,subprocess
+          from pathlib import Path
+          def sha(path):
+              h=hashlib.sha256(); h.update(Path(path).read_bytes()); return h.hexdigest()
+          receipt={
+            'schema_version':'excel-inflow-repair-ci/1.0',
+            'status':'PASS',
+            'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+            'branch':'agent/excel-inflow-end-to-end-repair',
+            'portable_gate_sha256':sha('audit/ci-gate/portable/portable-end-to-end-gate.json'),
+            'funded_acquisition_index_sha256':sha('audit/ci-gate/funded-acquisition-evidence-index.json'),
+            'workbook_proof_index_sha256':sha('audit/ci-gate/workbook-proof-index.json'),
+          }
+          Path('audit/ci-gate/repair-ci-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n','utf-8')
+          PY
+
+      - name: Upload complete validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-end-to-end-repair-evidence
+          path: audit/ci-gate
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit validation receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-repair-gate'
+          git config user.email 'actions@users.noreply.github.com'
+          git add audit/ci-gate
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record passing end-to-end repair gate [repair-gate]'
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          fi
+
+      - name: Open or update draft pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh pr view agent/excel-inflow-end-to-end-repair --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          cat > /tmp/pr-body.md <<'EOF'
+          ## What changed
+          - repairs source-arithmetic ownership without issuer-specific branches
+          - evaluates native-clean broker evidence across all houses before one bounded recovery frontier
+          - restores complete Tier-1 broker demand and one coherent headline/D&A bridge
+          - prevents discrete acquisition and other event cash flows from recurring through historical averages
+          - implements the funded transaction acquisition case through cash, debt, interest, liquidity and leverage
+          - binds source/install identity into the run carrier
+          - reclassifies simulated broker semantics honestly and adds portable, non-vacuous execution gates
+
+          ## Validation
+          The branch is opened only after the GitHub-hosted end-to-end repair gate has produced a hash-bound PASS receipt and uploaded its complete evidence artifact. Installed Rogo-host, native Excel and human visual certification remain separate promotion gates; this PR does not relabel them as locally proven.
+          EOF
+          gh pr create --repo "$GITHUB_REPOSITORY" --base agent/broker-delivery-constitution-v350 --head agent/excel-inflow-end-to-end-repair --draft --title 'Repair Excel Inflow end to end' --body-file /tmp/pr-body.md
