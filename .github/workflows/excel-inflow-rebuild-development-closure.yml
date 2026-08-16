@@ -1,0 +1,110 @@
+name: Excel Inflow rebuild development closure
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  compile-development-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Start from latest settled branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 60
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git reset --hard origin/agent/excel-inflow-end-to-end-repair
+      - name: Wait for ordinary-source convergence
+        id: ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          scaffolding="$(find scripts -maxdepth 1 -type f \( -name 'apply_excel_inflow_repair_stage*.py' -o -name 'fix_stage*.py' -o -name 'run_repair_stage*_stage_v*.py' \) -print)"
+          if test -n "$scaffolding"; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo "$scaffolding"
+            if gh workflow view excel-inflow-converge-repair.yml >/dev/null 2>&1; then
+              gh workflow run excel-inflow-converge-repair.yml --ref agent/excel-inflow-end-to-end-repair || true
+            fi
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Remove this one-shot workflow before closure computation
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        run: rm -f .github/workflows/excel-inflow-rebuild-development-closure.yml
+      - name: Compile the development closure
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/compile_skill_release.mjs
+          if grep -q -- '--package-mode' scripts/compile_skill_release.mjs; then
+            node scripts/compile_skill_release.mjs --package-mode development
+          elif grep -q -- '--mode' scripts/compile_skill_release.mjs; then
+            node scripts/compile_skill_release.mjs --mode development
+          else
+            node scripts/compile_skill_release.mjs
+          fi
+      - name: Refuse accidental certification or stale identity
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          path=Path('release-manifest.json')
+          value=json.loads(path.read_text('utf-8'))
+          certification=value.get('certification') or {}
+          if value.get('packageMode') != 'development':
+              raise SystemExit(f"Expected development package, got {value.get('packageMode')}")
+          if certification.get('certifiedClosureSha256') is not None:
+              raise SystemExit('Development compile unexpectedly populated a certified closure')
+          current=certification.get('currentClosureSha256')
+          if not isinstance(current,str) or not re.fullmatch(r'[a-f0-9]{64}',current):
+              raise SystemExit('Development compile did not produce a valid current closure')
+          if not isinstance(certification.get('closureFileCount'),int) or certification['closureFileCount'] <= 0:
+              raise SystemExit('Development compile produced no closure member inventory')
+          print(json.dumps({
+              'packageMode':value.get('packageMode'),
+              'skillVersion':value.get('skillVersion'),
+              'currentClosureSha256':current,
+              'closureFileCount':certification.get('closureFileCount'),
+              'certifiedClosureSha256':certification.get('certifiedClosureSha256'),
+          },indent=2,sort_keys=True))
+          PY
+      - name: Commit generated development identity
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-closure-bot'
+          git config user.email 'excel-inflow-closure-bot@users.noreply.github.com'
+          git add -A -- release-manifest.json assets SKILL.md central-instructions.md references scripts .github/workflows/excel-inflow-rebuild-development-closure.yml
+          if git diff --cached --quiet; then
+            echo 'Development closure was already current.'
+            exit 0
+          fi
+          git commit -m 'Recompile the cleaned development package closure'
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git rebase origin/agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
