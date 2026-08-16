@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/source-identity-v1.schema.json",
+  "title": "Excel Inflow immutable source identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository",
+    "source_commit",
+    "source_tree",
+    "source_branch",
+    "package_mode"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "excel-inflow-source-identity/1.0"
+    },
+    "repository": {
+      "const": "computering001/excel-inflow"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_tree": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package_mode": {
+      "enum": ["development", "certified"]
+    }
+  }
+}
