@@ -1,0 +1,78 @@
+name: Excel Inflow repair stage 1 auto-chain
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/baseline-v2/**
+      - audit/generated/history-blame/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excel-inflow-repair-stage1
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Decide whether the stage is ready
+        id: ready
+        shell: bash
+        run: |
+          if test -s audit/generated/baseline-v2/deep-product-architecture-audit.json \
+             && test -s audit/generated/history-blame/history-blame-audit.json \
+             && ! test -s audit/generated/repair-stage1/stage1-gate.json; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install runtime dependencies
+        if: steps.ready.outputs.run == 'true'
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+      - name: Apply and gate stage one
+        if: steps.ready.outputs.run == 'true'
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          rm -rf audit/generated/repair-stage1
+          mkdir -p audit/generated/repair-stage1
+          python3 scripts/apply_excel_inflow_repair_stage1.py --out audit/generated/repair-stage1
+          python3 scripts/run_repair_stage1_gate.py --out audit/generated/repair-stage1 --timeout 900 \
+            2>&1 | tee audit/generated/repair-stage1/workflow.log
+      - name: Record diagnostics or passing repair
+        if: steps.ready.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          if test "${{ steps.gate.outcome }}" = success; then
+            git add scripts assets references SKILL.md central-instructions.md audit/generated/repair-stage1
+            git commit -m "Repair filing topology broker eligibility and event policy"
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          else
+            cp -R audit/generated/repair-stage1 /tmp/repair-stage1-failure
+            git reset --hard HEAD
+            rm -rf audit/generated/repair-stage1-failure
+            mkdir -p audit/generated
+            cp -R /tmp/repair-stage1-failure audit/generated/repair-stage1-failure
+            git add audit/generated/repair-stage1-failure
+            git commit -m "Record stage-one repair failure"
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+            exit 1
+          fi
