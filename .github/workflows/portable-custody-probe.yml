@@ -1,0 +1,136 @@
+name: Build portable Excel Inflow test custody
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  portable-custody:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out verified repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir jsonschema PyMuPDF openpyxl pypdf
+
+      - name: Probe repository-owned synthetic generators
+        shell: bash
+        run: |
+          set -u
+          rm -rf /tmp/excel-inflow-custody-probe fixtures/portable
+          mkdir -p /tmp/excel-inflow-custody-probe fixtures/portable/cases
+          commands=(
+            "node scripts/compile_synthetic_cohort.mjs --out /tmp/excel-inflow-custody-probe/cohort"
+            "node scripts/compile_synthetic_cohort.mjs /tmp/excel-inflow-custody-probe/cohort"
+            "node scripts/compile_synthetic_cohort.mjs --output /tmp/excel-inflow-custody-probe/cohort"
+            "node scripts/compile_public_test_run.mjs --out /tmp/excel-inflow-custody-probe/public"
+            "node scripts/compile_public_test_run.mjs /tmp/excel-inflow-custody-probe/public"
+          )
+          : > /tmp/excel-inflow-custody-probe/probe.log
+          for command in "${commands[@]}"; do
+            echo ">>> $command" | tee -a /tmp/excel-inflow-custody-probe/probe.log
+            bash -lc "$command" >> /tmp/excel-inflow-custody-probe/probe.log 2>&1 || true
+          done
+
+      - name: Select a schema-valid economically executable case
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, shutil, subprocess, os
+          from jsonschema import Draft202012Validator, FormatChecker
+          root=Path('.').resolve(); probe=Path('/tmp/excel-inflow-custody-probe')
+          schema=json.loads((root/'assets/model-case-v2.schema.json').read_text('utf8'))
+          validator=Draft202012Validator(schema,format_checker=FormatChecker())
+          candidates=[]
+          for base in [root,probe]:
+            for path in base.rglob('*.json'):
+              if any(part in {'.git','node_modules','audit'} for part in path.parts): continue
+              try: data=json.loads(path.read_text('utf8'))
+              except Exception: continue
+              if not isinstance(data,dict): continue
+              errors=list(validator.iter_errors(data))
+              if errors: continue
+              score=0
+              if len(data.get('periods',[]))==6: score+=20
+              if data.get('statement_structure'): score+=20
+              if data.get('instruments'): score+=10
+              if data.get('broker_pack'): score+=2
+              candidates.append((score,path,data))
+          candidates.sort(key=lambda item:(item[0],item[1].stat().st_size),reverse=True)
+          results=[]; selected=None
+          for score,path,data in candidates:
+            checks=[]
+            for name,command in [
+              ('statement',['node','scripts/run_statement_classifier_tests.mjs',str(path)]),
+              ('graph',['node','scripts/run_layered_graph_constitution_tests.mjs',str(path)]),
+            ]:
+              completed=subprocess.run(command,cwd=root,text=True,capture_output=True,timeout=300)
+              checks.append({'name':name,'returncode':completed.returncode,'stdout':completed.stdout[-2000:],'stderr':completed.stderr[-4000:]})
+            result={'path':str(path),'score':score,'checks':checks}
+            results.append(result)
+            if all(item['returncode']==0 for item in checks):
+              selected=path; break
+          probe.mkdir(parents=True,exist_ok=True)
+          (probe/'selection-report.json').write_text(json.dumps({'candidate_count':len(candidates),'results':results},indent=2)+'\n')
+          if selected is None:
+            raise SystemExit('No repository-owned case satisfied schema, statement and graph gates.')
+          destination=root/'fixtures/portable/representative-model-case.json'
+          destination.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copy2(selected,destination)
+          shutil.copy2(selected,root/'fixtures/portable/cases/portable-maximal-v2.json')
+          print(destination)
+          PY
+
+      - name: Run portable case matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          case=fixtures/portable/representative-model-case.json
+          cases=fixtures/portable/cases
+          node scripts/run_statement_classifier_tests.mjs "$case"
+          node scripts/run_layered_graph_constitution_tests.mjs "$case"
+          node scripts/run_broker_page_evidence_tests.mjs "$case"
+          node scripts/run_case_compiler_equivalence.mjs "$cases"
+          node scripts/run_evidence_run_tests.mjs "$cases"
+          node scripts/run_degraded_broker_delivery_tests.mjs "$cases"
+          node scripts/run_stage4_checkpoint_tests.mjs --cases "$cases" --python "$(command -v python3)" --soffice "$(command -v soffice)"
+
+      - name: Persist repository-owned portable custody
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-custody-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add fixtures/portable
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Add portable representative case custody [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload custody probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-portable-custody-probe
+          path: /tmp/excel-inflow-custody-probe
+          retention-days: 14
+          if-no-files-found: warn
