@@ -1,0 +1,128 @@
+name: Remove one-off Excel Inflow repair scaffolding
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/cleanup-repair-scaffolding.yml
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-scaffolding-cleanup-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove only one-off repair machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          root = Path('.').resolve()
+          preserve = {
+              '.github/workflows/excel-inflow-ci.yml',
+              '.github/workflows/final-clean-checkout-gate.yml',
+              'scripts/run_final_clean_checkout_gate.py',
+              'audit/product-target-v1.json',
+          }
+          file_globs = [
+              '.github/workflows/patch-*.yml',
+              '.github/workflows/patch-*.yaml',
+              '.github/workflows/*orchestrator*.yml',
+              '.github/workflows/*orchestrator*.yaml',
+              '.github/workflows/final-repair*.yml',
+              '.github/workflows/final-repair*.yaml',
+              '.github/workflows/repair-workspace-export.yml',
+              '.github/workflows/repair-execution.yml',
+              '.github/workflows/cleanup-repair-scaffolding.yml',
+              'scripts/apply_excel_inflow_repair*.py',
+              'scripts/fix_stage*.py',
+              'scripts/run_repair_stage*.py',
+              'scripts/run_*repair*stage*.py',
+              'scripts/*stage*repair*.py',
+              'scripts/trigger_*repair*.py',
+              'scripts/*repair*launcher*.py',
+          ]
+          removed = []
+          for pattern in file_globs:
+              for path in root.glob(pattern):
+                  rel = path.relative_to(root).as_posix()
+                  if rel in preserve or not path.is_file():
+                      continue
+                  path.unlink()
+                  removed.append(rel)
+
+          generated = root / 'audit' / 'generated'
+          if generated.is_dir():
+              for path in sorted(generated.iterdir()):
+                  rel = path.relative_to(root).as_posix()
+                  lowered = path.name.lower()
+                  if path.name == 'final-clean-checkout':
+                      continue
+                  if any(token in lowered for token in (
+                      'failure', 'failed', 'attempt', 'preflight',
+                      'full-repair', 'stage-one', 'stage-two', 'stage1', 'stage2',
+                      'orchestrator', 'patch-run', 'transaction-log',
+                  )):
+                      if path.is_dir():
+                          shutil.rmtree(path)
+                      else:
+                          path.unlink()
+                      removed.append(rel)
+
+          report = root / 'audit' / 'repair-scaffolding-removal.txt'
+          report.parent.mkdir(parents=True, exist_ok=True)
+          report.write_text('\n'.join(sorted(removed)) + ('\n' if removed else ''), 'utf-8')
+          print({'removed_count': len(removed), 'removed': sorted(removed)})
+          PY
+
+      - name: Refuse accidental source damage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f SKILL.md
+          test -f scripts/build_dynamic_model.mjs
+          test -f scripts/lib/solver.mjs
+          test -f scripts/run_final_clean_checkout_gate.py
+          test -f .github/workflows/final-clean-checkout-gate.yml
+          test -f audit/product-target-v1.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('.').rglob('*.json'):
+              if '.git' in path.parts:
+                  continue
+              json.loads(path.read_text('utf-8'))
+          print('JSON closure valid')
+          PY
+          python3 -m compileall -q scripts
+          if git diff --name-only --diff-filter=D | grep -E '^(scripts/(build_dynamic_model\.mjs|lib/(solver|equation_graph|instrument_period_state|rcf_policy)\.mjs)|assets/(equation-graph|convergence-contract|economic-solve-policy)\.v1\.json)$'; then
+            echo 'Cleanup attempted to delete protected economic source.' >&2
+            exit 1
+          fi
+
+      - name: Commit cleanup atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name excel-inflow-repair-bot
+          git config user.email 312638569+computering001@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Remove one-off forensic repair scaffolding"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
