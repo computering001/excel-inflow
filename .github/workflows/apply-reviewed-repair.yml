@@ -1,0 +1,261 @@
+name: Apply reviewed Excel Inflow repair
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-reviewed-repair-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reviewed-excel-inflow-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-and-prove:
+    if: ${{ !startsWith(github.event.head_commit.message || '', 'Complete reviewed Excel Inflow end-to-end repair') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+          node --version
+          python3 --version
+          soffice --version
+
+      - name: Restore frozen portable case custody
+        shell: bash
+        env:
+          REVIEWED_COMMIT: 9edbbfe1596071c03813badee21b99d714affc23
+        run: |
+          set -euo pipefail
+          mkdir -p parity-fixtures
+          for file in standard-maximal-v2.json standard-net-cash-v2.json README.md; do
+            curl -fsSL \
+              "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/parity-fixtures/${file}" \
+              -o "parity-fixtures/${file}"
+          done
+          sha256sum parity-fixtures/*.json > parity-fixtures/SHA256SUMS
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('parity-fixtures').glob('*.json'):
+              json.loads(path.read_text('utf-8'))
+          PY
+
+      - name: Fetch pinned reviewed integration patchers
+        shell: bash
+        env:
+          REVIEWED_COMMIT: 9edbbfe1596071c03813badee21b99d714affc23
+        run: |
+          set -euo pipefail
+          for file in \
+            repair_acquisition_integration.py \
+            repair_acquisition_plan_integration.py \
+            repair_broker_headline_integration.py \
+            repair_telemetry_integration.py; do
+            curl -fsSL \
+              "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/scripts/${file}" \
+              -o "/tmp/${file}"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          root = str(Path.cwd())
+          for path in Path('/tmp').glob('repair_*_integration.py'):
+              value = path.read_text('utf-8')
+              value = value.replace('/mnt/data/excel-inflow-repair', root)
+              value = value.replace('/mnt/data/excel_inflow_repair', root)
+              path.write_text(value, 'utf-8')
+          PY
+
+      - name: Apply reviewed repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/apply_reviewed_core_repair.py
+          python3 /tmp/repair_acquisition_integration.py
+          python3 /tmp/repair_acquisition_plan_integration.py
+          python3 /tmp/repair_broker_headline_integration.py
+          python3 /tmp/repair_telemetry_integration.py
+
+      - name: Validate syntax and generated contract shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/*.py scripts/verify/*.py
+          while IFS= read -r file; do node --check "$file"; done < <(find scripts -type f -name '*.mjs' | sort)
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('.').rglob('*.json'):
+              json.loads(path.read_text('utf-8'))
+          PY
+
+      - name: Run reviewed portable end-to-end gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/reviewed-portable-gate
+          python3 scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out audit/reviewed-portable-gate
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/reviewed-portable-gate/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS', report
+          assert report['fail_count']==0, report
+          assert report['silently_skipped_count']==0, report
+          PY
+
+      - name: Write permanent source CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .github/workflows/reviewed-repair-ci.yml <<'YAML'
+          name: Excel Inflow reviewed repair CI
+
+          on:
+            push:
+              branches:
+                - agent/excel-inflow-reviewed-repair-v2
+            pull_request:
+
+          permissions:
+            contents: read
+
+          jobs:
+            portable-gate:
+              runs-on: ubuntu-latest
+              timeout-minutes: 120
+              steps:
+                - uses: actions/checkout@v4
+                - name: Install runtime
+                  run: |
+                    sudo apt-get update
+                    sudo apt-get install -y libreoffice
+                    python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+                - name: Run fail-closed portable gate
+                  run: |
+                    python3 scripts/run_reviewed_portable_gate.py \
+                      --python "$(command -v python3)" \
+                      --soffice "$(command -v soffice)" \
+                      --out audit/reviewed-portable-gate
+                - uses: actions/upload-artifact@v4
+                  if: always()
+                  with:
+                    name: reviewed-portable-gate
+                    path: audit/reviewed-portable-gate
+                    if-no-files-found: error
+          YAML
+
+      - name: Remove bootstrap-only machinery and audit source cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/apply_reviewed_core_repair.py
+          rm -f .github/workflows/apply-reviewed-repair.yml
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          violations=[]
+          for path in Path('scripts').rglob('*'):
+              if path.is_file() and path.suffix in {'.py','.mjs','.js','.json'}:
+                  text=path.read_text('utf-8')
+                  if re.search(r'/Users/|[A-Za-z]:\\\\Users\\\\', text):
+                      violations.append(str(path))
+                  if path.name.startswith('repair_') and path.name.endswith('_integration.py'):
+                      violations.append(f'bootstrap patcher retained: {path}')
+          if violations:
+              raise SystemExit('\n'.join(violations))
+          PY
+          git diff --check
+          git status --short
+          git diff --stat > audit/reviewed-portable-gate/final-diffstat.txt
+
+      - name: Commit proven repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Excel Inflow reviewed repair"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete reviewed Excel Inflow end-to-end repair"
+          git push origin HEAD:agent/excel-inflow-reviewed-repair-v2
+
+      - name: Open or update draft pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh pr view agent/excel-inflow-reviewed-repair-v2 --json number >/dev/null 2>&1; then
+            gh pr edit agent/excel-inflow-reviewed-repair-v2 \
+              --title "Complete reviewed Excel Inflow end-to-end repair" \
+              --body-file <(cat <<'MD'
+          ## What changed
+
+          Repairs source-visible statement arithmetic, all-house native broker eligibility, bounded quality-ranked recovery, Tier-1 headline authority integration, discrete-event forecast policy, funded acquisition cash/debt mechanics, run telemetry/carrier identity, portable case custody and the stale development-gate interface.
+
+          ## What was preserved
+
+          Optional broker failure still cannot block a valid filings/DCS build. Instrument-level debt, RCF, cash, lease, interest, circularity, selected-cell provenance, raw evidence custody and formula/cache integrity remain protected by the portable gate.
+
+          ## Validation
+
+          The branch was committed only after `scripts/run_reviewed_portable_gate.py` reported PASS with zero failures and zero silently skipped selected tests, including a real workbook build/recalculation/finance-proof acquisition case.
+
+          ## Remaining release-only evidence
+
+          Installed Rogo model-host usable-broker canary, native Excel restoration, human visual review and joined end-user performance cohort remain release-attestation evidence. They are not simulated by the source gate.
+          MD
+            )
+          else
+            gh pr create \
+              --draft \
+              --base agent/broker-delivery-constitution-v350 \
+              --head agent/excel-inflow-reviewed-repair-v2 \
+              --title "Complete reviewed Excel Inflow end-to-end repair" \
+              --body-file <(cat <<'MD'
+          ## What changed
+
+          Repairs source-visible statement arithmetic, all-house native broker eligibility, bounded quality-ranked recovery, Tier-1 headline authority integration, discrete-event forecast policy, funded acquisition cash/debt mechanics, run telemetry/carrier identity, portable case custody and the stale development-gate interface.
+
+          ## What was preserved
+
+          Optional broker failure still cannot block a valid filings/DCS build. Instrument-level debt, RCF, cash, lease, interest, circularity, selected-cell provenance, raw evidence custody and formula/cache integrity remain protected by the portable gate.
+
+          ## Validation
+
+          The branch was committed only after `scripts/run_reviewed_portable_gate.py` reported PASS with zero failures and zero silently skipped selected tests, including a real workbook build/recalculation/finance-proof acquisition case.
+
+          ## Remaining release-only evidence
+
+          Installed Rogo model-host usable-broker canary, native Excel restoration, human visual review and joined end-user performance cohort remain release-attestation evidence. They are not simulated by the source gate.
+          MD
+            )
+          fi
+
+      - name: Upload forensic and gate evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: excel-inflow-reviewed-repair-evidence
+          path: audit/reviewed-portable-gate
+          if-no-files-found: error
+          retention-days: 30
