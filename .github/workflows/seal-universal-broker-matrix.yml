@@ -1,0 +1,229 @@
+name: Seal universal broker matrix into reviewed gate
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-reviewed-repair-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reviewed-excel-inflow-repair
+  cancel-in-progress: false
+
+jobs:
+  seal-universal-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Fetch exact pinned reviewed source
+        shell: bash
+        env:
+          REVIEWED_COMMIT: 9edbbfe1596071c03813badee21b99d714affc23
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/excel-inflow-pinned-reviewed /tmp/excel-inflow-pinned-reviewed.tar.gz
+          curl -fsSL \
+            "https://api.github.com/repos/computering001/excel-inflow/tarball/${REVIEWED_COMMIT}" \
+            -o /tmp/excel-inflow-pinned-reviewed.tar.gz
+          mkdir -p /tmp/excel-inflow-pinned-reviewed
+          tar -xzf /tmp/excel-inflow-pinned-reviewed.tar.gz \
+            -C /tmp/excel-inflow-pinned-reviewed --strip-components=1
+
+      - name: Resolve synthetic fixture and execute the actual universal matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/resolve_portable_universal_matrix_fixture.py \
+            --reviewed-root /tmp/excel-inflow-pinned-reviewed \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out parity-fixtures/raw-canary-evidence.json
+          test -s parity-fixtures/raw-canary-evidence.json
+          test -s audit/reviewed-portable-gate/universal-matrix-fixture-custody.json
+
+      - name: Make universal matrix a mandatory permanent test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('scripts/run_reviewed_portable_gate.py')
+          source=path.read_text('utf-8')
+          if '"universal-broker-matrix"' not in source:
+              marker=(
+                  '        ("broker-tier1-demand", '
+                  '[args.python, "scripts/run_broker_tier1_demand_tests.py"]),\n'
+              )
+              addition=marker+(
+                  '        ("universal-broker-matrix", [\n'
+                  '            "node", "scripts/run_universal_broker_delivery_matrix.mjs",\n'
+                  '            "parity-fixtures/raw-canary-evidence.json",\n'
+                  '            args.python, args.soffice,\n'
+                  '        ]),\n'
+              )
+              if marker not in source:
+                  raise SystemExit('Universal matrix gate insertion marker is absent.')
+              path.write_text(source.replace(marker,addition,1),'utf-8')
+          PY
+          python3 -m py_compile scripts/resolve_portable_universal_matrix_fixture.py
+          node --check scripts/run_universal_broker_delivery_matrix.mjs
+
+      - name: Remove bootstrap and compile exact final development closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f scripts/resolve_portable_universal_matrix_fixture.py
+          rm -f .github/workflows/seal-universal-broker-matrix.yml
+          python3 - <<'PY'
+          import hashlib,json,os,shutil,subprocess,tempfile
+          from pathlib import Path
+          root=Path('.').resolve()
+          candidates=[
+              ['node','scripts/compile_skill_release.mjs'],
+              ['node','scripts/compile_skill_release.mjs','--mode','development'],
+              ['node','scripts/compile_skill_release.mjs','--package-mode','development'],
+              ['node','scripts/compile_skill_release.mjs','development'],
+          ]
+          selected=None
+          with tempfile.TemporaryDirectory(prefix='release-command-probe-') as temporary:
+              for index,command in enumerate(candidates):
+                  trial=Path(temporary)/str(index)
+                  shutil.copytree(root,trial,ignore=shutil.ignore_patterns('.git','audit','__pycache__','*.pyc'))
+                  completed=subprocess.run(command,cwd=trial,text=True,capture_output=True,timeout=300,env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1'})
+                  if completed.returncode: continue
+                  try: manifest=json.loads((trial/'release-manifest.json').read_text('utf-8'))
+                  except Exception: continue
+                  cert=manifest.get('certification') or {}
+                  if manifest.get('packageMode')=='development' and cert.get('currentClosureSha256') and cert.get('certifiedClosureSha256') is None:
+                      selected=command
+                      break
+          if selected is None:
+              raise SystemExit('No supported development release compiler invocation succeeded.')
+          completed=subprocess.run(selected,cwd=root,text=True,capture_output=True,timeout=600,env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1'})
+          if completed.returncode: raise SystemExit(completed.stdout+'\n'+completed.stderr)
+          manifest=json.loads(Path('release-manifest.json').read_text('utf-8'))
+          cert=manifest.get('certification') or {}
+          assert manifest.get('packageMode')=='development'
+          assert cert.get('currentClosureSha256')
+          assert cert.get('certifiedClosureSha256') is None
+          assert cert.get('evidenceReceipt') is None
+          members=manifest.get('files') or manifest.get('closure',{}).get('files') or []
+          failures=[]; checked=0
+          for item in members:
+              if not isinstance(item,dict) or not isinstance(item.get('path'),str): continue
+              path=root/item['path']
+              if not path.is_file(): failures.append('missing:'+item['path']); continue
+              if item.get('sha256') and hashlib.sha256(path.read_bytes()).hexdigest()!=item['sha256']:
+                  failures.append('hash:'+item['path'])
+              if item.get('bytes') is not None and path.stat().st_size!=item['bytes']:
+                  failures.append('bytes:'+item['path'])
+              checked+=1
+          if failures: raise SystemExit('\n'.join(failures))
+          audit=Path('audit/reviewed-portable-gate'); audit.mkdir(parents=True,exist_ok=True)
+          (audit/'universal-matrix-development-closure.json').write_text(json.dumps({
+              'schema_version':'universal-matrix-development-closure/1.0',
+              'status':'PASS',
+              'command':selected,
+              'package_mode':manifest.get('packageMode'),
+              'source_status':manifest.get('sourceStatus'),
+              'skill_version':manifest.get('skillVersion'),
+              'current_closure_sha256':cert.get('currentClosureSha256'),
+              'certified_closure_sha256':cert.get('certifiedClosureSha256'),
+              'certification_evidence_receipt':cert.get('evidenceReceipt'),
+              'verified_member_count':checked,
+          },indent=2)+'\n','utf-8')
+          PY
+
+      - name: Run the complete final matrix including universal broker delivery
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/reviewed-portable-gate/final-with-universal-matrix
+          python3 scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out audit/reviewed-portable-gate/final-with-universal-matrix
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          report=json.loads(Path('audit/reviewed-portable-gate/final-with-universal-matrix/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS',report
+          assert report['fail_count']==0,report
+          assert report['silently_skipped_count']==0,report
+          record=next(item for item in report['records'] if item['id']=='universal-broker-matrix')
+          assert record['status']=='PASS',record
+          failures=[]
+          for path in Path('scripts').rglob('*'):
+              if not path.is_file() or path.suffix not in {'.py','.mjs','.js','.json'}: continue
+              text=path.read_text('utf-8')
+              if re.search(r'/Users/|[A-Za-z]:\\\\Users\\\\',text): failures.append('author-path:'+str(path))
+              if path.name.startswith('repair_') and path.name.endswith('_integration.py'): failures.append('patcher:'+str(path))
+          if failures: raise SystemExit('\n'.join(failures))
+          PY
+          git diff --check
+          git diff --stat > audit/reviewed-portable-gate/universal-matrix-final-diffstat.txt
+
+      - name: Commit proven universal-matrix development candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Excel Inflow reviewed repair"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Seal universal broker matrix in reviewed candidate"
+          git push origin HEAD:agent/excel-inflow-reviewed-repair-v2
+
+      - name: Update draft PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/pr-body.md <<'MD'
+          ## End-to-end repair
+
+          The branch repairs issuer statement arithmetic, native broker eligibility and recovery ordering, the complete nine-metric Tier-1 demand/headline surface, discrete-event forecasting, funded acquisition cash/debt mechanics, carrier/telemetry identity, portable case custody and the stale development-gate interface.
+
+          ## Full executable proof
+
+          The permanent portable gate now executes the actual universal broker delivery matrix from a sealed synthetic fixture. It proves explicit-skip, failed-optional-close and usable-broker workbooks across both DCS balance bases, including zero-authority economic parity and positive broker consumption. It is run alongside source-arithmetic mutations, broker extraction/selection/recovery tests, DCS proof, forecast behavior/topology, acquisition solver and real workbook build/recalculation/finance proof, carrier identity, equation graph, instrument state, opening debt, case equivalence, degraded delivery and Stage-4 resume.
+
+          GitHub commits only after the matrix reports PASS with zero failures and zero silently skipped selected tests.
+
+          ## Package status
+
+          This remains an internally consistent `development` candidate with a fresh current closure. Certified closure and certification evidence are intentionally null; the live route is unchanged.
+
+          ## Remaining release-only evidence
+
+          Production promotion still requires the installed Rogo model-host canary, native Excel restoration, human visual review and the joined end-user performance cohort.
+          MD
+          gh pr edit agent/excel-inflow-reviewed-repair-v2 \
+            --title "Complete reviewed Excel Inflow end-to-end repair" \
+            --body-file /tmp/pr-body.md
+
+      - name: Upload universal-matrix proof
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: excel-inflow-reviewed-universal-matrix-proof
+          path: audit/reviewed-portable-gate
+          retention-days: 30
+          if-no-files-found: error
