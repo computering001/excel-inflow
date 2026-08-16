@@ -197,6 +197,7 @@ export async function writeRunCarrier({
     run_id: validateRunId(runId),
     controller_version: controllerVersion,
     status: String(status ?? "RESUMABLE"),
+    experience_trace_id: process.env.EXCEL_INFLOW_EXPERIENCE_TRACE_ID ?? null,
     workspace_session_token_hash: sha256Bytes(token),
     run_identity_hash: identity.identity.identity_hash,
     issuer_identity: normalisedIssuer,

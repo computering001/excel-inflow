@@ -31,8 +31,12 @@
       "phase": "graph",
       "runtime": "node",
       "script": "run_layered_graph_constitution_tests.mjs",
-      "arguments": ["$REPRESENTATIVE"],
-      "requires": ["REPRESENTATIVE"]
+      "arguments": [
+        "$REPRESENTATIVE"
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ]
     },
     {
       "id": "equation-graph-and-scc",
@@ -45,8 +49,13 @@
       "phase": "graph",
       "runtime": "node",
       "script": "run_fixed_point_constitution_tests.mjs",
-      "arguments": ["--manifest", "$FIXED_POINT_CASES_MANIFEST"],
-      "requires": ["FIXED_POINT_CASES_MANIFEST"]
+      "arguments": [
+        "--manifest",
+        "$FIXED_POINT_CASES_MANIFEST"
+      ],
+      "requires": [
+        "FIXED_POINT_CASES_MANIFEST"
+      ]
     },
     {
       "id": "instrument-period-state",
@@ -66,42 +75,42 @@
       "runtime": "node",
       "script": "run_forecast_observation_tests.mjs"
     },
-  {
-    "id": "evidence-resolution-v2",
-    "phase": "evidence",
-    "runtime": "node",
-    "script": "run_evidence_resolution_v2_tests.mjs"
-  },
-  {
-    "id": "run-constitution-graph",
-    "phase": "graph",
-    "runtime": "node",
-    "script": "run_run_constitution_graph_tests.mjs"
-  },
-  {
-    "id": "product-constitution",
-    "phase": "workflow",
-    "runtime": "node",
-    "script": "run_product_constitution_tests.mjs"
-  },
-  {
-    "id": "delivery-constitution",
-    "phase": "workflow",
-    "runtime": "node",
-    "script": "run_delivery_constitution_tests.mjs"
-  },
-  {
-    "id": "controller-terminal-exits",
-    "phase": "workflow",
-    "runtime": "node",
-    "script": "run_controller_exit_inventory_tests.mjs"
-  },
-  {
-    "id": "broker-dynamic-concepts",
-    "phase": "evidence",
-    "runtime": "node",
-    "script": "run_broker_dynamic_concept_tests.mjs"
-  },
+    {
+      "id": "evidence-resolution-v2",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_evidence_resolution_v2_tests.mjs"
+    },
+    {
+      "id": "run-constitution-graph",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_run_constitution_graph_tests.mjs"
+    },
+    {
+      "id": "product-constitution",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_product_constitution_tests.mjs"
+    },
+    {
+      "id": "delivery-constitution",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_delivery_constitution_tests.mjs"
+    },
+    {
+      "id": "controller-terminal-exits",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_controller_exit_inventory_tests.mjs"
+    },
+    {
+      "id": "broker-dynamic-concepts",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_broker_dynamic_concept_tests.mjs"
+    },
     {
       "id": "forecast-topology",
       "phase": "forecast",
@@ -113,8 +122,12 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_statement_classifier_tests.mjs",
-      "arguments": ["$REPRESENTATIVE"],
-      "requires": ["REPRESENTATIVE"]
+      "arguments": [
+        "$REPRESENTATIVE"
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ]
     },
     {
       "id": "case-source-proposer",
@@ -175,8 +188,12 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_broker_page_evidence_tests.mjs",
-      "arguments": ["$REPRESENTATIVE"],
-      "requires": ["REPRESENTATIVE"]
+      "arguments": [
+        "$REPRESENTATIVE"
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ]
     },
     {
       "id": "internal-evidence-fixed-point",
@@ -195,14 +212,20 @@
       "phase": "evidence",
       "runtime": "python",
       "script": "run_dcs_evidence_tests.py",
-      "arguments": ["--out", "$TEST_OUT"]
+      "arguments": [
+        "--out",
+        "$TEST_OUT"
+      ]
     },
     {
       "id": "dcs-controller-fixed-point",
       "phase": "evidence",
       "runtime": "python",
       "script": "run_dcs_pipeline_tests.py",
-      "arguments": ["--out", "$TEST_OUT"]
+      "arguments": [
+        "--out",
+        "$TEST_OUT"
+      ]
     },
     {
       "id": "broker-physical-reconciliation",
@@ -233,16 +256,30 @@
       "phase": "real_corpus",
       "runtime": "python",
       "script": "run_broker_public_layout_tests.py",
-      "arguments": ["--corpus", "$BROKER_CORPUS", "--out", "$TEST_OUT"],
-      "requires": ["BROKER_CORPUS"]
+      "arguments": [
+        "--corpus",
+        "$BROKER_CORPUS",
+        "--out",
+        "$TEST_OUT"
+      ],
+      "requires": [
+        "BROKER_CORPUS"
+      ]
     },
     {
       "id": "broker-real-pack-completion",
       "phase": "real_corpus",
       "runtime": "python",
       "script": "run_broker_real_pack_completion_tests.py",
-      "arguments": ["--manifest", "$BROKER_REAL_PACK_MANIFEST", "--out", "$TEST_OUT"],
-      "requires": ["BROKER_REAL_PACK_MANIFEST"]
+      "arguments": [
+        "--manifest",
+        "$BROKER_REAL_PACK_MANIFEST",
+        "--out",
+        "$TEST_OUT"
+      ],
+      "requires": [
+        "BROKER_REAL_PACK_MANIFEST"
+      ]
     },
     {
       "id": "filings-controller",
@@ -261,8 +298,12 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_evidence_run_tests.mjs",
-      "arguments": ["$CASES"],
-      "requires": ["CASES"]
+      "arguments": [
+        "$CASES"
+      ],
+      "requires": [
+        "CASES"
+      ]
     },
     {
       "id": "production-user-flow",
@@ -276,19 +317,30 @@
       "runtime": "node",
       "script": "run_stage4_checkpoint_tests.mjs",
       "arguments": [
-        "--cases", "$CASES",
-        "--python", "$PYTHON",
-        "--soffice", "$SOFFICE"
+        "--cases",
+        "$CASES",
+        "--python",
+        "$PYTHON",
+        "--soffice",
+        "$SOFFICE"
       ],
-      "requires": ["CASES", "PYTHON", "SOFFICE"]
+      "requires": [
+        "CASES",
+        "PYTHON",
+        "SOFFICE"
+      ]
     },
     {
       "id": "degraded-broker-delivery",
       "phase": "workflow",
       "runtime": "node",
       "script": "run_degraded_broker_delivery_tests.mjs",
-      "arguments": ["$CASES"],
-      "requires": ["CASES"]
+      "arguments": [
+        "$CASES"
+      ],
+      "requires": [
+        "CASES"
+      ]
     },
     {
       "id": "broker-exit-fault-injection",
@@ -301,16 +353,30 @@
       "phase": "workflow",
       "runtime": "node",
       "script": "run_universal_broker_delivery_matrix.mjs",
-      "arguments": ["$DEGRADED_DELIVERY_REPORT", "$USABLE_BROKER_WORKBOOK"],
-      "requires": ["DEGRADED_DELIVERY_REPORT", "USABLE_BROKER_WORKBOOK"]
+      "arguments": [
+        "$DEGRADED_DELIVERY_REPORT",
+        "$USABLE_BROKER_WORKBOOK"
+      ],
+      "requires": [
+        "DEGRADED_DELIVERY_REPORT",
+        "USABLE_BROKER_WORKBOOK"
+      ]
     },
     {
       "id": "raw-input-local-semantic-canary",
       "phase": "proof",
       "runtime": "node",
       "script": "run_raw_input_local_semantic_canary.mjs",
-      "arguments": ["$RAW_CANARY_EVIDENCE", "$PYTHON", "$SOFFICE"],
-      "requires": ["RAW_CANARY_EVIDENCE", "PYTHON", "SOFFICE"]
+      "arguments": [
+        "$RAW_CANARY_EVIDENCE",
+        "$PYTHON",
+        "$SOFFICE"
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE"
+      ]
     },
     {
       "id": "real-raw-filing-black-box-canary",
@@ -339,8 +405,12 @@
       "phase": "cohort",
       "runtime": "node",
       "script": "run_case_compiler_equivalence.mjs",
-      "arguments": ["$CASES"],
-      "requires": ["CASES"]
+      "arguments": [
+        "$CASES"
+      ],
+      "requires": [
+        "CASES"
+      ]
     },
     {
       "id": "opening-debt-reconciliation",
@@ -359,6 +429,12 @@
       "phase": "proof",
       "runtime": "node",
       "script": "run_delivery_inventory_tests.mjs"
+    },
+    {
+      "id": "experience-trace",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_experience_trace_tests.mjs"
     }
   ]
 }

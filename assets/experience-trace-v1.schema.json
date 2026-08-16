@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/experience-trace-v1.schema.json",
+  "title": "Excel Inflow user-visible experience trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "trace_id", "run_id", "root_span_id", "created_at",
+    "completed_at", "visible_response_at", "status", "spans", "trace_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-experience-trace/1.0" },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": ["string", "null"] },
+    "root_span_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time" },
+    "visible_response_at": { "type": ["string", "null"], "format": "date-time" },
+    "status": { "enum": ["OPEN", "PASS", "FAIL", "BLOCKED", "DEGRADED"] },
+    "spans": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "span_id", "parent_span_id", "component", "phase", "started_at",
+          "completed_at", "outcome", "retry_count", "reused", "wait_reason",
+          "attributes"
+        ],
+        "properties": {
+          "span_id": { "type": "string", "minLength": 1 },
+          "parent_span_id": { "type": ["string", "null"] },
+          "component": { "type": "string", "minLength": 1 },
+          "phase": { "type": "string", "minLength": 1 },
+          "started_at": { "type": "string", "format": "date-time" },
+          "completed_at": { "type": ["string", "null"], "format": "date-time" },
+          "outcome": { "type": "string", "minLength": 1 },
+          "retry_count": { "type": "integer", "minimum": 0 },
+          "reused": { "type": "boolean" },
+          "wait_reason": { "type": ["string", "null"] },
+          "attributes": { "type": "object" }
+        }
+      }
+    },
+    "trace_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+  }
+}

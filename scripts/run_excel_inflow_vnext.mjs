@@ -20,6 +20,7 @@ import {
   validatePreBrokerDemandCoverage,
 } from "./lib/run_constitution_graph.mjs";
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
+import { beginExperienceTrace } from "./lib/experience_trace.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -174,7 +175,8 @@ async function main() {
     started_epoch_ms: Date.now(),
     stages: {},
   };
-  const options = parseArgs(process.argv.slice(2));
+  const excelInflowExperienceTrace = beginExperienceTrace({ component: "public_controller" });
+const options = parseArgs(process.argv.slice(2));
   if (options.screen) {
     const screen = await run(process.execPath, [
       path.join(HERE, "run_user_flow.mjs"),
