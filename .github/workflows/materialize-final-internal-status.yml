@@ -1,0 +1,108 @@
+name: Materialize Excel Inflow final internal status
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/architecture-hygiene.json
+      - audit/generated/final-clean-checkout/final-clean-checkout-gate.json
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-final-status-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind reports to the exact branch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          architecture_path=Path('audit/generated/architecture-hygiene.json')
+          clean_path=Path('audit/generated/final-clean-checkout/final-clean-checkout-gate.json')
+          if not architecture_path.is_file() or not clean_path.is_file():
+              raise SystemExit('Required final reports are absent.')
+          architecture=json.loads(architecture_path.read_text('utf-8'))
+          clean=json.loads(clean_path.read_text('utf-8'))
+          temporary=[]
+          patterns=(
+              'scripts/apply_excel_inflow_repair',
+              'scripts/fix_stage',
+              'scripts/run_repair_stage',
+              '.github/workflows/patch-',
+              '.github/workflows/repair-workspace-export.yml',
+              '.github/workflows/repair-execution.yml',
+              '.github/workflows/cleanup-repair-scaffolding.yml',
+              '.github/workflows/apply-architecture-hygiene-repairs.yml',
+          )
+          for path in Path('.').rglob('*'):
+              if not path.is_file():
+                  continue
+              rel=path.as_posix()
+              if any(token in rel for token in patterns):
+                  temporary.append(rel)
+          commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()
+          branch=subprocess.check_output(['git','branch','--show-current'],text=True).strip()
+          pass_state=(
+              architecture.get('status') == 'PASS'
+              and clean.get('status') == 'PASS'
+              and not temporary
+          )
+          body={
+              'schema_version':'excel-inflow-final-internal-status/1.0',
+              'status':'PASS' if pass_state else 'FAIL',
+              'branch':branch,
+              'source_commit':commit,
+              'git_tree':tree,
+              'architecture_status':architecture.get('status'),
+              'architecture_checks':architecture.get('checks'),
+              'architecture_findings':architecture.get('finding_count'),
+              'clean_checkout_status':clean.get('status'),
+              'clean_checkout_test_count':clean.get('test_count'),
+              'clean_checkout_pass_count':clean.get('pass_count'),
+              'clean_checkout_fail_count':clean.get('fail_count'),
+              'missing_required_custody':clean.get('missing_required_custody'),
+              'temporary_scaffolding':temporary,
+              'architecture_report_sha256':hashlib.sha256(architecture_path.read_bytes()).hexdigest(),
+              'clean_checkout_report_sha256':hashlib.sha256(clean_path.read_bytes()).hexdigest(),
+              'external_certification_not_claimed':clean.get('external_certification_not_claimed'),
+          }
+          output=Path('audit/generated/FINAL_INTERNAL_PASS.json' if pass_state else 'audit/generated/FINAL_INTERNAL_FAIL.json')
+          opposite=Path('audit/generated/FINAL_INTERNAL_FAIL.json' if pass_state else 'audit/generated/FINAL_INTERNAL_PASS.json')
+          opposite.unlink(missing_ok=True)
+          output.write_text(json.dumps(body,indent=2,sort_keys=True)+'\n','utf-8')
+          print(body)
+          if not pass_state:
+              raise SystemExit(1)
+          PY
+
+      - name: Commit the status marker
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name excel-inflow-repair-bot
+          git config user.email 312638569+computering001@users.noreply.github.com
+          git add audit/generated/FINAL_INTERNAL_PASS.json audit/generated/FINAL_INTERNAL_FAIL.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            marker=$(git diff --cached --name-only | grep 'FINAL_INTERNAL_' | head -n1)
+            git commit -m "Record $(basename "$marker" .json)"
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          fi
