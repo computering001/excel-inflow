@@ -1,0 +1,339 @@
+name: Finalize Excel Inflow repair candidate
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Require every prerequisite proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            fixtures/portable/representative-model-case.json
+            fixtures/portable/cases/portable-maximal-v2.json
+            fixtures/portable/raw-canary-evidence.json
+            audit/acquisition-solver-proof/solver-delta.json
+            audit/acquisition-workbook-proof/acquisition-workbook-proof.json
+            audit/raw-canary-proof/universal-matrix.json
+            audit/telemetry-proof/runtime-summary.json
+            audit/broker-headline-proof/forensic-audit.json
+          )
+          for target in "${required[@]}"; do
+            test -s "$target" || { echo "Missing prerequisite proof: $target" >&2; exit 1; }
+          done
+          jq -e '.status == "PASS"' audit/acquisition-solver-proof/solver-delta.json
+          jq -e '.status == "PASS"' audit/acquisition-workbook-proof/acquisition-workbook-proof.json
+          jq -e '.status == "PASS"' audit/raw-canary-proof/universal-matrix.json
+          jq -e '.attribution_ratio >= 0 and .user_visible_duration_ms >= 0' audit/telemetry-proof/runtime-summary.json
+
+      - name: Install complete portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq unzip zip rsync
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+          echo "SOFFICE=$(command -v soffice)" >> "$GITHUB_ENV"
+          node --version
+          python3 --version
+          soffice --version
+
+      - name: Compile a portable fixed-point manifest by executable discovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fixtures/portable/fixed-point-probes
+          case_path="$(pwd)/fixtures/portable/representative-model-case.json"
+          cat > fixtures/portable/fixed-point-probes/a.json <<JSON
+          {"schema_version":"fixed-point-cases-manifest/1.0","cases":[{"case_id":"portable-maximal","path":"$case_path"}]}
+          JSON
+          cat > fixtures/portable/fixed-point-probes/b.json <<JSON
+          {"schema_version":"fixed-point-cases/1.0","cases":[{"id":"portable-maximal","path":"$case_path"}]}
+          JSON
+          cat > fixtures/portable/fixed-point-probes/c.json <<JSON
+          {"cases":[{"id":"portable-maximal","case_path":"$case_path"}]}
+          JSON
+          cat > fixtures/portable/fixed-point-probes/d.json <<JSON
+          {"cases":["$case_path"]}
+          JSON
+          selected=''
+          : > fixtures/portable/fixed-point-probes/probe.log
+          for candidate in fixtures/portable/fixed-point-probes/{a,b,c,d}.json; do
+            echo ">>> $candidate" >> fixtures/portable/fixed-point-probes/probe.log
+            if node scripts/run_fixed_point_constitution_tests.mjs --manifest "$candidate" \
+              >> fixtures/portable/fixed-point-probes/probe.log 2>&1; then
+              selected="$candidate"
+              break
+            fi
+          done
+          test -n "$selected"
+          cp "$selected" fixtures/portable/fixed-point-cases.json
+          node scripts/run_fixed_point_constitution_tests.mjs --manifest fixtures/portable/fixed-point-cases.json
+
+      - name: Run complete portable development gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/final-gate
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases fixtures/portable/cases \
+            --representative fixtures/portable/representative-model-case.json \
+            --fixed-point-cases-manifest fixtures/portable/fixed-point-cases.json \
+            --raw-canary-evidence fixtures/portable/raw-canary-evidence.json \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --concurrency 1 \
+            --timeout-ms 1800000 \
+            --out audit/final-gate
+          jq -e '.status == "PASS" and .counts.FAIL == 0 and .counts.BLOCKED == 0' audit/final-gate/development-gate-report.json
+
+      - name: Re-run the three end-to-end user classes after the full gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            fixtures/portable/raw-canary-evidence.json \
+            "$(command -v python3)" \
+            "$(command -v soffice)" \
+            | tee audit/final-gate/final-universal-matrix.json
+          jq -e '.status == "PASS"' audit/final-gate/final-universal-matrix.json
+          node scripts/run_acquisition_solver_case_tests.mjs fixtures/portable/representative-model-case.json \
+            | tee audit/final-gate/final-acquisition-solver.json
+          jq -e '.status == "PASS"' audit/final-gate/final-acquisition-solver.json
+          rm -rf audit/final-gate/acquisition-workbook
+          node scripts/compile_acquisition_portable_case.mjs \
+            fixtures/portable/representative-model-case.json \
+            audit/final-gate/acquisition-case.json
+          python3 scripts/run_acquisition_workbook_tests.py \
+            audit/final-gate/acquisition-case.json \
+            --soffice "$(command -v soffice)" \
+            --out audit/final-gate/acquisition-workbook
+
+      - name: Audit final source against the blueprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/final-static
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          python3 /tmp/forensic_audit.py --out audit/final-static
+          jq '.summary' audit/final-static/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/final-static/forensic-audit.json)" -eq 0
+          test "$(jq '[.syntax[] | select(.status != "PASS")] | length' audit/final-static/forensic-audit.json)" -eq 0
+          test "$(jq '[.json_validation[] | select(.status != "PASS")] | length' audit/final-static/forensic-audit.json)" -eq 0
+
+      - name: Remove temporary repair machinery and intermediate evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .audit-trigger .audit-trigger-v2 .repair-trigger .custody-trigger \
+            .acquisition-trigger .acquisition-solver-trigger .acquisition-workbook-trigger \
+            .raw-canary-trigger .telemetry-trigger .broker-headline-trigger \
+            .github/workflows/repair-workspace-export.yml \
+            scripts/forensic_repair.py \
+            scripts/repair_acquisition_integration.py \
+            scripts/repair_acquisition_plan_integration.py \
+            scripts/repair_telemetry_integration.py \
+            scripts/repair_broker_headline_integration.py
+          rm -rf \
+            audit/baseline audit/post-repair audit/acquisition-post-repair \
+            audit/acquisition-solver-proof audit/acquisition-workbook-proof \
+            audit/raw-canary-proof audit/telemetry-proof audit/broker-headline-proof \
+            fixtures/portable/fixed-point-probes
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          repair_scripts={
+            'scripts/forensic_repair.py','scripts/repair_acquisition_integration.py',
+            'scripts/repair_acquisition_plan_integration.py','scripts/repair_telemetry_integration.py',
+            'scripts/repair_broker_headline_integration.py',
+          }
+          manifest_path=Path('release-manifest.json'); manifest=json.loads(manifest_path.read_text('utf8'))
+          scripts=manifest.setdefault('closure',{}).setdefault('scripts',[])
+          manifest['closure']['scripts']=[item for item in scripts if item not in repair_scripts]
+          manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
+          runtime_path=Path('assets/attachment-evidence-runtime-members.json'); runtime=json.loads(runtime_path.read_text('utf8'))
+          runtime['members']=[item for item in runtime.get('members',[]) if item not in repair_scripts]
+          runtime_path.write_text(json.dumps(runtime,indent=2)+'\n')
+          PY
+          git diff --check
+
+      - name: Prepare v3.6.0 development identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          release_path=Path('release-manifest.json'); release=json.loads(release_path.read_text('utf8'))
+          release['releaseName']='Excel Inflow v3.6.0'
+          release['skillVersion']='3.6.0'
+          release['packageMode']='development'
+          release['sourceStatus']='v2_development'
+          release.setdefault('certification',{})['certifiedClosureSha256']=None
+          release['certification']['recordedAt']=None
+          release['certification']['recertifiedByThisRun']=False
+          release['certification']['evidenceReceipt']=None
+          release_path.write_text(json.dumps(release,indent=2)+'\n')
+          runtime_path=Path('assets/runtime-manifest.json'); runtime=json.loads(runtime_path.read_text('utf8'))
+          for key in ['skill_version','skillVersion','version']:
+            if key in runtime: runtime[key]='3.6.0'
+          for key in ['package_mode','packageMode']:
+            if key in runtime: runtime[key]='development'
+          runtime_path.write_text(json.dumps(runtime,indent=2)+'\n')
+          for relative in ['SKILL.md','central-instructions.md','references/runtime-core.md','references/model-intent.md','references/development-and-release-loop.md']:
+            path=Path(relative)
+            if not path.exists(): continue
+            content=path.read_text('utf8').replace('Excel Inflow v3.5.0','Excel Inflow v3.6.0')
+            content=re.sub(r'(?<![0-9])3\.5\.0(?![0-9])','3.6.0',content)
+            path.write_text(content,'utf8')
+          PY
+
+      - name: Recompile immutable development closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/excel-inflow-release-probe
+          cp -a . /tmp/excel-inflow-release-probe
+          (cd /tmp/excel-inflow-release-probe && node scripts/compile_skill_release.mjs)
+          node scripts/compile_skill_release.mjs
+          jq -e '.packageMode == "development" and .skillVersion == "3.6.0" and .certification.certifiedClosureSha256 == null and .certification.currentClosureSha256 != null' release-manifest.json
+          node scripts/validate_release_certification.mjs release-manifest.json >/tmp/release-certification.out 2>/tmp/release-certification.err && {
+            echo 'An uncertified development manifest was incorrectly accepted as certified.' >&2
+            exit 1
+          } || true
+
+      - name: Re-run final clean gate after closure compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/final-clean-gate
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases fixtures/portable/cases \
+            --representative fixtures/portable/representative-model-case.json \
+            --fixed-point-cases-manifest fixtures/portable/fixed-point-cases.json \
+            --raw-canary-evidence fixtures/portable/raw-canary-evidence.json \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --concurrency 1 \
+            --timeout-ms 1800000 \
+            --out audit/final-clean-gate
+          jq -e '.status == "PASS" and .counts.FAIL == 0 and .counts.BLOCKED == 0' audit/final-clean-gate/development-gate-report.json
+          python3 - <<'PY'
+          import json,subprocess,sys
+          from pathlib import Path
+          failures=[]
+          for path in Path('.').rglob('*.json'):
+            if any(part in {'.git','node_modules'} for part in path.parts):continue
+            try:json.loads(path.read_text('utf8'))
+            except Exception as exc:failures.append(f'{path}: {exc}')
+          for path in Path('scripts').rglob('*'):
+            if not path.is_file():continue
+            if path.suffix=='.py':command=[sys.executable,'-m','py_compile',str(path)]
+            elif path.suffix in {'.mjs','.js'}:command=['node','--check',str(path)]
+            else:continue
+            result=subprocess.run(command,text=True,capture_output=True)
+            if result.returncode:failures.append(f'{path}: {result.stderr}')
+          if failures:raise SystemExit('\n'.join(failures))
+          PY
+
+      - name: Write final verification and remaining release gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit/final
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,subprocess,datetime,shutil
+          def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          release=json.loads(Path('release-manifest.json').read_text('utf8'))
+          gate=json.loads(Path('audit/final-clean-gate/development-gate-report.json').read_text('utf8'))
+          static=json.loads(Path('audit/final-static/forensic-audit.json').read_text('utf8'))
+          matrix=json.loads(Path('audit/final-gate/final-universal-matrix.json').read_text('utf8'))
+          solver=json.loads(Path('audit/final-gate/final-acquisition-solver.json').read_text('utf8'))
+          workbook=json.loads(Path('audit/final-gate/acquisition-workbook/acquisition-workbook-proof.json').read_text('utf8'))
+          commit=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          tree=subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip()
+          remaining=[
+            {"gate":"installed_host_raw_broker_semantic_canary","status":"BLOCKED_EXTERNAL","required_evidence":"installed-host-broker-canary/1.0 receipt from the actual Rogo model host"},
+            {"gate":"native_excel_toggle_restoration","status":"BLOCKED_EXTERNAL","required_evidence":"native-excel-restoration-evidence/3.1"},
+            {"gate":"human_visual_review","status":"BLOCKED_EXTERNAL","required_evidence":"hash-bound reviewed workbook screenshots"},
+            {"gate":"rogo_user_visible_performance_cohort","status":"BLOCKED_EXTERNAL","required_evidence":"submission-to-visible-response traces for the installed v3.6.0 closure"},
+            {"gate":"production_release_certification","status":"BLOCKED_EXTERNAL","required_evidence":"release-certification-evidence/1.0 binding all preceding evidence"},
+          ]
+          verification={
+            "schema_version":"excel-inflow-repair-verification/1.0",
+            "status":"PASS_DEVELOPMENT_CANDIDATE",
+            "recorded_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "repository":"computering001/excel-inflow","source_commit_before_repair":"ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd",
+            "source_commit_pre_final_commit":commit,"source_tree_pre_final_commit":tree,
+            "release_name":release.get('releaseName'),"skill_version":release.get('skillVersion'),"package_mode":release.get('packageMode'),
+            "current_closure_sha256":release.get('certification',{}).get('currentClosureSha256'),
+            "certified_closure_sha256":release.get('certification',{}).get('certifiedClosureSha256'),
+            "portable_development_gate":gate.get('counts'),"portable_development_gate_status":gate.get('status'),
+            "self_contained_static_gate":static.get('summary'),
+            "universal_broker_matrix_status":matrix.get('status'),
+            "acquisition_solver_status":solver.get('status'),"acquisition_workbook_status":workbook.get('status'),
+            "user_ready_for_candidate_route":True,"production_promotion_ready":False,
+            "remaining_release_gates":remaining,
+            "evidence_sha256":{
+              "development_gate":digest('audit/final-clean-gate/development-gate-report.json'),
+              "universal_matrix":digest('audit/final-gate/final-universal-matrix.json'),
+              "acquisition_solver":digest('audit/final-gate/final-acquisition-solver.json'),
+              "acquisition_workbook":digest('audit/final-gate/acquisition-workbook/acquisition-workbook-proof.json'),
+              "final_static_audit":digest('audit/final-static/forensic-audit.json'),
+            },
+          }
+          Path('audit/final/verification.json').write_text(json.dumps(verification,indent=2)+'\n')
+          Path('audit/final/remaining-release-gates.json').write_text(json.dumps({"schema_version":"remaining-release-gates/1.0","gates":remaining},indent=2)+'\n')
+          shutil.copy2('audit/final-static/blueprint-requirement-map.csv','audit/final/blueprint-requirement-map.csv')
+          shutil.copy2('audit/final-static/finding-register.csv','audit/final/finding-register.csv')
+          shutil.copy2('audit/final-clean-gate/development-gate-report.json','audit/final/development-gate-report.json')
+          PY
+          jq -e '.status == "PASS_DEVELOPMENT_CANDIDATE" and .user_ready_for_candidate_route == true and .production_promotion_ready == false' audit/final/verification.json
+
+      - name: Persist final clean repair candidate
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-finalizer'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Finalize Excel Inflow v3.6.0 repair candidate [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload final verification package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-final-verification
+          path: |
+            audit/final
+            audit/final-gate
+            audit/final-clean-gate
+            audit/final-static
+            release-manifest.json
+          retention-days: 30
+          if-no-files-found: warn
