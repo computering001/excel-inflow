@@ -1,0 +1,36 @@
+name: Final audit snapshot export
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-final-audit-snapshot
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Package exact snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > /tmp/commit.txt
+          git rev-parse HEAD^{tree} > /tmp/tree.txt
+          tar --exclude=.git -czf /tmp/source.tar.gz .
+          sha256sum /tmp/source.tar.gz > /tmp/source.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-final-audit-snapshot
+          path: |
+            /tmp/source.tar.gz
+            /tmp/source.sha256
+            /tmp/commit.txt
+            /tmp/tree.txt
+          retention-days: 1
+          if-no-files-found: error
