@@ -1,0 +1,57 @@
+name: Register usable broker consumption proof
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/register-usable-broker-consumption-proof.yml
+
+permissions:
+  contents: write
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Register the delivered-workbook usefulness test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('assets/development-test-registry.json')
+          data=json.loads(path.read_text('utf-8'))
+          tests=data.get('tests') or []
+          if not any(row.get('id')=='usable-broker-workbook-consumption' for row in tests if isinstance(row,dict)):
+              tests.append({
+                  'id':'usable-broker-workbook-consumption',
+                  'phase':'proof',
+                  'runtime':'python',
+                  'script':'run_usable_broker_workbook_consumption_tests.py',
+                  'arguments':[
+                      '--fixture','$RAW_CANARY_EVIDENCE',
+                      '--python','$PYTHON',
+                      '--soffice','$SOFFICE',
+                      '--out','$TEST_OUT'
+                  ],
+                  'requires':['RAW_CANARY_EVIDENCE','PYTHON','SOFFICE']
+              })
+              data['tests']=tests
+              path.write_text(json.dumps(data,indent=2)+'\n','utf-8')
+          PY
+          python3 -m py_compile scripts/run_usable_broker_workbook_consumption_tests.py
+          rm -f .github/workflows/register-usable-broker-consumption-proof.yml
+          git config user.name 'excel-inflow-acceptance-bot'
+          git config user.email 'excel-inflow-acceptance-bot@users.noreply.github.com'
+          git add -A -- \
+            assets/development-test-registry.json \
+            scripts/run_usable_broker_workbook_consumption_tests.py \
+            .github/workflows/register-usable-broker-consumption-proof.yml
+          git commit -m 'Require actual broker consumption in delivered workbooks'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
