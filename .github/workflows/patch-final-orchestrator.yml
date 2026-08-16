@@ -1,0 +1,44 @@
+name: Patch final repair orchestrator
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/trigger-patch-final-orchestrator.txt
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Correct cancellation filter and retrigger final transaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('.github/workflows/full-audit-repair-orchestrator-v4.yml')
+          text=path.read_text()
+          old='select(.databaseId != env.GITHUB_RUN_ID|tonumber)'
+          new='select(.databaseId != (env.GITHUB_RUN_ID | tonumber))'
+          if old not in text and new not in text:
+              raise SystemExit('Cancellation selector was not found.')
+          path.write_text(text.replace(old,new))
+          marker=Path('audit/trigger-full-repair-v4.txt')
+          marker.write_text(marker.read_text().rstrip()+f'\nPatched orchestrator trigger run {__import__("os").environ["GITHUB_RUN_ID"]}.\n')
+          PY
+          rm -f .github/workflows/patch-final-orchestrator.yml
+          rm -f audit/trigger-patch-final-orchestrator.txt
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add -A
+          git commit -m "Correct final repair orchestration"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
