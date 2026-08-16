@@ -1,0 +1,170 @@
+name: Move publication into final acceptance
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/move-publication-into-acceptance.yml
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Add exact-SHA publication as a dependent acceptance job
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('.github/workflows/excel-inflow-final-acceptance-v3.yml')
+          text=path.read_text('utf-8')
+          marker='  publish-after-all-gates:'
+          if marker not in text:
+              text += r'''
+
+  publish-after-all-gates:
+    needs: acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out exact accepted source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Refuse moving branch or residual repair scaffolding
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="$(git ls-remote origin refs/heads/agent/excel-inflow-end-to-end-repair | awk '{print $1}')"
+          test "$remote" = "$GITHUB_SHA" || {
+            echo "Acceptance passed $GITHUB_SHA but repair branch moved to $remote." >&2
+            exit 1
+          }
+          test -z "$(find scripts -maxdepth 1 -type f \( -name 'apply_excel_inflow_repair_stage*.py' -o -name 'fix_stage*.py' -o -name 'run_repair_stage*_stage_v*.py' \) -print -quit)"
+          extras="$(find .github/workflows -maxdepth 1 -type f ! -name 'excel-inflow-ci.yml' ! -name 'excel-inflow-final-acceptance-v3.yml' ! -name 'excel-inflow-forensic-lint.yml' -print)"
+          test -z "$extras" || {
+            echo "Temporary workflow scaffolding remains:" >&2
+            echo "$extras" >&2
+            exit 1
+          }
+
+      - name: Require candidate CI and forensic lint on the exact SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=('Excel Inflow candidate CI' 'Excel Inflow forensic architecture lint')
+          for attempt in $(seq 1 180); do
+            payload="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&per_page=100")"
+            pending=0
+            for name in "${required[@]}"; do
+              row="$(jq -c --arg name "$name" '[.workflow_runs[] | select(.name==$name)] | sort_by(.created_at) | last // empty' <<<"$payload")"
+              if test -z "$row"; then
+                pending=1
+                continue
+              fi
+              status="$(jq -r '.status' <<<"$row")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"$row")"
+              if test "$status" != completed; then
+                pending=1
+              elif test "$conclusion" != success; then
+                echo "$name failed for $GITHUB_SHA with conclusion $conclusion" >&2
+                echo "$row" >&2
+                exit 1
+              fi
+            done
+            if test "$pending" = 0; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo 'Timed out waiting for exact-SHA source gates.' >&2
+          exit 1
+
+      - name: Record the exact accepted candidate ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --force-with-lease origin HEAD:refs/heads/agent/excel-inflow-accepted
+
+      - name: Open or refresh the audited draft repair PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = 'agent/excel-inflow-end-to-end-repair';
+            const base = 'agent/broker-delivery-constitution-v350';
+            const title = 'Repair Excel Inflow end to end against the master blueprint';
+            const body = [
+              '## Acceptance state',
+              '',
+              'This draft PR is opened only by the dependent publication job of the clean-checkout final acceptance workflow.',
+              '',
+              `- Exact accepted commit: \`${context.sha}\``,
+              `- Accepted ref: \`agent/excel-inflow-accepted\``,
+              `- Acceptance workflow: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+              '- Base: the exact live v3.5 candidate branch, not stale `main`.',
+              '',
+              '## Repaired product obligations',
+              '',
+              '- relabel-safe source arithmetic and company-specific statement topology;',
+              '- quality-ranked all-house native broker eligibility with one bounded recovery frontier;',
+              '- complete core broker demand, one headline authority and a live D&A bridge;',
+              '- discrete-event forecasts that cannot recur from historical averages;',
+              '- funded acquisition consideration, proceeds, cash/RCF, debt, interest, liquidity and leverage;',
+              '- exact carrier source/install identity and an end-to-end experience trace root;',
+              '- non-vacuous delivered-workbook broker consumption proof;',
+              '- portable maximal/net-cash cases, Stage-4 resume and raw broker delivery matrix;',
+              '- honest separation of local simulated semantics from installed-host evidence;',
+              '- removal of one-off repair launchers and private-path custody.',
+              '',
+              '## Promotion boundary',
+              '',
+              'The PR remains draft. Source CI does not manufacture native-Excel, installed-host, visual-review or production-route certification evidence. Those external receipts must bind the same accepted commit and closure before production promotion.',
+            ].join('\n');
+            const list = await github.rest.pulls.list({owner, repo, state:'open', head:`${owner}:${head}`, base});
+            let pr;
+            if (list.data.length) {
+              pr = list.data[0];
+              await github.rest.pulls.update({owner, repo, pull_number:pr.number, title, body});
+            } else {
+              pr = (await github.rest.pulls.create({owner, repo, head, base, title, body, draft:true})).data;
+            }
+            try {
+              const temporary = await github.rest.pulls.get({owner, repo, pull_number:4});
+              if (temporary.data.state === 'open') {
+                await github.rest.pulls.update({owner, repo, pull_number:4, state:'closed'});
+              }
+            } catch (error) {
+              core.info(`Temporary PR cleanup skipped: ${error.message}`);
+            }
+            core.notice(`Audited repair PR #${pr.number}: ${pr.html_url}`);
+'''
+          path.write_text(text,'utf-8')
+          PY
+          rm -f .github/workflows/excel-inflow-post-acceptance.yml .github/workflows/move-publication-into-acceptance.yml
+          git config user.name 'excel-inflow-convergence-bot'
+          git config user.email 'excel-inflow-convergence-bot@users.noreply.github.com'
+          git add -A -- .github/workflows
+          git commit -m 'Publish only from the exact fully accepted candidate'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
