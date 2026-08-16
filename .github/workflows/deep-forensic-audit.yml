@@ -1,0 +1,50 @@
+name: Excel Inflow deep forensic audit
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+
+      - name: Run untouched forensic audit
+        shell: bash
+        env:
+          EXCEL_INFLOW_SOURCE_COMMIT: ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd
+          EXCEL_INFLOW_SOURCE_TREE: 8631c69b2ca960241e78a4719b3d7441d1c727c8
+        run: |
+          set -euo pipefail
+          python3 scripts/run_forensic_repository_audit.py \
+            --out audit-output \
+            --timeout 900 \
+            --source-commit "$EXCEL_INFLOW_SOURCE_COMMIT" \
+            --source-tree "$EXCEL_INFLOW_SOURCE_TREE"
+          cat audit-output/forensic-repository-audit.md
+
+      - name: Upload forensic audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-forensic-audit
+          path: audit-output
+          retention-days: 7
+          if-no-files-found: error
