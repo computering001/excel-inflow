@@ -1,0 +1,206 @@
+name: Finalize reviewed Excel Inflow development candidate
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-reviewed-repair-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reviewed-excel-inflow-repair
+  cancel-in-progress: false
+
+jobs:
+  finalize-development-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Finalize dictionary-backed nine-metric demand and probe development compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/finalize_core_demand_and_development_release.py
+          python3 scripts/run_broker_tier1_demand_tests.py
+          python3 -m py_compile scripts/*.py scripts/verify/*.py
+          node --check scripts/run_reviewed_repair_contract_tests.mjs
+
+      - name: Run full repaired-product matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/reviewed-portable-gate/pre-final-closure
+          python3 scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out audit/reviewed-portable-gate/pre-final-closure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/reviewed-portable-gate/pre-final-closure/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS', report
+          assert report['fail_count']==0, report
+          assert report['silently_skipped_count']==0, report
+          PY
+
+      - name: Remove all bootstrap machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp audit/reviewed-portable-gate/development-release-refresh.json /tmp/development-release-refresh.json
+          rm -f scripts/finalize_core_demand_and_development_release.py
+          rm -f scripts/apply_reviewed_core_repair.py
+          rm -f scripts/apply_reviewed_followup.py
+          rm -f scripts/apply_broker_tier1_demand_repair.py
+          rm -f scripts/run_reviewed_auto_finalize.py
+          rm -f .github/workflows/apply-reviewed-repair.yml
+          rm -f .github/workflows/apply-reviewed-repair-followup.yml
+          rm -f .github/workflows/apply-reviewed-demand-followup.yml
+          rm -f .github/workflows/reviewed-auto-finalize.yml
+          rm -f .github/workflows/finalize-reviewed-development-candidate.yml
+
+      - name: Compile and independently verify final development closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          root=Path('.').resolve()
+          receipt=json.loads(Path('/tmp/development-release-refresh.json').read_text('utf-8'))
+          command=receipt['command']
+          completed=subprocess.run(command,cwd=root,text=True,capture_output=True,timeout=600,env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1'})
+          if completed.returncode:
+              raise SystemExit(completed.stdout+'\n'+completed.stderr)
+          manifest=json.loads(Path('release-manifest.json').read_text('utf-8'))
+          certification=manifest.get('certification') or {}
+          assert manifest.get('packageMode')=='development', manifest.get('packageMode')
+          assert certification.get('currentClosureSha256'), certification
+          assert certification.get('certifiedClosureSha256') is None, certification
+          assert certification.get('evidenceReceipt') is None, certification
+          members=manifest.get('files') or manifest.get('closure',{}).get('files') or []
+          checked=0
+          failures=[]
+          forbidden={
+              'scripts/finalize_core_demand_and_development_release.py',
+              'scripts/apply_reviewed_core_repair.py',
+              'scripts/apply_reviewed_followup.py',
+              'scripts/apply_broker_tier1_demand_repair.py',
+              'scripts/run_reviewed_auto_finalize.py',
+          }
+          for item in members:
+              if not isinstance(item,dict) or not isinstance(item.get('path'),str): continue
+              rel=item['path']
+              if rel in forbidden: failures.append('bootstrap-member:'+rel)
+              path=root/rel
+              if not path.is_file(): failures.append('missing:'+rel); continue
+              if item.get('sha256') and hashlib.sha256(path.read_bytes()).hexdigest()!=item['sha256']:
+                  failures.append('hash:'+rel)
+              if item.get('bytes') is not None and path.stat().st_size!=item['bytes']:
+                  failures.append('bytes:'+rel)
+              checked+=1
+          if failures: raise SystemExit('\n'.join(failures))
+          audit=Path('audit/reviewed-portable-gate')
+          audit.mkdir(parents=True,exist_ok=True)
+          (audit/'final-development-closure.json').write_text(json.dumps({
+              'schema_version':'final-development-closure/1.0',
+              'status':'PASS',
+              'command':command,
+              'package_mode':manifest.get('packageMode'),
+              'source_status':manifest.get('sourceStatus'),
+              'skill_version':manifest.get('skillVersion'),
+              'current_closure_sha256':certification.get('currentClosureSha256'),
+              'certified_closure_sha256':certification.get('certifiedClosureSha256'),
+              'certification_evidence_receipt':certification.get('evidenceReceipt'),
+              'verified_member_count':checked,
+          },indent=2)+'\n','utf-8')
+          PY
+
+      - name: Replay full matrix against final compiled bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/reviewed-portable-gate/final-compiled-tree
+          python3 scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out audit/reviewed-portable-gate/final-compiled-tree
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          report=json.loads(Path('audit/reviewed-portable-gate/final-compiled-tree/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS', report
+          assert report['fail_count']==0, report
+          assert report['silently_skipped_count']==0, report
+          failures=[]
+          for path in Path('scripts').rglob('*'):
+              if not path.is_file() or path.suffix not in {'.py','.mjs','.js','.json'}: continue
+              text=path.read_text('utf-8')
+              if re.search(r'/Users/|[A-Za-z]:\\\\Users\\\\',text): failures.append('author-path:'+str(path))
+              if path.name.startswith('repair_') and path.name.endswith('_integration.py'): failures.append('patcher:'+str(path))
+          if failures: raise SystemExit('\n'.join(failures))
+          PY
+          git diff --check
+          git diff --stat > audit/reviewed-portable-gate/final-development-diffstat.txt
+
+      - name: Commit internally consistent development candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Excel Inflow reviewed repair"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Refresh proven reviewed Excel Inflow development candidate"
+          git push origin HEAD:agent/excel-inflow-reviewed-repair-v2
+
+      - name: Update draft PR description
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/pr-body.md <<'MD'
+          ## End-to-end repair
+
+          This branch repairs source-visible statement arithmetic, all-house native broker eligibility, quality-ranked one-house recovery, the complete nine-metric Tier-1 demand surface, EBIT/Adjusted EBITDA/D&A headline authority, discrete-event forecasting, funded acquisition cash/debt mechanics, run identity/telemetry, portable case custody and the stale development-gate interface.
+
+          ## Proof performed on the committed source class
+
+          The final development closure is compiled only after all bootstrap files are removed. The full portable matrix is then replayed against those compiled bytes and must report PASS with zero failures and zero silently skipped selected tests. It includes real workbook generation, LibreOffice recalculation, formula/cache checks and independent acquisition finance proof as well as protected debt, RCF, interest, lease, fixed-point, broker failure and resume cases.
+
+          ## Package status
+
+          The package is deliberately `development`: it has a fresh current closure and independently verified member hashes, while certified closure and certification evidence remain null. The PR does not claim production certification or change the live route.
+
+          ## Remaining release-only evidence
+
+          A production promotion still requires the installed Rogo model-host usable-broker canary, native Excel Off/On/Off/On restoration, human visual review and the joined user-submission-to-download performance cohort.
+          MD
+          gh pr edit agent/excel-inflow-reviewed-repair-v2 \
+            --title "Complete reviewed Excel Inflow end-to-end repair" \
+            --body-file /tmp/pr-body.md
+
+      - name: Upload final proof
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: excel-inflow-reviewed-development-proof
+          path: audit/reviewed-portable-gate
+          retention-days: 30
+          if-no-files-found: error
