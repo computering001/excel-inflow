@@ -1,0 +1,177 @@
+name: Close reviewed Tier-1 broker demand
+
+on:
+  push:
+    branches: [agent/excel-inflow-reviewed-repair-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reviewed-excel-inflow-repair
+  cancel-in-progress: false
+
+jobs:
+  close-demand-and-prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install runtime
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Ensure the reviewed product repairs exist
+        env:
+          REVIEWED_COMMIT: 9edbbfe1596071c03813badee21b99d714affc23
+        run: |
+          set -euo pipefail
+          mkdir -p parity-fixtures
+          for file in standard-maximal-v2.json standard-net-cash-v2.json README.md; do
+            curl -fsSL "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/parity-fixtures/${file}" -o "parity-fixtures/${file}"
+          done
+          sha256sum parity-fixtures/*.json > parity-fixtures/SHA256SUMS
+          for file in repair_acquisition_integration.py repair_acquisition_plan_integration.py repair_broker_headline_integration.py repair_telemetry_integration.py; do
+            curl -fsSL "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/scripts/${file}" -o "/tmp/${file}"
+          done
+          for file in compile_acquisition_portable_case.mjs run_acquisition_solver_case_tests.mjs run_acquisition_workbook_tests.py run_carrier_identity_tests.mjs; do
+            if [ ! -f "scripts/${file}" ]; then
+              curl -fsSL "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/scripts/${file}" -o "scripts/${file}"
+            fi
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          root=str(Path.cwd())
+          for path in Path('/tmp').glob('repair_*_integration.py'):
+              text=path.read_text('utf-8').replace('/mnt/data/excel-inflow-repair',root).replace('/mnt/data/excel_inflow_repair',root)
+              path.write_text(text,'utf-8')
+          PY
+          if grep -q 'archive_only = not selected_targets or unselected_house$' scripts/extract_broker_evidence.py; then
+            test -f scripts/apply_reviewed_core_repair.py
+            python3 scripts/apply_reviewed_core_repair.py
+          fi
+          if grep -qi 'zero direct transaction cash-flow effect' references/acquisition.md; then
+            python3 /tmp/repair_acquisition_integration.py
+            python3 /tmp/repair_acquisition_plan_integration.py
+          fi
+          if [ ! -f scripts/lib/broker_headline_policy.mjs ]; then python3 /tmp/repair_broker_headline_integration.py; fi
+          if [ ! -f scripts/lib/run_telemetry.mjs ]; then python3 /tmp/repair_telemetry_integration.py; fi
+          if [ -f scripts/apply_reviewed_followup.py ]; then python3 scripts/apply_reviewed_followup.py; fi
+
+      - name: Close and test Tier-1 demand
+        run: |
+          set -euo pipefail
+          python3 scripts/apply_broker_tier1_demand_repair.py
+          python3 scripts/run_broker_tier1_demand_tests.py
+          python3 -m py_compile scripts/*.py scripts/verify/*.py
+          node --check scripts/run_reviewed_repair_contract_tests.mjs
+
+      - name: Run complete portable gate
+        run: |
+          set -euo pipefail
+          rm -rf audit/reviewed-portable-gate
+          python3 scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out audit/reviewed-portable-gate
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/reviewed-portable-gate/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS' and report['fail_count']==0 and report['silently_skipped_count']==0, report
+          PY
+
+      - name: Make Tier-1 demand part of the permanent gate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('scripts/run_reviewed_portable_gate.py')
+          text=path.read_text('utf-8')
+          marker='        ("broker-native-eligibility", [args.python, "scripts/run_broker_native_eligibility_tests.py"]),\n'
+          addition=marker+'        ("broker-tier1-demand", [args.python, "scripts/run_broker_tier1_demand_tests.py"]),\n'
+          if '"broker-tier1-demand"' not in text:
+              if marker not in text: raise SystemExit('portable gate insertion marker missing')
+              text=text.replace(marker,addition,1)
+              path.write_text(text,'utf-8')
+          PY
+          rm -f scripts/apply_broker_tier1_demand_repair.py
+          rm -f scripts/apply_reviewed_core_repair.py scripts/apply_reviewed_followup.py
+          rm -f .github/workflows/apply-reviewed-repair.yml .github/workflows/apply-reviewed-repair-followup.yml .github/workflows/apply-reviewed-demand-followup.yml
+          if [ ! -f .github/workflows/reviewed-repair-ci.yml ]; then
+            cat > .github/workflows/reviewed-repair-ci.yml <<'YAML'
+          name: Excel Inflow reviewed repair CI
+          on:
+            push:
+              branches: [agent/excel-inflow-reviewed-repair-v2]
+            pull_request:
+          permissions:
+            contents: read
+          jobs:
+            portable-gate:
+              runs-on: ubuntu-latest
+              timeout-minutes: 120
+              steps:
+                - uses: actions/checkout@v4
+                - run: |
+                    sudo apt-get update
+                    sudo apt-get install -y libreoffice
+                    python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+                - run: |
+                    python3 scripts/run_reviewed_portable_gate.py --python "$(command -v python3)" --soffice "$(command -v soffice)" --out audit/reviewed-portable-gate
+                - uses: actions/upload-artifact@v4
+                  if: always()
+                  with:
+                    name: reviewed-portable-gate
+                    path: audit/reviewed-portable-gate
+                    if-no-files-found: error
+          YAML
+          fi
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          errors=[]
+          for path in Path('scripts').rglob('*'):
+              if path.is_file() and path.suffix in {'.py','.mjs','.js','.json'}:
+                  text=path.read_text('utf-8')
+                  if re.search(r'/Users/|[A-Za-z]:\\\\Users\\\\',text): errors.append(str(path))
+                  if path.name.startswith('repair_') and path.name.endswith('_integration.py'): errors.append(str(path))
+          if errors: raise SystemExit('\n'.join(errors))
+          PY
+          git diff --check
+          git diff --stat > audit/reviewed-portable-gate/final-diffstat.txt
+
+      - name: Commit and push if the tree changed
+        run: |
+          set -euo pipefail
+          git config user.name "Excel Inflow reviewed repair"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Complete reviewed Excel Inflow Tier-1 demand repair"
+          git push origin HEAD:agent/excel-inflow-reviewed-repair-v2
+
+      - name: Ensure draft PR exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh pr view agent/excel-inflow-reviewed-repair-v2 --json number >/dev/null 2>&1; then
+            gh pr create --draft --base agent/broker-delivery-constitution-v350 --head agent/excel-inflow-reviewed-repair-v2 --title "Complete reviewed Excel Inflow end-to-end repair" --body "This repair branch is published only after the fail-closed portable matrix passes with zero failures and zero silently skipped selected tests. It repairs source arithmetic, all-house native broker eligibility, quality-ranked one-house recovery, Tier-1 demand/headline authority, discrete-event forecasting, funded acquisition cash/debt mechanics, carrier/telemetry identity, portable cases and the stale registry interface while preserving the broker-failure delivery invariant and protected debt/RCF/interest engine. Installed-host, native Excel, visual and performance evidence remain explicit release-only attestation gates."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewed-tier1-demand-evidence
+          path: audit/reviewed-portable-gate
+          if-no-files-found: warn
+          retention-days: 30
