@@ -1,0 +1,92 @@
+name: Apply one-headline broker authority
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  broker-headline:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+
+      - name: Integrate one-headline policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/repair_broker_headline_integration.py
+          git diff --check
+          node --check scripts/lib/broker_headline_policy.mjs
+          node --check scripts/lib/forecast_candidate_compiler.mjs
+          node scripts/run_broker_headline_policy_tests.mjs
+
+      - name: Re-run broker, forecast and delivery gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run_broker_core_demand_tests.py
+          python3 scripts/run_broker_demand_selection_tests.py
+          python3 scripts/run_broker_house_exclusion_tests.py
+          node scripts/run_broker_preview_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+          if test -f fixtures/portable/raw-canary-evidence.json; then
+            node scripts/run_universal_broker_delivery_matrix.mjs \
+              fixtures/portable/raw-canary-evidence.json "$(command -v python3)" "$(command -v soffice)"
+          fi
+
+      - name: Re-run self-contained registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/broker-headline-proof
+          mkdir -p audit/broker-headline-proof
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          python3 /tmp/forensic_audit.py --out audit/broker-headline-proof
+          jq '.summary' audit/broker-headline-proof/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/broker-headline-proof/forensic-audit.json)" -eq 0
+
+      - name: Persist verified policy
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-broker-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Enforce one coherent broker headline authority [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload broker authority proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-broker-headline-proof
+          path: |
+            audit/broker-headline-proof
+            /tmp/broker-headline-integration.json
+          retention-days: 14
+          if-no-files-found: warn
