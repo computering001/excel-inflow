@@ -1,0 +1,114 @@
+name: Excel Inflow materialize and clean repair
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/excel-inflow-materialize-and-clean.yml
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-materialize-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out complete branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: agent/excel-inflow-end-to-end-repair
+
+      - name: Install repair-time dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y libreoffice python3-pip
+          python3 -m pip install --disable-pip-version-check --no-input openpyxl pymupdf pillow
+
+      - name: Apply each versioned repair stage once
+        shell: bash
+        run: |
+          set -euo pipefail
+          export EXCEL_INFLOW_TEST_PYTHON=/usr/bin/python3
+          for launcher in \
+            scripts/run_repair_stage1_stage_v3.py \
+            scripts/run_repair_stage2_stage_v3.py
+          do
+            if test -f "$launcher"; then
+              echo "Running $launcher"
+              python3 "$launcher"
+            fi
+          done
+
+      - name: Verify materialized source before deleting migration code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q scripts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in sorted(Path('.').rglob('*.json')):
+              if '.git' in path.parts:
+                  continue
+              json.loads(path.read_text('utf-8'))
+          print('JSON and Python syntax valid after materialization')
+          PY
+          test -f scripts/run_development_gate.mjs
+          test -f scripts/run_universal_broker_delivery_matrix.mjs
+          test -f scripts/run_stage4_checkpoint_tests.mjs
+
+      - name: Remove one-off migration and temporary execution scaffolding
+        shell: bash
+        run: |
+          set -euo pipefail
+          find scripts -maxdepth 1 -type f \( \
+              -name 'apply_excel_inflow_repair_stage*.py' -o \
+              -name 'fix_stage1_*.py' -o \
+              -name 'fix_stage2_*.py' -o \
+              -name 'run_repair_stage1_stage_v*.py' -o \
+              -name 'run_repair_stage2_stage_v*.py' \
+            \) -print -delete
+          rm -f \
+            .github/workflows/repair-workspace-export.yml \
+            .github/workflows/repair-execution.yml \
+            .github/workflows/excel-inflow-materialize-and-clean.yml
+          rm -rf audit/generated audit/tmp
+
+      - name: Enforce clean architecture literals and no private paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -R --line-number --exclude-dir=.git --exclude-dir=audit \
+            'latest_supplied_house_then_zero_authority' .
+          ! grep -R --line-number --exclude-dir=.git --exclude-dir=audit \
+            'archive-only regardless of whether its native lane happens to look complete' .
+          ! grep -R --line-number --exclude-dir=.git --exclude-dir=audit \
+            '/Users/archie\|/Users/[^/]\+/\|archiepjod' \
+            scripts assets references SKILL.md central-instructions.md || true
+          test -z "$(find scripts -maxdepth 1 -type f -name '*repair_stage*' -print -quit)"
+
+      - name: Commit the ordinary repaired source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-repair-bot'
+          git config user.email 'excel-inflow-repair-bot@users.noreply.github.com'
+          git add -A -- \
+            SKILL.md central-instructions.md release-manifest.json \
+            assets references scripts .github/workflows
+          if git diff --cached --quiet; then
+            echo 'No materialization changes remained to commit.'
+            exit 0
+          fi
+          git commit -m 'Materialize and clean end-to-end Excel Inflow repair'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
