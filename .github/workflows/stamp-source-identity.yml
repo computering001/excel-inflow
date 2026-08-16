@@ -1,0 +1,136 @@
+name: Stamp source identity into release runtime
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  source-identity:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir jsonschema
+
+      - name: Add deterministic source identity stamping
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          source_path=Path('scripts/lib/source_identity.mjs'); source=source_path.read_text('utf8')
+          source=source.replace(
+            'const commit = overrides.source_commit ?? process.env.EXCEL_INFLOW_SOURCE_COMMIT ?? runtime.source_commit ?? await gitValue(root, ["rev-parse", "HEAD"]);',
+            'const commit = overrides.source_commit ?? process.env.EXCEL_INFLOW_SOURCE_COMMIT ?? runtime.source_commit ?? release.sourceCommit ?? release.source_commit ?? await gitValue(root, ["rev-parse", "HEAD"]);'
+          )
+          source=source.replace(
+            'const tree = overrides.source_tree ?? process.env.EXCEL_INFLOW_SOURCE_TREE ?? runtime.source_tree ?? await gitValue(root, ["rev-parse", "HEAD^{tree}"]);',
+            'const tree = overrides.source_tree ?? process.env.EXCEL_INFLOW_SOURCE_TREE ?? runtime.source_tree ?? release.sourceTree ?? release.source_tree ?? await gitValue(root, ["rev-parse", "HEAD^{tree}"]);'
+          )
+          block='''
+export async function stampRuntimeSourceIdentity({ skillRoot, repository = "computering001/excel-inflow" } = {}) {
+  const root = path.resolve(skillRoot ?? new URL("../../", import.meta.url).pathname);
+  const commit = await gitValue(root, ["rev-parse", "HEAD"]);
+  const tree = await gitValue(root, ["rev-parse", "HEAD^{tree}"]);
+  if (!commit || !tree) throw new Error("Source identity stamping requires an exact Git commit and tree.");
+  const runtimePath = path.join(root, "assets", "runtime-manifest.json");
+  const releasePath = path.join(root, "release-manifest.json");
+  const runtime = await readJson(runtimePath) ?? {};
+  const release = await readJson(releasePath) ?? {};
+  Object.assign(runtime, {
+    source_repository: repository,
+    source_commit: commit,
+    source_tree: tree,
+    source_identity_scope: "code_parent_before_generated_release_metadata",
+  });
+  Object.assign(release, {
+    sourceRepository: repository,
+    sourceCommit: commit,
+    sourceTree: tree,
+    sourceIdentityScope: "code_parent_before_generated_release_metadata",
+  });
+  await fs.writeFile(runtimePath, `${JSON.stringify(runtime, null, 2)}\\n`, "utf8");
+  await fs.writeFile(releasePath, `${JSON.stringify(release, null, 2)}\\n`, "utf8");
+  return { repository, source_commit: commit, source_tree: tree };
+}
+'''
+          if 'stampRuntimeSourceIdentity' not in source:
+            source=source.replace('\nexport default {',block+'\nexport default {')
+            source=source.replace('export default { resolveSourceIdentity, assertProductionSourceIdentity };','export default { resolveSourceIdentity, assertProductionSourceIdentity, stampRuntimeSourceIdentity };')
+          source_path.write_text(source,'utf8')
+
+          compiler_path=Path('scripts/compile_skill_release.mjs'); compiler=compiler_path.read_text('utf8')
+          line='import { stampRuntimeSourceIdentity } from "./lib/source_identity.mjs";'
+          if line not in compiler: compiler=line+'\n'+compiler
+          call='await stampRuntimeSourceIdentity({ skillRoot: new URL("../", import.meta.url).pathname });'
+          if call not in compiler:
+            imports=list(__import__('re').finditer(r'^import[^\n]*;\n',compiler,__import__('re').M))
+            position=imports[-1].end() if imports else 0
+            compiler=compiler[:position]+'\n'+call+'\n'+compiler[position:]
+          compiler_path.write_text(compiler,'utf8')
+
+          test_path=Path('scripts/run_source_identity_tests.mjs'); test=test_path.read_text('utf8')
+          if 'source_identity_scope' not in test:
+            test=test.replace('assert.ok(identity.current_closure_sha256);','assert.ok(identity.current_closure_sha256);\nassert.ok(identity.source_commit);\nassert.ok(identity.source_tree);')
+            test=test.replace('console.log(JSON.stringify({ status: "PASS", checks: 5 }));','console.log(JSON.stringify({ status: "PASS", checks: 7 }));')
+          test_path.write_text(test,'utf8')
+          PY
+          git diff --check
+
+      - name: Prove development compiler stamps installable identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/lib/source_identity.mjs
+          node --check scripts/compile_skill_release.mjs
+          node scripts/run_source_identity_tests.mjs
+          rm -rf /tmp/excel-inflow-source-stamp
+          cp -a . /tmp/excel-inflow-source-stamp
+          (cd /tmp/excel-inflow-source-stamp && node scripts/compile_skill_release.mjs)
+          jq -e '.source_commit != null and .source_tree != null and .source_repository == "computering001/excel-inflow"' /tmp/excel-inflow-source-stamp/assets/runtime-manifest.json
+          jq -e '.sourceCommit != null and .sourceTree != null and .sourceRepository == "computering001/excel-inflow"' /tmp/excel-inflow-source-stamp/release-manifest.json
+          test "$(jq -r '.source_commit' /tmp/excel-inflow-source-stamp/assets/runtime-manifest.json)" = "$(git rev-parse HEAD)"
+          test "$(jq -r '.source_tree' /tmp/excel-inflow-source-stamp/assets/runtime-manifest.json)" = "$(git rev-parse HEAD^{tree})"
+
+      - name: Re-run carrier, release and self-contained gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_workflow_state_tests.mjs
+          node scripts/run_delivery_inventory_tests.mjs
+          node scripts/run_release_certification_tests.mjs
+          rm -rf audit/source-identity-proof
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          python3 /tmp/forensic_audit.py --out audit/source-identity-proof
+          jq '.summary' audit/source-identity-proof/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/source-identity-proof/forensic-audit.json)" -eq 0
+
+      - name: Persist source identity integration
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-identity-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/lib/source_identity.mjs scripts/compile_skill_release.mjs scripts/run_source_identity_tests.mjs audit/source-identity-proof
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Stamp source identity into installed runtime [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
