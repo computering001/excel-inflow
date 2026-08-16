@@ -1,0 +1,385 @@
+name: Excel Inflow authoritative acceptance
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+    paths-ignore:
+      - audit/**
+  workflow_dispatch:
+    inputs:
+      repair_ref:
+        description: Repair branch or exact commit to test
+        required: true
+        default: agent/excel-inflow-end-to-end-repair
+
+concurrency:
+  group: excel-inflow-authoritative-${{ github.event.pull_request.head.sha || inputs.repair_ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  exact-source-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      REPAIR_BRANCH: agent/excel-inflow-end-to-end-repair
+      LIVE_BASE: agent/broker-delivery-constitution-v350
+    steps:
+      - name: Resolve exact repair SHA
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MANUAL_REF: ${{ inputs.repair_ref }}
+        run: |
+          set -euo pipefail
+          if test -n "${PR_HEAD_SHA:-}"; then
+            sha="$PR_HEAD_SHA"
+          else
+            sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/${MANUAL_REF}" --jq .sha)"
+          fi
+          test -n "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Testing exact repair SHA $sha"
+
+      - name: Check out exact repair SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Establish isolated deterministic runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y libreoffice python3-venv jq
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-input --upgrade pip
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-input openpyxl pymupdf pillow
+          echo "PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
+          echo "SOFFICE=$(command -v libreoffice)" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "${{ steps.source.outputs.sha }}"
+          git status --short
+          test -z "$(git status --porcelain)"
+          node --version
+          "$RUNNER_TEMP/venv/bin/python" --version
+          libreoffice --version
+
+      - name: Refuse unmaterialized repair or temporary workflow scaffolding
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration="$(find scripts -maxdepth 1 -type f \( \
+            -name 'apply_excel_inflow_repair_stage*.py' -o \
+            -name 'fix_stage1_*.py' -o \
+            -name 'fix_stage2_*.py' -o \
+            -name 'run_repair_stage1_stage_v*.py' -o \
+            -name 'run_repair_stage2_stage_v*.py' \
+          \) -print)"
+          test -z "$migration" || {
+            echo 'One-off repair scripts remain in the tested source:' >&2
+            echo "$migration" >&2
+            exit 1
+          }
+          extras="$(find .github/workflows -maxdepth 1 -type f \
+            ! -name 'excel-inflow-ci.yml' \
+            ! -name 'excel-inflow-final-acceptance-v3.yml' \
+            ! -name 'excel-inflow-forensic-lint.yml' -print)"
+          test -z "$extras" || {
+            echo 'Temporary repair workflows remain in the tested source:' >&2
+            echo "$extras" >&2
+            exit 1
+          }
+
+      - name: Validate source contracts and architecture lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" -m compileall -q scripts
+          "$PYTHON" - <<'PY'
+          import json
+          from pathlib import Path
+          errors=[]
+          for path in Path('.').rglob('*.json'):
+              if '.git' in path.parts or 'node_modules' in path.parts:
+                  continue
+              try:
+                  json.loads(path.read_text('utf-8'))
+              except Exception as exc:
+                  errors.append(f'{path}: {exc}')
+          if errors:
+              raise SystemExit('\n'.join(errors))
+          PY
+          node --check scripts/run_excel_inflow_vnext.mjs
+          node --check scripts/run_raw_input_black_box_canary.mjs
+          node --check scripts/run_raw_input_local_semantic_canary.mjs
+          node --check scripts/lib/experience_trace.mjs
+          "$PYTHON" -m py_compile \
+            scripts/run_repository_forensic_lint.py \
+            scripts/run_usable_broker_workbook_consumption_tests.py \
+            scripts/run_funded_acquisition_visible_bridge_tests.py
+          mkdir -p "$RUNNER_TEMP/authoritative/forensic"
+          "$PYTHON" scripts/run_repository_forensic_lint.py \
+            --out "$RUNNER_TEMP/authoritative/forensic/repository-forensic-lint.json"
+          node scripts/run_experience_trace_tests.mjs \
+            | tee "$RUNNER_TEMP/authoritative/experience-trace-tests.json"
+
+      - name: Resolve committed fixture custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" - <<'PY' > "$RUNNER_TEMP/authoritative/fixtures.env"
+          import json
+          from pathlib import Path
+          root=Path('.').resolve()
+          model_cases=[]
+          evidence=[]
+          fixed=[]
+          clean=[]
+          for path in root.rglob('*.json'):
+              if '.git' in path.parts or 'node_modules' in path.parts or 'generated' in path.parts:
+                  continue
+              try:
+                  value=json.loads(path.read_text('utf-8'))
+              except Exception:
+                  continue
+              if not isinstance(value,dict):
+                  continue
+              schema=str(value.get('schema_version') or value.get('schemaVersion') or '')
+              if schema.startswith('model-case/') and isinstance(value.get('periods'),list):
+                  model_cases.append(path)
+              if schema.startswith('evidence-run/'):
+                  evidence.append(path)
+              if 'fixed-point' in schema and isinstance(value.get('cases') or value.get('fixtures') or value.get('entries'),list):
+                  fixed.append(path)
+              if 'clean' in path.name.lower() and 'evidence' in path.name.lower():
+                  clean.append(path)
+          if len(model_cases)<2:
+              raise SystemExit(f'Need at least two committed model cases; found {len(model_cases)}')
+          parents={}
+          for path in model_cases:
+              parents.setdefault(path.parent,[]).append(path)
+          cases=max(parents,key=lambda item:len(parents[item]))
+          if len(parents[cases])<2:
+              raise SystemExit('No committed case cohort contains maximal and net-cash cases')
+          representative=max(model_cases,key=lambda item:item.stat().st_size)
+          raw=max(clean or evidence,key=lambda item:item.stat().st_size) if (clean or evidence) else None
+          if raw is None:
+              raise SystemExit('No committed raw/evidence fixture found')
+          if not fixed:
+              fixed=[p for p in root.rglob('*.json') if 'fixed' in p.name.lower() and 'point' in p.name.lower()]
+          if not fixed:
+              raise SystemExit('No committed fixed-point manifest found')
+          fixed_manifest=max(fixed,key=lambda item:item.stat().st_size)
+          for name,path in {
+              'CASES':cases,
+              'REPRESENTATIVE':representative,
+              'RAW_CANARY_EVIDENCE':raw,
+              'FIXED_POINT_CASES_MANIFEST':fixed_manifest,
+          }.items():
+              print(f'{name}={path.resolve()}')
+          PY
+          cat "$RUNNER_TEMP/authoritative/fixtures.env"
+          cat "$RUNNER_TEMP/authoritative/fixtures.env" >> "$GITHUB_ENV"
+
+      - name: Execute complete portable development registry
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/authoritative/development-gate"
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases "$CASES" \
+            --representative "$REPRESENTATIVE" \
+            --fixed-point-cases-manifest "$FIXED_POINT_CASES_MANIFEST" \
+            --raw-canary-evidence "$RAW_CANARY_EVIDENCE" \
+            --python "$PYTHON" \
+            --soffice "$SOFFICE" \
+            --concurrency 2 \
+            --timeout-ms 3600000 \
+            --out "$RUNNER_TEMP/authoritative/development-gate"
+          "$PYTHON" - <<'PY'
+          import json,os
+          from pathlib import Path
+          path=Path(os.environ['RUNNER_TEMP'])/'authoritative'/'development-gate'/'development-gate-report.json'
+          report=json.loads(path.read_text('utf-8'))
+          bad=[row for row in report.get('results',[]) if row.get('status')!='PASS']
+          if report.get('status')!='PASS' or bad:
+              raise SystemExit(json.dumps({'counts':report.get('counts'),'bad':[row.get('id') for row in bad]},sort_keys=True))
+          print(json.dumps(report.get('counts'),sort_keys=True))
+          PY
+
+      - name: Execute raw broker delivery matrix
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            "$RAW_CANARY_EVIDENCE" "$PYTHON" "$SOFFICE" \
+            > "$RUNNER_TEMP/authoritative/universal-broker-delivery-matrix.out"
+          cat "$RUNNER_TEMP/authoritative/universal-broker-delivery-matrix.out"
+          "$PYTHON" - <<'PY'
+          import json,os
+          from pathlib import Path
+          text=(Path(os.environ['RUNNER_TEMP'])/'authoritative'/'universal-broker-delivery-matrix.out').read_text('utf-8')
+          decoder=json.JSONDecoder(); values=[]
+          for i,ch in enumerate(text):
+              if ch!='{': continue
+              try: value,_=decoder.raw_decode(text[i:])
+              except Exception: continue
+              if isinstance(value,dict): values.append(value)
+          passes=[value for value in values if value.get('status')=='PASS']
+          if not passes: raise SystemExit('Universal matrix emitted no PASS receipt')
+          encoded=json.dumps(passes[-1],sort_keys=True)
+          for state in ('explicit_skip','failed_optional_close','usable'):
+              if state not in encoded: raise SystemExit(f'Matrix receipt omits {state}')
+          PY
+
+      - name: Re-run long content-addressed Stage-4 proof
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases "$CASES" --python "$PYTHON" --soffice "$SOFFICE" \
+            > "$RUNNER_TEMP/authoritative/stage4-checkpoint-proof.out"
+          cat "$RUNNER_TEMP/authoritative/stage4-checkpoint-proof.out"
+
+      - name: Verify development closure and non-certification boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" - <<'PY'
+          import json,re
+          value=json.load(open('release-manifest.json'))
+          certification=value.get('certification') or {}
+          assert value.get('packageMode')=='development'
+          assert certification.get('certifiedClosureSha256') is None
+          assert re.fullmatch(r'[a-f0-9]{64}',str(certification.get('currentClosureSha256') or ''))
+          assert int(certification.get('closureFileCount') or 0)>0
+          PY
+          test -z "$(git status --porcelain)"
+
+      - name: Write exact-SHA acceptance receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" - <<'PY'
+          import hashlib,json,os,subprocess
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'authoritative'
+          files=[
+              root/'forensic'/'repository-forensic-lint.json',
+              root/'experience-trace-tests.json',
+              root/'development-gate'/'development-gate-report.json',
+              root/'universal-broker-delivery-matrix.out',
+              root/'stage4-checkpoint-proof.out',
+          ]
+          artifacts={}
+          for path in files:
+              if not path.is_file(): raise SystemExit(f'Missing {path}')
+              artifacts[path.name]={'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'bytes':path.stat().st_size}
+          body={
+              'schema_version':'excel-inflow-authoritative-acceptance/1.0',
+              'status':'PASS',
+              'repository':'computering001/excel-inflow',
+              'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+              'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+              'clean_checkout':not subprocess.check_output(['git','status','--porcelain'],text=True).strip(),
+              'package_mode':'development',
+              'production_certified':False,
+              'artifacts':artifacts,
+          }
+          canonical=json.dumps(body,sort_keys=True,separators=(',',':')).encode()
+          body['receipt_sha256']=hashlib.sha256(canonical).hexdigest()
+          path=root/'authoritative-acceptance-receipt.json'
+          path.write_text(json.dumps(body,indent=2,sort_keys=True)+'\n','utf-8')
+          print(path.read_text('utf-8'))
+          PY
+
+      - name: Upload complete acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-authoritative-acceptance-${{ steps.source.outputs.sha }}
+          path: ${{ runner.temp }}/authoritative
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Refuse a moving repair branch before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="$(git ls-remote origin refs/heads/$REPAIR_BRANCH | awk '{print $1}')"
+          test "$remote" = "${{ steps.source.outputs.sha }}" || {
+            echo "Tested ${{ steps.source.outputs.sha }} but repair branch moved to $remote" >&2
+            exit 1
+          }
+
+      - name: Advance exact accepted ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --force origin HEAD:refs/heads/agent/excel-inflow-accepted
+
+      - name: Open or refresh real audited repair PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner=context.repo.owner;
+            const repo=context.repo.repo;
+            const head='agent/excel-inflow-end-to-end-repair';
+            const base='agent/broker-delivery-constitution-v350';
+            const accepted='${{ steps.source.outputs.sha }}';
+            const title='Repair Excel Inflow end to end against the master blueprint';
+            const body=[
+              '## Authoritative source acceptance',
+              '',
+              'The execution-base workflow opened this draft PR only after testing the exact head SHA from a clean checkout.',
+              '',
+              `- Accepted commit: \`${accepted}\``,
+              '- Accepted ref: `agent/excel-inflow-accepted`',
+              `- Acceptance workflow: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+              '- Base: exact live v3.5 candidate branch, not stale `main`.',
+              '',
+              '## Proven in source CI',
+              '',
+              '- source arithmetic and relabel-safe statement topology;',
+              '- native-first, quality-ranked broker selection with one bounded recovery frontier;',
+              '- complete core broker demand, one headline authority and D&A bridge;',
+              '- discrete-event non-recurrence;',
+              '- funded acquisition economics and visible P&L bridge;',
+              '- delivered-workbook broker consumption;',
+              '- instrument debt, RCF, lease, interest, fixed point and Stage-4 resume;',
+              '- formula/cache/finance/semantic workbook checks;',
+              '- source/install carrier identity and end-to-end trace root;',
+              '- portable repository-owned test custody and no repair scaffolding.',
+              '',
+              '## External promotion boundary',
+              '',
+              'This remains a draft development candidate. Native-Excel restoration, real installed-host broker semantics, visual review, hosted wall-clock cohort, installation identity and production-route evidence must bind the same accepted commit/closure before promotion.',
+            ].join('\n');
+            const list=await github.rest.pulls.list({owner,repo,state:'open',head:`${owner}:${head}`,base});
+            let pr;
+            if(list.data.length){
+              pr=list.data[0];
+              await github.rest.pulls.update({owner,repo,pull_number:pr.number,title,body});
+            }else{
+              pr=(await github.rest.pulls.create({owner,repo,head,base,title,body,draft:true})).data;
+            }
+            try{
+              const temporary=await github.rest.pulls.get({owner,repo,pull_number:4});
+              if(temporary.data.state==='open') await github.rest.pulls.update({owner,repo,pull_number:4,state:'closed'});
+            }catch(error){core.info(`Temporary PR cleanup skipped: ${error.message}`);}
+            core.notice(`Audited repair PR #${pr.number}: ${pr.html_url}`);
