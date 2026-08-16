@@ -1,0 +1,52 @@
+name: Reviewed repair source export
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair-reviewed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out frozen reviewed source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out immutable parity fixtures
+        uses: actions/checkout@v4
+        with:
+          ref: parity-fixtures
+          path: _parity_source
+          sparse-checkout: |
+            parity-fixtures
+          sparse-checkout-cone-mode: true
+
+      - name: Package exact source and fixture custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git --exclude=_parity_source -czf /tmp/excel-inflow-reviewed-source.tar.gz .
+          mkdir -p /tmp/excel-inflow-parity-fixtures
+          cp _parity_source/parity-fixtures/standard-maximal-v2.json /tmp/excel-inflow-parity-fixtures/
+          cp _parity_source/parity-fixtures/standard-net-cash-v2.json /tmp/excel-inflow-parity-fixtures/
+          cp _parity_source/parity-fixtures/README.md /tmp/excel-inflow-parity-fixtures/
+          tar -czf /tmp/excel-inflow-parity-fixtures.tar.gz -C /tmp excel-inflow-parity-fixtures
+          sha256sum /tmp/excel-inflow-reviewed-source.tar.gz /tmp/excel-inflow-parity-fixtures.tar.gz > /tmp/excel-inflow-reviewed-artifacts.sha256
+
+      - name: Upload frozen workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-reviewed-source
+          path: |
+            /tmp/excel-inflow-reviewed-source.tar.gz
+            /tmp/excel-inflow-parity-fixtures.tar.gz
+            /tmp/excel-inflow-reviewed-artifacts.sha256
+          retention-days: 1
+          if-no-files-found: error
