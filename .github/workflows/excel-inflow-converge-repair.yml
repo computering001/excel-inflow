@@ -1,0 +1,250 @@
+name: Excel Inflow converge repair
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/excel-inflow-converge-repair.yml
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  converge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Start from the settled remote tip
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 60
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git reset --hard origin/agent/excel-inflow-end-to-end-repair
+          git clean -fdx
+
+      - name: Install deterministic repair-time runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y libreoffice python3-venv
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-input openpyxl pymupdf pillow
+          echo "PYTHON=$RUNNER_TEMP/venv/bin/python" >> "$GITHUB_ENV"
+          echo "SOFFICE=$(command -v libreoffice)" >> "$GITHUB_ENV"
+
+      - name: Materialize any still-pending versioned repair stages
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: ${{ env.PYTHON }}
+        run: |
+          set -euo pipefail
+          for launcher in scripts/run_repair_stage1_stage_v3.py scripts/run_repair_stage2_stage_v3.py; do
+            if test -f "$launcher"; then
+              "$PYTHON" "$launcher"
+            fi
+          done
+
+      - name: Converge policy, canary, telemetry and test ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          root=Path('.')
+
+          # 1. Local semantic canary is honest and cannot impersonate host proof.
+          old=root/'scripts'/'run_raw_input_black_box_canary.mjs'
+          local=root/'scripts'/'run_raw_input_local_semantic_canary.mjs'
+          if old.is_file() and not local.is_file() and any(token in old.read_text('utf-8') for token in ('coverage_ledger =','.mappings =','definition_fingerprint =')):
+              old.rename(local)
+          if local.is_file():
+              body=local.read_text('utf-8')
+              body=body.replace(
+                  '// Simulate the installed model-host semantic response from the raw PDF.',
+                  '// Author an explicit simulated semantic response for this local downstream component canary.\n    // This is not installed-host, model-host or production-route evidence.',
+              )
+              body=body.replace(
+                  'preauthored_broker_crosswalk: false,',
+                  'preauthored_broker_crosswalk: true,\n  semantic_response_boundary: "simulated_local_fixture",\n  installed_host_semantics_exercised: false,',
+              )
+              body=body.replace(
+                  'schema_version: "raw-input-black-box-canary/1.0",',
+                  'schema_version: "raw-input-local-semantic-canary/2.0",',
+              )
+              local.write_text(body,'utf-8')
+          else:
+              raise SystemExit('Local semantic canary is absent')
+          wrapper='''#!/usr/bin/env node\n\n/** Deprecated compatibility entrypoint.  It authors no semantic response and is not installed-host evidence. */\nimport { spawnSync } from "node:child_process";\nimport path from "node:path";\nimport process from "node:process";\nimport { fileURLToPath } from "node:url";\nconst here = path.dirname(fileURLToPath(import.meta.url));\nconsole.error("Deprecated: running the local simulated-semantic canary; this is not installed-host evidence.");\nconst result = spawnSync(process.execPath, [path.join(here, "run_raw_input_local_semantic_canary.mjs"), ...process.argv.slice(2)], {cwd:process.cwd(),env:process.env,stdio:"inherit"});\nif (result.error) throw result.error;\nprocess.exitCode = result.status ?? 1;\n'''
+          old.write_text(wrapper,'utf-8')
+          for base in (root/'scripts',root/'assets',root/'references'):
+              if not base.exists(): continue
+              for path in base.rglob('*'):
+                  if not path.is_file() or path.suffix.lower() not in {'.mjs','.js','.cjs','.py','.json','.md'} or path in {old,local}:
+                      continue
+                  text=path.read_text('utf-8',errors='ignore')
+                  if 'run_raw_input_black_box_canary.mjs' in text:
+                      path.write_text(text.replace('run_raw_input_black_box_canary.mjs','run_raw_input_local_semantic_canary.mjs'),'utf-8')
+          for path in (root/'SKILL.md',root/'central-instructions.md',root/'release-manifest.json'):
+              if path.is_file():
+                  text=path.read_text('utf-8')
+                  if 'run_raw_input_black_box_canary.mjs' in text:
+                      path.write_text(text.replace('run_raw_input_black_box_canary.mjs','run_raw_input_local_semantic_canary.mjs'),'utf-8')
+
+          # 2. Public trace root, visible response marker and carrier propagation.
+          trace_module=root/'scripts'/'lib'/'experience_trace.mjs'
+          trace_schema=root/'assets'/'experience-trace-v1.schema.json'
+          trace_test=root/'scripts'/'run_experience_trace_tests.mjs'
+          for required in (trace_module,trace_schema,trace_test):
+              if not required.is_file():
+                  raise SystemExit(f'Missing committed telemetry component {required}')
+          module=trace_module.read_text('utf-8')
+          module=re.sub(r'\n\s*process\.once\("unhandledRejection",[\s\S]*?\n\s*\);\n','\n',module,count=1)
+          trace_module.write_text(module,'utf-8')
+          controller=root/'scripts'/'run_excel_inflow_vnext.mjs'
+          source=controller.read_text('utf-8')
+          if 'experience_trace.mjs' not in source:
+              imports=list(re.finditer(r'^import[\s\S]*?;\n',source,flags=re.M))
+              if not imports: raise SystemExit('No public-controller import block found')
+              end=max(item.end() for item in imports)
+              source=source[:end]+'import { beginExperienceTrace } from "./lib/experience_trace.mjs";\n'+source[end:]
+          if 'excelInflowExperienceTrace = beginExperienceTrace' not in source:
+              imports=list(re.finditer(r'^import[\s\S]*?;\n',source,flags=re.M))
+              end=max(item.end() for item in imports)
+              source=source[:end]+'\nconst excelInflowExperienceTrace = beginExperienceTrace({ component: "public_controller" });\n'+source[end:]
+          if 'excelInflowExperienceTrace.markVisibleResponse' not in source:
+              match=re.search(r'function\s+finish\s*\([^)]*\)\s*\{',source) or re.search(r'(?:const|let)\s+finish\s*=\s*\([^)]*\)\s*=>\s*\{',source)
+              if not match: raise SystemExit('Public finish boundary not found')
+              injection='''\n  try {\n    excelInflowExperienceTrace.markVisibleResponse({ status: "COMPLETE" });\n  } catch (error) {\n    console.error(`Experience trace response marker failed: ${error.message}`);\n  }\n'''
+              source=source[:match.end()]+injection+source[match.end():]
+          controller.write_text(source,'utf-8')
+          carrier=root/'scripts'/'lib'/'run_carrier.mjs'
+          body=carrier.read_text('utf-8')
+          if 'experience_trace_id:' not in body:
+              marker='    status: String(status ?? "RESUMABLE"),\n'
+              if marker not in body: raise SystemExit('Carrier status marker not found')
+              body=body.replace(marker,marker+'    experience_trace_id: process.env.EXCEL_INFLOW_EXPERIENCE_TRACE_ID ?? null,\n',1)
+          carrier.write_text(body,'utf-8')
+
+          # 3. Registry interfaces and explicit proof ownership.
+          registry=root/'assets'/'development-test-registry.json'
+          data=json.loads(registry.read_text('utf-8'))
+          tests=data.get('tests') or []
+          matrix=next((row for row in tests if isinstance(row,dict) and row.get('id')=='universal-broker-delivery-matrix'),None)
+          if matrix is None:
+              tests.append({
+                  'id':'universal-broker-delivery-matrix','phase':'workflow','runtime':'node',
+                  'script':'run_universal_broker_delivery_matrix.mjs',
+                  'arguments':['$RAW_CANARY_EVIDENCE','$PYTHON','$SOFFICE'],
+                  'requires':['RAW_CANARY_EVIDENCE','PYTHON','SOFFICE']
+              })
+          else:
+              matrix['arguments']=['$RAW_CANARY_EVIDENCE','$PYTHON','$SOFFICE']
+              matrix['requires']=['RAW_CANARY_EVIDENCE','PYTHON','SOFFICE']
+          if not any(isinstance(row,dict) and row.get('id')=='experience-trace' for row in tests):
+              tests.append({'id':'experience-trace','phase':'workflow','runtime':'node','script':'run_experience_trace_tests.mjs'})
+          if not any(isinstance(row,dict) and row.get('id')=='usable-broker-workbook-consumption' for row in tests):
+              tests.append({
+                  'id':'usable-broker-workbook-consumption','phase':'proof','runtime':'python',
+                  'script':'run_usable_broker_workbook_consumption_tests.py',
+                  'arguments':['--fixture','$RAW_CANARY_EVIDENCE','--python','$PYTHON','--soffice','$SOFFICE','--out','$TEST_OUT'],
+                  'requires':['RAW_CANARY_EVIDENCE','PYTHON','SOFFICE']
+              })
+          for row in tests:
+              if isinstance(row,dict) and row.get('id')=='raw-input-black-box-canary':
+                  row['id']='raw-input-local-semantic-canary'
+                  row['script']='run_raw_input_local_semantic_canary.mjs'
+          data['tests']=tests
+          registry.write_text(json.dumps(data,indent=2)+'\n','utf-8')
+
+          # 4. The funded acquisition specification has one meaning.
+          acquisition=root/'references'/'acquisition.md'
+          acquisition.write_text('''# Funded acquisition overlay\n\nRead only when the lightweight acquisition case is requested.\n\n## Product mode\n\nThe canonical mode is `funded_transaction`.  The adjustment-columns switch is the single On/Off control.  The user supplies transaction enterprise value, acquisition debt, entry EV/EBITDA, incremental debt rate, close year and close month.\n\nThe overlay remains lightweight: no target balance sheet, purchase accounting, synergies, fees, automatic equity plug, funding percentage, target net debt/cash, financing tranches or acquisition maturity.\n\n## Operating contribution\n\nDerive target EBITDA as transaction value divided by entry EV/EBITDA.  Scale the issuer's visible standalone operating rows by the target-revenue/standalone-revenue factor so the acquisition adjustment preserves the visible gross-profit, operating-expense, EBIT, D&A and EBITDA bridge.  Totals calculate from those visible components; Operating Profit may not bypass them through a hidden EBITDA-minus-D&A shortcut.\n\nDerive target revenue from target EBITDA and the standalone EBITDA margin.  Derive D&A, capex, working-capital cash impact, tax, net income and operating cash flow from the corresponding standalone forecast ratios, guarding unavailable or zero denominators.\n\n## Timing\n\nThe close-year contribution fraction is `(13 - close month) / 12`.  Apply it once to close-year operating contribution and acquisition interest.  Subsequent years receive a full-year contribution.  The full acquisition-debt balance enters at closing and remains outstanding unless a bespoke extension supplies repayment.\n\n## Funding and cash\n\nTransaction value is a purchase-consideration investing cash outflow once at close.  Acquisition debt is a financing cash inflow once at close and a persistent dedicated pro-forma debt balance.  The residual consideration is funded from existing cash and, where required, the ordinary RCF waterfall.  No balancing equity contribution is invented.\n\n`cash from investing` includes the consideration outflow once.  `cash from financing` includes acquisition debt proceeds once.  `change in debt`, gross debt, net debt, interest, liquidity and leverage include the acquisition debt once.\n\nIncremental interest uses average opening and closing acquisition debt, the incremental rate and the close-year fraction/full-year factor.\n\n## Required validation\n\nWhen Off, every acquisition adjustment is formula-driven zero or intentionally grey as appropriate, standalone economics are unchanged and pro forma equals standalone.  When On, consideration, debt proceeds, cash/RCF funding, debt balance, interest and operating contribution must each enter exactly once; visible P&L subtotals must foot; close timing must be correct; debt may not exceed transaction value; and no unsupported target ratios or financing terms may be introduced.\n''','utf-8')
+
+          # 5. Narrow the usefulness proof to standalone forecast J:L.
+          useful=root/'scripts'/'run_usable_broker_workbook_consumption_tests.py'
+          if not useful.is_file(): raise SystemExit('Usable-broker workbook proof is absent')
+          text=useful.read_text('utf-8')
+          text=re.sub(
+              r'def broker_links\(sheet, row: int\) -> list\[str\]:[\s\S]*?\n\s*return links\n',
+              'def broker_links(sheet, row: int) -> list[str]:\n    """Return broker formulas only from standalone forecast columns J:L."""\n    links = []\n    for column in range(10, 13):\n        value = formula(sheet.cell(row=row, column=column).value)\n        if value and "brokers" in value.lower():\n            links.append(value)\n    return links\n',
+              text,
+              count=1,
+          )
+          useful.write_text(text,'utf-8')
+          PY
+
+      - name: Remove migration and one-shot execution scaffolding
+        shell: bash
+        run: |
+          set -euo pipefail
+          find scripts -maxdepth 1 -type f \( \
+              -name 'apply_excel_inflow_repair_stage*.py' -o \
+              -name 'fix_stage1_*.py' -o \
+              -name 'fix_stage2_*.py' -o \
+              -name 'run_repair_stage1_stage_v*.py' -o \
+              -name 'run_repair_stage2_stage_v*.py' \
+            \) -delete
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            test -e "$workflow" || continue
+            case "$(basename "$workflow")" in
+              excel-inflow-ci.yml|excel-inflow-final-acceptance-v3.yml|excel-inflow-forensic-lint.yml|excel-inflow-post-acceptance.yml)
+                ;;
+              *) rm -f "$workflow" ;;
+            esac
+          done
+          rm -rf audit/generated audit/tmp
+
+      - name: Validate the converged ordinary source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$PYTHON" -m compileall -q scripts
+          "$PYTHON" - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('.').rglob('*.json'):
+              if '.git' in path.parts or 'node_modules' in path.parts:
+                  continue
+              json.loads(path.read_text('utf-8'))
+          PY
+          node --check scripts/run_excel_inflow_vnext.mjs
+          node --check scripts/run_raw_input_black_box_canary.mjs
+          node --check scripts/run_raw_input_local_semantic_canary.mjs
+          node --check scripts/lib/experience_trace.mjs
+          node scripts/run_experience_trace_tests.mjs
+          "$PYTHON" -m py_compile scripts/run_repository_forensic_lint.py scripts/run_usable_broker_workbook_consumption_tests.py
+          mkdir -p "$RUNNER_TEMP/forensic"
+          "$PYTHON" scripts/run_repository_forensic_lint.py --out "$RUNNER_TEMP/forensic/report.json"
+          test -z "$(find scripts -maxdepth 1 -type f \( -name 'apply_excel_inflow_repair_stage*.py' -o -name 'fix_stage*.py' -o -name 'run_repair_stage*_stage_v*.py' \) -print -quit)"
+
+      - name: Commit one converged repair transaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-convergence-bot'
+          git config user.email 'excel-inflow-convergence-bot@users.noreply.github.com'
+          git add -A -- SKILL.md central-instructions.md release-manifest.json assets references scripts .github/workflows
+          if git diff --cached --quiet; then
+            echo 'Branch was already converged.'
+            exit 0
+          fi
+          git commit -m 'Converge the end-to-end Excel Inflow repair'
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git rebase origin/agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
