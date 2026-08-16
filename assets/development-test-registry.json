@@ -435,6 +435,27 @@
       "phase": "workflow",
       "runtime": "node",
       "script": "run_experience_trace_tests.mjs"
+    },
+    {
+      "id": "usable-broker-workbook-consumption",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_usable_broker_workbook_consumption_tests.py",
+      "arguments": [
+        "--fixture",
+        "$RAW_CANARY_EVIDENCE",
+        "--python",
+        "$PYTHON",
+        "--soffice",
+        "$SOFFICE",
+        "--out",
+        "$TEST_OUT"
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE"
+      ]
     }
   ]
 }
