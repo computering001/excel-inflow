@@ -1,0 +1,283 @@
+name: Excel Inflow full forensic repair transaction v2
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/trigger-full-repair-v2.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: excel-inflow-full-repair-transaction-v2
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out latest isolated repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Synchronise starting point
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          echo "START_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Install complete runtime and proof toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+          node --version
+          python3 --version
+          soffice --version
+      - name: Run corrected atomic audit, repair and portable proof transaction
+        id: transaction
+        continue-on-error: true
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: python3
+          EXCEL_INFLOW_SOURCE_COMMIT: ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd
+          EXCEL_INFLOW_SOURCE_TREE: 8631c69b2ca960241e78a4719b3d7441d1c727c8
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/full-repair-v2
+          mkdir -p audit/generated/full-repair-v2
+          exec > >(tee audit/generated/full-repair-v2/transaction.log) 2>&1
+
+          echo '=== 1. Detached exact-source baseline and history ==='
+          rm -rf /tmp/excel-inflow-frozen-source-v2
+          git worktree add --detach /tmp/excel-inflow-frozen-source-v2 ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd
+          mkdir -p /tmp/excel-inflow-frozen-source-v2/audit
+          cp audit/product-target-v1.json /tmp/excel-inflow-frozen-source-v2/audit/product-target-v1.json
+          cp scripts/run_deep_product_architecture_audit.py /tmp/excel-inflow-frozen-source-v2/scripts/
+          cp scripts/run_forensic_repository_audit.py /tmp/excel-inflow-frozen-source-v2/scripts/
+          mkdir -p audit/generated/full-repair-v2/frozen-baseline
+          (
+            cd /tmp/excel-inflow-frozen-source-v2
+            python3 scripts/run_deep_product_architecture_audit.py \
+              --out "$GITHUB_WORKSPACE/audit/generated/full-repair-v2/frozen-baseline" \
+              --timeout 900 \
+              --source-commit ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd \
+              --source-tree 8631c69b2ca960241e78a4719b3d7441d1c727c8
+          )
+          python3 scripts/run_history_blame_audit.py \
+            --out audit/generated/full-repair-v2/history \
+            --source-commit ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd \
+            --source-tree 8631c69b2ca960241e78a4719b3d7441d1c727c8
+
+          echo '=== 2. Filing arithmetic, broker native eligibility and event policy ==='
+          mkdir -p audit/generated/full-repair-v2/stage1
+          python3 scripts/run_repair_stage1_stage_v5.py \
+            --out audit/generated/full-repair-v2/stage1
+          python3 scripts/run_repair_stage1_gate.py \
+            --out audit/generated/full-repair-v2/stage1 \
+            --timeout 900
+
+          echo '=== 3. Workflow, source identity, canary honesty and telemetry ==='
+          mkdir -p audit/generated/full-repair-v2/stage2
+          python3 scripts/run_repair_stage2_stage_v3.py \
+            --out audit/generated/full-repair-v2/stage2
+          EXCEL_INFLOW_SOURCE_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+          EXCEL_INFLOW_SOURCE_TREE=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+          python3 scripts/run_repair_stage2_gate.py \
+            --out audit/generated/full-repair-v2/stage2 \
+            --timeout 900
+
+          echo '=== 4. Acquisition map, solver/workbook/proof funded transaction ==='
+          mkdir -p audit/generated/full-repair-v2/acquisition-map
+          python3 scripts/run_acquisition_execution_map.py \
+            --out audit/generated/full-repair-v2/acquisition-map
+          mkdir -p audit/generated/full-repair-v2/acquisition
+          python3 scripts/apply_excel_inflow_acquisition_repair_v2.py \
+            --out audit/generated/full-repair-v2/acquisition
+          python3 scripts/run_acquisition_repair_gate_v2.py \
+            --out audit/generated/full-repair-v2/acquisition \
+            --timeout 900
+
+          echo '=== 5. Register raw-PDF integration tests ==='
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('assets/development-test-registry.json')
+          registry=json.loads(path.read_text())
+          ids={item.get('id') for item in registry.get('tests', [])}
+          additions=[
+              {'id':'raw-filing-arithmetic-integration','phase':'evidence','runtime':'python','script':'run_raw_filing_arithmetic_integration_test.py'},
+              {'id':'raw-broker-native-integration','phase':'evidence','runtime':'python','script':'run_raw_broker_native_integration_test.py'},
+          ]
+          for item in additions:
+              if item['id'] not in ids:
+                  registry['tests'].append(item); ids.add(item['id'])
+          path.write_text(json.dumps(registry,indent=2)+'\n')
+          PY
+
+          echo '=== 6. Raw input to portable workbook cohort ==='
+          mkdir -p audit/generated/full-repair-v2/e2e
+          EXCEL_INFLOW_SOURCE_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+          EXCEL_INFLOW_SOURCE_TREE=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+          python3 scripts/run_portable_end_to_end_cases_v2.py \
+            --out audit/generated/full-repair-v2/e2e \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --timeout 1800
+
+          echo '=== 7. Remove one-off scaffolding and rebuild development closure ==='
+          python3 scripts/cleanup_repair_scaffolding_v2.py
+          mkdir -p audit/generated/full-repair-v2/release
+          python3 audit/tools/run_development_release_compile.py \
+            --out audit/generated/full-repair-v2/release \
+            --timeout 1800
+
+          echo '=== 8. Final post-cleanup source and economic sentinels ==='
+          python3 -m compileall -q scripts audit/tools
+          while IFS= read -r file; do node --check "$file"; done < <(find scripts -type f \( -name '*.mjs' -o -name '*.js' -o -name '*.cjs' \) | sort)
+          node scripts/run_test_registry_interface_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_run_constitution_graph_tests.mjs
+          node scripts/run_workflow_state_pairing_tests.mjs
+          python3 scripts/run_raw_filing_arithmetic_integration_test.py
+          python3 scripts/run_raw_broker_native_integration_test.py
+          node scripts/run_discrete_event_forecast_tests.mjs
+          node scripts/run_funded_acquisition_policy_tests.mjs
+          python3 scripts/verify/run_funded_acquisition_policy_tests.py
+          python3 scripts/run_funded_acquisition_source_tests.py
+
+          echo '=== 9. Final candidate and external promotion-boundary audit ==='
+          mkdir -p audit/generated/full-repair-v2/final
+          python3 audit/tools/run_final_candidate_audit.py \
+            --out audit/generated/full-repair-v2/final \
+            --portable-e2e audit/generated/full-repair-v2/e2e/portable-end-to-end-cases.json \
+            --stage1 audit/generated/full-repair-v2/stage1/stage1-gate.json \
+            --stage2 audit/generated/full-repair-v2/stage2/stage2-gate.json \
+            --acquisition audit/generated/full-repair-v2/acquisition/acquisition-gate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          final=json.loads(Path('audit/generated/full-repair-v2/final/final-candidate-audit.json').read_text())
+          e2e=json.loads(Path('audit/generated/full-repair-v2/e2e/portable-end-to-end-cases.json').read_text())
+          release=json.loads(Path('release-manifest.json').read_text())
+          assert final['candidate_status']=='REPOSITORY_CANDIDATE_READY_FOR_HOST_VALIDATION'
+          assert final['promotion_recommendation']=='PROMOTE_ONLY_AFTER_NAMED_EXTERNAL_CONDITIONS'
+          assert e2e['status']=='PASS'
+          assert e2e['installed_host_semantic_seam_exercised'] is False
+          assert release['packageMode']=='development'
+          assert (release.get('certification') or {}).get('certifiedClosureSha256') is None
+          PY
+
+      - name: Preserve complete failure evidence only
+        if: steps.transaction.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -R audit/generated/full-repair-v2 "/tmp/full-repair-v2-failure-${GITHUB_RUN_ID}"
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git reset --hard origin/agent/excel-inflow-end-to-end-repair
+          target="audit/generated/full-repair-v2-failure-${GITHUB_RUN_ID}"
+          rm -rf "$target"; mkdir -p audit/generated
+          cp -R "/tmp/full-repair-v2-failure-${GITHUB_RUN_ID}" "$target"
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add "$target"
+          git commit -m "Record corrected full repair failure ${GITHUB_RUN_ID}"
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          exit 1
+
+      - name: Commit passing repaired source and evidence
+        if: steps.transaction.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add -A
+          git commit -m "Repair Excel Inflow end to end"
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          echo "SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "SOURCE_TREE=$(git rev-parse HEAD^{tree})" >> "$GITHUB_ENV"
+
+      - name: Bind exact repaired source to evidence
+        if: steps.transaction.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          paths={
+              'final':'audit/generated/full-repair-v2/final/final-candidate-audit.json',
+              'e2e':'audit/generated/full-repair-v2/e2e/portable-end-to-end-cases.json',
+              'release':'release-manifest.json',
+          }
+          attestation={
+              'schema_version':'excel-inflow-repaired-source-attestation/1.0',
+              'source_commit':os.environ['SOURCE_COMMIT'],
+              'source_tree':os.environ['SOURCE_TREE'],
+              'branch':'agent/excel-inflow-end-to-end-repair',
+              'base_commit':'ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd',
+              'evidence':{name:{'path':path,'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()} for name,path in paths.items()},
+              'installed_host_certified':False,
+              'promotion_recommendation':'PROMOTE_ONLY_AFTER_NAMED_EXTERNAL_CONDITIONS',
+          }
+          Path('audit/generated/full-repair-v2/source-attestation.json').write_text(json.dumps(attestation,indent=2,sort_keys=True)+'\n')
+          PY
+          git add audit/generated/full-repair-v2/source-attestation.json
+          git commit -m "Attest repaired source and portable evidence"
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+
+      - name: Create or update draft repair PR
+        if: steps.transaction.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/pr-body.md <<'EOF'
+          ## Repair scope
+
+          This PR repairs Excel Inflow from raw evidence through workbook delivery:
+
+          - source-visible issuer arithmetic before label taxonomy;
+          - quality-first all-house native broker eligibility and one bounded recovery frontier;
+          - complete Tier-1 broker demand with coherent headline-anchor handling;
+          - discrete event/non-recurring forecast closure;
+          - funded acquisition consideration, proceeds, cash, debt, interest and leverage mechanics;
+          - valid workflow states, source/install identity, honest canary boundaries and user-visible telemetry;
+          - raw-PDF, mutation, case, workbook, cache, finance and semantic proof coverage;
+          - consistent development closure with one-off scaffolding removed.
+
+          Full evidence is under `audit/generated/full-repair-v2/`.
+
+          The repository candidate is ready for installed-host validation. It remains deliberately uncertified until the named live Rogo usable-broker, native Excel, visual and wall-clock evidence is supplied.
+          EOF
+          existing=$(gh pr list --repo computering001/excel-inflow --head agent/excel-inflow-end-to-end-repair --json number --jq '.[0].number // empty')
+          if test -n "$existing"; then
+            gh pr edit "$existing" --repo computering001/excel-inflow --base agent/broker-delivery-constitution-v350 --title "Repair Excel Inflow end to end" --body-file /tmp/pr-body.md
+            gh pr ready "$existing" --repo computering001/excel-inflow --undo || true
+          else
+            gh pr create --repo computering001/excel-inflow --draft --base agent/broker-delivery-constitution-v350 --head agent/excel-inflow-end-to-end-repair --title "Repair Excel Inflow end to end" --body-file /tmp/pr-body.md
+          fi
+
+      - name: Upload complete corrected transaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-full-repair-v2-${{ github.run_id }}
+          path: audit/generated/full-repair-v2*
+          retention-days: 30
+          if-no-files-found: warn
