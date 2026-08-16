@@ -1,0 +1,81 @@
+name: Separate local and installed host canaries
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/separate-local-and-host-canaries.yml
+
+permissions:
+  contents: write
+
+jobs:
+  separate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Reclassify simulated semantic canary honestly
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root=Path('.')
+          old=root/'scripts'/'run_raw_input_black_box_canary.mjs'
+          new=root/'scripts'/'run_raw_input_local_semantic_canary.mjs'
+
+          if old.is_file() and not new.is_file():
+              old.rename(new)
+          if not new.is_file():
+              raise SystemExit('Neither legacy nor local semantic canary exists')
+
+          body=new.read_text('utf-8')
+          body=body.replace(
+              '// Simulate the installed model-host semantic response from the raw PDF.',
+              '// Author an explicit simulated semantic response for this local downstream component canary.\n    // This is not installed-host, model-host or production-route evidence.',
+          )
+          body=body.replace(
+              'preauthored_broker_crosswalk: false,',
+              'preauthored_broker_crosswalk: true,\n  semantic_response_boundary: "simulated_local_fixture",\n  installed_host_semantics_exercised: false,',
+          )
+          body=body.replace(
+              'schema_version: "raw-input-black-box-canary/1.0",',
+              'schema_version: "raw-input-local-semantic-canary/2.0",',
+          )
+          new.write_text(body,'utf-8')
+
+          wrapper='''#!/usr/bin/env node\n\n/**\n * Compatibility entrypoint for one transition release.\n *\n * This wrapper authors no semantic response and makes no black-box or\n * installed-host claim.  The invoked target is the explicitly named local\n * simulated-semantic component canary.\n */\nimport { spawnSync } from "node:child_process";\nimport path from "node:path";\nimport process from "node:process";\nimport { fileURLToPath } from "node:url";\n\nconst here = path.dirname(fileURLToPath(import.meta.url));\nconst target = path.join(here, "run_raw_input_local_semantic_canary.mjs");\nconsole.error("Deprecated compatibility entrypoint: running the local simulated-semantic canary; this is not installed-host evidence.");\nconst completed = spawnSync(process.execPath, [target, ...process.argv.slice(2)], {\n  cwd: process.cwd(),\n  env: process.env,\n  stdio: "inherit",\n});\nif (completed.error) throw completed.error;\nprocess.exitCode = completed.status ?? 1;\n'''
+          old.write_text(wrapper,'utf-8')
+
+          suffixes={'.mjs','.js','.cjs','.py','.json','.md'}
+          for path in root.rglob('*'):
+              if not path.is_file() or path.suffix.lower() not in suffixes:
+                  continue
+              if '.git' in path.parts or 'audit' in path.parts or path in {old,new}:
+                  continue
+              text=path.read_text('utf-8',errors='ignore')
+              if 'run_raw_input_black_box_canary.mjs' in text:
+                  path.write_text(
+                      text.replace('run_raw_input_black_box_canary.mjs','run_raw_input_local_semantic_canary.mjs'),
+                      'utf-8',
+                  )
+
+          registry=root/'assets'/'development-test-registry.json'
+          if registry.is_file():
+              text=registry.read_text('utf-8')
+              text=text.replace('"id": "raw-input-black-box-canary"','"id": "raw-input-local-semantic-canary"')
+              registry.write_text(text,'utf-8')
+          PY
+          node --check scripts/run_raw_input_black_box_canary.mjs
+          node --check scripts/run_raw_input_local_semantic_canary.mjs
+          rm -f .github/workflows/separate-local-and-host-canaries.yml
+          git config user.name 'excel-inflow-acceptance-bot'
+          git config user.email 'excel-inflow-acceptance-bot@users.noreply.github.com'
+          git add -A -- scripts assets references SKILL.md central-instructions.md release-manifest.json .github/workflows/separate-local-and-host-canaries.yml
+          git commit -m 'Separate local simulated semantics from installed-host proof'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
