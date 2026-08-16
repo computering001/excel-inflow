@@ -1,0 +1,50 @@
+name: Final repair environment preflight
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/trigger-final-environment-preflight.txt
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Correct same-step source identity environment and retrigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow=Path('.github/workflows/full-audit-repair-orchestrator-v4.yml')
+          text=workflow.read_text()
+          text=text.replace(
+              'select(.databaseId != env.GITHUB_RUN_ID|tonumber)',
+              'select(.databaseId != (env.GITHUB_RUN_ID | tonumber))',
+          )
+          old='''          echo "REPAIRED_SOURCE_COMMIT=$repaired_source_commit" >> "$GITHUB_ENV"\n          echo "REPAIRED_SOURCE_TREE=$repaired_source_tree" >> "$GITHUB_ENV"'''
+          new='''          export REPAIRED_SOURCE_COMMIT="$repaired_source_commit"\n          export REPAIRED_SOURCE_TREE="$repaired_source_tree"\n          echo "REPAIRED_SOURCE_COMMIT=$repaired_source_commit" >> "$GITHUB_ENV"\n          echo "REPAIRED_SOURCE_TREE=$repaired_source_tree" >> "$GITHUB_ENV"'''
+          if old in text:
+              text=text.replace(old,new,1)
+          elif 'export REPAIRED_SOURCE_COMMIT=' not in text:
+              raise SystemExit('Repaired-source environment block was not found.')
+          workflow.write_text(text)
+          marker=Path('audit/trigger-full-repair-v4.txt')
+          marker.write_text(marker.read_text().rstrip()+f'\nEnvironment preflight run {__import__("os").environ["GITHUB_RUN_ID"]}.\n')
+          PY
+          rm -f .github/workflows/patch-final-orchestrator-v3.yml
+          rm -f audit/trigger-final-environment-preflight.txt
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add -A
+          git commit -m "Correct final source identity environment"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
