@@ -1,0 +1,123 @@
+name: Build portable raw-input canary custody
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  raw-canary:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install complete canary runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+          mkdir -p /tmp/excel-inflow-raw-canary
+
+      - name: Discover a portable clean fixture by executable proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python_bin="$(command -v python3)"
+          soffice_bin="$(command -v soffice)"
+          mapfile -t candidates < <(find fixtures assets scripts -type f -name '*.json' \
+            ! -path '*/node_modules/*' ! -path '*/audit/*' -size +100c | sort)
+          candidates=(fixtures/portable/representative-model-case.json "${candidates[@]}")
+          : > /tmp/excel-inflow-raw-canary/selection.log
+          selected=''
+          for candidate in "${candidates[@]}"; do
+            test -f "$candidate" || continue
+            echo ">>> $candidate" >> /tmp/excel-inflow-raw-canary/selection.log
+            if timeout 1800 node scripts/run_raw_input_black_box_canary.mjs \
+              "$candidate" "$python_bin" "$soffice_bin" --broker-state explicit_skip \
+              > /tmp/excel-inflow-raw-canary/skip.json \
+              2>> /tmp/excel-inflow-raw-canary/selection.log \
+              && jq -e '.status == "PASS" and .broker_state == "explicit_skip"' /tmp/excel-inflow-raw-canary/skip.json >/dev/null; then
+              if timeout 1800 node scripts/run_raw_input_black_box_canary.mjs \
+                "$candidate" "$python_bin" "$soffice_bin" --broker-state usable \
+                > /tmp/excel-inflow-raw-canary/usable.json \
+                2>> /tmp/excel-inflow-raw-canary/selection.log \
+                && jq -e '.status == "PASS" and .broker_state == "usable" and .runtime_broker_selected_value_count > 0' /tmp/excel-inflow-raw-canary/usable.json >/dev/null; then
+                selected="$candidate"
+                break
+              fi
+            fi
+          done
+          test -n "$selected"
+          echo "$selected" > /tmp/excel-inflow-raw-canary/selected.txt
+          cp "$selected" fixtures/portable/raw-canary-evidence.json
+
+      - name: Run universal broker delivery matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            fixtures/portable/raw-canary-evidence.json \
+            "$(command -v python3)" \
+            "$(command -v soffice)" \
+            | tee /tmp/excel-inflow-raw-canary/universal-matrix.json
+          jq -e '.status == "PASS"' /tmp/excel-inflow-raw-canary/universal-matrix.json
+
+      - name: Prove useful broker workbook consumption
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.runtime_broker_selected_value_count > 0' /tmp/excel-inflow-raw-canary/usable.json
+          jq -e '.selected_broker_case != "Forecast Waterfall"' /tmp/excel-inflow-raw-canary/usable.json
+          jq -e '.branch_receipts.broker_authority_selected == true' /tmp/excel-inflow-raw-canary/usable.json
+          jq -e '.branch_receipts.workbook_built == true and .branch_receipts.delivery_attested == true' /tmp/excel-inflow-raw-canary/usable.json
+          test -s "$(jq -r '.workbook' /tmp/excel-inflow-raw-canary/usable.json)"
+
+      - name: Prove failed optional close equals no-broker economics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_raw_input_black_box_canary.mjs \
+            fixtures/portable/raw-canary-evidence.json \
+            "$(command -v python3)" "$(command -v soffice)" \
+            --broker-state failed_optional_close \
+            > /tmp/excel-inflow-raw-canary/failed.json
+          jq -e '.status == "PASS" and .runtime_broker_selected_value_count == 0' /tmp/excel-inflow-raw-canary/failed.json
+          test "$(jq -r '.economic_signature_sha256' /tmp/excel-inflow-raw-canary/skip.json)" = \
+               "$(jq -r '.economic_signature_sha256' /tmp/excel-inflow-raw-canary/failed.json)"
+
+      - name: Persist portable raw-canary custody and proof
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          rm -rf audit/raw-canary-proof
+          mkdir -p audit/raw-canary-proof
+          cp /tmp/excel-inflow-raw-canary/{selected.txt,skip.json,usable.json,failed.json,universal-matrix.json,selection.log} audit/raw-canary-proof/
+          git config user.name 'excel-inflow-canary-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add fixtures/portable/raw-canary-evidence.json audit/raw-canary-proof
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Add portable raw-input broker delivery proof [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload raw canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-portable-raw-canary
+          path: /tmp/excel-inflow-raw-canary
+          retention-days: 14
+          if-no-files-found: warn
