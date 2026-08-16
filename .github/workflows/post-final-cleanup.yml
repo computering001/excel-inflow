@@ -1,0 +1,155 @@
+name: Clean and reverify finalized Excel Inflow source
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Wait for finalized verification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init /tmp/excel-inflow-cleanup
+          cd /tmp/excel-inflow-cleanup
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          found=''
+          for attempt in $(seq 1 240); do
+            git fetch --depth=1 origin agent/excel-inflow-end-to-end-repair --quiet
+            if git show FETCH_HEAD:audit/final/verification.json >/tmp/final-verification.json 2>/dev/null \
+              && jq -e '.status == "PASS_DEVELOPMENT_CANDIDATE"' /tmp/final-verification.json >/dev/null; then
+              found=true
+              break
+            fi
+            sleep 15
+          done
+          test "$found" = true
+
+      - name: Check out latest finalized repair
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+
+      - name: Remove every temporary orchestration artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -maxdepth 1 -type f -name '.*trigger*' -print -delete
+          rm -f .github/workflows/repair-workspace-export.yml
+          rm -f \
+            scripts/forensic_repair.py \
+            scripts/repair_acquisition_integration.py \
+            scripts/repair_acquisition_plan_integration.py \
+            scripts/repair_telemetry_integration.py \
+            scripts/repair_broker_headline_integration.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          removed={
+            'scripts/forensic_repair.py','scripts/repair_acquisition_integration.py',
+            'scripts/repair_acquisition_plan_integration.py','scripts/repair_telemetry_integration.py',
+            'scripts/repair_broker_headline_integration.py',
+          }
+          for relative,key in [('release-manifest.json','closure'),('assets/attachment-evidence-runtime-members.json','members')]:
+            path=Path(relative); data=json.loads(path.read_text('utf8'))
+            if key=='closure':
+              scripts=data.setdefault('closure',{}).setdefault('scripts',[])
+              data['closure']['scripts']=[item for item in scripts if item not in removed]
+            else:data['members']=[item for item in data.get('members',[]) if item not in removed]
+            path.write_text(json.dumps(data,indent=2)+'\n')
+          PY
+          git diff --check
+
+      - name: Recompile development closure after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/compile_skill_release.mjs
+          jq -e '.packageMode == "development" and .skillVersion == "3.6.0" and .certification.certifiedClosureSha256 == null' release-manifest.json
+
+      - name: Re-run complete portable development gate after cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/post-cleanup-gate
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases fixtures/portable/cases \
+            --representative fixtures/portable/representative-model-case.json \
+            --fixed-point-cases-manifest fixtures/portable/fixed-point-cases.json \
+            --raw-canary-evidence fixtures/portable/raw-canary-evidence.json \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --concurrency 1 \
+            --timeout-ms 1800000 \
+            --out audit/post-cleanup-gate
+          jq -e '.status == "PASS" and .counts.FAIL == 0 and .counts.BLOCKED == 0' audit/post-cleanup-gate/development-gate-report.json
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            fixtures/portable/raw-canary-evidence.json "$(command -v python3)" "$(command -v soffice)" \
+            > audit/post-cleanup-gate/universal-matrix.json
+          jq -e '.status == "PASS"' audit/post-cleanup-gate/universal-matrix.json
+          node scripts/run_acquisition_solver_case_tests.mjs fixtures/portable/representative-model-case.json \
+            > audit/post-cleanup-gate/acquisition-solver.json
+          jq -e '.status == "PASS"' audit/post-cleanup-gate/acquisition-solver.json
+
+      - name: Extend final receipt with post-cleanup proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,datetime
+          path=Path('audit/final/verification.json'); value=json.loads(path.read_text('utf8'))
+          gate=Path('audit/post-cleanup-gate/development-gate-report.json')
+          matrix=Path('audit/post-cleanup-gate/universal-matrix.json')
+          solver=Path('audit/post-cleanup-gate/acquisition-solver.json')
+          value['post_verification_cleanup']={
+            'status':'PASS','recorded_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'temporary_triggers_removed':True,'temporary_repair_scripts_removed':True,
+            'development_gate_sha256':hashlib.sha256(gate.read_bytes()).hexdigest(),
+            'universal_matrix_sha256':hashlib.sha256(matrix.read_bytes()).hexdigest(),
+            'acquisition_solver_sha256':hashlib.sha256(solver.read_bytes()).hexdigest(),
+          }
+          path.write_text(json.dumps(value,indent=2)+'\n')
+          PY
+          jq -e '.post_verification_cleanup.status == "PASS" and .post_verification_cleanup.temporary_triggers_removed == true' audit/final/verification.json
+
+      - name: Commit cleaned verified source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-cleanup-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Clean and reverify Excel Inflow v3.6.0 candidate [skip ci]'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+
+      - name: Upload post-cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-post-cleanup-proof
+          path: |
+            audit/final
+            audit/post-cleanup-gate
+          retention-days: 30
+          if-no-files-found: warn
