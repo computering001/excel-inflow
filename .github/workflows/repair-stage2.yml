@@ -1,0 +1,111 @@
+name: Excel Inflow repair stage 2
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/repair-stage1/stage1-gate.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excel-inflow-repair-stage2
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Require passing stage one
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/repair-stage1/stage1-gate.json').read_text())
+          assert report['status'] == 'PASS'
+          PY
+
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+
+      - name: Apply stage-two repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/repair-stage2
+          mkdir -p audit/generated/repair-stage2
+          python3 scripts/apply_excel_inflow_repair_stage2.py --out audit/generated/repair-stage2
+
+      - name: Run independent stage-two gate
+        id: gate
+        continue-on-error: true
+        shell: bash
+        env:
+          EXCEL_INFLOW_SOURCE_COMMIT: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          EXCEL_INFLOW_SOURCE_TREE: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        run: |
+          set -o pipefail
+          python3 scripts/run_repair_stage2_gate.py \
+            --out audit/generated/repair-stage2 \
+            --timeout 900 \
+            2>&1 | tee audit/generated/repair-stage2/workflow.log
+
+      - name: Record failed stage-two diagnostics
+        if: steps.gate.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -R audit/generated/repair-stage2 /tmp/repair-stage2-failure
+          git reset --hard HEAD
+          rm -rf audit/generated/repair-stage2-failure
+          mkdir -p audit/generated
+          cp -R /tmp/repair-stage2-failure audit/generated/repair-stage2-failure
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/repair-stage2-failure
+          git commit -m "Record stage-two repair failure"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          exit 1
+
+      - name: Commit passing stage-two repair
+        if: steps.gate.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/repair-stage2/stage2-gate.json').read_text())
+          assert report['status'] == 'PASS'
+          PY
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add scripts assets references SKILL.md central-instructions.md audit/generated/repair-stage2
+          git commit -m "Repair workflow identity canary and telemetry contracts"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+
+      - name: Upload stage-two evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-repair-stage2
+          path: audit/generated/repair-stage2*
+          retention-days: 14
+          if-no-files-found: warn
