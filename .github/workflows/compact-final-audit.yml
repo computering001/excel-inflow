@@ -1,0 +1,144 @@
+name: Compact final Excel Inflow audit evidence
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  compact:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Wait for post-cleanup verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init /tmp/excel-inflow-compact-wait
+          cd /tmp/excel-inflow-compact-wait
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          found=''
+          for attempt in $(seq 1 240); do
+            git fetch --depth=1 origin agent/excel-inflow-end-to-end-repair --quiet
+            if git show FETCH_HEAD:audit/final/verification.json >/tmp/compact-verification.json 2>/dev/null \
+              && jq -e '.status == "PASS_DEVELOPMENT_CANDIDATE" and .post_verification_cleanup.status == "PASS"' /tmp/compact-verification.json >/dev/null; then
+              found=true
+              break
+            fi
+            sleep 15
+          done
+          test "$found" = true
+
+      - name: Check out cleaned repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+
+      - name: Preserve only durable final evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/excel-inflow-final-evidence audit/final
+          for mapping in \
+            "audit/final-gate/final-universal-matrix.json:universal-broker-matrix.json" \
+            "audit/final-gate/final-acquisition-solver.json:acquisition-solver-proof.json" \
+            "audit/final-gate/acquisition-workbook/acquisition-workbook-proof.json:acquisition-workbook-proof.json" \
+            "audit/final-static/forensic-audit.json:forensic-audit.json" \
+            "audit/final-static/forensic-audit.md:forensic-audit.md" \
+            "audit/post-cleanup-gate/development-gate-report.json:post-cleanup-development-gate.json"; do
+            source=${mapping%%:*}; target=${mapping#*:}
+            if test -s "$source"; then cp "$source" "/tmp/excel-inflow-final-evidence/$target"; fi
+          done
+          find audit -mindepth 1 -maxdepth 1 ! -name final -exec rm -rf {} +
+          cp -a /tmp/excel-inflow-final-evidence/. audit/final/
+          find . -maxdepth 1 -type f -name '.*trigger*' -delete
+          git diff --check
+
+      - name: Run complete gate against compacted tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/excel-inflow-compacted-gate
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases fixtures/portable/cases \
+            --representative fixtures/portable/representative-model-case.json \
+            --fixed-point-cases-manifest fixtures/portable/fixed-point-cases.json \
+            --raw-canary-evidence fixtures/portable/raw-canary-evidence.json \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --concurrency 1 \
+            --timeout-ms 1800000 \
+            --out /tmp/excel-inflow-compacted-gate
+          jq -e '.status == "PASS" and .counts.FAIL == 0 and .counts.BLOCKED == 0' /tmp/excel-inflow-compacted-gate/development-gate-report.json
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            fixtures/portable/raw-canary-evidence.json "$(command -v python3)" "$(command -v soffice)" \
+            > /tmp/excel-inflow-compacted-gate/universal-matrix.json
+          jq -e '.status == "PASS"' /tmp/excel-inflow-compacted-gate/universal-matrix.json
+          node scripts/run_acquisition_solver_case_tests.mjs fixtures/portable/representative-model-case.json \
+            > /tmp/excel-inflow-compacted-gate/acquisition-solver.json
+          jq -e '.status == "PASS"' /tmp/excel-inflow-compacted-gate/acquisition-solver.json
+
+      - name: Recompile closure and extend final receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/compile_skill_release.mjs
+          jq -e '.packageMode == "development" and .skillVersion == "3.6.0" and .certification.certifiedClosureSha256 == null' release-manifest.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import datetime,hashlib,json,shutil
+          verification=Path('audit/final/verification.json'); value=json.loads(verification.read_text('utf8'))
+          gate=Path('/tmp/excel-inflow-compacted-gate/development-gate-report.json')
+          matrix=Path('/tmp/excel-inflow-compacted-gate/universal-matrix.json')
+          solver=Path('/tmp/excel-inflow-compacted-gate/acquisition-solver.json')
+          value['final_tree_compaction']={
+            'status':'PASS','recorded_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'intermediate_audit_directories_removed':True,
+            'development_gate_sha256':hashlib.sha256(gate.read_bytes()).hexdigest(),
+            'universal_matrix_sha256':hashlib.sha256(matrix.read_bytes()).hexdigest(),
+            'acquisition_solver_sha256':hashlib.sha256(solver.read_bytes()).hexdigest(),
+          }
+          value['current_closure_sha256']=json.loads(Path('release-manifest.json').read_text('utf8'))['certification']['currentClosureSha256']
+          verification.write_text(json.dumps(value,indent=2)+'\n')
+          shutil.copy2(gate,'audit/final/development-gate-report.json')
+          shutil.copy2(matrix,'audit/final/universal-broker-matrix.json')
+          shutil.copy2(solver,'audit/final/acquisition-solver-proof.json')
+          PY
+          jq -e '.final_tree_compaction.status == "PASS" and .final_tree_compaction.intermediate_audit_directories_removed == true' audit/final/verification.json
+
+      - name: Commit compacted verified candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-audit-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Compact final Excel Inflow audit evidence [skip ci]'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+
+      - name: Upload compacted final evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-compacted-final-evidence
+          path: |
+            audit/final
+            /tmp/excel-inflow-compacted-gate
+          retention-days: 30
+          if-no-files-found: warn
