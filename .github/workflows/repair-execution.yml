@@ -1,0 +1,63 @@
+name: Excel Inflow repair execution
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Record toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          python3 --version
+          git rev-parse HEAD
+          git status --short
+
+      - name: Validate repository JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          failures=[]
+          for path in sorted(Path('.').rglob('*.json')):
+              try:
+                  json.loads(path.read_text('utf-8'))
+              except Exception as exc:
+                  failures.append(f'{path}: {exc}')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print('json files valid')
+          PY
+
+      - name: Package exact source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git -czf /tmp/excel-inflow-repair-source.tar.gz .
+          sha256sum /tmp/excel-inflow-repair-source.tar.gz > /tmp/excel-inflow-repair-source.sha256
+
+      - name: Upload repair workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-repair-source
+          path: |
+            /tmp/excel-inflow-repair-source.tar.gz
+            /tmp/excel-inflow-repair-source.sha256
+          retention-days: 1
+          if-no-files-found: error
