@@ -1,0 +1,36 @@
+name: Repair workspace export
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact branch source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git -czf /tmp/excel-inflow-repair-source.tar.gz .
+          sha256sum /tmp/excel-inflow-repair-source.tar.gz > /tmp/excel-inflow-repair-source.sha256
+
+      - name: Upload source workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-repair-source
+          path: |
+            /tmp/excel-inflow-repair-source.tar.gz
+            /tmp/excel-inflow-repair-source.sha256
+          retention-days: 1
+          if-no-files-found: error
