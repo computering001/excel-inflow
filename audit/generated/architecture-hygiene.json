@@ -1,0 +1,284 @@
+{
+  "checks": 191,
+  "finding_count": 48,
+  "findings": [
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": "assets/broker-extraction-bundle.schema.json"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_evidence_run_tests.mjs"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_case_compiler_equivalence.mjs"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": "scripts/extract_broker_evidence.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_decision_round_tests.mjs"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": "scripts/run_final_clean_checkout_gate.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_final_clean_checkout_gate.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/home/oai/",
+      "path": "scripts/run_final_clean_checkout_gate.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/mnt/data/",
+      "path": "scripts/run_final_clean_checkout_gate.py"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": "scripts/run_source_arithmetic_and_architecture_hygiene_tests.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_source_arithmetic_and_architecture_hygiene_tests.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/home/oai/",
+      "path": "scripts/run_source_arithmetic_and_architecture_hygiene_tests.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/mnt/data/",
+      "path": "scripts/run_source_arithmetic_and_architecture_hygiene_tests.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_stage4_checkpoint_tests.mjs"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": "scripts/run_repository_forensic_lint.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_repository_forensic_lint.py"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_degraded_broker_delivery_tests.mjs"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_user_flow_tests.mjs"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": "scripts/run_filings_pipeline_tests.mjs"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": ".github/workflows/excel-inflow-final-acceptance-v2.yml"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": ".github/workflows/fix-acceptance-self-reference.yml"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": ".github/workflows/excel-inflow-finalize-repair-source.yml"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": ".github/workflows/excel-inflow-finalize-repair-source.yml"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": ".github/workflows/excel-inflow-materialize-and-clean.yml"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": ".github/workflows/excel-inflow-materialize-and-clean.yml"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": ".github/workflows/excel-inflow-final-acceptance-v3.yml"
+    },
+    {
+      "code": "PRIVATE-PATH",
+      "message": "/Users/",
+      "path": ".github/workflows/excel-inflow-final-acceptance-v3.yml"
+    },
+    {
+      "code": "BROKER-OLD-POLICY",
+      "message": "latest_supplied_house_then_zero_authority",
+      "path": ".github/workflows/excel-inflow-ultimate-finalize.yml"
+    },
+    {
+      "code": "REGISTRY-CUSTODY",
+      "message": "dcs-lossless-evidence: placeholders=['TEST_OUT'], requires=[]",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "REGISTRY-CUSTODY",
+      "message": "dcs-controller-fixed-point: placeholders=['TEST_OUT'], requires=[]",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "REGISTRY-CUSTODY",
+      "message": "broker-public-layout-corpus: placeholders=['BROKER_CORPUS', 'TEST_OUT'], requires=['BROKER_CORPUS']",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "REGISTRY-CUSTODY",
+      "message": "broker-real-pack-completion: placeholders=['BROKER_REAL_PACK_MANIFEST', 'TEST_OUT'], requires=['BROKER_REAL_PACK_MANIFEST']",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "REGISTRY-UNIVERSAL-MATRIX-CLI",
+      "message": "[\"$DEGRADED_DELIVERY_REPORT\", \"$USABLE_BROKER_WORKBOOK\"]",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "REGISTRY-CUSTODY",
+      "message": "usable-broker-workbook-consumption: placeholders=['PYTHON', 'RAW_CANARY_EVIDENCE', 'SOFFICE', 'TEST_OUT'], requires=['PYTHON', 'RAW_CANARY_EVIDENCE', 'SOFFICE']",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "REGISTRY-CUSTODY",
+      "message": "funded-acquisition-visible-bridge: placeholders=['TEST_OUT'], requires=[]",
+      "path": "assets/development-test-registry.json"
+    },
+    {
+      "code": "DECLARED-PATH-MISSING",
+      "message": "scripts/debt-model-economics.mjs and its bundled pure-JavaScript libraries",
+      "path": "release-manifest.json"
+    },
+    {
+      "code": "DECLARED-PATH-MISSING",
+      "message": "scripts/emit (Python renderer; needs openpyxl, native in deployment host, NOT vendored) and assets/plan.schema.json, which it refuses to render without",
+      "path": "release-manifest.json"
+    },
+    {
+      "code": "DECLARED-PATH-MISSING",
+      "message": "scripts/render (Python image-check stage; needs PyMuPDF, Pillow, numpy \u2014 all native, none vendored \u2014 and soffice on the host)",
+      "path": "release-manifest.json"
+    },
+    {
+      "code": "DECLARED-PATH-MISSING",
+      "message": "scripts/validate_structure.mjs, validate_style_tokens.mjs, validate_cache_parity.mjs, validate_source_parity.mjs",
+      "path": "release-manifest.json"
+    },
+    {
+      "code": "DECLARED-PATH-MISSING",
+      "message": "scripts/verify (Python validator port; stdlib only, by policy and by check)",
+      "path": "release-manifest.json"
+    },
+    {
+      "code": "ROLE-ORPHAN-ACQUISITION",
+      "message": "acquisitions_net_of_cash is not owned by forecast behavior/authority.",
+      "path": "assets/statement-semantic-taxonomy.v1.json"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "source_identity",
+      "path": "scripts/lib/run_carrier.mjs"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "repository",
+      "path": "scripts/lib/run_carrier.mjs"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "source_commit",
+      "path": "scripts/lib/run_carrier.mjs"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "git_tree",
+      "path": "scripts/lib/run_carrier.mjs"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "closure_sha256",
+      "path": "scripts/lib/run_carrier.mjs"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "package_mode",
+      "path": "scripts/lib/run_carrier.mjs"
+    },
+    {
+      "code": "CARRIER-IDENTITY",
+      "message": "installation_identity",
+      "path": "scripts/lib/run_carrier.mjs"
+    }
+  ],
+  "new_broker_policy_paths": [
+    ".github/workflows/excel-inflow-finalize-repair-source.yml",
+    ".github/workflows/excel-inflow-ultimate-finalize.yml",
+    "scripts/run_final_candidate_audit.py",
+    "scripts/run_final_clean_checkout_gate.py",
+    "scripts/run_raw_broker_native_integration_test.py",
+    "scripts/run_repository_forensic_lint.py",
+    "scripts/run_source_arithmetic_and_architecture_hygiene_tests.py"
+  ],
+  "schema_version": "excel-inflow-architecture-hygiene/1.0",
+  "status": "FAIL",
+  "warning_count": 4,
+  "warnings": [
+    {
+      "code": "ROLE-REVIEW",
+      "message": "acquisitions_net_of_cash",
+      "path": "assets/statement-semantic-taxonomy.v1.json"
+    },
+    {
+      "code": "ROLE-REVIEW",
+      "message": "cash_flow_tax_addback",
+      "path": "assets/statement-semantic-taxonomy.v1.json"
+    },
+    {
+      "code": "ROLE-REVIEW",
+      "message": "fx_effect_on_cash",
+      "path": "assets/statement-semantic-taxonomy.v1.json"
+    },
+    {
+      "code": "LARGE-MODULES",
+      "items": [
+        {
+          "bytes": 517769,
+          "path": "scripts/build_dynamic_model.mjs"
+        }
+      ]
+    }
+  ]
+}
