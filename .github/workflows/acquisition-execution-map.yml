@@ -1,0 +1,52 @@
+name: Excel Inflow acquisition execution map
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/repair-stage2/stage2-gate.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Require passing stage two
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/repair-stage2/stage2-gate.json').read_text())
+          assert report['status'] == 'PASS'
+          PY
+      - name: Map acquisition execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/acquisition-execution-map
+          python3 scripts/run_acquisition_execution_map.py --out audit/generated/acquisition-execution-map
+          test -s audit/generated/acquisition-execution-map/acquisition-execution-map.json
+      - name: Commit acquisition map
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "excel-inflow-audit-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/acquisition-execution-map
+          git commit -m "Record acquisition execution map"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+      - uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-acquisition-execution-map
+          path: audit/generated/acquisition-execution-map
+          retention-days: 14
