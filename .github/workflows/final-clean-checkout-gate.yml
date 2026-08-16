@@ -1,0 +1,96 @@
+name: Excel Inflow final clean-checkout gate
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths-ignore:
+      - audit/generated/final-clean-checkout/**
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-final-clean-checkout-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  final-clean-checkout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repair candidate with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install deterministic workbook toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet openpyxl pymupdf jsonschema pillow
+          node --version
+          python3 --version
+          soffice --version
+
+      - name: Create clean archived checkout
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          clean_root="$RUNNER_TEMP/excel-inflow-clean-checkout"
+          rm -rf "$clean_root"
+          mkdir -p "$clean_root"
+          git archive --format=tar HEAD | tar -xf - -C "$clean_root"
+          printf 'root=%s\n' "$clean_root" >> "$GITHUB_OUTPUT"
+          test -f "$clean_root/SKILL.md"
+          test -f "$clean_root/audit/product-target-v1.json"
+          if find "$clean_root" -name .git -print -quit | grep -q .; then
+            echo 'Archived checkout unexpectedly contains .git metadata.' >&2
+            exit 1
+          fi
+
+      - name: Run final internal source, case and workbook gate
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_root="$RUNNER_TEMP/final-clean-checkout-report"
+          python3 "${{ steps.archive.outputs.root }}/scripts/run_final_clean_checkout_gate.py" \
+            --root "${{ steps.archive.outputs.root }}" \
+            --out "$report_root" \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --timeout-seconds 1800
+
+      - name: Upload complete gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-final-clean-checkout-${{ github.sha }}
+          path: ${{ runner.temp }}/final-clean-checkout-report
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Publish hash-bound gate receipt on success
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="audit/generated/final-clean-checkout"
+          rm -rf "$destination"
+          mkdir -p "$destination"
+          cp "$RUNNER_TEMP/final-clean-checkout-report/final-clean-checkout-gate.json" "$destination/"
+          cp "$RUNNER_TEMP/final-clean-checkout-report/final-clean-checkout-gate.md" "$destination/"
+          sha256sum "$destination"/* > "$destination/SHA256SUMS"
+          git config user.name excel-inflow-repair-bot
+          git config user.email 312638569+computering001@users.noreply.github.com
+          git add "$destination"
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Record passing final clean-checkout repair gate"
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
