@@ -1,0 +1,90 @@
+name: Apply funded acquisition integration
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  acquisition-integration:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install portable model runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+          echo "SOFFICE=$(command -v soffice)" >> "$GITHUB_ENV"
+
+      - name: Integrate acquisition authority into case, solve and plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/repair_acquisition_integration.py
+          git diff --check
+
+      - name: Validate source and run acquisition mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/repair_acquisition_integration.py
+          node --check scripts/lib/funded_acquisition_runtime.mjs
+          node --check scripts/lib/case_compiler.mjs
+          node --check scripts/lib/forecast_candidate_compiler.mjs
+          node scripts/run_acquisition_funding_integration_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_equation_graph_tests.mjs
+          node scripts/run_instrument_period_state_tests.mjs
+          node scripts/run_opening_debt_reconciliation_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+
+      - name: Re-run self-contained development registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit/acquisition-post-repair
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          python3 /tmp/forensic_audit.py --out audit/acquisition-post-repair
+          jq '.summary' audit/acquisition-post-repair/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/acquisition-post-repair/forensic-audit.json)" -eq 0
+          test "$(jq '[.syntax[] | select(.status != "PASS")] | length' audit/acquisition-post-repair/forensic-audit.json)" -eq 0
+          test "$(jq '[.json_validation[] | select(.status != "PASS")] | length' audit/acquisition-post-repair/forensic-audit.json)" -eq 0
+
+      - name: Persist acquisition integration
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-acquisition-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Integrate funded acquisition transaction end to end [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload acquisition proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-acquisition-integration
+          path: |
+            /tmp/acquisition-integration-repair.json
+            audit/acquisition-post-repair
+          retention-days: 14
+          if-no-files-found: warn
