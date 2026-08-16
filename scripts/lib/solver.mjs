@@ -83,6 +83,14 @@ function iterationResidual(previous, current) {
 
 const NORMALISED_STATEMENT_CACHE = new WeakMap();
 
+function statementSemanticRoles(row) {
+  return [
+    row?.semantic_role,
+    row?.acquisition_driver_role,
+    ...(Array.isArray(row?.role_aliases) ? row.role_aliases : []),
+  ].filter(Boolean);
+}
+
 function normalisedStatementDefinitions(modelCase) {
   if (!NORMALISED_STATEMENT_CACHE.has(modelCase)) {
     NORMALISED_STATEMENT_CACHE.set(modelCase, [
@@ -375,7 +383,9 @@ function otherNonOperatingIncome(modelCase, periodIndex) {
     visited.add(rowId);
     const row = rowsById.get(rowId);
     if (!row) return 0;
-    if (SOLVED_PRE_TAX_ROLES.has(row.semantic_role)) return 0;
+    if (statementSemanticRoles(row).some((role) => SOLVED_PRE_TAX_ROLES.has(role))) {
+      return 0;
+    }
     // Expand a subtotal by the rule that governs its FORECAST columns, not its
     // historical one. A presentation subtotal can restate the operating line —
     // Kerry's "Operating profit" is `EBIT + non-trading items` in the forecast
@@ -609,10 +619,7 @@ function declaredStatementPeriod(
   );
   const bySemanticRole = new Map();
   for (const definition of definitions) {
-    for (const role of [
-      definition.semantic_role,
-      definition.acquisition_driver_role,
-    ]) {
+    for (const role of statementSemanticRoles(definition)) {
       if (role && !bySemanticRole.has(role)) {
         bySemanticRole.set(role, definition.row_id);
       }
@@ -620,8 +627,9 @@ function declaredStatementPeriod(
   }
   const values = new Map();
   for (const definition of definitions) {
-    const role =
-      definition.acquisition_driver_role ?? definition.semantic_role;
+    const role = statementSemanticRoles(definition).find((candidate) =>
+      semanticOverrides.has(candidate),
+    ) ?? definition.acquisition_driver_role ?? definition.semantic_role;
     const activeRule = forecastRule(definition, forecastIndex);
     // `cash_flow_da` can be a visible issuer aggregate that adds disclosed
     // cash-flow-only D&A (for example discontinued operations) to the income

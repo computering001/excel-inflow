@@ -47,17 +47,22 @@ Run one deterministic graph:
 
 `scripts/run_excel_inflow_vnext.mjs` is the candidate end-to-end owner above
 that proven graph. It invokes the raw filings, broker and DCS transaction,
-pauses at the compiled model-decision boundary, seals one
-`evidence-resolution/2.0`, and only then delegates the unchanged workbook stage
-to `run_user_flow.mjs`. The v64 controller remains the rollback implementation;
-it is not rewritten or removed during vNext certification.
+pauses at the compiled model-decision boundary, seals one model-demand graph,
+one `selected-authority-contract/1.0` and one run-constitution graph, and only
+then delegates the unchanged workbook stage to `run_user_flow.mjs`. The v64
+controller remains the rollback implementation; it is not rewritten or removed
+during vNext certification.
 
-The resolution artifact contains one content-addressed source index, one
-cross-lane observation ledger, one per-node authority graph, quarantines,
-blocker ownership and a quality receipt. Large source tables and PDFs remain in
-the run store and are referenced by hash rather than copied into the case.
-Filings own historical statements, DCS owns contractual debt hardcodes and
-broker research contributes only verified model-driving forecast cells.
+The selected-authority contract is the executable evidence resolver and the
+sole upstream forecast writer. It is compiled from the complete candidate
+ledger, then projects the sealed forecast plan into the model case; a plan
+authored or changed elsewhere cannot write workbook economics. The joined
+run-constitution graph carries source-to-observation-to-authority reachability,
+quarantines, blocker ownership and a quality receipt. Large source tables and
+PDFs remain in the run store and are referenced by hash rather than copied into
+the case. Filings own historical statements, DCS owns contractual debt
+hardcodes and broker research contributes only verified model-driving forecast
+cells.
 
 The model is built by default. Optional evidence uncertainty reduces authority
 through the declared forecast waterfall and produces `DEGRADED`; it does not
@@ -92,8 +97,10 @@ The source-owned contract and adversarial test is runnable as:
 node scripts/run_evidence_resolution_v2_tests.mjs
 ```
 
-The standalone compiler is diagnostic only. It cannot replace the vNext
-controller for a company run, and its output cannot author a workbook.
+The standalone `evidence-resolution/2.0` compiler is a read-only audit
+projection over sealed inputs. It cannot replace the executable
+`selected-authority-contract/1.0` resolver in a company run, and its output
+cannot become a second workbook writer.
 
 `PASS_PENDING_MANUAL` may carry quality `VERIFIED` or `DEGRADED`. Both require
 zero workbook violations; degraded means only that optional evidence was

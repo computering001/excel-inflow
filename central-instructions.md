@@ -500,14 +500,13 @@ The tool refuses on any request, source-hash, receipt or vintage mismatch,
 re-homes only receipt-verified checkpoints, writes a migration receipt beside
 the state, and never asks the user to re-upload unchanged sources.
 
-Do not force the complete broker-page inventory (page images, OCR lanes and
-narrative regions) into model authority. Raw files, page renders and capture
-ledgers remain lossless run artifacts. Attachment ingress projects page images
-and raw-document custody into the separate `broker_archive` lane; it projects
-only selected-cell mappings and values into `broker_pack`. Archive-only
-material never needs a semantic pack. Every supplied house remains represented
-in the archive, while every mapped model cell must land on a selected
-analytical table with exact cell provenance.
+Do not force the complete broker-page inventory into model authority. Raw
+files, page renders and capture ledgers remain lossless run artifacts.
+Attachment ingress projects page images and raw-document custody into the
+separate `broker_archive` lane; only selected-cell mappings and values enter
+`broker_pack`. Archive-only material needs no semantic pack. Every supplied
+house remains represented in the archive, while every mapped model cell lands
+on a selected analytical table with exact cell provenance.
 
 The extractor captures native text, geometry, tables, workbook cells and
 images. Image-only surfaces remain unresolved until the vision command proves
@@ -518,8 +517,8 @@ Structural differences with identical economic observations do not block;
 unresolved economic cells become quarantined evidence. The pack compiler
 accepts only reviewed, cell-addressed mappings. Before it can pass, every
 selected candidate cell has one reasoned semantic disposition; unused rows,
-tables and pages have no semantic obligation and remain archive-only. A missing
-or unowned selected mapping removes that authority edge. Coverage count alone is
+tables and pages remain archive-only. A missing selected mapping removes that
+authority edge. Coverage count alone is
 not enough: the semantic-quality gate also rejects numeric rows called unusable,
 model-relevant rows discarded as irrelevant, non-equivalent duplicates,
 broker-derived values described as company guidance, incompatible definition
@@ -532,10 +531,8 @@ Compile the filings-derived model-demand and material-output-reachability graph
 before broker semantics. Archive every raw broker file and render every page,
 but create OCR/vision work only for selected candidate cells that can satisfy a
 demanded concept-period. Open at most one deterministic coherent-house recovery
-frontier; other reports stay archived (and may retain already clean native
-selected cells) but do not multiply optional OCR work. Retries are bounded and
-cell-local; an exhausted cell is quarantined and its authority edge removed
-while clean sibling cells survive. If that recovery does not yield a coherent
+frontier; other reports remain archived and do not multiply optional OCR work.
+Retries are bounded and cell-local. If recovery does not yield one coherent
 house, close at zero broker authority and continue. Archive-only files require
 no semantic pack.
 

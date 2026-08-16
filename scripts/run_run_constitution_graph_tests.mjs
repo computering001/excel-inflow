@@ -140,6 +140,20 @@ const preBrokerDemand = {
   graph_sha256: createHash("sha256").update(`${JSON.stringify(canonical(preBrokerBody))}\n`).digest("hex"),
 };
 assert.equal(validatePreBrokerDemandCoverage(preBrokerDemand, demand).valid, true);
+const demandWithCompilerIdentity = structuredClone(demand);
+demandWithCompilerIdentity.nodes.push({
+  ...structuredClone(demand.nodes.find((node) => node.node_kind === "forecast_state")),
+  node_id: "income_statement.compiler_owned_margin.fy1",
+  concept_id: "compiler_owned_margin",
+  authority_class: "identity",
+  allowed_authorities: ["accounting_identity"],
+  source_line_ids: ["is.compiler_owned_margin"],
+});
+assert.equal(
+  validatePreBrokerDemandCoverage(preBrokerDemand, demandWithCompilerIdentity).valid,
+  true,
+  "compiler-owned semantic rows were mistaken for missing filed demand",
+);
 
 const authority = compileSelectedAuthorityContract({ modelCase, forecastPlan, modelDemandGraph: demand, evidenceRun });
 assert.equal(validateSelectedAuthorityContract(authority, { modelDemandGraph: demand, forecastPlan }).valid, true);

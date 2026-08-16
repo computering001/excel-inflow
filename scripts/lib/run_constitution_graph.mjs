@@ -301,11 +301,12 @@ export function validatePreBrokerDemandCoverage(preBrokerDemand, modelDemandGrap
       errors.push(`Filed model demand disappeared before final authority resolution: ${key.replaceAll("\0", ".")}.`);
     }
   }
-  for (const key of finalKeys) {
-    if (!preKeys.has(key)) {
-      errors.push(`Final filed demand was absent from the pre-broker graph: ${key.replaceAll("\0", ".")}.`);
-    }
-  }
+  // The final semantic graph lawfully adds compiler-owned identity and ratio
+  // rows after the raw filing graph closes. Their generated source-line IDs
+  // are not filed observations and therefore cannot be required upstream of
+  // broker semantics. The liveness contract is one-way: every raw filed node
+  // must survive into final authority resolution. Added semantic nodes are
+  // governed by the statement/equation graph validators instead.
   return {
     valid: errors.length === 0,
     errors,

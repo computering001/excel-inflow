@@ -1609,15 +1609,24 @@ function validateBrokerMapping(run, findings) {
     );
   }
   for (const metricId of Object.keys(source.metrics ?? {})) {
+    const hasSelectedValue = (source.houses ?? []).some((house) =>
+      (house.estimates?.[metricId] ?? []).some(
+        (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+      ),
+    ) || (source.provider_consensus?.[metricId] ?? []).some(
+      (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+    );
     const metric = target.metrics?.[metricId];
     if (!metric) {
-      findings.push(
-        finding(
-          "evidence.broker.metric_dropped",
-          "BLOCK",
-          `Broker metric ${metricId} is absent from the model case.`,
-        ),
-      );
+      if (hasSelectedValue) {
+        findings.push(
+          finding(
+            "evidence.broker.metric_dropped",
+            "BLOCK",
+            `Broker metric ${metricId} has selected numeric evidence but is absent from the model case.`,
+          ),
+        );
+      }
       continue;
     }
     for (const house of source.houses ?? []) {
@@ -1630,27 +1639,6 @@ function validateBrokerMapping(run, findings) {
             "evidence.broker.house_series_mismatch",
             "BLOCK",
             `${metricId} for ${house.house_name} does not match the normalized broker source.`,
-          ),
-        );
-      }
-      const metadata = target.house_metadata?.[house.house_name];
-      const inventorySource = (run.source_inventory ?? []).find(
-        (entry) =>
-          entry.kind === "user_broker_research" &&
-          entry.name === house.document?.file_name,
-      );
-      if (
-        !metadata ||
-        metadata.published_date !== house.published_date ||
-        metadata.document !== house.document?.file_name ||
-        !inventorySource ||
-        metadata.source_id !== inventorySource.source_id
-      ) {
-        findings.push(
-          finding(
-            "evidence.broker.house_metadata_mismatch",
-            "BLOCK",
-            `Publication metadata for ${house.house_name} was not preserved in the model case.`,
           ),
         );
       }
@@ -1672,6 +1660,38 @@ function validateBrokerMapping(run, findings) {
           ),
         );
       }
+    }
+  }
+  const sourceTableByHouse = new Map(
+    (run.broker_source_tables?.houses ?? []).map((house) => [house.house_id, house]),
+  );
+  const brokerSourceById = new Map(
+    (run.source_inventory ?? [])
+      .filter((sourceEntry) => sourceEntry.kind === "user_broker_research")
+      .map((sourceEntry) => [sourceEntry.source_id, sourceEntry]),
+  );
+  for (const house of source.houses ?? []) {
+    const metadata = target.house_metadata?.[house.house_name];
+    const controllerSourceId = sourceTableByHouse.get(house.house_id)?.source_id;
+    const sourceId = controllerSourceId ?? metadata?.source_id;
+    const inventorySource = brokerSourceById.get(sourceId);
+    if (
+      !metadata ||
+      metadata.published_date !== house.published_date ||
+      metadata.document !== house.document?.file_name ||
+      !sourceId ||
+      metadata.source_id !== sourceId ||
+      !inventorySource ||
+      (!controllerSourceId && inventorySource.name !== house.document?.file_name) ||
+      inventorySource.publication_date !== house.published_date
+    ) {
+      findings.push(
+        finding(
+          "evidence.broker.house_metadata_mismatch",
+          "BLOCK",
+          `Publication metadata for ${house.house_name} was not preserved in the model case.`,
+        ),
+      );
     }
   }
 }
@@ -1745,8 +1765,91 @@ function validateBrokerIngressCoherence(run, findings) {
 function validateBrokerSourceTables(run, findings) {
   const evidenceTables = run.broker_source_tables ?? null;
   const modelTables = run.model_case?.broker_pack?.raw_tables ?? null;
-  const pageEvidence = run.model_case?.broker_pack?.page_evidence ?? null;
+  // Bxx is an archive/presentation lane, not part of the broker calculation
+  // pack.  Accept the explicit broker_archive projection; retain the legacy
+  // location only so old immutable reference fixtures remain auditable.
+  const pageEvidence =
+    run.model_case?.broker_archive?.page_evidence ??
+    run.model_case?.broker_pack?.page_evidence ??
+    null;
   if (!evidenceTables && !modelTables && !pageEvidence) return;
+  if (!evidenceTables && !modelTables && Array.isArray(pageEvidence)) {
+    // Archive-only is a first-class closed broker lane.  It deliberately has
+    // no semantic table pack, but raw custody must still be exact and
+    // executable: every broker source is evidence-only, appears once in the
+    // page archive, and every rendered page is hash-bound on disk.
+    const brokerSources = (run.source_inventory ?? []).filter(
+      (source) => source.kind === "user_broker_research",
+    );
+    const sourceById = new Map(brokerSources.map((source) => [source.source_id, source]));
+    const archivedIds = pageEvidence.map((entry) => entry.source_id);
+    const exactCoverage =
+      archivedIds.length === sourceById.size &&
+      new Set(archivedIds).size === archivedIds.length &&
+      archivedIds.every((sourceId) => sourceById.has(sourceId));
+    if (!exactCoverage) {
+      findings.push(
+        finding(
+          "evidence.broker_archive.source_coverage_mismatch",
+          "BLOCK",
+          "The archive-only broker lane does not exactly cover the preserved raw broker sources.",
+          { broker_source_ids: [...sourceById.keys()], archived_source_ids: archivedIds },
+        ),
+      );
+      return;
+    }
+    for (const entry of pageEvidence) {
+      const source = sourceById.get(entry.source_id);
+      if (source.status !== "evidence_only") {
+        findings.push(
+          finding(
+            "evidence.broker_archive.authority_leak",
+            "BLOCK",
+            `${entry.source_id} is archived without the required evidence_only source status.`,
+          ),
+        );
+      }
+      if (entry.content_sha256 !== source.content_sha256) {
+        findings.push(
+          finding(
+            "evidence.broker_archive.raw_hash_mismatch",
+            "BLOCK",
+            `${entry.source_id} page archive is not bound to the preserved raw broker hash.`,
+          ),
+        );
+      }
+      if (!Array.isArray(entry.pages) || entry.pages.length === 0) {
+        findings.push(
+          finding(
+            "evidence.broker_archive.pages_missing",
+            "BLOCK",
+            `${entry.source_id} has no preserved page images.`,
+          ),
+        );
+        continue;
+      }
+      for (const page of entry.pages) {
+        let actualSha256 = null;
+        try {
+          actualSha256 = createHash("sha256")
+            .update(fs.readFileSync(page.artifact_path))
+            .digest("hex");
+        } catch {
+          // The single finding below covers absent and unreadable artifacts.
+        }
+        if (!actualSha256 || actualSha256 !== page.artifact_sha256) {
+          findings.push(
+            finding(
+              "evidence.broker_archive.page_hash_mismatch",
+              "BLOCK",
+              `${entry.source_id} page ${page.page_number} is absent or not hash-bound to the archive declaration.`,
+            ),
+          );
+        }
+      }
+    }
+    return;
+  }
   if (!evidenceTables) {
     findings.push(
       finding(
@@ -1965,9 +2068,8 @@ function validateBrokerSourceTables(run, findings) {
     if (
       !source ||
       source.kind !== "user_broker_research" ||
-      source.status !== "used" ||
-      source.content_sha256 !== house.content_sha256 ||
-      source.name !== house.file_name
+      !["used", "evidence_only", "quarantined", "rejected_for_model_use"].includes(source.status) ||
+      source.content_sha256 !== house.content_sha256
     ) {
       findings.push(
         finding(

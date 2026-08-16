@@ -174,9 +174,13 @@ export function openingPosition(modelCase) {
         ?.opening_balance ??
       0,
   );
-  const translated = (instrument) =>
-    Number(instrument.opening_balance ?? 0) *
-    openingFxRate(modelCase, instrument.currency);
+  const translated = (instrument) => {
+    const amount = Number(instrument.opening_balance ?? 0);
+    if (instrument.balance_basis === "reporting_currency_carrying_value") {
+      return amount;
+    }
+    return amount * openingFxRate(modelCase, instrument.currency);
+  };
   const grossExcludingLeases =
     instruments
       .filter(

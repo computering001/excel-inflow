@@ -604,6 +604,7 @@
     "broker_terminal_recovery.py",
     "broker_work_graph.py",
     "archive_broker_pages.py",
+    "zero_broker_authority.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
@@ -768,6 +769,10 @@
         "fitz"
       ],
       "reason": "The archive-only broker page renderer uses deferred native PyMuPDF to create screenshot evidence. It has no semantic or selected-cell authority, and callers degrade safely when rendering is unavailable."
+    },
+    "zero_broker_authority.py": {
+      "may_import_third_party": [],
+      "reason": "The terminal optional-broker fallback is stdlib-only. It rewrites only the broker authority projection to a schema-valid zero-authority state while preserving immutable archive custody."
     },
     "run_attachment_evidence_pipeline.py": {
       "may_import_third_party": [],
