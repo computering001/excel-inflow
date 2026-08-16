@@ -1,0 +1,51 @@
+name: Excel Inflow full portable end-to-end
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - agent/broker-delivery-constitution-v350
+
+permissions:
+  contents: read
+
+concurrency:
+  group: excel-inflow-full-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+      - name: Run raw-input, broker, debt, acquisition and workbook cohort
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: python3
+          EXCEL_INFLOW_SOURCE_COMMIT: ${{ github.sha }}
+          EXCEL_INFLOW_SOURCE_TREE: 0000000000000000000000000000000000000000
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/ci-full-e2e
+          python3 scripts/run_portable_end_to_end_cases.py \
+            --out audit/generated/ci-full-e2e \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --timeout 1800
+      - name: Upload complete case evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-full-e2e-${{ github.sha }}
+          path: audit/generated/ci-full-e2e
+          retention-days: 30
+          if-no-files-found: error
