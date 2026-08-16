@@ -1,0 +1,46 @@
+name: Authoritative acceptance status beacon
+
+on:
+  workflow_run:
+    workflows:
+      - Excel Inflow authoritative acceptance
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record authoritative result on a dedicated status branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          run='${{ github.event.workflow_run.id }}'
+          conclusion='${{ github.event.workflow_run.conclusion }}'
+          tested='${{ github.event.workflow_run.head_sha }}'
+          url='${{ github.event.workflow_run.html_url }}'
+          tmp="$(mktemp -d)"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${repo}.git" "$tmp/repo"
+          cd "$tmp/repo"
+          git config user.name 'excel-inflow-status-bot'
+          git config user.email 'excel-inflow-status-bot@users.noreply.github.com'
+          git checkout --orphan agent/excel-inflow-acceptance-status
+          git rm -rf . >/dev/null 2>&1 || true
+          cat > acceptance-status.json <<EOF
+          {
+            "schema_version": "excel-inflow-acceptance-status/1.0",
+            "workflow_run_id": ${run},
+            "tested_sha": "${tested}",
+            "conclusion": "${conclusion}",
+            "workflow_url": "${url}",
+            "recorded_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          git add acceptance-status.json
+          git commit -m "Record authoritative acceptance ${conclusion} for ${tested}"
+          git push --force origin HEAD:refs/heads/agent/excel-inflow-acceptance-status
