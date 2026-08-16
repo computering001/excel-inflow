@@ -1,0 +1,110 @@
+name: Verify funded acquisition on portable case
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  acquisition-case:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install model runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+          test -f fixtures/portable/representative-model-case.json
+
+      - name: Register portable solver regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          registry_path=Path('assets/development-test-registry.json')
+          registry=json.loads(registry_path.read_text('utf8'))
+          entry={"id":"acquisition-solver-portable-case","phase":"economics","runtime":"node","script":"run_acquisition_solver_case_tests.mjs","arguments":["$REPRESENTATIVE"],"requires":["REPRESENTATIVE"]}
+          current=next((row for row in registry['tests'] if row.get('id')==entry['id']),None)
+          if current: current.clear(); current.update(entry)
+          else: registry['tests'].append(entry)
+          registry_path.write_text(json.dumps(registry,indent=2)+'\n')
+          manifest_path=Path('release-manifest.json'); manifest=json.loads(manifest_path.read_text('utf8'))
+          scripts=manifest.setdefault('closure',{}).setdefault('scripts',[])
+          item='scripts/run_acquisition_solver_case_tests.mjs'
+          if item not in scripts: scripts.append(item); scripts.sort()
+          manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
+          PY
+
+      - name: Run portable solver delta proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_acquisition_solver_case_tests.mjs fixtures/portable/representative-model-case.json | tee /tmp/acquisition-solver-case.json
+          jq -e '.status == "PASS" and .checks >= 10' /tmp/acquisition-solver-case.json
+
+      - name: Re-run dependent economic and delivery gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_acquisition_funding_integration_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_equation_graph_tests.mjs
+          node scripts/run_instrument_period_state_tests.mjs
+          node scripts/run_opening_debt_reconciliation_tests.mjs
+          node scripts/run_case_compiler_equivalence.mjs fixtures/portable/cases
+          node scripts/run_degraded_broker_delivery_tests.mjs fixtures/portable/cases
+          node scripts/run_stage4_checkpoint_tests.mjs --cases fixtures/portable/cases --python "$(command -v python3)" --soffice "$(command -v soffice)"
+
+      - name: Re-run self-contained registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/acquisition-solver-proof
+          mkdir -p audit/acquisition-solver-proof
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          REPRESENTATIVE=fixtures/portable/representative-model-case.json python3 /tmp/forensic_audit.py --out audit/acquisition-solver-proof
+          jq '.summary' audit/acquisition-solver-proof/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/acquisition-solver-proof/forensic-audit.json)" -eq 0
+
+      - name: Persist verified regression
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/acquisition-solver-proof
+          cp /tmp/acquisition-solver-case.json audit/acquisition-solver-proof/solver-delta.json
+          git config user.name 'excel-inflow-solver-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add assets/development-test-registry.json release-manifest.json audit/acquisition-solver-proof
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Prove funded acquisition through portable solver case [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload acquisition solver proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-acquisition-solver-proof
+          path: |
+            /tmp/acquisition-solver-case.json
+            audit/acquisition-solver-proof
+          retention-days: 14
+          if-no-files-found: warn
