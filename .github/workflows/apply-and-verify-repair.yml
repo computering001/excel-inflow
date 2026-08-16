@@ -1,0 +1,128 @@
+name: Apply and verify Excel Inflow repair
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-verify:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install full portable test runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq unzip zip
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+          echo "SOFFICE=$(command -v soffice)" >> "$GITHUB_ENV"
+          node --version
+          python3 --version
+          soffice --version
+          git rev-parse HEAD
+
+      - name: Apply earliest-owner repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit/repair audit/post-repair
+          python3 scripts/forensic_repair.py --out audit/repair
+          git diff --check
+
+      - name: Validate JSON and source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+          root=Path('.')
+          failures=[]
+          for path in sorted(root.rglob('*.json')):
+              if any(part in {'.git','node_modules'} for part in path.parts): continue
+              try: json.loads(path.read_text('utf-8'))
+              except Exception as exc: failures.append(f'{path}: {exc}')
+          for path in sorted(root.rglob('*')):
+              if not path.is_file() or any(part in {'.git','node_modules'} for part in path.parts): continue
+              if path.suffix == '.py': command=[sys.executable,'-m','py_compile',str(path)]
+              elif path.suffix in {'.mjs','.js'}: command=['node','--check',str(path)]
+              else: continue
+              completed=subprocess.run(command,text=True,capture_output=True)
+              if completed.returncode: failures.append(f'{path}: {completed.stderr}')
+          if failures: raise SystemExit('\n'.join(failures))
+          print('all JSON and source syntax valid')
+          PY
+
+      - name: Run targeted economic and control-plane regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run_source_arithmetic_topology_tests.py
+          node scripts/run_semantic_role_closure_tests.mjs
+          node scripts/run_public_state_ownership_tests.mjs
+          python3 scripts/run_broker_core_demand_tests.py
+          node scripts/run_nonrecurring_forecast_policy_tests.mjs
+          node scripts/run_source_identity_tests.mjs
+          node scripts/run_test_registry_contract_tests.mjs
+          node scripts/run_portability_contract_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          python3 scripts/run_broker_demand_selection_tests.py
+          python3 scripts/run_broker_house_exclusion_tests.py
+          node scripts/run_broker_preview_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+          node scripts/run_equation_graph_tests.mjs
+          node scripts/run_instrument_period_state_tests.mjs
+          node scripts/run_opening_debt_reconciliation_tests.mjs
+
+      - name: Re-run complete self-contained registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          python3 /tmp/forensic_audit.py --out audit/post-repair
+          jq '.summary' audit/post-repair/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/post-repair/forensic-audit.json)" -eq 0
+          test "$(jq '[.syntax[] | select(.status != "PASS")] | length' audit/post-repair/forensic-audit.json)" -eq 0
+          test "$(jq '[.json_validation[] | select(.status != "PASS")] | length' audit/post-repair/forensic-audit.json)" -eq 0
+
+      - name: Persist verified repair
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-repair-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No repair diff remains.'
+            exit 0
+          fi
+          git commit -m 'Repair Excel Inflow economic usefulness and runtime contracts [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload repair and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-repair-verification
+          path: |
+            audit/repair
+            audit/post-repair
+          retention-days: 14
+          if-no-files-found: warn
