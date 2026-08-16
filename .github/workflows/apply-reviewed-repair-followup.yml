@@ -1,0 +1,196 @@
+name: Apply reviewed Excel Inflow repair follow-up
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-reviewed-repair-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: reviewed-excel-inflow-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-and-prove:
+    if: ${{ !startsWith(github.event.head_commit.message || '', 'Complete reviewed Excel Inflow end-to-end repair') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install runtime
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Restore pinned cases, patchers and focused proofs
+        env:
+          REVIEWED_COMMIT: 9edbbfe1596071c03813badee21b99d714affc23
+        run: |
+          set -euo pipefail
+          mkdir -p parity-fixtures
+          for file in standard-maximal-v2.json standard-net-cash-v2.json README.md; do
+            curl -fsSL "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/parity-fixtures/${file}" -o "parity-fixtures/${file}"
+          done
+          sha256sum parity-fixtures/*.json > parity-fixtures/SHA256SUMS
+          for file in \
+            repair_acquisition_integration.py \
+            repair_acquisition_plan_integration.py \
+            repair_broker_headline_integration.py \
+            repair_telemetry_integration.py; do
+            curl -fsSL "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/scripts/${file}" -o "/tmp/${file}"
+          done
+          for file in \
+            compile_acquisition_portable_case.mjs \
+            run_acquisition_solver_case_tests.mjs \
+            run_acquisition_workbook_tests.py \
+            run_carrier_identity_tests.mjs; do
+            if [ ! -f "scripts/${file}" ]; then
+              curl -fsSL "https://raw.githubusercontent.com/computering001/excel-inflow/${REVIEWED_COMMIT}/scripts/${file}" -o "scripts/${file}"
+            fi
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          root=str(Path.cwd())
+          for path in Path('/tmp').glob('repair_*_integration.py'):
+              value=path.read_text('utf-8')
+              value=value.replace('/mnt/data/excel-inflow-repair',root)
+              value=value.replace('/mnt/data/excel_inflow_repair',root)
+              path.write_text(value,'utf-8')
+          PY
+
+      - name: Apply only missing reviewed repairs
+        run: |
+          set -euo pipefail
+          if grep -q 'archive_only = not selected_targets or unselected_house$' scripts/extract_broker_evidence.py; then
+            python3 scripts/apply_reviewed_core_repair.py
+          fi
+          if grep -qi 'zero direct transaction cash-flow effect' references/acquisition.md; then
+            python3 /tmp/repair_acquisition_integration.py
+            python3 /tmp/repair_acquisition_plan_integration.py
+          fi
+          if [ ! -f scripts/lib/broker_headline_policy.mjs ]; then
+            python3 /tmp/repair_broker_headline_integration.py
+          fi
+          if [ ! -f scripts/lib/run_telemetry.mjs ]; then
+            python3 /tmp/repair_telemetry_integration.py
+          fi
+          python3 scripts/apply_reviewed_followup.py
+
+      - name: Syntax and contract validation
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/*.py scripts/verify/*.py
+          while IFS= read -r file; do node --check "$file"; done < <(find scripts -type f -name '*.mjs' | sort)
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('.').rglob('*.json'):
+              json.loads(path.read_text('utf-8'))
+          PY
+
+      - name: Run fail-closed portable matrix
+        run: |
+          set -euo pipefail
+          rm -rf audit/reviewed-portable-gate
+          python3 scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out audit/reviewed-portable-gate
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/reviewed-portable-gate/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS', report
+          assert report['fail_count']==0, report
+          assert report['silently_skipped_count']==0, report
+          PY
+
+      - name: Install permanent CI and remove bootstrap code
+        run: |
+          set -euo pipefail
+          cat > .github/workflows/reviewed-repair-ci.yml <<'YAML'
+          name: Excel Inflow reviewed repair CI
+          on:
+            push:
+              branches: [agent/excel-inflow-reviewed-repair-v2]
+            pull_request:
+          permissions:
+            contents: read
+          jobs:
+            portable-gate:
+              runs-on: ubuntu-latest
+              timeout-minutes: 120
+              steps:
+                - uses: actions/checkout@v4
+                - run: |
+                    sudo apt-get update
+                    sudo apt-get install -y libreoffice
+                    python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+                - run: |
+                    python3 scripts/run_reviewed_portable_gate.py \
+                      --python "$(command -v python3)" \
+                      --soffice "$(command -v soffice)" \
+                      --out audit/reviewed-portable-gate
+                - uses: actions/upload-artifact@v4
+                  if: always()
+                  with:
+                    name: reviewed-portable-gate
+                    path: audit/reviewed-portable-gate
+                    if-no-files-found: error
+          YAML
+          rm -f scripts/apply_reviewed_core_repair.py scripts/apply_reviewed_followup.py
+          rm -f .github/workflows/apply-reviewed-repair.yml
+          rm -f .github/workflows/apply-reviewed-repair-followup.yml
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          failures=[]
+          for path in Path('scripts').rglob('*'):
+              if path.is_file() and path.suffix in {'.py','.mjs','.js','.json'}:
+                  text=path.read_text('utf-8')
+                  if re.search(r'/Users/|[A-Za-z]:\\\\Users\\\\',text): failures.append(str(path))
+                  if path.name.startswith('repair_') and path.name.endswith('_integration.py'): failures.append(str(path))
+          if failures: raise SystemExit('\n'.join(failures))
+          PY
+          git diff --check
+          git diff --stat > audit/reviewed-portable-gate/final-diffstat.txt
+
+      - name: Commit and push proven tree
+        run: |
+          set -euo pipefail
+          git config user.name "Excel Inflow reviewed repair"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete reviewed Excel Inflow end-to-end repair"
+          git push origin HEAD:agent/excel-inflow-reviewed-repair-v2
+
+      - name: Open draft pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh pr view agent/excel-inflow-reviewed-repair-v2 --json number >/dev/null 2>&1; then
+            gh pr create --draft \
+              --base agent/broker-delivery-constitution-v350 \
+              --head agent/excel-inflow-reviewed-repair-v2 \
+              --title "Complete reviewed Excel Inflow end-to-end repair" \
+              --body "The branch is committed only after the reviewed portable gate passes with zero failures and zero silently skipped selected tests. It repairs statement arithmetic, broker eligibility and recovery ordering, headline/D&A authority, discrete-event forecasting, funded acquisition cash/debt mechanics, identity/telemetry, case portability and the stale test interface while preserving broker-failure delivery safety and the protected debt/RCF/interest engine. Installed-host, native Excel, visual and performance cohort evidence remain explicit release-attestation gates."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: excel-inflow-reviewed-repair-evidence-followup
+          path: audit/reviewed-portable-gate
+          if-no-files-found: warn
+          retention-days: 30
