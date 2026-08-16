@@ -137,6 +137,12 @@ async function checkpoint(id, status, target = null) {
 }
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
+  try {
+    excelInflowExperienceTrace.markVisibleResponse({ status: "COMPLETE" });
+  } catch (error) {
+    console.error(`Experience trace response marker failed: ${error.message}`);
+  }
+
   if (ACTIVE_PERFORMANCE) {
     ACTIVE_PERFORMANCE.total_duration_ms = Date.now() - ACTIVE_PERFORMANCE.started_epoch_ms;
   }
