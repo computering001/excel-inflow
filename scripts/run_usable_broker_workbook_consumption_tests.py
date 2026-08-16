@@ -56,9 +56,10 @@ def row_label(sheet, row: int) -> str:
 
 
 def broker_links(sheet, row: int) -> list[str]:
+    """Return broker formulas only from standalone forecast columns J:L."""
     links = []
-    for cell in sheet[row]:
-        value = formula(cell.value)
+    for column in range(10, 13):
+        value = formula(sheet.cell(row=row, column=column).value)
         if value and "brokers" in value.lower():
             links.append(value)
     return links
