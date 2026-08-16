@@ -132,6 +132,8 @@ def main() -> int:
 
     # Runtime portability and migration hygiene.
     for path, body in bodies.items():
+        if path.resolve() == Path(__file__).resolve():
+            continue
         relative = rel(path)
         for pattern in PRIVATE_PATTERNS:
             match = pattern.search(body)
