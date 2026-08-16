@@ -1,0 +1,97 @@
+name: Excel Inflow frozen baseline audit
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/trigger-frozen-baseline.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excel-inflow-frozen-baseline
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out full repair history
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Install audit/runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+
+      - name: Create detached exact-source worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/excel-inflow-frozen-source
+          git worktree add --detach /tmp/excel-inflow-frozen-source ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd
+          mkdir -p /tmp/excel-inflow-frozen-source/audit
+          cp audit/product-target-v1.json /tmp/excel-inflow-frozen-source/audit/product-target-v1.json
+          cp scripts/run_deep_product_architecture_audit.py /tmp/excel-inflow-frozen-source/scripts/
+          cp scripts/run_forensic_repository_audit.py /tmp/excel-inflow-frozen-source/scripts/
+
+      - name: Run remarkably deep untouched audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/frozen-baseline
+          mkdir -p audit/generated/frozen-baseline
+          (
+            cd /tmp/excel-inflow-frozen-source
+            python3 scripts/run_deep_product_architecture_audit.py \
+              --out "$GITHUB_WORKSPACE/audit/generated/frozen-baseline" \
+              --timeout 900 \
+              --source-commit ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd \
+              --source-tree 8631c69b2ca960241e78a4719b3d7441d1c727c8
+          )
+          python3 scripts/run_history_blame_audit.py \
+            --out audit/generated/frozen-baseline/history \
+            --source-commit ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd \
+            --source-tree 8631c69b2ca960241e78a4719b3d7441d1c727c8
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          audit=json.loads(Path('audit/generated/frozen-baseline/deep-product-architecture-audit.json').read_text())
+          history=json.loads(Path('audit/generated/frozen-baseline/history/history-blame-audit.json').read_text())
+          assert audit['source_identity']['commit'] == 'ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd'
+          assert audit['source_identity']['tree'] == '8631c69b2ca960241e78a4719b3d7441d1c727c8'
+          assert history['sunday_comparison']['commit_count'] == 51
+          assert len(audit['target_crosswalk']) >= 50
+          assert len(audit['findings']) >= 1
+          PY
+
+      - name: Commit frozen audit evidence atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "excel-inflow-audit-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/frozen-baseline
+          if ! git diff --cached --quiet; then
+            git commit -m "Record exact-source deep forensic baseline"
+            git pull --rebase origin agent/excel-inflow-end-to-end-repair
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          fi
+
+      - name: Upload frozen audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-frozen-baseline
+          path: audit/generated/frozen-baseline
+          retention-days: 30
+          if-no-files-found: error
