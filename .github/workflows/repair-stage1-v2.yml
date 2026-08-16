@@ -1,0 +1,96 @@
+name: Excel Inflow repair stage 1 v2
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - audit/generated/baseline-v2/**
+      - audit/generated/history-blame/**
+      - audit/trigger-repair-stage1-v2.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excel-inflow-repair-stage1
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Require frozen audit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s audit/generated/baseline-v2/deep-product-architecture-audit.json
+          test -s audit/generated/history-blame/history-blame-audit.json
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+      - name: Apply corrected stage-one repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/repair-stage1
+          mkdir -p audit/generated/repair-stage1
+          python3 scripts/run_repair_stage1_stage.py --out audit/generated/repair-stage1
+      - name: Run independent stage-one gate
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/run_repair_stage1_gate.py --out audit/generated/repair-stage1 --timeout 900 \
+            2>&1 | tee audit/generated/repair-stage1/workflow.log
+      - name: Preserve failure diagnostics only
+        if: steps.gate.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -R audit/generated/repair-stage1 /tmp/repair-stage1-v2-failure
+          git reset --hard HEAD
+          rm -rf audit/generated/repair-stage1-v2-failure
+          mkdir -p audit/generated
+          cp -R /tmp/repair-stage1-v2-failure audit/generated/repair-stage1-v2-failure
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/repair-stage1-v2-failure
+          git commit -m "Record corrected stage-one repair failure"
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          exit 1
+      - name: Commit passing corrected stage-one repair
+        if: steps.gate.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/repair-stage1/stage1-gate.json').read_text())
+          assert report['status'] == 'PASS'
+          PY
+          git config user.name "excel-inflow-repair-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add scripts assets references SKILL.md central-instructions.md audit/generated/repair-stage1
+          git commit -m "Repair filing topology broker eligibility and event policy"
+          git pull --rebase origin agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-repair-stage1-v2
+          path: audit/generated/repair-stage1*
+          retention-days: 14
+          if-no-files-found: warn
