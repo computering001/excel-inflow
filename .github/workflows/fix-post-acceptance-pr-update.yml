@@ -1,0 +1,40 @@
+name: Fix post acceptance PR refresh
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/fix-post-acceptance-pr-update.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Remove unsupported draft field from PR update
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('.github/workflows/excel-inflow-post-acceptance.yml')
+          text=path.read_text('utf-8')
+          text=text.replace(
+              'await github.rest.pulls.update({owner, repo, pull_number: pr.number, title, body, draft: true});',
+              'await github.rest.pulls.update({owner, repo, pull_number: pr.number, title, body});',
+          )
+          path.write_text(text,'utf-8')
+          PY
+          rm -f .github/workflows/fix-post-acceptance-pr-update.yml
+          git config user.name 'excel-inflow-acceptance-bot'
+          git config user.email 'excel-inflow-acceptance-bot@users.noreply.github.com'
+          git add -A -- .github/workflows/excel-inflow-post-acceptance.yml .github/workflows/fix-post-acceptance-pr-update.yml
+          git commit -m 'Fix audited PR refresh payload'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
