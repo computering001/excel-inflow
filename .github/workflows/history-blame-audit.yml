@@ -1,0 +1,63 @@
+name: Excel Inflow history and blame audit
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - scripts/run_history_blame_audit.py
+      - audit/trigger-history-audit.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Run history and blame audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/history-blame
+          python3 scripts/run_history_blame_audit.py \
+            --out audit/generated/history-blame \
+            --source-commit ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd \
+            --source-tree 8631c69b2ca960241e78a4719b3d7441d1c727c8
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/generated/history-blame/history-blame-audit.json').read_text())
+          assert report['sunday_comparison']['commit_count'] == 51
+          assert report['report_sha256']
+          assert len(report['targets']) >= 9
+          print(report['report_sha256'])
+          PY
+
+      - name: Commit history audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "excel-inflow-audit-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/history-blame
+          if ! git diff --cached --quiet; then
+            git commit -m "Record history and blame audit"
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          fi
+
+      - name: Upload history audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-history-blame-audit
+          path: audit/generated/history-blame
+          retention-days: 14
+          if-no-files-found: error
