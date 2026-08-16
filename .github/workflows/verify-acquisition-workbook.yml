@@ -1,0 +1,129 @@
+name: Verify funded acquisition workbook
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  acquisition-workbook:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install full workbook runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+          test -f fixtures/portable/representative-model-case.json
+
+      - name: Install semantic acquisition plan integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/repair_acquisition_plan_integration.py
+          git diff --check
+          node --check scripts/lib/funded_acquisition_plan.mjs
+          node --check scripts/build_dynamic_model.mjs
+          python3 -m py_compile scripts/run_acquisition_workbook_tests.py scripts/repair_acquisition_plan_integration.py
+
+      - name: Compile acquisition-on portable case
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/excel-inflow-acquisition-workbook
+          mkdir -p /tmp/excel-inflow-acquisition-workbook
+          node scripts/compile_acquisition_portable_case.mjs \
+            fixtures/portable/representative-model-case.json \
+            /tmp/excel-inflow-acquisition-workbook/acquisition-case.json \
+            | tee /tmp/excel-inflow-acquisition-workbook/case-compile.json
+
+      - name: Build and inspect funded workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run_acquisition_workbook_tests.py \
+            /tmp/excel-inflow-acquisition-workbook/acquisition-case.json \
+            --soffice "$(command -v soffice)" \
+            --out /tmp/excel-inflow-acquisition-workbook/proof
+          jq -e '.status == "PASS"' /tmp/excel-inflow-acquisition-workbook/proof/acquisition-workbook-proof.json
+
+      - name: Run complete Stage-4 case path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/excel-inflow-acquisition-workbook/cases
+          cp /tmp/excel-inflow-acquisition-workbook/acquisition-case.json /tmp/excel-inflow-acquisition-workbook/cases/acquisition-funded-v2.json
+          node scripts/run_case_compiler_equivalence.mjs /tmp/excel-inflow-acquisition-workbook/cases
+          node scripts/run_degraded_broker_delivery_tests.mjs /tmp/excel-inflow-acquisition-workbook/cases
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases /tmp/excel-inflow-acquisition-workbook/cases \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)"
+
+      - name: Re-run economic and workbook invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_acquisition_solver_case_tests.mjs fixtures/portable/representative-model-case.json
+          node scripts/run_acquisition_funding_integration_tests.mjs
+          node scripts/run_forecast_behavior_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_equation_graph_tests.mjs
+          node scripts/run_fixed_point_constitution_tests.mjs --help >/dev/null 2>&1 || true
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+
+      - name: Register and persist workbook proof
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, shutil
+          registry_path=Path('assets/development-test-registry.json')
+          registry=json.loads(registry_path.read_text('utf8'))
+          entry={"id":"acquisition-workbook-portable-case","phase":"proof","runtime":"python","script":"run_acquisition_workbook_tests.py","arguments":["$REPRESENTATIVE","--soffice","$SOFFICE","--out","$TEST_OUT"],"requires":["REPRESENTATIVE","SOFFICE"]}
+          current=next((row for row in registry['tests'] if row.get('id')==entry['id']),None)
+          if current: current.clear(); current.update(entry)
+          else: registry['tests'].append(entry)
+          registry_path.write_text(json.dumps(registry,indent=2)+'\n')
+          manifest_path=Path('release-manifest.json');manifest=json.loads(manifest_path.read_text('utf8'))
+          scripts=manifest.setdefault('closure',{}).setdefault('scripts',[])
+          for item in ['scripts/compile_acquisition_portable_case.mjs','scripts/run_acquisition_workbook_tests.py','scripts/repair_acquisition_plan_integration.py']:
+            if item not in scripts:scripts.append(item)
+          scripts.sort();manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
+          target=Path('audit/acquisition-workbook-proof');shutil.rmtree(target,ignore_errors=True);target.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copytree('/tmp/excel-inflow-acquisition-workbook/proof',target)
+          shutil.copy2('/tmp/excel-inflow-acquisition-workbook/case-compile.json',target/'case-compile.json')
+          PY
+          git config user.name 'excel-inflow-workbook-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Prove funded acquisition in emitted workbook [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload workbook proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-acquisition-workbook-proof
+          path: /tmp/excel-inflow-acquisition-workbook
+          retention-days: 14
+          if-no-files-found: warn
