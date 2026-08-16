@@ -1,0 +1,148 @@
+name: Excel Inflow finalize repair source
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/excel-inflow-finalize-repair-source.yml
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Start after all queued repair transactions
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 120
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git reset --hard origin/agent/excel-inflow-end-to-end-repair
+          git clean -fdx
+      - name: Verify every required repaired owner exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            assets/development-test-registry.json
+            assets/semantic-role-registry-v2.json
+            assets/experience-trace-v1.schema.json
+            scripts/lib/experience_trace.mjs
+            scripts/run_experience_trace_tests.mjs
+            scripts/run_repository_forensic_lint.py
+            scripts/run_raw_input_local_semantic_canary.mjs
+            scripts/run_usable_broker_workbook_consumption_tests.py
+            scripts/run_funded_acquisition_visible_bridge_tests.py
+            .github/workflows/excel-inflow-ci.yml
+            .github/workflows/excel-inflow-final-acceptance-v3.yml
+            .github/workflows/excel-inflow-forensic-lint.yml
+          )
+          for path in "${required[@]}"; do
+            test -f "$path" || { echo "Missing required repaired owner: $path" >&2; exit 1; }
+          done
+          grep -q 'quality_ranked_native_then_one_recovery_frontier' scripts/extract_broker_evidence.py
+          grep -q 'experience_trace_id' scripts/lib/run_carrier.mjs
+          grep -q 'markVisibleResponse' scripts/run_excel_inflow_vnext.mjs
+          grep -q 'preauthored_broker_crosswalk: true' scripts/run_raw_input_local_semantic_canary.mjs
+          grep -q 'installed_host_semantics_exercised: false' scripts/run_raw_input_local_semantic_canary.mjs
+          grep -q 'publish-after-all-gates:' .github/workflows/excel-inflow-final-acceptance-v3.yml
+          grep -q 'usable-broker-workbook-consumption' assets/development-test-registry.json
+          grep -q 'funded-acquisition-visible-bridge' assets/development-test-registry.json
+      - name: Enforce the one final ordinary source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          find scripts -maxdepth 1 -type f \( \
+              -name 'apply_excel_inflow_repair_stage*.py' -o \
+              -name 'fix_stage1_*.py' -o \
+              -name 'fix_stage2_*.py' -o \
+              -name 'run_repair_stage1_stage_v*.py' -o \
+              -name 'run_repair_stage2_stage_v*.py' \
+            \) -delete
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            test -e "$workflow" || continue
+            case "$(basename "$workflow")" in
+              excel-inflow-ci.yml|excel-inflow-final-acceptance-v3.yml|excel-inflow-forensic-lint.yml|excel-inflow-finalize-repair-source.yml)
+                ;;
+              *) rm -f "$workflow" ;;
+            esac
+          done
+          rm -rf audit/generated audit/tmp
+          ! grep -R --line-number --exclude-dir=node_modules --exclude-dir=audit \
+            'latest_supplied_house_then_zero_authority' \
+            scripts assets references SKILL.md central-instructions.md
+          ! grep -R --line-number --exclude-dir=node_modules --exclude-dir=audit \
+            'archive-only regardless of whether its native lane happens to look complete' \
+            scripts assets references SKILL.md central-instructions.md
+          ! grep -R --line-number --exclude-dir=node_modules --exclude-dir=audit \
+            -E '/Users/[^/]+/|archiepjod|archiepjod@gmail.com' \
+            scripts assets references SKILL.md central-instructions.md
+      - name: Validate source and independent forensic contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q scripts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('.').rglob('*.json'):
+              if '.git' in path.parts or 'node_modules' in path.parts:
+                  continue
+              json.loads(path.read_text('utf-8'))
+          PY
+          node --check scripts/run_excel_inflow_vnext.mjs
+          node --check scripts/run_raw_input_black_box_canary.mjs
+          node --check scripts/run_raw_input_local_semantic_canary.mjs
+          node --check scripts/lib/experience_trace.mjs
+          node scripts/run_experience_trace_tests.mjs
+          python3 -m py_compile \
+            scripts/run_repository_forensic_lint.py \
+            scripts/run_usable_broker_workbook_consumption_tests.py \
+            scripts/run_funded_acquisition_visible_bridge_tests.py
+          mkdir -p "$RUNNER_TEMP/forensic"
+          python3 scripts/run_repository_forensic_lint.py --out "$RUNNER_TEMP/forensic/report.json"
+      - name: Recompile current development package closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/excel-inflow-finalize-repair-source.yml
+          if grep -q -- '--package-mode' scripts/compile_skill_release.mjs; then
+            node scripts/compile_skill_release.mjs --package-mode development
+          elif grep -q -- '--mode' scripts/compile_skill_release.mjs; then
+            node scripts/compile_skill_release.mjs --mode development
+          else
+            node scripts/compile_skill_release.mjs
+          fi
+          python3 - <<'PY'
+          import json,re
+          value=json.load(open('release-manifest.json'))
+          certification=value.get('certification') or {}
+          assert value.get('packageMode') == 'development', value.get('packageMode')
+          assert certification.get('certifiedClosureSha256') is None
+          assert re.fullmatch(r'[a-f0-9]{64}',str(certification.get('currentClosureSha256') or ''))
+          assert int(certification.get('closureFileCount') or 0) > 0
+          PY
+      - name: Commit the final source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-finalizer'
+          git config user.email 'excel-inflow-finalizer@users.noreply.github.com'
+          git add -A -- SKILL.md central-instructions.md release-manifest.json assets references scripts .github/workflows
+          git commit -m 'Finalize the deeply audited Excel Inflow repair candidate'
+          git fetch origin agent/excel-inflow-end-to-end-repair
+          git rebase origin/agent/excel-inflow-end-to-end-repair
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
