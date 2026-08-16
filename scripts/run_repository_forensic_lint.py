@@ -187,6 +187,19 @@ def main() -> int:
                 "The active acquisition specification still forbids funded transaction cash flows.",
                 phrase=phrase,
             ))
+    contradictory_acquisition = re.findall(
+        r"(?:do not|never|without|zero)[^\n]{0,140}(?:consideration|financing[- ]proceeds|transaction cash)",
+        acquisition_text,
+        flags=re.I,
+    )
+    if contradictory_acquisition:
+        findings.append(finding(
+            "ACQUISITION_POLICY_NEGATIVE_CONTRADICTION",
+            "BLOCK",
+            "Active acquisition policy still negates funded consideration or financing mechanics.",
+            matches=contradictory_acquisition[:10],
+        ))
+
     for required in ("consideration", "financing proceeds", "acquisition debt"):
         if required not in acquisition_text:
             findings.append(finding(
