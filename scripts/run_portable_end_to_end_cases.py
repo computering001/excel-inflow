@@ -96,7 +96,7 @@ def canary(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     result = run([
         NODE,
-        str(ROOT / "scripts" / "run_raw_input_black_box_canary.mjs"),
+        str(ROOT / "scripts" / "run_raw_input_local_semantic_canary.mjs"),
         str(fixture), python, soffice,
         "--broker-state", broker_state,
         "--dcs-balance-basis", dcs_basis,

@@ -741,7 +741,7 @@ node scripts/run_controller_exit_inventory_tests.mjs
 node scripts/run_broker_dynamic_concept_tests.mjs
 node scripts/run_broker_exit_fault_injection_tests.mjs
 node scripts/run_universal_broker_delivery_matrix.mjs <degraded-delivery-report.json> <usable-broker-workbook.xlsx>
-node scripts/run_raw_input_black_box_canary.mjs <raw-canary-evidence.json> <python> <soffice>
+node scripts/run_raw_input_local_semantic_canary.mjs <raw-canary-evidence.json> <python> <soffice>
 node scripts/run_equation_graph_tests.mjs
 node scripts/run_fixed_point_constitution_tests.mjs --manifest <fixed-point-cases.json>
 node scripts/test_release_convergence_seam.mjs

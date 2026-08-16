@@ -305,10 +305,10 @@
       "requires": ["DEGRADED_DELIVERY_REPORT", "USABLE_BROKER_WORKBOOK"]
     },
     {
-      "id": "raw-input-black-box-canary",
+      "id": "raw-input-local-semantic-canary",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_raw_input_black_box_canary.mjs",
+      "script": "run_raw_input_local_semantic_canary.mjs",
       "arguments": ["$RAW_CANARY_EVIDENCE", "$PYTHON", "$SOFFICE"],
       "requires": ["RAW_CANARY_EVIDENCE", "PYTHON", "SOFFICE"]
     },
@@ -316,7 +316,7 @@
       "id": "real-raw-filing-black-box-canary",
       "phase": "real_corpus",
       "runtime": "node",
-      "script": "run_raw_input_black_box_canary.mjs",
+      "script": "run_raw_input_local_semantic_canary.mjs",
       "arguments": [
         "$RAW_CANARY_EVIDENCE",
         "$PYTHON",

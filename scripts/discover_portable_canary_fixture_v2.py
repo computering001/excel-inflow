@@ -66,7 +66,7 @@ def command(command: list[str], *, cwd: Path, env: dict[str,str], timeout: int) 
 
 
 def canary(candidate: Path, python: str, soffice: str, timeout: int, env: dict[str,str]) -> dict[str,Any]:
-    result=command([NODE,str(ROOT/"scripts/run_raw_input_black_box_canary.mjs"),str(candidate),python,soffice,"--broker-state","explicit_skip","--dcs-balance-basis","native_principal"],cwd=ROOT,env=env,timeout=timeout)
+    result=command([NODE,str(ROOT/"scripts/run_raw_input_local_semantic_canary.mjs"),str(candidate),python,soffice,"--broker-state","explicit_skip","--dcs-balance-basis","native_principal"],cwd=ROOT,env=env,timeout=timeout)
     receipt=None
     if result["status"]=="PASS":
         starts=[i for i,c in enumerate(result["stdout"]) if c=="{"]

@@ -40,7 +40,7 @@ const rawClasses = [];
 for (const brokerState of ["explicit_skip", "failed_optional_close", "usable"]) {
   for (const dcsBalanceBasis of ["native_principal", "reporting_currency_carrying_value"]) {
     const executed = await exec(process.execPath, [
-      path.join(here, "run_raw_input_black_box_canary.mjs"),
+      path.join(here, "run_raw_input_local_semantic_canary.mjs"),
       cleanFixture,
       python,
       soffice,

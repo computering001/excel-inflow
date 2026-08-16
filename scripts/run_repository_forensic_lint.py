@@ -197,7 +197,7 @@ def main() -> int:
             ))
 
     # False installed-host / black-box claims.
-    canary = ROOT / "scripts" / "run_raw_input_black_box_canary.mjs"
+    canary = ROOT / "scripts" / "run_raw_input_local_semantic_canary.mjs"
     if canary.is_file():
         body = text(canary)
         semantic_authorship = any(marker in body for marker in (

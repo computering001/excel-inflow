@@ -50,7 +50,7 @@ def source_contract_checks() -> list[dict[str, Any]]:
         "behavior": (ROOT / "scripts" / "lib" / "forecast_behavior.mjs").read_text("utf-8"),
         "authority": (ROOT / "scripts" / "lib" / "forecast_authority.mjs").read_text("utf-8"),
         "carrier": (ROOT / "scripts" / "lib" / "run_carrier.mjs").read_text("utf-8"),
-        "canary": (ROOT / "scripts" / "run_raw_input_black_box_canary.mjs").read_text("utf-8"),
+        "canary": (ROOT / "scripts" / "run_raw_input_local_semantic_canary.mjs").read_text("utf-8"),
         "acquisition": (ROOT / "references" / "acquisition.md").read_text("utf-8"),
         "validation": (ROOT / "references" / "validation.md").read_text("utf-8"),
     }

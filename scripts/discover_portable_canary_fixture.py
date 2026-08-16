@@ -61,7 +61,7 @@ def candidates() -> list[tuple[int, Path]]:
 def run_canary(candidate: Path, python: str, soffice: str, output: Path, timeout: int) -> dict[str, Any]:
     command = [
         shutil.which("node") or "node",
-        str(ROOT / "scripts" / "run_raw_input_black_box_canary.mjs"),
+        str(ROOT / "scripts" / "run_raw_input_local_semantic_canary.mjs"),
         str(candidate), python, soffice,
         "--broker-state", "explicit_skip",
         "--dcs-balance-basis", "native_principal",

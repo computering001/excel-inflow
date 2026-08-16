@@ -65,7 +65,7 @@ def main() -> int:
             continue
         results.append({"id": path.name, **run([sys.executable if runtime == "python" else node, str(path)], args.timeout, env)})
     # Canary source must be honest even though installed-host evidence is external.
-    canary_source = (ROOT / "scripts" / "run_raw_input_black_box_canary.mjs").read_text("utf-8")
+    canary_source = (ROOT / "scripts" / "run_raw_input_local_semantic_canary.mjs").read_text("utf-8")
     honesty = (
         'installed_host_semantic_seam_exercised: false' in canary_source
         and 'installed_host_certification_claim: false' in canary_source

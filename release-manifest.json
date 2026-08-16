@@ -42,7 +42,7 @@
       "scripts/run_broker_dynamic_concept_tests.mjs",
       "scripts/run_broker_exit_fault_injection_tests.mjs",
       "scripts/run_universal_broker_delivery_matrix.mjs",
-      "scripts/run_raw_input_black_box_canary.mjs",
+      "scripts/run_raw_input_local_semantic_canary.mjs",
       "scripts/run_fixed_point_constitution_tests.mjs",
       "scripts/debt-model-economics.mjs",
       "scripts/test_release_convergence_seam.mjs",
@@ -146,7 +146,7 @@
       "scripts/run_forecast_observation_tests.mjs",
       "scripts/run_instrument_period_state_tests.mjs",
       "scripts/run_product_constitution_tests.mjs",
-      "scripts/run_raw_input_black_box_canary.mjs",
+      "scripts/run_raw_input_local_semantic_canary.mjs",
       "scripts/run_run_constitution_graph_tests.mjs",
       "scripts/run_statement_classifier_tests.mjs",
       "scripts/run_universal_broker_delivery_matrix.mjs",
@@ -489,8 +489,8 @@
       "scripts/run_product_constitution_tests.mjs -> scripts/lib/broker_preview.mjs",
       "scripts/run_product_constitution_tests.mjs -> scripts/lib/run_constitution_graph.mjs",
       "scripts/run_product_constitution_tests.mjs -> scripts/lib/workflow_state.mjs",
-      "scripts/run_raw_input_black_box_canary.mjs -> scripts/lib/json_schema.mjs",
-      "scripts/run_raw_input_black_box_canary.mjs -> scripts/lib/solver.mjs",
+      "scripts/run_raw_input_local_semantic_canary.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/run_raw_input_local_semantic_canary.mjs -> scripts/lib/solver.mjs",
       "scripts/run_run_constitution_graph_tests.mjs -> scripts/lib/run_constitution_graph.mjs",
       "scripts/run_statement_classifier_tests.mjs -> scripts/lib/coverage.mjs",
       "scripts/run_statement_classifier_tests.mjs -> scripts/lib/row_plan.mjs",
@@ -1233,7 +1233,7 @@
       "run_forecast_observation_tests.mjs",
       "run_instrument_period_state_tests.mjs",
       "run_product_constitution_tests.mjs",
-      "run_raw_input_black_box_canary.mjs",
+      "run_raw_input_local_semantic_canary.mjs",
       "run_run_constitution_graph_tests.mjs",
       "run_statement_classifier_tests.mjs",
       "run_universal_broker_delivery_matrix.mjs",
@@ -1386,7 +1386,7 @@
         "resolved": true
       },
       {
-        "target": "scripts/run_raw_input_black_box_canary.mjs",
+        "target": "scripts/run_raw_input_local_semantic_canary.mjs",
         "status": 1,
         "resolved": true
       },
@@ -3066,7 +3066,7 @@
       "words": null
     },
     {
-      "path": "scripts/run_raw_input_black_box_canary.mjs",
+      "path": "scripts/run_raw_input_local_semantic_canary.mjs",
       "sha256": "0ac20078083d9cdf0b7fccd913955cf095527652e176aa8f1242bfbab246d20e",
       "bytes": 43754,
       "words": null

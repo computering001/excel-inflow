@@ -155,7 +155,7 @@ console.log(JSON.stringify({ status: "PASS", checks: 7 }, null, 2));
 
 
 def patch_canary_honesty() -> list[str]:
-    path = "scripts/run_raw_input_black_box_canary.mjs"
+    path = "scripts/run_raw_input_local_semantic_canary.mjs"
     text = read(path)
     text = text.replace(
         '  preauthored_broker_crosswalk: false,',
