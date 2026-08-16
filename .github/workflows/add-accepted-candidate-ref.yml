@@ -1,0 +1,46 @@
+name: Add accepted candidate ref
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/add-accepted-candidate-ref.yml
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Advance a separate ref only from the successful publication job
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('.github/workflows/excel-inflow-post-acceptance.yml')
+          text=path.read_text('utf-8')
+          anchor='''      - name: Open or refresh the real draft repair PR\n        if: steps.cleanup.outputs.changed == 'false'\n'''
+          step='''      - name: Record the exact accepted candidate ref\n        if: steps.cleanup.outputs.changed == 'false'\n        shell: bash\n        run: |\n          set -euo pipefail\n          tested='${{ github.event.workflow_run.head_sha }}'\n          test "$(git rev-parse HEAD)" = "$tested"\n          git push --force-with-lease origin HEAD:refs/heads/agent/excel-inflow-accepted\n\n'''
+          if step not in text:
+              if anchor not in text:
+                  raise SystemExit('Post-acceptance PR step anchor not found')
+              text=text.replace(anchor,step+anchor,1)
+          path.write_text(text,'utf-8')
+          PY
+          rm -f .github/workflows/add-accepted-candidate-ref.yml
+          git config user.name 'excel-inflow-convergence-bot'
+          git config user.email 'excel-inflow-convergence-bot@users.noreply.github.com'
+          git add -A -- .github/workflows/excel-inflow-post-acceptance.yml .github/workflows/add-accepted-candidate-ref.yml
+          git commit -m 'Record accepted candidates on an immutable review ref'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
