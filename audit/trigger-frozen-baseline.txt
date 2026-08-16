@@ -1,0 +1,1 @@
+Run the complete zero-context product, architecture, history, test, portability and code-quality audit in a detached worktree at the exact live candidate commit.
