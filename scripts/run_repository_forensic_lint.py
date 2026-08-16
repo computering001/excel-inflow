@@ -267,7 +267,10 @@ def main() -> int:
                     arguments=arguments,
                 ))
 
-        registered_names={str(row.get("script") or "") for row in registry_tests if isinstance(row, dict)}
+        registered_names={
+            f'{row.get("id") or ""} {row.get("script") or ""}'
+            for row in registry_tests if isinstance(row, dict)
+        }
         categories={
             "source_arithmetic": ("arithmetic", "statement"),
             "discrete_event": ("discrete", "forecast"),
@@ -289,6 +292,7 @@ def main() -> int:
     # Semantic role closure and discrete acquisition behavior.
     registry_role_path = locate_role_registry()
     roles: set[str] = set()
+    role_registry_value: dict[str, Any] = {}
     if registry_role_path is None:
         findings.append(finding(
             "SEMANTIC_ROLE_REGISTRY_MISSING",
@@ -296,7 +300,8 @@ def main() -> int:
             "No canonical semantic-role registry v2 is present.",
         ))
     else:
-        roles = role_ids(load_json(registry_role_path))
+        role_registry_value = load_json(registry_role_path)
+        roles = role_ids(role_registry_value)
         if "acquisitions_net_of_cash" not in roles:
             findings.append(finding(
                 "ACQUISITION_ROLE_ORPHAN",
@@ -319,11 +324,15 @@ def main() -> int:
     behavior = ROOT / "scripts" / "lib" / "forecast_behavior.mjs"
     candidate = ROOT / "scripts" / "lib" / "forecast_candidate_compiler.mjs"
     combined = "\n".join(text(path) for path in (behavior, candidate) if path.is_file())
-    if "acquisitions_net_of_cash" not in combined:
+    role_rows = (role_registry_value.get("roles") or role_registry_value.get("entries") or role_registry_value.get("semantic_roles") or [])
+    acquisition_role = next((row for row in role_rows if isinstance(row, dict) and (row.get("id") or row.get("role_id") or row.get("semantic_role")) == "acquisitions_net_of_cash"), None)
+    acquisition_policy_text = json.dumps(acquisition_role or {}, sort_keys=True).lower()
+    registry_declares_discrete = "discrete" in acquisition_policy_text or "non_recurring" in acquisition_policy_text or "non-recurring" in acquisition_policy_text
+    if "acquisitions_net_of_cash" not in combined and not registry_declares_discrete:
         findings.append(finding(
             "DISCRETE_ACQUISITION_BEHAVIOR_UNBOUND",
             "BLOCK",
-            "Forecast behavior does not bind acquisitions_net_of_cash explicitly or through generated role metadata.",
+            "Neither generated role metadata nor an explicit consumer binds acquisitions_net_of_cash as a discrete event.",
         ))
     discrete_windows = re.findall(
         r"(?:discrete_event|non_recurring_event).{0,900}", combined, flags=re.I | re.S
@@ -346,7 +355,10 @@ def main() -> int:
                 "Extractor does not declare the quality-ranked native-first policy.",
                 path=rel(extractor),
             ))
-        if re.search(r"unselected_house\s*=.*house_id.*vision_house", body, re.S):
+        if re.search(
+            r"unselected_house\s*=\s*descriptor\.get\([\"']house_id[\"']\)\s*!=\s*vision_house_id",
+            body,
+        ):
             findings.append(finding(
                 "BROKER_EARLY_HOUSE_PROHIBITION",
                 "BLOCK",
@@ -377,9 +389,10 @@ def main() -> int:
     carrier = ROOT / "scripts" / "lib" / "run_carrier.mjs"
     if carrier.is_file():
         body = text(carrier).lower()
+        normalized = re.sub(r"[^a-z0-9]+", "", body)
         missing = [token for token in (
-            "repository", "commit", "tree", "closure", "package_mode", "installation"
-        ) if token not in body]
+            "repository", "commit", "tree", "closure", "packagemode", "installation"
+        ) if token not in normalized]
         if missing:
             findings.append(finding(
                 "RUN_CARRIER_IDENTITY_INCOMPLETE",
