@@ -1,0 +1,244 @@
+name: Excel Inflow final acceptance v2
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+  workflow_dispatch:
+
+concurrency:
+  group: excel-inflow-final-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  clean-checkout-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install deterministic runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y libreoffice python3-pip
+          python3 -m pip install --disable-pip-version-check --no-input openpyxl pymupdf pillow
+          node --version
+          python3 --version
+          libreoffice --version
+          git rev-parse HEAD
+          git status --short
+
+      - name: Prove committed checkout is clean and structurally readable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          python3 -m compileall -q scripts
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          failures=[]
+          for path in sorted(Path('.').rglob('*.json')):
+              if '.git' in path.parts:
+                  continue
+              try:
+                  json.loads(path.read_text('utf-8'))
+              except Exception as exc:
+                  failures.append(f'{path}: {exc}')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print('all repository JSON parses')
+          PY
+
+      - name: Locate repository-owned acceptance fixtures
+        id: fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > "$RUNNER_TEMP/fixtures.env"
+          import json
+          from pathlib import Path
+
+          root=Path('.').resolve()
+          ignored={'.git','node_modules','audit','dist','build'}
+          model_cases=[]
+          evidence_runs=[]
+          fixed_manifests=[]
+          for path in root.rglob('*.json'):
+              if any(part in ignored for part in path.parts):
+                  continue
+              try:
+                  obj=json.loads(path.read_text('utf-8'))
+              except Exception:
+                  continue
+              if not isinstance(obj, dict):
+                  continue
+              schema=str(obj.get('schema_version') or obj.get('schemaVersion') or '')
+              if schema.startswith('model-case/') and isinstance(obj.get('periods'), list):
+                  model_cases.append(path)
+              if schema.startswith('evidence-run/'):
+                  evidence_runs.append(path)
+              if 'fixed-point' in schema and isinstance(obj.get('cases') or obj.get('fixtures') or obj.get('entries'), list):
+                  fixed_manifests.append(path)
+
+          if len(model_cases) < 2:
+              raise SystemExit(f'Expected at least two repository-owned model cases; found {len(model_cases)}')
+          by_parent={}
+          for path in model_cases:
+              by_parent.setdefault(path.parent, []).append(path)
+          cases_dir=max(by_parent, key=lambda parent: len(by_parent[parent]))
+          representatives=sorted(model_cases, key=lambda p: p.stat().st_size, reverse=True)
+          representative=representatives[0]
+          if not evidence_runs:
+              raise SystemExit('No repository-owned evidence-run fixture found')
+          raw_evidence=max(evidence_runs, key=lambda p: p.stat().st_size)
+          if not fixed_manifests:
+              candidates=[p for p in root.rglob('*.json') if 'fixed' in p.name.lower() and 'point' in p.name.lower()]
+              fixed_manifests=candidates
+          if not fixed_manifests:
+              raise SystemExit('No repository-owned fixed-point manifest found')
+          fixed_manifest=max(fixed_manifests, key=lambda p: p.stat().st_size)
+
+          def emit(name, path):
+              print(f'{name}={path.resolve()}')
+          emit('CASES', cases_dir)
+          emit('REPRESENTATIVE', representative)
+          emit('RAW_CANARY_EVIDENCE', raw_evidence)
+          emit('FIXED_POINT_CASES_MANIFEST', fixed_manifest)
+          print('PYTHON=' + str(Path('/usr/bin/python3')))
+          print('SOFFICE=' + str(Path('/usr/bin/libreoffice')))
+          PY
+          cat "$RUNNER_TEMP/fixtures.env"
+          cat "$RUNNER_TEMP/fixtures.env" >> "$GITHUB_ENV"
+
+      - name: Run source-owned development gate
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: /usr/bin/python3
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/development-gate"
+          node scripts/run_development_gate.mjs \
+            --phase graph,workflow,evidence,forecast,economics,cohort,proof \
+            --cases "$CASES" \
+            --representative "$REPRESENTATIVE" \
+            --fixed-point-cases-manifest "$FIXED_POINT_CASES_MANIFEST" \
+            --raw-canary-evidence "$RAW_CANARY_EVIDENCE" \
+            --python "$PYTHON" \
+            --soffice "$SOFFICE" \
+            --concurrency 2 \
+            --timeout-ms 3600000 \
+            --out "$RUNNER_TEMP/development-gate"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          report=Path(os.environ['RUNNER_TEMP'])/'development-gate'/'development-gate-report.json'
+          data=json.loads(report.read_text('utf-8'))
+          if data.get('status') != 'PASS':
+              raise SystemExit(json.dumps(data.get('counts'), sort_keys=True))
+          if any(item.get('status') != 'PASS' for item in data.get('results', [])):
+              raise SystemExit('Development gate contains a non-PASS test')
+          print(json.dumps(data.get('counts'), sort_keys=True))
+          PY
+
+      - name: Run universal broker delivery matrix from raw inputs
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: /usr/bin/python3
+        run: |
+          set -euo pipefail
+          node scripts/run_universal_broker_delivery_matrix.mjs \
+            "$RAW_CANARY_EVIDENCE" "$PYTHON" "$SOFFICE" \
+            | tee "$RUNNER_TEMP/universal-broker-delivery-matrix.json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          path=Path(os.environ['RUNNER_TEMP'])/'universal-broker-delivery-matrix.json'
+          lines=[line for line in path.read_text('utf-8').splitlines() if line.strip()]
+          data=json.loads(lines[-1])
+          if data.get('status') != 'PASS':
+              raise SystemExit(json.dumps(data, sort_keys=True))
+          print(json.dumps(data, sort_keys=True))
+          PY
+
+      - name: Re-run long content-addressed Stage-4 resume proof
+        shell: bash
+        env:
+          EXCEL_INFLOW_TEST_PYTHON: /usr/bin/python3
+        run: |
+          set -euo pipefail
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases "$CASES" \
+            --python "$PYTHON" \
+            --soffice "$SOFFICE" \
+            | tee "$RUNNER_TEMP/stage4-checkpoint-proof.json"
+
+      - name: Enforce repaired behavior and no legacy policy leakage
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -R --line-number --exclude-dir=.git --exclude-dir=audit \
+            'latest_supplied_house_then_zero_authority' .
+          ! grep -R --line-number --exclude-dir=.git --exclude-dir=audit \
+            'archive-only regardless of whether its native lane happens to look complete' .
+          ! grep -R --line-number --exclude-dir=.git --exclude-dir=audit \
+            'Simulate the installed model-host semantic response' scripts/run_raw_input_black_box_canary.mjs
+          test -z "$(git status --porcelain)"
+
+      - name: Write hash-bound acceptance receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/final-acceptance"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          root=Path('.').resolve()
+          temp=Path(os.environ['RUNNER_TEMP'])
+          def sha(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+          artifacts={}
+          for path in [
+              temp/'development-gate'/'development-gate-report.json',
+              temp/'universal-broker-delivery-matrix.json',
+              temp/'stage4-checkpoint-proof.json',
+          ]:
+              if not path.is_file():
+                  raise SystemExit(f'missing required receipt {path}')
+              artifacts[path.name]={'sha256':sha(path),'bytes':path.stat().st_size}
+          body={
+              'schema_version':'excel-inflow-final-acceptance/2.0',
+              'status':'PASS',
+              'repository':'computering001/excel-inflow',
+              'branch':'agent/excel-inflow-end-to-end-repair',
+              'commit':subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
+              'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'], text=True).strip(),
+              'clean_checkout':not subprocess.check_output(['git','status','--porcelain'], text=True).strip(),
+              'artifacts':artifacts,
+          }
+          encoded=json.dumps(body, sort_keys=True, separators=(',',':')).encode()
+          body['receipt_sha256']=hashlib.sha256(encoded).hexdigest()
+          out=temp/'final-acceptance'/'final-acceptance-receipt.json'
+          out.write_text(json.dumps(body, indent=2, sort_keys=True)+'\n','utf-8')
+          print(out.read_text('utf-8'))
+          PY
+
+      - name: Upload complete acceptance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-final-acceptance-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/development-gate
+            ${{ runner.temp }}/universal-broker-delivery-matrix.json
+            ${{ runner.temp }}/stage4-checkpoint-proof.json
+            ${{ runner.temp }}/final-acceptance
+          retention-days: 14
+          if-no-files-found: error
