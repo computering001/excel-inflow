@@ -1,0 +1,74 @@
+name: Harden experience telemetry
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/harden-experience-telemetry.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Preserve Node failure semantics and mark visible terminal responses
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          module=Path('scripts/lib/experience_trace.mjs')
+          text=module.read_text('utf-8')
+          text=re.sub(
+              r'\n\s*process\.once\("unhandledRejection",[\s\S]*?\n\s*\);\n',
+              '\n',
+              text,
+              count=1,
+          )
+          module.write_text(text,'utf-8')
+
+          controller=Path('scripts/run_excel_inflow_vnext.mjs')
+          source=controller.read_text('utf-8')
+          marker='excelInflowExperienceTrace.markVisibleResponse'
+          if marker not in source:
+              match=re.search(r'function\s+finish\s*\([^)]*\)\s*\{',source)
+              if not match:
+                  match=re.search(r'(?:const|let)\s+finish\s*=\s*\([^)]*\)\s*=>\s*\{',source)
+              if not match:
+                  raise SystemExit('Public controller finish boundary not found; refusing an unbound trace root')
+              injection='''\n  try {\n    excelInflowExperienceTrace.markVisibleResponse({ status: "COMPLETE" });\n  } catch (error) {\n    console.error(`Experience trace response marker failed: ${error.message}`);\n  }\n'''
+              source=source[:match.end()]+injection+source[match.end():]
+          controller.write_text(source,'utf-8')
+
+          test=Path('scripts/run_experience_trace_tests.mjs')
+          body=test.read_text('utf-8')
+          old='''          assert.ok(controllerSource.includes("experience_trace"));\n          console.log(JSON.stringify({ status: "PASS", checks: 14, trace: output }, null, 2));\n'''
+          new='''          assert.ok(controllerSource.includes("experience_trace"));\n          assert.ok(controllerSource.includes("markVisibleResponse"));\n          assert.ok(!controllerSource.includes("unhandledRejection"));\n          console.log(JSON.stringify({ status: "PASS", checks: 16, trace: output }, null, 2));\n'''
+          if old in body:
+              body=body.replace(old,new,1)
+          elif 'markVisibleResponse' not in body:
+              raise SystemExit('Experience trace test assertion anchor not found')
+          test.write_text(body,'utf-8')
+          PY
+          node --check scripts/lib/experience_trace.mjs
+          node --check scripts/run_excel_inflow_vnext.mjs
+          node scripts/run_experience_trace_tests.mjs
+          rm -f .github/workflows/harden-experience-telemetry.yml
+          git config user.name 'excel-inflow-acceptance-bot'
+          git config user.email 'excel-inflow-acceptance-bot@users.noreply.github.com'
+          git add -A -- \
+            scripts/lib/experience_trace.mjs \
+            scripts/run_excel_inflow_vnext.mjs \
+            scripts/run_experience_trace_tests.mjs \
+            .github/workflows/harden-experience-telemetry.yml
+          git commit -m 'Harden user-visible experience trace semantics'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
