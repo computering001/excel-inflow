@@ -1,0 +1,107 @@
+name: Close all acquisition policy surfaces
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/close-all-acquisition-policy-surfaces.yml
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Replace contradictory acquisition sections atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          retired=(
+              'zero direct transaction cash-flow effect',
+              'zero direct cash-flow effect',
+              'no consideration row',
+              'no financing-proceeds row',
+              'no financing proceeds row',
+              'do not create one consideration row',
+              'do not create one financing-proceeds row',
+              'do not create one financing proceeds row',
+          )
+          canonical_body='''The canonical acquisition mode is `funded_transaction`; `references/acquisition.md` is the detailed authority.  Transaction enterprise value creates one purchase-consideration investing cash outflow at close.  Separately supplied acquisition debt creates one financing cash inflow at close and one persistent debt balance.  Residual consideration is funded from existing cash and, if required, the ordinary RCF waterfall; no equity plug is invented.\n\nTarget EBITDA equals transaction value divided by entry EV/EBITDA.  Target revenue and the visible operating statement rows derive from corresponding standalone forecast ratios so gross profit, operating expenses, EBIT, D&A and EBITDA form a visible bridge.  Close-year contribution and interest use `(13 - close month) / 12`; later years use full-year amounts.\n\nThe lightweight case does not add a target balance sheet, purchase accounting, synergies, fees, target net debt/cash, funding percentage, financing tranches or acquisition maturity.  Off state preserves standalone economics exactly.  On state proves consideration, debt proceeds, debt balance, cash/RCF funding, interest, liquidity and leverage each enter once.\n\n'''
+
+          def replace_sections(path: Path) -> None:
+              text=path.read_text('utf-8')
+              matches=list(re.finditer(r'^(?P<hashes>#{1,6})\s+[^\n]*acquisition[^\n]*$',text,flags=re.I|re.M))
+              replacements=[]
+              for match in matches:
+                  level=len(match.group('hashes'))
+                  following=text[match.end():]
+                  end_match=re.search(rf'^#{{1,{level}}}\s+[^\n]+$',following,flags=re.M)
+                  end=match.end()+end_match.start() if end_match else len(text)
+                  section=text[match.start():end]
+                  lower=section.lower()
+                  contradiction=any(item in lower for item in retired) or bool(re.search(
+                      r'(?:do not|never|without|zero)[^\n]{0,120}(?:consideration|financing[- ]proceeds)',
+                      lower,
+                  ))
+                  if contradiction:
+                      heading=text[match.start():match.end()]
+                      replacements.append((match.start(),end,heading+'\n\n'+canonical_body))
+              for start,end,replacement in reversed(replacements):
+                  text=text[:start]+replacement+text[end:]
+              # A retired phrase outside an acquisition section is a policy defect,
+              # not something to paper over with word substitution.
+              leftovers=[item for item in retired if item in text.lower()]
+              if leftovers:
+                  text += '\n\n## Funded acquisition policy correction\n\n'+canonical_body
+                  for item in leftovers:
+                      text=re.sub(rf'[^\n]*{re.escape(item)}[^\n]*\n?', '', text, flags=re.I)
+              path.write_text(text,'utf-8')
+
+          for name in ('SKILL.md','central-instructions.md','references/runtime-core.md','references/model-intent.md'):
+              path=Path(name)
+              if path.is_file(): replace_sections(path)
+          PY
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('scripts/run_repository_forensic_lint.py')
+          text=path.read_text('utf-8')
+          anchor='''    for required in ("consideration", "financing proceeds", "acquisition debt"):\n'''
+          insert='''    contradictory_acquisition = re.findall(\n        r"(?:do not|never|without|zero)[^\\n]{0,140}(?:consideration|financing[- ]proceeds|transaction cash)",\n        acquisition_text,\n        flags=re.I,\n    )\n    if contradictory_acquisition:\n        findings.append(finding(\n            "ACQUISITION_POLICY_NEGATIVE_CONTRADICTION",\n            "BLOCK",\n            "Active acquisition policy still negates funded consideration or financing mechanics.",\n            matches=contradictory_acquisition[:10],\n        ))\n\n'''
+          if insert not in text:
+              if anchor not in text:
+                  raise SystemExit('Acquisition completeness lint anchor missing')
+              text=text.replace(anchor,insert+anchor,1)
+          path.write_text(text,'utf-8')
+          PY
+          python3 -m py_compile scripts/run_repository_forensic_lint.py
+          rm -f .github/workflows/close-all-acquisition-policy-surfaces.yml
+          git config user.name 'excel-inflow-convergence-bot'
+          git config user.email 'excel-inflow-convergence-bot@users.noreply.github.com'
+          git add -A -- SKILL.md central-instructions.md references scripts/run_repository_forensic_lint.py .github/workflows/close-all-acquisition-policy-surfaces.yml
+          git commit -m 'Close funded acquisition semantics across all policy surfaces'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+      - name: Re-dispatch convergence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh workflow view excel-inflow-converge-repair.yml >/dev/null 2>&1; then
+            gh workflow run excel-inflow-converge-repair.yml --ref agent/excel-inflow-end-to-end-repair
+          fi
