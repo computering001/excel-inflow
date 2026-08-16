@@ -1,0 +1,43 @@
+name: Enforce installed host proof boundary
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/enforce-installed-host-proof-boundary.yml
+
+permissions:
+  contents: write
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Add non-substitution proof to the forensic lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('scripts/run_repository_forensic_lint.py')
+          text=path.read_text('utf-8')
+          anchor='''    # Run carrier must identify both source and installation state.\n'''
+          insert='''    # A local simulated-semantic canary may never satisfy installed-host release evidence.\n    release_paths = [\n        ROOT / "scripts" / "compile_skill_release.mjs",\n        ROOT / "scripts" / "validate_release_certification.mjs",\n        ROOT / "scripts" / "lib" / "release_certification.mjs",\n        ROOT / "scripts" / "orchestrate_release.mjs",\n        ROOT / "assets" / "release-certification-evidence-v1.schema.json",\n        ROOT / "release-manifest.json",\n    ]\n    release_body = "\\n".join(text(item) for item in release_paths if item.is_file())\n    for forbidden in (\n        "run_raw_input_local_semantic_canary",\n        "run_raw_input_black_box_canary",\n        "raw-input-local-semantic-canary",\n    ):\n        if forbidden in release_body:\n            findings.append(finding(\n                "LOCAL_CANARY_USED_AS_RELEASE_HOST_PROOF",\n                "BLOCK",\n                "Release certification references a local simulated-semantic canary as evidence.",\n                identifier=forbidden,\n            ))\n    normalized_release = re.sub(r"[^a-z0-9]+", "", release_body.lower())\n    if release_body and not any(token in normalized_release for token in (\n        "installedhost", "hostinstallation", "installedroute", "installreceipt"\n    )):\n        findings.append(finding(\n            "INSTALLED_HOST_EVIDENCE_CONTRACT_MISSING",\n            "BLOCK",\n            "Release certification has no distinct installed-host/install-receipt evidence boundary.",\n        ))\n\n'''
+          if insert not in text:
+              if anchor not in text:
+                  raise SystemExit('Run carrier lint anchor not found')
+              text=text.replace(anchor,insert+anchor,1)
+          path.write_text(text,'utf-8')
+          PY
+          python3 -m py_compile scripts/run_repository_forensic_lint.py
+          rm -f .github/workflows/enforce-installed-host-proof-boundary.yml
+          git config user.name 'excel-inflow-acceptance-bot'
+          git config user.email 'excel-inflow-acceptance-bot@users.noreply.github.com'
+          git add -A -- scripts/run_repository_forensic_lint.py .github/workflows/enforce-installed-host-proof-boundary.yml
+          git commit -m 'Forbid local canary substitution for installed-host proof'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
