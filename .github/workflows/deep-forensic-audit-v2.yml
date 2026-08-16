@@ -1,0 +1,86 @@
+name: Excel Inflow deep product audit v2
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths-ignore:
+      - audit/generated/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excel-inflow-deep-audit-v2
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Install audit/runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libreoffice-calc poppler-utils
+          python3 -m pip install --disable-pip-version-check --quiet pymupdf openpyxl pillow
+          node --version
+          python3 --version
+          soffice --version
+
+      - name: Run untouched product, architecture and code audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/generated/baseline-v2
+          python3 scripts/run_deep_product_architecture_audit.py \
+            --out audit/generated/baseline-v2 \
+            --timeout 900 \
+            --source-commit ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd \
+            --source-tree 8631c69b2ca960241e78a4719b3d7441d1c727c8
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('audit/generated/baseline-v2/deep-product-architecture-audit.json').read_text())
+          assert report['source_identity']['commit'] == 'ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd'
+          assert report['source_identity']['tree'] == '8631c69b2ca960241e78a4719b3d7441d1c727c8'
+          assert report['report_sha256']
+          assert len(report['target_crosswalk']) >= 50
+          assert len(report['findings']) >= 1
+          print(json.dumps({
+              'findings': len(report['findings']),
+              'tests': report['test_registry']['counts'],
+              'report_sha256': report['report_sha256'],
+          }, sort_keys=True))
+          PY
+
+      - name: Commit immutable baseline audit to repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "excel-inflow-audit-bot"
+          git config user.email "312638569+computering001@users.noreply.github.com"
+          git add audit/generated/baseline-v2
+          if git diff --cached --quiet; then
+            echo "Baseline audit already current"
+          else
+            git commit -m "Record untouched deep product audit"
+            git push origin HEAD:agent/excel-inflow-end-to-end-repair
+          fi
+
+      - name: Upload baseline audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-deep-product-audit-v2
+          path: audit/generated/baseline-v2
+          retention-days: 14
+          if-no-files-found: error
