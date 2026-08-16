@@ -1,0 +1,74 @@
+name: Register funded acquisition visible bridge proof
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-end-to-end-repair
+    paths:
+      - .github/workflows/register-funded-acquisition-visible-bridge.yml
+
+concurrency:
+  group: excel-inflow-converge-repair
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+      - name: Register and syntax-check the independent XLSX oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          script=Path('scripts/run_funded_acquisition_visible_bridge_tests.py')
+          text=script.read_text('utf-8')
+          if '\nimport sys\n' not in text.split('from pathlib import Path')[0]:
+              text=text.replace('import subprocess\n','import subprocess\nimport sys\n',1)
+          text=text.replace(
+              '"EXCEL_INFLOW_TEST_PYTHON": sys.executable if \'sys\' in globals() else os.environ.get("EXCEL_INFLOW_TEST_PYTHON", "python3")',
+              '"EXCEL_INFLOW_TEST_PYTHON": os.environ.get("EXCEL_INFLOW_TEST_PYTHON", sys.executable)',
+          )
+          text=text.replace('''if __name__ == "__main__":\n    import sys\n    raise SystemExit(main())\n''','''if __name__ == "__main__":\n    raise SystemExit(main())\n''')
+          script.write_text(text,'utf-8')
+
+          registry=Path('assets/development-test-registry.json')
+          data=json.loads(registry.read_text('utf-8'))
+          tests=data.get('tests') or []
+          if not any(isinstance(row,dict) and row.get('id')=='funded-acquisition-visible-bridge' for row in tests):
+              tests.append({
+                  'id':'funded-acquisition-visible-bridge',
+                  'phase':'proof',
+                  'runtime':'python',
+                  'script':'run_funded_acquisition_visible_bridge_tests.py',
+                  'arguments':['--out','$TEST_OUT']
+              })
+              data['tests']=tests
+              registry.write_text(json.dumps(data,indent=2)+'\n','utf-8')
+          PY
+          python3 -m py_compile scripts/run_funded_acquisition_visible_bridge_tests.py
+          rm -f .github/workflows/register-funded-acquisition-visible-bridge.yml
+          git config user.name 'excel-inflow-convergence-bot'
+          git config user.email 'excel-inflow-convergence-bot@users.noreply.github.com'
+          git add -A -- assets/development-test-registry.json scripts/run_funded_acquisition_visible_bridge_tests.py .github/workflows/register-funded-acquisition-visible-bridge.yml
+          git commit -m 'Require a visible funded-acquisition P&L bridge'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+      - name: Re-dispatch convergence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh workflow view excel-inflow-converge-repair.yml >/dev/null 2>&1; then
+            gh workflow run excel-inflow-converge-repair.yml --ref agent/excel-inflow-end-to-end-repair
+          fi
