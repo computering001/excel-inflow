@@ -456,6 +456,16 @@
         "PYTHON",
         "SOFFICE"
       ]
+    },
+    {
+      "id": "funded-acquisition-visible-bridge",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_funded_acquisition_visible_bridge_tests.py",
+      "arguments": [
+        "--out",
+        "$TEST_OUT"
+      ]
     }
   ]
 }

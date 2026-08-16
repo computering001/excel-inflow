@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -258,7 +259,7 @@ def main() -> int:
         capture_output=True,
         check=False,
         timeout=3600,
-        env={**os.environ, "EXCEL_INFLOW_TEST_PYTHON": sys.executable if 'sys' in globals() else os.environ.get("EXCEL_INFLOW_TEST_PYTHON", "python3")},
+        env={**os.environ, "EXCEL_INFLOW_TEST_PYTHON": os.environ.get("EXCEL_INFLOW_TEST_PYTHON", sys.executable)},
     )
     time.sleep(0.5)
     stop.set()
@@ -296,5 +297,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import sys
     raise SystemExit(main())
