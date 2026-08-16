@@ -1,0 +1,107 @@
+name: Apply Excel Inflow user-visible telemetry
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+
+permissions:
+  contents: write
+
+jobs:
+  telemetry:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install portable runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf jsonschema
+
+      - name: Integrate joined telemetry
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/repair_telemetry_integration.py
+          git diff --check
+          python3 -m py_compile scripts/repair_telemetry_integration.py scripts/run_attachment_evidence_pipeline.py
+          node --check scripts/lib/run_telemetry.mjs
+          node --check scripts/compile_run_telemetry.mjs
+          node --check scripts/run_excel_inflow_vnext.mjs
+          node --check scripts/run_user_flow.mjs
+
+      - name: Run telemetry and workflow ownership tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/run_telemetry_tests.mjs
+          node scripts/run_public_state_ownership_tests.mjs
+          node scripts/run_workflow_state_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+          node scripts/run_controller_exit_inventory_tests.mjs
+          node scripts/run_delivery_constitution_tests.mjs
+          node scripts/run_product_constitution_tests.mjs
+
+      - name: Prove process traces share one run identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/excel-inflow-telemetry
+          mkdir -p /tmp/excel-inflow-telemetry
+          export EXCEL_INFLOW_TELEMETRY_DIR=/tmp/excel-inflow-telemetry
+          export EXCEL_INFLOW_TRACE_ID=trace.portable-runtime
+          export EXCEL_INFLOW_RUN_ID=portable-runtime
+          export EXCEL_INFLOW_USER_SUBMITTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          node scripts/run_excel_inflow_vnext.mjs --screen company >/tmp/excel-inflow-telemetry/vnext.out 2>/tmp/excel-inflow-telemetry/vnext.err || true
+          node scripts/run_user_flow.mjs --screen company >/tmp/excel-inflow-telemetry/user-flow.out 2>/tmp/excel-inflow-telemetry/user-flow.err || true
+          test "$(find /tmp/excel-inflow-telemetry -maxdepth 1 -name '*.json' | wc -l)" -ge 2
+          node scripts/compile_run_telemetry.mjs /tmp/excel-inflow-telemetry /tmp/excel-inflow-telemetry/summary.json
+          jq -e '.trace_id == "trace.portable-runtime" and .component_count >= 2 and .user_visible_duration_ms >= 0' /tmp/excel-inflow-telemetry/summary.json
+
+      - name: Re-run self-contained registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audit/telemetry-proof
+          mkdir -p audit/telemetry-proof
+          git show origin/agent/excel-inflow-execution-base:scripts/forensic_audit.py > /tmp/forensic_audit.py
+          python3 /tmp/forensic_audit.py --out audit/telemetry-proof
+          jq '.summary' audit/telemetry-proof/forensic-audit.json
+          test "$(jq '.summary.self_contained_fail' audit/telemetry-proof/forensic-audit.json)" -eq 0
+          cp /tmp/excel-inflow-telemetry/summary.json audit/telemetry-proof/runtime-summary.json
+
+      - name: Persist telemetry repair
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-telemetry-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Add joined user-visible runtime telemetry [skip ci]'
+          git push origin "HEAD:${HEAD_REF}"
+
+      - name: Upload telemetry proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-telemetry-proof
+          path: |
+            /tmp/excel-inflow-telemetry
+            audit/telemetry-proof
+            /tmp/telemetry-integration.json
+          retention-days: 14
+          if-no-files-found: warn
