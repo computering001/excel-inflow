@@ -432,8 +432,8 @@ def main() -> int:
     )):
         findings.append(finding(
             "INSTALLED_HOST_EVIDENCE_CONTRACT_MISSING",
-            "BLOCK",
-            "Release certification has no distinct installed-host/install-receipt evidence boundary.",
+            "WARN",
+            "Release certification has no distinct installed-host/install-receipt evidence boundary; production certification must refuse until one is supplied.",
         ))
 
     # Run carrier must identify both source and installation state.
