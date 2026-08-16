@@ -1,0 +1,66 @@
+name: Excel Inflow blueprint forensic audit
+
+on:
+  pull_request:
+    branches:
+      - agent/excel-inflow-execution-base
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  forensic-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact repair candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install audit runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc poppler-utils jq
+          python3 -m pip install --disable-pip-version-check --no-cache-dir PyMuPDF openpyxl pypdf
+          echo "SOFFICE=$(command -v soffice)" >> "$GITHUB_ENV"
+          node --version
+          python3 --version
+          soffice --version
+          git rev-parse HEAD
+
+      - name: Validate repository JSON and source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit-output
+          python3 scripts/forensic_audit.py --out audit-output
+
+      - name: Publish concise audit summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f audit-output/forensic-audit.json; then
+            jq '.summary' audit-output/forensic-audit.json
+            {
+              echo '## Excel Inflow forensic audit'
+              echo
+              echo '```json'
+              jq '.summary' audit-output/forensic-audit.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload immutable audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-forensic-audit
+          path: audit-output
+          retention-days: 14
+          if-no-files-found: error
