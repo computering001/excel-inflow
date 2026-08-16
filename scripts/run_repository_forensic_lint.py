@@ -404,6 +404,38 @@ def main() -> int:
                 path=rel(filing_extractor),
             ))
 
+    # A local simulated-semantic canary may never satisfy installed-host release evidence.
+    release_paths = [
+        ROOT / "scripts" / "compile_skill_release.mjs",
+        ROOT / "scripts" / "validate_release_certification.mjs",
+        ROOT / "scripts" / "lib" / "release_certification.mjs",
+        ROOT / "scripts" / "orchestrate_release.mjs",
+        ROOT / "assets" / "release-certification-evidence-v1.schema.json",
+        ROOT / "release-manifest.json",
+    ]
+    release_body = "\n".join(text(item) for item in release_paths if item.is_file())
+    for forbidden in (
+        "run_raw_input_local_semantic_canary",
+        "run_raw_input_black_box_canary",
+        "raw-input-local-semantic-canary",
+    ):
+        if forbidden in release_body:
+            findings.append(finding(
+                "LOCAL_CANARY_USED_AS_RELEASE_HOST_PROOF",
+                "BLOCK",
+                "Release certification references a local simulated-semantic canary as evidence.",
+                identifier=forbidden,
+            ))
+    normalized_release = re.sub(r"[^a-z0-9]+", "", release_body.lower())
+    if release_body and not any(token in normalized_release for token in (
+        "installedhost", "hostinstallation", "installedroute", "installreceipt"
+    )):
+        findings.append(finding(
+            "INSTALLED_HOST_EVIDENCE_CONTRACT_MISSING",
+            "BLOCK",
+            "Release certification has no distinct installed-host/install-receipt evidence boundary.",
+        ))
+
     # Run carrier must identify both source and installation state.
     carrier = ROOT / "scripts" / "lib" / "run_carrier.mjs"
     if carrier.is_file():
