@@ -1,0 +1,126 @@
+name: Excel Inflow post acceptance
+
+on:
+  workflow_run:
+    workflows:
+      - Excel Inflow final acceptance v3
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish-clean-candidate:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'agent/excel-inflow-end-to-end-repair'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the exact tested branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-end-to-end-repair
+          fetch-depth: 0
+
+      - name: Refuse stale workflow result
+        shell: bash
+        run: |
+          set -euo pipefail
+          tested='${{ github.event.workflow_run.head_sha }}'
+          current="$(git rev-parse HEAD)"
+          test "$tested" = "$current" || {
+            echo "Acceptance tested $tested but branch is now $current; refusing publication." >&2
+            exit 1
+          }
+
+      - name: Remove superseded temporary execution files
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/excel-inflow-final-acceptance-v2.yml \
+            .github/workflows/repair-workspace-export.yml \
+            .github/workflows/repair-execution.yml \
+            .github/workflows/excel-inflow-materialize-and-clean.yml
+          find scripts -maxdepth 1 -type f \( \
+              -name 'apply_excel_inflow_repair_stage*.py' -o \
+              -name 'fix_stage*.py' -o \
+              -name 'run_repair_stage*_stage_v*.py' \
+            \) -delete
+          git add -A -- scripts .github/workflows
+          if git diff --cached --quiet; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit cleanup and require a new acceptance run
+        if: steps.cleanup.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-acceptance-bot'
+          git config user.email 'excel-inflow-acceptance-bot@users.noreply.github.com'
+          git commit -m 'Remove superseded repair execution scaffolding'
+          git push origin HEAD:agent/excel-inflow-end-to-end-repair
+
+      - name: Open or refresh the real draft repair PR
+        if: steps.cleanup.outputs.changed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = 'agent/excel-inflow-end-to-end-repair';
+            const base = 'agent/broker-delivery-constitution-v350';
+            const testedSha = context.payload.workflow_run.head_sha;
+            const runUrl = context.payload.workflow_run.html_url;
+            const title = 'Repair Excel Inflow end to end against the master blueprint';
+            const body = [
+              '## Status',
+              '',
+              'This draft PR was opened only after the clean-checkout Excel Inflow final acceptance v3 workflow passed on the exact head commit.',
+              '',
+              `- Tested commit: \`${testedSha}\``,
+              `- Acceptance workflow: ${runUrl}`,
+              '- Base: the exact live v3.5 candidate branch, not stale `main`',
+              '',
+              '## Scope',
+              '',
+              '- source-visible statement arithmetic and relabel-safe aggregation;',
+              '- quality-ranked all-house native broker eligibility with one bounded recovery frontier;',
+              '- complete Tier-1 broker demand and one headline authority with a D&A bridge;',
+              '- discrete-event forecast policy with no historical-average recurrence;',
+              '- funded acquisition cash, debt, interest, liquidity and leverage mechanics;',
+              '- carrier source/install identity and development-versus-certification separation;',
+              '- portable repository-owned cases, Stage-4 resume, raw broker matrix, finance and workbook proof;',
+              '- removal of one-off repair launchers and private-path test custody.',
+              '',
+              'The PR remains draft until any external installed-host, native-Excel and visual evidence required for production routing is attached. No release certification is inferred from source CI alone.',
+            ].join('\n');
+
+            const pulls = await github.rest.pulls.list({
+              owner, repo, state: 'open', head: `${owner}:${head}`, base,
+            });
+            let pr;
+            if (pulls.data.length) {
+              pr = pulls.data[0];
+              await github.rest.pulls.update({owner, repo, pull_number: pr.number, title, body, draft: true});
+            } else {
+              const created = await github.rest.pulls.create({owner, repo, head, base, title, body, draft: true});
+              pr = created.data;
+            }
+
+            try {
+              const temporary = await github.rest.pulls.get({owner, repo, pull_number: 4});
+              if (temporary.data.state === 'open') {
+                await github.rest.pulls.update({owner, repo, pull_number: 4, state: 'closed'});
+              }
+            } catch (error) {
+              core.info(`Temporary PR cleanup skipped: ${error.message}`);
+            }
+            core.notice(`Repair PR #${pr.number}: ${pr.html_url}`);
