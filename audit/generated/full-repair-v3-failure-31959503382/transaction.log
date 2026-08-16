@@ -1,4 +1,0 @@
-=== 1. Detached exact-source baseline and history ===
-Preparing worktree (detached HEAD ee5ae55)
-HEAD is now at ee5ae55 Complete broker-failure delivery constitution
-cp: cannot stat 'audit/product-target-v1.json': No such file or directory
