@@ -1,0 +1,2602 @@
+{
+  "contract_version": 2,
+  "execution_profile": "production_model",
+  "presentation_profile": "crh_dynamic",
+  "case_id": "standard_net_cash",
+  "issuer": {
+    "name": "Standard Net Cash Co (STANDARDISED TEST CASE — NOT A REAL COMPANY)",
+    "reporting_currency": "USD",
+    "units": "millions",
+    "fiscal_year_end": "12-31"
+  },
+  "periods": [
+    {
+      "date": "2023-12-31",
+      "status": "historical"
+    },
+    {
+      "date": "2024-12-31",
+      "status": "historical"
+    },
+    {
+      "date": "2025-12-31",
+      "status": "historical"
+    },
+    {
+      "date": "2026-12-31",
+      "status": "forecast"
+    },
+    {
+      "date": "2027-12-31",
+      "status": "forecast"
+    },
+    {
+      "date": "2028-12-31",
+      "status": "forecast"
+    }
+  ],
+  "modules": {
+    "multi_currency": false,
+    "historical_normalisation": false,
+    "acquisition": true
+  },
+  "controls": {
+    "broker_case": "Consensus",
+    "circularity": 1,
+    "debt_maturities_roll": 1
+  },
+  "operating_metrics": {
+    "revenue": {
+      "values": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. Flat by construction so every derived figure is a round number."
+    },
+    "adjusted_ebitda": {
+      "values": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. A flat 20.0% margin on flat revenue."
+    },
+    "depreciation_and_amortisation": {
+      "values": [
+        50,
+        50,
+        50,
+        50,
+        50,
+        50
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. 5.0% of revenue."
+    },
+    "change_in_working_capital": {
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. Zero, because revenue is flat."
+    },
+    "capex": {
+      "values": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. 10.0% of revenue, twice D&A."
+    },
+    "tax": {
+      "values": [
+        31,
+        31,
+        31,
+        null,
+        null,
+        null
+      ],
+      "forecast_method": "not_applicable",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. Forecast tax is formula-driven from the visible rate."
+    },
+    "ebit": {
+      "values": [
+        150,
+        150,
+        150,
+        150,
+        150,
+        150
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "recurring_disclosed_adjustments": {
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "other_non_cash": {
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "other_investing": {
+      "values": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "dividends_and_buybacks": {
+      "values": [
+        60,
+        60,
+        60,
+        70,
+        70,
+        70
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied",
+      "note": "Synthetic. Set so forecast free cash flow after leases is fully distributed and cash holds at exactly 400."
+    }
+  },
+  "forecast_assumptions": {
+    "revenue_growth": [
+      0,
+      0,
+      0
+    ],
+    "adjusted_ebitda_margin": [
+      0.2,
+      0.2,
+      0.2
+    ],
+    "da_to_revenue": [
+      0.05,
+      0.05,
+      0.05
+    ],
+    "effective_tax_rate": [
+      0.2,
+      0.2,
+      0.2
+    ],
+    "capex_to_revenue": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "working_capital_to_revenue_change": [
+      0,
+      0,
+      0
+    ],
+    "dividends_and_buybacks": [
+      70,
+      70,
+      70
+    ],
+    "other_non_cash": [
+      0,
+      0,
+      0
+    ],
+    "other_investing": [
+      0,
+      0,
+      0
+    ],
+    "fx_effect_on_cash": [
+      0,
+      0,
+      0
+    ]
+  },
+  "statement_structure": {
+    "income_statement": [
+      {
+        "row_id": "revenue",
+        "label": "Revenue",
+        "row_type": "input",
+        "values": [
+          1000,
+          1000,
+          1000,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "revenue",
+        "broker_metric_id": "revenue",
+        "style_role": "total"
+      },
+      {
+        "row_id": "revenue_growth",
+        "label": "Revenue growth %",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "growth",
+          "refs": [
+            "revenue"
+          ]
+        },
+        "style_role": "subsection",
+        "number_format": "percentage"
+      },
+      {
+        "row_id": "adjusted_ebitda",
+        "label": "Adjusted EBITDA",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "operating_profit",
+            "depreciation_and_amortisation"
+          ]
+        },
+        "semantic_role": "adjusted_ebitda",
+        "broker_metric_id": "adjusted_ebitda",
+        "forecast_treatment": "broker",
+        "style_role": "total"
+      },
+      {
+        "row_id": "adjusted_ebitda_margin",
+        "label": "Adjusted EBITDA margin",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "ratio",
+          "refs": [
+            "adjusted_ebitda",
+            "revenue"
+          ]
+        },
+        "style_role": "subsection",
+        "number_format": "percentage"
+      },
+      {
+        "row_id": "is_da_expense",
+        "label": "Depreciation and amortisation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "negate",
+          "refs": [
+            "depreciation_and_amortisation"
+          ]
+        }
+      },
+      {
+        "row_id": "ebit",
+        "label": "EBIT",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "adjusted_ebitda",
+            "is_da_expense"
+          ]
+        },
+        "semantic_role": "ebit",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "operating_profit",
+        "label": "Operating profit",
+        "row_type": "input",
+        "values": [
+          150,
+          150,
+          150,
+          null,
+          null,
+          null
+        ],
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "link",
+          "refs": [
+            "ebit"
+          ]
+        },
+        "style_role": "total"
+      },
+      {
+        "row_id": "interest_income",
+        "label": "Finance income",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "interest_income"
+      },
+      {
+        "row_id": "interest_expense",
+        "label": "Finance costs",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "interest_expense"
+      },
+      {
+        "row_id": "pre_tax_income",
+        "label": "Profit before taxation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "operating_profit",
+            "interest_income",
+            "interest_expense"
+          ]
+        },
+        "semantic_role": "pre_tax_income",
+        "style_role": "total"
+      },
+      {
+        "row_id": "effective_tax_rate",
+        "label": "Effective tax rate",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "negated_ratio",
+          "refs": [
+            "tax_expense",
+            "pre_tax_income"
+          ]
+        },
+        "semantic_role": "effective_tax_rate",
+        "broker_metric_id": "effective_tax_rate",
+        "forecast_treatment": "broker",
+        "style_role": "subsection",
+        "number_format": "percentage"
+      },
+      {
+        "row_id": "tax_expense",
+        "label": "Income taxes",
+        "row_type": "input",
+        "values": [
+          -31,
+          -31,
+          -31,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "tax_expense",
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "tax",
+          "refs": [
+            "pre_tax_income",
+            "effective_tax_rate"
+          ]
+        }
+      },
+      {
+        "row_id": "net_income",
+        "label": "Profit after taxation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "pre_tax_income",
+            "tax_expense"
+          ]
+        },
+        "semantic_role": "net_income",
+        "style_role": "total"
+      },
+      {
+        "row_id": "adjusted_ebitda_bridge",
+        "label": "Adjusted EBITDA bridge",
+        "row_type": "header",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "bridge_operating_profit",
+        "label": "Operating profit",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "link",
+          "refs": [
+            "operating_profit"
+          ]
+        },
+        "indent": 1
+      },
+      {
+        "row_id": "depreciation_and_amortisation",
+        "label": "Depreciation and amortisation",
+        "row_type": "input",
+        "values": [
+          50,
+          50,
+          50,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "depreciation_and_amortisation",
+        "broker_metric_id": "depreciation_and_amortisation",
+        "indent": 1
+      },
+      {
+        "row_id": "adjusted_ebitda_bridge_total",
+        "label": "Adjusted EBITDA",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "bridge_operating_profit",
+            "depreciation_and_amortisation"
+          ]
+        },
+        "style_role": "total"
+      },
+      {
+        "row_id": "adjusted_ebitda_reconciliation",
+        "label": "Adjusted EBITDA reconciliation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "subtract",
+          "refs": [
+            "adjusted_ebitda",
+            "adjusted_ebitda_bridge_total"
+          ]
+        },
+        "indent": 1
+      }
+    ],
+    "cash_flow": [
+      {
+        "row_id": "cash_flow_net_income",
+        "label": "Profit after taxation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "link",
+          "refs": [
+            "net_income"
+          ]
+        },
+        "semantic_role": "cash_flow_net_income"
+      },
+      {
+        "row_id": "cash_flow_tax_addback",
+        "label": "Income tax charge",
+        "row_type": "input",
+        "values": [
+          31,
+          31,
+          31,
+          null,
+          null,
+          null
+        ],
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "negate",
+          "refs": [
+            "tax_expense"
+          ]
+        },
+        "indent": 1
+      },
+      {
+        "row_id": "cash_flow_profit_before_tax",
+        "label": "Profit before taxation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "cash_flow_net_income",
+            "cash_flow_tax_addback"
+          ]
+        },
+        "style_role": "total"
+      },
+      {
+        "row_id": "cash_flow_adjustments",
+        "label": "Adjustments for",
+        "row_type": "header",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "cash_flow_da",
+        "label": "Depreciation and amortisation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "link",
+          "refs": [
+            "depreciation_and_amortisation"
+          ]
+        },
+        "semantic_role": "cash_flow_da",
+        "indent": 1
+      },
+      {
+        "row_id": "net_finance_result",
+        "label": "Net finance result",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "interest_income",
+            "interest_expense"
+          ]
+        },
+        "indent": 1
+      },
+      {
+        "row_id": "finance_costs_net_addback",
+        "label": "Net finance costs add-back",
+        "row_type": "input",
+        "values": [
+          -5,
+          -5,
+          -5,
+          null,
+          null,
+          null
+        ],
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "negate",
+          "refs": [
+            "net_finance_result"
+          ]
+        },
+        "indent": 1
+      },
+      {
+        "row_id": "change_in_working_capital",
+        "label": "Change in working capital",
+        "row_type": "input",
+        "values": [
+          0,
+          0,
+          0,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "change_in_working_capital",
+        "broker_metric_id": "change_in_working_capital",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "cash_generated_from_operations",
+        "label": "Cash generated from operations",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "cash_flow_profit_before_tax",
+            "cash_flow_da",
+            "finance_costs_net_addback",
+            "change_in_working_capital"
+          ]
+        },
+        "style_role": "total"
+      },
+      {
+        "row_id": "income_taxes_paid",
+        "label": "Income taxes paid",
+        "row_type": "input",
+        "values": [
+          -31,
+          -31,
+          -31,
+          null,
+          null,
+          null
+        ],
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "link",
+          "refs": [
+            "tax_expense"
+          ]
+        }
+      },
+      {
+        "row_id": "finance_income_received",
+        "label": "Finance income received",
+        "row_type": "input",
+        "values": [
+          10,
+          10,
+          10,
+          null,
+          null,
+          null
+        ],
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "link",
+          "refs": [
+            "interest_income"
+          ]
+        }
+      },
+      {
+        "row_id": "finance_costs_paid",
+        "label": "Finance costs paid",
+        "row_type": "input",
+        "values": [
+          -5,
+          -5,
+          -5,
+          null,
+          null,
+          null
+        ],
+        "forecast_treatment": "formula",
+        "forecast_calculation": {
+          "operator": "link",
+          "refs": [
+            "interest_expense"
+          ]
+        }
+      },
+      {
+        "row_id": "cash_from_operations",
+        "label": "Net cash from operating activities",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "cash_generated_from_operations",
+            "income_taxes_paid",
+            "finance_income_received",
+            "finance_costs_paid"
+          ]
+        },
+        "semantic_role": "cash_from_operations",
+        "style_role": "total"
+      },
+      {
+        "row_id": "investing_activities",
+        "label": "Investing activities",
+        "row_type": "header",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "capex",
+        "label": "Purchase of property, plant and equipment",
+        "row_type": "input",
+        "values": [
+          -100,
+          -100,
+          -100,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "capex",
+        "broker_metric_id": "capex"
+      },
+      {
+        "row_id": "acquisitions_net_of_cash",
+        "label": "Acquisitions, net of cash acquired",
+        "row_type": "input",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "semantic_role": "acquisitions_net_of_cash",
+        "movement_type": "investing_cash_flow",
+        "cash_flow_classification": "investing",
+        "forecast_treatment": "hardcode"
+      },
+      {
+        "row_id": "cash_from_investing",
+        "label": "Net cash used in investing activities",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "capex",
+            "acquisitions_net_of_cash"
+          ]
+        },
+        "semantic_role": "cash_from_investing",
+        "style_role": "total"
+      },
+      {
+        "row_id": "financing_activities",
+        "label": "Financing activities",
+        "row_type": "header",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "dividends",
+        "label": "Dividends paid",
+        "row_type": "input",
+        "values": [
+          -60,
+          -60,
+          -60,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "dividends",
+        "broker_metric_id": "dividends"
+      },
+      {
+        "row_id": "lease_principal",
+        "label": "Payment of lease liabilities",
+        "row_type": "input",
+        "values": [
+          -4,
+          -4,
+          -4,
+          null,
+          null,
+          null
+        ],
+        "semantic_role": "lease_principal"
+      },
+      {
+        "row_id": "debt_repayment",
+        "label": "Repayment of borrowings",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "debt_repayment",
+        "values": [
+          0,
+          0,
+          0,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row_id": "debt_issuance",
+        "label": "Proceeds from borrowings",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "debt_issuance",
+        "values": [
+          0,
+          0,
+          0,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row_id": "rcf_draw",
+        "label": "RCF draw",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "rcf_draw",
+        "values": [
+          0,
+          0,
+          0,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row_id": "rcf_repayment",
+        "label": "RCF repayment",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "rcf_repayment",
+        "values": [
+          0,
+          0,
+          0,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row_id": "cash_from_financing",
+        "label": "Net cash from financing activities",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "dividends",
+            "lease_principal",
+            "debt_repayment",
+            "debt_issuance",
+            "rcf_draw",
+            "rcf_repayment"
+          ]
+        },
+        "semantic_role": "cash_from_financing",
+        "style_role": "total"
+      },
+      {
+        "row_id": "fx_effect_on_cash",
+        "label": "Effect of exchange rate changes on cash",
+        "row_type": "input",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "semantic_role": "fx_effect_on_cash"
+      },
+      {
+        "row_id": "net_change_in_cash",
+        "label": "Net increase/(decrease) in cash and cash equivalents",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "cash_from_operations",
+            "cash_from_investing",
+            "cash_from_financing"
+          ]
+        },
+        "semantic_role": "net_change_in_cash",
+        "style_role": "total"
+      },
+      {
+        "row_id": "opening_cash",
+        "label": "Opening cash",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "opening_cash",
+        "style_role": "total",
+        "values": [
+          370,
+          380,
+          390,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row_id": "ending_cash",
+        "label": "Ending cash",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "ending_cash",
+        "style_role": "total",
+        "values": [
+          380,
+          390,
+          400,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "row_id": "free_cash_flow_header",
+        "label": "Free cash flow",
+        "row_type": "header",
+        "style_role": "subsection"
+      },
+      {
+        "row_id": "free_cash_flow",
+        "label": "Free cash flow",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "cash_from_operations",
+            "capex"
+          ]
+        },
+        "style_role": "total"
+      },
+      {
+        "row_id": "free_cash_flow_conversion",
+        "label": "Free cash flow conversion",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "ratio",
+          "refs": [
+            "free_cash_flow",
+            "adjusted_ebitda"
+          ]
+        },
+        "style_role": "subsection",
+        "number_format": "percentage"
+      }
+    ]
+  },
+  "source_coverage": {
+    "status": "complete",
+    "reviewed_at": "2026-07-26",
+    "review_evidence": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY. Every line in this case is generated by that specification: there is no issuer, no filing, no broker note and no third-party research behind any figure. The inventory is complete against the specification because the specification IS the source.",
+    "income_statement": [
+      {
+        "source_line_id": "is.revenue",
+        "label": "Revenue",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "revenue"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.revenue_growth",
+        "label": "Revenue growth %",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue_growth\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "revenue_growth"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda",
+        "label": "Adjusted EBITDA",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "adjusted_ebitda"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda_margin",
+        "label": "Adjusted EBITDA margin",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_margin\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "adjusted_ebitda_margin"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.is_da_expense",
+        "label": "Depreciation and amortisation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "is_da_expense"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.ebit",
+        "label": "EBIT",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "ebit"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.operating_profit",
+        "label": "Operating profit",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "operating_profit"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.interest_income",
+        "label": "Finance income",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "interest_income"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.interest_expense",
+        "label": "Finance costs",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "interest_expense"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.pre_tax_income",
+        "label": "Profit before taxation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "pre_tax_income"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.effective_tax_rate",
+        "label": "Effective tax rate",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"effective_tax_rate\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "effective_tax_rate"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.tax_expense",
+        "label": "Income taxes",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "tax_expense"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.net_income",
+        "label": "Profit after taxation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "net_income"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.bridge_operating_profit",
+        "label": "Operating profit",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"bridge_operating_profit\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "bridge_operating_profit"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.depreciation_and_amortisation",
+        "label": "Depreciation and amortisation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "depreciation_and_amortisation"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda_bridge_total",
+        "label": "Adjusted EBITDA",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_bridge_total\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "adjusted_ebitda_bridge_total"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda_reconciliation",
+        "label": "Adjusted EBITDA reconciliation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "adjusted_ebitda_reconciliation"
+        ],
+        "mapping_method": "exact"
+      }
+    ],
+    "cash_flow": [
+      {
+        "source_line_id": "cf.cash_flow_net_income",
+        "label": "Profit after taxation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_flow_net_income"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_flow_tax_addback",
+        "label": "Income tax charge",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_flow_tax_addback"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_flow_profit_before_tax",
+        "label": "Profit before taxation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_flow_profit_before_tax"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_flow_da",
+        "label": "Depreciation and amortisation",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_flow_da"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.net_finance_result",
+        "label": "Net finance result",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "net_finance_result"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.finance_costs_net_addback",
+        "label": "Net finance costs add-back",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "finance_costs_net_addback"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.change_in_working_capital",
+        "label": "Change in working capital",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "change_in_working_capital"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_generated_from_operations",
+        "label": "Cash generated from operations",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_generated_from_operations"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.income_taxes_paid",
+        "label": "Income taxes paid",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "income_taxes_paid"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.finance_income_received",
+        "label": "Finance income received",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "finance_income_received"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.finance_costs_paid",
+        "label": "Finance costs paid",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "finance_costs_paid"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_from_operations",
+        "label": "Net cash from operating activities",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_from_operations"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.capex",
+        "label": "Purchase of property, plant and equipment",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "capex"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.acquisitions_net_of_cash",
+        "label": "Acquisitions, net of cash acquired",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "acquisitions_net_of_cash"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_from_investing",
+        "label": "Net cash used in investing activities",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_from_investing"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.dividends",
+        "label": "Dividends paid",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "dividends"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.lease_principal",
+        "label": "Payment of lease liabilities",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "lease_principal"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.debt_repayment",
+        "label": "Repayment of borrowings",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "debt_repayment"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.debt_issuance",
+        "label": "Proceeds from borrowings",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "debt_issuance"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.rcf_draw",
+        "label": "RCF draw",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "rcf_draw"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.rcf_repayment",
+        "label": "RCF repayment",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "rcf_repayment"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.cash_from_financing",
+        "label": "Net cash from financing activities",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "cash_from_financing"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.fx_effect_on_cash",
+        "label": "Effect of exchange rate changes on cash",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "fx_effect_on_cash"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.net_change_in_cash",
+        "label": "Net increase/(decrease) in cash and cash equivalents",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "net_change_in_cash"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.opening_cash",
+        "label": "Opening cash",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "opening_cash"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.ending_cash",
+        "label": "Ending cash",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "ending_cash"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.free_cash_flow",
+        "label": "Free cash flow",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "free_cash_flow"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "cf.free_cash_flow_conversion",
+        "label": "Free cash flow conversion",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow_conversion\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "free_cash_flow_conversion"
+        ],
+        "mapping_method": "exact"
+      }
+    ]
+  },
+  "provenance": {
+    "revenue": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+        "units": "USD millions",
+        "source_label": "Revenue",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+        "units": "USD millions",
+        "source_label": "Revenue",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+        "units": "USD millions",
+        "source_label": "Revenue",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "operating_profit": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+        "units": "USD millions",
+        "source_label": "Operating profit",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+        "units": "USD millions",
+        "source_label": "Operating profit",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+        "units": "USD millions",
+        "source_label": "Operating profit",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "tax_expense": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+        "units": "USD millions",
+        "source_label": "Income taxes",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+        "units": "USD millions",
+        "source_label": "Income taxes",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+        "units": "USD millions",
+        "source_label": "Income taxes",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "depreciation_and_amortisation": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+        "units": "USD millions",
+        "source_label": "Depreciation and amortisation",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+        "units": "USD millions",
+        "source_label": "Depreciation and amortisation",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+        "units": "USD millions",
+        "source_label": "Depreciation and amortisation",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "cash_flow_tax_addback": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+        "units": "USD millions",
+        "source_label": "Income tax charge",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+        "units": "USD millions",
+        "source_label": "Income tax charge",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+        "units": "USD millions",
+        "source_label": "Income tax charge",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "finance_costs_net_addback": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+        "units": "USD millions",
+        "source_label": "Net finance costs add-back",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+        "units": "USD millions",
+        "source_label": "Net finance costs add-back",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+        "units": "USD millions",
+        "source_label": "Net finance costs add-back",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "change_in_working_capital": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+        "units": "USD millions",
+        "source_label": "Change in working capital",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+        "units": "USD millions",
+        "source_label": "Change in working capital",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+        "units": "USD millions",
+        "source_label": "Change in working capital",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "income_taxes_paid": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+        "units": "USD millions",
+        "source_label": "Income taxes paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+        "units": "USD millions",
+        "source_label": "Income taxes paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+        "units": "USD millions",
+        "source_label": "Income taxes paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "finance_income_received": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+        "units": "USD millions",
+        "source_label": "Finance income received",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+        "units": "USD millions",
+        "source_label": "Finance income received",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+        "units": "USD millions",
+        "source_label": "Finance income received",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "finance_costs_paid": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+        "units": "USD millions",
+        "source_label": "Finance costs paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+        "units": "USD millions",
+        "source_label": "Finance costs paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+        "units": "USD millions",
+        "source_label": "Finance costs paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "capex": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+        "units": "USD millions",
+        "source_label": "Purchase of property, plant and equipment",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+        "units": "USD millions",
+        "source_label": "Purchase of property, plant and equipment",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+        "units": "USD millions",
+        "source_label": "Purchase of property, plant and equipment",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "acquisitions_net_of_cash": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+        "units": "USD millions",
+        "source_label": "Acquisitions, net of cash acquired",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+        "units": "USD millions",
+        "source_label": "Acquisitions, net of cash acquired",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+        "units": "USD millions",
+        "source_label": "Acquisitions, net of cash acquired",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "dividends": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+        "units": "USD millions",
+        "source_label": "Dividends paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+        "units": "USD millions",
+        "source_label": "Dividends paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+        "units": "USD millions",
+        "source_label": "Dividends paid",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "lease_principal": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+        "units": "USD millions",
+        "source_label": "Payment of lease liabilities",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+        "units": "USD millions",
+        "source_label": "Payment of lease liabilities",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+        "units": "USD millions",
+        "source_label": "Payment of lease liabilities",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "debt_repayment": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+        "units": "USD millions",
+        "source_label": "Repayment of borrowings",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+        "units": "USD millions",
+        "source_label": "Repayment of borrowings",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+        "units": "USD millions",
+        "source_label": "Repayment of borrowings",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "debt_issuance": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+        "units": "USD millions",
+        "source_label": "Proceeds from borrowings",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+        "units": "USD millions",
+        "source_label": "Proceeds from borrowings",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+        "units": "USD millions",
+        "source_label": "Proceeds from borrowings",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "rcf_draw": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+        "units": "USD millions",
+        "source_label": "RCF draw",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+        "units": "USD millions",
+        "source_label": "RCF draw",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+        "units": "USD millions",
+        "source_label": "RCF draw",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "rcf_repayment": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+        "units": "USD millions",
+        "source_label": "RCF repayment",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+        "units": "USD millions",
+        "source_label": "RCF repayment",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+        "units": "USD millions",
+        "source_label": "RCF repayment",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "fx_effect_on_cash": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+        "units": "USD millions",
+        "source_label": "Effect of exchange rate changes on cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+        "units": "USD millions",
+        "source_label": "Effect of exchange rate changes on cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+        "units": "USD millions",
+        "source_label": "Effect of exchange rate changes on cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "opening_cash": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+        "units": "USD millions",
+        "source_label": "Opening cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+        "units": "USD millions",
+        "source_label": "Opening cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+        "units": "USD millions",
+        "source_label": "Opening cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ],
+    "ending_cash": [
+      {
+        "period_index": 0,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+        "units": "USD millions",
+        "source_label": "Ending cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 1,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+        "units": "USD millions",
+        "source_label": "Ending cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      },
+      {
+        "period_index": 2,
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "publication_date": "2026-07-26",
+        "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+        "units": "USD millions",
+        "source_label": "Ending cash",
+        "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+      }
+    ]
+  },
+  "broker_pack": {
+    "source_label": "Synthetic broker pack. Broker A, Broker B and Broker C are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied.",
+    "forecast_periods": [
+      "2026-12-31",
+      "2027-12-31",
+      "2028-12-31"
+    ],
+    "metrics": {
+      "revenue": {
+        "label": "Revenue",
+        "provider_consensus": [
+          1000,
+          1000,
+          1000
+        ],
+        "brokers": {
+          "Broker A": [
+            990,
+            990,
+            990
+          ],
+          "Broker B": [
+            1000,
+            1000,
+            1000
+          ],
+          "Broker C": [
+            1010,
+            1010,
+            1010
+          ]
+        }
+      },
+      "adjusted_ebitda": {
+        "label": "Adjusted EBITDA",
+        "provider_consensus": [
+          200,
+          200,
+          200
+        ],
+        "brokers": {
+          "Broker A": [
+            198,
+            198,
+            198
+          ],
+          "Broker B": [
+            200,
+            200,
+            200
+          ],
+          "Broker C": [
+            202,
+            202,
+            202
+          ]
+        }
+      },
+      "ebit": {
+        "label": "EBIT",
+        "provider_consensus": [
+          150,
+          150,
+          150
+        ],
+        "brokers": {
+          "Broker A": [
+            148.5,
+            148.5,
+            148.5
+          ],
+          "Broker B": [
+            150,
+            150,
+            150
+          ],
+          "Broker C": [
+            151.5,
+            151.5,
+            151.5
+          ]
+        }
+      },
+      "depreciation_and_amortisation": {
+        "label": "Depreciation and amortisation",
+        "provider_consensus": [
+          50,
+          50,
+          50
+        ],
+        "brokers": {
+          "Broker A": [
+            49.5,
+            49.5,
+            49.5
+          ],
+          "Broker B": [
+            50,
+            50,
+            50
+          ],
+          "Broker C": [
+            50.5,
+            50.5,
+            50.5
+          ]
+        }
+      },
+      "effective_tax_rate": {
+        "label": "Effective tax rate",
+        "provider_consensus": [
+          0.2,
+          0.2,
+          0.2
+        ],
+        "brokers": {
+          "Broker A": [
+            0.2,
+            0.2,
+            0.2
+          ],
+          "Broker B": [
+            0.2,
+            0.2,
+            0.2
+          ],
+          "Broker C": [
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      },
+      "capex": {
+        "label": "Capital expenditure",
+        "provider_consensus": [
+          100,
+          100,
+          100
+        ],
+        "brokers": {
+          "Broker A": [
+            99,
+            99,
+            99
+          ],
+          "Broker B": [
+            100,
+            100,
+            100
+          ],
+          "Broker C": [
+            101,
+            101,
+            101
+          ]
+        }
+      },
+      "change_in_working_capital": {
+        "label": "Change in working capital",
+        "provider_consensus": [
+          0,
+          0,
+          0
+        ],
+        "brokers": {
+          "Broker A": [
+            0,
+            0,
+            0
+          ],
+          "Broker B": [
+            0,
+            0,
+            0
+          ],
+          "Broker C": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "dividends": {
+        "label": "Dividends",
+        "provider_consensus": [
+          70,
+          70,
+          70
+        ],
+        "brokers": {
+          "Broker A": [
+            69.3,
+            69.3,
+            69.3
+          ],
+          "Broker B": [
+            70,
+            70,
+            70
+          ],
+          "Broker C": [
+            70.7,
+            70.7,
+            70.7
+          ]
+        }
+      }
+    }
+  },
+  "instruments": [
+    {
+      "instrument_id": "sncc_bond_2033",
+      "display_order": 1,
+      "name": "$80m 5.000% senior notes due Jun-2033",
+      "class": "fixed_bond",
+      "currency": "USD",
+      "opening_balance": 80,
+      "maturity_date": "2033-06-30",
+      "maturity_precision": "day",
+      "maturity_treatment": "contractual",
+      "scheduled_amortisation": [
+        0,
+        0,
+        0
+      ],
+      "new_issuance": [
+        0,
+        0,
+        0
+      ],
+      "rate_type": "fixed",
+      "coupon_or_all_in_rate": [
+        0.05,
+        0.05,
+        0.05
+      ],
+      "benchmark": null,
+      "benchmark_rate": [
+        0,
+        0,
+        0
+      ],
+      "spread_bps": null,
+      "facility_capacity": null,
+      "include_in_gross_debt": true,
+      "include_in_net_debt": true,
+      "cash_interest": true,
+      "source_line_ids": [],
+      "other_non_cash_movement": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "instrument_id": "sncc_rcf",
+      "display_order": 99,
+      "name": "$100m committed revolving credit facility",
+      "class": "rcf",
+      "currency": "USD",
+      "opening_balance": 0,
+      "maturity_date": "2030-06-30",
+      "maturity_precision": "day",
+      "maturity_treatment": "contractual",
+      "scheduled_amortisation": [
+        0,
+        0,
+        0
+      ],
+      "new_issuance": [
+        0,
+        0,
+        0
+      ],
+      "rate_type": "manual_all_in",
+      "coupon_or_all_in_rate": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "benchmark": null,
+      "benchmark_rate": [
+        0,
+        0,
+        0
+      ],
+      "spread_bps": null,
+      "facility_capacity": 100,
+      "include_in_gross_debt": true,
+      "include_in_net_debt": true,
+      "cash_interest": true,
+      "source_line_ids": [],
+      "other_non_cash_movement": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "rcf_policy": {
+    "instrument_id": "sncc_rcf",
+    "capacity": 100,
+    "opening_draw": 0,
+    "commitment_fee_convention": "none",
+    "commitment_fee_value": 0
+  },
+  "cash_policy": {
+    "opening_cash": 400,
+    "historical_year_end_cash": [
+      380,
+      390,
+      400
+    ],
+    "minimum_cash_override": 100,
+    "eligible_cash_percentage": 1,
+    "cash_yield": [
+      0.025,
+      0.025,
+      0.025
+    ]
+  },
+  "lease_policy": {
+    "mode": "flat_replacement",
+    "historical_liabilities": [
+      20,
+      20,
+      20
+    ],
+    "principal_repayment": [
+      4,
+      4,
+      4
+    ],
+    "additions": [
+      4,
+      4,
+      4
+    ],
+    "effective_rate": [
+      0.05,
+      0.05,
+      0.05
+    ],
+    "include_in_gross_debt": true,
+    "include_in_net_debt": true,
+    "include_in_leverage": true
+  },
+  "historical_supplement": {
+    "prior_cash_and_cash_equivalents": [
+      380,
+      390
+    ],
+    "prior_gross_debt_excluding_leases": [
+      80,
+      80
+    ],
+    "prior_lease_liabilities": [
+      20,
+      20
+    ],
+    "debt_interest_expense": [
+      4,
+      4,
+      4
+    ],
+    "lease_interest_expense": [
+      1,
+      1,
+      1
+    ],
+    "interest_income": [
+      10,
+      10,
+      10
+    ]
+  },
+  "other_interest": [
+    0,
+    0,
+    0
+  ],
+  "non_cash_interest": [
+    0,
+    0,
+    0
+  ],
+  "debt_reconciliation": {
+    "reported_opening_gross_debt": 80,
+    "maximum_residual_percentage": 0.05,
+    "note": "Synthetic. The single bond IS the whole debt register; there is no residual pool."
+  },
+  "historical_interest_reconciliation": {
+    "reported_interest": [
+      5,
+      5,
+      5
+    ],
+    "identified_interest": [
+      5,
+      5,
+      5
+    ],
+    "maximum_plug_percentage": 0.1
+  },
+  "acquisition": {
+    "enabled": 0,
+    "transaction_enterprise_value": 500,
+    "entry_ev_to_ebitda": 10,
+    "acquisition_debt_amount": 250,
+    "incremental_rate": 0.06,
+    "close_year": 2027,
+    "close_month": 6
+  }
+}
