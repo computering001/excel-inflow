@@ -31,7 +31,11 @@ VERSION = "broker-evidence-extractor/1.1"
 PDF_LANE_TIMEOUT_SECONDS = float(os.environ.get("BROKER_PDF_LANE_TIMEOUT_SECONDS", "0.5"))
 MAX_REGION_CROPS_PER_PAGE = int(os.environ.get("BROKER_MAX_REGION_CROPS_PER_PAGE", "12"))
 NUMERIC_RE = re.compile(
-    r"(?<![A-Za-z0-9])(?:\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?%?\)?|[-+]?\d+(?:\.\d+)?x)(?![A-Za-z])",
+    # Both boundaries exclude letters *and digits*.  The old right boundary
+    # excluded letters only, so the engine could backtrack through ``2026E``
+    # and count the prefix ``202`` as a missing table value.  That turned a
+    # complete ruled forecast table into unnecessary OCR work.
+    r"(?<![A-Za-z0-9])(?:\(?[-+]?[$€£¥]?\s*(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?%?\)?|[-+]?\d+(?:\.\d+)?x)(?![A-Za-z0-9])",
 )
 SUPPORTED = {
     "application/pdf",

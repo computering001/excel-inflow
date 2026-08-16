@@ -26,6 +26,7 @@ from typing import Any
 from archive_broker_pages import archive_pdf_pages
 from delivery_constitution import assert_broker_failure_degrades
 from workflow_state import assert_state, assert_transition
+from zero_broker_authority import apply_zero_broker_authority
 
 
 HERE = Path(__file__).resolve().parent
@@ -384,6 +385,18 @@ def broker_declaration_with_model_context(
         isinstance(request.get("model_context"), dict)
         and isinstance(request["model_context"].get("model_demand_graph"), dict)
     ):
+        # A model host may resume with the exact graph authored by an earlier
+        # controller pass.  Preserve that graph as a first-class artifact just
+        # as the freshly compiled path does; returning the declaration early
+        # made a valid resumed broker request appear to have skipped the
+        # mandatory pre-broker graph stage.
+        demand_graph = request["model_context"]["model_demand_graph"]
+        demand_path = output_root / "internal-requests" / "pre-broker-model-demand.json"
+        atomic_json(demand_path, demand_graph)
+        derived_path = output_root / "internal-requests" / "broker-extraction-request.json"
+        atomic_json(derived_path, request)
+        declaration["request_path"] = str(derived_path)
+        declaration["model_demand_path"] = str(demand_path)
         return declaration
     ingress_path = resolve(spec_path.parent, spec.get("attachment_ingress_path"))
     if not ingress_path or not ingress_path.is_file():
@@ -627,25 +640,21 @@ def apply_broker_archive_only(
         item for item in evidence.get("retrieval_log") or []
         if item.get("selected_source_id") not in broker_source_ids
     ]
-    previous_pack = evidence.get("broker_pack") or {}
     for field in (
         "broker_source_tables",
         "broker_crosswalk_receipt",
         "broker_semantic_verification",
     ):
         evidence.pop(field, None)
-    forecast_periods = (
-        previous_pack.get("forecast_periods")
-        or (evidence.get("filings") or {}).get("forecast_periods")
-        or ((evidence.get("case_evidence") or {}).get("lanes") or {}).get("periods", {}).get("forecast")
-        or []
+    zero_pack = apply_zero_broker_authority(
+        evidence,
+        source_label="Forecast Waterfall — zero broker authority",
+        notes=(
+            "Optional broker processing failed internally. Raw reports remain archived, "
+            "all broker observations are prohibited from model use, and the company "
+            "forecast continues through the ordinary authority waterfall."
+        ),
     )
-    zero_pack = {
-        "source_label": "Forecast Waterfall — zero broker authority",
-        "forecast_periods": forecast_periods,
-        "metrics": {},
-    }
-    evidence["broker_pack"] = zero_pack
 
     raw_documents: list[dict[str, Any]] = []
     page_evidence: list[dict[str, Any]] = []
@@ -698,7 +707,6 @@ def apply_broker_archive_only(
 
     lanes = (evidence.get("case_evidence") or {}).get("lanes")
     if isinstance(lanes, dict):
-        lanes["broker_pack"] = zero_pack
         lanes["broker_archive"] = {
             "schema_version": "broker-archive/1.0",
             "raw_documents": raw_documents,
@@ -848,39 +856,78 @@ def apply_explicit_broker_skip(
     forecast_periods = list(filings.get("forecast_periods") or [])
     if len(forecast_periods) != 3:
         raise ValueError("Explicit broker skip requires three filings-derived forecast periods")
-    evidence["broker_pack"] = {
-        "schema_version": "broker-pack/1.0",
-        "pack_kind": "broker_forecast_set",
-        "as_of": filings.get("historical_periods", [None])[-1],
-        "source_label": "Broker research explicitly skipped",
-        "reporting_currency": filings.get("reporting_currency"),
-        "units": filings.get("units"),
-        "forecast_periods": forecast_periods,
-        "metrics": {},
-        "houses": [],
-        "recommended_primary_house_id": None,
-        "eligibility_summary": {
-            "primary_eligible_house_count": 0,
-            "supplemental_eligible_house_count": 0,
-            "reference_only_house_count": 0,
-            "run_can_continue_without_broker_question": True,
-        },
-        "notes": "Sealed upload-or-skip receipt selected zero broker authority.",
-    }
-    lanes = evidence.setdefault("case_evidence", {}).setdefault("lanes", {})
-    lanes["broker_pack"] = {
-        "source_label": "Broker research explicitly skipped",
-        "forecast_periods": forecast_periods,
-        "metrics": {},
-        "house_metadata": {},
-        "source_mappings": [],
-        "house_digests": {},
-    }
-    lanes.setdefault("controls", {})["broker_case"] = "Forecast Waterfall"
+    apply_zero_broker_authority(
+        evidence,
+        source_label="Broker research explicitly skipped",
+        notes="Sealed upload-or-skip receipt selected zero broker authority.",
+    )
     resolved_path = output_root / "explicit-skip-evidence-template.json"
     atomic_json(resolved_path, evidence)
     resolved_ingress["evidence_run_path"] = str(resolved_path)
     return resolved_ingress, {"explicit_broker_skip_projection": str(resolved_path)}
+
+
+def apply_closed_broker_lane(
+    *,
+    resolved_ingress: dict[str, Any],
+    ingress_base: Path,
+    broker_state: dict[str, Any],
+    output_root: Path,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Bind a closed broker lane to ingress without making raw custody semantic.
+
+    The broker controller, not the caller's attachment descriptor, owns the
+    compiled pack.  A selected-authority pack is therefore installed as the
+    normalized artifact for the raw broker attachment.  A lawful degraded
+    close whose pack selects no values keeps the raw files and controller
+    receipts, but marks those sources evidence-only so attachment ingress does
+    not demand a semantic-pack path from an archive-only file.
+    """
+    artifacts = broker_state.get("artifacts") or {}
+    hashes = broker_state.get("artifact_sha256") or {}
+    pack_path = Path(str(artifacts.get("broker_pack") or "")).resolve()
+    if not pack_path.is_file():
+        raise FileNotFoundError("Closed broker lane has no controller-owned broker pack")
+    if hashes.get("broker_pack") != sha256_file(pack_path):
+        raise ValueError("Closed broker lane has a stale broker-pack hash")
+    pack = read_json(pack_path, "closed broker lane pack")
+
+    evidence_path = resolve(ingress_base, resolved_ingress.get("evidence_run_path"))
+    if not evidence_path or not evidence_path.is_file():
+        raise FileNotFoundError("Closed broker lane has no evidence template")
+    evidence = read_json(evidence_path, "closed-broker evidence template")
+    evidence["broker_pack"] = pack
+    selected_value_count = sum(
+        len(values)
+        for metric in (pack.get("metrics") or {}).values()
+        for values in (metric.get("brokers") or {}).values()
+        if isinstance(values, list)
+    )
+    archive_only = selected_value_count == 0
+
+    broker_source_ids = {
+        str(source_id)
+        for descriptor in resolved_ingress.get("attachments", [])
+        if (descriptor.get("adapter") or {}).get("domain") == "broker_pack"
+        for source_id in descriptor.get("source_ids") or []
+    }
+    if archive_only:
+        for source in evidence.get("source_inventory") or []:
+            if str(source.get("source_id")) in broker_source_ids:
+                source["status"] = "evidence_only"
+    else:
+        for descriptor in resolved_ingress.get("attachments", []):
+            adapter = descriptor.get("adapter") or {}
+            if adapter.get("domain") == "broker_pack":
+                adapter["normalized_path"] = str(pack_path)
+
+    resolved_path = output_root / "closed-broker-evidence-template.json"
+    atomic_json(resolved_path, evidence)
+    resolved_ingress["evidence_run_path"] = str(resolved_path)
+    return resolved_ingress, {
+        "closed_broker_pack_projection": str(resolved_path),
+        "closed_broker_pack": str(pack_path),
+    }
 
 
 CLOSED_LANE_STATUSES = {"PASS", "PASS_DEGRADED"}
@@ -1359,6 +1406,20 @@ def main() -> int:
                 output_root=output_root,
             )
         broker_archive_artifacts: dict[str, str] = {}
+        broker_lane_artifacts: dict[str, str] = {}
+        if (
+            "broker" in lanes
+            and broker_intake_choice.get("intake_state") != "explicitly_skipped"
+            and not (lanes.get("broker", {}).get("summary") or {}).get(
+                "fault_contained_to_zero_authority"
+            )
+        ):
+            resolved_ingress, broker_lane_artifacts = apply_closed_broker_lane(
+                resolved_ingress=resolved_ingress,
+                ingress_base=base_ingress_path.parent,
+                broker_state=lanes["broker"],
+                output_root=output_root,
+            )
         if (lanes.get("broker", {}).get("summary") or {}).get(
             "fault_contained_to_zero_authority"
         ):
@@ -1391,6 +1452,7 @@ def main() -> int:
             "validation": str(compiled_root / "validation.json"),
             **derived_artifacts,
             **filings_artifacts,
+            **broker_lane_artifacts,
             **broker_archive_artifacts,
             **broker_skip_artifacts,
         }

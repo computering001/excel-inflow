@@ -103,6 +103,7 @@
     "production-contract-v2.json",
     "public-test-run-v1.schema.json",
     "deployment-profile.json",
+    "runtime-manifest.json",
     "row-taxonomy-v2.json",
     "statement-semantic-taxonomy.v1.json",
     "standardised-design-runtime.v2.json",
@@ -183,6 +184,7 @@
     "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
     "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
     "deployment-profile.json": "Package provenance and exact allowlists. It is compiler input rather than runtime-loaded content, but ships so release-manifest.json never points to an absent profile.",
+    "runtime-manifest.json": "Version and certification-state identity consumed by the release compiler and read back by the installed host. It must ship so runtime and release manifests cannot disagree after a versioned update.",
     "row-taxonomy-v2.json": "Row taxonomy the agent reads while mapping company rows. Referenced from the instructions, not imported by a shipped script.",
     "broker-metric-dictionary.schema.json": "Contract for assets/broker-metric-dictionary.json. The dictionary itself is read at runtime by compile_broker_pack.py and scripts/lib/broker_metric_dictionary.mjs, which pin its digest; the schema is the review-time check on the asset's own shape.",
     "case-source.schema.json": "Loaded by scripts/lib/case_compiler.mjs via path.resolve(HERE, '..', '..', 'assets', ...) \u2014 the resolve form the static scanner does not parse. The schema is the case-source doctrine: compile_case refuses any authoring surface it cannot validate against it.",
@@ -604,6 +606,7 @@
     "broker_terminal_recovery.py",
     "broker_work_graph.py",
     "archive_broker_pages.py",
+    "zero_broker_authority.py",
     "run_attachment_evidence_pipeline.py",
     "run_dcs_pipeline.py",
     "extract_filing_statements.py",
@@ -768,6 +771,10 @@
         "fitz"
       ],
       "reason": "The archive-only broker page renderer uses deferred native PyMuPDF to create screenshot evidence. It has no semantic or selected-cell authority, and callers degrade safely when rendering is unavailable."
+    },
+    "zero_broker_authority.py": {
+      "may_import_third_party": [],
+      "reason": "The terminal optional-broker fallback is stdlib-only. It rewrites only the broker authority projection to a schema-valid zero-authority state while preserving immutable archive custody."
     },
     "run_attachment_evidence_pipeline.py": {
       "may_import_third_party": [],

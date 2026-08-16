@@ -292,6 +292,61 @@
             "other_model_check"
           ]
         },
+        "economic_domain": {
+          "enum": [
+            "operating", "cash_flow", "debt_liquidity", "leverage_coverage",
+            "interest_finance", "lease", "tax", "guidance", "valuation",
+            "presentation_metadata", "other"
+          ]
+        },
+        "concept_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "evidence_kind": {
+          "enum": [
+            "broker_estimate", "company_guidance", "broker_derived_estimate",
+            "partial_period", "calculated_check", "market_data",
+            "historical_observation", "non_numeric"
+          ]
+        },
+        "model_use": {
+          "enum": [
+            "active_input", "reference_only", "exact_duplicate",
+            "derived_input", "unresolved"
+          ]
+        },
+        "definition_fingerprint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "concept_id", "measurement_basis", "restatement_basis",
+            "cash_flow_basis", "lease_basis", "units", "currency",
+            "period_basis", "sign_convention", "accounting_basis",
+            "operating_scope"
+          ],
+          "properties": {
+            "concept_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+            "measurement_basis": {
+              "enum": ["reported", "adjusted", "core", "underlying", "statutory", "mixed", "unspecified"]
+            },
+            "restatement_basis": {
+              "enum": ["restated", "originally_reported", "not_applicable", "unspecified"]
+            },
+            "cash_flow_basis": { "enum": ["cfo", "fcf", "fcfe", "not_applicable", "unspecified"] },
+            "lease_basis": { "enum": ["including_leases", "excluding_leases", "not_applicable", "unspecified"] },
+            "units": { "type": ["string", "null"] },
+            "currency": { "type": ["string", "null"] },
+            "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic", "historical"] },
+            "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
+            "accounting_basis": { "type": "string", "minLength": 1 },
+            "operating_scope": { "type": "string", "minLength": 1 }
+          }
+        },
+        "definition_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
         "consensus_family": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9_.-]*$",

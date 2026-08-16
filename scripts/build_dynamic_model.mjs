@@ -3658,6 +3658,31 @@ function configureOperatingModel(
   }
 
   function historicalSemanticFormula(definition, column) {
+    const historicalIndex = HISTORICAL_COLUMNS.indexOf(column);
+    const historicalValues = rowValues(modelCase, definition);
+    if (
+      definition.historical_authority === "source_input" &&
+      historicalIndex >= 0 &&
+      historicalValues[historicalIndex] !== null &&
+      historicalValues[historicalIndex] !== undefined
+    ) {
+      // Schedule links and semantic identities own forecasts.  A filed value
+      // explicitly marked source_input owns its historical cell, including
+      // issuer-specific sign presentation such as a net-finance add-back.
+      return null;
+    }
+    if (
+      definition.semantic_role === "opening_cash" &&
+      historicalIndex >= 0 &&
+      historicalValues[historicalIndex] !== null &&
+      historicalValues[historicalIndex] !== undefined
+    ) {
+      // The three historical opening balances are filed observations.  The
+      // prior-ending-cash link begins at FY1 forecast; applying it inside G:I
+      // flattens the reported series and changes the first forecast's average
+      // cash/interest fixed point.
+      return null;
+    }
     if (definition.semantic_role === "cash_tax_rate") {
       const cashTaxes = statementByRole.get("cash_taxes")?.row;
       const preTaxIncome = statementByRole.get("pre_tax_income")?.row;

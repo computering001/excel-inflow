@@ -575,6 +575,121 @@ def audit_package(members):
     }
 
 
+def _relationship_records(xml):
+    """Return the internal relationship records carried by one rels part."""
+    records = []
+    for match in _TAG.finditer(xml):
+        if _local(match.group(1)) != "Relationship":
+            continue
+        attrs = _attrs(match.group(2))
+        records.append((match, attrs))
+    return records
+
+
+def _remove_relationship_ids(xml, relationship_ids):
+    """Remove only the named relationships, preserving every unrelated edge."""
+    relationship_ids = set(relationship_ids)
+    output = []
+    cursor = 0
+    for match, attrs in _relationship_records(xml):
+        if attrs.get("Id") not in relationship_ids:
+            continue
+        output.append(xml[cursor:match.start()])
+        cursor = match.end()
+    output.append(xml[cursor:])
+    return "".join(output)
+
+
+def _remove_sheet_drawing_tags(xml, relationship_ids):
+    """Remove worksheet drawing elements bound to the named relationship IDs."""
+    relationship_ids = set(relationship_ids)
+    output = []
+    cursor = 0
+    for match in _TAG.finditer(xml):
+        if _local(match.group(1)) != "drawing":
+            continue
+        attrs = _attrs(match.group(2))
+        if attrs.get("r:id") not in relationship_ids:
+            continue
+        output.append(xml[cursor:match.start()])
+        cursor = match.end()
+    output.append(xml[cursor:])
+    return "".join(output)
+
+
+def _remove_content_type_overrides(xml, part_names):
+    """Remove overrides for parts intentionally removed by a transactional rewrite."""
+    part_names = {f"/{name.lstrip('/')}" for name in part_names}
+    output = []
+    cursor = 0
+    for match in _TAG.finditer(xml):
+        if _local(match.group(1)) != "Override":
+            continue
+        if _attrs(match.group(2)).get("PartName") not in part_names:
+            continue
+        output.append(xml[cursor:match.start()])
+        cursor = match.end()
+    output.append(xml[cursor:])
+    return "".join(output)
+
+
+def _remove_existing_sheet_drawings(members, sheet_part):
+    """
+    Remove the drawing subtree currently owned by one worksheet.
+
+    N10 writes the Bxx screenshots, LibreOffice may rename their media parts,
+    and N12 writes the canonical screenshots again.  Adding the second subtree
+    over the first is not idempotent: when both use ``drawing1.xml``, the new
+    drawing rels replace the old edge while LibreOffice's ``image1.png`` is
+    left orphaned.  This function makes N12 a replacement transaction scoped
+    to the Bxx worksheet: discover through relationships, remove that exact
+    drawing/media subtree, then let the caller install the canonical one.
+    """
+    sheet_rels_path = _rels_part_for(sheet_part)
+    rels_xml = members.get(sheet_rels_path, b"").decode("utf8")
+    drawing_records = [
+        attrs
+        for _match, attrs in _relationship_records(rels_xml)
+        if attrs.get("Type") == _DRAWING_REL and attrs.get("Id")
+    ]
+    if not drawing_records:
+        return {"drawings": 0, "media": 0}
+
+    removed_parts = set()
+    removed_media = set()
+    drawing_ids = {record["Id"] for record in drawing_records}
+    for record in drawing_records:
+        target = record.get("Target")
+        if not target:
+            continue
+        drawing_part = _resolve_target(sheet_part, target)
+        drawing_rels_path = _rels_part_for(drawing_part)
+        drawing_rels_xml = members.get(drawing_rels_path, b"").decode("utf8")
+        for _match, image_record in _relationship_records(drawing_rels_xml):
+            if image_record.get("Type") != _IMAGE_REL or not image_record.get("Target"):
+                continue
+            media_part = _resolve_target(drawing_part, image_record["Target"])
+            if media_part in members:
+                removed_media.add(media_part)
+                members.pop(media_part)
+        for owned_part in (drawing_rels_path, drawing_part):
+            if owned_part in members:
+                removed_parts.add(owned_part)
+                members.pop(owned_part)
+
+    members[sheet_rels_path] = _remove_relationship_ids(rels_xml, drawing_ids).encode("utf8")
+    members[sheet_part] = _remove_sheet_drawing_tags(
+        members[sheet_part].decode("utf8"), drawing_ids
+    ).encode("utf8")
+
+    removed_parts.update(removed_media)
+    if removed_parts and "[Content_Types].xml" in members:
+        members["[Content_Types].xml"] = _remove_content_type_overrides(
+            members["[Content_Types].xml"].decode("utf8"), removed_parts
+        ).encode("utf8")
+    return {"drawings": len(drawing_records), "media": len(removed_media)}
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -635,6 +750,9 @@ def apply(plan, path, *, backup=None, asset_root=None):
                 raise ValueError(
                     f"Raster evidence is permitted only on Bxx sheets, not {spec['name']!r}."
                 )
+            replaced = _remove_existing_sheet_drawings(members, part)
+            report["sheets"][spec["name"]]["replaced_drawings"] = replaced["drawings"]
+            report["sheets"][spec["name"]]["replaced_media"] = replaced["media"]
             drawing_index += 1
             drawing_path = f"xl/drawings/drawing{drawing_index}.xml"
             drawing_rels_path = f"xl/drawings/_rels/drawing{drawing_index}.xml.rels"

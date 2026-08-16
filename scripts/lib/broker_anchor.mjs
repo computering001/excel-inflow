@@ -56,6 +56,13 @@ const METRIC_SHORT_LABEL = Object.freeze({
   depreciation_and_amortisation: "D&A",
 });
 
+function rowOwnsSemanticRole(row, role) {
+  return (
+    row?.semantic_role === role ||
+    (Array.isArray(row?.role_aliases) && row.role_aliases.includes(role))
+  );
+}
+
 /**
  * A broker CONTRIBUTES a metric when it has a usable series, not when it has
  * a key. Packs carry a placeholder entry for every house on every line, so
@@ -95,7 +102,7 @@ export function brokerMetricDefinitionSignature(modelCase, metricId) {
 }
 
 export function statementMetricDefinitionSignature(modelCase, rows, metricId) {
-  const row = (rows ?? []).find((candidate) => candidate.semantic_role === metricId);
+  const row = (rows ?? []).find((candidate) => rowOwnsSemanticRole(candidate, metricId));
   return {
     metric_id: metricId,
     accounting_basis: modelCase?.issuer?.accounting_basis ?? null,
@@ -402,7 +409,7 @@ export function selectBrokerAnchor(modelCase, rows = []) {
 export function resolveEbitdaBridge(rows) {
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const roleRow = (role) =>
-    rows.find((row) => row.semantic_role === role) ?? null;
+    rows.find((row) => rowOwnsSemanticRole(row, role)) ?? null;
   const ebitdaRow = roleRow("adjusted_ebitda");
   const ebitRow = roleRow("ebit");
   const daRow = roleRow("depreciation_and_amortisation");
@@ -568,7 +575,9 @@ export function bridgeAddbackTotal(
  */
 export function resolveAnchorPlanDecision(modelCase, rows) {
   const selection = selectBrokerAnchor(modelCase, rows);
-  const roles = new Set((rows ?? []).map((row) => row.semantic_role).filter(Boolean));
+  const roles = new Set(
+    (rows ?? []).flatMap((row) => [row.semantic_role, ...(row.role_aliases ?? [])]).filter(Boolean),
+  );
   const hasBridgeRoles = ANCHOR_METRIC_IDS.every((metricId) => roles.has(metricId));
   const authoredForBrokerAnchor = (rows ?? []).some(
     (row) =>

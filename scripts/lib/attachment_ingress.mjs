@@ -53,6 +53,15 @@ export function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+/** Translate the evidence dictionary's measurement vocabulary into the
+ * model constitution's adjustment vocabulary.  `reported` evidence is the
+ * statutory statement basis; carrying that word through verbatim makes
+ * ordinary EBIT/D&A appear incompatible with their statement rows. */
+export function modelAdjustmentBasis(measurementBasis) {
+  if (measurementBasis === null || measurementBasis === undefined) return null;
+  return measurementBasis === "reported" ? "statutory" : measurementBasis;
+}
+
 function canonicalCompactSha256(value) {
   return sha256(Buffer.from(`${JSON.stringify(canonicalise(value))}\n`, "utf8"));
 }
@@ -76,6 +85,104 @@ function contentAddressedReference(artifact, kind) {
     sha256: artifact.sha256,
     byte_length: artifact.bytes.length,
   };
+}
+
+const DCS_BALANCE_BASES = new Set([
+  "native_principal",
+  "reporting_currency_carrying_value",
+]);
+
+/**
+ * Project one sealed DCS instrument into the model lane.
+ *
+ * Creation and merge deliberately share this writer. DCS owns contractual
+ * terms and amount basis; pre-existing filing topology may supply the object,
+ * but it cannot cause one DCS field to disappear at the merge seam.
+ */
+export function projectDcsInstrument({
+  projected,
+  existingInstrument = null,
+  termAuthorities = [],
+  displayOrder = 1,
+}) {
+  if (!projected?.instrument_id) {
+    throw new Error("DCS instrument projection requires an instrument_id.");
+  }
+  const authorityByField = new Map(
+    termAuthorities
+      .filter((authority) => authority?.instrument_id === projected.instrument_id)
+      .map((authority) => [authority.model_field, authority.output_value]),
+  );
+  const projectedBasis = projected.balance_basis ?? authorityByField.get("balance_basis");
+  if (!DCS_BALANCE_BASES.has(projectedBasis)) {
+    throw new Error(
+      `${projected.instrument_id}.balance_basis must be explicit in current DCS evidence.`,
+    );
+  }
+  const authorityBasis = authorityByField.get("balance_basis");
+  if (authorityBasis !== undefined && authorityBasis !== projectedBasis) {
+    throw new Error(
+      `${projected.instrument_id}.balance_basis does not match its DCS term authority.`,
+    );
+  }
+
+  const instrument = structuredClone(existingInstrument ?? {});
+  const benchmarkResolved = projected.benchmark_curve?.resolved ?? [0, 0, 0];
+  const openingBalance = Number(
+    projected.outstanding_amount ?? projected.drawn_amount ?? 0,
+  );
+  const includeInGrossDebt =
+    projected.debt_classification?.include_in_gross_debt ?? true;
+  const includeInNetDebt =
+    projected.debt_classification?.include_in_net_debt ?? true;
+
+  Object.assign(instrument, {
+    instrument_id: projected.instrument_id,
+    display_order: instrument.display_order ??
+      (projected.instrument_type === "rcf" ? 99 : displayOrder),
+    name: projected.description,
+    class: projected.instrument_type,
+    currency: projected.currency,
+    opening_balance: openingBalance,
+    balance_basis: projectedBasis,
+    maturity_date: projected.maturity_date,
+    maturity_precision: projected.maturity_precision,
+    maturity_source_value: projected.maturity_source_value,
+    maturity_timing_convention: projected.maturity_timing_convention,
+    maturity_treatment: projected.maturity_treatment ?? "contractual",
+    pricing_treatment: projected.pricing_treatment ??
+      (projected.rate_type === "unpriced" ? "residual_interest_plug" : "source_terms"),
+    pricing_treatment_reason: projected.pricing_treatment_reason,
+    rate_type: projected.rate_type,
+    facility_capacity: projected.instrument_type === "rcf"
+      ? Number(projected.facility_limit ?? 0)
+      : null,
+    include_in_gross_debt: includeInGrossDebt,
+    include_in_net_debt: includeInNetDebt,
+    cash_interest: projected.interest_settlement !== "non_cash",
+    source_line_ids: projected.source_row === undefined || projected.source_row === null
+      ? (instrument.source_line_ids ?? [])
+      : [projected.source_row],
+    scheduled_amortisation: instrument.scheduled_amortisation ?? [0, 0, 0],
+    new_issuance: instrument.new_issuance ?? [0, 0, 0],
+    other_non_cash_movement: instrument.other_non_cash_movement ?? [0, 0, 0],
+  });
+
+  delete instrument.coupon_or_all_in_rate;
+  delete instrument.benchmark;
+  delete instrument.benchmark_rate;
+  delete instrument.spread_bps;
+  if (projected.rate_type === "fixed" || projected.rate_type === "manual_all_in") {
+    const rate = Number(
+      projected.rate_type === "fixed" ? projected.coupon_rate : projected.all_in_rate,
+    );
+    instrument.coupon_or_all_in_rate = [rate, rate, rate];
+  } else if (projected.rate_type === "floating") {
+    instrument.benchmark = projected.reference_rate ?? "Unspecified benchmark";
+    instrument.benchmark_rate = structuredClone(benchmarkResolved);
+    instrument.spread_bps = Number(projected.margin_bps ?? 0);
+  }
+  return instrument;
 }
 
 function verifyClosedBrokerWorkGraph(runState) {
@@ -897,6 +1004,11 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       .filter((checkpoint) => checkpoint.status === "PASS")
       .map((checkpoint) => checkpoint.stage)
       .filter((stage) => [
+        // A clean physical/semantic pass can still yield zero eligible houses.
+        // The controller's hash-bound degraded-delivery receipt is the lawful
+        // close for that state; it must not be mistaken for an unreceipted
+        // degradation merely because no earlier physical fallback fired.
+        "degraded_delivery_close",
         "physical_degraded_close",
         "period_header_recovery",
         "house_local_authority_fallback",
@@ -1523,9 +1635,87 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
   if (!compilerLanes || typeof compilerLanes !== "object") {
     throw new Error("Broker ingress requires case_evidence.lanes for compiler-owned evidence projection.");
   }
-  compilerLanes.broker_pack = structuredClone(
-    compilerLanes.broker_pack ?? evidence.broker_pack ?? {},
+  // The normalized broker pack is the immutable evidence/archive contract;
+  // model-case-v2 deliberately exposes a smaller selected-authority contract.
+  // Passing the evidence pack through verbatim leaks houses, eligibility and
+  // extraction-only metric metadata into the model and also omits the
+  // house-keyed `brokers` arrays the forecast writer consumes.  Project once
+  // here, at the evidence->model boundary.
+  const sourcePack = evidence.broker_pack ?? {};
+  const sourceTableHouseById = new Map(
+    (sourceTables.json.houses ?? []).map((house) => [house.house_id, house]),
   );
+  const modelMetrics = {};
+  for (const [metricId, declaration] of Object.entries(sourcePack.metrics ?? {})) {
+    const brokers = Object.fromEntries(
+      (sourcePack.houses ?? [])
+        .map((house) => [house.house_name, house.estimates?.[metricId]])
+        .filter(([, series]) =>
+          Array.isArray(series) &&
+          series.length === 3,
+        ),
+    );
+    const hasSelectedValue = Object.values(brokers).some((series) =>
+      series.some((value) => typeof value === "number" && Number.isFinite(value)),
+    ) || (sourcePack.provider_consensus?.[metricId] ?? []).some(
+      (value) => typeof value === "number" && Number.isFinite(value),
+    );
+    if (!hasSelectedValue) continue;
+    const providerConsensus = sourcePack.provider_consensus?.[metricId] ?? [0, 1, 2].map(
+      (periodIndex) => {
+        const values = Object.values(brokers)
+          .map((series) => series[periodIndex])
+          .filter((value) => typeof value === "number" && Number.isFinite(value));
+        return values.length > 0
+          ? values.reduce((total, value) => total + value, 0) / values.length
+          : null;
+      },
+    );
+    const fingerprint = declaration.definition_fingerprint ?? {};
+    const definitionSignature = Object.fromEntries(
+      Object.entries({
+        metric_id: metricId,
+        accounting_basis: fingerprint.accounting_basis ?? null,
+        operation_scope: fingerprint.operating_scope ?? null,
+        adjustment_basis: modelAdjustmentBasis(fingerprint.measurement_basis),
+        currency: fingerprint.currency ?? sourcePack.reporting_currency ?? null,
+        units: fingerprint.units ?? sourcePack.units ?? null,
+        fiscal_calendar: null,
+        cash_flow_basis: fingerprint.cash_flow_basis ?? null,
+        lease_basis: fingerprint.lease_basis ?? null,
+      }).filter(([, value]) => value !== undefined),
+    );
+    modelMetrics[metricId] = {
+      label: declaration.label ?? metricId,
+      ...(declaration.definition_id ? { definition_id: declaration.definition_id } : {}),
+      ...(declaration.semantic_role ? { semantic_role: declaration.semantic_role } : {}),
+      definition_signature: definitionSignature,
+      provider_consensus: providerConsensus,
+      brokers,
+    };
+  }
+  compilerLanes.broker_pack = {
+    source_label: sourcePack.source_label ?? "Forecast Waterfall — zero broker authority",
+    forecast_periods: structuredClone(sourcePack.forecast_periods ?? []),
+    metrics: modelMetrics,
+    ...(Array.isArray(sourcePack.run_scoped_concepts)
+      ? { run_scoped_concepts: structuredClone(sourcePack.run_scoped_concepts) }
+      : {}),
+    house_metadata: Object.fromEntries(
+      (sourcePack.houses ?? []).map((house) => [
+        house.house_name,
+        {
+          published_date: house.published_date,
+          document: house.document?.file_name ?? "preserved broker source",
+          ...(house.document?.source_id
+            ? { source_id: house.document.source_id }
+            : sourceTableHouseById.get(house.house_id)?.source_id
+              ? { source_id: sourceTableHouseById.get(house.house_id).source_id }
+              : {}),
+        },
+      ]),
+    ),
+  };
   const pageHouseIds = new Set(workbookPages.map((house) => house.house_id));
   const completePageArchive =
     workbookPages.length === packHouses.size &&
@@ -1550,8 +1740,6 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     }));
   }
   compilerLanes.broker_archive = brokerArchive;
-  delete compilerLanes.broker_pack.page_evidence;
-  delete compilerLanes.broker_pack.raw_tables;
   compilerLanes.broker_pack.source_mappings = structuredClone(
     receipt.json.mappings,
   );
@@ -1863,51 +2051,35 @@ export async function compileDcsEvidence({
       instrument,
     ]),
   );
+  const hadPreexistingInstruments = modelInstruments.size > 0;
+  const projectedDcsInstruments = projection.json.dcs_export.instruments ?? [];
   if (modelInstruments.size === 0) {
-    compilerLanes.instruments = (projection.json.dcs_export.instruments ?? []).map(
-      (projected, index) => {
-        const benchmarkResolved = projected.benchmark_curve?.resolved ?? [0, 0, 0];
-        const fixedRate = Number(projected.coupon_rate ?? projected.all_in_rate ?? 0);
-        const openingBalance = Number(
-          projected.outstanding_amount ?? projected.drawn_amount ?? 0,
-        );
-        return {
-          instrument_id: projected.instrument_id,
-          display_order: projected.instrument_type === "rcf" ? 99 : index + 1,
-          name: projected.description,
-          class: projected.instrument_type,
-          currency: projected.currency,
-          opening_balance: openingBalance,
-          maturity_date: projected.maturity_date,
-          maturity_precision: projected.maturity_precision,
-          maturity_treatment: projected.maturity_treatment ?? "contractual",
-          scheduled_amortisation: [0, 0, 0],
-          new_issuance: [0, 0, 0],
-          rate_type: projected.rate_type,
-          ...(projected.rate_type === "fixed"
-            ? { coupon_or_all_in_rate: [fixedRate, fixedRate, fixedRate] }
-            : projected.rate_type === "floating"
-              ? {
-                  benchmark: projected.reference_rate ?? "Unspecified benchmark",
-                  benchmark_rate: benchmarkResolved,
-                  spread_bps: Number(projected.margin_bps ?? 0),
-                }
-              : {}),
-          facility_capacity: projected.instrument_type === "rcf"
-            ? Number(projected.facility_limit ?? 0)
-            : null,
-          include_in_gross_debt: true,
-          include_in_net_debt: true,
-          cash_interest: true,
-          source_line_ids: projected.source_row ? [projected.source_row] : [],
-          other_non_cash_movement: [0, 0, 0],
-          balance_basis: projected.balance_basis ?? "native_principal",
-        };
-      },
-    );
-    for (const instrument of compilerLanes.instruments) {
-      modelInstruments.set(instrument.instrument_id, instrument);
+    compilerLanes.instruments = [];
+  }
+  for (const [index, projected] of projectedDcsInstruments.entries()) {
+    const existingInstrument = modelInstruments.get(projected.instrument_id) ?? null;
+    if (!existingInstrument && hadPreexistingInstruments) {
+      throw new Error(
+        `DCS projection instrument ${projected.instrument_id} is absent from sealed case_evidence.lanes.instruments. ` +
+        "Repair the internal case-evidence assembly; do not ask the user to re-upload an unchanged export.",
+      );
     }
+    const instrument = projectDcsInstrument({
+      projected,
+      existingInstrument,
+      termAuthorities: projection.json.term_authorities,
+      displayOrder: index + 1,
+    });
+    if (existingInstrument) {
+      Object.keys(existingInstrument).forEach((key) => delete existingInstrument[key]);
+      Object.assign(existingInstrument, instrument);
+      modelInstruments.set(projected.instrument_id, existingInstrument);
+    } else {
+      compilerLanes.instruments.push(instrument);
+      modelInstruments.set(projected.instrument_id, instrument);
+    }
+  }
+  if (projectedDcsInstruments.length > 0) {
     const projectedRcf = (projection.json.dcs_export.instruments ?? []).find(
       (instrument) => instrument.instrument_type === "rcf",
     );
@@ -1927,37 +2099,16 @@ export async function compileDcsEvidence({
       };
     }
   }
-  for (const projected of projection.json.dcs_export.instruments ?? []) {
-    const instrument = modelInstruments.get(projected.instrument_id);
-    if (!instrument) {
-      throw new Error(
-        `DCS projection instrument ${projected.instrument_id} is absent from sealed case_evidence.lanes.instruments. ` +
-        "Repair the internal case-evidence assembly; do not ask the user to re-upload an unchanged export.",
-      );
-    }
-    instrument.maturity_date = projected.maturity_date;
-    instrument.maturity_precision = projected.maturity_precision;
-    instrument.maturity_source_value = projected.maturity_source_value;
-    instrument.maturity_timing_convention = projected.maturity_timing_convention;
-    instrument.maturity_treatment = projected.maturity_treatment;
-    instrument.pricing_treatment = projected.pricing_treatment ?? "source_terms";
-    instrument.pricing_treatment_reason = projected.pricing_treatment_reason;
-    if (projected.rate_type === "unpriced") {
-      instrument.rate_type = "unpriced";
-      delete instrument.coupon_or_all_in_rate;
-      delete instrument.benchmark;
-      delete instrument.benchmark_rate;
-      delete instrument.spread_bps;
-      if (
-        projected.instrument_type === "rcf" &&
-        compilerLanes.policy_evidence?.rcf?.instrument_id ===
-          projected.instrument_id
-      ) {
-        compilerLanes.policy_evidence ??= {};
-        compilerLanes.policy_evidence.rcf ??= {};
-        compilerLanes.policy_evidence.rcf.commitment_fee_convention = "captured_in_residual";
-        compilerLanes.policy_evidence.rcf.commitment_fee_value = 0;
-      }
+  for (const projected of projectedDcsInstruments) {
+    if (
+      projected.rate_type === "unpriced" &&
+      projected.instrument_type === "rcf" &&
+      compilerLanes.policy_evidence?.rcf?.instrument_id === projected.instrument_id
+    ) {
+      compilerLanes.policy_evidence ??= {};
+      compilerLanes.policy_evidence.rcf ??= {};
+      compilerLanes.policy_evidence.rcf.commitment_fee_convention = "captured_in_residual";
+      compilerLanes.policy_evidence.rcf.commitment_fee_value = 0;
     }
   }
   compilerLanes.dcs = {
