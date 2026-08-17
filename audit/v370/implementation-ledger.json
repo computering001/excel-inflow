@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T17:38:03Z",
+  "recorded_at": "2026-08-17T17:40:59Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -370,16 +370,16 @@
       "earliest_responsible_layer": "Cash-flow protected identities.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
         "baseline_reproduction": "FAIL reproduced: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
-        "focused_test": "PASS guardrail: protected-identity unit checks 4/4 and real-workbook adversarial mutations 8/8.",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PASS: 9d24f24 requires formula ownership, same-period members and no protected prior-period dependency.",
-        "native_excel_evidence": "PENDING",
-        "commit": "9d24f24 (guardrail only; economic source repair remains open)"
+        "focused_test": "PASS: forecast topology 30/30 with a semantic prior-period mutation; protected-identity OOXML checks 4/4 and real-workbook adversarial mutations 8/8.",
+        "source_fix": "Protected investing cash flow must resolve as accounting_identity; its source formula must be non-temporal and sum exactly the top-level rows in the investing statement band.",
+        "integration_evidence": "PASS: forecast phase gate 6/6 and both frozen compiler cases solve with zero compile, economic or plan diffs.",
+        "semantic_oracle_evidence": "PASS: 9d24f24 enforces workbook formula ownership/current-period membership; 14dceb9 enforces the matching semantic authority before emission.",
+        "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
+        "commit": "14dceb9 (source repair); 9d24f24 (independent workbook guardrail)"
       }
     },
     {
@@ -391,16 +391,16 @@
       "earliest_responsible_layer": "Cash-flow protected identities.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
         "baseline_reproduction": "FAIL reproduced generically: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
-        "focused_test": "PASS guardrail: protected-identity unit checks 4/4 and real-workbook adversarial mutations 8/8.",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PASS: 9d24f24 rejects prior-period and missing-member protected identities.",
-        "native_excel_evidence": "PENDING",
-        "commit": "9d24f24 (guardrail only; economic source repair remains open)"
+        "focused_test": "PASS: forecast topology 30/30 rejects a receipted cash-before-financing carry and accepts the valid current-period identity.",
+        "source_fix": "Cash before financing must resolve as accounting_identity and its same-period formula must reference exactly operating plus investing cash flow.",
+        "integration_evidence": "PASS: forecast phase gate 6/6 and two-case compiler equivalence with zero blocks or diffs.",
+        "semantic_oracle_evidence": "PASS: semantic and OOXML layers independently reject prior-period ownership and missing current-period members.",
+        "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
+        "commit": "14dceb9 (source repair); 9d24f24 (independent workbook guardrail)"
       }
     },
     {
