@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T19:02:34Z",
+  "recorded_at": "2026-08-17T19:18:32Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -99,12 +99,13 @@
       "risks": [
         "KPI-005"
       ],
-      "anchor": "compiler authors visible EBITDA proxy labels",
+      "anchor": "selected EBITDA basis is typed and disclosed across the statement and credit consumers",
       "locations": [
-        "scripts/lib/case_compiler.mjs:1066",
-        "scripts/lib/case_compiler.mjs:1074"
+        "scripts/lib/semantic_roles.mjs",
+        "scripts/lib/case_compiler.mjs",
+        "scripts/build_dynamic_model.mjs"
       ],
-      "state": "PRESENT_UNCHANGED"
+      "state": "REPAIRED_A2EB84D"
     },
     {
       "risks": [
@@ -286,16 +287,16 @@
       "earliest_responsible_layer": "Derived KPI presentation contract.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/semantic_roles.mjs",
       "acceptance_criterion": "The face uses EBITDA / Adjusted EBITDA according to actual economic definition; derivation status stays in provenance.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "The face uses EBITDA / Adjusted EBITDA according to actual economic definition; derivation status stays in provenance.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "PASS_RED: the baseline compiler minted visible EBITDA proxy captions and assigned adjusted_ebitda semantics to statutory operating profit plus D&A.",
+        "focused_test": "PASS: selected-basis contract 24/24; source-proposer/compiler economics 51/51 including unsupported-D&A rejection; semantic roles 11/11; forecast behaviour 33 plus 7 mutations; forecast topology 33 plus 6 mutations; statement classifier and hierarchy suite PASS.",
+        "source_fix": "Reported EBITDA and Adjusted EBITDA remain distinct semantic roles. Direct company measures take priority; otherwise company-adjusted EBIT plus compatible D&A derives Adjusted EBITDA, statutory EBIT plus compatible D&A derives EBITDA, and absent compatible D&A derives no EBITDA. Derivation and no-impairment status are sealed in selected_ebitda_basis provenance. Legacy schedule IDs remain transport-only and cannot control the visible definition.",
+        "integration_evidence": "PASS: both an adjusted-basis production case and a reported-basis mutation completed portable plan emission with 236 historical caches, 816 solver caches, 161 evaluated caches, zero unresolved caches and solver checks passing. The reported face shows EBITDA, EBITDA margin, FCF / EBITDA, leverage / EBITDA and EBITDA / net interest; the leverage formula divides by the visible selected EBITDA row and acquisition adjustments populate that same row.",
+        "semantic_oracle_evidence": "PASS: the economic graph binds mechanical leverage to the selected reported_ebitda node; FCF conversion binds to the same statement row; schema mutations using proxy wording or impairment inclusion fail; a no-compatible-D&A case emits no EBITDA row.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "a2eb84d0946801d71101dd5e32bb4ef156f39baf"
       }
     },
     {
