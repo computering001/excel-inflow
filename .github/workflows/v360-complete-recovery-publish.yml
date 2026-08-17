@@ -1,4 +1,4 @@
-# retry after complete payload upload
+# final retry after parts 00-15 are present
 name: v360 complete recovery publish
 
 on:
