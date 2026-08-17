@@ -9,6 +9,7 @@ import {
   requiredPrimaryHouseIds,
 } from "./broker_metric_dictionary.mjs";
 import { hashFile, hashValue } from "./run_store.mjs";
+import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 
 export const BROKER_PREVIEW_SCHEMA_VERSION = "broker-preview/1.0";
 export const BROKER_PREVIEW_CONFIRMATION_SCHEMA_VERSION =
@@ -1111,6 +1112,16 @@ export function applyBrokerPreviewSelection(modelCase, preview, confirmation) {
     "broker.primary_house": verified.selection.house_id,
     "broker.preview_sha256": preview.preview_sha256,
   };
+  // Broker confirmation is a canonical forecast-authority transition. In
+  // forecast-waterfall mode it deliberately removes broker writers and
+  // reactivates the row-owned formula/historical fallback. Any existing
+  // forecast-authority ledger therefore belongs to the pre-selection graph
+  // and must be resealed here, at the mutator that changed that graph.
+  // Downstream solvers remain fail-closed: any later unreceipted mutation still
+  // causes verifyForecastAuthorityLedger() to reject the case.
+  if (modelCase.forecast_authority_ledger) {
+    sealForecastAuthorityLedger(modelCase);
+  }
   return modelCase;
 }
 
