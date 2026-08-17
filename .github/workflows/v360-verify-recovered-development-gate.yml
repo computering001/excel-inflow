@@ -1,4 +1,4 @@
-# repair the audited neutral-separator cash-flow hierarchy bug on the v3.6 target
+# focused regression proof of the recovered v3.6 repairs before the full source-owned gate
 name: v360 verify recovered development gate
 
 on:
@@ -9,45 +9,35 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/excel-inflow-v360-rebuild
+          ref: 273ecc0623d51386635cb515c9a0d4eae3b07b70
           fetch-depth: 0
-      - name: Require audited starting point
+      - name: Install validation dependencies
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = '4d871ca1cad6aa3e586ff3b74204e5bbc71a080a'
-      - name: Allow neutral source rows inside uniquely proved subtotal families
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+      - name: Run focused regression seams
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/extract_filing_statements.py')
-          s=p.read_text()
-          old='''                level = int(candidate.get("hierarchy_level") or 0)\n                if level <= parent_level:\n                    break\n                if level == parent_level + 1 and _finite_series(candidate) is not None:\n                    indexes.append(cursor)\n                cursor += direction\n'''
-          new='''                level = int(candidate.get("hierarchy_level") or 0)\n                if level <= parent_level:\n                    # A same-level, non-subtotal line that is numerically zero\n                    # in every reported period is an arithmetically neutral\n                    # separator, not proof that a visible subtotal family ended.\n                    # Skip it only inside the three-period arithmetic search; it\n                    # is never promoted to a child and caption fallback remains\n                    # conservative. This covers filing surfaces that print a\n                    # zero net-finance/result line between operating cash-flow\n                    # components while preserving the issuer's proved subtotal.\n                    series = _finite_series(candidate)\n                    neutral_separator = (\n                        level == parent_level\n                        and not candidate.get("is_subtotal")\n                        and series is not None\n                        and all(abs(value) <= 0.5000001 for value in series)\n                    )\n                    if neutral_separator:\n                        cursor += direction\n                        continue\n                    break\n                if level == parent_level + 1 and _finite_series(candidate) is not None:\n                    indexes.append(cursor)\n                cursor += direction\n'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-          PY
-          python3 -m py_compile scripts/extract_filing_statements.py
-          git diff --check
-          git diff -- scripts/extract_filing_statements.py
-      - name: Commit cash-flow hierarchy repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'excel-inflow-recovery-publisher'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/extract_filing_statements.py
-          git commit -m 'Preserve subtotal arithmetic across neutral source rows'
-          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
-          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
+          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          node scripts/run_test_registry_contract_tests.mjs
+          python3 scripts/run_source_arithmetic_topology_tests.py
+          python3 scripts/run_evidence_pipeline_tests.py
+          node scripts/run_filings_pipeline_tests.mjs
+          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
+          node scripts/run_decision_round_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+          echo 'FOCUSED_V360_REGRESSIONS=PASS'
