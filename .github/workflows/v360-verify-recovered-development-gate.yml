@@ -1,4 +1,4 @@
-# diagnose the two statement-arithmetic differences on the exact repaired v3.6 target
+# inspect duplicate statement row identities behind v3.6 arithmetic validation
 name: v360 verify recovered development gate
 
 on:
@@ -16,47 +16,38 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out exact repaired v3.6 target
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: 8f92ec0c978c0a141b86046dfc702a99170a9087
+          ref: 7c4791ff0ceb800be18f04cefc90056fd94aeebc
           fetch-depth: 0
-      - name: Install Python validation dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m pip install --upgrade pip
-          python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
-      - name: Run broker page evidence and inspect T51/T62 authority
+      - name: Install Python dependencies
+        run: python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
+      - name: Generate page workbook and inspect row identities
         shell: bash
         run: |
           set +e
           node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
-          test_exit=$?
           root="$(find /tmp -maxdepth 1 -type d -name 'broker-page-evidence-*' | head -1)"
-          echo "ROOT=$root TEST_EXIT=$test_exit"
           export ROOT_PATH="$root"
           python3 - <<'PY'
-          import json, os
+          import json,os
           from pathlib import Path
           from openpyxl import load_workbook
           root=Path(os.environ['ROOT_PATH'])
-          wb=load_workbook(root/'emit/model.xlsx', data_only=False, read_only=False)
-          wv=load_workbook(root/'emit/model.xlsx', data_only=True, read_only=False)
-          ws=wb['Operating Model']; vs=wv['Operating Model']
-          for addr in ['T51','T62']:
-              print(addr, 'FORMULA=', ws[addr].value, 'CACHED=', vs[addr].value)
-          wb.close(); wv.close()
-          plan=json.loads(Path(str(root/'emit/model.xlsx')+'.plan.json').read_text())
           rp=json.loads(Path(str(root/'emit/model.xlsx')+'.row-map.json').read_text())
-          print('ROW51_DEF=', json.dumps(next((r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s] if r.get('row')==51),None),sort_keys=True))
-          print('ROW62_DEF=', json.dumps(next((r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s] if r.get('row')==62),None),sort_keys=True))
-          for addr in ['T51','T62']:
-              row=int(addr[1:])
-              defs=[r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s] if r.get('row')==row]
-              if defs:
-                  d=defs[0]
-                  print('DEF',addr,json.dumps(d,sort_keys=True))
-          print('VALIDATOR=',(root/'validator/validation-report.json').read_text())
+          rows=[r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s]]
+          ids=['capex','acquisitions_net_of_cash','cash_from_investing','cash_from_operations','cash_from_financing','net_change_in_cash']
+          wb=load_workbook(root/'emit/model.xlsx',data_only=False); wv=load_workbook(root/'emit/model.xlsx',data_only=True)
+          ws=wb['Operating Model']; vs=wv['Operating Model']
+          for rid in ids:
+              found=[r for r in rows if r.get('row_id')==rid]
+              print('ROW_ID',rid,'COUNT',len(found))
+              for r in found:
+                  addr='T'+str(r['row'])
+                  print(' ',addr,'formula=',ws[addr].value,'value=',vs[addr].value,'DEF=',json.dumps(r,sort_keys=True))
+          from collections import Counter
+          dup=[(k,v) for k,v in Counter(r.get('row_id') for r in rows).items() if v>1]
+          print('DUPLICATE_ROW_IDS=',dup)
+          wb.close();wv.close()
           PY
-          exit $test_exit
+          exit 1
