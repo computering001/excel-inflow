@@ -352,6 +352,28 @@ assert(
   "An unsourced one-reference income-statement alias survived as a second visible authority.",
 );
 
+const projectedRoleAlias = clone(fixture);
+const projectedEbitRow = projectedRoleAlias.statement_structure.income_statement
+  .find((row) => row.semantic_role === "ebit");
+const projectedEbitSource = projectedRoleAlias.source_coverage.income_statement
+  .find((source) => source.mapped_row_ids.includes(projectedEbitRow.row_id));
+Object.assign(projectedEbitRow, {
+  semantic_role: "operating_profit",
+  role_aliases: ["ebit"],
+});
+Object.assign(projectedEbitSource, {
+  label: "EBIT",
+  numeric_type: "currency",
+  ...accepted({ label: "EBIT", section: "income_statement" }),
+});
+assert(
+  !hasBlock(
+    assessCoverage(projectedRoleAlias),
+    `classification.${projectedEbitSource.source_line_id}.destination`,
+  ),
+  "A source classification was rejected after its semantic role was preserved as an explicit projection alias.",
+);
+
 const unexplainedPostNetRows = normaliseStatementRows(
   fixture,
   "income_statement",
@@ -717,4 +739,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 13 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);
+console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 14 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);

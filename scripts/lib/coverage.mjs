@@ -105,14 +105,20 @@ function classificationChecks(disclosure, section, rows) {
         { expected: classification, declared_role: declaredRole, declared_confidence: disclosure.classification_confidence },
       ));
     }
-    const mappedRoles = disclosure.mapped_row_ids
-      .map((rowId) => rows.find((row) => row.row_id === rowId)?.semantic_role)
+    const mappedRows = disclosure.mapped_row_ids
+      .map((rowId) => rows.find((row) => row.row_id === rowId))
       .filter(Boolean);
-    if (mappedRoles.length > 0 && !mappedRoles.includes(declaredRole)) {
+    if (mappedRows.length > 0 && !mappedRows.some((row) => rowHasRole(row, declaredRole))) {
       checks.push(result(
         `classification.${id}.destination`, "BLOCK",
         `${disclosure.label ?? id} is classified as ${declaredRole} but maps to a different semantic role.`,
-        { classified_role: declaredRole, mapped_roles: mappedRoles },
+        {
+          classified_role: declaredRole,
+          mapped_roles: mappedRows.map((row) => ({
+            semantic_role: row.semantic_role ?? null,
+            role_aliases: row.role_aliases ?? [],
+          })),
+        },
       ));
     }
   } else if (disclosure.classification_review_status !== "reviewed" ||
