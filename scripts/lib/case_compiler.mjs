@@ -3029,13 +3029,32 @@ function verifyManifestSeals(caseSource, manifestsBySection, report) {
 }
 
 function synchronizeDerivedHistoricalForecastCaches(modelCase) {
+  const cashFlowRows = modelCase.statement_structure?.cash_flow ?? [];
+  const cashFlowIds = new Set(cashFlowRows.map((row) => row.row_id));
   const rows = [
     ...(modelCase.statement_structure?.income_statement ?? []),
-    ...(modelCase.statement_structure?.cash_flow ?? []),
+    ...cashFlowRows,
   ];
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const evaluate = (row, periodIndex, visiting = new Set()) => {
     if (!row || visiting.has(row.row_id)) return null;
+    // Historical normalisation retains a filed/reconciled answer separately
+    // from the visible formula that proves it.  Treat that answer as the
+    // terminal value when a downstream historical cache is materialised.
+    // Re-walking through statement-only dependencies is not equivalent: some
+    // visible children are schedule links whose workbook values are owned by
+    // debt or interest schedules, so the case-only walk can manufacture a
+    // stale subtotal even though the emitted workbook formula reconciles.
+    const reconciled = cashFlowIds.has(row.row_id)
+      ? row.reported_historical_values?.[periodIndex]
+      : null;
+    if (
+      reconciled !== null &&
+      reconciled !== undefined &&
+      Number.isFinite(Number(reconciled))
+    ) {
+      return Number(reconciled);
+    }
     const rule = row.calculation;
     if (!rule || (rule.refs ?? []).length === 0) {
       const literal = row.values?.[periodIndex];

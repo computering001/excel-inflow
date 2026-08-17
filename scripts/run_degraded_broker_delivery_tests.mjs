@@ -183,6 +183,42 @@ assert(
   compiled.model_case.controls.broker_case === "Forecast Waterfall",
   "compiled case silently selected a broker",
 );
+const compiledCashRows = new Map(
+  (compiled.model_case.statement_structure?.cash_flow ?? []).map((row) => [
+    row.semantic_role ?? row.row_id,
+    row,
+  ]),
+);
+const historicalCashCacheSyncs = (cashRows) => {
+  const netCashChange = cashRows.get("net_change_in_cash");
+  const endingCash = cashRows.get("ending_cash");
+  return (
+  [0, 1, 2].every(
+    (period) =>
+        Number(endingCash?.values?.[period]) ===
+        Number(endingCash?.reported_historical_values?.[period]),
+    ) &&
+    [0, 1, 2].every(
+      (period) =>
+        Number(netCashChange?.values?.[period]) ===
+        Number(endingCash?.values?.[period]) -
+          Number(cashRows.get("opening_cash")?.values?.[period]) -
+          Number(cashRows.get("fx_effect_on_cash")?.values?.[period]),
+    )
+  );
+};
+assert(
+  historicalCashCacheSyncs(compiledCashRows),
+  "forecast-waterfall cache synchronisation did not preserve the historical cash roll-forward",
+);
+const mutatedCashRows = new Map(
+  [...compiledCashRows].map(([role, row]) => [role, structuredClone(row)]),
+);
+mutatedCashRows.get("ending_cash").values[2] -= 1;
+assert(
+  !historicalCashCacheSyncs(mutatedCashRows),
+  "historical cash cache mutation was not detected",
+);
 const brokerBoundRows = ["income_statement", "cash_flow"].flatMap((section) =>
   (compiled.model_case.statement_structure?.[section] ?? [])
     .filter((row) => row.broker_metric_id)
@@ -364,6 +400,8 @@ const report = {
   broker_preview_mode: preview.selection_mode,
   broker_preview_selected_value_count: preview.selected_value_count,
   case_compile_status: compiled.report.status,
+  historical_cash_cache_sync: "PASS",
+  historical_cash_cache_mutation: "BLOCKED",
   stage4_status: buildResult.status,
   zero_broker_stage4_status: zeroBrokerBuildResult.status,
   zero_broker_workbook: path.resolve(zeroBrokerBuildResult.workbook),
