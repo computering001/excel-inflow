@@ -47,7 +47,7 @@ jobs:
           git diff --check
           node scripts/run_forecast_authority_ledger_tests.mjs
           node scripts/run_forecast_topology_tests.mjs
-          node scripts/run_user_flow_tests.mjs
+          node scripts/run_user_flow_tests.mjs test-fixtures/cases
       - name: Commit audited ledger ownership repair
         shell: bash
         run: |
