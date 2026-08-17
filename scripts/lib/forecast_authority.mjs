@@ -60,6 +60,23 @@ const UNCALCULATED_METHODS = new Set([
   "not_applicable",
 ]);
 
+const PROTECTED_SAME_PERIOD_CASH_FLOW_ROLES = new Set([
+  "cash_generated_from_operations",
+  "cash_from_operations",
+  "cash_from_investing",
+  "cash_before_financing",
+  "cash_from_financing",
+  "net_change_in_cash",
+]);
+
+const SAME_PERIOD_IDENTITY_OPERATORS = new Set([
+  "sum",
+  "subtract",
+  "negate_sum",
+  "negate",
+  "link",
+]);
+
 const MATERIALITY_REQUIRED_METHODS = new Set([
   "actual_plus_remainder",
   "contractual_commitment",
@@ -924,6 +941,88 @@ export function validateForecastAuthorities(modelCase, rows = []) {
       ) {
         errors.push(
           `${label} declares semantic_event_nonrecurrence without the required structured event role, source convention and as-of date.`,
+        );
+      }
+    }
+  }
+
+  // Cash-flow activity totals are protected same-period identities, never
+  // independent forecast series. This source-level rule is the semantic twin
+  // of the workbook oracle: even a syntactically valid, fully receipted carry
+  // cannot replace the current-period activity equation.
+  const cashFlowRows = modelCase?.statement_structure?.cash_flow ?? [];
+  const cashFlowById = new Map(cashFlowRows.map((row) => [row.row_id, row]));
+  const cashRole = (row) => canonicalSemanticRole(row?.semantic_role ?? row?.row_id);
+  const samePeriodRule = (rule, rowId) =>
+    SAME_PERIOD_IDENTITY_OPERATORS.has(rule?.operator) &&
+    (rule.refs ?? []).length > 0 &&
+    !(rule.refs ?? []).includes(rowId);
+  for (const row of cashFlowRows) {
+    const role = cashRole(row);
+    if (!PROTECTED_SAME_PERIOD_CASH_FLOW_ROLES.has(role)) continue;
+    if (!samePeriodRule(row.calculation, row.row_id)) {
+      errors.push(
+        `cash_flow.${row.row_id} is a protected cash-flow identity but its ` +
+        "historical rule is absent, temporal or self-referential.",
+      );
+    }
+    if (role === "cash_before_financing") {
+      const memberRoles = new Set(
+        (row.calculation?.refs ?? [])
+          .map((rowId) => cashRole(cashFlowById.get(rowId))),
+      );
+      const exact =
+        memberRoles.size === 2 &&
+        memberRoles.has("cash_from_operations") &&
+        memberRoles.has("cash_from_investing");
+      if (!exact) {
+        errors.push(
+          `cash_flow.${row.row_id} is a protected cash-flow identity and must ` +
+          "sum exactly current-period operating and investing cash flow.",
+        );
+      }
+    }
+    if (role === "cash_from_investing") {
+      const totalIndex = cashFlowRows.indexOf(row);
+      const headerIndex = cashFlowRows.findIndex(
+        (candidate) => candidate.row_id === "investing_activities",
+      );
+      if (headerIndex >= 0 && totalIndex > headerIndex) {
+        const band = cashFlowRows.slice(headerIndex + 1, totalIndex);
+        const bandIds = new Set(band.map((candidate) => candidate.row_id));
+        const topLevelMembers = band
+          .filter(
+            (candidate) =>
+              candidate.row_type !== "header" &&
+              (!candidate.parent_row_id || !bandIds.has(candidate.parent_row_id)),
+          )
+          .map((candidate) => candidate.row_id)
+          .sort();
+        const actualMembers = [...(row.calculation?.refs ?? [])].sort();
+        if (
+          topLevelMembers.length === 0 ||
+          JSON.stringify(actualMembers) !== JSON.stringify(topLevelMembers)
+        ) {
+          errors.push(
+            `cash_flow.${row.row_id} is a protected cash-flow identity but ` +
+            "does not sum exactly the current-period top-level investing members.",
+          );
+        }
+      }
+    }
+    for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+      const authority = resolveForecastAuthority(modelCase, row, forecastIndex);
+      if (authority.method !== "accounting_identity") {
+        errors.push(
+          `cash_flow.${row.row_id} is a protected cash-flow identity but ` +
+          `forecast period ${forecastIndex + 1} selects ${authority.method}.`,
+        );
+      }
+      const rule = periodRule(row, forecastIndex);
+      if (rule && !samePeriodRule(rule, row.row_id)) {
+        errors.push(
+          `cash_flow.${row.row_id} is a protected cash-flow identity but its ` +
+          `forecast period ${forecastIndex + 1} rule is temporal or self-referential.`,
         );
       }
     }

@@ -322,6 +322,82 @@ assert(
   "An unsealed transaction zero escaped the explicit-zero authority gate.",
 );
 
+const protectedCashFlowRows = [
+  row("operating_member", "Operating member", [10, 11, 12, null, null, null], {
+    forecast_period_authorities: direct(13),
+  }),
+  row("cash_from_operations", "Operating cash total", undefined, {
+    row_type: "calculation",
+    semantic_role: "cash_from_operations",
+    calculation: { operator: "sum", refs: ["operating_member"] },
+  }),
+  row("investing_activities", "Investing activities", undefined, {
+    row_type: "header",
+  }),
+  row("investment_alpha", "Investment alpha", [-3, -4, -5, null, null, null], {
+    forecast_period_authorities: direct(-6),
+  }),
+  row("investment_beta", "Investment beta", [-1, -2, -3, null, null, null], {
+    forecast_period_authorities: direct(-4),
+  }),
+  row("cash_from_investing", "Issuer investing total", undefined, {
+    row_type: "calculation",
+    semantic_role: "cash_from_investing",
+    calculation: { operator: "sum", refs: ["investment_alpha", "investment_beta"] },
+  }),
+  row("cash_before_financing", "Cash before financing", undefined, {
+    row_type: "calculation",
+    semantic_role: "cash_before_financing",
+    calculation: {
+      operator: "sum",
+      refs: ["cash_from_operations", "cash_from_investing"],
+    },
+  }),
+];
+const protectedCashFlowCase = {
+  case_id: "protected_cash_flow_identities",
+  forecast_authority_contract_version: "waterfall_v1",
+  periods,
+  source_coverage: {
+    income_statement: [],
+    cash_flow: protectedCashFlowRows
+      .filter((candidate) => candidate.row_type !== "header")
+      .map((candidate) => ({
+        source_line_id: candidate.source_line_ids[0],
+        mapped_row_ids: [candidate.row_id],
+        material: true,
+      })),
+  },
+  statement_structure: { income_statement: [], cash_flow: protectedCashFlowRows },
+};
+assert(
+  validateForecastAuthorities(protectedCashFlowCase, protectedCashFlowRows).length === 0,
+  "Valid same-period protected cash-flow identities were rejected.",
+);
+for (const protectedRole of ["cash_from_investing", "cash_before_financing"]) {
+  const mutation = clone(protectedCashFlowCase);
+  const protectedRow = mutation.statement_structure.cash_flow.find(
+    (candidate) => candidate.semantic_role === protectedRole,
+  );
+  protectedRow.calculation = {
+    operator: "prior_period",
+    refs: [protectedRow.row_id],
+  };
+  protectedRow.forecast_period_authorities = [0, 1, 2].map(() => ({
+    method: "carry_forward",
+    source_kind: "historical_inference",
+    material: true,
+    note: "Adversarial prior-period carry on a protected cash-flow identity.",
+  }));
+  assert(
+    validateForecastAuthorities(
+      mutation,
+      mutation.statement_structure.cash_flow,
+    ).some((error) => error.includes("protected cash-flow identity")),
+    `${protectedRole} accepted prior-period forecast authority.`,
+  );
+}
+
 const crossSection = fixture();
 crossSection.statement_structure.income_statement[0].forecast_capture_parent_id = "cash_from_financing";
 crossSection.statement_structure.income_statement[0].forecast_capture_mode = "semantic_scope";
@@ -364,8 +440,8 @@ assert(
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 27,
-  mutations_caught: 4,
+  tests: 30,
+  mutations_caught: 6,
   captured_paths: topology.behavior_map.filter((entry) => entry.behavior === "captured_detail").length,
   cash_flow_event_method: state("cash_flow", "debt_fees", 0).method,
 }, null, 2));
