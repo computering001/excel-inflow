@@ -46,6 +46,10 @@ DECORATION_RE = re.compile(
     r"annual report\b.*(?:financial statements?|form 10-k|form 20-f)\b)",
     re.I,
 )
+SOURCE_REFERENCE_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Z]{1,3}-\d{1,3}|notes?\s+\d+[A-Za-z]?)(?![A-Za-z0-9])",
+    re.I,
+)
 
 ACCOUNTING_FRAMEWORK_PATTERNS = {
     "ifrs": [
@@ -175,6 +179,33 @@ def parse_number(text: str) -> float | None:
     if match.group("open") or match.group("sign") == "-":
         number = -abs(number)
     return int(number) if number.is_integer() else number
+
+
+def split_source_reference_tokens(label: str) -> tuple[str, list[str]]:
+    """Separate filing references from the economic label they decorate.
+
+    Tokens such as ``F-5`` and ``Note 12`` identify source locations; they are
+    not statement concepts.  Preserve their printed form for provenance while
+    ensuring a reference-only line cannot be minted as an economic model row.
+    The deliberately narrow grammar does not consume accounting labels such as
+    ``IFRS 16 lease expense``.
+    """
+
+    tokens: list[str] = []
+    for match in SOURCE_REFERENCE_TOKEN_RE.finditer(str(label or "")):
+        token = re.sub(r"\s+", " ", match.group(0)).strip()
+        if token and token not in tokens:
+            tokens.append(token)
+    cleaned = SOURCE_REFERENCE_TOKEN_RE.sub(" ", str(label or ""))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" :;,.()[]–—-")
+    return cleaned, tokens
+
+
+def source_provenance_note(page: int, reference_tokens: list[str]) -> str:
+    base = f"page {page}"
+    if not reference_tokens:
+        return base
+    return f"{base}; source reference {', '.join(reference_tokens)}"
 
 
 def classify_value_token(text: str) -> tuple[float | None, str] | None:
@@ -589,6 +620,7 @@ def extract_statement(
     if len(columns) != 3:
         return None, [{"code": "PERIOD_COLUMNS_UNRESOLVED", "section": section, "page": window[0]["page"]}]
     rows = []
+    pending_reference_tokens: list[str] = []
     base_x = min((line["x0"] for line in window[1:] if line["text"]), default=0)
     data_left = min(columns) - 20
     for line in window[1:]:
@@ -606,6 +638,29 @@ def extract_statement(
             if word["x0"] < data_left and parse_number(word["text"]) is None
         ]
         label = " ".join(label_words).strip(" :–—-")
+        label, reference_tokens = split_source_reference_tokens(label)
+        if reference_tokens and not label:
+            # A standalone source marker belongs to the adjacent statement
+            # evidence, never to the economic row inventory. Prefer the prior
+            # row on the same reading surface; otherwise carry it to the next
+            # economic row.
+            if rows:
+                prior_tokens = [
+                    token
+                    for token in reference_tokens
+                    if token not in rows[-1]["page_or_note"]
+                ]
+                if prior_tokens:
+                    rows[-1]["page_or_note"] += (
+                        f"; source reference {', '.join(prior_tokens)}"
+                    )
+            else:
+                pending_reference_tokens.extend(
+                    token
+                    for token in reference_tokens
+                    if token not in pending_reference_tokens
+                )
+            continue
         if not label or HEADINGS[section].search(label):
             continue
         if DECORATION_RE.search(label):
@@ -637,13 +692,24 @@ def extract_statement(
             suffix += 1
         used_ids.add(source_line_id)
         hierarchy = max(0, min(8, round((line["x0"] - base_x) / 12)))
+        provenance_tokens = [
+            *pending_reference_tokens,
+            *(
+                token
+                for token in reference_tokens
+                if token not in pending_reference_tokens
+            ),
+        ]
+        pending_reference_tokens = []
         rows.append({
             "source_line_id": source_line_id,
             "ordinal": len(rows) + 1,
             "raw_label": label,
             "values": values,
             "value_states": value_states,
-            "page_or_note": f"page {line['page']}",
+            "page_or_note": source_provenance_note(
+                int(line["page"]), provenance_tokens
+            ),
             "material": any(value not in {None, 0} for value in values),
             "hierarchy_level": hierarchy,
             "is_subtotal": is_subtotal_label(label),
