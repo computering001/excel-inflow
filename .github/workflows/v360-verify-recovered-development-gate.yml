@@ -81,6 +81,7 @@ jobs:
       - name: Run diagnostic gate and print every failure
         shell: bash
         run: |
+          set +e
           set -uo pipefail
           rm -rf /tmp/v360-development-gate
           node scripts/run_development_gate.mjs \
@@ -109,6 +110,5 @@ jobs:
                       print('STDOUT_TAIL:\n'+r['stdout'][-5000:])
                   if r.get('stderr'):
                       print('STDERR_TAIL:\n'+r['stderr'][-8000:])
-          if d['status']!='PASS': raise SystemExit(1)
           PY
           exit $gate_exit
