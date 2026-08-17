@@ -1,0 +1,41 @@
+name: v360 repair part15
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - publish/v360-recovery-complete/part15.suffix
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Append exact missing suffix and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='publish/v360-recovery-complete/part15.b64'
+          suffix='publish/v360-recovery-complete/part15.suffix'
+          test "$(wc -c < "$target")" -eq 7750
+          test "$(wc -c < "$suffix")" -eq 36
+          cat "$suffix" >> "$target"
+          test "$(wc -c < "$target")" -eq 7786
+          echo 'dfccdc536caa66c866d5fa0aecdd19ac06346ab2f16d8f78443af4d8c2d4691b  publish/v360-recovery-complete/part15.b64' | sha256sum -c -
+      - name: Commit repaired chunk
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add publish/v360-recovery-complete/part15.b64
+          git commit -m 'Repair complete v3.6 recovery payload tail'
+          git push origin HEAD:agent/v360-publication-bridge
