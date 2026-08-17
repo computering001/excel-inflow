@@ -1,4 +1,4 @@
-# final retry after parts 00-15 are present
+# trigger after exact part15 SHA repair
 name: v360 complete recovery publish
 
 on:
