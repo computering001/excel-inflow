@@ -198,6 +198,7 @@ function previewNumber(value) {
  */
 export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } = {}) {
   const waterfallMode = preview?.selection_mode === "forecast_waterfall";
+  const zeroBrokerPolicy = preview?.broker_authority_policy === "zero_broker";
   const selected = (preview?.selection_cases ?? []).find(
     (candidate) => candidate.house_id === preview?.recommended_primary_house_id,
   );
@@ -227,7 +228,7 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     `   Quarantined cells ....... ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,
     "",
     `   SELECTION MODE ......... ${waterfallMode ? "FORECAST WATERFALL" : "PRIMARY HOUSE"}`,
-    `   RECOMMENDED PRIMARY: ${selected?.house_name ?? (waterfallMode ? "none - broker authority unavailable" : "none")}`,
+    `   RECOMMENDED PRIMARY: ${selected?.house_name ?? (waterfallMode ? "none - no coherent primary house" : "none")}`,
     `   House id ............... ${selected?.house_id ?? (waterfallMode ? "FORECAST_WATERFALL" : "none")}`,
     `   Headline anchor ........ ${preview?.headline_anchor ?? "none"}`,
     "",
@@ -258,9 +259,12 @@ export function renderBrokerPreviewScreen(preview, { confirmationErrors = [] } =
     }
     lines.push(
       "",
-      "   No broker value will be selected. Company evidence,",
-      "   formulas and historical inference remain subject to",
-      "   the forecast-authority and workbook-integrity gates.",
+      zeroBrokerPolicy
+        ? "   This failure policy explicitly rejects broker values."
+        : "   Compatible per-metric broker values remain eligible.",
+      "   Company evidence, formulas and historical inference",
+      "   remain subject to forecast-authority and",
+      "   workbook-integrity gates.",
     );
   }
   if (confirmationErrors.length > 0) {

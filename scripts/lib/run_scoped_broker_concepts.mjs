@@ -115,7 +115,7 @@ export function applyRunScopedBrokerConcepts(modelCase, report) {
       "Repair or remove the run-scoped contract; an invalid contract cannot become model authority.",
     );
   }
-  if (errors.length || modelCase.controls?.broker_case === "Forecast Waterfall") return;
+  if (errors.length) return;
   const allRows = () => [
     ...(modelCase.statement_structure?.income_statement ?? []),
     ...(modelCase.statement_structure?.cash_flow ?? []),

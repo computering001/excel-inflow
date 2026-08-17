@@ -520,6 +520,76 @@ assert(
   "A sectionless instruction leaked across duplicate row ids in two statements.",
 );
 
+const incompatibleBrokerCase = {
+  ...clone(selectionCase),
+  controls: { broker_case: "Forecast Waterfall" },
+  broker_pack: {
+    metrics: {
+      revenue: {
+        definition_signature: {
+          metric_id: "revenue",
+          accounting_basis: "IFRS",
+          operation_scope: "continuing",
+          adjustment_basis: "statutory",
+          currency: "USD",
+          units: "millions",
+          fiscal_calendar: "fixed_date",
+        },
+        brokers: { "House A": [50, 55, 60] },
+      },
+    },
+  },
+};
+const incompatibleBrokerRows = {
+  income_statement: [{
+    row_id: "revenue",
+    label: "Issuer sales",
+    semantic_role: "revenue",
+    row_type: "input",
+    historical_authority: "source_input",
+    values: [30, 35, 40, null, null, null],
+  }],
+  cash_flow: [],
+};
+const incompatibleBrokerPlan = compileForecastPlan(
+  incompatibleBrokerCase,
+  incompatibleBrokerRows,
+);
+assert(
+  incompatibleBrokerPlan.states.every((state) => state.method !== "broker_consensus"),
+  "A definition-incompatible broker series entered the forecast waterfall.",
+);
+assert(
+  incompatibleBrokerPlan.candidate_ledger
+    .filter((candidate) => candidate.origin === "row_broker_rejection")
+    .every((candidate) =>
+      candidate.broker_rejections?.some((rejection) =>
+        rejection.definition_mismatches?.some((item) => item.dimension === "currency"),
+      ),
+    ) &&
+    incompatibleBrokerPlan.candidate_ledger
+      .filter((candidate) => candidate.origin === "row_broker_rejection")
+      .length === 3,
+  "The rejected broker authority was not receipted with its definition mismatch.",
+);
+const materializedIncompatibleBroker = materializeForecastPlan(
+  {
+    ...incompatibleBrokerCase,
+    statement_structure: clone(incompatibleBrokerRows),
+  },
+  incompatibleBrokerPlan,
+);
+assert(
+  materializedIncompatibleBroker.statement_structure.income_statement[0]
+    .forecast_period_authorities
+    .every((authority) =>
+      authority.broker_rejection_reasons?.some((reason) =>
+        reason.includes("definition-incompatible"),
+      ),
+    ),
+  "The selected fallback authorities did not retain their broker-rejection receipts.",
+);
+
 const mutations = [
   ["unknown behavior", (value) => { value.rows[0].behavior = "company_specific_magic"; }],
   ["extra property", (value) => { value.rows[0].cell = "J47"; }],
@@ -538,7 +608,7 @@ for (const [name, mutate] of mutations) {
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 24 + mutations.length,
+  tests: 26 + mutations.length,
   adversarial_mutations_caught: mutations.length,
   total_violations: 0,
 }, null, 2));

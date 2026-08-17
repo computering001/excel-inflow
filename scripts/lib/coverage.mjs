@@ -2006,7 +2006,6 @@ function brokerChecks(modelCase) {
       .map((row) => row.broker_metric_id)
       .filter(Boolean),
   );
-  const brokerDisabled = modelCase.controls?.broker_case === "Forecast Waterfall";
   for (const [metricId, metric] of Object.entries(pack.metrics ?? {})) {
     if (consumedMetricIds.has(metricId)) continue;
     const disposition = metric.model_disposition;
@@ -2015,7 +2014,6 @@ function brokerChecks(modelCase) {
       ["reference_only", "rejected", "not_applicable"].includes(disposition) &&
       typeof reason === "string" &&
       reason.trim().length > 0;
-    const waterfallReferenceOnly = brokerDisabled;
     // A disclosed broker subtotal may deliberately remain a counter-headline
     // rather than drive the model when the compiled statement calculates the
     // same semantic concept from visible constituents.  This is generic: it
@@ -2038,11 +2036,9 @@ function brokerChecks(modelCase) {
     checks.push(
       result(
         `broker_pack.${metricId}.consumption`,
-        explicitlyExcluded || waterfallReferenceOnly || derivedSemanticReference ? "PASS" : "BLOCK",
+        explicitlyExcluded || derivedSemanticReference ? "PASS" : "BLOCK",
         explicitlyExcluded
           ? `${metricId} is explicitly ${disposition}: ${reason.trim()}`
-          : waterfallReferenceOnly
-            ? `${metricId} is retained as broker evidence only; the confirmed forecast waterfall owns the model forecast.`
           : derivedSemanticReference
             ? `${metricId} is retained on Brokers as a disclosed counter-headline while the visible model derives the same semantic concept through its declared calculation graph.`
           : `${metricId} is present in the accepted broker pack but maps to no visible statement or schedule node. Map it exactly once or reject it with a model disposition and reason.`,

@@ -2536,47 +2536,6 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   for (const row of allRows) {
     if (row.semantic_role) byRole.set(row.semantic_role, row);
   }
-  const brokerDisabled = modelCase.controls?.broker_case === "Forecast Waterfall";
-  let filedProfitLevel = null;
-  if (brokerDisabled) {
-    // A sealed preview with no selectable broker authority is an affirmative
-    // model decision, not a missing-input state. Remove inherited broker
-    // ownership before compiling the ordinary evidence/history waterfall;
-    // retaining the marker would make a null broker series outrank usable
-    // company history and could recreate a profit-bridge cycle.
-    for (const row of allRows) {
-      delete row.broker_metric_id;
-      if (row.forecast_treatment === "broker") {
-        delete row.forecast_treatment;
-      }
-    }
-    const profitRoles = new Set([
-      "operating_profit",
-      "ebit",
-      "ebitda",
-      "adjusted_ebitda",
-    ]);
-    filedProfitLevel = allRows.find(
-      (row) =>
-        profitRoles.has(row.semantic_role) &&
-        row.historical_authority === "source_input" &&
-        (row.values ?? []).slice(0, 3).every(
-          (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
-        ),
-    );
-    if (
-      filedProfitLevel?.forecast_calculation?.operator === "link" &&
-      (filedProfitLevel.forecast_calculation.refs ?? []).some((rowId) =>
-        profitRoles.has(rowsById.get(rowId)?.semantic_role),
-      )
-    ) {
-      delete filedProfitLevel.forecast_calculation;
-      delete filedProfitLevel.forecast_period_calculations;
-      if (filedProfitLevel.forecast_treatment === "formula") {
-        delete filedProfitLevel.forecast_treatment;
-      }
-    }
-  }
   // 1. Broker links: a pack metric whose id names a statement role is
   // consumed there.  Calculation rows consume as treatment overrides;
   // input rows only carry the link.
@@ -2591,7 +2550,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     "dividends",
     "share_buybacks",
   ]);
-  for (const metricId of brokerDisabled ? [] : packMetrics) {
+  for (const metricId of packMetrics) {
     if (!CONSUMABLE_ROLES.has(metricId)) continue;
     const row = byRole.get(metricId);
     if (!row || row.row_type === "header") continue;
@@ -2621,7 +2580,6 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   const ntiForOp = rowsById.get("non_trading_items");
   if (
     statOp && ebit && statOp !== ebit &&
-    (!brokerDisabled || statOp !== filedProfitLevel) &&
     !statOp.calculation && !statOp.forecast_calculation
   ) {
     wire(
@@ -2665,8 +2623,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   if (
     ebit && adjRefsIncludeEbit &&
     !ebit.forecast_calculation &&
-    Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "ebit") &&
-    !brokerDisabled
+    Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "ebit")
   ) {
     ebit.broker_metric_id ??= "ebit";
     ebit.forecast_treatment = "broker";

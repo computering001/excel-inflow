@@ -198,7 +198,7 @@ export function runReleaseN0N9({ modelCase, dcsExport = null, brokerPack = null,
         forecastWaterfall
           ? brokerAuthorityUnavailable
             ? "No usable broker authority exists; the sealed forecast waterfall owns forecast selection."
-            : "Broker authority is explicitly disabled; the sealed forecast waterfall owns forecast selection."
+            : "The cross-source forecast waterfall may consume compatible broker observations and records each rejected broker rung."
           : `Anchor: ${anchor.label ?? (anchor.anchors ?? []).join(" + ")}.`,
         {
           ...anchor,

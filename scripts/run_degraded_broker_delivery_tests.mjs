@@ -115,9 +115,10 @@ assert(
   "forecast-waterfall confirmation did not validate",
 );
 
-// 3. Recompile an existing complete issuer evidence case with broker authority
-// explicitly disabled. Company history and accounting formulas—not invented
-// broker values—must resolve the forecast waterfall.
+// 3. Recompile an existing complete issuer evidence case with a broker pack
+// whose preserved metrics have no selectable values. Company history and
+// accounting formulas—not invented broker values—must resolve the waterfall,
+// and every rejected broker rung must remain visible in the authority receipt.
 const cleanEvidencePath = path.join(out, "clean-evidence-run.json");
 await command(process.execPath, [
   path.join(HERE, "run_evidence_run_tests.mjs"),
@@ -154,6 +155,17 @@ cleanEvidence.case_evidence.lanes.controls = {
   ...cleanEvidence.case_evidence.lanes.controls,
   broker_case: "Forecast Waterfall",
 };
+for (const metric of Object.values(
+  cleanEvidence.case_evidence.lanes.broker_pack.metrics ?? {},
+)) {
+  metric.provider_consensus = [null, null, null];
+  metric.brokers = Object.fromEntries(
+    Object.keys(metric.brokers ?? {}).map((house) => [
+      house,
+      [null, null, null],
+    ]),
+  );
+}
 const compiled = compileCase(
   cleanEvidence.case_source,
   cleanEvidence.case_evidence,
@@ -171,14 +183,25 @@ assert(
   compiled.model_case.controls.broker_case === "Forecast Waterfall",
   "compiled case silently selected a broker",
 );
-for (const section of ["income_statement", "cash_flow"]) {
-  for (const row of compiled.model_case.statement_structure?.[section] ?? []) {
-    assert(!row.broker_metric_id, `${section}.${row.row_id} retained broker ownership`);
-    assert(
-      row.forecast_treatment !== "broker",
-      `${section}.${row.row_id} retained broker treatment`,
-    );
-  }
+const brokerBoundRows = ["income_statement", "cash_flow"].flatMap((section) =>
+  (compiled.model_case.statement_structure?.[section] ?? [])
+    .filter((row) => row.broker_metric_id)
+    .map((row) => ({ section, row })),
+);
+assert(brokerBoundRows.length > 0, "zero-value pack lost its broker evidence bindings");
+for (const { section, row } of brokerBoundRows) {
+  assert(
+    (row.forecast_period_authorities ?? []).every(
+      (authority) => authority?.method !== "broker_consensus",
+    ),
+    `${section}.${row.row_id} consumed a missing broker value`,
+  );
+  assert(
+    (row.forecast_period_authorities ?? []).every(
+      (authority) => authority?.broker_rejection_reasons?.length > 0,
+    ),
+    `${section}.${row.row_id} did not receipt the rejected broker rung`,
+  );
 }
 const casePath = path.join(out, "forecast-waterfall-model-case.json");
 // This fixture's only Stage-3 decision is already reflected in lease_policy;

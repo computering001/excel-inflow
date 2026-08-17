@@ -62,6 +62,7 @@ function ledgerBody(modelCase) {
         source_id: authority.source_id ?? null,
         value: authority.value ?? null,
         material: authority.material ?? null,
+        broker_rejection_reasons: authority.broker_rejection_reasons ?? [],
         status: authority.status ?? (authority.method==='unresolved' ? 'BLOCK' : 'PASS'),
       });
     }

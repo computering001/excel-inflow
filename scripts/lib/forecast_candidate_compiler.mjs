@@ -11,9 +11,12 @@ import {
 import { observationsForConcept } from "./forecast_observation.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import {
+  brokerMetricDefinitionSignature,
+  compareDefinitionSignatures,
   resolveAnchorPlanDecision,
   resolveBrokerForecastSelection,
   selectBrokerAnchor,
+  statementMetricDefinitionSignature,
 } from "./broker_anchor.mjs";
 import {
   SCHEDULE_PRODUCER_BY_ROLE,
@@ -430,32 +433,91 @@ function declaredCandidate(row, forecastIndex) {
   return authority ? { ...structuredClone(authority), origin: "declared_period_authority" } : null;
 }
 
-function brokerCandidate(modelCase, row, forecastIndex) {
+function brokerCandidateResolution(modelCase, row, forecastIndex) {
   // Broker availability is evidence, not a presentation property.  Testing
   // the semantic role even when row planning did not pre-label the row keeps
   // working-capital and other issuer-specific aggregates independent of a
   // hardwired broker treatment while still requiring an actually resolved
   // broker selection.
+  const packMetrics = modelCase?.broker_pack?.metrics ?? {};
   const metricIds = [...new Set([
     row?.broker_metric_id,
     row?.semantic_role,
     row?.row_id,
-  ].filter(Boolean))];
+  ].filter((metricId) =>
+    Boolean(metricId) &&
+    (metricId === row?.broker_metric_id || Object.hasOwn(packMetrics, metricId)),
+  ))];
+  const rejections = [];
   for (const metricId of metricIds) {
+    const metric = packMetrics[metricId];
+    if (!metric) {
+      rejections.push({
+        metric_id: metricId,
+        reason: `Declared broker metric ${metricId} is absent from the sealed broker pack.`,
+      });
+      continue;
+    }
+    const brokerDefinition = brokerMetricDefinitionSignature(modelCase, metricId);
+    const statementDefinition = statementMetricDefinitionSignature(
+      modelCase,
+      [row],
+      metricId,
+    );
+    const compatibility = compareDefinitionSignatures(
+      brokerDefinition,
+      statementDefinition,
+    );
+    if (!compatibility.compatible) {
+      rejections.push({
+        metric_id: metricId,
+        reason: `Broker metric ${metricId} is definition-incompatible with ${row.row_id}.`,
+        definition_mismatches: compatibility.mismatches,
+      });
+      continue;
+    }
     const selection = resolveBrokerForecastSelection(modelCase, metricId, forecastIndex);
-    if (!finite(selection?.value)) continue;
-    return {
-      method: "broker_consensus",
-      origin: "row_broker_selection",
-      source_kind: "broker",
-      value: Number(selection.value),
-      source_id: "broker-pack",
-      source_bindings: ["broker-pack"],
-      broker_metric_id: metricId,
-      note: `Selected ${metricId} from the declared broker case.`,
-    };
+    if (finite(selection?.value)) {
+      return {
+        candidate: {
+          method: "broker_consensus",
+          origin: "row_broker_selection",
+          source_kind: "broker",
+          value: Number(selection.value),
+          source_id: "broker-pack",
+          source_bindings: ["broker-pack"],
+          broker_metric_id: metricId,
+          broker_selection: structuredClone(selection),
+          note: `Selected ${metricId} from the declared broker case.`,
+        },
+        rejection: null,
+      };
+    }
+    rejections.push({
+      metric_id: metricId,
+      reason:
+        selection?.substitution_reason ??
+        `Broker metric ${metricId} has no usable value for forecast period ${forecastIndex + 1}.`,
+      selection: structuredClone(selection),
+    });
   }
-  return null;
+  return {
+    candidate: null,
+    rejection: rejections.length > 0
+      ? {
+          method: "unresolved",
+          origin: "row_broker_rejection",
+          source_kind: "broker_rejected",
+          broker_metric_id: rejections[0].metric_id,
+          broker_rejections: rejections,
+          reason: rejections.map((item) => item.reason).join(" "),
+        }
+      : null,
+  };
+}
+
+function brokerCandidate(modelCase, row, forecastIndex) {
+  return brokerCandidateResolution(modelCase, row, forecastIndex).candidate;
 }
 
 const INDEPENDENT_CAPTURE_METHODS = new Set([
@@ -827,7 +889,12 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         const stateId = `${section}.${row.row_id}.fy${forecastIndex + 1}`;
         let candidates = [];
         const declared = declaredCandidate(row, forecastIndex);
-        const broker = brokerCandidate(modelCase, row, forecastIndex);
+        const brokerResolution = brokerCandidateResolution(
+          modelCase,
+          row,
+          forecastIndex,
+        );
+        const broker = brokerResolution.candidate;
         if (
           declared?.method === "broker_consensus" &&
           broker &&
@@ -846,6 +913,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         }
         if (declared) candidates.push(declared);
         if (broker) candidates.push(broker);
+        if (brokerResolution.rejection) candidates.push(brokerResolution.rejection);
         const formula = formulaCandidate(row, behavior, forecastIndex, sectionRows);
         if (formula) candidates.push(formula);
         const derivedDisplay = derivedDisplayCandidate(row);
@@ -1028,6 +1096,11 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         }));
         ledger.push(...candidates);
         const selectedRecord = candidates[selectedIndex];
+        const brokerRejectionReasons = candidates
+          .filter((candidate) => candidate.origin === "row_broker_rejection")
+          .flatMap((candidate) =>
+            (candidate.broker_rejections ?? []).map((rejection) => rejection.reason),
+          );
         const [producerType, renderState] = producerAndRender(selectedRecord.method);
         const status =
           selectedRecord.method === "unresolved" &&
@@ -1051,6 +1124,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           render_state: renderState,
           status,
           rationale: selectedRecord.note ?? selectedRecord.reason ?? `Selected ${selectedRecord.method}.`,
+          broker_rejection_reasons: brokerRejectionReasons,
         };
         const witnessedState = attachForecastProducerWitness(state, selectedRecord);
         witnessedState.status = witnessedState.producer_witness.executable
@@ -1114,6 +1188,11 @@ function authorityFromState(state, candidate) {
   if (candidate?.source_id) authority.source_id = candidate.source_id;
   if (candidate?.as_of_date) authority.as_of_date = candidate.as_of_date;
   if (candidate?.note ?? state.rationale) authority.note = candidate?.note ?? state.rationale;
+  if (state.broker_rejection_reasons?.length > 0) {
+    authority.broker_rejection_reasons = structuredClone(
+      state.broker_rejection_reasons,
+    );
+  }
   if (finite(state.value) && ["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "user_assumption", "explicit_zero"].includes(state.method)) authority.value = Number(state.value);
   if (candidate?.partial_period) authority.partial_period = structuredClone(candidate.partial_period);
   if (candidate?.guidance_range) authority.guidance_range = structuredClone(candidate.guidance_range);
