@@ -3098,6 +3098,86 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
   }
 }
 
+/**
+ * Remove the pre-waterfall cash-tax fallback written by older source
+ * compilers. Cash tax is a cash-flow authority, not an accounting identity
+ * with the P&L tax charge. Once the silent link is removed, the ordinary
+ * forecast waterfall records whichever source, guidance, broker, driver or
+ * disclosed historical fallback actually owns each period.
+ */
+function removeSilentCashTaxExpenseLink(rows) {
+  const rowsById = new Map(rows.map((row) => [row.row_id, row]));
+  const isTaxExpenseReference = (rule) =>
+    rule?.operator === "link" &&
+    (rule.refs ?? []).length === 1 &&
+    (() => {
+      const referenced = rowsById.get(rule.refs[0]);
+      return rule.refs[0] === "tax_expense" ||
+        referenced?.semantic_role === "tax_expense";
+    })();
+  for (const row of rows) {
+    const classification = row.semantic_role
+      ? null
+      : classifyStatementLine({
+          label: row.label,
+          section: "cash_flow",
+          numeric_type: "currency",
+        });
+    const cashTax =
+      row.semantic_role === "cash_taxes" ||
+      classification?.classified_role === "cash_taxes";
+    if (!cashTax || !isTaxExpenseReference(row.forecast_calculation)) continue;
+    row.semantic_role ??= "cash_taxes";
+    const originalValues = [...(row.values ?? [])];
+    delete row.forecast_calculation;
+    const authorities = row.forecast_period_authorities;
+    if (!Array.isArray(authorities) || authorities.length !== 3) {
+      row.values = [...originalValues.slice(0, 3), null, null, null];
+      delete row.forecast_period_calculations;
+      delete row.forecast_period_authorities;
+      delete row.forecast_treatment;
+      continue;
+    }
+    const lastReported = row.values[2] ?? row.values[1] ?? row.values[0] ?? 0;
+    let migratedFormula = false;
+    const calculations = [null, null, null];
+    row.forecast_period_authorities = authorities.map((authority, forecastIndex) => {
+      if (!["accounting_identity", "driver_formula"].includes(authority?.method)) {
+        return authority;
+      }
+      migratedFormula = true;
+      calculations[forecastIndex] = {
+        operator: "prior_period",
+        refs: [row.row_id],
+      };
+      return {
+        method: "carry_forward",
+        source_kind: "historical_inference",
+        value: Number(lastReported),
+        material: authority.material ?? true,
+        note:
+          `${row.row_id}: the legacy cash-tax link to P&L tax was rejected; ` +
+          `latest reported cash tax ${Number(lastReported)} is the disclosed ` +
+          "fallback because no stronger source, guidance, broker or driver authority resolved.",
+      };
+    });
+    if (migratedFormula) {
+      row.forecast_period_calculations = calculations;
+      row.values = [
+        ...originalValues.slice(0, 3),
+        ...authorities.map((authority, forecastIndex) =>
+          ["accounting_identity", "driver_formula"].includes(authority?.method)
+            ? null
+            : originalValues[forecastIndex + 3] ?? authority?.value ?? null,
+        ),
+      ];
+      row.forecast_treatment = "formula";
+    } else {
+      delete row.forecast_period_calculations;
+    }
+  }
+}
+
 function assignDisplayAndFormulaRoles(rows) {
   const referencedAsChild = new Set(
     rows.flatMap((row) => row.calculation?.refs ?? []),
@@ -3149,6 +3229,7 @@ export function normaliseStatementRows(
       "semantic-statements/1.0",
   });
   bindStatementSourceLineage(modelCase, section, rows);
+  if (section === "cash_flow") removeSilentCashTaxExpenseLink(rows);
   // Repair stale pre-topology compiled cases before the sealed fast path can
   // return. The row's declared accounting identity is the authority; old
   // capture metadata may never override a protected bridge.
@@ -3178,6 +3259,7 @@ export function normaliseStatementRows(
       const classification = classifyStatementLine({
         label: row.label,
         section,
+        numeric_type: "currency",
       });
       if (
         classification.status === "accepted" &&

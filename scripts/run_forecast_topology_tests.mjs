@@ -151,6 +151,11 @@ function fixture() {
         null,
       ],
     }),
+    row("cash_taxes", "Income taxes paid", [-7, -20, -8, null, null, null], {
+      semantic_role: "cash_taxes",
+      economic_class: "tax",
+      cash_flow_classification: "operating",
+    }),
     row("debt_issuance", "Proceeds from debt", undefined, {
       row_type: "calculation",
       semantic_role: "debt_issuance",
@@ -278,7 +283,54 @@ assert(
     state("cash_flow", "other_debt_transaction", index).render_state === "zero"),
   "A residual financing transaction was naively carried forward instead of reaching the event backstop.",
 );
+assert(
+  [0, 1, 2].every((index) => {
+    const cashTax = state("cash_flow", "cash_taxes", index);
+    return cashTax.behavior === "driver_linked_flow" &&
+      cashTax.method !== "accounting_identity" &&
+      cashTax.method !== "driver_formula" &&
+      cashTax.formula_spec?.refs?.[0] !== "tax_expense" &&
+      cashTax.rationale?.includes("cash_taxes") &&
+      cashTax.rationale?.includes("no stronger authority resolved");
+  }),
+  `Cash tax did not retain an independent, explicitly receipted forecast fallback: ${JSON.stringify([0, 1, 2].map((index) => state("cash_flow", "cash_taxes", index)))}`,
+);
+const cashTaxGuidanceCase = clone(base);
+const guidedCashTax = cashTaxGuidanceCase.statement_structure.cash_flow.find(
+  (candidate) => candidate.semantic_role === "cash_taxes",
+);
+guidedCashTax.forecast_period_authorities = [0, 1, 2].map((forecastIndex) => ({
+  method: "company_guidance",
+  source_kind: "company_guidance",
+  source_id: `cash-tax-guidance-${forecastIndex + 1}`,
+  as_of_date: "2025-12-31",
+  value: [-9, -10, -11][forecastIndex],
+  material: true,
+  note: "Issuer cash-tax guidance for the matching forecast period.",
+}));
+const cashTaxGuidanceTopology = compileForecastCaptureTopology(cashTaxGuidanceCase);
+const cashTaxGuidancePlan = compileForecastPlan(
+  cashTaxGuidanceCase,
+  cashTaxGuidanceCase.statement_structure,
+  { behaviorMap: cashTaxGuidanceTopology.behavior_map },
+);
+assert(
+  cashTaxGuidancePlan.states
+    .filter((candidate) => candidate.row_id === "cash_taxes")
+    .every((candidate) =>
+      candidate.method === "company_guidance" &&
+      candidate.formula_spec?.refs?.[0] !== "tax_expense"),
+  "Explicit cash-tax guidance did not outrank the disclosed historical fallback.",
+);
 const materialized = materializeForecastPlan(base, plan);
+const materializedCashTax = materialized.statement_structure.cash_flow.find(
+  (candidate) => candidate.semantic_role === "cash_taxes",
+);
+assert(
+  materializedCashTax.forecast_period_authorities.every((authority) =>
+    authority.note.includes("no stronger authority resolved")),
+  "The selected cash-tax fallback lost its reviewer-facing receipt during materialization.",
+);
 const materializedInterest = materialized.statement_structure.income_statement.find(
   (candidate) => candidate.row_id === "interest_expense",
 );
@@ -492,7 +544,7 @@ assert(
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 32,
+  tests: 33,
   mutations_caught: 6,
   captured_paths: topology.behavior_map.filter((entry) => entry.behavior === "captured_detail").length,
   cash_flow_event_method: state("cash_flow", "debt_fees", 0).method,

@@ -2517,6 +2517,7 @@ export function compileForecastCaptureTopology(
       });
       if (
         [
+          "driver_linked_flow",
           "contractual_flow",
           "lumpy_discretionary_flow",
           "seasonal_flow",
@@ -2679,12 +2680,16 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   if (taxExpense && preTax && etr && !taxExpense.forecast_calculation) {
     wire(taxExpense, { operator: "tax", refs: [preTax.row_id, etr.row_id] });
   }
-  // The taxonomy carries only high-impact roles; where a CF payment line has
-  // no classified role, its conventional map-declared row_id is the binding.
+  // The taxonomy carries only high-impact roles; where a CF interest-payment
+  // line has no classified role, its conventional map-declared row_id is the
+  // binding. Cash tax is deliberately absent from this identity wiring. A
+  // filed cash-tax line is an independent cash-flow series and must reach the
+  // normal source / guidance / broker / driver / historical fallback
+  // waterfall. Linking it to P&L tax here silently outranked every one of
+  // those authorities and erased the cash-versus-accrual distinction.
   for (const [cfRole, fallbackRowIds, isRole] of [
     ["cash_interest_paid", ["interest_paid"], "interest_expense"],
     ["cash_interest_received", ["interest_received"], "interest_income"],
-    ["cash_tax_paid", ["tax_paid", "income_taxes_paid", "income_tax_paid", "taxes_paid"], "tax_expense"],
   ]) {
     const cfRow =
       byRole.get(cfRole) ??

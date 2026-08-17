@@ -500,6 +500,33 @@ for (const childId of capex.calculation?.refs ?? []) {
   );
 }
 
+const legacyCashTaxCase = clone(fixture);
+delete legacyCashTaxCase.statement_structure_compiled_version;
+const legacyCashTaxRows = legacyCashTaxCase.statement_structure.cash_flow;
+const legacyCashTaxInsert = legacyCashTaxRows.findIndex(
+  (row) => row.semantic_role === "cash_from_operations",
+);
+legacyCashTaxRows.splice(legacyCashTaxInsert < 0 ? legacyCashTaxRows.length : legacyCashTaxInsert, 0, {
+  row_id: "income_taxes_paid_policy_regression",
+  label: "Income taxes paid",
+  row_type: "input",
+  values: [-7, -20, -8, null, null, null],
+  forecast_treatment: "formula",
+  forecast_calculation: { operator: "link", refs: ["tax_expense"] },
+  source_line_ids: ["cf.cash_tax_policy_regression"],
+});
+const normalisedCashTax = normaliseStatementRows(
+  legacyCashTaxCase,
+  "cash_flow",
+).find((row) => row.row_id === "income_taxes_paid_policy_regression");
+assert(
+  normalisedCashTax?.semantic_role === "cash_taxes" &&
+    normalisedCashTax.forecast_calculation?.refs?.[0] !== "tax_expense" &&
+    normalisedCashTax.forecast_decision?.method === "carry_forward" &&
+    /latest reported value/i.test(normalisedCashTax.forecast_decision.reason),
+  `A legacy silent cash-tax-to-P&L-tax link survived source normalization without a disclosed fallback: ${JSON.stringify(normalisedCashTax)}`,
+);
+
 const ambiguous = clone(fixture);
 Object.assign(ambiguous.source_coverage.income_statement.find((source) => source.source_line_id === interestSource.source_line_id), {
   label: "Interest paid",
@@ -775,4 +802,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 14 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);
+console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 15 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);
