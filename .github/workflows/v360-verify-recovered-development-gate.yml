@@ -1,4 +1,4 @@
-# prove Stage-4 checkpoint recovery using a HOME-independent Python runtime
+# diagnose the sole remaining Stage-4 semantic gate failure with a HOME-independent runtime
 name: v360 verify recovered development gate
 
 on:
@@ -29,24 +29,30 @@ jobs:
           python3 -m venv /tmp/v360-python
           /tmp/v360-python/bin/python -m pip install --upgrade pip
           /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-          HOME=/tmp/isolated-home /tmp/v360-python/bin/python - <<'PY'
-          import fitz, openpyxl
-          print('HOME_INDEPENDENT_PYTHON=PASS')
-          print('OPENPYXL='+openpyxl.__version__)
-          PY
-      - name: Run sole Stage-4 checkpoint recovery test
+          HOME=/tmp/isolated-home /tmp/v360-python/bin/python -c 'import fitz,openpyxl; print("HOME_INDEPENDENT_PYTHON=PASS",openpyxl.__version__)'
+      - name: Capture earliest Stage-4 failure evidence
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
           rm -rf /tmp/v360-stage4-proof
+          set +e
           node scripts/run_stage4_checkpoint_tests.mjs \
             --cases test-fixtures/cases \
             --python /tmp/v360-python/bin/python \
             --soffice "$(command -v soffice)" \
-            --out /tmp/v360-stage4-proof
-          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
-          echo 'STAGE4_CONTENT_ADDRESSED_RESUME=PASS'
+            --out /tmp/v360-stage4-proof \
+            > /tmp/v360-stage4.stdout 2> /tmp/v360-stage4.stderr
+          code=$?
+          set -e
+          echo "STAGE4_TEST_EXIT=$code"
+          echo '--- stdout ---'; cat /tmp/v360-stage4.stdout || true
+          echo '--- stderr ---'; cat /tmp/v360-stage4.stderr || true
+          echo '--- run-result/build-result ---'
+          find /tmp/v360-stage4-proof -type f \( -name 'run-result.json' -o -name 'build-result.json' -o -name 'environment-probe.json' \) -print -exec sh -c 'echo "### $1"; cat "$1"' _ {} \; || true
+          echo '--- internal receipts ---'
+          find /tmp/v360-stage4-proof -type f -path '*/.stage4/receipts/*.json' -print -exec sh -c 'echo "### $1"; cat "$1"' _ {} \; || true
+          exit 0
