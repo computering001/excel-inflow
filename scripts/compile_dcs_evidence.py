@@ -236,10 +236,10 @@ def apply_transform(authority: dict[str, Any], cells: dict[str, dict[str, Any]],
             return False
         raise ValueError("boolean transform requires true/false, yes/no or 1/0")
     if kind == "classified_constant":
-        if len(values) != 1:
-            raise ValueError("classified_constant requires exactly one source evidence cell")
-        if values[0] is None or str(values[0]).strip() == "":
-            raise ValueError("classified_constant source evidence cell is blank")
+        if not values:
+            raise ValueError("classified_constant requires at least one source evidence cell")
+        if all(value is None or str(value).strip() == "" for value in values):
+            raise ValueError("classified_constant source evidence cells are blank")
         return transform.get("value")
     if kind == "json":
         if len(values) != 1:

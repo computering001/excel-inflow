@@ -1,0 +1,61 @@
+{
+  "schema_version": "excel-inflow-v370-baseline-gate-report/1.0",
+  "completed_at": "2026-08-17T17:10:09.921Z",
+  "status": "INCOMPLETE_EXTERNAL_CUSTODY",
+  "counts": {
+    "PASS": 64,
+    "FAIL": 0,
+    "BLOCKED": 7
+  },
+  "full_report": "audit/v370/baseline-gate/development-gate-report.json",
+  "full_report_sha256": "1d205f4b94a367cf458f6b79a2ad9cb6c3c79a8315ba8ad2d6a12e6df922a5e2",
+  "blocked": [
+    {
+      "id": "fixed-point-multi-archetype",
+      "missing": [
+        "FIXED_POINT_CASES_MANIFEST"
+      ]
+    },
+    {
+      "id": "broker-public-layout-corpus",
+      "missing": [
+        "BROKER_CORPUS"
+      ]
+    },
+    {
+      "id": "broker-real-pack-completion",
+      "missing": [
+        "BROKER_REAL_PACK_MANIFEST"
+      ]
+    },
+    {
+      "id": "universal-broker-delivery-matrix",
+      "missing": [
+        "RAW_CANARY_EVIDENCE"
+      ]
+    },
+    {
+      "id": "raw-input-black-box-canary",
+      "missing": [
+        "RAW_CANARY_EVIDENCE"
+      ]
+    },
+    {
+      "id": "real-raw-filing-black-box-canary",
+      "missing": [
+        "RAW_CANARY_EVIDENCE",
+        "REAL_FILINGS_REQUEST",
+        "REAL_FILINGS_EXPECTATIONS"
+      ]
+    },
+    {
+      "id": "installed-host-usable-broker",
+      "missing": [
+        "INSTALLED_HOST_BROKER_RECEIPT"
+      ]
+    }
+  ],
+  "golden_actions_performed": false,
+  "native_excel_actions_performed": false,
+  "release_actions_performed": false
+}

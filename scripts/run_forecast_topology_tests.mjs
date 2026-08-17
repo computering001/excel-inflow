@@ -151,6 +151,11 @@ function fixture() {
         null,
       ],
     }),
+    row("cash_taxes", "Income taxes paid", [-7, -20, -8, null, null, null], {
+      semantic_role: "cash_taxes",
+      economic_class: "tax",
+      cash_flow_classification: "operating",
+    }),
     row("debt_issuance", "Proceeds from debt", undefined, {
       row_type: "calculation",
       semantic_role: "debt_issuance",
@@ -278,7 +283,54 @@ assert(
     state("cash_flow", "other_debt_transaction", index).render_state === "zero"),
   "A residual financing transaction was naively carried forward instead of reaching the event backstop.",
 );
+assert(
+  [0, 1, 2].every((index) => {
+    const cashTax = state("cash_flow", "cash_taxes", index);
+    return cashTax.behavior === "driver_linked_flow" &&
+      cashTax.method !== "accounting_identity" &&
+      cashTax.method !== "driver_formula" &&
+      cashTax.formula_spec?.refs?.[0] !== "tax_expense" &&
+      cashTax.rationale?.includes("cash_taxes") &&
+      cashTax.rationale?.includes("no stronger authority resolved");
+  }),
+  `Cash tax did not retain an independent, explicitly receipted forecast fallback: ${JSON.stringify([0, 1, 2].map((index) => state("cash_flow", "cash_taxes", index)))}`,
+);
+const cashTaxGuidanceCase = clone(base);
+const guidedCashTax = cashTaxGuidanceCase.statement_structure.cash_flow.find(
+  (candidate) => candidate.semantic_role === "cash_taxes",
+);
+guidedCashTax.forecast_period_authorities = [0, 1, 2].map((forecastIndex) => ({
+  method: "company_guidance",
+  source_kind: "company_guidance",
+  source_id: `cash-tax-guidance-${forecastIndex + 1}`,
+  as_of_date: "2025-12-31",
+  value: [-9, -10, -11][forecastIndex],
+  material: true,
+  note: "Issuer cash-tax guidance for the matching forecast period.",
+}));
+const cashTaxGuidanceTopology = compileForecastCaptureTopology(cashTaxGuidanceCase);
+const cashTaxGuidancePlan = compileForecastPlan(
+  cashTaxGuidanceCase,
+  cashTaxGuidanceCase.statement_structure,
+  { behaviorMap: cashTaxGuidanceTopology.behavior_map },
+);
+assert(
+  cashTaxGuidancePlan.states
+    .filter((candidate) => candidate.row_id === "cash_taxes")
+    .every((candidate) =>
+      candidate.method === "company_guidance" &&
+      candidate.formula_spec?.refs?.[0] !== "tax_expense"),
+  "Explicit cash-tax guidance did not outrank the disclosed historical fallback.",
+);
 const materialized = materializeForecastPlan(base, plan);
+const materializedCashTax = materialized.statement_structure.cash_flow.find(
+  (candidate) => candidate.semantic_role === "cash_taxes",
+);
+assert(
+  materializedCashTax.forecast_period_authorities.every((authority) =>
+    authority.note.includes("no stronger authority resolved")),
+  "The selected cash-tax fallback lost its reviewer-facing receipt during materialization.",
+);
 const materializedInterest = materialized.statement_structure.income_statement.find(
   (candidate) => candidate.row_id === "interest_expense",
 );
@@ -322,6 +374,171 @@ assert(
   "An unsealed transaction zero escaped the explicit-zero authority gate.",
 );
 
+const protectedCashFlowRows = [
+  row("operating_member", "Operating member", [10, 11, 12, null, null, null], {
+    forecast_period_authorities: direct(13),
+  }),
+  row("cash_from_operations", "Operating cash total", undefined, {
+    row_type: "calculation",
+    semantic_role: "cash_from_operations",
+    calculation: { operator: "sum", refs: ["operating_member"] },
+  }),
+  row("investing_activities", "Investing activities", undefined, {
+    row_type: "header",
+  }),
+  row("investment_alpha", "Investment alpha", [-3, -4, -5, null, null, null], {
+    forecast_period_authorities: direct(-6),
+  }),
+  row("investment_beta", "Investment beta", [-1, -2, -3, null, null, null], {
+    forecast_period_authorities: direct(-4),
+  }),
+  row("cash_from_investing", "Issuer investing total", undefined, {
+    row_type: "calculation",
+    semantic_role: "cash_from_investing",
+    calculation: { operator: "sum", refs: ["investment_alpha", "investment_beta"] },
+  }),
+  row("cash_before_financing", "Cash before financing", undefined, {
+    row_type: "calculation",
+    semantic_role: "cash_before_financing",
+    calculation: {
+      operator: "sum",
+      refs: ["cash_from_operations", "cash_from_investing"],
+    },
+  }),
+];
+const protectedCashFlowCase = {
+  case_id: "protected_cash_flow_identities",
+  forecast_authority_contract_version: "waterfall_v1",
+  periods,
+  source_coverage: {
+    income_statement: [],
+    cash_flow: protectedCashFlowRows
+      .filter((candidate) => candidate.row_type !== "header")
+      .map((candidate) => ({
+        source_line_id: candidate.source_line_ids[0],
+        mapped_row_ids: [candidate.row_id],
+        material: true,
+      })),
+  },
+  statement_structure: { income_statement: [], cash_flow: protectedCashFlowRows },
+};
+assert(
+  validateForecastAuthorities(protectedCashFlowCase, protectedCashFlowRows).length === 0,
+  "Valid same-period protected cash-flow identities were rejected.",
+);
+const investingMemoCase = clone(protectedCashFlowCase);
+const investingMemoRows = investingMemoCase.statement_structure.cash_flow;
+const investingMemoTotalIndex = investingMemoRows.findIndex(
+  (candidate) => candidate.semantic_role === "cash_from_investing",
+);
+investingMemoRows.splice(investingMemoTotalIndex, 0,
+  row("investment_intensity", "Investment intensity", undefined, {
+    row_type: "calculation",
+    calculation: { operator: "ratio", refs: ["investment_alpha", "operating_member"] },
+    number_format: "percentage",
+  }),
+  row("investment_growth", "Investment growth", undefined, {
+    row_type: "calculation",
+    calculation: { operator: "growth", refs: ["investment_beta"] },
+    number_format: "percentage",
+  }),
+  row("investment_hurdle_rate", "Investment hurdle rate", [0.1, 0.1, 0.1, null, null, null], {
+    number_format: "rate",
+    forecast_period_authorities: direct(0.11),
+  }),
+);
+const investingMemoErrors = validateForecastAuthorities(investingMemoCase, investingMemoRows);
+assert(
+  investingMemoErrors.length === 0,
+  `A dimensionless investing memo was misclassified as a currency subtotal member: ${JSON.stringify(investingMemoErrors)}`,
+);
+const omittedCurrencyMember = clone(investingMemoCase);
+omittedCurrencyMember.statement_structure.cash_flow
+  .find((candidate) => candidate.semantic_role === "cash_from_investing")
+  .calculation.refs = ["investment_alpha"];
+assert(
+  validateForecastAuthorities(
+    omittedCurrencyMember,
+    omittedCurrencyMember.statement_structure.cash_flow,
+  ).some((error) => error.includes("top-level investing members")),
+  "A missing currency member escaped the protected investing identity beside a dimensionless memo.",
+);
+const nestedInvestingCase = clone(protectedCashFlowCase);
+const nestedInvestingRows = nestedInvestingCase.statement_structure.cash_flow;
+const investingTotalIndex = nestedInvestingRows.findIndex(
+  (candidate) => candidate.semantic_role === "cash_from_investing",
+);
+nestedInvestingRows.splice(investingTotalIndex - 2, 0,
+  row("investment_alpha_detail", "Investment alpha detail", [-3, -4, -5, null, null, null], {
+    forecast_period_authorities: direct(-6),
+  }),
+);
+nestedInvestingRows.find((candidate) => candidate.row_id === "investment_alpha")
+  .calculation = { operator: "sum", refs: ["investment_alpha_detail"] };
+assert(
+  validateForecastAuthorities(nestedInvestingCase, nestedInvestingRows).length === 0,
+  "A nested investing detail was misclassified as a second top-level subtotal member.",
+);
+const unavailableBrokerParent = {
+  case_id: "unavailable_broker_parent",
+  periods,
+  controls: { broker_case: "Forecast Waterfall" },
+  broker_pack: {
+    metrics: {
+      capex: {
+        provider_consensus: [null, null, null],
+        brokers: { "House A": [null, null, null] },
+      },
+    },
+  },
+  statement_structure: {
+    income_statement: [],
+    cash_flow: [
+      row("ppe_detail", "Issuer PP&E purchases", [-1, -2, -3, null, null, null]),
+      row("capex_parent", "Issuer capital expenditure", undefined, {
+        row_type: "calculation",
+        semantic_role: "capex",
+        broker_metric_id: "capex",
+        calculation: { operator: "sum", refs: ["ppe_detail"] },
+      }),
+    ],
+  },
+};
+const unavailableBrokerTopology = compileForecastCaptureTopology(
+  unavailableBrokerParent,
+);
+assert(
+  !unavailableBrokerParent.statement_structure.cash_flow[0].forecast_capture_parent_id &&
+    !unavailableBrokerTopology.behavior_map.some(
+      (entry) =>
+        entry.row_id === "ppe_detail" && entry.behavior === "captured_detail",
+    ),
+  "A broker-labelled aggregate with no usable values captured the child needed by its formula fallback.",
+);
+for (const protectedRole of ["cash_from_investing", "cash_before_financing"]) {
+  const mutation = clone(protectedCashFlowCase);
+  const protectedRow = mutation.statement_structure.cash_flow.find(
+    (candidate) => candidate.semantic_role === protectedRole,
+  );
+  protectedRow.calculation = {
+    operator: "prior_period",
+    refs: [protectedRow.row_id],
+  };
+  protectedRow.forecast_period_authorities = [0, 1, 2].map(() => ({
+    method: "carry_forward",
+    source_kind: "historical_inference",
+    material: true,
+    note: "Adversarial prior-period carry on a protected cash-flow identity.",
+  }));
+  assert(
+    validateForecastAuthorities(
+      mutation,
+      mutation.statement_structure.cash_flow,
+    ).some((error) => error.includes("protected cash-flow identity")),
+    `${protectedRole} accepted prior-period forecast authority.`,
+  );
+}
+
 const crossSection = fixture();
 crossSection.statement_structure.income_statement[0].forecast_capture_parent_id = "cash_from_financing";
 crossSection.statement_structure.income_statement[0].forecast_capture_mode = "semantic_scope";
@@ -364,8 +581,8 @@ assert(
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 27,
-  mutations_caught: 4,
+  tests: 37,
+  mutations_caught: 7,
   captured_paths: topology.behavior_map.filter((entry) => entry.behavior === "captured_detail").length,
   cash_flow_event_method: state("cash_flow", "debt_fees", 0).method,
 }, null, 2));

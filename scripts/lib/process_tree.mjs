@@ -1,4 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
+import { constants as fsConstants } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 const DEFAULT_MAX_BUFFER = 64 * 1024 * 1024;
 const DEFAULT_TERMINATION_GRACE_MS = 750;
@@ -112,16 +115,19 @@ async function terminateProcessTree(child, closePromise, graceMs) {
   }
   await closePromise;
 
-  if (process.platform !== "win32") {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      if (!knownPids.some(processExists)) break;
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-    const survivors = knownPids.filter(processExists);
-    if (survivors.length > 0) {
-      throw new Error(`Timed-out process tree retained live pids after SIGKILL: ${survivors.join(", ")}.`);
-    }
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (!knownPids.some(processExists)) break;
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
+  const survivors = knownPids.filter(processExists);
+  if (survivors.length > 0) {
+    throw new Error(`Timed-out process tree retained live pids after forced termination: ${survivors.join(", ")}.`);
+  }
+  return Object.freeze({
+    targeted_pids: Object.freeze([...knownPids]),
+    survivor_pids: Object.freeze([]),
+    verified: true,
+  });
 }
 
 /**
@@ -214,7 +220,24 @@ export async function runProcessTree(binary, args, options = {}) {
     : null;
   const closed = await closePromise;
   if (timer) clearTimeout(timer);
-  if (terminationPromise) await terminationPromise;
+  let terminationEvidence = null;
+  if (terminationPromise) {
+    try {
+      terminationEvidence = await terminationPromise;
+    } catch (error) {
+      // A survivor is a hard custody failure: do not return a normal result or
+      // let the caller release run state. Keep both captured streams on the
+      // thrown error so the failed termination remains diagnosable.
+      error.stdout = stdout;
+      error.stderr = stderr;
+      error.message = [
+        error.message,
+        stdout ? `Captured stdout:\n${stdout.slice(-4000)}` : null,
+        stderr ? `Captured stderr:\n${stderr.slice(-4000)}` : null,
+      ].filter(Boolean).join("\n");
+      throw error;
+    }
+  }
 
   const timedOut = terminationReason === "timeout";
   const maxBufferExceeded = terminationReason === "max_buffer";
@@ -227,12 +250,40 @@ export async function runProcessTree(binary, args, options = {}) {
     signal: closed.signal,
     killed: terminationReason !== null,
     timed_out: timedOut,
+    termination_verified: terminationEvidence?.verified ?? null,
+    terminated_pids: terminationEvidence?.targeted_pids ?? [],
+    survivor_pids: terminationEvidence?.survivor_pids ?? [],
     error_code: timedOut
       ? "ETIMEDOUT"
       : maxBufferExceeded
         ? "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
         : spawnError?.code ?? null,
   };
+}
+
+/** Resolve the one Python interpreter that owns an entire controller run. */
+export async function resolvePythonExecutable(candidate = "python3", options = {}) {
+  const probe = await runProcessTree(String(candidate), [
+    "-c",
+    "import os,sys; print(os.path.realpath(sys.executable))",
+  ], {
+    cwd: options.cwd,
+    env: options.env,
+    timeout: options.timeout ?? 30_000,
+  });
+  if (!probe.ok) {
+    throw new Error(
+      `Unable to resolve the selected Python executable ${JSON.stringify(String(candidate))}: ` +
+      `${probe.stderr || probe.error_code || `exit ${probe.code}`}`,
+    );
+  }
+  const printed = probe.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1) ?? "";
+  if (!path.isAbsolute(printed)) {
+    throw new Error("The selected Python interpreter did not report an absolute executable path.");
+  }
+  const resolved = await fs.realpath(printed);
+  await fs.access(resolved, fsConstants.X_OK);
+  return resolved;
 }
 
 export const PROCESS_TREE_DEFAULTS = Object.freeze({

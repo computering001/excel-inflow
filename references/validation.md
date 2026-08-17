@@ -118,9 +118,10 @@ declared roles.
   The evidence is only as good as the human who produced it.
 - **The Node validator still uses one absolute tolerance for currency and ratios.**
   Its default is `0.05`, applied to `net_leverage` as readily as to a balance.
-  It is development evidence only. Production native evidence is schema v3.1
+  It is development evidence only. Production native evidence is schema v3.2
   and must use the metric-class policy in `production-contract-v2.json`, report
-  maximum observed drift by class, and bind the exact certified closure.
+  maximum observed drift by class, scan every serialized used cell on every
+  worksheet for native Excel error types, and bind the exact certified closure.
   **Never widen a tolerance to clear a violation.**
 - It imports the local artifact tooling and therefore **cannot ship**. It is now
   ported: `verify/validate_dynamic_model.py` reproduces all twenty-nine checks
@@ -711,9 +712,10 @@ mechanics.
 Confirm the circularity breaker produces stable, coherent results in both
 states, and that off/on/off/on restores values identically. Nothing may latch.
 The authoritative restoration report is
-`native-excel-restoration-evidence/3.1`: it records the fixed metric-class
-tolerance policy, maximum observed drift, exact candidate workbook hashes and
-the certified closure hash. A scalar blanket tolerance is not certification.
+`native-excel-restoration-evidence/3.2`: it records the fixed metric-class
+tolerance policy, maximum observed drift, exact candidate workbook hashes, an
+all-worksheet native-error scan for every state and the certified closure hash.
+A scalar blanket tolerance or a partial-cell scan is not certification.
 
 ## Historical and forecast checks
 

@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 
 import {
   forecastRowMateriality,
+  forecastAuthorityDecidingDimension,
+  forecastAuthorityRankVector,
   isScheduleOwnedForecastRole,
   isStructuredSemanticEvent,
   resolveForecastAuthority,
@@ -11,9 +13,12 @@ import {
 import { observationsForConcept } from "./forecast_observation.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import {
+  brokerMetricDefinitionSignature,
+  compareDefinitionSignatures,
   resolveAnchorPlanDecision,
   resolveBrokerForecastSelection,
   selectBrokerAnchor,
+  statementMetricDefinitionSignature,
 } from "./broker_anchor.mjs";
 import {
   SCHEDULE_PRODUCER_BY_ROLE,
@@ -52,6 +57,141 @@ function sourceBindings(candidate) {
   ].filter(Boolean))].sort();
 }
 
+function sourceInventoryIndex(sourceInventory) {
+  return new Map(
+    (sourceInventory ?? [])
+      .filter((source) => typeof source?.source_id === "string")
+      .map((source) => [source.source_id, source]),
+  );
+}
+
+function canonicalUnit(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (/\bmillions?\b/.test(normalized)) return "millions";
+  if (/\bthousands?\b/.test(normalized)) return "thousands";
+  if (/\bunits?\b/.test(normalized)) return "units";
+  if (["m", "mm", "million", "millions"].includes(normalized)) return "millions";
+  if (["k", "000", "thousand", "thousands"].includes(normalized)) return "thousands";
+  if (["unit", "units"].includes(normalized)) return "units";
+  if (/^[a-z]{3}(m|mm)$/.test(normalized)) return "millions";
+  if (/^[a-z]{3}k$/.test(normalized)) return "thousands";
+  return normalized || null;
+}
+
+function canonicalCurrency(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (raw.includes("£")) return "GBP";
+  if (raw.includes("€")) return "EUR";
+  if (raw.includes("$")) return "USD";
+  const upper = raw.toUpperCase();
+  const separated = upper.match(/(?:^|[^A-Z])([A-Z]{3})(?:[^A-Z]|$)/);
+  if (separated) return separated[1];
+  const compact = upper.match(/^([A-Z]{3})(?:M|MM|K|000|MILLIONS?|THOUSANDS?|UNITS?)$/);
+  return compact?.[1] ?? null;
+}
+
+function observationUnitsCompatible(modelCase, value) {
+  const expectedScale = canonicalUnit(
+    modelCase?.issuer?.units ?? modelCase?.units,
+  );
+  const observedScale = canonicalUnit(value);
+  const expectedCurrency = canonicalCurrency(
+    modelCase?.issuer?.reporting_currency,
+  );
+  const observedCurrency = canonicalCurrency(value);
+  const scaleCompatible =
+    expectedScale && observedScale
+      ? expectedScale === observedScale
+      : undefined;
+  const currencyCompatible =
+    expectedCurrency && observedCurrency
+      ? expectedCurrency === observedCurrency
+      : undefined;
+  if (scaleCompatible === false || currencyCompatible === false) return false;
+  if (scaleCompatible === true || currencyCompatible === true) return true;
+  return undefined;
+}
+
+function observationRecords(observationInput) {
+  return observationInput?.schema_version === "forecast-observation-ledger/1.0"
+    ? observationInput.observations ?? []
+    : observationInput ?? [];
+}
+
+function isAnnualObservation(observationInput, observation) {
+  return (
+    observation?.period_basis === "annual" ||
+    (observationInput?.schema_version !== "forecast-observation-ledger/1.0" &&
+      !observation?.period_basis)
+  );
+}
+
+function observationSeriesCompleteness(observationInput, observation, forecastPeriods) {
+  const covered = new Set(
+    observationRecords(observationInput)
+      .filter((candidate) =>
+        candidate?.source_id === observation?.source_id &&
+        candidate?.economic_concept_id === observation?.economic_concept_id &&
+        candidate?.definition_id === observation?.definition_id &&
+        candidate?.observation_kind === observation?.observation_kind &&
+        isAnnualObservation(observationInput, candidate) &&
+        forecastPeriods.includes(candidate?.period_end),
+      )
+      .map((candidate) => candidate.period_end),
+  );
+  return covered.size / Math.max(1, forecastPeriods.length);
+}
+
+function observationQuality(
+  modelCase,
+  row,
+  observation,
+  observationInput,
+  forecastPeriods,
+  sourceById,
+) {
+  const source = sourceById.get(observation?.source_id) ?? null;
+  const expectedDefinition =
+    row?.definition_id ?? row?.definition_signature?.definition_id ?? null;
+  const exactConcept = [row?.row_id, row?.semantic_role]
+    .filter(Boolean)
+    .includes(observation?.economic_concept_id);
+  return {
+    definition_id: observation?.definition_id ?? null,
+    units: observation?.units ?? null,
+    sign_convention: observation?.sign_convention ?? null,
+    period_basis: observation?.period_basis ?? null,
+    period_start: observation?.period_start ?? null,
+    period_end: observation?.period_end ?? null,
+    definition_compatible: expectedDefinition
+      ? observation?.definition_id === expectedDefinition
+      : exactConcept
+        ? true
+        : undefined,
+    period_compatible: isAnnualObservation(observationInput, observation),
+    period_completeness: isAnnualObservation(observationInput, observation) ? 1 : 0,
+    units_compatible: observationUnitsCompatible(
+      modelCase,
+      observation?.units,
+    ),
+    freshness_date:
+      source?.publication_date ??
+      source?.as_of_date ??
+      observation?.freshness_date ??
+      null,
+    confidence: finite(observation?.confidence)
+      ? Number(observation.confidence)
+      : 1,
+    completeness: observationSeriesCompleteness(
+      observationInput,
+      observation,
+      forecastPeriods,
+    ),
+    stable_id: observation?.observation_id ?? observation?.source_id ?? "",
+  };
+}
+
 function producerAndRender(method) {
   if (method === "schedule_link") return ["schedule", "formula"];
   if (FORMULA_METHODS.has(method)) return ["formula", "formula"];
@@ -73,9 +213,22 @@ function historicalValues(row) {
   );
 }
 
-function evaluatedHistoricalValues(row, rows) {
+function evaluatedHistoricalValues(
+  row,
+  rows,
+  { preferReportedReconciliations = false } = {},
+) {
   const byId = new Map((rows ?? []).map((candidate) => [candidate.row_id, candidate]));
   const evaluate = (candidate, periodIndex, visiting = new Set()) => {
+    // Cash-flow totals can depend on schedule-owned rows whose authoritative
+    // history is not reconstructible from this statement-local graph.  A
+    // reconciled filed total is therefore the terminal value for cash-flow
+    // cache materialisation. Income-statement rows deliberately keep the
+    // formula walk so the separate finance-authority bridge remains live.
+    const reported = preferReportedReconciliations
+      ? candidate?.reported_historical_values?.[periodIndex]
+      : null;
+    if (finite(reported)) return Number(reported);
     const literal = candidate?.values?.[periodIndex];
     if (
       !candidate?.calculation ||
@@ -129,10 +282,15 @@ function applyFiledFinanceHistoricalAuthority(modelCase, rows) {
   return nextRows;
 }
 
-function normaliseEvaluatedHistoricalValues(rows) {
+function normaliseEvaluatedHistoricalValues(
+  rows,
+  { preferReportedReconciliations = false } = {},
+) {
   const sourceRows = rows ?? [];
   return sourceRows.map((row) => {
-    const evaluated = evaluatedHistoricalValues(row, sourceRows);
+    const evaluated = evaluatedHistoricalValues(row, sourceRows, {
+      preferReportedReconciliations,
+    });
     if (
       row.historical_authority === "reported_total_reconciled" ||
       !row.calculation ||
@@ -266,37 +424,97 @@ function observationMatches(observationInput, row, forecastIndex, windowStart, p
   );
 }
 
-function observationCandidates(observationInput, row, forecastIndex, windowStart, periodEnd) {
+function observationCandidates(
+  modelCase,
+  observationInput,
+  row,
+  forecastIndex,
+  windowStart,
+  periodEnd,
+  forecastPeriods,
+  sourceById,
+) {
   const matches = observationMatches(observationInput, row, forecastIndex, windowStart, periodEnd);
   const candidates = [];
   for (const observation of matches) {
     const method = OBSERVATION_METHOD[observation.observation_kind];
-    if (!method || !finite(observation.value)) continue;
+    if (
+      !method ||
+      !finite(observation.value) ||
+      !isAnnualObservation(observationInput, observation)
+    ) continue;
     if (method === "broker_consensus") {
       const headline = brokerHeadlineEligibility(row, observationInput);
-      if (!headline.eligible && ["ebit", "adjusted_ebitda"].includes(headline.role)) continue;
+      if (
+        !headline.eligible &&
+        ["ebit", "adjusted_ebitda", "reported_ebitda"].includes(headline.role)
+      ) continue;
     }
-    candidates.push({ method, origin: "forecast_observation", source_kind: method === "broker_consensus" ? "broker" : method === "user_assumption" ? "user_supplied" : "company_guidance", value: Number(observation.value), source_id: observation.source_id, as_of_date: observation.reported_through ?? observation.period_end, observation_id: observation.observation_id, source_bindings: [observation.source_id], note: `Selected from forecast observation ${observation.observation_id}.` });
+    candidates.push({
+      method,
+      origin: "forecast_observation",
+      source_kind:
+        method === "broker_consensus"
+          ? "broker"
+          : method === "user_assumption"
+            ? "user_supplied"
+            : "company_guidance",
+      value: Number(observation.value),
+      source_id: observation.source_id,
+      as_of_date: observation.reported_through ?? observation.period_end,
+      observation_id: observation.observation_id,
+      source_bindings: [observation.source_id],
+      ...observationQuality(
+        modelCase,
+        row,
+        observation,
+        observationInput,
+        forecastPeriods,
+        sourceById,
+      ),
+      note: `Selected from forecast observation ${observation.observation_id}.`,
+    });
   }
   if (forecastIndex === 0) {
     const partials = matches.filter((observation) => observation.observation_kind === "company_actual" && ["h1_ytd", "q3_ytd"].includes(observation.period_basis) && finite(observation.value));
-    const fullYear = matches.find((observation) => ["broker_estimate", "company_guidance"].includes(observation.observation_kind) && observation.period_basis === "annual" && finite(observation.value));
     for (const partial of partials) {
-      if (!fullYear || partial.definition_id !== fullYear.definition_id || partial.units !== fullYear.units || partial.sign_convention !== fullYear.sign_convention) continue;
-      candidates.push({
-        method: "actual_plus_remainder",
-        origin: "forecast_observation",
-        source_kind: "company_reported",
-        value: Number(fullYear.value),
-        source_id: partial.source_id,
-        as_of_date: partial.reported_through,
-        source_bindings: [partial.source_id, fullYear.source_id],
-        reported_source_id: partial.source_id,
-        remainder_source_id: fullYear.source_id,
-        partial_period: { reported_to_date: Number(partial.value), forecast_remainder: Number(fullYear.value) - Number(partial.value), reported_through: partial.reported_through, reported_source_id: partial.source_id, remainder_source_id: fullYear.source_id, remainder_method: "full_year_authority_less_reported" },
-        formula_spec: { operator: "actual_plus_remainder", reported_observation_id: partial.observation_id, full_year_observation_id: fullYear.observation_id },
-        note: `Reported-to-date ${partial.observation_id} plus the compatible remainder implied by ${fullYear.observation_id}.`,
-      });
+      const compatibleFullYears = matches.filter((observation) =>
+        ["broker_estimate", "company_guidance"].includes(
+          observation.observation_kind,
+        ) &&
+        isAnnualObservation(observationInput, observation) &&
+        finite(observation.value) &&
+        partial.definition_id === observation.definition_id &&
+        partial.units === observation.units &&
+        partial.sign_convention === observation.sign_convention,
+      );
+      for (const fullYear of compatibleFullYears) {
+        const quality = observationQuality(
+          modelCase,
+          row,
+          fullYear,
+          observationInput,
+          forecastPeriods,
+          sourceById,
+        );
+        candidates.push({
+          method: "actual_plus_remainder",
+          origin: "forecast_observation",
+          source_kind: "company_reported",
+          value: Number(fullYear.value),
+          source_id: partial.source_id,
+          as_of_date: partial.reported_through,
+          observation_id: `${partial.observation_id}+${fullYear.observation_id}`,
+          source_bindings: [partial.source_id, fullYear.source_id],
+          reported_source_id: partial.source_id,
+          remainder_source_id: fullYear.source_id,
+          ...quality,
+          stable_id: `${partial.observation_id}+${fullYear.observation_id}`,
+          partial_period: { reported_to_date: Number(partial.value), forecast_remainder: Number(fullYear.value) - Number(partial.value), reported_through: partial.reported_through, reported_source_id: partial.source_id, remainder_source_id: fullYear.source_id, remainder_method: "full_year_authority_less_reported" },
+          formula_spec: { operator: "actual_plus_remainder", reported_observation_id: partial.observation_id, full_year_observation_id: fullYear.observation_id },
+          note: `Reported-to-date ${partial.observation_id} plus the compatible remainder implied by ${fullYear.observation_id}.`,
+        });
+      }
     }
   }
   return candidates;
@@ -430,32 +648,91 @@ function declaredCandidate(row, forecastIndex) {
   return authority ? { ...structuredClone(authority), origin: "declared_period_authority" } : null;
 }
 
-function brokerCandidate(modelCase, row, forecastIndex) {
+function brokerCandidateResolution(modelCase, row, forecastIndex) {
   // Broker availability is evidence, not a presentation property.  Testing
   // the semantic role even when row planning did not pre-label the row keeps
   // working-capital and other issuer-specific aggregates independent of a
   // hardwired broker treatment while still requiring an actually resolved
   // broker selection.
+  const packMetrics = modelCase?.broker_pack?.metrics ?? {};
   const metricIds = [...new Set([
     row?.broker_metric_id,
     row?.semantic_role,
     row?.row_id,
-  ].filter(Boolean))];
+  ].filter((metricId) =>
+    Boolean(metricId) &&
+    (metricId === row?.broker_metric_id || Object.hasOwn(packMetrics, metricId)),
+  ))];
+  const rejections = [];
   for (const metricId of metricIds) {
+    const metric = packMetrics[metricId];
+    if (!metric) {
+      rejections.push({
+        metric_id: metricId,
+        reason: `Declared broker metric ${metricId} is absent from the sealed broker pack.`,
+      });
+      continue;
+    }
+    const brokerDefinition = brokerMetricDefinitionSignature(modelCase, metricId);
+    const statementDefinition = statementMetricDefinitionSignature(
+      modelCase,
+      [row],
+      metricId,
+    );
+    const compatibility = compareDefinitionSignatures(
+      brokerDefinition,
+      statementDefinition,
+    );
+    if (!compatibility.compatible) {
+      rejections.push({
+        metric_id: metricId,
+        reason: `Broker metric ${metricId} is definition-incompatible with ${row.row_id}.`,
+        definition_mismatches: compatibility.mismatches,
+      });
+      continue;
+    }
     const selection = resolveBrokerForecastSelection(modelCase, metricId, forecastIndex);
-    if (!finite(selection?.value)) continue;
-    return {
-      method: "broker_consensus",
-      origin: "row_broker_selection",
-      source_kind: "broker",
-      value: Number(selection.value),
-      source_id: "broker-pack",
-      source_bindings: ["broker-pack"],
-      broker_metric_id: metricId,
-      note: `Selected ${metricId} from the declared broker case.`,
-    };
+    if (finite(selection?.value)) {
+      return {
+        candidate: {
+          method: "broker_consensus",
+          origin: "row_broker_selection",
+          source_kind: "broker",
+          value: Number(selection.value),
+          source_id: "broker-pack",
+          source_bindings: ["broker-pack"],
+          broker_metric_id: metricId,
+          broker_selection: structuredClone(selection),
+          note: `Selected ${metricId} from the declared broker case.`,
+        },
+        rejection: null,
+      };
+    }
+    rejections.push({
+      metric_id: metricId,
+      reason:
+        selection?.substitution_reason ??
+        `Broker metric ${metricId} has no usable value for forecast period ${forecastIndex + 1}.`,
+      selection: structuredClone(selection),
+    });
   }
-  return null;
+  return {
+    candidate: null,
+    rejection: rejections.length > 0
+      ? {
+          method: "unresolved",
+          origin: "row_broker_rejection",
+          source_kind: "broker_rejected",
+          broker_metric_id: rejections[0].metric_id,
+          broker_rejections: rejections,
+          reason: rejections.map((item) => item.reason).join(" "),
+        }
+      : null,
+  };
+}
+
+function brokerCandidate(modelCase, row, forecastIndex) {
+  return brokerCandidateResolution(modelCase, row, forecastIndex).candidate;
 }
 
 const INDEPENDENT_CAPTURE_METHODS = new Set([
@@ -474,6 +751,7 @@ const INDEPENDENT_CAPTURE_METHODS = new Set([
 
 function independentlyForecastedParent(modelCase, parent, forecastIndex) {
   if (!parent) return false;
+  if (isScheduleOwnedForecastRole(parent.semantic_role)) return true;
   if (brokerCandidate(modelCase, parent, forecastIndex)) return true;
   const declared = declaredCandidate(parent, forecastIndex);
   if (declared && INDEPENDENT_CAPTURE_METHODS.has(declared.method)) return true;
@@ -484,6 +762,7 @@ function independentlyForecastedParent(modelCase, parent, forecastIndex) {
       "ebit",
       "ebitda",
       "adjusted_ebitda",
+      "reported_ebitda",
       "depreciation_and_amortisation",
     ].includes(parent.semantic_role) &&
     Boolean(
@@ -678,9 +957,39 @@ function captureCandidate(modelCase, row, rows, forecastIndex, material, section
   };
 }
 
-function candidateId(stateId, index, candidate) { return `${stateId}:${String(index + 1).padStart(2, "0")}:${candidate.origin}:${candidate.method}`; }
+function candidateStableKey(candidate) {
+  const projection = structuredClone(candidate ?? {});
+  for (const field of [
+    "candidate_id",
+    "rank_vector",
+    "selected",
+    "rejection_reason",
+    "state_id",
+  ]) {
+    delete projection[field];
+  }
+  return JSON.stringify(canonical(projection));
+}
 
-export function compileForecastPlan(modelCase, rowsBySection, { observations = [], observationLedger = null, behaviorMap = [] } = {}) {
+function candidateId(stateId, candidate) {
+  const digest = crypto
+    .createHash("sha256")
+    .update(candidateStableKey(candidate))
+    .digest("hex")
+    .slice(0, 16);
+  return `${stateId}:${candidate.origin}:${candidate.method}:${digest}`;
+}
+
+export function compileForecastPlan(
+  modelCase,
+  rowsBySection,
+  {
+    observations = [],
+    observationLedger = null,
+    sourceInventory = [],
+    behaviorMap = [],
+  } = {},
+) {
   const normalisedRowsBySection = Object.fromEntries(
     ["income_statement", "cash_flow"].map((section) => [
       section,
@@ -691,6 +1000,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               rowsBySection?.[section] ?? [],
             )
           : rowsBySection?.[section] ?? [],
+        { preferReportedReconciliations: section === "cash_flow" },
       ),
     ]),
   );
@@ -794,6 +1104,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
     }
   }
   const observationInput = observationLedger ?? observations;
+  const sourceById = sourceInventoryIndex(sourceInventory);
   const states = [];
   const ledger = [];
   for (const section of ["income_statement", "cash_flow"]) {
@@ -827,7 +1138,12 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         const stateId = `${section}.${row.row_id}.fy${forecastIndex + 1}`;
         let candidates = [];
         const declared = declaredCandidate(row, forecastIndex);
-        const broker = brokerCandidate(modelCase, row, forecastIndex);
+        const brokerResolution = brokerCandidateResolution(
+          modelCase,
+          row,
+          forecastIndex,
+        );
+        const broker = brokerResolution.candidate;
         if (
           declared?.method === "broker_consensus" &&
           broker &&
@@ -846,6 +1162,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         }
         if (declared) candidates.push(declared);
         if (broker) candidates.push(broker);
+        if (brokerResolution.rejection) candidates.push(brokerResolution.rejection);
         const formula = formulaCandidate(row, behavior, forecastIndex, sectionRows);
         if (formula) candidates.push(formula);
         const derivedDisplay = derivedDisplayCandidate(row);
@@ -854,7 +1171,16 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         // genuine accounting identity or schedule link owns the row before
         // this ladder; driver and roll-forward formulas compete at their
         // declared waterfall rungs.
-        candidates.push(...observationCandidates(observationInput, row, forecastIndex, windowStarts[forecastIndex], forecastPeriods[forecastIndex]));
+        candidates.push(...observationCandidates(
+          modelCase,
+          observationInput,
+          row,
+          forecastIndex,
+          windowStarts[forecastIndex],
+          forecastPeriods[forecastIndex],
+          forecastPeriods,
+          sourceById,
+        ));
         let inferred = historicalCandidate(row, behavior, forecastIndex);
         if (!inferred && behavior === "driver_linked_flow") {
           const evaluated = evaluatedHistoricalValues(row, sectionRows);
@@ -879,13 +1205,15 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           candidates.push(captureCandidate(modelCase, row, sectionRows, forecastIndex, material, section));
         }
         if (declared) {
-          const executableTwin = candidates.find(
-            (candidate) =>
-              candidate !== declared &&
-              candidate.method === declared.method &&
-              (finite(candidate.value) ||
-                candidate.formula_spec ||
-                candidate.capture_certificate),
+          const executableTwin = selectForecastAuthority(
+            candidates.filter(
+              (candidate) =>
+                candidate !== declared &&
+                candidate.method === declared.method &&
+                (finite(candidate.value) ||
+                  candidate.formula_spec ||
+                  candidate.capture_certificate),
+            ),
           );
           if (executableTwin) {
             for (const field of [
@@ -899,6 +1227,21 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               "capture_certificate",
               "zero_basis",
               "as_of_date",
+              "definition_id",
+              "units",
+              "sign_convention",
+              "period_basis",
+              "period_start",
+              "period_end",
+              "definition_compatible",
+              "period_compatible",
+              "period_completeness",
+              "units_compatible",
+              "freshness_date",
+              "confidence",
+              "completeness",
+              "stable_id",
+              "observation_id",
             ]) {
               if (
                 (declared[field] === undefined || declared[field] === null) &&
@@ -910,6 +1253,17 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           }
         }
         if (candidates.length === 0) candidates.push({ method: "unresolved", origin: "compiler", source_kind: "none", reason: "No compatible forecast candidate exists." });
+
+        // Candidate arrays may arrive from evidence in any record order. Sort
+        // by the candidate's complete canonical identity before minting IDs or
+        // sealing the plan; array position is not economic evidence and cannot
+        // be allowed to change package identity.
+        candidates.sort((left, right) =>
+          candidateStableKey(left).localeCompare(candidateStableKey(right)),
+        );
+        for (const candidate of candidates) {
+          candidate.rank_vector = forecastAuthorityRankVector(candidate);
+        }
 
         const compatible = candidates.filter((candidate) =>
           candidate.method === "unresolved" ||
@@ -1004,6 +1358,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
               ? `Forecast behavior for ${row.row_id} is unresolved or low confidence.`
               : `No candidate is permitted for behavior ${behavior}.`,
           };
+          unresolved.rank_vector = forecastAuthorityRankVector(unresolved);
           candidates.push(unresolved);
           owner = unresolved;
         }
@@ -1011,7 +1366,7 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
         const selectedIndex = candidates.indexOf(selected);
         candidates = candidates.map((candidate, index) => ({
           ...candidate,
-          candidate_id: candidateId(stateId, index, candidate),
+          candidate_id: candidateId(stateId, candidate),
           state_id: stateId,
           selected: index === selectedIndex,
           rejection_reason: index === selectedIndex
@@ -1022,12 +1377,19 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
                 ? "The broker anchor is Tier-1 consumed and outranks the identity formula on the anchor row."
                 : declaredBrokerOwned
                   ? "The declared broker consumption owns this total; its accounting identity remains the fallback when broker evidence is unavailable."
-                : absoluteFormula
-                  ? "Formula or schedule ownership outranks independent-input candidates."
-                  : `Stronger compatible candidate ${selected.method} selected.`,
+              : absoluteFormula
+                ? "Formula or schedule ownership outranks independent-input candidates."
+                  : candidate.method === selected.method
+                    ? `Equal-rung candidate ranked behind ${selected.method} on ${forecastAuthorityDecidingDimension(selected, candidate)} before stable identifier ordering.`
+                    : `Stronger compatible candidate ${selected.method} selected.`,
         }));
         ledger.push(...candidates);
         const selectedRecord = candidates[selectedIndex];
+        const brokerRejectionReasons = candidates
+          .filter((candidate) => candidate.origin === "row_broker_rejection")
+          .flatMap((candidate) =>
+            (candidate.broker_rejections ?? []).map((rejection) => rejection.reason),
+          );
         const [producerType, renderState] = producerAndRender(selectedRecord.method);
         const status =
           selectedRecord.method === "unresolved" &&
@@ -1045,12 +1407,14 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
           method: selectedRecord.method,
           material,
           selected_candidate_id: selectedRecord.candidate_id,
+          selected_rank_vector: structuredClone(selectedRecord.rank_vector),
           value: finite(selectedRecord.value) ? Number(selectedRecord.value) : null,
           formula_spec: selectedRecord.formula_spec ?? null,
           source_bindings: sourceBindings(selectedRecord),
           render_state: renderState,
           status,
           rationale: selectedRecord.note ?? selectedRecord.reason ?? `Selected ${selectedRecord.method}.`,
+          broker_rejection_reasons: brokerRejectionReasons,
         };
         const witnessedState = attachForecastProducerWitness(state, selectedRecord);
         witnessedState.status = witnessedState.producer_witness.executable
@@ -1077,6 +1441,14 @@ export function compileForecastPlan(modelCase, rowsBySection, { observations = [
 export function validateForecastPlan(plan, rowsBySection) {
   const errors = [];
   const expected = [];
+  for (const candidate of plan?.candidate_ledger ?? []) {
+    if (
+      JSON.stringify(candidate.rank_vector) !==
+      JSON.stringify(forecastAuthorityRankVector(candidate))
+    ) {
+      errors.push(`${candidate.candidate_id ?? "unknown candidate"} rank proof is stale or invalid.`);
+    }
+  }
   for (const section of ["income_statement", "cash_flow"]) for (const row of rowsBySection?.[section] ?? []) if (row.row_type !== "header") for (let index = 0; index < 3; index += 1) expected.push(`${section}.${row.row_id}.fy${index + 1}`);
   const statesById = new Map();
   for (const state of plan?.states ?? []) {
@@ -1085,6 +1457,13 @@ export function validateForecastPlan(plan, rowsBySection) {
     const selected = (plan.candidate_ledger ?? []).filter((candidate) => candidate.state_id === state.state_id && candidate.selected);
     if (selected.length !== 1) errors.push(`${state.state_id} must have exactly one selected candidate; found ${selected.length}.`);
     if (selected[0]?.candidate_id !== state.selected_candidate_id) errors.push(`${state.state_id} selected candidate does not match the state.`);
+    if (
+      selected[0] &&
+      JSON.stringify(state.selected_rank_vector) !==
+        JSON.stringify(selected[0].rank_vector)
+    ) {
+      errors.push(`${state.state_id} selected rank proof does not match its candidate.`);
+    }
     if (!state.producer_witness?.executable && state.material && state.status !== "BLOCKED") {
       errors.push(`${state.state_id} is material but has no executable producer witness.`);
     }
@@ -1113,7 +1492,16 @@ function authorityFromState(state, candidate) {
   };
   if (candidate?.source_id) authority.source_id = candidate.source_id;
   if (candidate?.as_of_date) authority.as_of_date = candidate.as_of_date;
+  if (finite(candidate?.confidence)) authority.confidence = Number(candidate.confidence);
+  if (state?.selected_rank_vector) {
+    authority.selection_rank = structuredClone(state.selected_rank_vector);
+  }
   if (candidate?.note ?? state.rationale) authority.note = candidate?.note ?? state.rationale;
+  if (state.broker_rejection_reasons?.length > 0) {
+    authority.broker_rejection_reasons = structuredClone(
+      state.broker_rejection_reasons,
+    );
+  }
   if (finite(state.value) && ["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "user_assumption", "explicit_zero"].includes(state.method)) authority.value = Number(state.value);
   if (candidate?.partial_period) authority.partial_period = structuredClone(candidate.partial_period);
   if (candidate?.guidance_range) authority.guidance_range = structuredClone(candidate.guidance_range);
@@ -1174,6 +1562,7 @@ export function materializeForecastPlan(modelCase, plan) {
             next.statement_structure?.[section] ?? [],
           )
         : next.statement_structure?.[section] ?? [],
+      { preferReportedReconciliations: section === "cash_flow" },
     );
     next.statement_structure[section] = sectionRows;
     rowsBySection.set(section, sectionRows);
@@ -1375,6 +1764,12 @@ export function validateForecastPlanCaseParity(modelCase, plan) {
     const resolved = resolveForecastAuthority(modelCase, row, state.forecast_index);
     if (resolved.method !== state.method) errors.push(`${state.state_id} method ${resolved.method} does not match sealed ${state.method}.`);
     if (finite(state.value) && finite(resolved.value) && Math.abs(Number(state.value) - Number(resolved.value)) > 1e-9) errors.push(`${state.state_id} value ${resolved.value} does not match sealed ${state.value}.`);
+    if (
+      JSON.stringify(resolved.selection_rank ?? null) !==
+      JSON.stringify(state.selected_rank_vector ?? null)
+    ) {
+      errors.push(`${state.state_id} materialized rank proof does not match the sealed plan.`);
+    }
   }
   return errors;
 }

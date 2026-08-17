@@ -83,8 +83,10 @@
       "pre_tax_income",
       "tax_expense",
       "net_income",
-      "depreciation_and_amortisation",
-      "adjusted_ebitda"
+      "depreciation_and_amortisation"
+    ],
+    "required_income_statement_role_groups": [
+      ["adjusted_ebitda", "reported_ebitda"]
     ],
     "required_cash_flow_roles": [
       "cash_flow_net_income",
@@ -243,7 +245,7 @@
     "required_control_states": 8,
     "mutation_detection_required": true,
     "native_excel_restoration_required": true,
-    "native_excel_evidence_schema": "native-excel-restoration-evidence/3.1",
+    "native_excel_evidence_schema": "native-excel-restoration-evidence/3.2",
     "native_excel_required_control_sequence": [1, 0, 1, 0, 1],
     "native_excel_evidence_bindings": [
       "case_id",
@@ -285,7 +287,10 @@
       "failed_test_or_nonempty_failures_rejected": true,
       "metric_class_tolerance_policy_required": true,
       "maximum_observed_drift_required": true,
-      "certified_closure_binding_required": true
+      "certified_closure_binding_required": true,
+      "all_worksheets_scanned_required": true,
+      "used_cells_scanned_minimum": 1,
+      "excel_error_cells_maximum": 0
     },
     "positive_liquidity_shortfall_allowed": true,
     "positive_liquidity_shortfall_condition": "ending_rcf_equals_committed_capacity",

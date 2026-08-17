@@ -1211,7 +1211,7 @@ def embedded_rate_literals(formula) -> List[Dict[str, Any]]:
     return matches
 
 
-_NATIVE_SCHEMA = "native-excel-restoration-evidence/3.1"
+_NATIVE_SCHEMA = "native-excel-restoration-evidence/3.2"
 _NATIVE_SEQUENCE = [1, 0, 1, 0, 1]
 _NATIVE_TOLERANCE_POLICY = {
     "currency_abs": 1e-6,
@@ -1483,6 +1483,28 @@ def validate_native_evidence(evidence, expected) -> List[Dict[str, Any]]:
                     _native_error(errors, "%s.file.path" % test_prefix, actual=state_path)
                 if not _valid_hash(state_hash):
                     _native_error(errors, "%s.file.sha256" % test_prefix, actual=state_hash)
+                for field in ("worksheets_scanned", "used_cells_scanned"):
+                    if type(state.get(field)) is not int or state.get(field) <= 0:
+                        _native_error(
+                            errors,
+                            "%s.file.%s" % (test_prefix, field),
+                            state_index=state_index,
+                            actual=state.get(field),
+                        )
+                if state.get("excel_error_count") != 0:
+                    _native_error(
+                        errors,
+                        "%s.file.excel_error_count" % test_prefix,
+                        state_index=state_index,
+                        actual=state.get("excel_error_count"),
+                    )
+                if state.get("excel_error_cells") != []:
+                    _native_error(
+                        errors,
+                        "%s.file.excel_error_cells" % test_prefix,
+                        state_index=state_index,
+                        actual=state.get("excel_error_cells"),
+                    )
             if len(paths) != len(set(paths)):
                 _native_error(errors, "%s.file.duplicate_path" % test_prefix)
             if len(set(hashes)) < 2:

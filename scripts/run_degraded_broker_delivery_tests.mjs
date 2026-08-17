@@ -115,9 +115,10 @@ assert(
   "forecast-waterfall confirmation did not validate",
 );
 
-// 3. Recompile an existing complete issuer evidence case with broker authority
-// explicitly disabled. Company history and accounting formulas—not invented
-// broker values—must resolve the forecast waterfall.
+// 3. Recompile an existing complete issuer evidence case with a broker pack
+// whose preserved metrics have no selectable values. Company history and
+// accounting formulas—not invented broker values—must resolve the waterfall,
+// and every rejected broker rung must remain visible in the authority receipt.
 const cleanEvidencePath = path.join(out, "clean-evidence-run.json");
 await command(process.execPath, [
   path.join(HERE, "run_evidence_run_tests.mjs"),
@@ -154,6 +155,17 @@ cleanEvidence.case_evidence.lanes.controls = {
   ...cleanEvidence.case_evidence.lanes.controls,
   broker_case: "Forecast Waterfall",
 };
+for (const metric of Object.values(
+  cleanEvidence.case_evidence.lanes.broker_pack.metrics ?? {},
+)) {
+  metric.provider_consensus = [null, null, null];
+  metric.brokers = Object.fromEntries(
+    Object.keys(metric.brokers ?? {}).map((house) => [
+      house,
+      [null, null, null],
+    ]),
+  );
+}
 const compiled = compileCase(
   cleanEvidence.case_source,
   cleanEvidence.case_evidence,
@@ -171,14 +183,61 @@ assert(
   compiled.model_case.controls.broker_case === "Forecast Waterfall",
   "compiled case silently selected a broker",
 );
-for (const section of ["income_statement", "cash_flow"]) {
-  for (const row of compiled.model_case.statement_structure?.[section] ?? []) {
-    assert(!row.broker_metric_id, `${section}.${row.row_id} retained broker ownership`);
-    assert(
-      row.forecast_treatment !== "broker",
-      `${section}.${row.row_id} retained broker treatment`,
-    );
-  }
+const compiledCashRows = new Map(
+  (compiled.model_case.statement_structure?.cash_flow ?? []).map((row) => [
+    row.semantic_role ?? row.row_id,
+    row,
+  ]),
+);
+const historicalCashCacheSyncs = (cashRows) => {
+  const netCashChange = cashRows.get("net_change_in_cash");
+  const endingCash = cashRows.get("ending_cash");
+  return (
+  [0, 1, 2].every(
+    (period) =>
+        Number(endingCash?.values?.[period]) ===
+        Number(endingCash?.reported_historical_values?.[period]),
+    ) &&
+    [0, 1, 2].every(
+      (period) =>
+        Number(netCashChange?.values?.[period]) ===
+        Number(endingCash?.values?.[period]) -
+          Number(cashRows.get("opening_cash")?.values?.[period]) -
+          Number(cashRows.get("fx_effect_on_cash")?.values?.[period]),
+    )
+  );
+};
+assert(
+  historicalCashCacheSyncs(compiledCashRows),
+  "forecast-waterfall cache synchronisation did not preserve the historical cash roll-forward",
+);
+const mutatedCashRows = new Map(
+  [...compiledCashRows].map(([role, row]) => [role, structuredClone(row)]),
+);
+mutatedCashRows.get("ending_cash").values[2] -= 1;
+assert(
+  !historicalCashCacheSyncs(mutatedCashRows),
+  "historical cash cache mutation was not detected",
+);
+const brokerBoundRows = ["income_statement", "cash_flow"].flatMap((section) =>
+  (compiled.model_case.statement_structure?.[section] ?? [])
+    .filter((row) => row.broker_metric_id)
+    .map((row) => ({ section, row })),
+);
+assert(brokerBoundRows.length > 0, "zero-value pack lost its broker evidence bindings");
+for (const { section, row } of brokerBoundRows) {
+  assert(
+    (row.forecast_period_authorities ?? []).every(
+      (authority) => authority?.method !== "broker_consensus",
+    ),
+    `${section}.${row.row_id} consumed a missing broker value`,
+  );
+  assert(
+    (row.forecast_period_authorities ?? []).every(
+      (authority) => authority?.broker_rejection_reasons?.length > 0,
+    ),
+    `${section}.${row.row_id} did not receipt the rejected broker rung`,
+  );
 }
 const casePath = path.join(out, "forecast-waterfall-model-case.json");
 // This fixture's only Stage-3 decision is already reflected in lease_policy;
@@ -341,6 +400,8 @@ const report = {
   broker_preview_mode: preview.selection_mode,
   broker_preview_selected_value_count: preview.selected_value_count,
   case_compile_status: compiled.report.status,
+  historical_cash_cache_sync: "PASS",
+  historical_cash_cache_mutation: "BLOCKED",
   stage4_status: buildResult.status,
   zero_broker_stage4_status: zeroBrokerBuildResult.status,
   zero_broker_workbook: path.resolve(zeroBrokerBuildResult.workbook),

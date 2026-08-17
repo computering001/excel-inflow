@@ -32,6 +32,8 @@
         "selected_origins",
         "excluded_document_ids",
         "official_urls_must_be_declarative",
+        "official_domain_authority",
+        "local_root_authority",
         "content_addressed",
         "ordering"
       ],
@@ -41,6 +43,12 @@
         },
         "official_urls_must_be_declarative": {
           "const": true
+        },
+        "official_domain_authority": {
+          "const": "excel-inflow-official-filings-v1"
+        },
+        "local_root_authority": {
+          "const": "controller_request_directory"
         },
         "content_addressed": {
           "const": true

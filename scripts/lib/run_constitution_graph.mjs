@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 
 import { validateJsonSchema } from "./json_schema.mjs";
+import { normalizePreBrokerDemand } from "./pre_broker_demand.mjs";
 import { forecastProducerWitness } from "./forecast_producer_contract.mjs";
 
 const ROOT = new URL("../../", import.meta.url);
@@ -272,33 +273,43 @@ export function compileModelDemandGraph(modelCase) {
 
 export function validatePreBrokerDemandCoverage(preBrokerDemand, modelDemandGraph) {
   const errors = [];
-  if (preBrokerDemand?.schema_version !== "pre-broker-model-demand/1.0") {
-    errors.push("Pre-broker demand has the wrong schema version.");
+  let normalized;
+  try {
+    normalized = normalizePreBrokerDemand(preBrokerDemand);
+  } catch (error) {
+    errors.push(error.message);
     return { valid: false, errors, matched_nodes: 0 };
   }
-  const preBody = withoutHash(preBrokerDemand, "graph_sha256");
-  if (preBrokerDemand.graph_sha256 !== digest(preBody)) {
-    errors.push("Pre-broker demand has a stale canonical graph hash.");
-  }
   if (
-    JSON.stringify(preBrokerDemand.forecast_periods ?? []) !==
+    JSON.stringify(normalized.forecast_periods) !==
     JSON.stringify(modelDemandGraph?.forecast_periods ?? [])
   ) {
     errors.push("Pre-broker and final model demand use different forecast periods.");
   }
-  const preKeys = new Set((preBrokerDemand.nodes ?? []).map(
-    (node) => `${node.section}\0${node.source_line_id}\0${node.period_end}`,
-  ));
-  const finalKeys = new Set();
+  const finalSourceKeys = new Set();
+  const finalConceptKeys = new Set();
   for (const node of modelDemandGraph?.nodes ?? []) {
     if (node.node_kind !== "forecast_state") continue;
     for (const sourceLineId of node.source_line_ids ?? []) {
-      finalKeys.add(`${node.section}\0${sourceLineId}\0${node.period_end}`);
+      finalSourceKeys.add(`${node.section}\0${sourceLineId}\0${node.period_end}`);
     }
+    finalConceptKeys.add(`${node.section}\0${node.concept_id}\0${node.period_end}`);
   }
-  for (const key of preKeys) {
-    if (!finalKeys.has(key)) {
-      errors.push(`Filed model demand disappeared before final authority resolution: ${key.replaceAll("\0", ".")}.`);
+  let matchedNodes = 0;
+  for (const node of normalized.nodes) {
+    const sourceMatches = node.source_line_ids.some((sourceLineId) =>
+      finalSourceKeys.has(`${node.section}\0${sourceLineId}\0${node.period_end}`),
+    );
+    const conceptMatches = node.metric_id
+      ? finalConceptKeys.has(`${node.section}\0${node.metric_id}\0${node.period_end}`)
+      : false;
+    if (sourceMatches || conceptMatches) {
+      matchedNodes += 1;
+    } else {
+      errors.push(
+        `Pre-broker demand disappeared before final authority resolution: ` +
+        `${node.section}.${node.metric_id ?? node.source_line_ids[0] ?? node.node_id}.${node.period_end}.`,
+      );
     }
   }
   // The final semantic graph lawfully adds compiler-owned identity and ratio
@@ -310,7 +321,7 @@ export function validatePreBrokerDemandCoverage(preBrokerDemand, modelDemandGrap
   return {
     valid: errors.length === 0,
     errors,
-    matched_nodes: [...preKeys].filter((key) => finalKeys.has(key)).length,
+    matched_nodes: matchedNodes,
   };
 }
 

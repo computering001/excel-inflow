@@ -21,7 +21,7 @@ function hasBlock(report, prefix) {
 const classifierVersion = "statement-semantic-taxonomy.v1";
 
 function accepted(line) {
-  const result = classifyStatementLine(line);
+  const result = classifyStatementLine({ numeric_type: "currency", ...line });
   assert(result.status === "accepted", `Expected accepted ${line.label}: ${JSON.stringify(result)}`);
   return {
     classification_status: "accepted",
@@ -37,6 +37,12 @@ function accepted(line) {
 const positive = [
   ["Turnover", "income_statement", "revenue"],
   ["Cost of revenue", "income_statement", "cost_of_sales"],
+  ["Core operating profit", "income_statement", "adjusted_ebit"],
+  [
+    "Depreciation, amortisation and impairment",
+    "income_statement",
+    "depreciation_amortisation_and_impairment",
+  ],
   ["Exceptional impairment of goodwill", "income_statement", "impairment_loss"],
   ["Finance costs", "income_statement", "interest_expense"],
   ["Interest paid", "cash_flow", "cash_interest_paid"],
@@ -48,14 +54,49 @@ const positive = [
   ["Effect of exchange rate changes on cash", "cash_flow", "fx_effect_on_cash"],
 ];
 for (const [label, section, role] of positive) {
-  const result = classifyStatementLine({ label, section });
+  const result = classifyStatementLine({ label, section, numeric_type: "currency" });
   assert(result.status === "accepted" && result.classified_role === role,
     `Positive classification failed for ${label}: ${JSON.stringify(result)}`);
 }
+const aliasOnlyAdjusted = classifyStatementLine({
+  label: "Core operating profit",
+  section: "income_statement",
+});
+assert(
+  aliasOnlyAdjusted.status !== "accepted",
+  "A high-impact adjusted-profit alias became final authority without structural or numeric evidence.",
+);
+const unfamiliarAdjusted = classifyStatementLine({
+  label: "Core operating result",
+  section: "income_statement",
+  numeric_type: "currency",
+  is_subtotal: true,
+  neighbouring_labels: ["Operating profit reconciliation"],
+});
+assert(
+  unfamiliarAdjusted.status === "accepted" &&
+    unfamiliarAdjusted.classified_role === "adjusted_ebit",
+  `Contextually equivalent adjusted EBIT did not classify: ${JSON.stringify(unfamiliarAdjusted)}`,
+);
+const percentageProfit = classifyStatementLine({
+  label: "Core operating profit margin",
+  section: "income_statement",
+  numeric_type: "percentage",
+  is_subtotal: true,
+});
+assert(
+  percentageProfit.classified_role !== "adjusted_ebit",
+  "A percentage margin was admitted as a currency adjusted-EBIT row.",
+);
 for (const [label, section, forbiddenRole] of [
   ["Deferred tax", "cash_flow"],
   ["Impairment charge", "cash_flow", "capex"],
   ["Impairment charge", "income_statement", "other_non_cash"],
+  [
+    "Depreciation, amortisation and impairment",
+    "income_statement",
+    "depreciation_and_amortisation",
+  ],
   ["Operating lease interest paid", "cash_flow"],
 ]) {
   const result = classifyStatementLine({ label, section });
@@ -104,10 +145,20 @@ assert(
   interestSource,
   "Representative fixture needs a sourced finance-cost line feeding the interest-expense graph.",
 );
-Object.assign(interestSource, { label: "Finance costs", ...accepted({ label: "Finance costs", section: "income_statement" }) });
+Object.assign(interestSource, {
+  label: "Finance costs",
+  numeric_type: "currency",
+  ...accepted({ label: "Finance costs", section: "income_statement" }),
+});
 
 assert(validateCaseShape(fixture).length === 0, "Evidence fixture failed schema validation.");
-assert(assessCoverage(fixture).ready_to_build, "Evidence fixture did not pass baseline coverage.");
+const baselineCoverage = assessCoverage(fixture);
+assert(
+  baselineCoverage.ready_to_build,
+  `Evidence fixture did not pass baseline coverage: ${JSON.stringify(
+    baselineCoverage.checks.filter((check) => check.status === "BLOCK"),
+  )}`,
+);
 
 const orderInversion = clone(fixture);
 // Exercise the source-order compiler, not the sealed Stage-4 fast path. A
@@ -301,6 +352,64 @@ assert(
   "An unsourced one-reference income-statement alias survived as a second visible authority.",
 );
 
+const rejectedBrokerRoleAlias = clone(fixture);
+const rejectedBrokerEbit = rejectedBrokerRoleAlias.statement_structure.income_statement
+  .find((row) => row.semantic_role === "ebit");
+Object.assign(rejectedBrokerEbit, {
+  row_type: "input",
+  values: [10, 11, 12, null, null, null],
+});
+delete rejectedBrokerEbit.calculation;
+rejectedBrokerEbit.broker_metric_id = "ebit";
+rejectedBrokerEbit.forecast_treatment = "formula";
+rejectedBrokerRoleAlias.statement_structure.income_statement.splice(
+  rejectedBrokerRoleAlias.statement_structure.income_statement.indexOf(
+    rejectedBrokerEbit,
+  ),
+  0,
+  {
+    row_id: "reported_operating_profit_alias",
+    label: "Reported operating profit",
+    semantic_role: "operating_profit",
+    row_type: "input",
+    values: [10, 11, 12, null, null, null],
+    source_line_ids: ["is.reported_operating_profit_alias"],
+  },
+);
+const rejectedBrokerProjection = normaliseStatementRows(
+  rejectedBrokerRoleAlias,
+  "income_statement",
+);
+const rejectedBrokerSurvivor = rejectedBrokerProjection.find(
+  (row) => row.role_aliases?.includes("ebit"),
+);
+assert(
+  rejectedBrokerSurvivor?.broker_metric_id === "ebit",
+  "A rejected broker metric lost its evidence binding when EBIT projected into an equivalent operating-profit row.",
+);
+
+const projectedRoleAlias = clone(fixture);
+const projectedEbitRow = projectedRoleAlias.statement_structure.income_statement
+  .find((row) => row.semantic_role === "ebit");
+const projectedEbitSource = projectedRoleAlias.source_coverage.income_statement
+  .find((source) => source.mapped_row_ids.includes(projectedEbitRow.row_id));
+Object.assign(projectedEbitRow, {
+  semantic_role: "operating_profit",
+  role_aliases: ["ebit"],
+});
+Object.assign(projectedEbitSource, {
+  label: "EBIT",
+  numeric_type: "currency",
+  ...accepted({ label: "EBIT", section: "income_statement" }),
+});
+assert(
+  !hasBlock(
+    assessCoverage(projectedRoleAlias),
+    `classification.${projectedEbitSource.source_line_id}.destination`,
+  ),
+  "A source classification was rejected after its semantic role was preserved as an explicit projection alias.",
+);
+
 const unexplainedPostNetRows = normaliseStatementRows(
   fixture,
   "income_statement",
@@ -390,6 +499,158 @@ for (const childId of capex.calculation?.refs ?? []) {
     `Capex child ${childId} did not inherit graph depth.`,
   );
 }
+
+const workingCapitalParent = parentFirstCash.find(
+  (row) => row.semantic_role === "change_in_working_capital",
+);
+const workingCapitalChildren = new Set(
+  parentFirstCash
+    .filter((row) => row.forecast_capture_parent_id === workingCapitalParent?.row_id)
+    .map((row) => row.row_id),
+);
+const cashGeneratedPlanRow = parentFirstCash.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+if (workingCapitalChildren.size > 0) {
+  assert(
+    cashGeneratedPlanRow?.calculation?.refs?.includes(workingCapitalParent.row_id) &&
+      cashGeneratedPlanRow.calculation.refs.every((ref) => !workingCapitalChildren.has(ref)),
+    "Cash generated from operations bypassed the selected working-capital parent.",
+  );
+}
+
+const workingCapitalBypassCase = clone(fixture);
+delete workingCapitalBypassCase.statement_structure_compiled_version;
+const workingCapitalBypassRows = workingCapitalBypassCase.statement_structure.cash_flow;
+const bypassParent = workingCapitalBypassRows.find(
+  (row) => row.semantic_role === "change_in_working_capital",
+);
+const bypassChildren = [
+  {
+    row_id: "working_capital_receivables_regression",
+    label: "Receivables movement",
+    row_type: "input",
+    values: [-3, -4, -5, null, null, null],
+    economic_class: "working_capital",
+    movement_type: "working_capital_movement",
+  },
+  {
+    row_id: "working_capital_inventory_regression",
+    label: "Inventory movement",
+    row_type: "input",
+    values: [-2, -3, -4, null, null, null],
+    economic_class: "working_capital",
+    movement_type: "working_capital_movement",
+  },
+];
+Object.assign(bypassParent, {
+  row_type: "subtotal",
+  aggregation_authority: "derived_from_children",
+  calculation: { operator: "sum", refs: bypassChildren.map((row) => row.row_id) },
+});
+workingCapitalBypassRows.splice(
+  workingCapitalBypassRows.indexOf(bypassParent) + 1,
+  0,
+  ...bypassChildren,
+);
+const bypassCashGenerated = workingCapitalBypassRows.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+bypassCashGenerated.calculation.refs = [
+  ...bypassCashGenerated.calculation.refs.filter((ref) => ref !== bypassParent.row_id),
+  ...bypassChildren.map((row) => row.row_id),
+];
+bypassCashGenerated.forecast_period_calculations = [0, 1, 2].map(() => ({
+  operator: "sum",
+  refs: [...bypassCashGenerated.calculation.refs],
+}));
+const repairedWorkingCapitalBypass = normaliseStatementRows(
+  workingCapitalBypassCase,
+  "cash_flow",
+);
+const repairedCashGenerated = repairedWorkingCapitalBypass.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+const repairedWorkingCapitalRules = [
+  repairedCashGenerated.calculation,
+  ...(repairedCashGenerated.forecast_period_calculations ?? []),
+];
+assert(
+  repairedWorkingCapitalRules.every(
+    (rule) =>
+      rule.refs.filter((ref) => ref === bypassParent.row_id).length === 1 &&
+      rule.refs.every(
+        (ref) => !bypassChildren.some((child) => child.row_id === ref),
+      ),
+  ),
+  "A historical or forecast cash-generation rule bypassed the working-capital parent.",
+);
+
+const changeInDebt = parentFirstCash.find(
+  (row) => row.semantic_role === "change_in_debt",
+);
+const debtChildren = parentFirstCash.filter(
+  (row) => row.forecast_capture_parent_id === changeInDebt?.row_id,
+);
+assert(
+  changeInDebt?.forecast_period_authorities?.every(
+    (authority) => authority.method === "schedule_link",
+  ) &&
+    ["debt_issuance", "debt_repayment", "rcf_draw", "rcf_repayment"].every(
+      (role) => debtChildren.some((row) => row.semantic_role === role),
+    ) &&
+    debtChildren.every(
+      (row) =>
+        row.forecast_treatment === "uncalculated" &&
+        (row.values ?? []).slice(3, 6).every((value) => value === null),
+    ),
+  "Debt and RCF forecast detail did not transfer to one schedule-linked Change in Debt parent.",
+);
+const financingTotal = parentFirstCash.find(
+  (row) => row.semantic_role === "cash_from_financing",
+);
+const financingRules = [
+  financingTotal?.calculation,
+  financingTotal?.forecast_calculation,
+  ...(financingTotal?.forecast_period_calculations ?? []),
+].filter(Boolean);
+const debtChildIds = new Set(debtChildren.map((row) => row.row_id));
+assert(
+  financingRules.length > 0 &&
+    financingRules.every(
+      (rule) =>
+        rule.refs.filter((ref) => ref === changeInDebt.row_id).length === 1 &&
+        rule.refs.every((ref) => !debtChildIds.has(ref)),
+    ),
+  "Financing cash flow bypassed Change in Debt or counted a debt/RCF leg twice.",
+);
+
+const legacyCashTaxCase = clone(fixture);
+delete legacyCashTaxCase.statement_structure_compiled_version;
+const legacyCashTaxRows = legacyCashTaxCase.statement_structure.cash_flow;
+const legacyCashTaxInsert = legacyCashTaxRows.findIndex(
+  (row) => row.semantic_role === "cash_from_operations",
+);
+legacyCashTaxRows.splice(legacyCashTaxInsert < 0 ? legacyCashTaxRows.length : legacyCashTaxInsert, 0, {
+  row_id: "income_taxes_paid_policy_regression",
+  label: "Income taxes paid",
+  row_type: "input",
+  values: [-7, -20, -8, null, null, null],
+  forecast_treatment: "formula",
+  forecast_calculation: { operator: "link", refs: ["tax_expense"] },
+  source_line_ids: ["cf.cash_tax_policy_regression"],
+});
+const normalisedCashTax = normaliseStatementRows(
+  legacyCashTaxCase,
+  "cash_flow",
+).find((row) => row.row_id === "income_taxes_paid_policy_regression");
+assert(
+  normalisedCashTax?.semantic_role === "cash_taxes" &&
+    normalisedCashTax.forecast_calculation?.refs?.[0] !== "tax_expense" &&
+    normalisedCashTax.forecast_decision?.method === "carry_forward" &&
+    /latest reported value/i.test(normalisedCashTax.forecast_decision.reason),
+  `A legacy silent cash-tax-to-P&L-tax link survived source normalization without a disclosed fallback: ${JSON.stringify(normalisedCashTax)}`,
+);
 
 const ambiguous = clone(fixture);
 Object.assign(ambiguous.source_coverage.income_statement.find((source) => source.source_line_id === interestSource.source_line_id), {
@@ -666,4 +927,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 13 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");
+console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 19 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);

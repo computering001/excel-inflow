@@ -10,9 +10,10 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
+import { filingManifestCustodyErrors } from "./lib/face_statement_manifest.mjs";
 import { acquireFilingsSources } from "./lib/filings_acquisition.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { resolvePythonExecutable } from "./lib/process_tree.mjs";
 import { canonicalise } from "./lib/run_store.mjs";
 import {
   assertWorkflowState,
@@ -141,30 +142,6 @@ function stateBase({ runId, requestHash, sourceHashes, runtimeHash, cacheKey, at
   };
 }
 
-function manifestErrors(manifest, document, section, globalLineIds) {
-  const errors = [];
-  const rows = manifest?.rows ?? [];
-  if (manifest?.schema_version !== "face-statement-manifest/1.0") errors.push(`${section} manifest has the wrong schema version`);
-  if (manifest?.statement !== section) errors.push(`${section} manifest declares ${manifest?.statement}`);
-  if (manifest?.source_id !== document.source_id) errors.push(`${section} manifest source_id is detached from ${document.document_id}`);
-  if (manifest?.document_sha256 !== document.raw_sha256) errors.push(`${section} manifest document hash is detached from ${document.document_id}`);
-  if (manifest?.complete_face_statement !== true) errors.push(`${section} manifest is not marked complete`);
-  if (!Array.isArray(manifest?.periods) || manifest.periods.length !== 3) errors.push(`${section} manifest does not carry exactly three periods`);
-  if (!Array.isArray(rows) || rows.length === 0 || manifest?.row_count !== rows.length) errors.push(`${section} row_count is not exact`);
-  for (const [index, row] of rows.entries()) {
-    if (row?.ordinal !== index + 1) errors.push(`${section}.${row?.source_line_id ?? index} ordinal is not contiguous`);
-    if (!row?.source_line_id || globalLineIds.has(row.source_line_id)) errors.push(`${section} repeats or omits source_line_id ${row?.source_line_id ?? ""}`);
-    else globalLineIds.add(row.source_line_id);
-    if (typeof row?.raw_label !== "string" || row.raw_label.trim() === "") errors.push(`${section}.${row?.source_line_id ?? index} has no exact label`);
-    if (!Array.isArray(row?.values) || row.values.length !== 3 || row.values.some((item) => item !== null && !Number.isFinite(Number(item)))) {
-      errors.push(`${section}.${row?.source_line_id ?? index} does not carry three numeric/null values`);
-    }
-    if (typeof row?.page_or_note !== "string" || row.page_or_note.trim() === "") errors.push(`${section}.${row?.source_line_id ?? index} has no source location`);
-  }
-  if (manifest?.rows_sha256 !== faceStatementManifestDigest(manifest)) errors.push(`${section} rows_sha256 does not bind the ordered rows`);
-  return errors;
-}
-
 function deriveLines(manifests) {
   const labels = new Map();
   for (const manifest of manifests) {
@@ -291,7 +268,13 @@ function compileResponse({ response, request, sourceHashes }) {
     for (const section of SECTIONS) {
       const entries = document.face_statement_manifests?.[section] ?? [];
       for (const manifest of entries) {
-        errors.push(...manifestErrors(manifest, document, section, globalLineIds));
+        errors.push(...filingManifestCustodyErrors({
+          manifest,
+          document,
+          section,
+          globalLineIds,
+          filingFacts: response.filing_facts,
+        }));
         documentManifests[section].push(structuredClone(manifest));
         manifests[section].push(structuredClone(manifest));
       }
@@ -454,8 +437,15 @@ async function main() {
   const nativeArtifacts = {};
   if (!responsePath) {
     const nativeRoot = path.join(outputRoot, `native-${cacheKey.slice(0, 16)}`);
+    const pythonCandidate = process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3";
+    if (process.env.EXCEL_INFLOW_PYTHON && !path.isAbsolute(pythonCandidate)) {
+      throw new Error("EXCEL_INFLOW_PYTHON must be the top-level resolved absolute executable.");
+    }
+    const pythonExecutable = process.env.EXCEL_INFLOW_PYTHON
+      ? pythonCandidate
+      : await resolvePythonExecutable(pythonCandidate, { cwd: HERE, env: process.env });
     const completed = await execFileAsync(
-      "python3",
+      pythonExecutable,
       [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
       { cwd: HERE, maxBuffer: 32 * 1024 * 1024 },
     ).then((value) => ({ ...value, code: 0 })).catch((error) => ({

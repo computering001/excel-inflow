@@ -29,6 +29,10 @@ MODEL_FIELDS = {
     "commitment_fee_convention", "commitment_fee_value",
 }
 ASSET_ROOT = Path(__file__).resolve().parents[2] / "assets"
+DEBT_CLASS_ONTOLOGY = json.loads(
+    (ASSET_ROOT / "debt-class-ontology-v1.json").read_text("utf-8")
+)
+CANONICAL_DEBT_CLASSES = frozenset(DEBT_CLASS_ONTOLOGY["canonical_classes"])
 
 
 def contract_errors(value: Any, schema_name: str) -> list[str]:
@@ -237,10 +241,10 @@ def compute(authority: dict[str, Any], cells: dict[str, dict[str, Any]], supplem
             return False
         raise ValueError("invalid boolean")
     if kind == "classified_constant":
-        if len(values) != 1:
-            raise ValueError("classified_constant needs one source evidence cell")
-        if values[0] is None or str(values[0]).strip() == "":
-            raise ValueError("classified_constant source evidence cell is blank")
+        if not values:
+            raise ValueError("classified_constant needs at least one source evidence cell")
+        if all(value is None or str(value).strip() == "" for value in values):
+            raise ValueError("classified_constant source evidence cells are blank")
         return transform.get("value")
     if kind == "json":
         if len(values) != 1:
@@ -436,29 +440,42 @@ def main() -> int:
             ).lower()
             normalized = re.sub(r"[^a-z0-9]+", " ", source_text).strip()
             declared_type = item.get("output_value")
+            is_bond = any(token in normalized for token in ("bond", "note", "debenture"))
+            is_term_loan = any(token in normalized for token in ("term loan", "term facility", "bank loan"))
+            floating = any(token in normalized for token in ("floating", "sofr", "sonia", "euribor", "libor"))
+            numeric_pricing = any(
+                isinstance(cells[cell_id].get("raw_value"), (int, float))
+                or bool(re.fullmatch(r"\s*\d+(?:\.\d+)?\s*%?\s*", str(cells[cell_id].get("display_value") or "")))
+                for cell_id in item.get("source_cells") or []
+            )
+            fixed = (
+                "fixed" in normalized
+                or bool(re.search(r"\d+(?:\.\d+)?\s*%", source_text))
+                or ((is_bond or is_term_loan) and numeric_pricing and not floating)
+            )
+            other_explicit = any(
+                token in normalized
+                for token in ("other debt", "other borrow", "miscellaneous borrow", "finance obligation")
+            )
             independent_matches = {
                 "rcf": bool("revolv" in normalized or re.search(r"\brcf\b", normalized)),
                 "commercial_paper": bool("commercial paper" in normalized or re.search(r"\bcp\b", normalized)),
                 "securitisation": "securiti" in normalized,
-                "floating_loan": bool("floating" in normalized or "loan" in normalized or "term facility" in normalized),
-                "fixed_bond": any(token in normalized for token in ("bond", "note", "debenture", "fixed")),
-                "other_debt": not any(
-                    (
-                        "revolv" in normalized,
-                        bool(re.search(r"\brcf\b", normalized)),
-                        "commercial paper" in normalized,
-                        bool(re.search(r"\bcp\b", normalized)),
-                        "securiti" in normalized,
-                        "floating" in normalized,
-                        "loan" in normalized,
-                        "term facility" in normalized,
-                        "bond" in normalized,
-                        "note" in normalized,
-                        "debenture" in normalized,
-                        "fixed" in normalized,
-                    )
-                ),
+                "overdraft": "overdraft" in normalized,
+                "lease_liability": "lease liabil" in normalized or "finance lease" in normalized,
+                "bond_fixed": is_bond and fixed and not floating,
+                "bond_floating": is_bond and floating,
+                "term_loan_fixed": is_term_loan and fixed and not floating,
+                "term_loan_floating": is_term_loan and floating,
+                "other_explicit": other_explicit,
             }
+            independent_matches["unclassified"] = not any(independent_matches.values())
+            if declared_type not in CANONICAL_DEBT_CLASSES:
+                violation(
+                    failures,
+                    "DCS-ORACLE-INSTRUMENT-TYPE-VOCABULARY",
+                    "instrument type %r is not in the canonical debt ontology" % declared_type,
+                )
             if not independent_matches.get(declared_type, False):
                 violation(
                     failures,

@@ -847,7 +847,7 @@ if (brokerState === "usable") {
 ) {
   throw new Error(`${brokerState} did not compile to zero broker model authority.`);
 }
-const bondInstrument = (lanes.instruments ?? []).find((instrument) => instrument.class === "fixed_bond");
+const bondInstrument = (lanes.instruments ?? []).find((instrument) => instrument.class === "bond_fixed");
 if (bondInstrument?.balance_basis !== dcsBalanceBasis) {
   throw new Error(
     `DCS balance basis did not reach the model instrument: ${bondInstrument?.balance_basis}`,

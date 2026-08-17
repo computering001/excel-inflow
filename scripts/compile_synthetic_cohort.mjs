@@ -744,8 +744,8 @@ function resetOpeningDebtAuthority(caseData) {
 
 function simplifyDebtBook(caseData, { low = false } = {}) {
   const rcf = caseData.instruments.find((item) => item.class === "rcf");
-  const fixed = clone(caseData.instruments.find((item) => item.class === "fixed_bond"));
-  const floating = clone(caseData.instruments.find((item) => item.class === "floating_loan"));
+  const fixed = clone(caseData.instruments.find((item) => item.class === "bond_fixed"));
+  const floating = clone(caseData.instruments.find((item) => item.class === "term_loan_floating"));
   if (!rcf || !fixed || !floating) throw new Error("The maximal authority cannot supply a simple synthetic debt book.");
   if (low) {
     fixed.opening_balance = round(fixed.opening_balance * 0.12, 6);
@@ -761,7 +761,7 @@ function simplifyDebtBook(caseData, { low = false } = {}) {
 }
 
 function addFourthCurrency(caseData) {
-  const source = caseData.instruments.find((item) => item.currency === caseData.issuer.reporting_currency && item.class === "fixed_bond");
+  const source = caseData.instruments.find((item) => item.currency === caseData.issuer.reporting_currency && item.class === "bond_fixed");
   if (!source) throw new Error("A fourth-currency overlay needs a reporting-currency fixed instrument to split.");
   const chf = clone(source);
   source.opening_balance = round(source.opening_balance / 2, 6);
@@ -823,7 +823,7 @@ function applyDebtOverlay(caseData, kind) {
   if (kind === "sparse") simplifyDebtBook(caseData, { low: true });
   if (kind === "low") simplifyDebtBook(caseData, { low: true });
   if (kind === "levfin-pik-floor") {
-    const floating = caseData.instruments.find((item) => item.class === "floating_loan");
+    const floating = caseData.instruments.find((item) => item.class === "term_loan_floating");
     if (floating) {
       floating.benchmark_floor = [0.02, 0.02, 0.02];
       floating.pik_rate = [0.0125, 0.0125, 0.0125];
@@ -831,7 +831,7 @@ function applyDebtOverlay(caseData, kind) {
     }
   }
   if (kind === "all-movement-classes") {
-    const target = caseData.instruments.find((item) => item.class === "floating_loan");
+    const target = caseData.instruments.find((item) => item.class === "term_loan_floating");
     if (target) {
       delete target.other_non_cash_movement;
       target.non_cash_movement_components = {
@@ -842,11 +842,11 @@ function applyDebtOverlay(caseData, kind) {
     }
   }
   if (kind === "amortising") {
-    const target = caseData.instruments.find((item) => item.class === "floating_loan");
+    const target = caseData.instruments.find((item) => item.class === "term_loan_floating");
     if (target) target.scheduled_amortisation = [round(target.opening_balance * 0.08), round(target.opening_balance * 0.08), round(target.opening_balance * 0.08)];
   }
   if (kind === "refinancing") {
-    const target = caseData.instruments.find((item) => item.class === "fixed_bond");
+    const target = caseData.instruments.find((item) => item.class === "bond_fixed");
     if (target) target.new_issuance = [350, 0, 0];
   }
 }

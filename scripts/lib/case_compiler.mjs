@@ -30,7 +30,13 @@ import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import { isRankedTotalIdentity } from "./row_plan.mjs";
-import { applyTier1AnchorOwnership } from "./broker_anchor.mjs";
+import {
+  applyTier1AnchorOwnership,
+  brokerMetricDefinitionSignature,
+  compareDefinitionSignatures,
+  resolveBrokerForecastSelection,
+  statementMetricDefinitionSignature,
+} from "./broker_anchor.mjs";
 import {
   ALLOWED_METHODS_BY_BEHAVIOR,
   classifyForecastBehavior,
@@ -42,6 +48,11 @@ import {
   validateForecastPlanCaseParity,
 } from "./forecast_candidate_compiler.mjs";
 import { applyRunScopedBrokerConcepts } from "./run_scoped_broker_concepts.mjs";
+import {
+  ebitdaBasis,
+  selectedEbitdaRow,
+} from "./semantic_roles.mjs";
+import { migrateLegacyDebtClasses } from "./debt_class.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CASE_SOURCE_SCHEMA = JSON.parse(
@@ -62,6 +73,7 @@ export const PASSTHROUGH_LANES = Object.freeze([
   "controls",
   "coverage_policy",
   "operating_metrics",
+  "selected_ebitda_basis",
   "forecast_assumptions",
   "instruments",
   "instrument_authority_contract_version",
@@ -70,6 +82,7 @@ export const PASSTHROUGH_LANES = Object.freeze([
   "historical_interest_reconciliation",
   "historical_supplement",
   "other_interest",
+  "other_interest_authority",
   "non_cash_interest",
   "acquisition",
   "fx",
@@ -164,6 +177,18 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
   // Row minting — first pass: kept lines become rows carrying manifest values
   // (historicals only; forecasts belong to the forecast plan) and manifest
   // materiality.  Absorbed lines fold their identity into their absorber.
+  const typedHistoricalStates = (line) => {
+    if (Array.isArray(line?.value_states) && line.value_states.length === 3) {
+      return [...line.value_states];
+    }
+    return (line?.values ?? []).slice(0, 3).map((value) => {
+      if (value === "") return "reported_blank";
+      if (value === null || value === undefined) return "unresolved";
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "unresolved";
+      return number === 0 ? "reported_zero" : "reported_number";
+    });
+  };
   const rows = [];
   const rowsBySourceLine = new Map();
   for (const { manifest, row: line } of lines) {
@@ -205,6 +230,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
           row_type: entry.uncalculated ? "uncalculated" : "input",
           ...(entry.uncalculated ? { forecast_treatment: "uncalculated" } : {}),
           values: [...(line.values ?? []).slice(0, 3), null, null, null],
+          historical_value_states: typedHistoricalStates(line),
           ...(declaredRole ? { semantic_role: declaredRole } : {}),
           ...(entry.movement_type ? { movement_type: entry.movement_type } : {}),
           ...(entry.acquisition_driver_role
@@ -430,8 +456,12 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     parentRow.row_type = "calculation";
     parentRow.calculation = { operator: "sum", refs };
     parentRow.reported_historical_values = [...filed];
+    parentRow.reported_historical_value_states = [
+      ...(parentRow.historical_value_states ?? typedHistoricalStates(parentLine)),
+    ];
     parentRow.historical_authority = "reported_total_reconciled";
     delete parentRow.values;
+    delete parentRow.historical_value_states;
     parentRow.style_role = totalStyle(parentRow) ? "total" : "subsection";
     // The DERIVED variant: a total summed live from its filed members
     // declares them as contributing children.  (The reconciled-subtotal
@@ -508,6 +538,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
       row.values = [...(row.values ?? []).slice(0, 3), null, null, null];
     } else {
       delete row.values;
+      delete row.historical_value_states;
     }
   }
   // Authored forecast wiring declarations.
@@ -586,6 +617,13 @@ function compileSourceCoverage({ section, lines, entriesById, rowsBySourceLine, 
       page_or_note: line.page_or_note ?? manifest.page_or_note ?? "face statement",
       face_statement: true,
       material: line.material ?? null,
+      numeric_type: /(?:margin|rate|percent|percentage)/i.test(line.raw_label ?? "")
+        ? "percentage"
+        : (line.values ?? []).some(
+            (value) => value !== null && value !== "" && Number.isFinite(Number(value)),
+          )
+          ? "currency"
+          : "text",
       disposition: ["absorb", "expand"].includes(entry?.disposition) ? "aggregated" : "mapped",
       mapped_row_ids: expansionRowsByLine.get(line.source_line_id) ?? (target ? [target.row_id] : []),
     };
@@ -756,6 +794,8 @@ function applyRoleRecipes(statementStructure) {
  */
 function applyDerivedStratum(modelCase, evidence = {}) {
   const derived = new Set();
+  const packMetrics = modelCase?.broker_pack?.metrics ?? {};
+  const packHas = (metricId) => Object.hasOwn(packMetrics, metricId);
   const sections = modelCase.statement_structure ?? {};
   const isRows = sections.income_statement ?? [];
   const cfRows = sections.cash_flow ?? [];
@@ -781,7 +821,6 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // structural channel, exactly as it was under hand authorship, but now the
   // stratum recipes consume it instead of prose doctrine.
   const role = (id) => roleIndex.get(id) ?? rowIdIndex.get(id) ?? null;
-  const packHas = (metricId) => Boolean(modelCase.broker_pack?.metrics?.[metricId]);
   const operatingMetricHistory = (metricId) => {
     const values = modelCase.operating_metrics?.[metricId]?.values ?? [];
     return values.slice(0, 3).every((value) => value !== null && Number.isFinite(Number(value)))
@@ -794,6 +833,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     rows.splice(index + 1, 0, ...newRows);
     for (const row of newRows) {
       derived.add(row.row_id);
+      rowIdIndex.set(row.row_id, row);
       if (row.semantic_role) roleIndex.set(row.semantic_role, row);
     }
     return true;
@@ -804,6 +844,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     rows.splice(index, 0, ...newRows);
     for (const row of newRows) {
       derived.add(row.row_id);
+      rowIdIndex.set(row.row_id, row);
       if (row.semantic_role) roleIndex.set(row.semantic_role, row);
     }
     return true;
@@ -991,15 +1032,20 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     delete financeResult.values;
   }
 
-  // The EBITDA bridge: minted whenever the pack can price a headline anchor
-  // and the operating-profit level exists to bridge from.
-  const operatingProfit = role("ebit") ?? role("operating_profit");
+  // The EBITDA bridge follows the economic hierarchy, not a generic proxy:
+  // a company-adjusted EBIT base produces Adjusted EBITDA; statutory EBIT or
+  // operating profit produces reported EBITDA.  A directly reported EBITDA
+  // row always wins over a compiler-derived one.
+  const adjustedEbitBase = role("adjusted_ebit");
+  const operatingProfit = adjustedEbitBase ?? role("ebit") ?? role("operating_profit");
+  const existingEbitda = selectedEbitdaRow(isRows);
   // The bridge's D&A evidence is the cash-flow statement's filed D&A line;
   // where the issuer splits continuing/discontinued, the model's stated basis
   // is continuing operations.
   const cfDaCandidates = cfRows.filter(
     (row) =>
       /depreciat|amortis|amortiz/i.test(row.label ?? "") &&
+      !/impair/i.test(row.label ?? "") &&
       !/grant/i.test(row.label ?? "") &&
       row.row_type === "input" &&
       (row.values ?? []).slice(0, 3).some((value) => Number.isFinite(Number(value))),
@@ -1027,22 +1073,25 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       : null;
   if (
     operatingProfit &&
-    !role("adjusted_ebitda") &&
+    !existingEbitda &&
     (
       cfDaGroupValues ||
-      operatingMetricHistory("depreciation_and_amortisation") ||
-      packHas("adjusted_ebitda") ||
-      packHas("depreciation_and_amortisation")
+      operatingMetricHistory("depreciation_and_amortisation")
     )
   ) {
     const historicalDa = cfDaGroupValues ?? operatingMetricHistory("depreciation_and_amortisation");
     const daValues = historicalDa
       ? [...historicalDa, null, null, null]
       : [null, null, null, null, null, null];
+    const derivedEbitdaRole = adjustedEbitBase
+      ? "adjusted_ebitda"
+      : "reported_ebitda";
+    const derivedEbitdaId = derivedEbitdaRole;
+    const derivedBasis = ebitdaBasis({ semantic_role: derivedEbitdaRole });
     const bridgeRows = [
       {
         row_id: "ebitda_bridge_header",
-        label: "EBITDA bridge",
+        label: `${derivedBasis.label} bridge`,
         row_type: "header",
         style_role: "subsection",
       },
@@ -1062,18 +1111,26 @@ function applyDerivedStratum(modelCase, evidence = {}) {
         indent: 1,
       },
       {
-        row_id: "adjusted_ebitda",
-        label: "EBITDA proxy",
+        row_id: derivedEbitdaId,
+        label: derivedBasis.label,
         row_type: "calculation",
         calculation: { operator: "sum", refs: ["bridge_operating_profit", "depreciation_and_amortisation"] },
-        semantic_role: "adjusted_ebitda",
+        semantic_role: derivedEbitdaRole,
+        ebitda_basis: {
+          ...derivedBasis,
+          derivation: adjustedEbitBase
+            ? "company_adjusted_ebit_plus_compatible_da"
+            : "reported_ebit_plus_compatible_da",
+          source_row_ids: [operatingProfit.row_id, "depreciation_and_amortisation"],
+          impairment_included: false,
+        },
         style_role: "total",
       },
       {
-        row_id: "adjusted_ebitda_margin",
-        label: "EBITDA proxy margin",
+        row_id: `${derivedEbitdaId}_margin`,
+        label: derivedBasis.margin_label,
         row_type: "calculation",
-        calculation: { operator: "ratio", refs: ["adjusted_ebitda", revenue?.row_id ?? operatingProfit.row_id] },
+        calculation: { operator: "ratio", refs: [derivedEbitdaId, revenue?.row_id ?? operatingProfit.row_id] },
         number_format: "percentage",
         style_role: "subsection",
       },
@@ -1339,6 +1396,26 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     }
   }
 
+  // A directly reported EBITDA line may not carry its own display ratio.  The
+  // ratio is minted only from the selected basis and visibly names that basis.
+  {
+    const selected = selectedEbitdaRow(isRows);
+    if (selected && revenue) {
+      const basis = ebitdaBasis(selected);
+      const marginId = `${selected.row_id}_margin`;
+      if (!isRows.some((row) => row.row_id === marginId)) {
+        insertAfter(isRows, selected.row_id, [{
+          row_id: marginId,
+          label: basis.margin_label,
+          row_type: "calculation",
+          calculation: { operator: "ratio", refs: [selected.row_id, revenue.row_id] },
+          number_format: "percentage",
+          style_role: "subsection",
+        }]);
+      }
+    }
+  }
+
   // Ensure-recipes for identities the issuer may either file or omit: when
   // the row exists it is converted to its identity form; when absent and its
   // ingredients exist, doctrine elsewhere mints it.
@@ -1574,7 +1651,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // The free-cash-flow block closes the statement.
   const endingCash = role("ending_cash");
   const capexRow = role("capex");
-  const adjustedEbitda = role("adjusted_ebitda");
+  const adjustedEbitda = selectedEbitdaRow(isRows);
   if (endingCash && cfo && capexRow && !cfRows.some((row) => row.row_id === "free_cash_flow")) {
     const block = [
       {
@@ -1593,7 +1670,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       ...(adjustedEbitda
         ? [{
             row_id: "free_cash_flow_conversion",
-            label: "Free cash flow conversion",
+            label: `Free cash flow / ${ebitdaBasis(adjustedEbitda).label}`,
             row_type: "calculation",
             calculation: { operator: "ratio", refs: ["free_cash_flow", adjustedEbitda.row_id] },
             number_format: "percentage",
@@ -1658,7 +1735,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       delete target.values;
     };
     const revenueRow = role("revenue");
-    const adjRow = role("adjusted_ebitda");
+    const adjRow = selectedEbitdaRow(isRows);
     const taxRow = role("tax_expense");
     const preTaxRow = role("pre_tax_income");
     const ntiRow = role("non_trading_items");
@@ -1666,7 +1743,13 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     const opBase = rowIdIndex.get("operating_profit") ?? role("ebit");
     if (revenueRow) {
       ensure("revenue_growth", { operator: "growth", refs: [revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
-      if (adjRow) ensure("adjusted_ebitda_margin", { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
+      if (adjRow) {
+        const basis = ebitdaBasis(adjRow);
+        const marginId = `${adjRow.row_id}_margin`;
+        ensure(marginId, { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
+        const marginRow = rowIdIndex.get(marginId);
+        if (marginRow) marginRow.label = basis.margin_label;
+      }
     }
     if (taxRow && preTaxRow) {
       ensure("effective_tax_rate", {
@@ -1695,6 +1778,8 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     const fcfRow = rowIdIndex.get("free_cash_flow");
     if (fcfRow && adjRow) {
       ensure("free_cash_flow_conversion", { operator: "ratio", refs: [fcfRow.row_id, adjRow.row_id], number_format: "percentage", style_role: "subsection" });
+      const conversion = rowIdIndex.get("free_cash_flow_conversion");
+      if (conversion) conversion.label = `Free cash flow / ${ebitdaBasis(adjRow).label}`;
     }
     if (fcfRow && !cfRows.some((row) => row.row_id === "free_cash_flow_header")) {
       insertBefore(cfRows, fcfRow.row_id, [{
@@ -1715,6 +1800,22 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     } else {
       row.historical_authority ??= "derived_formula";
     }
+  }
+  const selectedBasis = selectedEbitdaRow(isRows);
+  if (selectedBasis) {
+    const basis = ebitdaBasis(selectedBasis);
+    selectedBasis.ebitda_basis ??= {
+      ...basis,
+      derivation: selectedBasis.calculation
+        ? "declared_formula"
+        : "company_reported",
+      source_row_ids: selectedBasis.calculation?.refs ?? [selectedBasis.row_id],
+      impairment_included: false,
+    };
+    modelCase.selected_ebitda_basis = {
+      row_id: selectedBasis.row_id,
+      ...selectedBasis.ebitda_basis,
+    };
   }
   return derived;
 }
@@ -1875,6 +1976,7 @@ const TOTAL_STYLE_ROLES = new Set([
   "net_income",
   "net_income_common",
   "adjusted_ebitda",
+  "reported_ebitda",
   "adjusted_ebitda_bridge_total",
   "cash_flow_profit_before_tax",
   "cash_from_operations",
@@ -1916,6 +2018,7 @@ const SCHEDULE_ROLES = new Set([
   "net_finance_addback",
   "debt_issuance",
   "debt_repayment",
+  "change_in_debt",
   "rcf_draw",
   "rcf_repayment",
   "lease_principal",
@@ -1976,6 +2079,7 @@ const CAPTURE_HEADLINE_ROLES = new Set([
   "ebit",
   "ebitda",
   "adjusted_ebitda",
+  "reported_ebitda",
   "depreciation_and_amortisation",
 ]);
 
@@ -2031,10 +2135,46 @@ function carriesStructuralEventSemantics(row) {
   );
 }
 
-function hasDirectForecastAuthority(row) {
+function hasCompleteCompatibleBrokerAuthority(modelCase, row) {
+  const packMetrics = modelCase?.broker_pack?.metrics ?? {};
+  const metricIds = [...new Set([
+    row?.broker_metric_id,
+    row?.semantic_role,
+    row?.row_id,
+  ].filter((metricId) =>
+    Boolean(metricId) &&
+    (metricId === row?.broker_metric_id || Object.hasOwn(packMetrics, metricId)),
+  ))];
+  return metricIds.some((metricId) => {
+    if (!packMetrics[metricId]) return false;
+    const compatibility = compareDefinitionSignatures(
+      brokerMetricDefinitionSignature(modelCase, metricId),
+      statementMetricDefinitionSignature(modelCase, [row], metricId),
+    );
+    if (!compatibility.compatible) return false;
+    return [0, 1, 2].every((forecastIndex) => {
+      const selection = resolveBrokerForecastSelection(
+        modelCase,
+        metricId,
+        forecastIndex,
+      );
+      return selection?.value !== null &&
+        selection?.value !== undefined &&
+        Number.isFinite(Number(selection.value));
+    });
+  });
+}
+
+function hasDirectForecastAuthority(modelCase, row) {
   if (!row) return false;
-  if (row.broker_metric_id) return true;
-  if (["broker", "hardcode", "zero"].includes(row.forecast_treatment)) {
+  if (SCHEDULE_ROLES.has(row.semantic_role)) return true;
+  if (
+    (row.broker_metric_id || row.forecast_treatment === "broker") &&
+    hasCompleteCompatibleBrokerAuthority(modelCase, row)
+  ) {
+    return true;
+  }
+  if (["hardcode", "zero"].includes(row.forecast_treatment)) {
     return true;
   }
   if (
@@ -2052,9 +2192,9 @@ function hasDirectForecastAuthority(row) {
   );
 }
 
-function hasLiveHeadlineForecastAuthority(row) {
+function hasLiveHeadlineForecastAuthority(modelCase, row) {
   return (
-    hasDirectForecastAuthority(row) ||
+    hasDirectForecastAuthority(modelCase, row) ||
     (CAPTURE_HEADLINE_ROLES.has(row?.semantic_role) &&
       (Boolean(row.forecast_calculation?.refs?.length) ||
         (row.forecast_period_calculations ?? []).some(
@@ -2063,9 +2203,9 @@ function hasLiveHeadlineForecastAuthority(row) {
   );
 }
 
-function mayResolveAsAggregate(row) {
+function mayResolveAsAggregate(modelCase, row) {
   if (!row) return false;
-  if (hasDirectForecastAuthority(row)) return true;
+  if (hasDirectForecastAuthority(modelCase, row)) return true;
   // A filed total with no formula is a single economic series and may resolve
   // through the ordinary evidence waterfall. This remains useful for direct
   // reported-parent captures (especially working capital), but it is NOT a
@@ -2241,7 +2381,13 @@ export function compileForecastCaptureTopology(
       if (row.row_type === "header") continue;
       if (restoreDerivedDisplayIdentity(row)) continue;
       if (derivedRowIds.has(row.row_id)) continue;
-      if (CAPTURE_REQUIRED_ROLES.has(row.semantic_role)) continue;
+      const scheduleDetailCapturedByChangeInDebt =
+        SCHEDULE_ROLES.has(row.semantic_role) &&
+        rowsById.get(row.parent_row_id)?.semantic_role === "change_in_debt";
+      if (
+        CAPTURE_REQUIRED_ROLES.has(row.semantic_role) &&
+        !scheduleDetailCapturedByChangeInDebt
+      ) continue;
       if (row.broker_metric_id || row.forecast_calculation) continue;
       if ((row.forecast_period_calculations ?? []).some(Boolean)) continue;
       if (
@@ -2271,7 +2417,7 @@ export function compileForecastCaptureTopology(
           parentsByChild,
           (candidate) =>
             candidate.row_id !== row.row_id &&
-            hasLiveHeadlineForecastAuthority(candidate) &&
+            hasLiveHeadlineForecastAuthority(modelCase, candidate) &&
             (CAPTURE_HEADLINE_ROLES.has(candidate.semantic_role) ||
               !candidate.calculation?.refs?.length ||
               candidate.broker_metric_id ||
@@ -2314,8 +2460,8 @@ export function compileForecastCaptureTopology(
             (parent) =>
               parent.membership_count === 1 &&
               (section === "income_statement"
-                ? mayResolveAsAggregate(rowsById.get(parent.parent_row_id))
-                : hasDirectForecastAuthority(rowsById.get(parent.parent_row_id))),
+                ? mayResolveAsAggregate(modelCase, rowsById.get(parent.parent_row_id))
+                : hasDirectForecastAuthority(modelCase, rowsById.get(parent.parent_row_id))),
           )
           .map((parent) => parent.parent_row_id);
         const hierarchyParent = row.parent_row_id && rowsById.has(row.parent_row_id)
@@ -2324,8 +2470,8 @@ export function compileForecastCaptureTopology(
         const hierarchyEligible =
           hierarchyParent &&
           (section === "income_statement"
-            ? mayResolveAsAggregate(hierarchyParent)
-            : hasDirectForecastAuthority(hierarchyParent));
+            ? mayResolveAsAggregate(modelCase, hierarchyParent)
+            : hasDirectForecastAuthority(modelCase, hierarchyParent));
         const directTargets = new Set([
           ...directFormulaParents,
           ...(hierarchyEligible ? [hierarchyParent.row_id] : []),
@@ -2366,7 +2512,7 @@ export function compileForecastCaptureTopology(
         const ebit = ebitIndex >= 0 ? rows[ebitIndex] : null;
         if (
           revenue &&
-          hasLiveHeadlineForecastAuthority(revenue) &&
+          hasLiveHeadlineForecastAuthority(modelCase, revenue) &&
           rowIndex >= 0 &&
           rowIndex < revenueIndex
         ) {
@@ -2374,7 +2520,7 @@ export function compileForecastCaptureTopology(
           statementBandCapture = true;
         } else if (
           ebit &&
-          hasLiveHeadlineForecastAuthority(ebit) &&
+          hasLiveHeadlineForecastAuthority(modelCase, ebit) &&
           rowIndex > revenueIndex &&
           rowIndex < ebitIndex
         ) {
@@ -2407,7 +2553,7 @@ export function compileForecastCaptureTopology(
           if (
             total &&
             headerIndex >= 0 &&
-            mayResolveAsAggregate(total) &&
+            mayResolveAsAggregate(modelCase, total) &&
             rowIndex > headerIndex &&
             rowIndex < totalIndex
           ) {
@@ -2450,6 +2596,7 @@ export function compileForecastCaptureTopology(
       });
       if (
         [
+          "driver_linked_flow",
           "contractual_flow",
           "lumpy_discretionary_flow",
           "seasonal_flow",
@@ -2510,47 +2657,6 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   for (const row of allRows) {
     if (row.semantic_role) byRole.set(row.semantic_role, row);
   }
-  const brokerDisabled = modelCase.controls?.broker_case === "Forecast Waterfall";
-  let filedProfitLevel = null;
-  if (brokerDisabled) {
-    // A sealed preview with no selectable broker authority is an affirmative
-    // model decision, not a missing-input state. Remove inherited broker
-    // ownership before compiling the ordinary evidence/history waterfall;
-    // retaining the marker would make a null broker series outrank usable
-    // company history and could recreate a profit-bridge cycle.
-    for (const row of allRows) {
-      delete row.broker_metric_id;
-      if (row.forecast_treatment === "broker") {
-        delete row.forecast_treatment;
-      }
-    }
-    const profitRoles = new Set([
-      "operating_profit",
-      "ebit",
-      "ebitda",
-      "adjusted_ebitda",
-    ]);
-    filedProfitLevel = allRows.find(
-      (row) =>
-        profitRoles.has(row.semantic_role) &&
-        row.historical_authority === "source_input" &&
-        (row.values ?? []).slice(0, 3).every(
-          (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
-        ),
-    );
-    if (
-      filedProfitLevel?.forecast_calculation?.operator === "link" &&
-      (filedProfitLevel.forecast_calculation.refs ?? []).some((rowId) =>
-        profitRoles.has(rowsById.get(rowId)?.semantic_role),
-      )
-    ) {
-      delete filedProfitLevel.forecast_calculation;
-      delete filedProfitLevel.forecast_period_calculations;
-      if (filedProfitLevel.forecast_treatment === "formula") {
-        delete filedProfitLevel.forecast_treatment;
-      }
-    }
-  }
   // 1. Broker links: a pack metric whose id names a statement role is
   // consumed there.  Calculation rows consume as treatment overrides;
   // input rows only carry the link.
@@ -2558,6 +2664,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   const CONSUMABLE_ROLES = new Set([
     "revenue",
     "adjusted_ebitda",
+    "reported_ebitda",
     "effective_tax_rate",
     "depreciation_and_amortisation",
     "change_in_working_capital",
@@ -2565,7 +2672,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     "dividends",
     "share_buybacks",
   ]);
-  for (const metricId of brokerDisabled ? [] : packMetrics) {
+  for (const metricId of packMetrics) {
     if (!CONSUMABLE_ROLES.has(metricId)) continue;
     const row = byRole.get(metricId);
     if (!row || row.row_type === "header") continue;
@@ -2589,13 +2696,16 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     row.forecast_calculation = calculation;
   };
   const ebit = byRole.get("ebit");
-  const adjustedEbitda = byRole.get("adjusted_ebitda");
+  const adjustedEbitda = selectedEbitdaRow(allRows);
   const da = byRole.get("depreciation_and_amortisation");
   const statOp = rowsById.get("operating_profit");
   const ntiForOp = rowsById.get("non_trading_items");
+  const independentHeadlineAuthority = [ebit, adjustedEbitda].some((row) =>
+    hasDirectForecastAuthority(modelCase, row),
+  );
   if (
     statOp && ebit && statOp !== ebit &&
-    (!brokerDisabled || statOp !== filedProfitLevel) &&
+    independentHeadlineAuthority &&
     !statOp.calculation && !statOp.forecast_calculation
   ) {
     wire(
@@ -2639,8 +2749,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   if (
     ebit && adjRefsIncludeEbit &&
     !ebit.forecast_calculation &&
-    Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "ebit") &&
-    !brokerDisabled
+    Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "ebit")
   ) {
     ebit.broker_metric_id ??= "ebit";
     ebit.forecast_treatment = "broker";
@@ -2651,12 +2760,16 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   if (taxExpense && preTax && etr && !taxExpense.forecast_calculation) {
     wire(taxExpense, { operator: "tax", refs: [preTax.row_id, etr.row_id] });
   }
-  // The taxonomy carries only high-impact roles; where a CF payment line has
-  // no classified role, its conventional map-declared row_id is the binding.
+  // The taxonomy carries only high-impact roles; where a CF interest-payment
+  // line has no classified role, its conventional map-declared row_id is the
+  // binding. Cash tax is deliberately absent from this identity wiring. A
+  // filed cash-tax line is an independent cash-flow series and must reach the
+  // normal source / guidance / broker / driver / historical fallback
+  // waterfall. Linking it to P&L tax here silently outranked every one of
+  // those authorities and erased the cash-versus-accrual distinction.
   for (const [cfRole, fallbackRowIds, isRole] of [
     ["cash_interest_paid", ["interest_paid"], "interest_expense"],
     ["cash_interest_received", ["interest_received"], "interest_income"],
-    ["cash_tax_paid", ["tax_paid", "income_taxes_paid", "income_tax_paid", "taxes_paid"], "tax_expense"],
   ]) {
     const cfRow =
       byRole.get(cfRole) ??
@@ -2916,13 +3029,32 @@ function verifyManifestSeals(caseSource, manifestsBySection, report) {
 }
 
 function synchronizeDerivedHistoricalForecastCaches(modelCase) {
+  const cashFlowRows = modelCase.statement_structure?.cash_flow ?? [];
+  const cashFlowIds = new Set(cashFlowRows.map((row) => row.row_id));
   const rows = [
     ...(modelCase.statement_structure?.income_statement ?? []),
-    ...(modelCase.statement_structure?.cash_flow ?? []),
+    ...cashFlowRows,
   ];
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const evaluate = (row, periodIndex, visiting = new Set()) => {
     if (!row || visiting.has(row.row_id)) return null;
+    // Historical normalisation retains a filed/reconciled answer separately
+    // from the visible formula that proves it.  Treat that answer as the
+    // terminal value when a downstream historical cache is materialised.
+    // Re-walking through statement-only dependencies is not equivalent: some
+    // visible children are schedule links whose workbook values are owned by
+    // debt or interest schedules, so the case-only walk can manufacture a
+    // stale subtotal even though the emitted workbook formula reconciles.
+    const reconciled = cashFlowIds.has(row.row_id)
+      ? row.reported_historical_values?.[periodIndex]
+      : null;
+    if (
+      reconciled !== null &&
+      reconciled !== undefined &&
+      Number.isFinite(Number(reconciled))
+    ) {
+      return Number(reconciled);
+    }
     const rule = row.calculation;
     if (!rule || (rule.refs ?? []).length === 0) {
       const literal = row.values?.[periodIndex];
@@ -3150,6 +3282,18 @@ export function compileCase(caseSource, evidence = {}) {
   };
   for (const lane of PASSTHROUGH_LANES) {
     if (lanes[lane] !== undefined) modelCase[lane] = clone(lanes[lane]);
+  }
+  const debtClassMigrations = migrateLegacyDebtClasses(modelCase);
+  for (const migration of debtClassMigrations) {
+    report.add(
+      "instruments.debt_class_migrated",
+      migration.mapping === "legacy_alias" ? "WARN" : "BLOCK",
+      `${migration.instrument_id}: debt class ${JSON.stringify(migration.source_class)} mapped to ${migration.canonical_class}.`,
+      migration.mapping === "legacy_alias"
+        ? "Re-extract the DCS lane under debt-class-ontology/1.0 to remove the compatibility migration."
+        : "Classify the instrument from affirmative type and pricing evidence before compilation.",
+      migration,
+    );
   }
   modelCase.provenance = compileFilingProvenance({
     existing: modelCase.provenance,
@@ -3389,17 +3533,20 @@ export function compileCase(caseSource, evidence = {}) {
       // sealed case carries broker links only on the consumable set.
       if (
         row.broker_metric_id &&
-        !["revenue", "adjusted_ebitda", "effective_tax_rate",
+        !["revenue", "adjusted_ebitda", "reported_ebitda", "effective_tax_rate",
           "depreciation_and_amortisation", "change_in_working_capital",
           "capex", "dividends", "share_buybacks"].includes(row.broker_metric_id) &&
-        // ebit is a real consumption in exactly three shapes: a declared
+        // ebit remains a real evidence binding in four shapes: a declared
         // inline bridge pins the level (subtract-recipe circularity), the
         // pack is ebit-led (no adjusted_ebitda metric to anchor on), or the
-        // row is a formula-less reported level nothing else can forecast.
+        // row is a formula-less reported level nothing else can forecast. An
+        // unavailable or incompatible series is also retained so its explicit
+        // rejection survives any later EBIT/operating-profit projection.
         !(row.broker_metric_id === "ebit" &&
           (inlineBridgePinned.has(row.row_id) ||
             !Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "adjusted_ebitda") ||
-            !row.calculation))
+            !row.calculation ||
+            !hasCompleteCompatibleBrokerAuthority(modelCase, row)))
       ) {
         delete row.broker_metric_id;
         if (row.forecast_treatment === "broker") delete row.forecast_treatment;

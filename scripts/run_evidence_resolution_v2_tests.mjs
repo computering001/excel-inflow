@@ -83,7 +83,7 @@ function evidenceRun() {
           instrument_id: "bond_1",
           source_row: "dcs.1",
           description: "5% notes",
-          instrument_type: "fixed_bond",
+          instrument_type: "bond_fixed",
           currency: "USD",
           outstanding_amount: 50,
           maturity_date: "2030-06-30",

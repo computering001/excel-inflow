@@ -47,7 +47,7 @@ function roleOf(cell) {
 function definitionRole(definition) {
  const role=normalise(definition?.semantic_role ?? definition?.row_id ?? definition?.movement_type).replaceAll(" ","_");
  if(["acquisitions_net_of_cash","acquisition_consideration","purchase_consideration"].includes(role)) return "consideration";
- if(["debt_issuance","additions_to_debt","acquisition_debt_proceeds"].includes(role)) return "debt_proceeds";
+ if(["debt_issuance","change_in_debt","additions_to_debt","acquisition_debt_proceeds"].includes(role)) return "debt_proceeds";
  return null;
 }
 function statementDefinitions(rowPlan) {
@@ -78,12 +78,33 @@ export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
  const sheet=workbook?.sheetByName?.("Operating Model");
  if(!sheet)return{changed:0,reason:"operating-model-absent"};
  const definitions=statementDefinitions(rowPlan);
- const consideration=definitions.find(definition=>definitionRole(definition)==="consideration");
- const debtProceeds=definitions.find(definition=>definitionRole(definition)==="debt_proceeds");
- if(!consideration||!debtProceeds) throw new Error("Funded acquisition portable plan is missing the existing consideration or debt-issuance row.");
+ const considerationRows=definitions.filter(definition=>definitionRole(definition)==="consideration");
+ const debtProceedsCandidates=definitions.filter(definition=>definitionRole(definition)==="debt_proceeds");
+ const consolidatedDebtRows=debtProceedsCandidates.filter(
+  definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="change_in_debt",
+ );
+ const debtProceedsRows=consolidatedDebtRows.length>0
+  ? consolidatedDebtRows
+  : debtProceedsCandidates.filter(definition=>!definition.forecast_capture_parent_id);
+ if(considerationRows.length!==1||debtProceedsRows.length!==1) throw new Error("Funded acquisition portable plan must contain exactly one existing consideration row and one consolidated debt-proceeds row.");
+ const consideration=considerationRows[0];
+ const debtProceeds=debtProceedsRows[0];
+ const investingRows=definitions.filter(definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="cash_from_investing");
+ if(investingRows.length!==1) throw new Error("Funded acquisition portable plan must contain exactly one investing cash-flow total.");
+ const investingRefs=investingRows[0]?.calculation?.refs??[];
+ const considerationRefCount=investingRefs.filter(reference=>reference===consideration.row_id).length;
+ const fxRowIds=new Set(definitions.filter(definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="fx_effect_on_cash").map(definition=>definition.row_id));
+ if(considerationRefCount!==1||investingRefs.some(reference=>fxRowIds.has(reference))) throw new Error("Funded acquisition consideration must be owned exactly once by investing cash flow and must never bind to the FX-effect row.");
+ const consolidatedScheduleDebt=
+  normalise(debtProceeds?.semantic_role??debtProceeds?.row_id).replaceAll(" ","_")==="change_in_debt";
+ // The modern builder owns acquisition debt through the debt schedule and the
+ // Change in Debt parent already links to that schedule total. Replacing that
+ // link with a transaction hardcode would create a second financing writer and
+ // disconnect the cash sweep. Legacy captured plans without the consolidated
+ // parent still receive the direct proceeds formula for compatibility.
  const targets=[
   {definition:consideration,kind:"consideration"},
-  {definition:debtProceeds,kind:"debt_proceeds"},
+  ...(consolidatedScheduleDebt?[]:[{definition:debtProceeds,kind:"debt_proceeds"}]),
  ];
  const adjustmentColumns=["N","O","P"];
  const proFormaColumns=["S","T","U"];
@@ -93,8 +114,8 @@ export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
    const address=`${column}${definition.row}`;
    const flow=acquisitionTransactionFlows(modelCase,index);
    const amount=kind==="consideration"?"-$P$5":"$P$8";
-   const headerRef=`${column}$6`;
-   const periodYear=`IF(${headerRef}>3000,YEAR(${headerRef}),${headerRef})`;
+   const periodYear=Number(String(modelCase.periods?.[index+3]?.date??"").slice(0,4));
+   if(!Number.isInteger(periodYear)) throw new Error(`Funded acquisition period ${index+1} has no calendar-year end.`);
    const formula=`=IF($P$4=0,0,IF(${periodYear}=$P$10,${amount},0))`;
    if(!sheet.setFormulaText(address,formula)) throw new Error(`Funded acquisition target ${address} is not an existing formula cell.`);
    const cached=kind==="consideration"?flow.consideration_cash_flow:flow.acquisition_debt_proceeds;
@@ -125,9 +146,15 @@ export function applyFundedAcquisitionPlan(plan, modelCase) {
  // Canonical geometry remains a deterministic fallback, but discovered controls win.
  controls.enabled??="$P$4";controls.transaction??="$P$5";controls.debt??="$P$8";controls.close_year??="$P$10";
  const forecastColumns=["N","O","P"];
+ const transactionCells=cells.map(cell=>({cell,kind:roleOf(cell)})).filter(({cell,kind})=>kind&&forecastColumns.includes(cell.address.column));
+ for(const kind of ["consideration","debt_proceeds"]){
+  const owned=transactionCells.filter(target=>target.kind===kind);
+  const rows=new Set(owned.map(target=>target.cell.address.row));
+  const columns=new Set(owned.map(target=>target.cell.address.column));
+  if(rows.size!==1||owned.length!==3||forecastColumns.some(column=>!columns.has(column))) throw new Error(`Funded acquisition captured plan must contain exactly one ${kind} row across N:P; duplicate or incomplete physical binding detected.`);
+ }
  let changed=0;
- for(const cell of cells){
-  const kind=roleOf(cell); if(!kind||!forecastColumns.includes(cell.address.column))continue;
+ for(const {cell,kind} of transactionCells){
   const index=forecastColumns.indexOf(cell.address.column);const flow=acquisitionTransactionFlows(modelCase,index);
   const headerCandidates=cells.filter(candidate=>candidate.address.column===cell.address.column&&candidate.address.row<cell.address.row&&candidate.address.row<=15&&candidate.value!==null);
   const header=headerCandidates.sort((a,b)=>b.address.row-a.address.row)[0];const headerRef=header?`${cell.address.column}$${header.address.row}`:`${cell.address.column}$6`;

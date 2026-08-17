@@ -5,15 +5,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { solveCase } from "./lib/solver.mjs";
-import {
-  applyFundedAcquisitionRows,
-  fundedAcquisitionCandidate,
-  fundedAcquisitionRole,
-} from "./lib/funded_acquisition_runtime.mjs";
+import { applyFundedAcquisitionRows } from "./lib/funded_acquisition_runtime.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fixture = process.argv[2] ?? path.join(root, "fixtures", "portable", "representative-model-case.json");
+const fixture = process.argv[2] ??
+  path.join(root, "test-fixtures", "cases", "standard-net-cash-v2.json");
 const base = JSON.parse(fs.readFileSync(fixture, "utf8"));
+base.execution_profile = "reference_parity";
 
 function clone(value) { return structuredClone(value); }
 function normalise(value) { return String(value ?? "").toLowerCase().replaceAll(/[^a-z0-9]+/g, "_"); }
@@ -35,39 +33,36 @@ function mutateAcquisitionInputs(value, enabled, closeYear) {
       else if (["entry_ev_ebitda", "entry_ev_to_ebitda", "entry_multiple"].includes(token) && nextContext) node[key] = 10;
       else if (["incremental_debt_rate", "acquisition_debt_rate", "incremental_rate"].includes(token) && nextContext) node[key] = 0.05;
       else if (["enabled", "acquisition_on", "adjustment_columns_on", "acquisition_case"].includes(token) && nextContext) {
-        node[key] = typeof entry === "string" ? (enabled ? "On" : "Off") : enabled;
+        node[key] = typeof entry === "string" ? (enabled ? "On" : "Off") : (enabled ? 1 : 0);
       } else visit(entry, nextContext);
     }
   };
   visit(value);
   value.acquisition ??= {};
   Object.assign(value.acquisition, {
-    enabled,
+    enabled: enabled ? 1 : 0,
     transaction_enterprise_value: 1000,
     acquisition_debt_amount: 400,
     close_year: closeYear,
     close_month: 6,
-    entry_ev_ebitda: 10,
-    incremental_debt_rate: 0.05,
+    entry_ev_to_ebitda: 10,
+    incremental_rate: 0.05,
   });
+  delete value.acquisition.entry_ev_ebitda;
+  delete value.acquisition.incremental_debt_rate;
   value.controls ??= {};
   for (const key of ["acquisition_adjustments", "adjustment_columns", "acquisition_case"]) {
     if (key in value.controls) value.controls[key] = enabled ? "On" : "Off";
   }
 }
 function materialiseFundedRows(modelCase) {
+  const before = JSON.stringify(modelCase.statement_structure);
   applyFundedAcquisitionRows(modelCase);
-  for (const row of modelCase.statement_structure?.cash_flow ?? []) {
-    if (!fundedAcquisitionRole(row)) continue;
-    row.values ??= [null, null, null, null, null, null];
-    for (let index = 0; index < 3; index += 1) {
-      const candidate = fundedAcquisitionCandidate(modelCase, row, index);
-      row.values[index + 3] = candidate.value;
-      row.forecast_treatment = candidate.method;
-      row.forecast_period_calculations ??= [null, null, null];
-      row.forecast_period_calculations[index] = candidate.formula_spec;
-    }
-  }
+  assert.equal(
+    JSON.stringify(modelCase.statement_structure),
+    before,
+    "Acquisition runtime contaminated standalone statement authority.",
+  );
 }
 function finite(value) { return value !== null && value !== undefined && Number.isFinite(Number(value)); }
 function metric(period, names) {

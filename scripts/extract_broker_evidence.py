@@ -28,7 +28,8 @@ from broker_terminal_recovery import compile_broker_demand_contract, normalized_
 
 
 VERSION = "broker-evidence-extractor/1.1"
-PDF_LANE_TIMEOUT_SECONDS = float(os.environ.get("BROKER_PDF_LANE_TIMEOUT_SECONDS", "0.5"))
+PDF_LANE_MIN_SECONDS = 2.0
+PDF_LANE_MAX_SECONDS = 15.0
 MAX_REGION_CROPS_PER_PAGE = int(os.environ.get("BROKER_MAX_REGION_CROPS_PER_PAGE", "12"))
 NUMERIC_RE = re.compile(
     # Both boundaries exclude letters *and digits*.  The old right boundary
@@ -110,19 +111,43 @@ def normalise_text(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
 
 
-def bounded_table_find(page: Any, kwargs: dict[str, Any]) -> Any:
+def pdf_lane_timeout_budget(
+    *, page_count: int, word_count: int, target_count: int, lane_id: str
+) -> float:
+    """Give legitimate native table discovery time in proportion to evidence.
+
+    The former fixed 0.5 second alarm routinely abandoned valid ruled tables
+    on dense or multi-page reports. The budget remains finite and per-lane, but
+    grows with document size, page density and the bounded model-demand target
+    set. More expensive discovery strategies receive a small explicit factor.
+    """
+    lane_factor = {"lines": 1.0, "lines_strict": 1.2, "text": 1.4}.get(lane_id, 1.0)
+    evidence_seconds = (
+        1.5
+        + min(max(0, page_count), 200) / 80.0
+        + min(max(0, word_count), 3_000) / 600.0
+        + min(max(0, target_count), 20) * 0.20
+    ) * lane_factor
+    return min(PDF_LANE_MAX_SECONDS, max(PDF_LANE_MIN_SECONDS, evidence_seconds))
+
+
+def pdf_document_table_budget(*, page_count: int, target_count: int) -> float:
+    return min(300.0, max(30.0, page_count * 2.5 + min(max(0, target_count), 20) * 3.0))
+
+
+def bounded_table_find(page: Any, kwargs: dict[str, Any], timeout_seconds: float) -> Any:
     """Bound pathological PDF table discovery and fall through to rendering."""
-    if not hasattr(signal, "setitimer") or PDF_LANE_TIMEOUT_SECONDS <= 0:
+    if not hasattr(signal, "setitimer") or timeout_seconds <= 0:
         return page.find_tables(**kwargs)
 
     def timed_out(_signum: int, _frame: Any) -> None:
         raise TimeoutError(
-            f"PDF table lane exceeded {PDF_LANE_TIMEOUT_SECONDS:g}s budget"
+            f"PDF table lane exceeded {timeout_seconds:g}s evidence-sized budget"
         )
 
     previous = signal.signal(signal.SIGALRM, timed_out)
     try:
-        signal.setitimer(signal.ITIMER_REAL, PDF_LANE_TIMEOUT_SECONDS)
+        signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
         return page.find_tables(**kwargs)
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
@@ -609,9 +634,9 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
     captured_table_tokens: list[str] = []
     unresolved = False
     seen_images: set[int] = set()
-    table_budget_seconds = min(
-        45.0,
-        max(8.0, float(document.page_count) * 0.35),
+    table_budget_seconds = pdf_document_table_budget(
+        page_count=document.page_count,
+        target_count=len(demand_contract.get("targets") or []),
     )
     table_budget_started = time.monotonic()
 
@@ -649,17 +674,24 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
         page_tables: list[tuple[str, Any]] = []
         lane_summaries: list[dict[str, Any]] = []
         for lane_id, kwargs in discovery_specs:
+            lane_timeout_seconds = pdf_lane_timeout_budget(
+                page_count=document.page_count,
+                word_count=len(words),
+                target_count=len(selected_targets),
+                lane_id=lane_id,
+            )
+            lane_started = time.monotonic()
             try:
                 if time.monotonic() - table_budget_started > table_budget_seconds:
                     raise TimeoutError(
                         f"document table-discovery budget {table_budget_seconds:g}s exhausted"
                     )
-                finder = bounded_table_find(page, kwargs)
+                finder = bounded_table_find(page, kwargs, lane_timeout_seconds)
                 found = list(getattr(finder, "tables", []) or [])
-                lane_summaries.append({"lane_id": lane_id, "status": "pass" if found else "empty", "candidate_count": len(found)})
+                lane_summaries.append({"lane_id": lane_id, "status": "pass" if found else "empty", "candidate_count": len(found), "timeout_budget_seconds": lane_timeout_seconds, "duration_ms": round((time.monotonic() - lane_started) * 1000, 3)})
                 page_tables.extend((lane_id, item) for item in found)
             except Exception as error:
-                lane_summaries.append({"lane_id": lane_id, "status": "error", "candidate_count": 0, "message": str(error)})
+                lane_summaries.append({"lane_id": lane_id, "status": "timeout" if isinstance(error, TimeoutError) else "error", "candidate_count": 0, "timeout_budget_seconds": lane_timeout_seconds, "duration_ms": round((time.monotonic() - lane_started) * 1000, 3), "message": str(error)})
 
         table_bboxes: list[list[float]] = []
         text_discovery_bboxes: list[list[float]] = []
@@ -1029,7 +1061,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             "lane_status": {
                 "native_text": "pass" if text.strip() else "empty",
                 "geometry": "pass" if words else "empty",
-                "tables": "pass" if page_tables else ("error" if all(item["status"] == "error" for item in lane_summaries) else "none"),
+                "tables": "pass" if page_tables else ("error" if all(item["status"] in {"error", "timeout"} for item in lane_summaries) else "none"),
                 "images": "pass" if image_infos else "none",
                 "vision": "required" if vision_required else "not_required",
             },

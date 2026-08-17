@@ -154,6 +154,40 @@ assert(interrupted.status === "BLOCKED" && interrupted.stage === "build_checks",
 assert(interrupted.reused_stages.join(",") === "inputs,evidence_review,decisions", "Forced timeout did not retain user Stages 1-3.");
 
 const casePath = path.join(runDir, "stages", "decisions", "model-case.json");
+const stage3Case = JSON.parse(await fs.readFile(casePath, "utf8"));
+const stage3CashRows = new Map(
+  (stage3Case.statement_structure?.cash_flow ?? []).map((row) => [
+    row.semantic_role ?? row.row_id,
+    row,
+  ]),
+);
+const stage3CashCacheSyncs = (cashRows) => {
+  const opening = cashRows.get("opening_cash");
+  const movement = cashRows.get("net_change_in_cash");
+  const fx = cashRows.get("fx_effect_on_cash");
+  const ending = cashRows.get("ending_cash");
+  return [0, 1, 2].every(
+    (period) =>
+      Number(ending?.values?.[period]) ===
+        Number(ending?.reported_historical_values?.[period]) &&
+      Number(ending?.values?.[period]) ===
+        Number(opening?.values?.[period]) +
+          Number(movement?.values?.[period]) +
+          Number(fx?.values?.[period]),
+  );
+};
+assert(
+  stage3CashCacheSyncs(stage3CashRows),
+  "Stage 3 materialisation replaced reconciled historical cash caches.",
+);
+const mutatedStage3CashRows = new Map(
+  [...stage3CashRows].map(([role, row]) => [role, structuredClone(row)]),
+);
+mutatedStage3CashRows.get("ending_cash").values[2] -= 1;
+assert(
+  !stage3CashCacheSyncs(mutatedStage3CashRows),
+  "Stage 3 historical cash cache mutation was not detected.",
+);
 const caseHash = await sha256(casePath);
 const buildDir = path.join(runDir, `build-${caseHash.slice(0, 12)}`);
 const receiptDir = path.join(buildDir, ".stage4", "receipts");
@@ -280,6 +314,7 @@ const report = {
   status: "PASS",
   total_violations: 0,
   tests: [
+    { id: "stage3-reconciled-historical-cash-cache", status: "PASS", mutation: "BLOCKED" },
     { id: "real-mid-build-timeout", status: "PASS" },
     { id: "resume-from-last-internal-success", status: "PASS", reused: recoveredBuild.checkpointing.reused },
     { id: "internal-scratch-loss-does-not-invalidate-published-closure", status: "PASS", reused: scratchReuse.reused_stages },

@@ -57,6 +57,97 @@ function forecastYears(modelCase) {
     .filter(Number.isFinite);
 }
 
+export const ACQUISITION_VALUATION_AUTHORITY =
+  "transaction_enterprise_value_and_entry_ev_to_ebitda/1.0";
+
+const FORBIDDEN_TARGET_EBITDA_INPUTS = Object.freeze([
+  "target_ebitda",
+  "target_adjusted_ebitda",
+  "target_ebitda_input",
+]);
+
+/**
+ * The canonical overlay has exactly two valuation inputs. Target EBITDA is an
+ * answer, never a third editable assumption. Keeping this contract in one
+ * module prevents the solver, renderer and intake validation from developing
+ * separate definitions of the same transaction value.
+ */
+export function acquisitionValuationErrors(modelCase) {
+  const errors = [];
+  const acquisition = modelCase?.acquisition;
+  if (!acquisition || typeof acquisition !== "object") return errors;
+  const isV2 = Number(modelCase?.contract_version) === 2;
+
+  for (const field of FORBIDDEN_TARGET_EBITDA_INPUTS) {
+    if (Object.hasOwn(acquisition, field)) {
+      errors.push(
+        `acquisition.${field} is forbidden: target EBITDA must be derived from transaction_enterprise_value / entry_ev_to_ebitda.`,
+      );
+    }
+  }
+
+  if (Number(acquisition.enabled ?? 0) === 1) {
+    if (
+      isV2 &&
+      !(Number(acquisition.transaction_enterprise_value) > 0)
+    ) {
+      errors.push(
+        "Enabled acquisition needs transaction_enterprise_value greater than zero.",
+      );
+    }
+    if (!(Number(acquisition.entry_ev_to_ebitda) > 0)) {
+      errors.push(
+        "Enabled acquisition needs entry_ev_to_ebitda greater than zero.",
+      );
+    }
+    if (!/^[A-Z]{3}$/.test(String(modelCase?.issuer?.reporting_currency ?? ""))) {
+      errors.push(
+        "Enabled acquisition needs issuer.reporting_currency so transaction amounts have an explicit currency.",
+      );
+    }
+    if (!new Set(["units", "thousands", "millions"]).has(modelCase?.issuer?.units)) {
+      errors.push(
+        "Enabled acquisition needs issuer.units so transaction amounts have an explicit scale.",
+      );
+    }
+  }
+  return errors;
+}
+
+export function acquisitionValuation(modelCase) {
+  const acquisition = modelCase?.acquisition ?? {};
+  const enterpriseValue = Number(acquisition.transaction_enterprise_value);
+  const entryMultiple = Number(acquisition.entry_ev_to_ebitda);
+  return Object.freeze({
+    authority: ACQUISITION_VALUATION_AUTHORITY,
+    transaction_enterprise_value: enterpriseValue,
+    entry_ev_to_ebitda: entryMultiple,
+    target_ebitda:
+      enterpriseValue > 0 && entryMultiple > 0
+        ? enterpriseValue / entryMultiple
+        : 0,
+    reporting_currency: String(modelCase?.issuer?.reporting_currency ?? ""),
+    units: String(modelCase?.issuer?.units ?? ""),
+  });
+}
+
+export function acquisitionAmountLabel(modelCase, label) {
+  const valuation = acquisitionValuation(modelCase);
+  return `${label} (${valuation.reporting_currency}, ${valuation.units})`;
+}
+
+export function acquisitionTargetEbitdaFormula(
+  enterpriseValueCell,
+  entryMultipleCell,
+) {
+  // Invalid valuation inputs must remain visible spreadsheet errors.  The case
+  // gate and face validations stop non-positive entries before build/use; an
+  // IFERROR fallback here would turn a corrupted denominator into fake zero
+  // EBITDA and let every downstream acquisition formula continue apparently
+  // clean.
+  return `=${enterpriseValueCell}/${entryMultipleCell}`;
+}
+
 export function ensureIllustrativeAcquisitionCase(modelCase) {
   if (Number(modelCase?.contract_version) !== 2) return modelCase;
   modelCase.modules ??= {};

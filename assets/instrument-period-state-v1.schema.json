@@ -113,13 +113,17 @@
         "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
         "class": {
           "enum": [
-            "fixed_bond",
-            "floating_loan",
+            "bond_fixed",
+            "bond_floating",
+            "term_loan_fixed",
+            "term_loan_floating",
             "commercial_paper",
             "securitisation",
             "rcf",
-            "other_debt",
-            "lease_liability"
+            "lease_liability",
+            "overdraft",
+            "other_explicit",
+            "unclassified"
           ]
         },
         "family": {
@@ -129,7 +133,9 @@
             "commercial_paper",
             "securitisation",
             "revolving_credit_facility",
+            "overdraft",
             "other_debt",
+            "unclassified_review",
             "lease"
           ]
         },

@@ -500,6 +500,22 @@
           "maxItems": 3,
           "items": { "type": ["number", "null"] }
         },
+        "value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          }
+        },
+        "structural_role": { "enum": ["body", "header"] },
         "page_or_note": { "type": "string", "minLength": 1 },
         "material": { "type": "boolean" },
         "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
@@ -524,7 +540,7 @@
         "rows"
       ],
       "properties": {
-        "schema_version": { "const": "face-statement-manifest/1.0" },
+        "schema_version": { "enum": ["face-statement-manifest/1.0", "face-statement-manifest/1.1"] },
         "statement": { "enum": ["income_statement", "cash_flow"] },
         "statement_order": { "type": "integer", "minimum": 1 },
         "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
@@ -532,6 +548,19 @@
         "page_or_note": { "type": "string", "minLength": 1 },
         "periods": { "$ref": "#/$defs/periods3" },
         "complete_face_statement": { "const": true },
+        "source_pages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 1 },
+          "uniqueItems": true
+        },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "type": "string", "minLength": 1 },
+        "source_unit_labels": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
         "row_count": { "type": "integer", "minimum": 1 },
         "rows_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "rows": {
@@ -539,7 +568,15 @@
           "minItems": 1,
           "items": { "$ref": "#/$defs/faceStatementRow" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "schema_version": { "const": "face-statement-manifest/1.1" } } },
+          "then": {
+            "required": ["source_pages", "reporting_currency", "units", "source_unit_labels"]
+          }
+        }
+      ]
     },
     "faceStatementManifests": {
       "type": "object",

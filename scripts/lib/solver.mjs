@@ -24,6 +24,12 @@ import {
   mandatoryRepaymentForPeriod,
 } from "./instrument_period_state.mjs";
 import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
+import { selectedEbitdaRow } from "./semantic_roles.mjs";
+import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
+import {
+  acquisitionValuation,
+  acquisitionValuationErrors,
+} from "./acquisition_policy.mjs";
 
 const SOLVER_ITERATION_POLICY = solverIterationOptions();
 
@@ -107,6 +113,14 @@ function normalisedStatementDefinitions(modelCase) {
     ]);
   }
   return NORMALISED_STATEMENT_CACHE.get(modelCase);
+}
+
+function selectedEbitdaRole(modelCase) {
+  return (
+    modelCase?.selected_ebitda_basis?.semantic_role ??
+    selectedEbitdaRow(normalisedStatementDefinitions(modelCase))?.semantic_role ??
+    "adjusted_ebitda"
+  );
 }
 
 function asSeries3(value, fallback = 0) {
@@ -849,12 +863,19 @@ export function normalisedCashBuckets(modelCase) {
     }));
   }
   const cash = modelCase.cash_policy ?? {};
-  const filedEndingCash = (
+  const filedEndingCashRow = (
     modelCase.statement_structure?.cash_flow ?? []
   ).find(
     (row) =>
       row.semantic_role === "ending_cash" || row.row_id === "ending_cash",
-  )?.values;
+  );
+  // Direct legacy cases keep the filed closing balance in `values`; compiled
+  // authority cases retain it separately because the visible row also owns a
+  // forecast identity.  They are the same historical source fact and must feed
+  // the same FY1 cash opening.
+  const filedEndingCash = Array.isArray(filedEndingCashRow?.values)
+    ? filedEndingCashRow.values
+    : filedEndingCashRow?.reported_historical_values;
   const filedHistoricalCash = [0, 1, 2].map((index) => {
     const value = filedEndingCash?.[index];
     return value !== null && value !== undefined && Number.isFinite(Number(value))
@@ -1476,6 +1497,8 @@ export function validateCaseShape(modelCase) {
     }
   }
   errors.push(...validateLeasePolicy(modelCase));
+  errors.push(...validateResidualInterestAuthority(modelCase));
+  errors.push(...acquisitionValuationErrors(modelCase));
   if (modelCase.modules?.acquisition && !modelCase.acquisition) {
     errors.push("Acquisition module is enabled but acquisition inputs are absent.");
   }
@@ -1488,17 +1511,6 @@ export function validateCaseShape(modelCase) {
     if (!(acquisitionDebt(modelCase.acquisition) > 0)) {
       errors.push(
         "Enabled acquisition needs acquisition_debt_amount greater than zero.",
-      );
-    }
-    if (!(Number(modelCase.acquisition.entry_ev_to_ebitda) > 0)) {
-      errors.push("Enabled acquisition needs entry_ev_to_ebitda greater than zero.");
-    }
-    if (
-      Number(modelCase.contract_version) === 2 &&
-      !(Number(modelCase.acquisition.transaction_enterprise_value) > 0)
-    ) {
-      errors.push(
-        "Enabled v2 acquisition needs transaction_enterprise_value greater than zero.",
       );
     }
     if (
@@ -1844,7 +1856,9 @@ export function solveCase(
     const derivedMetric = anchorPlan?.selection?.derived ?? null;
     const bridgeAddbacks = anchorPlan?.addbackTotals?.[forecastIndex] ?? 0;
     const brokerEbitda = () => {
-      const declared = declaredStatementGraph.resolveRole("adjusted_ebitda");
+      const declared = declaredStatementGraph.resolveRole(
+        selectedEbitdaRole(modelCase),
+      );
       return declared === null ? metricValue(
         modelCase,
         "adjusted_ebitda",
@@ -2257,12 +2271,15 @@ export function solveCase(
       : acquisitionActive
         ? 1
         : 0;
+    const valuation = acquisitionValuation(modelCase);
     const transactionEnterpriseValue = isV2
-      ? Number(modelCase.acquisition?.transaction_enterprise_value ?? 0)
+      ? valuation.transaction_enterprise_value
       : acquisitionDebtAmount;
     const baseTargetEbitda = acquisitionActive
-      ? transactionEnterpriseValue /
-        Number(modelCase.acquisition.entry_ev_to_ebitda)
+      ? isV2
+        ? valuation.target_ebitda
+        : transactionEnterpriseValue /
+          Number(modelCase.acquisition.entry_ev_to_ebitda)
       : 0;
     // EVERY TARGET OPERATING DRIVER RESOLVES THE SAME WAY THE CELLS DO.
     //
@@ -2407,6 +2424,7 @@ export function solveCase(
       // what permits a PBT-led issuer to derive EBIT backwards through solved
       // interest, and then derive EBITDA through D&A, without inventing an
       // EBITDA hardcode or a company-specific branch.
+      const ebitdaRole = selectedEbitdaRole(modelCase);
       const operatingOverrides = new Map([
         ["revenue", revenue],
         ["interest_income", interestIncome],
@@ -2414,7 +2432,7 @@ export function solveCase(
         ["recurring_disclosed_adjustments", adjustments],
       ]);
       for (const [role, supplied] of [
-        ["adjusted_ebitda", suppliedEbitda],
+        [ebitdaRole, suppliedEbitda],
         ["depreciation_and_amortisation", suppliedDa],
         ["ebit", suppliedEbit],
       ]) {
@@ -2437,7 +2455,7 @@ export function solveCase(
           suppliedDa,
       );
       ebitda = Number(
-        operatingGraph.resolveRole("adjusted_ebitda") ?? suppliedEbitda,
+        operatingGraph.resolveRole(ebitdaRole) ?? suppliedEbitda,
       );
 
       if (
@@ -2509,10 +2527,11 @@ export function solveCase(
           ? baseEbit - (standaloneGrossInterest - interestIncome) +
             otherNonOperating
           : declaredStandalonePreTax;
-      const targetPreTaxIncome = Math.max(
-        0,
-        targetEbit * acquisitionTiming - acquisitionInterest,
-      );
+      // Losses are economic outputs too.  Do not silently rewrite a negative
+      // target PBT to zero: the inherited visible tax-rate assumption then
+      // determines the corresponding tax benefit in both solver and workbook.
+      const targetPreTaxIncome =
+        targetEbit * acquisitionTiming - acquisitionInterest;
       const preTaxIncome = standalonePreTaxIncome + targetPreTaxIncome;
       // Tax and net income belong to the issuer's declared statement graph too.
       // Most cases derive them from PBT and an effective rate, but a legitimate
@@ -2559,7 +2578,7 @@ export function solveCase(
         (interestIncomeInInvesting ? interestIncome : 0);
       const statementOverrides = new Map([
         ["revenue", revenue + targetRevenue * acquisitionTiming],
-        ["adjusted_ebitda", ebitda + targetEbitda * acquisitionTiming],
+        [ebitdaRole, ebitda + targetEbitda * acquisitionTiming],
         ["depreciation_and_amortisation", totalDa],
         ["ebit", totalEbit],
         ["interest_income", interestIncome],
@@ -3002,7 +3021,10 @@ export function solveCase(
       total_liquidity:
         finalCashBucketSnapshot.liquidity_cash +
         undrawnRcf -
-        (balancingRcfEnabled ? drawnCommercialPaper : 0),
+        (balancingRcfEnabled &&
+        modelCase.rcf_policy?.commercial_paper_backstopped !== false
+          ? drawnCommercialPaper
+          : 0),
       iterations: iteration,
       converged,
       residual,

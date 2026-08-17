@@ -198,14 +198,12 @@ export function resolveBrokerForecastSelection(
   const consensus = () => consensusSelection(metric, forecastIndex);
   const selected = modelCase.controls?.broker_case ?? "Consensus";
   if (selected === "Forecast Waterfall") {
-    return {
-      value: null,
-      source_kind: "broker_authority_unavailable",
-      source_name: null,
-      substituted: false,
-      substitution_reason:
-        "The sealed broker preview selected the cross-source forecast waterfall; no broker cell may be consumed.",
-    };
+    // "Forecast Waterfall" selects the cross-source decision process; it is
+    // not a rejection of broker evidence. A compatible broker observation is
+    // still the broker rung of that process. Where no usable value exists,
+    // consensusSelection returns a disclosed null and the ordinary waterfall
+    // proceeds to the next authority without inventing a house or a value.
+    return consensus();
   }
   if (selected === "Consensus") return consensus();
   const values = Object.entries(metric.brokers ?? {})
@@ -283,6 +281,7 @@ export function applyTier1AnchorOwnership(modelCase) {
   const PROFIT_AUTHORITY_ROLES = new Set([
     "ebit",
     "adjusted_ebitda",
+    "reported_ebitda",
     "operating_profit",
     "pre_tax_income",
     "net_income",
@@ -379,7 +378,6 @@ export function selectBrokerAnchor(modelCase, rows = []) {
       compareDefinitionSignatures(signatures.broker, signatures.statement),
     ]),
   );
-  const brokerDisabled = selectedBrokerCase === "Forecast Waterfall";
   return {
     counts,
     counts_by_period: countsByPeriod,
@@ -391,7 +389,7 @@ export function selectBrokerAnchor(modelCase, rows = []) {
     // Exactly one headline plus D&A needs full-period support. We never fall
     // back to using both headline metrics, because doing so merely moves their
     // consensus mismatch into D&A.
-    supported: !brokerDisabled && counts[headlineAnchor] > 0 && counts[da] > 0,
+    supported: counts[headlineAnchor] > 0 && counts[da] > 0,
     definition_signatures: definitionSignatures,
     definition_compatibility: definitionCompatibility,
     label,
@@ -598,17 +596,18 @@ export function resolveAnchorPlanDecision(modelCase, rows) {
       selection,
     };
   }
+  if (!selection.supported) {
+    return {
+      status: "not_applicable",
+      reason:
+        "The declared broker headline has no usable full-period headline-plus-D&A authority; the ordinary forecast waterfall owns the fallback.",
+      selection,
+    };
+  }
   if (!hasBridgeRoles) {
     return {
       status: "unresolved",
       reason: "Broker anchor evidence exists but the statement does not declare the complete EBIT/Adjusted EBITDA/D&A identity.",
-      selection,
-    };
-  }
-  if (!selection.supported) {
-    return {
-      status: "unresolved",
-      reason: "No single headline metric plus D&A has usable coverage in all three forecast periods.",
       selection,
     };
   }

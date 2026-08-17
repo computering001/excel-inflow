@@ -75,7 +75,7 @@ const SCHEDULE_ROLES = new Set(Object.keys(SCHEDULE_PRODUCER_BY_ROLE));
 
 const IDENTITY_ROLES = new Set([
   "revenue", "gross_profit", "operating_profit", "ebit", "ebitda",
-  "adjusted_ebitda", "pre_tax_income", "profit_before_tax", "net_income",
+  "adjusted_ebitda", "reported_ebitda", "pre_tax_income", "profit_before_tax", "net_income",
   "cash_generated_from_operations", "cash_from_operations",
   "cash_from_investing", "cash_from_financing", "free_cash_flow",
 ]);

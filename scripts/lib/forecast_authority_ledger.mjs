@@ -61,7 +61,10 @@ function ledgerBody(modelCase) {
         source_kind: authority.source_kind ?? authority.origin ?? null,
         source_id: authority.source_id ?? null,
         value: authority.value ?? null,
+        confidence: authority.confidence ?? null,
+        selection_rank: authority.selection_rank ?? null,
         material: authority.material ?? null,
+        broker_rejection_reasons: authority.broker_rejection_reasons ?? [],
         status: authority.status ?? (authority.method==='unresolved' ? 'BLOCK' : 'PASS'),
       });
     }
@@ -86,7 +89,17 @@ export function verifyForecastAuthorityLedger(modelCase) {
   }
   const expected=buildForecastAuthorityLedger(modelCase);
   const actual=modelCase.forecast_authority_ledger;
-  if (actual.ledger_sha256!==expected.ledger_sha256 || canonicalJson({...actual,ledger_sha256:undefined})===null) {
+  const {ledger_sha256:actualStoredSha,...actualBody}=actual;
+  const {ledger_sha256:expectedStoredSha,...expectedBody}=expected;
+  const actualBodySha=hashValue(actualBody);
+  const expectedBodySha=hashValue(expectedBody);
+  const bodiesMatch=canonicalJson(actualBody)===canonicalJson(expectedBody);
+  if (
+    actualStoredSha!==actualBodySha ||
+    expectedStoredSha!==expectedBodySha ||
+    actualBodySha!==expectedBodySha ||
+    !bodiesMatch
+  ) {
     throw new Error(`forecast authority ledger drift: expected ${expected.ledger_sha256}, received ${actual.ledger_sha256}`);
   }
   return actual;

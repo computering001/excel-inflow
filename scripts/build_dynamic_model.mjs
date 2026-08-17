@@ -22,6 +22,7 @@ import { assessCoverage } from "./lib/coverage.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { instrumentDisplayLabel } from "./lib/instrument_display.mjs";
 import { compileInstrumentPeriodState } from "./lib/instrument_period_state.mjs";
+import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
 import { presentationEpoch, sharedHorizontalGrammar } from "./lib/design_contract.mjs";
 // IMPORTED, NOT REIMPLEMENTED. The Brokers sheet states how many named houses
 // supply each metric, and the broker-anchor rule DECIDES on that same number. A
@@ -62,7 +63,11 @@ import {
 } from "./lib/solver.mjs";
 import { assertWriteTargetOutsideSkill } from "./lib/runtime_isolation.mjs";
 import { applyHistoricalNormalisation } from "./lib/historical_normalisation.mjs";
-import { ensureIllustrativeAcquisitionCase } from "./lib/acquisition_policy.mjs";
+import {
+  acquisitionAmountLabel,
+  acquisitionTargetEbitdaFormula,
+  ensureIllustrativeAcquisitionCase,
+} from "./lib/acquisition_policy.mjs";
 import {
   balancingRcfInstrument,
   hasBalancingRcf,
@@ -81,6 +86,15 @@ import {
 } from "./lib/historical_interest_authority.mjs";
 import { workbookCalcProperties } from "./lib/economic_solve_policy.mjs";
 import { coreConsumptionIds } from "./lib/broker_metric_dictionary.mjs";
+import {
+  ebitdaBasis,
+  isEbitdaSemanticRole,
+  selectedEbitdaRow,
+} from "./lib/semantic_roles.mjs";
+import {
+  residualInterestAuthorityLabel,
+  resolvedResidualInterestAuthority,
+} from "./lib/residual_interest_authority.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -368,13 +382,12 @@ const FX_RATE = '0.0000;(0.0000);"–"';
 // never a thousands separator, never a decimal. They used to share a bare `0`
 // with nothing to say what they were.
 const YEAR = "0000";
-// The close month is a MONTH, so it reads as one. The cell still holds the
-// integer every DATE() formula in the acquisition block consumes — only the
-// display changes, via a twelve-branch positional format. "01" told a reader
-// nothing; "Jan" tells them what they picked.
-const MONTH =
-  '[=1]"Jan";[=2]"Feb";[=3]"Mar";[=4]"Apr";[=5]"May";[=6]"Jun";' +
-  '[=7]"Jul";[=8]"Aug";[=9]"Sep";[=10]"Oct";[=11]"Nov";[=12]"Dec";00';
+// The close month remains the integer consumed by DATE(). Excel custom number
+// formats allow no more than four sections, so a twelve-condition Jan–Dec
+// display is not a valid native format: Excel repairs /xl/styles.xml on open.
+// The fixed-width numeric month is unambiguous beside the "Close month" label
+// and preserves clean native-Excel custody.
+const MONTH = "00";
 const TOGGLE = '[=1]"On";[=0]"Off"';
 // COLUMN C OF THE INTEREST SCHEDULE IS A CLOSED VOCABULARY, AND IT IS COMPILED.
 //
@@ -790,6 +803,28 @@ function applyTotalHierarchy(
       sheet.getRange(address).format.borders = borders;
     }
   }
+}
+
+export function creditMetricEbitdaPresentation(
+  statementRows,
+  leverageNetDebtLabel,
+) {
+  const row = selectedEbitdaRow(statementRows);
+  if (!row) {
+    throw new Error(
+      "The debt overlay requires a selected EBITDA basis for leverage and coverage.",
+    );
+  }
+  const label = ebitdaBasis(row).label;
+  return {
+    row,
+    label,
+    company_reported_ebitda: `${label} (as above)`,
+    company_reported_leverage: `Net debt (company reported) / ${label}`,
+    net_debt_excluding_leases_leverage: `Net debt (excl. leases) / ${label}`,
+    net_debt_leverage: `${leverageNetDebtLabel} / ${label}`,
+    coverage: `${label} / net interest expense`,
+  };
 }
 
 /**
@@ -1349,6 +1384,62 @@ function brokerMetricRowMap(modelCase) {
     actual_column: "C",
     forecast_columns: ["D", "E", "F"],
     rows,
+  };
+}
+
+const QUALITY_FALLBACK_METHODS = new Set([
+  "driver_formula",
+  "roll_forward",
+  "seasonal_run_rate",
+  "historical_average",
+  "historical_trend",
+  "carry_forward",
+  "explicit_zero",
+]);
+
+function workbookQualityDisclosure(modelCase, brokerEvidence) {
+  const houses = brokerNames(modelCase);
+  const selection = String(modelCase.controls?.broker_case ?? "Not selected");
+  const selectedMetricIds = consumedBrokerMetricIds(modelCase);
+  const ledgerRows = modelCase.forecast_authority_ledger?.rows ?? [];
+  const fallbackCount = ledgerRows.filter(
+    (entry) =>
+      QUALITY_FALLBACK_METHODS.has(entry.method) ||
+      (entry.broker_rejection_reasons ?? []).length > 0,
+  ).length;
+  const rejectedAuthorityCount = ledgerRows.filter(
+    (entry) => (entry.broker_rejection_reasons ?? []).length > 0,
+  ).length;
+  const quarantinedCellCount = Number(brokerEvidence?.quarantinedCellCount ?? 0);
+  const unresolvedCount = ledgerRows.filter(
+    (entry) => entry.status === "BLOCK" || entry.method === "unresolved",
+  ).length;
+  const selectedHouses = ["Consensus", "High", "Low"].includes(selection)
+    ? houses
+    : houses.includes(selection)
+      ? [selection]
+      : [];
+  const degraded =
+    selection === "Forecast Waterfall" ||
+    fallbackCount > 0 ||
+    rejectedAuthorityCount > 0 ||
+    quarantinedCellCount > 0 ||
+    unresolvedCount > 0;
+  return {
+    source_identity: `${modelCase.case_id} · contract v${modelCase.contract_version}`,
+    source_label: modelCase.broker_pack?.source_label ?? "No broker source label declared",
+    broker_status:
+      selection === "Forecast Waterfall"
+        ? "DEGRADED — company evidence / forecast waterfall"
+        : `${selection} selected`,
+    selected_house_count: selectedHouses.length,
+    selected_metric_ids: selectedMetricIds,
+    fallback_count: fallbackCount,
+    rejected_evidence_count: rejectedAuthorityCount + quarantinedCellCount,
+    quarantined_cell_count: quarantinedCellCount,
+    unresolved_count: unresolvedCount,
+    quality_mode: degraded ? "DEGRADED / REVIEW" : "STANDARD",
+    certification_status: "PENDING — native Excel restoration and visual review",
   };
 }
 
@@ -2299,59 +2390,50 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     row += 1;
   }
 
-  // A compact, visible evidence disposition. This is deliberately on the
-  // central Brokers sheet: a quarantined source cell must not silently vanish
-  // merely because the forecast waterfall found a safe non-broker authority.
-  // The raw value remains on its house tab in amber; this block tells the
-  // analyst whether broker cells were linked, retained only as evidence, or
-  // excluded from formulas.
-  if (brokerEvidence) {
-    setValue(sheet, `B${row}`, "BROKER EVIDENCE STATUS");
-    sheet.getRange(`B${row}:${LAST_COLUMN}${row}`).format.fill = COLORS.navy;
-    styleFont(sheet, `B${row}:${LAST_COLUMN}${row}`, COLORS.white, { bold: true });
-    row += 1;
-    const brokerCase = String(modelCase.controls?.broker_case ?? "");
-    setValue(sheet, `B${row}`, "Forecast authority");
-    setValue(
-      sheet,
-      `C${row}`,
-      brokerCase === "Forecast Waterfall"
-        ? "Company evidence / forecast waterfall — no broker case selected"
-        : brokerCase || "Not selected",
-    );
-    styleFont(sheet, `C${row}`, brokerCase === "Forecast Waterfall" ? COLORS.stateAmber : COLORS.black, {
-      bold: true,
-    });
-    row += 1;
-    setValue(sheet, `B${row}`, "Model-linked broker mappings");
-    setValue(sheet, `C${row}`, brokerEvidence.mappingByKey.size);
-    styleFont(sheet, `C${row}`, COLORS.black);
-    row += 1;
-    setValue(sheet, `B${row}`, "Quarantined source cells");
-    setValue(sheet, `C${row}`, brokerEvidence.quarantinedCellCount);
-    setValue(
-      sheet,
-      `D${row}`,
-      brokerEvidence.quarantinedCellCount > 0
-        ? "Retained on source tabs; prohibited from model formulas"
-        : "None",
-    );
-    styleFont(
-      sheet,
-      `C${row}:D${row}`,
-      brokerEvidence.quarantinedCellCount > 0 ? COLORS.stateAmber : COLORS.grey,
-    );
-    row += 1;
-    setValue(sheet, `B${row}`, "Raw broker tables rendered");
-    setValue(sheet, `C${row}`, brokerEvidence.tableCount);
-    setValue(
-      sheet,
-      `D${row}`,
-      `${brokerEvidence.evidenceOnlyTableCount} evidence-only`,
-    );
-    styleFont(sheet, `C${row}:D${row}`, COLORS.grey);
-    row += 2;
-  }
+  // A compact disclosure on the central Brokers sheet. It is always emitted,
+  // including cases with no raw broker-page layout, so degraded authority,
+  // rejected evidence and outstanding certification cannot disappear simply
+  // because a safe forecast fallback exists.
+  const quality = workbookQualityDisclosure(modelCase, brokerEvidence);
+  setValue(sheet, `B${row}`, "BUILD IDENTITY / QUALITY");
+  sheet.getRange(`B${row}:${LAST_COLUMN}${row}`).format.fill = COLORS.navy;
+  styleFont(sheet, `B${row}:${LAST_COLUMN}${row}`, COLORS.white, { bold: true });
+  row += 1;
+  setValue(sheet, `B${row}`, "Case source identity");
+  setValue(sheet, `C${row}`, quality.source_identity);
+  setValue(sheet, `E${row}`, quality.source_label);
+  styleFont(sheet, `C${row}:E${row}`, COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Broker status");
+  setValue(sheet, `C${row}`, quality.broker_status);
+  setValue(sheet, `E${row}`, `${quality.selected_house_count} selected house(s)`);
+  styleFont(sheet, `C${row}:E${row}`, quality.quality_mode === "STANDARD" ? COLORS.black : COLORS.stateAmber, {
+    bold: true,
+  });
+  row += 1;
+  setValue(sheet, `B${row}`, "Selected broker metrics");
+  setValue(sheet, `C${row}`, quality.selected_metric_ids.length);
+  setValue(sheet, `E${row}`, quality.selected_metric_ids.join(", ") || "None");
+  styleFont(sheet, `C${row}:E${row}`, COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Forecast fallbacks");
+  setValue(sheet, `C${row}`, quality.fallback_count);
+  setValue(sheet, `E${row}`, `${quality.unresolved_count} unresolved`);
+  styleFont(sheet, `C${row}:E${row}`, quality.fallback_count > 0 ? COLORS.stateAmber : COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Rejected / quarantined evidence");
+  setValue(sheet, `C${row}`, quality.rejected_evidence_count);
+  setValue(sheet, `E${row}`, `${quality.quarantined_cell_count} quarantined source cell(s)`);
+  styleFont(sheet, `C${row}:E${row}`, quality.rejected_evidence_count > 0 ? COLORS.stateAmber : COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Quality mode");
+  setValue(sheet, `C${row}`, quality.quality_mode);
+  styleFont(sheet, `C${row}`, quality.quality_mode === "STANDARD" ? COLORS.black : COLORS.stateAmber, { bold: true });
+  row += 1;
+  setValue(sheet, `B${row}`, "Delivery certification");
+  setValue(sheet, `C${row}`, quality.certification_status);
+  styleFont(sheet, `C${row}`, COLORS.stateAmber, { bold: true });
+  row += 2;
 
   // INDEPENDENT FORECAST ASSUMPTIONS LIVE HERE, NOT ON THE MODEL FACE.
   //
@@ -2554,6 +2636,16 @@ function rateFormula(
     const row = curveRows.manualRates?.[instrument.instrument_id];
     if (row) {
       const column = ["F", "G", "H"][forecastIndex];
+      if (visibleRateCell) {
+        // Column D is the instrument's visible, source-owned all-in rate.  The
+        // Forward Curves row carries only the period-to-period movement from
+        // that anchor.  Referencing both preserves a varying manual rate series
+        // without letting an identically valued support-sheet cell impersonate
+        // the instrument's own pricing term.
+        return forecastIndex === 0
+          ? visibleRateCell
+          : `(${visibleRateCell}+'Forward Curves'!${column}${row}-'Forward Curves'!F${row})`;
+      }
       return `'Forward Curves'!${column}${row}`;
     }
   }
@@ -2689,7 +2781,7 @@ function acquisitionDerivedDrivers(modelCase, rowPlan) {
       }) ?? null
     );
   };
-  const ebitda = byRole("adjusted_ebitda");
+  const ebitda = selectedEbitdaRow(definitions);
   const drivers = {
     revenue: byRole("revenue"),
     ebitda,
@@ -2799,6 +2891,28 @@ function acquisitionRatioDrivenAmount(drivers, column, kind) {
 // eight rows and not fourteen.
 function acquisitionRatioRowFormula(definition, column) {
   return `=${standaloneColumnFor(column)}${definition.row}`;
+}
+
+function acquisitionRoleForDefinition(definition) {
+  if (definition?.acquisition_driver_role) {
+    return definition.acquisition_driver_role;
+  }
+  const aliases = new Set([
+    definition?.semantic_role,
+    ...(definition?.role_aliases ?? []),
+  ]);
+  if (aliases.has("ebit")) return "ebit";
+  return definition?.semantic_role ?? null;
+}
+
+function acquisitionDirectProFormaRole(definition) {
+  return new Set([
+    "revenue",
+    "depreciation_and_amortisation",
+    "ebit",
+    "change_in_working_capital",
+    "capex",
+  ]).has(acquisitionRoleForDefinition(definition));
 }
 
 // THE NUMERIC TWIN OF THE TWO FUNCTIONS ABOVE.
@@ -2952,7 +3066,7 @@ function acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan) {
     );
     if (!growth && Number(modelCase.acquisition?.enabled ?? 0) === 1) {
       throw new Error(
-        "Acquisition target growth requires a standalone adjusted-EBITDA semantic row.",
+        "Acquisition target growth requires a standalone selected-EBITDA semantic row.",
       );
     }
     const priorPeriodEnd =
@@ -2967,7 +3081,7 @@ function acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan) {
     Number(modelCase.acquisition?.enabled ?? 0) === 1
   ) {
     throw new Error(
-      "Acquisition target growth requires a standalone adjusted-EBITDA semantic row.",
+      "Acquisition target growth requires a standalone selected-EBITDA semantic row.",
     );
   }
   return `$P$${c.target_ebitda}${growthFactors
@@ -2994,9 +3108,7 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
   if (drivers.standalone_ratio_row_ids.has(definition.row_id)) {
     return acquisitionRatioRowFormula(definition, column);
   }
-  const role =
-    definition.acquisition_driver_role ??
-    definition.semantic_role;
+  const role = acquisitionRoleForDefinition(definition);
   if (role === "revenue") {
     const margin = acquisitionMarginExpression(drivers, column);
     if (!margin) return null;
@@ -3008,7 +3120,9 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
       `IFERROR(${fullEbitda}/${margin}*${factor},0),0)`
     );
   }
-  if (role === "adjusted_ebitda") return `=${fullEbitda}*${factor}`;
+  if (isEbitdaSemanticRole(role)) {
+    return `=${fullEbitda}*${factor}`;
+  }
   if (role === "depreciation_and_amortisation") {
     // D&A is a percentage of a driver, and the percentage is the target's own —
     // the line sitting against the D&A row when the company prints one, the
@@ -3054,7 +3168,7 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
     // standalone tax-rate cell. This is acyclic and lets every transaction
     // change above PBT flow through exactly once.
     return (
-      `=-MAX(0,${column}${preTaxIncomeRow})*` +
+      `=-${column}${preTaxIncomeRow}*` +
       `${standaloneColumn}${effectiveTaxRateRow}`
     );
   }
@@ -3070,6 +3184,10 @@ function configureOperatingModel(
   curveRows,
 ) {
   const balancingRcfEnabled = hasBalancingRcf(modelCase);
+  const commercialPaperBackstopped =
+    modelCase.rcf_policy?.commercial_paper_backstopped !== false;
+  const residualInterestAuthority =
+    resolvedResidualInterestAuthority(modelCase);
   // The model ends where the reader can see it end. There is no hidden
   // "MODEL BUILD SUPPORT" block below the interest schedule any more.
   const maxRow = rowPlan.visible_end_row;
@@ -3265,6 +3383,7 @@ function configureOperatingModel(
   const acquisition = modelCase.acquisition ?? {};
   const fy1AdjustedEbitda = Number(
     modelCase.operating_metrics?.adjusted_ebitda?.values?.[3] ??
+      modelCase.operating_metrics?.reported_ebitda?.values?.[3] ??
       modelCase.operating_metrics?.ebitda?.values?.[3] ??
       0,
   );
@@ -3292,7 +3411,7 @@ function configureOperatingModel(
     ],
     [
       c.transaction_enterprise_value,
-      "Enterprise value",
+      acquisitionAmountLabel(modelCase, "Enterprise value"),
       acquisition.transaction_enterprise_value ?? illustrativeEnterpriseValue,
       AMOUNT,
       "entry",
@@ -3304,12 +3423,18 @@ function configureOperatingModel(
       MULTIPLE,
       "entry",
     ],
-    [c.target_ebitda, "Target EBITDA", null, AMOUNT, "formula"],
+    [
+      c.target_ebitda,
+      acquisitionAmountLabel(modelCase, "Target EBITDA"),
+      null,
+      AMOUNT,
+      "formula",
+    ],
     [
       // Absolute acquisition debt is supplied independently from EV. EV
       // controls inferred EBITDA; this amount alone controls debt economics.
       c.acquisition_debt_amount,
-      "Acquisition debt",
+      acquisitionAmountLabel(modelCase, "Acquisition debt"),
       acquisition.acquisition_debt_amount ?? illustrativeDebt,
       AMOUNT,
       "entry",
@@ -3344,7 +3469,10 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `P${row}`,
-        `=IFERROR(P${c.transaction_enterprise_value}/P${c.entry_ev_to_ebitda},0)`,
+        acquisitionTargetEbitdaFormula(
+          `P${c.transaction_enterprise_value}`,
+          `P${c.entry_ev_to_ebitda}`,
+        ),
       );
       sheet.getRange(`P${row}`).format.numberFormat = format;
     } else if (treatment === "toggle") {
@@ -3355,6 +3483,31 @@ function configureOperatingModel(
       styleEntryControl(`P${row}`, format);
     }
   }
+  for (const row of [
+    c.transaction_enterprise_value,
+    c.entry_ev_to_ebitda,
+  ]) {
+    sheet.getRange(`P${row}`).dataValidation = {
+      rule: {
+        type: "decimal",
+        operator: "greaterThan",
+        formula1: 0,
+      },
+      showErrorMessage: true,
+    };
+  }
+  addCommentOnce(
+    workbook,
+    sheet,
+    `N${c.transaction_enterprise_value}`,
+    "Primary valuation input. Must be greater than zero and uses the issuer reporting currency and scale shown in the label.",
+  );
+  addCommentOnce(
+    workbook,
+    sheet,
+    `N${c.entry_ev_to_ebitda}`,
+    "Primary valuation input. Must be greater than zero. Target EBITDA is calculated as enterprise value divided by this multiple with no zero fallback.",
+  );
   addCommentOnce(
     workbook,
     sheet,
@@ -3620,6 +3773,14 @@ function configureOperatingModel(
       const mandatory = debtRows.mandatory_debt_repayments;
       return Number.isInteger(mandatory) ? `=-${column}${mandatory}` : "=0";
     }
+    if (role === "change_in_debt") {
+      if (!Number.isInteger(debtRows.total_change_in_debt)) {
+        throw new Error(
+          "Change in Debt requires the debt schedule's total cash-movement row.",
+        );
+      }
+      return `=${column}${debtRows.total_change_in_debt}`;
+    }
     if (role === "rcf_draw") return `=${column}${waterfallRows.rcf_draw_waterfall}`;
     if (role === "rcf_repayment") {
       return `=-${column}${waterfallRows.rcf_repayment_waterfall}`;
@@ -3756,7 +3917,21 @@ function configureOperatingModel(
 
   for (const definition of allStatementRows) {
     if (definition.row_type === "header") continue;
-    const values = rowValues(modelCase, definition);
+    const ordinaryValues = rowValues(modelCase, definition);
+    // A compiled authority case keeps a filed subtotal separately from the
+    // row's calculation inputs. Historical ending cash is the one legacy
+    // balance whose filed observation owns the visible historical cell; the
+    // cash-flow identity takes over only in forecast periods. Mirror the direct
+    // legacy `values` path so FY1 opening cash and interest consume one source.
+    const values =
+      !explicitCashBuckets &&
+      definition.semantic_role === "ending_cash" &&
+      Array.isArray(definition.reported_historical_values)
+        ? [
+            ...definition.reported_historical_values,
+            ...ordinaryValues.slice(3),
+          ]
+        : ordinaryValues;
     // The revolver legs exist only where the forecast waterfall exists. A
     // history with no sourced draw or repayment has nothing to calculate —
     // the cells are structurally empty and render grey-blank, never as
@@ -4021,6 +4196,8 @@ function configureOperatingModel(
           case "debt_repayment":
           case "lease_principal":
             return "=0";
+          case "change_in_debt":
+            return `=${adjustmentColumn}${debtRows.total_change_in_debt}`;
           default:
             return null;
         }
@@ -4187,6 +4364,19 @@ function configureOperatingModel(
           `${proFormaColumn}${definition.row}`,
           `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
         );
+      } else if (
+        acquisitionFormula &&
+        acquisitionDirectProFormaRole(definition)
+      ) {
+        // Acquisition operating leaves are written once in the adjustment
+        // block and then added to standalone. A historical/standalone formula
+        // on the same visible row (for example Capex = PPE purchases) must not
+        // rebuild pro forma from a child that deliberately has no deal overlay.
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
+        );
       } else if (definition.semantic_role === "opening_cash") {
         // This semantic roll-forward outranks a source row's generic period
         // rule.  In every basis, FY1 opens on the shared last actual and later
@@ -4228,6 +4418,16 @@ function configureOperatingModel(
           sheet,
           `${proFormaColumn}${definition.row}`,
           nonBalancingBucketMovementFormula(proFormaColumn, prior),
+        );
+      } else if (definition.semantic_role === "change_in_debt") {
+        // The pro-forma cash-flow statement consumes the pro-forma debt
+        // schedule's cash-movement answer directly.  Reconstructing it as
+        // standalone plus adjustment leaves the right cache but loses the
+        // schedule-owned lineage asserted everywhere else in the workbook.
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${proFormaColumn}${debtRows.total_change_in_debt}`,
         );
       } else if (
         definition.forecast_treatment === "broker" &&
@@ -5066,6 +5266,12 @@ function configureOperatingModel(
           ? "Lease liabilities — assumes new leases replace principal repaid"
           : "Lease liabilities — after assumed new lease additions"
         : "Lease liabilities — amortising, no new leases assumed";
+  const selectedEbitdaPresentation = creditMetricEbitdaPresentation(
+    allStatementRows,
+    leverageNetDebtLabel,
+  );
+  const selectedEbitda = selectedEbitdaPresentation.row;
+  const selectedEbitdaLabel = selectedEbitdaPresentation.label;
   const debtLabels = {
     acquisition_debt_header: "Acquisition debt",
     acquisition_debt: "Acquisition term debt",
@@ -5114,15 +5320,17 @@ function configureOperatingModel(
     net_debt_company_reported: "Net debt (company reported)",
     // Restated, not re-derived: the multiple beneath it divides two rows the
     // reader can see, exactly as the model block's multiples do.
-    company_reported_adjusted_ebitda: "Adjusted EBITDA (as above)",
+    company_reported_adjusted_ebitda:
+      selectedEbitdaPresentation.company_reported_ebitda,
     net_debt_company_reported_to_adjusted_ebitda:
-      "Net debt (company reported) / Adjusted EBITDA",
-    leverage_adjusted_ebitda: "Adjusted EBITDA",
+      selectedEbitdaPresentation.company_reported_leverage,
+    leverage_adjusted_ebitda: selectedEbitdaLabel,
     net_debt_excluding_leases_to_adjusted_ebitda:
-      "Net debt (excl. leases) / Adjusted EBITDA",
-    net_debt_to_adjusted_ebitda: `${leverageNetDebtLabel} / Adjusted EBITDA`,
+      selectedEbitdaPresentation.net_debt_excluding_leases_leverage,
+    net_debt_to_adjusted_ebitda:
+      selectedEbitdaPresentation.net_debt_leverage,
     leverage_net_interest: "Net interest expense",
-    adjusted_ebitda_to_net_interest: "Adjusted EBITDA / net interest expense",
+    adjusted_ebitda_to_net_interest: selectedEbitdaPresentation.coverage,
     mandatory_debt_repayments: "Mandatory debt repayments",
     ...Object.fromEntries(
       bridgeComponents.map((component, index) => [
@@ -5134,8 +5342,10 @@ function configureOperatingModel(
     undrawn_rcf: balancingRcfEnabled
       ? "Undrawn RCF"
       : "Undrawn balancing facility — none",
-    drawn_commercial_paper: balancingRcfEnabled
+    drawn_commercial_paper: balancingRcfEnabled && commercialPaperBackstopped
       ? "Less: drawn commercial paper"
+      : balancingRcfEnabled
+        ? "Commercial paper — not RCF-backed (not deducted)"
       : "Commercial paper against RCF backstop — none",
     year_end_cash: explicitCashBuckets
       ? "Liquidity-eligible cash"
@@ -5533,7 +5743,7 @@ function configureOperatingModel(
   // income statement — so the multiple reconciles on screen. Net interest is
   // shown as a positive cost (the income statement carries it as a negative),
   // which is what makes the coverage ratio read straight off the two rows.
-  const leverageEbitdaRow = statementByRole.get("adjusted_ebitda").row;
+  const leverageEbitdaRow = selectedEbitda.row;
   const netInterestLegs = ["interest_expense", "interest_income"]
     .map((role) => statementByRole.get(role)?.row)
     .filter(Boolean);
@@ -5622,7 +5832,11 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${debtRows.total_liquidity}`,
-        `=${column}${debtRows.undrawn_rcf}+${column}${debtRows.drawn_commercial_paper}+${column}${debtRows.year_end_cash}`,
+        `=${column}${debtRows.undrawn_rcf}+` +
+          (commercialPaperBackstopped
+            ? `${column}${debtRows.drawn_commercial_paper}+`
+            : "") +
+          `${column}${debtRows.year_end_cash}`,
       );
     }
   }
@@ -5857,7 +6071,11 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${debtRows.total_liquidity}`,
-      `=${column}${debtRows.undrawn_rcf}+${column}${debtRows.drawn_commercial_paper}+${column}${debtRows.year_end_cash}`,
+      `=${column}${debtRows.undrawn_rcf}+` +
+        (commercialPaperBackstopped
+          ? `${column}${debtRows.drawn_commercial_paper}+`
+          : "") +
+        `${column}${debtRows.year_end_cash}`,
     );
 
     const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
@@ -5956,7 +6174,10 @@ function configureOperatingModel(
             : `=${col}${endingCashRow}`;
         case "total_liquidity":
           return (
-            `=${col}${debtRows.undrawn_rcf}+${col}${debtRows.drawn_commercial_paper}+` +
+            `=${col}${debtRows.undrawn_rcf}+` +
+            (commercialPaperBackstopped
+              ? `${col}${debtRows.drawn_commercial_paper}+`
+              : "") +
             `${col}${debtRows.year_end_cash}`
           );
         default:
@@ -6199,25 +6420,6 @@ function configureOperatingModel(
       movementType === "maturity_repayment"
     );
   });
-  // Every non-issuance, non-RCF debt cash movement belongs in the pre-RCF
-  // bridge exactly once.  Restricting this row to maturities orphaned visible
-  // issuance costs and other debt transactions from ending cash even though
-  // they sat inside the face-statement Net Change in Debt subtotal.
-  const preRcfDebtStatementRows = debtMovementRows.filter((definition) => {
-    const role = definition.semantic_role;
-    const movementType = inferMovementType(definition);
-    return role !== "debt_issuance" && movementType !== "debt_issuance";
-  });
-  // The issuance leg mirrors the repayment leg: the sweep consumes the
-  // visible statement issuance child (which itself links to the waterfall
-  // proceeds row), so every live financing component enters ending cash
-  // through the face of the statement exactly once instead of being
-  // bypassed by a direct schedule read.
-  const issuanceStatementRows = financingRows.filter((definition) => {
-    const role = definition.semantic_role;
-    const movementType = inferMovementType(definition);
-    return role === "debt_issuance" || movementType === "debt_issuance";
-  });
   const leasePrincipalRows = financingRows.filter(
     (definition) => inferMovementType(definition) === "lease_principal",
   );
@@ -6225,8 +6427,8 @@ function configureOperatingModel(
     sumCellExpression(
       definitions.map((definition) => `${blockColumn}${definition.row}`),
     );
-  const nonRcfIssuanceTerms = (blockColumn, forecastIndex) =>
-    rowPlan.instruments
+  const nonRcfIssuanceTerms = (blockColumn, forecastIndex) => {
+    const terms = rowPlan.instruments
       .filter((plan) => {
         const instrument = instrumentById.get(plan.instrument_id);
         return (
@@ -6246,6 +6448,15 @@ function configureOperatingModel(
         );
         return rate === "1" ? cell : `${cell}*${rate}`;
       });
+    if (blockColumn !== FORECAST_COLUMNS[forecastIndex]) {
+      const adjustmentColumn = ADJUSTMENT_COLUMNS[forecastIndex];
+      terms.push(
+        `IF($P$${c.adjustments_enabled}=0,0,` +
+          `${acquisitionDrawFormula(adjustmentColumn, rowPlan)})`,
+      );
+    }
+    return terms;
+  };
   // Instrument maturity mechanics remain inside each visible balance formula.
   // The schedule exposes one aggregate cash requirement, not a repeated
   // technical helper row beneath every instrument.  The waterfall consumes
@@ -6424,18 +6635,15 @@ function configureOperatingModel(
             : "=0",
         );
       }
-      // The maturity mechanics live once in the visible debt schedule, then
-      // flow through the visible financing-statement repayment line(s).  The
-      // sweep consumes those statement lines rather than bypassing them and
-      // reading the schedule a second time.  This preserves one economic
-      // writer while keeping the face of the cash-flow statement fully
-      // traceable into ending cash.
+      // The statement's debt children are intentionally blank in forecast.
+      // The sweep therefore consumes the same visible schedule authorities as
+      // the consolidated Change in Debt parent: non-RCF proceeds above and the
+      // one mandatory-repayment total here. Reading the captured statement
+      // children would silently drop the transaction from cash.
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}`,
-        preRcfDebtStatementRows.length
-          ? `=${sumCells(blockColumn, preRcfDebtStatementRows)}`
-          : `=-${blockColumn}${mandatoryDebtRow}`,
+        `=-${blockColumn}${mandatoryDebtRow}`,
       );
       applyFormula(
         sheet,
@@ -6447,11 +6655,7 @@ function configureOperatingModel(
         `${blockColumn}${waterfallRows.cash_before_rcf}`,
         `=${blockColumn}${waterfallRows.cash_before_debt}+` +
           (Number.isInteger(waterfallRows.non_rcf_debt_proceeds)
-            ? `${
-                issuanceStatementRows.length
-                  ? `${sumCells(blockColumn, issuanceStatementRows).replace(/^=/, "")}+`
-                  : `${blockColumn}${waterfallRows.non_rcf_debt_proceeds}+`
-              }`
+            ? `${blockColumn}${waterfallRows.non_rcf_debt_proceeds}+`
             : "") +
           `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}+` +
           `${blockColumn}${waterfallRows.lease_principal_waterfall}`,
@@ -6682,9 +6886,6 @@ function configureOperatingModel(
       // Existing issuer instruments are unchanged by the transaction, so the
       // same visible non-cash movement rows apply in the pro-forma block.
       const proFormaOtherNonCash = standaloneOtherNonCash;
-      const acquisitionDebtDelta =
-        `${proFormaColumn}${debtRows.acquisition_debt}-` +
-        `${index === 0 ? "R" : PRO_FORMA_COLUMNS[index - 1]}${debtRows.acquisition_debt}`;
       const cashMovementFormula = (blockColumn) => {
         const issuance = nonRcfIssuanceTerms(blockColumn, index);
         const terms = [
@@ -6723,8 +6924,7 @@ function configureOperatingModel(
           `${proFormaColumn}${fxRow}`,
           `=${proFormaColumn}${grossDebtRow}-${priorProFormaColumn}${grossDebtRow}` +
             `-${proFormaColumn}${changeRow}` +
-            `${proFormaOtherNonCash ? `-(${proFormaOtherNonCash})` : ""}` +
-            `-(${acquisitionDebtDelta})`,
+            `${proFormaOtherNonCash ? `-(${proFormaOtherNonCash})` : ""}`,
         );
         applyFormula(
           sheet,
@@ -7257,7 +7457,9 @@ function configureOperatingModel(
       leaseInterestBasis === "none"
         ? "Lease interest — not separately modelled"
         : "Lease interest",
-    other_unallocated_interest: "Other / unallocated interest",
+    other_unallocated_interest:
+      `Other / unallocated interest — ` +
+      residualInterestAuthorityLabel(residualInterestAuthority),
     interest_reported_total:
       historicalInterestBasisLabel(historicalInterestAuthority) ??
       "Filed finance expense (statement authority)",
@@ -7291,6 +7493,15 @@ function configureOperatingModel(
     // schedule. See the note there.
     interestScheduleRows.add(row);
   }
+  addCommentOnce(
+    workbook,
+    sheet,
+    `B${interestRows.other_unallocated_interest}`,
+    `Forecast authority: ${residualInterestAuthority.method}. ${residualInterestAuthority.basis_note}` +
+      ((residualInterestAuthority.source_ids ?? []).length > 0
+        ? ` Sources: ${residualInterestAuthority.source_ids.join(", ")}.`
+        : ""),
+  );
   for (const id of [
     "rcf_interest",
     "rcf_commitment_fee",
@@ -10032,12 +10243,14 @@ function statementSolverValues(
     // are all n/a on a forecast basis — so the solver has to be told what it
     // holds, or it reads the blank constituents and caches a zero on the
     // headline debt movement. It is the whole CASH debt movement: scheduled
-    // draws and repayments plus both revolver legs. The acquisition overlay is
-    // deliberately a non-cash balance addition and is excluded.
+    // draws and repayments, acquisition term-debt proceeds and both revolver
+    // legs. The acquisition balance addition is a cash financing source and
+    // must enter this line exactly once.
     [
       "change_in_debt",
       result.non_rcf_issuance -
         result.non_rcf_repayment +
+        Number(result.acquisition_debt_proceeds ?? 0) +
         result.rcf_draw -
         result.rcf_repayment,
     ],
@@ -10081,6 +10294,11 @@ function statementSolverValues(
     ["opening_cash", cashFlowOpeningCash],
     ["ending_cash", cashFlowEndingCash],
   ]);
+  const selectedEbitdaRole =
+    modelCase.selected_ebitda_basis?.semantic_role ??
+    selectedEbitdaRow(rowPlan.statement_rows.income_statement)?.semantic_role ??
+    "adjusted_ebitda";
+  semantic.set(selectedEbitdaRole, result.adjusted_ebitda);
   for (const [role, value] of [
     [
       "cash_interest_paid",
@@ -10113,8 +10331,7 @@ function statementSolverValues(
   );
   const valuesById = new Map();
   for (const definition of definitions) {
-    const solverRole =
-      definition.acquisition_driver_role ?? definition.semantic_role;
+    const solverRole = acquisitionRoleForDefinition(definition);
     const periodRulesDeclared = hasForecastPeriodCalculations(definition);
     const activeCalculation =
       forecastCalculationForIndex(definition, forecastIndex) ??
@@ -10150,8 +10367,16 @@ function statementSolverValues(
   if (acquisitionBaseValues) {
     for (const definition of definitions) {
       const periodRule = definition.forecast_period_calculations?.[forecastIndex] ?? null;
+      const acquisitionOverlay = acquisitionAdjustmentFormula(
+        modelCase,
+        definition,
+        ADJUSTMENT_COLUMNS[forecastIndex],
+        rowPlan,
+      );
       if (
         isStandaloneOnlyForecastRule(periodRule) &&
+        definition.semantic_role !== "opening_cash" &&
+        !acquisitionOverlay &&
         acquisitionBaseValues.has(definition.row_id)
       ) {
         valuesById.set(
@@ -10336,9 +10561,18 @@ function solverFormulaCaches(
       // Period-specific forecast rules reproduce the source workbook's
       // standalone dependency direction. They do not create a transaction
       // rule: adjustment is zero and pro forma equals standalone.
-      const standaloneOnlyPeriodRule = isStandaloneOnlyForecastRule(
-        definition.forecast_period_calculations?.[index] ?? null,
+      const acquisitionOverlay = acquisitionAdjustmentFormula(
+        modelCase,
+        definition,
+        adjustmentColumn,
+        rowPlan,
       );
+      const standaloneOnlyPeriodRule =
+        isStandaloneOnlyForecastRule(
+          definition.forecast_period_calculations?.[index] ?? null,
+        ) &&
+        definition.semantic_role !== "opening_cash" &&
+        !acquisitionOverlay;
       const proFormaValue = standaloneOnlyPeriodRule
         ? standaloneValue
         : proFormaValues.get(definition.row_id) ?? 0;
@@ -10590,6 +10824,7 @@ function solverFormulaCaches(
         total_change_in_debt:
           Number(result.non_rcf_issuance ?? 0) -
           Number(result.non_rcf_repayment ?? 0) +
+          Number(result.acquisition_debt_proceeds ?? 0) +
           Number(result.rcf_draw ?? 0) -
           Number(result.rcf_repayment ?? 0),
         mandatory_debt_repayments: Number(result.non_rcf_repayment ?? 0),
@@ -10680,7 +10915,9 @@ function solverFormulaCaches(
     }
     const waterfallValues = (result) => ({
       cash_before_debt: result.cash_before_debt,
-      non_rcf_debt_proceeds: result.non_rcf_issuance,
+      non_rcf_debt_proceeds:
+        Number(result.non_rcf_issuance ?? 0) +
+        Number(result.acquisition_debt_proceeds ?? 0),
       // Gross proceeds, mandatory repayments and lease principal are separate
       // visible rows. Never net one into another in the cache.
       pre_rcf_debt_cash_flow:
@@ -11775,6 +12012,11 @@ async function main(packaging = null) {
     }
   };
   assertThreePlusThree(rawModelCase, "Pre-compile period gate");
+  // Previously compiled model cases may carry the retired v3.6 class tokens.
+  // Migrate them once, visibly, before any validator or schedule consumer sees
+  // the register. Unknown values become `unclassified` and are then stopped by
+  // coverage; they never inherit an economic or presentation fallback.
+  migrateLegacyDebtClasses(rawModelCase);
   ensureIllustrativeAcquisitionCase(rawModelCase);
   const validationErrors = validateCaseShape(rawModelCase);
   if (validationErrors.length > 0) {
@@ -12208,4 +12450,9 @@ if (invokedDirectly) {
 // `main` is exported for scripts/build_package.mjs, the local-only `--out`
 // driver. It is the same `main()` this file runs when it is invoked directly;
 // there is no second copy of the build for the certification path to drift from.
-export { assertShippedPlan, declareShippedFacts, main };
+export {
+  assertShippedPlan,
+  declareShippedFacts,
+  main,
+  workbookQualityDisclosure,
+};

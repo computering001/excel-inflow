@@ -62,16 +62,43 @@ ALIASES = {
 AUDIT_ONLY = {"issue_date", "price", "yield_to_worst", "oas"}
 STRUCTURED_OPTIONAL = {"interest_settlement", "debt_classification", "amortisation_schedule", "refinancing_intent", "next_call_date", "is_backstop_for_paper"}
 
+DEBT_CLASS_ONTOLOGY = json.loads(
+    (Path(__file__).resolve().parents[1] / "assets" / "debt-class-ontology-v1.json").read_text("utf-8")
+)
+CANONICAL_DEBT_CLASSES = frozenset(DEBT_CLASS_ONTOLOGY["canonical_classes"])
 
-def classify_type(value: Any, description: str) -> str | None:
-    text = norm(value) + " " + norm(description)
-    if "revolv" in text or re.search(r"\brcf\b", text): return "rcf"
-    if "commercial paper" in text or re.search(r"\bcp\b", text): return "commercial_paper"
-    if "securiti" in text: return "securitisation"
-    if "floating" in text or "loan" in text or "term facility" in text: return "floating_loan"
-    if any(token in text for token in ("bond", "note", "debenture", "fixed")): return "fixed_bond"
-    if text.strip(): return "other_debt"
-    return None
+
+def classify_type(value: Any, description: str, rate_hint: str = "") -> str | None:
+    text = (norm(value) + " " + norm(description)).strip()
+    if not text:
+        return None
+    if "revolv" in text or re.search(r"\brcf\b", text):
+        return "rcf"
+    if "commercial paper" in text or re.search(r"\bcp\b", text):
+        return "commercial_paper"
+    if "securiti" in text:
+        return "securitisation"
+    if "overdraft" in text:
+        return "overdraft"
+    if "lease liabil" in text or "finance lease" in text:
+        return "lease_liability"
+    is_bond = any(token in text for token in ("bond", "note", "debenture"))
+    is_term_loan = any(token in text for token in ("term loan", "term facility", "bank loan"))
+    floating = "floating" in text or rate_hint == "floating"
+    fixed = "fixed" in text or rate_hint == "fixed"
+    if is_bond and floating:
+        return "bond_floating"
+    if is_bond and fixed:
+        return "bond_fixed"
+    if is_term_loan and floating:
+        return "term_loan_floating"
+    if is_term_loan and fixed:
+        return "term_loan_fixed"
+    if any(token in text for token in ("other debt", "other borrow", "miscellaneous borrow", "finance obligation")):
+        return "other_explicit"
+    # Unknown is a real class with a review obligation. It is never silently
+    # promoted to Other Debt.
+    return "unclassified"
 
 
 def parse_number(value: Any) -> float | int | None:
@@ -152,15 +179,56 @@ def main() -> int:
             desc_cell = value_for("description")
             description = str(desc_cell["display_value"] if desc_cell else "").strip()
             if not description: continue
-            instrument_type = classify_type(value_for("instrument_type")["display_value"] if value_for("instrument_type") else None, description)
+            rate_hint_cell = value_for("rate_type")
+            coupon_hint = value_for("coupon_rate")
+            reference_hint = value_for("reference_rate")
+            margin_hint = value_for("margin_bps")
+            declared_rate_hint = (
+                norm(rate_hint_cell["display_value"]).replace(" ", "_")
+                if rate_hint_cell
+                else ""
+            )
+            rate_hint = (
+                declared_rate_hint
+                if declared_rate_hint in {"fixed", "floating"}
+                else "floating"
+                if reference_hint and margin_hint and parse_number(margin_hint["display_value"]) is not None
+                else "fixed"
+                if coupon_hint and parse_number(coupon_hint["display_value"]) is not None
+                else ""
+            )
+            instrument_type = classify_type(
+                value_for("instrument_type")["display_value"] if value_for("instrument_type") else None,
+                description,
+                rate_hint,
+            )
             instrument_id = re.sub(r"[^a-z0-9]+", "_", description.lower()).strip("_")[:48] or f"instrument_{row['row']}"
             instrument_id = f"{instrument_id}_{sheet['index']}_{row['row']}"
             authorities: list[dict[str, Any]] = [direct("description", desc_cell, description)]
             owner_disposition = "model_input"
             missing: list[str] = []
             if instrument_type:
+                if instrument_type not in CANONICAL_DEBT_CLASSES:
+                    raise RuntimeError(f"Classifier emitted non-canonical debt class {instrument_type!r}")
                 type_cell = value_for("instrument_type")
-                authorities.append(direct("instrument_type", type_cell or desc_cell, instrument_type, kind="classified_constant"))
+                type_authority = direct(
+                    "instrument_type",
+                    type_cell or desc_cell,
+                    instrument_type,
+                    kind="classified_constant",
+                )
+                for evidence_cell in (
+                    desc_cell,
+                    rate_hint_cell,
+                    coupon_hint,
+                    reference_hint,
+                    margin_hint,
+                ):
+                    if evidence_cell and evidence_cell["cell_id"] not in type_authority["source_cells"]:
+                        type_authority["source_cells"].append(evidence_cell["cell_id"])
+                authorities.append(type_authority)
+                if instrument_type == "unclassified":
+                    missing.append("instrument_type_review")
             else: missing.append("instrument_type")
             currency_cell = value_for("currency")
             currency = str(currency_cell["display_value"]).upper().strip() if currency_cell else ""

@@ -20,7 +20,7 @@ function instrument(instrumentId, overrides = {}) {
   return {
     instrument_id: instrumentId,
     name: instrumentId,
-    class: "fixed_bond",
+    class: "bond_fixed",
     currency: "GBP",
     balance_basis: "native_principal",
     opening_balance: 100,
@@ -129,9 +129,9 @@ const rawExportReconciliation = reconcileExport({
     reporting_currency: "GBP",
     as_of: "2025-12-31",
     instruments: [
-      { instrument_type: "fixed_bond", currency: "GBP", outstanding_amount: 100 },
-      { instrument_type: "fixed_bond", currency: "EUR", outstanding_amount: 160 },
-      { instrument_type: "fixed_bond", currency: "USD", outstanding_amount: 50 },
+      { instrument_type: "bond_fixed", currency: "GBP", outstanding_amount: 100 },
+      { instrument_type: "bond_fixed", currency: "EUR", outstanding_amount: 160 },
+      { instrument_type: "bond_fixed", currency: "USD", outstanding_amount: 50 },
     ],
   },
   filings: {

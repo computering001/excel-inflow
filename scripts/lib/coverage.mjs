@@ -8,6 +8,11 @@ import { coreConsumptionIds } from "./broker_metric_dictionary.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 import { compileOpeningInstrumentState } from "./instrument_period_state.mjs";
 import { isBalancingRcf } from "./rcf_policy.mjs";
+import {
+  CANONICAL_DEBT_CLASS_SET,
+  isLegacyDebtClass,
+} from "./debt_class.mjs";
+import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -105,14 +110,20 @@ function classificationChecks(disclosure, section, rows) {
         { expected: classification, declared_role: declaredRole, declared_confidence: disclosure.classification_confidence },
       ));
     }
-    const mappedRoles = disclosure.mapped_row_ids
-      .map((rowId) => rows.find((row) => row.row_id === rowId)?.semantic_role)
+    const mappedRows = disclosure.mapped_row_ids
+      .map((rowId) => rows.find((row) => row.row_id === rowId))
       .filter(Boolean);
-    if (mappedRoles.length > 0 && !mappedRoles.includes(declaredRole)) {
+    if (mappedRows.length > 0 && !mappedRows.some((row) => rowHasRole(row, declaredRole))) {
       checks.push(result(
         `classification.${id}.destination`, "BLOCK",
         `${disclosure.label ?? id} is classified as ${declaredRole} but maps to a different semantic role.`,
-        { classified_role: declaredRole, mapped_roles: mappedRoles },
+        {
+          classified_role: declaredRole,
+          mapped_roles: mappedRows.map((row) => ({
+            semantic_role: row.semantic_role ?? null,
+            role_aliases: row.role_aliases ?? [],
+          })),
+        },
       ));
     }
   } else if (disclosure.classification_review_status !== "reviewed" ||
@@ -347,6 +358,20 @@ function requiredRoleChecks(modelCase) {
             `statement_role.${section}.${role}`,
             "BLOCK",
             `${section} is missing required semantic role ${role}.`,
+          ),
+        );
+      }
+    }
+    if (section === "income_statement") {
+      for (const alternatives of
+        PRODUCTION_CONTRACT.statement_coverage
+          .required_income_statement_role_groups ?? []) {
+        if (alternatives.some((role) => present.has(role))) continue;
+        checks.push(
+          result(
+            `statement_role.${section}.${alternatives.join("_or_")}`,
+            "BLOCK",
+            `${section} requires one of: ${alternatives.join(", ")}.`,
           ),
         );
       }
@@ -1165,6 +1190,23 @@ function instrumentChecks(modelCase) {
       );
     }
     ids.add(id);
+    if (!CANONICAL_DEBT_CLASS_SET.has(instrument.class)) {
+      checks.push(
+        result(
+          `instrument.${id}.class_vocabulary`,
+          "BLOCK",
+          `${id} uses ${JSON.stringify(instrument.class)}; debt classes must be canonical before model compilation${isLegacyDebtClass(instrument.class) ? " (legacy alias detected)" : ""}.`,
+        ),
+      );
+    } else if (instrument.class === "unclassified") {
+      checks.push(
+        result(
+          `instrument.${id}.class_review`,
+          "BLOCK",
+          `${id} is unclassified and requires an explicit reviewed debt class before production.`,
+        ),
+      );
+    }
     if (!instrument.name) {
       checks.push(
         result(`instrument.${id}.name`, "BLOCK", `${id} has no name.`),
@@ -1479,6 +1521,26 @@ function instrumentChecks(modelCase) {
     }
   }
   return checks;
+}
+
+function residualInterestAuthorityChecks(modelCase) {
+  const errors = validateResidualInterestAuthority(modelCase);
+  if (errors.length === 0) {
+    return [
+      result(
+        "interest.residual_forecast_authority",
+        "PASS",
+        "Other / unallocated interest is zero or carries an explicit forecast authority.",
+      ),
+    ];
+  }
+  return errors.map((message, index) =>
+    result(
+      `interest.residual_forecast_authority.${index + 1}`,
+      "BLOCK",
+      message,
+    ),
+  );
 }
 
 /**
@@ -1961,10 +2023,10 @@ function brokerChecks(modelCase) {
     visiting.delete(rowId);
     return pass;
   };
-  const declaredAuthorityPass = ["ebit", "adjusted_ebitda"].every((role) => {
-    const row = rowForRole(role);
-    return Boolean(row && resolvable(row.row_id));
-  });
+  const declaredAuthorityPass = [
+    rowForRole("ebit"),
+    rowForRole("adjusted_ebitda") ?? rowForRole("reported_ebitda"),
+  ].every((row) => Boolean(row && resolvable(row.row_id)));
   anchorCoverage.sort(
     (left, right) =>
       right.populated - left.populated ||
@@ -2006,7 +2068,6 @@ function brokerChecks(modelCase) {
       .map((row) => row.broker_metric_id)
       .filter(Boolean),
   );
-  const brokerDisabled = modelCase.controls?.broker_case === "Forecast Waterfall";
   for (const [metricId, metric] of Object.entries(pack.metrics ?? {})) {
     if (consumedMetricIds.has(metricId)) continue;
     const disposition = metric.model_disposition;
@@ -2015,7 +2076,6 @@ function brokerChecks(modelCase) {
       ["reference_only", "rejected", "not_applicable"].includes(disposition) &&
       typeof reason === "string" &&
       reason.trim().length > 0;
-    const waterfallReferenceOnly = brokerDisabled;
     // A disclosed broker subtotal may deliberately remain a counter-headline
     // rather than drive the model when the compiled statement calculates the
     // same semantic concept from visible constituents.  This is generic: it
@@ -2038,11 +2098,9 @@ function brokerChecks(modelCase) {
     checks.push(
       result(
         `broker_pack.${metricId}.consumption`,
-        explicitlyExcluded || waterfallReferenceOnly || derivedSemanticReference ? "PASS" : "BLOCK",
+        explicitlyExcluded || derivedSemanticReference ? "PASS" : "BLOCK",
         explicitlyExcluded
           ? `${metricId} is explicitly ${disposition}: ${reason.trim()}`
-          : waterfallReferenceOnly
-            ? `${metricId} is retained as broker evidence only; the confirmed forecast waterfall owns the model forecast.`
           : derivedSemanticReference
             ? `${metricId} is retained on Brokers as a disclosed counter-headline while the visible model derives the same semantic concept through its declared calculation graph.`
           : `${metricId} is present in the accepted broker pack but maps to no visible statement or schedule node. Map it exactly once or reject it with a model disposition and reason.`,
@@ -2189,6 +2247,7 @@ export function assessCoverage(modelCase) {
   checks.push(...forecastAuthorityChecks(modelCase));
   checks.push(...cashBucketStatementChecks(modelCase));
   checks.push(...instrumentChecks(modelCase));
+  checks.push(...residualInterestAuthorityChecks(modelCase));
   checks.push(...fxCoverageChecks(modelCase));
   checks.push(...debtReconciliationChecks(modelCase));
   checks.push(...historicalInterestChecks(modelCase));

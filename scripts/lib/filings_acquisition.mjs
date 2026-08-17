@@ -2,10 +2,11 @@
  * Controlled filing acquisition.
  *
  * This module never searches the web.  It materialises only caller-declared
- * local/runtime files or explicit HTTPS issuer/regulator URLs, binds their raw
- * bytes by SHA-256, and emits the ordinary filings-extraction request consumed
- * by the existing controller.  User-supplied sources outrank every retrieved
- * source for the same section and period.
+ * local/runtime files under controller-owned attachment roots or explicit HTTPS
+ * URLs admitted by the shipped official-domain authority. It binds raw bytes by
+ * SHA-256 and emits the ordinary filings-extraction request consumed by the
+ * existing controller. User-supplied sources outrank every retrieved source for
+ * the same section and period.
  */
 
 import { createHash } from "node:crypto";
@@ -14,6 +15,12 @@ import path from "node:path";
 
 import { validateJsonSchema } from "./json_schema.mjs";
 import { canonicalise } from "./run_store.mjs";
+import {
+  DEFAULT_REMOTE_INGRESS_AUTHORITY,
+  fetchOfficialFile,
+  hostAllowed,
+  readApprovedRegularFile,
+} from "./source_ingress_security.mjs";
 
 const ORIGIN_RANK = Object.freeze({
   user_supplied: 0,
@@ -42,36 +49,6 @@ async function atomicWrite(target, bytes) {
   }
 }
 
-function allowedHost(hostname, domains) {
-  const host = String(hostname).toLowerCase();
-  return domains.some((domain) => {
-    const allowed = String(domain).toLowerCase();
-    return host === allowed || host.endsWith(`.${allowed}`);
-  });
-}
-
-async function fetchDeclaredUrl(rawUrl, allowedDomains) {
-  let current = new URL(rawUrl);
-  for (let redirect = 0; redirect <= 5; redirect += 1) {
-    if (current.protocol !== "https:" || !allowedHost(current.hostname, allowedDomains)) {
-      throw new Error(`Declared filing URL leaves its allowed official domain set: ${current.href}`);
-    }
-    const response = await fetch(current, {
-      redirect: "manual",
-      headers: { "user-agent": "Excel-Inflow-Filings/1.0 controlled-evidence-fetch" },
-    });
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const location = response.headers.get("location");
-      if (!location) throw new Error(`Declared filing URL returned redirect ${response.status} without Location.`);
-      current = new URL(location, current);
-      continue;
-    }
-    if (!response.ok) throw new Error(`Declared filing URL returned HTTP ${response.status}.`);
-    return { bytes: Buffer.from(await response.arrayBuffer()), final_url: current.href };
-  }
-  throw new Error("Declared filing URL exceeded five controlled redirects.");
-}
-
 function acquisitionErrors(request) {
   const errors = [];
   if (!["filings-acquisition-request/1.0", "filings-acquisition-request/2.0"].includes(request?.schema_version)) errors.push("wrong schema_version");
@@ -92,6 +69,20 @@ function acquisitionErrors(request) {
       if (!String(source?.url ?? "").startsWith("https://")) errors.push(`${label}.url must be explicit HTTPS`);
       if (!source?.publisher_name) errors.push(`${label}.publisher_name is absent`);
       if (!Array.isArray(source?.allowed_domains) || source.allowed_domains.length === 0) errors.push(`${label}.allowed_domains is empty`);
+      if (
+        Array.isArray(source?.allowed_domains) &&
+        source.allowed_domains.some((domain) =>
+          !hostAllowed(domain, DEFAULT_REMOTE_INGRESS_AUTHORITY.allowed_domains)
+        )
+      ) errors.push(`${label}.allowed_domains exceeds controller-owned official-domain authority`);
+      try {
+        if (
+          Array.isArray(source?.allowed_domains) &&
+          !hostAllowed(new URL(source.url).hostname, source.allowed_domains)
+        ) errors.push(`${label}.url is not covered by its declarative domain claim`);
+      } catch {
+        errors.push(`${label}.url is invalid`);
+      }
       if (source?.path) errors.push(`${label} cannot carry path and URL`);
     } else if (!source?.path || source?.url) {
       errors.push(`${label} must carry only a local/runtime path`);
@@ -133,6 +124,7 @@ export async function acquireFilingsSources({
   if (errors.length > 0) throw new Error(`Filings acquisition request is invalid: ${errors.join("; ")}`);
   const root = path.resolve(outDir);
   const requestBase = path.dirname(path.resolve(requestPath));
+  const localRoots = [requestBase];
   const explicitSourceMode = request.schema_version === "filings-acquisition-request/2.0";
   const sourceMode = explicitSourceMode ? request.source_mode : null;
   const eligibleOrigins = !explicitSourceMode
@@ -160,12 +152,20 @@ export async function acquireFilingsSources({
     let finalUrl = null;
     let declaredPath = null;
     if (declaration.origin === "official_declarative_url") {
-      const fetched = await fetchDeclaredUrl(declaration.url, declaration.allowed_domains);
+      const fetched = await fetchOfficialFile({
+        rawUrl: declaration.url,
+        declaredMediaType: declaration.media_type,
+      });
       bytes = fetched.bytes;
       finalUrl = fetched.final_url;
     } else {
-      declaredPath = path.resolve(requestBase, declaration.path);
-      bytes = await fs.readFile(declaredPath);
+      const local = await readApprovedRegularFile({
+        candidate: path.resolve(requestBase, declaration.path),
+        approvedRoots: localRoots,
+        label: `Filing source ${declaration.document_id}`,
+      });
+      declaredPath = local.path;
+      bytes = local.bytes;
     }
     const digest = hashBytes(bytes);
     if (declaration.expected_sha256 && declaration.expected_sha256 !== digest) {
@@ -231,12 +231,16 @@ export async function acquireFilingsSources({
       selected_origins: [...selectedOrigins].sort(),
       excluded_document_ids: excludedDocumentIds,
       official_urls_must_be_declarative: true,
+      official_domain_authority: DEFAULT_REMOTE_INGRESS_AUTHORITY.authority_id,
+      local_root_authority: "controller_request_directory",
       content_addressed: true,
       ordering: ["user_supplied", "official_declarative_url", "runtime_library"],
     } : {
       search_performed: false,
       user_supplied_precedence: true,
       official_urls_must_be_declarative: true,
+      official_domain_authority: DEFAULT_REMOTE_INGRESS_AUTHORITY.authority_id,
+      local_root_authority: "controller_request_directory",
       content_addressed: true,
       ordering: ["user_supplied", "official_declarative_url", "runtime_library"],
     },

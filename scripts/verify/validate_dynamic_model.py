@@ -105,6 +105,7 @@ from verify.invariants import (  # noqa: E402
     validate_native_evidence,
     validate_semantic_artifacts,
 )
+from verify.interest_lineage import interest_lineage_findings  # noqa: E402
 
 _ECONOMIC_SOLVE_POLICY_PATH = os.path.abspath(
     os.path.join(
@@ -192,6 +193,7 @@ MECHANICAL_ROLES = {
 # 29  visual-review                            same id                 ported (manual)
 # 30  formula-complexity-contract              same id                 ported
 # 31  forecast-structural-state                Python independent      added
+# 32  instrument-interest-lineage              Python independent      added
 #
 # * Re-implemented rather than transliterated, because these two were the paths
 #   an earlier survey of the legacy workbook library surface MISSED.  The survey listed
@@ -213,7 +215,7 @@ MECHANICAL_ROLES = {
 #      font-colour violations across the 6 failing certification cases are this
 #      artefact; every reported address is an empty self-closing cell.  This
 #      port parses the XML properly and reports no violation.
-CHECK_COUNT = 31
+CHECK_COUNT = 32
 
 
 # --------------------------------------------------------------------------
@@ -3244,6 +3246,63 @@ def main(argv: List[str]) -> int:
             "debt balance.",
             gate_errors[:100],
             violations=len(gate_errors),
+        )
+    )
+
+    # ------------------------------------------ instrument-interest-lineage
+    # A row-number substring is not lineage: debt row 71 appearing in a rate,
+    # timing or unrelated branch proved nothing about the balance being priced.
+    # This check reconstructs each instrument's required physical dependencies
+    # from the independent row map and typed instrument-period state, then
+    # verifies the actual formula without reading its cached result.
+    interest_lineage_errors = []
+    instrument_states = {
+        (state.get("instrument_id"), int(state.get("period_index", -1))): state
+        for state in (
+            (semantic_manifest.get("instrument_period_state") or {}).get("states")
+            or []
+        )
+        if state.get("instrument_id") and state.get("period_index") is not None
+    }
+    reporting_currency = (
+        semantic_manifest.get("instrument_period_state") or {}
+    ).get("reporting_currency")
+    for plan in row_plan.get("instruments", []):
+        if not isinstance(plan.get("interest_row"), int):
+            continue
+        rate_type = value("C%d" % plan["interest_row"])
+        maturity_value = value("E%d" % plan["debt_row"])
+        for block, columns in (
+            ("standalone", FORECAST_COLUMNS),
+            ("pro_forma", PRO_FORMA_COLUMNS),
+        ):
+            for period_index, column in enumerate(columns):
+                address = "%s%d" % (column, plan["interest_row"])
+                state = instrument_states.get(
+                    (plan.get("instrument_id"), period_index), {}
+                )
+                interest_lineage_errors.extend(
+                    interest_lineage_findings(
+                        formula=cell_formula(address),
+                        address=address,
+                        plan=plan,
+                        all_plans=row_plan.get("instruments", []),
+                        row_plan=row_plan,
+                        rate_type=rate_type,
+                        period_index=period_index,
+                        block=block,
+                        state=state,
+                        reporting_currency=reporting_currency,
+                        maturity_value=maturity_value,
+                    )
+                )
+    checks.append(
+        record(
+            "instrument-interest-lineage",
+            len(interest_lineage_errors) == 0,
+            "Every instrument interest formula prices that same instrument's opening and movement state using its own rate, benchmark, floor, FX, timing and expense sign.",
+            interest_lineage_errors[:100],
+            violations=len(interest_lineage_errors),
         )
     )
 

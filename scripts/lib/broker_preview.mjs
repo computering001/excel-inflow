@@ -584,6 +584,10 @@ export function compileBrokerPreview({
     schema_version: BROKER_PREVIEW_SCHEMA_VERSION,
     status,
     selection_mode: selectionMode,
+    broker_authority_policy:
+      selectionMode === "forecast_waterfall"
+        ? "compatible_per_metric"
+        : "primary_house",
     ...bindings,
     pack_recommended_primary_house_id: packRecommended,
     recommended_primary_house_id: finalRecommended?.house_id ?? null,
@@ -614,10 +618,11 @@ export function compileBrokerPreview({
 }
 
 /**
- * Deterministically disable all broker model authority while preserving the
- * sealed pack and complete source-table inventory. This is the lawful fallback
- * for an optional broker selection/control-plane defect: no value is invented,
- * promoted or silently mixed across houses.
+ * Deterministically reject broker model authority while preserving the sealed
+ * pack and complete source-table inventory. This explicit zero-authority
+ * policy is the lawful fallback for an optional broker control-plane defect;
+ * ordinary forecast-waterfall previews instead retain compatible per-metric
+ * observations.
  */
 export function compileBrokerForecastWaterfallFallback({
   brokerPack,
@@ -638,6 +643,7 @@ export function compileBrokerForecastWaterfallFallback({
     schema_version: BROKER_PREVIEW_SCHEMA_VERSION,
     status: "PASS",
     selection_mode: "forecast_waterfall",
+    broker_authority_policy: "zero_broker",
     ...bindings,
     pack_recommended_primary_house_id:
       brokerPack?.recommended_primary_house_id ?? null,
@@ -661,7 +667,7 @@ export function compileBrokerForecastWaterfallFallback({
       ),
       quarantined_candidates: quarantinedCandidates,
       note:
-        "Broker model authority is disabled for this run; all supplied reports remain sealed evidence.",
+        "Broker model authority is explicitly rejected for this run; all supplied reports remain sealed evidence.",
     },
     forecast_waterfall_reasons: [...new Set([
       ...reasons.map((reason) => String(reason)).filter(Boolean),
@@ -693,6 +699,7 @@ export function compileEmergencyZeroBrokerPreview({
     schema_version: BROKER_PREVIEW_SCHEMA_VERSION,
     status: "PASS",
     selection_mode: "forecast_waterfall",
+    broker_authority_policy: "zero_broker",
     ...bindings,
     pack_recommended_primary_house_id: null,
     recommended_primary_house_id: null,
@@ -739,6 +746,27 @@ export function validateBrokerPreview(preview) {
   }
   if (!["primary_house", "forecast_waterfall"].includes(preview?.selection_mode)) {
     violations.push("Broker preview selection_mode is unsupported.");
+  }
+  if (
+    !["primary_house", "compatible_per_metric", "zero_broker"].includes(
+      preview?.broker_authority_policy,
+    )
+  ) {
+    violations.push("Broker preview broker_authority_policy is unsupported.");
+  }
+  if (
+    preview?.selection_mode === "primary_house" &&
+    preview?.broker_authority_policy !== "primary_house"
+  ) {
+    violations.push("Primary-house preview must use primary_house broker authority policy.");
+  }
+  if (
+    preview?.selection_mode === "forecast_waterfall" &&
+    !["compatible_per_metric", "zero_broker"].includes(
+      preview?.broker_authority_policy,
+    )
+  ) {
+    violations.push("Forecast-waterfall preview must declare its broker authority policy.");
   }
   if (preview?.preview_sha256 !== brokerPreviewSha256(preview ?? {})) {
     violations.push("Broker preview hash does not match its canonical contents.");
@@ -965,8 +993,9 @@ export function automaticBrokerPreviewConfirmation(preview) {
 
 /**
  * Project a sealed broker selection into compiler evidence without destroying
- * the immutable source lane.  A whole-pack waterfall suppresses every broker
- * observation.  A named-house selection suppresses only the exact
+ * the immutable source lane. A forecast-waterfall selection retains compatible
+ * per-metric observations unless the preview carries an explicit zero-broker
+ * failure policy. A named-house selection suppresses only the exact
  * concept-periods which the preview proved unavailable or quarantined; every
  * other clean period from that same house remains usable.
  */
@@ -988,7 +1017,10 @@ export function applyBrokerPreviewSelectionToCaseEvidence(
   const brokerPack = projected.lanes.broker_pack ?? {};
   const metrics = brokerPack.metrics ?? {};
   let suppressedObservationCount = 0;
-  if (verified.selection.house_id === "FORECAST_WATERFALL") {
+  if (
+    verified.selection.house_id === "FORECAST_WATERFALL" &&
+    preview.broker_authority_policy === "zero_broker"
+  ) {
     brokerPack.metrics = Object.fromEntries(
       Object.entries(metrics).map(([metricId, metric]) => [
         metricId,
@@ -1097,12 +1129,34 @@ export function applyBrokerPreviewSelection(modelCase, preview, confirmation) {
     ...(modelCase.controls ?? {}),
     broker_case: verified.selection.house_name,
   };
-  if (verified.selection.house_id === "FORECAST_WATERFALL") {
+  if (
+    verified.selection.house_id === "FORECAST_WATERFALL" &&
+    preview.broker_authority_policy === "zero_broker"
+  ) {
     for (const section of ["income_statement", "cash_flow"]) {
       for (const row of modelCase.statement_structure?.[section] ?? []) {
-        delete row.broker_metric_id;
         if (row.forecast_treatment === "broker") {
           delete row.forecast_treatment;
+        }
+        const authorities = row.forecast_period_authorities ?? [];
+        const brokerPeriods = authorities
+          .map((authority, forecastIndex) =>
+            authority?.method === "broker_consensus" ? forecastIndex : -1,
+          )
+          .filter((forecastIndex) => forecastIndex >= 0);
+        if (brokerPeriods.length > 0) {
+          row.forecast_period_authorities = authorities.map(
+            (authority, forecastIndex) =>
+              brokerPeriods.includes(forecastIndex) ? null : authority,
+          );
+          if (row.forecast_period_authorities.every((authority) => !authority)) {
+            delete row.forecast_period_authorities;
+          }
+          if (Array.isArray(row.values)) {
+            for (const forecastIndex of brokerPeriods) {
+              row.values[forecastIndex + 3] = null;
+            }
+          }
         }
       }
     }

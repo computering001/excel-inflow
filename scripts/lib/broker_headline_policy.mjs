@@ -48,7 +48,10 @@ export function selectBrokerHeadlineRole(observationInput) {
 }
 
 export function brokerHeadlineEligibility(row, observationInput) {
-  const role = canonicalSemanticRole(row?.semantic_role ?? row?.role ?? row?.row_id);
+  const semanticRole = canonicalSemanticRole(
+    row?.semantic_role ?? row?.role ?? row?.row_id,
+  );
+  const role = semanticRole === "operating_profit" ? "ebit" : semanticRole;
   if (!HEADLINES.has(role)) return { eligible: true, role, selected_role: null, reason: null };
   const selected = selectBrokerHeadlineRole(observationInput);
   if (!selected) return { eligible: false, role, selected_role: null, reason: "No verified broker headline observation is available." };

@@ -830,13 +830,72 @@ export function workbookSemanticProofContract(
       portableCompare(left.consumer_display_id, right.consumer_display_id) ||
       portableCompare(left.dependency_display_id, right.dependency_display_id),
   );
+  const graphNodeById = new Map(
+    graphNodes.map((node) => [node.display_id, node]),
+  );
+  const protectedIdentityRoles = new Set([
+    "cash_from_operations",
+    "cash_from_investing",
+    "cash_before_financing",
+    "cash_from_financing",
+    "net_change_in_cash",
+    "ending_cash",
+  ]);
+  const roleProtectedFormulaIdentities = graphNodes.flatMap((node) => {
+    if (!protectedIdentityRoles.has(node.semantic_role)) return [];
+    const memberRows = authorisedDependencyEdges
+      .filter(
+        (edge) =>
+          edge.consumer_display_id === node.display_id &&
+          edge.dependency_display_id !== node.display_id,
+      )
+      .map((edge) => graphNodeById.get(edge.dependency_display_id)?.row)
+      .filter(Number.isInteger);
+    const uniqueMemberRows = [...new Set(memberRows)].sort((a, b) => a - b);
+    if (uniqueMemberRows.length === 0) return [];
+    return [{
+      concept_id: node.semantic_role,
+      owner_row: node.row,
+      member_rows: uniqueMemberRows,
+      columns: ["J", "K", "L"],
+      period_relation: "same_period",
+    }];
+  });
+  const physicalStatementRows = ["income_statement", "cash_flow"].flatMap(
+    (section) => rowPlan.statement_rows?.[section] ?? [],
+  );
+  const physicalStatementById = new Map(
+    physicalStatementRows.map((row) => [row.row_id, row]),
+  );
+  const historicalColumns = rowPlan.columns?.historical ?? ["G", "H", "I"];
+  const reconciledHistoricalIdentities = graphNodes.flatMap((node) => {
+    const row = physicalStatementById.get(node.display_id);
+    const refs = row?.calculation?.refs ?? [];
+    if (
+      row?.historical_authority !== "reported_total_reconciled" ||
+      row?.calculation?.operator !== "sum" ||
+      refs.length === 0
+    ) return [];
+    const memberRows = refs.map((ref) => physicalRow(ref));
+    if (memberRows.some((memberRow) => !Number.isInteger(memberRow))) return [];
+    return [{
+      concept_id: `reported_total_reconciled:${node.display_id}`,
+      owner_row: node.row,
+      member_rows: [...new Set(memberRows)].sort((a, b) => a - b),
+      columns: [...historicalColumns],
+      period_relation: "same_period",
+    }];
+  });
+  const protectedFormulaIdentities = [
+    ...roleProtectedFormulaIdentities,
+    ...reconciledHistoricalIdentities,
+  ].sort((left, right) => portableCompare(left.concept_id, right.concept_id));
   const authorityByDisplayPeriod = new Map(
     modelIr.planes.authority.map((item) => [
       `${item.display_id}\u0000${item.forecast_index}`,
       item,
     ]),
   );
-  const graphNodeById = new Map(graphNodes.map((node) => [node.display_id, node]));
   const requiredFormulaPaths = [];
   const forecastColumns = ["J", "K", "L"];
   const priorColumns = ["I", "J", "K"];
@@ -1003,6 +1062,7 @@ export function workbookSemanticProofContract(
     semantic_scope_captures: semanticScopeCaptures,
     hierarchies,
     schedule_links: scheduleLinks,
+    protected_formula_identities: protectedFormulaIdentities,
     physical_formula_graph: physicalFormulaGraph,
     fixed_point_formula_graph: fixedPointFormulaGraph,
     broker_evidence: brokerEvidence,

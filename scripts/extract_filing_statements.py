@@ -37,11 +37,28 @@ NUMBER_RE = re.compile(
     r"^\s*(?P<open>\()?\s*(?:[$€£¥])?\s*(?P<sign>[-+])?\s*"
     r"(?P<number>(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?)\s*%?\s*(?P<close>\))?\s*$"
 )
+NOT_APPLICABLE_RE = re.compile(
+    r"^(?:n/?a|n\.?m\.?|not applicable|not meaningful)$",
+    re.I,
+)
 DECORATION_RE = re.compile(
     r"^(?:for (?:the )?(?:year|period) ended\b|financial statements?\b.*(?:annual report|form 10-k|form 20-f)\b|"
     r"annual report\b.*(?:financial statements?|form 10-k|form 20-f)\b)",
     re.I,
 )
+SOURCE_REFERENCE_TOKEN_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Z]{1,3}-\d{1,3}|notes?\s+\d+[A-Za-z]?)(?![A-Za-z0-9])",
+    re.I,
+)
+UNIT_HEADER_RE = re.compile(
+    r"^\s*(?:amounts?\s+)?(?:expressed\s+)?(?:in\s+)?"
+    r"(?:(?:USD|GBP|EUR|CAD|AUD|NZD|JPY|CHF|SEK|NOK|DKK|ZAR|INR|CNY|RMB|HKD|SGD|"
+    r"[$€£¥])\s*(?:in\s+)?)?"
+    r"(?:units?|thousands?|millions?|billions?|000s?|m|mm|bn)"
+    r"(?:\s+unless otherwise stated)?\s*$",
+    re.I,
+)
+CONTINUED_RE = re.compile(r"\bcontinued\b", re.I)
 
 ACCOUNTING_FRAMEWORK_PATTERNS = {
     "ifrs": [
@@ -173,6 +190,47 @@ def parse_number(text: str) -> float | None:
     return int(number) if number.is_integer() else number
 
 
+def split_source_reference_tokens(label: str) -> tuple[str, list[str]]:
+    """Separate filing references from the economic label they decorate.
+
+    Tokens such as ``F-5`` and ``Note 12`` identify source locations; they are
+    not statement concepts.  Preserve their printed form for provenance while
+    ensuring a reference-only line cannot be minted as an economic model row.
+    The deliberately narrow grammar does not consume accounting labels such as
+    ``IFRS 16 lease expense``.
+    """
+
+    tokens: list[str] = []
+    for match in SOURCE_REFERENCE_TOKEN_RE.finditer(str(label or "")):
+        token = re.sub(r"\s+", " ", match.group(0)).strip()
+        if token and token not in tokens:
+            tokens.append(token)
+    cleaned = SOURCE_REFERENCE_TOKEN_RE.sub(" ", str(label or ""))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" :;,.()[]–—-")
+    return cleaned, tokens
+
+
+def source_provenance_note(page: int, reference_tokens: list[str]) -> str:
+    base = f"page {page}"
+    if not reference_tokens:
+        return base
+    return f"{base}; source reference {', '.join(reference_tokens)}"
+
+
+def classify_value_token(text: str) -> tuple[float | None, str] | None:
+    """Preserve the source-visible state independently from its value."""
+
+    token = text.strip()
+    if token in {"-", "—", "–"}:
+        return None, "reported_dash"
+    if NOT_APPLICABLE_RE.fullmatch(token):
+        return None, "not_applicable"
+    value = parse_number(token)
+    if value is None:
+        return None
+    return value, "reported_zero" if value == 0 else "reported_number"
+
+
 def pdf_lines(target: Path) -> list[dict[str, Any]]:
     try:
         import fitz  # type: ignore
@@ -216,15 +274,120 @@ def numeric_runs(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     for word in words:
         token = word["text"]
-        value = parse_number(token)
-        if value is not None or token in {"-", "—", "–"}:
+        observation = classify_value_token(token)
+        if observation is not None:
+            value, value_state = observation
             runs.append({
                 "x0": word["x0"],
                 "x1": word["x1"],
                 "text": token,
                 "value": value,
+                "value_state": value_state,
             })
     return runs
+
+
+def _page_ranges(lines: list[dict[str, Any]]) -> dict[int, tuple[int, int]]:
+    ranges: dict[int, tuple[int, int]] = {}
+    for index, line in enumerate(lines):
+        page = int(line["page"])
+        if page not in ranges:
+            ranges[page] = (index, index + 1)
+        else:
+            ranges[page] = (ranges[page][0], index + 1)
+    return ranges
+
+
+def _line_years(line: dict[str, Any]) -> set[str]:
+    return {
+        word["text"].strip("(),")
+        for word in line.get("words", [])
+        if YEAR_RE.fullmatch(word["text"].strip("(),"))
+    }
+
+
+def _unit_header_text(text: str) -> str | None:
+    normalised = re.sub(r"[()]", " ", str(text or ""))
+    normalised = re.sub(r"\s+", " ", normalised).strip(" :;,.–—-")
+    return normalised if UNIT_HEADER_RE.fullmatch(normalised) else None
+
+
+def _is_period_header(line: dict[str, Any], periods: list[str]) -> bool:
+    requested_years = {str(period)[:4] for period in periods}
+    if not requested_years.issubset(_line_years(line)):
+        return False
+    residue = str(line.get("text") or "")
+    for year in requested_years:
+        residue = re.sub(rf"\b{re.escape(year)}\b", " ", residue)
+    residue = re.sub(
+        r"\b(?:notes?|year|years|ended|ending|for|the|period|periods|audited|unaudited|"
+        r"current|prior|restated|reported)\b",
+        " ",
+        residue,
+        flags=re.I,
+    )
+    residue = re.sub(r"[(),:;/|–—-]", " ", residue)
+    residue = re.sub(r"\s+", " ", residue).strip()
+    return not residue or _unit_header_text(residue) is not None
+
+
+def _is_statement_header_line(
+    line: dict[str, Any], periods: list[str], section: str | None = None,
+) -> bool:
+    text = str(line.get("text") or "").strip()
+    heading_patterns = [STRICT_HEADINGS[section]] if section else list(STRICT_HEADINGS.values())
+    return (
+        any(pattern.fullmatch(text) for pattern in heading_patterns)
+        or _is_period_header(line, periods)
+        or _unit_header_text(text) is not None
+    )
+
+
+def _resolved_row_count(
+    page_lines: list[dict[str, Any]], columns: list[float], periods: list[str], section: str,
+) -> int:
+    if len(columns) != 3:
+        return 0
+    count = 0
+    for line in page_lines:
+        if _is_statement_header_line(line, periods) or DECORATION_RE.search(str(line.get("text") or "")):
+            continue
+        runs = numeric_runs(line.get("words", []))
+        if len(runs) >= 3 and len(nearest_values(runs, columns)) == 3:
+            count += 1
+    return count
+
+
+def _continuation_page(
+    previous_lines: list[dict[str, Any]], page_lines: list[dict[str, Any]],
+    section: str, periods: list[str], inherited_columns: list[float],
+) -> tuple[bool, list[float]]:
+    """Prove that one adjacent page continues the selected face statement."""
+    top = page_lines[:20]
+    for line in top:
+        text = str(line.get("text") or "").strip()
+        for candidate_section, pattern in STRICT_HEADINGS.items():
+            if candidate_section != section and pattern.fullmatch(text):
+                return False, []
+
+    same_heading = any(
+        STRICT_HEADINGS[section].fullmatch(str(line.get("text") or "").strip())
+        for line in top
+    )
+    explicit_continuation = any(
+        CONTINUED_RE.search(str(line.get("text") or ""))
+        for line in [*previous_lines[-12:], *top]
+    )
+    page_columns = year_columns(page_lines, periods)
+    resolved_columns = page_columns if len(page_columns) == 3 else inherited_columns
+    resolved_rows = _resolved_row_count(page_lines, resolved_columns, periods, section)
+    has_period_header = any(_is_period_header(line, periods) for line in top)
+    has_unit_header = any(_unit_header_text(str(line.get("text") or "")) for line in top)
+
+    certified = resolved_rows >= 2 and (
+        same_heading or explicit_continuation or (has_period_header and has_unit_header)
+    )
+    return certified, resolved_columns if certified else []
 
 
 def statement_window(
@@ -234,24 +397,20 @@ def statement_window(
 
     Annual reports refer to cash flows and income statements hundreds of times
     before the audited accounts.  A face statement must therefore have an
-    anchored title, all three requested year columns on the same page, and a
-    meaningful three-value row surface.  Selection is page-local so notes,
-    governance and remuneration prose cannot expand the statement window.
+    anchored title, all three requested year columns on the opening page, and
+    a meaningful three-value row surface. Adjacent pages join only through a
+    positive continuation certificate; notes, governance and remuneration
+    prose therefore cannot expand the statement window.
     """
-    page_ranges: dict[int, tuple[int, int]] = {}
-    for index, line in enumerate(lines):
-        page = int(line["page"])
-        if page not in page_ranges:
-            page_ranges[page] = (index, index + 1)
-        else:
-            page_ranges[page] = (page_ranges[page][0], index + 1)
+    page_ranges = _page_ranges(lines)
 
     candidates: list[tuple[int, int, int]] = []
     requested_years = {str(period)[:4] for period in periods}
     for heading_index, line in enumerate(lines):
         if not STRICT_HEADINGS[section].fullmatch(line["text"]):
             continue
-        _, page_end = page_ranges[int(line["page"])]
+        page = int(line["page"])
+        page_start, page_end = page_ranges[page]
         local = lines[heading_index:page_end]
         observed_years = {
             word["text"].strip("(),")
@@ -264,16 +423,31 @@ def statement_window(
         columns = year_columns(local, periods)
         if len(columns) != 3:
             continue
-        resolved_rows = 0
-        for candidate in local[1:]:
-            runs = numeric_runs(candidate["words"])
-            if len(runs) >= 3 and len(nearest_values(runs, columns)) == 3:
-                resolved_rows += 1
+        resolved_rows = _resolved_row_count(local[1:], columns, periods, section)
+        end = page_end
+        previous_page_lines = lines[page_start:page_end]
+        inherited_columns = columns
+        next_page = page + 1
+        while next_page in page_ranges:
+            next_start, next_end = page_ranges[next_page]
+            next_page_lines = lines[next_start:next_end]
+            continued, resolved_columns = _continuation_page(
+                previous_page_lines, next_page_lines, section, periods, inherited_columns,
+            )
+            if not continued:
+                break
+            resolved_rows += _resolved_row_count(
+                next_page_lines, resolved_columns, periods, section,
+            )
+            end = next_end
+            previous_page_lines = next_page_lines
+            inherited_columns = resolved_columns
+            next_page += 1
         if resolved_rows < 5:
             continue
         # Exact title + complete period surface dominates; row count breaks
         # ties when an issuer repeats a face statement elsewhere in the file.
-        candidates.append((1000 + resolved_rows, heading_index, page_end))
+        candidates.append((1000 + resolved_rows, heading_index, end))
     if not candidates:
         return None
     _, start, end = max(candidates, key=lambda item: (item[0], item[1]))
@@ -303,9 +477,19 @@ def year_columns(window: list[dict[str, Any]], periods: list[str]) -> list[float
 
 
 def nearest_values(runs: list[dict[str, Any]], columns: list[float]) -> list[float | None]:
+    return nearest_observations(runs, columns)[0]
+
+
+def nearest_observations(
+    runs: list[dict[str, Any]],
+    columns: list[float],
+    *,
+    missing_state: str = "reported_blank",
+) -> tuple[list[float | None], list[str]]:
     if len(columns) != 3:
-        return []
+        return [], []
     assigned: list[float | None] = [None, None, None]
+    states = [missing_state, missing_state, missing_state]
     distances: list[float] = [float("inf")] * 3
     for run in runs:
         centre = (run["x0"] + run["x1"]) / 2
@@ -313,8 +497,45 @@ def nearest_values(runs: list[dict[str, Any]], columns: list[float]) -> list[flo
         distance = abs(columns[index] - centre)
         if distance < distances[index]:
             assigned[index] = run["value"]
+            states[index] = run["value_state"]
             distances[index] = distance
-    return assigned
+    return assigned, states
+
+
+def infer_structural_roles(rows: list[dict[str, Any]]) -> None:
+    """Stamp a heading only from positive hierarchy evidence.
+
+    A row without resolved numerics is not thereby a heading.  It becomes one
+    only when the source geometry places at least one subsequent row beneath
+    it before the next same-or-higher-level boundary.  Everything else remains
+    a body row, including unresolved, dash-only and N/A-only observations.
+    """
+
+    explicit_body_states = {
+        "reported_number",
+        "reported_zero",
+        "reported_dash",
+        "not_applicable",
+    }
+    for index, row in enumerate(rows):
+        states = row.get("value_states") or []
+        if any(state in explicit_body_states for state in states):
+            row["structural_role"] = "body"
+            continue
+        level = int(row.get("hierarchy_level") or 0)
+        owns_indented_child = False
+        for candidate in rows[index + 1 :]:
+            candidate_level = int(candidate.get("hierarchy_level") or 0)
+            if candidate_level <= level:
+                break
+            owns_indented_child = True
+            break
+        row["structural_role"] = "header" if owns_indented_child else "body"
+        if owns_indented_child:
+            row["value_states"] = [
+                "reported_blank" if state == "unresolved" else state
+                for state in states
+            ]
 
 
 def _finite_series(row: dict[str, Any]) -> list[float] | None:
@@ -511,7 +732,18 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
 def extract_statement(
     lines: list[dict[str, Any]], section: str, source_id: str,
     raw_sha256: str, periods: list[str], used_ids: set[str],
+    reporting_currency: str | None = None, units: str | None = None,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not re.fullmatch(r"[A-Z]{3}", str(reporting_currency or "")):
+        return None, [{
+            "code": "REPORTING_CURRENCY_UNRESOLVED",
+            "section": section,
+        }]
+    if units not in {"units", "thousands", "millions"}:
+        return None, [{
+            "code": "REPORTING_UNITS_UNRESOLVED",
+            "section": section,
+        }]
     bounds = statement_window(lines, section, periods)
     if not bounds:
         return None, [{"code": "HEADING_NOT_FOUND", "section": section}]
@@ -521,17 +753,46 @@ def extract_statement(
     findings: list[dict[str, Any]] = []
     if len(columns) != 3:
         return None, [{"code": "PERIOD_COLUMNS_UNRESOLVED", "section": section, "page": window[0]["page"]}]
+    source_pages = list(dict.fromkeys(int(line["page"]) for line in window))
+    page_lines = {
+        page: [line for line in window if int(line["page"]) == page]
+        for page in source_pages
+    }
+    columns_by_page: dict[int, list[float]] = {}
+    inherited_columns = columns
+    for page in source_pages:
+        local_columns = year_columns(page_lines[page], periods)
+        if len(local_columns) == 3:
+            inherited_columns = local_columns
+        columns_by_page[page] = inherited_columns
+    source_unit_labels = list(dict.fromkeys(
+        unit_label
+        for line in window
+        if (unit_label := _unit_header_text(str(line.get("text") or ""))) is not None
+    ))
     rows = []
-    base_x = min((line["x0"] for line in window[1:] if line["text"]), default=0)
-    data_left = min(columns) - 20
+    pending_reference_tokens: list[str] = []
+    base_x_by_page = {
+        page: min(
+            (
+                line["x0"] for line in page_lines[page]
+                if line["text"] and not _is_statement_header_line(line, periods)
+            ),
+            default=0,
+        )
+        for page in source_pages
+    }
     for line in window[1:]:
-        if not line["text"] or all(YEAR_RE.fullmatch(word["text"].strip("(),")) for word in line["words"]):
+        if not line["text"] or _is_statement_header_line(line, periods):
             continue
         if DECORATION_RE.search(line["text"]):
             continue
         # Only the three period columns are values.  A leading dash is often a
         # list bullet and the separate Notes column is not a historical value.
         # Neither may truncate or contaminate the issuer's printed label.
+        line_page = int(line["page"])
+        line_columns = columns_by_page[line_page]
+        data_left = min(line_columns) - 20
         runs = [run for run in numeric_runs(line["words"]) if run["x1"] >= data_left]
         label_words = [
             word["text"]
@@ -539,11 +800,38 @@ def extract_statement(
             if word["x0"] < data_left and parse_number(word["text"]) is None
         ]
         label = " ".join(label_words).strip(" :–—-")
+        label, reference_tokens = split_source_reference_tokens(label)
+        if reference_tokens and not label:
+            # A standalone source marker belongs to the adjacent statement
+            # evidence, never to the economic row inventory. Prefer the prior
+            # row on the same reading surface; otherwise carry it to the next
+            # economic row.
+            if rows:
+                prior_tokens = [
+                    token
+                    for token in reference_tokens
+                    if token not in rows[-1]["page_or_note"]
+                ]
+                if prior_tokens:
+                    rows[-1]["page_or_note"] += (
+                        f"; source reference {', '.join(prior_tokens)}"
+                    )
+            else:
+                pending_reference_tokens.extend(
+                    token
+                    for token in reference_tokens
+                    if token not in pending_reference_tokens
+                )
+            continue
         if not label or HEADINGS[section].search(label):
             continue
         if DECORATION_RE.search(label):
             continue
-        values = nearest_values(runs, columns) if runs else [None, None, None]
+        values, value_states = nearest_observations(
+            runs,
+            line_columns,
+            missing_state="reported_blank" if runs else "unresolved",
+        )
         if len(values) != 3:
             findings.append({"code": "ROW_VALUES_UNRESOLVED", "section": section, "page": line["page"], "label": label})
             continue
@@ -565,30 +853,50 @@ def extract_statement(
             source_line_id = f"{section_prefix}.{slug}_{suffix}"
             suffix += 1
         used_ids.add(source_line_id)
-        hierarchy = max(0, min(8, round((line["x0"] - base_x) / 12)))
+        hierarchy = max(0, min(8, round((line["x0"] - base_x_by_page[line_page]) / 12)))
+        provenance_tokens = [
+            *pending_reference_tokens,
+            *(
+                token
+                for token in reference_tokens
+                if token not in pending_reference_tokens
+            ),
+        ]
+        pending_reference_tokens = []
         rows.append({
             "source_line_id": source_line_id,
             "ordinal": len(rows) + 1,
             "raw_label": label,
             "values": values,
-            "page_or_note": f"page {line['page']}",
+            "value_states": value_states,
+            "page_or_note": source_provenance_note(
+                int(line["page"]), provenance_tokens
+            ),
             "material": any(value not in {None, 0} for value in values),
             "hierarchy_level": hierarchy,
             "is_subtotal": is_subtotal_label(label),
         })
+    infer_structural_roles(rows)
     rows = model_statement_scope(rows, section)
     if not rows:
         return None, findings + [{"code": "NO_STATEMENT_ROWS", "section": section}]
     infer_parent_links(rows)
     manifest = {
-        "schema_version": "face-statement-manifest/1.0",
+        "schema_version": "face-statement-manifest/1.1",
         "statement": section,
         "statement_order": 1,
         "source_id": source_id,
         "document_sha256": raw_sha256,
-        "page_or_note": f"pages {min(row['page_or_note'] for row in rows)} to {max(row['page_or_note'] for row in rows)}",
+        "page_or_note": (
+            f"pages {source_pages[0]}-{source_pages[-1]}"
+            if len(source_pages) > 1 else f"page {source_pages[0]}"
+        ),
         "periods": periods,
         "complete_face_statement": True,
+        "source_pages": source_pages,
+        **({"reporting_currency": reporting_currency} if reporting_currency else {}),
+        **({"units": units} if units else {}),
+        "source_unit_labels": source_unit_labels,
         "row_count": len(rows),
         "rows_sha256": "0" * 64,
         "rows": rows,
@@ -603,11 +911,17 @@ def extract_statement(
         "page_or_note": manifest["page_or_note"],
         "periods": manifest["periods"],
         "complete_face_statement": manifest["complete_face_statement"],
+        "source_pages": manifest["source_pages"],
+        **({"reporting_currency": manifest["reporting_currency"]} if "reporting_currency" in manifest else {}),
+        **({"units": manifest["units"]} if "units" in manifest else {}),
+        "source_unit_labels": manifest["source_unit_labels"],
         "rows": [{
             "source_line_id": row["source_line_id"],
             "ordinal": row["ordinal"],
             "raw_label": row["raw_label"],
             "values": row["values"],
+            "value_states": row["value_states"],
+            "structural_role": row["structural_role"],
             "page_or_note": row["page_or_note"],
             "material": row["material"],
             "parent_source_line_id": row.get("parent_source_line_id"),
@@ -650,6 +964,8 @@ def main() -> int:
                 manifest, section_findings = extract_statement(
                     lines, section, declaration["source_id"], raw_sha256,
                     request["filing_facts"]["historical_periods"], used_ids,
+                    request["filing_facts"].get("reporting_currency"),
+                    request["filing_facts"].get("units"),
                 )
                 findings.extend({"document_id": declaration["document_id"], **item} for item in section_findings)
                 if manifest:

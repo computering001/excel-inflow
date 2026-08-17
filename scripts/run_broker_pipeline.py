@@ -31,6 +31,7 @@ from broker_terminal_recovery import (
     degrade_finding_houses,
 )
 from broker_period_recovery import canonical_hash as period_canonical_hash, target_inventory as period_target_inventory
+from pre_broker_demand import normalize_pre_broker_demand
 from broker_work_graph import build_work_graph, verify_work_graph
 from workflow_state import assert_state, assert_transition
 
@@ -1115,15 +1116,8 @@ def main() -> int:
         demand_graph = model_context.get("model_demand_graph")
         if not isinstance(demand_graph, dict):
             raise ValueError("Broker model_context lacks the pre-broker model-demand graph.")
-        if demand_graph.get("schema_version") != "pre-broker-model-demand/1.0":
-            raise ValueError("Broker model_context carries the wrong demand-graph version.")
-        demand_body = {
-            key: value for key, value in demand_graph.items()
-            if key != "graph_sha256"
-        }
-        if demand_graph.get("graph_sha256") != sha256_bytes(canonical_bytes(demand_body)):
-            raise ValueError("Broker model_context demand graph has a stale canonical hash.")
-        if demand_graph.get("forecast_periods") != model_context.get("forecast_periods"):
+        normalized_demand = normalize_pre_broker_demand(demand_graph)
+        if normalized_demand["forecast_periods"] != model_context.get("forecast_periods"):
             raise ValueError("Broker model_context period basis differs from its demand graph.")
     run_id = str(request.get("run_id") or "")
     request_digest = sha256_file(request_path)

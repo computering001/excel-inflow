@@ -762,7 +762,7 @@ export function embeddedRateLiterals(formula) {
   return matches;
 }
 
-const NATIVE_SCHEMA = "native-excel-restoration-evidence/3.1";
+const NATIVE_SCHEMA = "native-excel-restoration-evidence/3.2";
 const NATIVE_SEQUENCE = [1, 0, 1, 0, 1];
 const NATIVE_TOLERANCE_POLICY = {
   currency_abs: 1e-6,
@@ -1014,6 +1014,26 @@ export function validateNativeEvidence(inputEvidence, inputExpected) {
         hashes.push(state.sha256);
         if (!safeStatePath(state.path)) nativeError(errors, `${testPrefix}.file.path`, { actual: state.path ?? null });
         if (!validHash(state.sha256)) nativeError(errors, `${testPrefix}.file.sha256`, { actual: state.sha256 ?? null });
+        for (const field of ["worksheets_scanned", "used_cells_scanned"]) {
+          if (!Number.isInteger(state[field]) || state[field] <= 0) {
+            nativeError(errors, `${testPrefix}.file.${field}`, {
+              state_index: stateIndex,
+              actual: state[field] ?? null,
+            });
+          }
+        }
+        if (state.excel_error_count !== 0) {
+          nativeError(errors, `${testPrefix}.file.excel_error_count`, {
+            state_index: stateIndex,
+            actual: state.excel_error_count ?? null,
+          });
+        }
+        if (!Array.isArray(state.excel_error_cells) || state.excel_error_cells.length !== 0) {
+          nativeError(errors, `${testPrefix}.file.excel_error_cells`, {
+            state_index: stateIndex,
+            actual: state.excel_error_cells ?? null,
+          });
+        }
       });
       if (new Set(paths).size !== paths.length) nativeError(errors, `${testPrefix}.file.duplicate_path`);
       if (new Set(hashes).size < 2) nativeError(errors, `${testPrefix}.file.insufficient_distinct_sha256`);

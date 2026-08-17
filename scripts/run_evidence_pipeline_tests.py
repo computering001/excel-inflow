@@ -257,6 +257,28 @@ def main() -> int:
             "broker request was not bound to a filings-derived demand graph before extraction",
         )
         checks += 1
+        broker_controller_out = root / "broker-controller-v2"
+        broker_controller = subprocess.run(
+            [
+                sys.executable,
+                str(HERE / "run_broker_pipeline.py"),
+                declaration["request_path"],
+                "--out",
+                str(broker_controller_out),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert_true(
+            broker_controller.returncode in {0, 2}
+            and (broker_controller_out / "broker-run-state.json").is_file()
+            and "wrong demand-graph version" not in (
+                broker_controller.stdout + broker_controller.stderr
+            ),
+            "fresh producer-owned v2 demand did not enter the broker controller",
+        )
+        checks += 1
     with tempfile.TemporaryDirectory(prefix="excel-inflow-broker-intake-binding-") as temporary:
         root = Path(temporary)
         report = root / "house-a.pdf"

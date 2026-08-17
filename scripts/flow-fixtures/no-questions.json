@@ -45,7 +45,7 @@
           "instrument_id": "sncc_bond_2033",
           "source_row": "dcs.1",
           "description": "5.000% senior notes due Jun-2033",
-          "instrument_type": "fixed_bond",
+          "instrument_type": "bond_fixed",
           "currency": "USD",
           "outstanding_amount": 80,
           "maturity_date": "2033-06-30",

@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from run_dcs_pipeline import classify_extract_receipt
+from propose_dcs_crosswalk import classify_type
 
 
 HERE = Path(__file__).resolve().parent
@@ -35,12 +36,31 @@ def main() -> int:
     root = Path(args.out).resolve()
     if root.exists(): shutil.rmtree(root)
     root.mkdir(parents=True)
+
+    # Every ontology class is reached only from affirmative source semantics;
+    # a vague instrument description must remain in the review class.
+    classifier_cases = [
+        ("fixed bond", "Senior notes", "fixed", "bond_fixed"),
+        ("floating bond", "Floating rate notes", "floating", "bond_floating"),
+        ("fixed term loan", "Term facility", "fixed", "term_loan_fixed"),
+        ("floating term loan", "Bank loan", "floating", "term_loan_floating"),
+        ("RCF", "Committed revolving credit facility", "floating", "rcf"),
+        ("commercial paper", "Commercial paper programme", "fixed", "commercial_paper"),
+        ("securitisation", "Receivables securitisation", "floating", "securitisation"),
+        ("finance lease", "Finance lease liability", "fixed", "lease_liability"),
+        ("overdraft", "Bank overdraft", "floating", "overdraft"),
+        ("other debt", "Other borrowings", "fixed", "other_explicit"),
+        ("", "Bespoke funding arrangement", "", "unclassified"),
+    ]
+    for source_type, description, rate_hint, expected in classifier_cases:
+        assert classify_type(source_type, description, rate_hint) == expected
+
     csv_path = root / "structured.csv"
     rows = [
-        ["Security Description", "Security Type", "CCY", "Amount Outstanding", "Maturity Date", "Coupon Rate", "Balance Basis", "Facility Size", "Amount Drawn", "Committed", "Fee Convention", "Commitment Fee Bps", "Issue Date", "Clean Price", "YTW", "OAS"],
-        ["Zero Commercial Paper", "commercial paper", "USD", 0, "2027-06-30", "", "reporting_currency_carrying_value", "", "", "", "", "", "2026-01-02", 100, 0.04, 55],
-        ["Committed Revolving Credit Facility", "RCF", "USD", 0, "2029-12-31", "", "reporting_currency_carrying_value", 1000, 0, "yes", "", "", "2024-05-01", 100, 0.03, 75],
-        ["USD 5% Senior Notes", "bond", "USD", 500, "2030-09", 0.05, "reporting_currency_carrying_value", "", "", "", "", "", "2025-09-15", 98.5, 0.052, 120],
+        ["Security Description", "Security Type", "CCY", "Amount Outstanding", "Maturity Date", "Coupon Rate", "Rate Type", "Balance Basis", "Facility Size", "Amount Drawn", "Committed", "Fee Convention", "Commitment Fee Bps", "Issue Date", "Clean Price", "YTW", "OAS"],
+        ["Zero Commercial Paper", "commercial paper", "USD", 0, "2027-06-30", "", "", "reporting_currency_carrying_value", "", "", "", "", "", "2026-01-02", 100, 0.04, 55],
+        ["Committed Revolving Credit Facility", "RCF", "USD", 0, "2029-12-31", "", "", "reporting_currency_carrying_value", 1000, 0, "yes", "", "", "2024-05-01", 100, 0.03, 75],
+        ["USD 5% Senior Notes", "bond", "USD", 500, "2030-09", 0.05, "fixed", "reporting_currency_carrying_value", "", "", "", "", "", "2025-09-15", 98.5, 0.052, 120],
     ]
     with csv_path.open("w", newline="", encoding="utf-8") as handle: csv.writer(handle).writerows(rows)
     request = root / "request.json"
@@ -66,7 +86,7 @@ def main() -> int:
     crosswalk = json.loads(crosswalk_path.read_text())
     bond_id = next(
         item["instrument_id"] for item in crosswalk["instruments"]
-        if any(term.get("output_value") == "fixed_bond" for term in item.get("term_authorities", []))
+        if any(term.get("output_value") == "bond_fixed" for term in item.get("term_authorities", []))
     )
     for instrument in crosswalk["instruments"]:
         if instrument.get("instrument_id") != bond_id: continue
@@ -100,13 +120,14 @@ def main() -> int:
 
     deficient = root / "deficient.csv"
     with deficient.open("w", newline="", encoding="utf-8") as handle:
-        csv.writer(handle).writerows([rows[0], ["Missing Terms Loan", "loan", "USD", 73, "", "", "reporting_currency_carrying_value", "", "", "", "", "", "", "", "", ""]])
+        csv.writer(handle).writerows([rows[0], ["Missing Terms Loan", "loan", "USD", 73, "", "", "", "reporting_currency_carrying_value", "", "", "", "", "", "", "", "", ""]])
     deficient_request = root / "deficient-request.json"
     payload = json.loads(request.read_text()); payload["source_path"] = str(deficient); payload.pop("expected_sha256"); write_json(deficient_request, payload)
     code, blocked = run(deficient_request, root / "deficient-run")
     assert code == 2 and blocked["pipeline_status"] == "BLOCKED_INPUT" and blocked["blocker_class"] == "USER_EVIDENCE"
     unresolved = blocked["tasks"][0]["unresolved"]
     assert len(unresolved) == 1 and "maturity" in unresolved[0]["missing_fields"]
+    assert "instrument_type_review" in unresolved[0]["missing_fields"]
 
     # Receipt failures are owned by the user only when the receipt proves the
     # source has no usable cells.  An unfamiliar/internal extractor finding may
@@ -127,7 +148,7 @@ def main() -> int:
         ],
     }) == ("BLOCKED_INTERNAL", False, "INTERNAL_WORK")
 
-    summary = {"schema_version": "dcs-pipeline-tests/1.0", "status": "PASS", "positive_checks": 9, "mutation_checks": 6, "resume_reused_all": True}
+    summary = {"schema_version": "dcs-pipeline-tests/1.0", "status": "PASS", "positive_checks": 21, "mutation_checks": 6, "resume_reused_all": True}
     write_json(root / "summary.json", summary)
     print(json.dumps(summary, sort_keys=True))
     return 0

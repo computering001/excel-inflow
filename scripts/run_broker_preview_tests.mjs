@@ -507,15 +507,114 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
   const accepted = confirmation(preview, "FORECAST_WATERFALL");
   const verified = verifyBrokerPreviewConfirmation(preview, accepted);
   assert(verified.valid && verified.selection.house_name === "Forecast Waterfall", verified.errors.join("; "));
-  const modelCase = { controls: { broker_case: "Consensus" } };
+  const modelCase = {
+    controls: { broker_case: "Consensus" },
+    statement_structure: {
+      income_statement: [{
+        row_id: "revenue",
+        semantic_role: "revenue",
+        broker_metric_id: "revenue",
+        forecast_treatment: "broker",
+      }],
+      cash_flow: [],
+    },
+  };
   applyBrokerPreviewSelection(modelCase, preview, accepted);
   assert(modelCase.controls.broker_case === "Forecast Waterfall", "forecast-waterfall selection was not applied");
+  const zeroAuthorityPreview = clone(preview);
+  zeroAuthorityPreview.broker_authority_policy = "zero_broker";
+  zeroAuthorityPreview.preview_sha256 = brokerPreviewSha256(zeroAuthorityPreview);
+  const zeroAuthorityConfirmation = confirmation(
+    zeroAuthorityPreview,
+    "FORECAST_WATERFALL",
+  );
+  const zeroAuthorityModelCase = clone(modelCase);
+  applyBrokerPreviewSelection(
+    zeroAuthorityModelCase,
+    zeroAuthorityPreview,
+    zeroAuthorityConfirmation,
+  );
+  assert(
+    zeroAuthorityModelCase.statement_structure.income_statement[0]
+      .broker_metric_id === "revenue" &&
+      zeroAuthorityModelCase.statement_structure.income_statement[0]
+        .forecast_treatment !== "broker",
+    "zero-broker selection erased the rejected metric evidence binding or left it as live authority",
+  );
   assert(
     resolveBrokerForecastSelection(modelCase, "revenue", 0).value === null,
     "forecast-waterfall mode consumed a broker cell",
   );
+  const compatibleEvidence = {
+    lanes: {
+      controls: { broker_case: "Consensus" },
+      broker_pack: {
+        metrics: {
+          revenue: {
+            brokers: {
+              "Supplemental A": [100, 110, 120],
+              "Supplemental B": [102, 112, 122],
+            },
+          },
+        },
+      },
+    },
+  };
+  const projected = applyBrokerPreviewSelectionToCaseEvidence(
+    compatibleEvidence,
+    preview,
+    accepted,
+  );
+  assert(
+    projected.suppressed_observation_count === 0 &&
+      projected.case_evidence.lanes.broker_pack.metrics.revenue
+        .brokers["Supplemental A"][0] === 100,
+    "forecast-waterfall projection erased compatible supplemental broker evidence",
+  );
   const screen = renderBrokerPreviewScreen(preview);
   assert(screen.includes("FORECAST WATERFALL"), "degraded preview screen hides the selected authority mode");
+});
+
+await test("forecast-waterfall mode consumes compatible broker evidence when it exists", () => {
+  const modelCase = {
+    issuer: {
+      accounting_basis: "IFRS",
+      reporting_currency: "GBP",
+      units: "millions",
+      fiscal_calendar: "fixed_date",
+    },
+    controls: { broker_case: "Forecast Waterfall" },
+    broker_pack: {
+      metrics: {
+        revenue: {
+          brokers: {
+            "House A": [100, 110, 120],
+            "House B": [102, 112, 122],
+          },
+        },
+        ebit: {
+          brokers: {
+            "House A": [20, 21, 22],
+            "House B": [19, 20, 21],
+          },
+        },
+        depreciation_and_amortisation: {
+          brokers: {
+            "House A": [5, 5, 6],
+            "House B": [4, 5, 5],
+          },
+        },
+      },
+    },
+  };
+  const selection = resolveBrokerForecastSelection(modelCase, "revenue", 0);
+  assert(selection.value === 101, `forecast waterfall rejected compatible broker evidence: ${selection.value}`);
+  assert(
+    selection.source_kind === "named_house_mean",
+    `forecast waterfall did not disclose its broker authority: ${selection.source_kind}`,
+  );
+  const anchor = selectBrokerAnchor(modelCase);
+  assert(anchor.supported, "forecast-waterfall label disabled a fully supported broker anchor");
 });
 
 await test("named-house gaps never mix to consensus while explicit consensus remains available", () => {

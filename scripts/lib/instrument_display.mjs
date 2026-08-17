@@ -1,3 +1,5 @@
+import { debtClassTypeLabel } from "./debt_class.mjs";
+
 /**
  * Presentation-only instrument labels.
  *
@@ -124,6 +126,7 @@ const CLASS_GENERIC_TYPE = Object.freeze({
 });
 
 function declaredInstrumentType(instrument) {
+  if (instrument?.class) return debtClassTypeLabel(instrument.class);
   const declared = String(
     instrument?.instrument_type ?? instrument?.type ?? "",
   ).trim();
@@ -206,130 +209,34 @@ export function compactInstrumentName(instrument) {
 // basis is genuinely native principal — a reporting-currency carrying value
 // must never read as foreign-currency nominal.
 export function instrumentDisplayLabel(instrument, reportingCurrency = null) {
-  let name = compactInstrumentName(instrument);
-
-  // A reporting-currency carrying value may state its amount in the
-  // reporting currency — "$80m" on a USD-reporting issuer is honest — but it
-  // must never wear a FOREIGN currency prefix, which would read as native
-  // nominal. Only the foreign-claim form is stripped.
-  const amountToken = name.match(CURRENCY_AMOUNT_TOKEN);
-  if (
-    instrument?.balance_basis === "reporting_currency_carrying_value" &&
-    amountToken
-  ) {
-    const symbolCurrency = amountToken[0].includes("€")
-      ? "EUR"
-      : amountToken[0].includes("£")
-        ? "GBP"
-        : amountToken[0].includes("$")
-          ? "USD"
-          : null;
-    const tokenCurrency = (amountToken[1] ?? symbolCurrency ?? "").toUpperCase();
-    const claimsForeign =
-      tokenCurrency &&
-      reportingCurrency &&
-      tokenCurrency !== String(reportingCurrency).toUpperCase();
-    if (claimsForeign) {
-      name = name.replace(CURRENCY_AMOUNT_TOKEN, "").trim();
-    }
-  }
-
-  // Verify, never reformat: an authored token that AGREES with the
-  // structured field keeps its exact authored spelling (the authority
-  // replay depends on byte-stable labels); only a token proved wrong by
-  // the audited fields is replaced.
-  const structuredPercent =
-    ["floating", "unpriced"].includes(instrument?.rate_type)
-      ? null
-      : Number(instrument?.coupon_or_all_in_rate?.[0]) * 100;
-  if (
-    Number.isFinite(structuredPercent) &&
-    structuredPercent !== 0 &&
-    RATE_TOKEN.test(name)
-  ) {
-    const authoredPercent = parseAuthoredPercent(name.match(RATE_TOKEN)[0]);
-    if (
-      authoredPercent !== null &&
-      Math.abs(authoredPercent - structuredPercent) > 0.0005
-    ) {
-      name = name.replace(
-        RATE_TOKEN,
-        formatRatePercentCorrection(instrument?.coupon_or_all_in_rate?.[0]),
-      );
-    }
-  }
-
-  const structuredMaturity = formatMaturity(instrument?.maturity_date);
-  const maturityDateMatch = String(instrument?.maturity_date ?? "").match(
-    /^(\d{4})-(\d{2})/,
-  );
-  if (structuredMaturity && maturityDateMatch && MATURITY_TOKEN.test(name)) {
-    const authored = parseAuthoredMaturity(name.match(MATURITY_TOKEN)[0]);
-    const structuredYear = Number(maturityDateMatch[1]);
-    const structuredMonth = Number(maturityDateMatch[2]);
-    const agrees =
-      authored !== null &&
-      authored.year === structuredYear &&
-      (authored.month === null || authored.month === structuredMonth);
-    // The machine-ordered "due 2027-03" spelling never appears in an
-    // authority label; even when it agrees it normalises to the analyst
-    // form. Every other agreeing spelling is preserved byte-for-byte.
-    const machineOrdered = /due\s+\d{4}[-/]\d{1,2}/i.test(
-      name.match(MATURITY_TOKEN)[0],
+  void reportingCurrency;
+  const type = debtClassTypeLabel(instrument?.class);
+  let rate = null;
+  if (instrument?.rate_type === "floating") {
+    const benchmark = String(
+      instrument?.benchmark ?? instrument?.reference_rate ?? "Floating rate",
+    ).trim();
+    const spread = Number(instrument?.spread_bps ?? instrument?.margin_bps ?? 0);
+    rate = spread ? `${benchmark} + ${spread}bp` : benchmark;
+  } else if (instrument?.rate_type !== "unpriced") {
+    const candidates = [
+      ...(instrument?.coupon_or_all_in_rate ?? []),
+      instrument?.coupon_rate,
+      instrument?.all_in_rate,
+    ];
+    const statedRate = candidates.find(
+      (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
     );
-    if (!agrees || machineOrdered) {
-      name = name.replace(MATURITY_TOKEN, `due ${structuredMaturity}`);
-    }
+    rate = formatRatePercent(statedRate);
   }
-
-  // The contract is TYPE + RATE + MATURITY, in that order. An appended rate
-  // must therefore land BEFORE a bare trailing year the name already carries,
-  // or an identifier-derived label reads "Senior notes 2030 4.35%".
-  const trailingYear = name.match(/\s(\d{4})$/);
-  if (trailingYear && !RATE_TOKEN.test(name) && !/\d\s*bps/i.test(name)) {
-    name = name.slice(0, trailingYear.index).trim();
-    const rate =
-      instrument?.rate_type === "floating" && instrument?.benchmark
-        ? Number(instrument.spread_bps ?? 0)
-          ? `${instrument.benchmark}+${instrument.spread_bps}bps`
-          : String(instrument.benchmark)
-        : instrument?.rate_type === "unpriced"
-          ? null
-          : formatRatePercent(instrument?.coupon_or_all_in_rate?.[0]);
-    name = [name, rate, trailingYear[1]].filter(Boolean).join(" ");
+  let maturity = null;
+  const maturityDate = String(instrument?.maturity_date ?? "");
+  if (instrument?.maturity_treatment === "non_maturing_within_forecast") {
+    maturity = "non-maturing";
+  } else if (/^\d{4}/.test(maturityDate)) {
+    maturity = instrument?.maturity_precision === "year"
+      ? `due ${maturityDate.slice(0, 4)}`
+      : `due ${formatMaturity(maturityDate) ?? maturityDate.slice(0, 4)}`;
   }
-  const parts = [name];
-  const hasRate = RATE_TOKEN.test(name) || /\d\s*bps/i.test(name);
-  if (!hasRate) {
-    if (instrument?.rate_type === "unpriced") {
-      // Pricing is deliberately absent and captured by the visible residual
-      // interest bridge; never manufacture a 0% token in the instrument name.
-    } else if (instrument?.rate_type === "floating" && instrument?.benchmark) {
-      const spread = Number(instrument.spread_bps ?? 0);
-      parts.push(
-        spread
-          ? `${instrument.benchmark}+${spread}bps`
-          : String(instrument.benchmark),
-      );
-    } else {
-      const rate = formatRatePercent(instrument?.coupon_or_all_in_rate?.[0]);
-      if (rate) parts.push(rate);
-    }
-  }
-
-  const maturityYear = instrument?.maturity_date
-    ? String(instrument.maturity_date).slice(0, 4)
-    : null;
-  const maturityYearShort = maturityYear?.slice(-2);
-  const hasMaturity =
-    MATURITY_TOKEN.test(name) ||
-    Boolean(maturityYear && name.includes(maturityYear)) ||
-    Boolean(
-      maturityYearShort &&
-        new RegExp(`(?:^|\\D)\\d{1,2}[/-]${maturityYearShort}(?:\\D|$)`).test(
-          name,
-        ),
-    );
-  if (maturityYear && !hasMaturity) parts.push(maturityYear);
-  return fitInstrumentText(parts.join(" "));
+  return fitInstrumentText([type, rate, maturity].filter(Boolean).join(" "));
 }

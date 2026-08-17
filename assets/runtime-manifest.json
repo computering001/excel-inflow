@@ -1,14 +1,14 @@
 {
   "schema_version": 2,
   "skill_name": "excel-inflow",
-  "skill_version": "3.6.0",
+  "skill_version": "3.7.0",
   "template_version": "4.0.0-dynamic",
   "model_case_schema_version": 2,
   "row_taxonomy_version": 3,
   "validation_policy_version": 3,
   "status": "v2_development",
-  "deployment_status": "local_integration_candidate",
-  "certification_invalidated_reason": "Excel Inflow v3.6 changes filing topology, broker demand/selection, forecast authority, transaction funding, carrier identity, runtime tracing and evidence orchestration. Fresh installed-Rogo, native Excel and human visual evidence are required before production certification.",
+  "deployment_status": "not_installed",
+  "certification_invalidated_reason": "Excel Inflow v3.7 repairs filing topology and custody, broker demand and source security, forecast authority, debt and interest lineage, acquisition economics, package identity, runtime custody and workbook-native compatibility. Fresh installed-Rogo, native Excel and human visual evidence are required before production certification.",
   "deployment_requires_explicit_user_approval": true,
   "certification_requires": [
     "lossless_attachment_evidence",

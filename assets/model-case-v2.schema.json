@@ -93,6 +93,30 @@
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9_-]*$"
     },
+    "selected_ebitda_basis": {
+      "$ref": "#/$defs/ebitdaBasis",
+      "description": "The exact reported or company-adjusted EBITDA definition consumed by leverage, coverage, acquisition and FCF conversion. Legacy schedule IDs do not override this semantic authority."
+    },
+    "debt_class_contract_version": {
+      "const": "debt-class-ontology/1.0"
+    },
+    "debt_class_migrations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instrument_id", "source_class", "canonical_class", "mapping"],
+        "properties": {
+          "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "source_class": { "type": ["string", "null"] },
+          "canonical_class": {
+            "enum": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "rcf", "commercial_paper", "securitisation", "lease_liability", "overdraft", "other_explicit", "unclassified"]
+          },
+          "mapping": { "enum": ["legacy_alias", "unrecognised_to_review"] }
+        }
+      }
+    },
     "stage_three_answers": {
       "type": "object",
       "description": "Canonical settled stage-3 decisions carried by the case across chats and rebuilds. Keys are stable question IDs and values are stable option IDs.",
@@ -1167,6 +1191,11 @@
           "minimum": 0,
           "description": "Opening drawn balance in the matched RCF instrument's native currency. It must equal that instrument's opening_balance before any FX translation."
         },
+        "commercial_paper_backstopped": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether outstanding commercial paper consumes the named RCF's liquidity headroom. This changes liquidity only; it never reclassifies commercial paper as another debt class."
+        },
         "commitment_fee_convention": {
           "enum": [
             "none",
@@ -1401,6 +1430,10 @@
     },
     "other_interest": {
       "$ref": "#/$defs/series3"
+    },
+    "other_interest_authority": {
+      "$ref": "#/$defs/residualInterestAuthority",
+      "description": "Forecast authority for a non-zero Other / unallocated interest series. A zero series may omit the object and resolves to an explicit zero authority."
     },
     "non_cash_interest": {
       "$ref": "#/$defs/series3"
@@ -1833,12 +1866,46 @@
           "minimum": 0,
           "maximum": 1
         },
+        "selection_rank": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method_priority",
+            "definition_score",
+            "period_score",
+            "units_score",
+            "freshness_timestamp",
+            "confidence_score",
+            "completeness_score",
+            "stable_id"
+          ],
+          "properties": {
+            "method_priority": { "type": "number" },
+            "definition_score": { "type": "number" },
+            "period_score": { "type": "number" },
+            "units_score": { "type": "number" },
+            "freshness_timestamp": { "type": "number" },
+            "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+            "completeness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+            "stable_id": { "type": "string" }
+          },
+          "description": "Canonical economic quality proof used to resolve equal-rung candidates before the stable identifier tie-break."
+        },
         "material": {
           "type": "boolean"
         },
         "note": {
           "type": "string",
           "minLength": 1
+        },
+        "broker_rejection_reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Explicit reasons compatible broker authority was unavailable or rejected before the selected forecast-waterfall fallback was used."
         },
         "zero_basis": {
           "enum": [
@@ -1922,6 +1989,56 @@
         }
       }
     },
+    "ebitdaBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semantic_role",
+        "label",
+        "adjustment_basis",
+        "derivation",
+        "source_row_ids",
+        "impairment_included"
+      ],
+      "properties": {
+        "row_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "semantic_role": {
+          "enum": ["reported_ebitda", "adjusted_ebitda"]
+        },
+        "label": {
+          "enum": ["EBITDA", "Adjusted EBITDA"]
+        },
+        "margin_label": {
+          "enum": ["EBITDA margin", "Adjusted EBITDA margin"]
+        },
+        "adjustment_basis": {
+          "enum": ["reported", "company_adjusted"]
+        },
+        "derivation": {
+          "enum": [
+            "company_reported",
+            "company_adjusted_ebit_plus_compatible_da",
+            "reported_ebit_plus_compatible_da",
+            "declared_formula"
+          ]
+        },
+        "source_row_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        },
+        "impairment_included": {
+          "const": false
+        }
+      }
+    },
     "statementRow": {
       "type": "object",
       "additionalProperties": false,
@@ -1962,8 +2079,44 @@
           "$ref": "#/$defs/series3",
           "description": "Filed historical total retained only for a reported_total_reconciled row. The workbook emits the declared formula, and validation proves that formula against these three source totals."
         },
+        "historical_value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          },
+          "description": "Source-visible state of each historical cell. Only reported_zero licenses numeric zero; null-valued states remain distinct."
+        },
+        "reported_historical_value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          },
+          "description": "Typed filed states retained as reconciliation evidence when a historical total is formula-owned."
+        },
         "semantic_role": {
           "type": "string"
+        },
+        "ebitda_basis": {
+          "$ref": "#/$defs/ebitdaBasis",
+          "description": "Provenance for an EBITDA row. Derivation status lives here; the visible label states the economic measure without proxy wording."
         },
         "role_aliases": {
           "type": "array",
@@ -2335,6 +2488,16 @@
         "table_context": {
           "type": "string"
         },
+        "numeric_type": {
+          "enum": [
+            "currency",
+            "percentage",
+            "multiple",
+            "count",
+            "date",
+            "text"
+          ]
+        },
         "classification_status": {
           "enum": [
             "accepted",
@@ -2369,8 +2532,12 @@
                 "enum": [
                   "label",
                   "context",
+                  "statement",
                   "hierarchy",
                   "numeric",
+                  "numeric_type",
+                  "definition_basis",
+                  "structure",
                   "negative"
                 ]
               },
@@ -2853,12 +3020,17 @@
         },
         "class": {
           "enum": [
-            "fixed_bond",
-            "floating_loan",
+            "bond_fixed",
+            "bond_floating",
+            "term_loan_fixed",
+            "term_loan_floating",
             "commercial_paper",
             "securitisation",
             "rcf",
-            "other_debt"
+            "lease_liability",
+            "overdraft",
+            "other_explicit",
+            "unclassified"
           ]
         },
         "currency": {
@@ -3052,6 +3224,36 @@
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_.-]*$"
           }
+        }
+      }
+    },
+    "residualInterestAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "method", "basis_note"],
+      "properties": {
+        "contract_version": {
+          "const": "residual-interest-authority/1.0"
+        },
+        "method": {
+          "enum": [
+            "zero",
+            "explicit_forecast_assumption",
+            "historical_residual_carry",
+            "broker_or_guidance"
+          ]
+        },
+        "basis_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },

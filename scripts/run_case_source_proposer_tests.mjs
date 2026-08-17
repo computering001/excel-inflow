@@ -5,6 +5,7 @@ import {
   writeRuntimeEvidenceLanes,
 } from "./lib/case_source_proposer.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
+import { compileCase } from "./lib/case_compiler.mjs";
 
 function manifest(statement, rows) {
   const value = {
@@ -58,7 +59,7 @@ assert.equal(result.statement_map.income_statement.length, 5);
 assert.equal(result.statement_map.cash_flow.length, 10);
 assert.equal(result.statement_map.income_statement[0].role, "revenue");
 assert.equal(result.statement_map.income_statement[0].broker_metric_id, "revenue");
-assert.equal(result.statement_map.income_statement[2].role, "ebit");
+assert.equal(result.statement_map.income_statement[2].role, "operating_profit");
 assert.equal(result.statement_map.income_statement[3].role, "is_da_expense");
 assert.equal(result.statement_map.income_statement[4].role, "net_income");
 assert.equal(result.statement_map.cash_flow[0].role, "cash_flow_net_income");
@@ -79,6 +80,122 @@ assert.equal(new Set([
   ...result.statement_map.income_statement,
   ...result.statement_map.cash_flow,
 ].map((row) => row.row_id)).size, 15);
+
+const fxCashFlow = manifest("cash_flow", [
+  {
+    source_line_id: "cf.fx_effect",
+    ordinal: 1,
+    raw_label: "Effect of exchange rate changes on cash",
+    values: [1, -2, 3],
+    material: true,
+  },
+]);
+const fxEvidence = structuredClone(evidence);
+fxEvidence.face_statement_manifests.cash_flow = [fxCashFlow];
+const fxSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "FX Identity Test plc", reporting_currency: "GBP" },
+  },
+  caseEvidence: fxEvidence,
+});
+assert.equal(
+  fxSource.statement_map.cash_flow[0].role,
+  "fx_effect_on_cash",
+  "A filed FX effect line lost the semantic role required by the cash identity.",
+);
+
+const typedIncome = manifest("income_statement", [
+  {
+    source_line_id: "is.unresolved_body",
+    ordinal: 1,
+    raw_label: "Unresolved operating movement",
+    values: [null, null, null],
+    value_states: ["unresolved", "unresolved", "unresolved"],
+    structural_role: "body",
+    material: true,
+  },
+  {
+    source_line_id: "is.positive_heading",
+    ordinal: 2,
+    raw_label: "Operating components",
+    values: [null, null, null],
+    value_states: ["reported_blank", "reported_blank", "reported_blank"],
+    structural_role: "header",
+    material: false,
+  },
+  {
+    source_line_id: "is.explicit_zero",
+    ordinal: 3,
+    raw_label: "Explicit nil movement",
+    values: [0, 0, 0],
+    value_states: ["reported_zero", "reported_zero", "reported_zero"],
+    structural_role: "body",
+    material: false,
+  },
+  {
+    source_line_id: "is.core_operating_profit",
+    ordinal: 4,
+    raw_label: "Core operating profit",
+    values: [11, 12, 13],
+    value_states: ["reported_number", "reported_number", "reported_number"],
+    structural_role: "body",
+    material: true,
+  },
+  {
+    source_line_id: "is.combined_da_impairment",
+    ordinal: 5,
+    raw_label: "Depreciation, amortisation and impairment",
+    values: [-4, -5, -6],
+    value_states: ["reported_number", "reported_number", "reported_number"],
+    structural_role: "body",
+    material: true,
+  },
+]);
+const typedEvidence = structuredClone(evidence);
+typedEvidence.face_statement_manifests.income_statement = [typedIncome];
+const typedSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Typed Value Test plc", reporting_currency: "GBP" },
+  },
+  caseEvidence: typedEvidence,
+});
+assert.equal(
+  typedSource.statement_map.income_statement[0].header,
+  undefined,
+  "An unresolved body row was promoted to a presentation header.",
+);
+assert.equal(
+  typedSource.statement_map.income_statement[1].header,
+  true,
+  "Positive structural header evidence was not preserved.",
+);
+assert.notEqual(
+  faceStatementManifestDigest({
+    ...typedIncome,
+    rows: typedIncome.rows.map((row, index) =>
+      index === 0
+        ? { ...row, value_states: ["reported_zero", "unresolved", "unresolved"] }
+        : row,
+    ),
+  }),
+  typedIncome.rows_sha256,
+  "The manifest seal did not bind typed value states.",
+);
+assert.deepEqual(
+  typedIncome.rows[2].values,
+  [0, 0, 0],
+  "Explicit reported zero was not preserved as numeric zero.",
+);
+assert.equal(
+  typedSource.statement_map.income_statement[3].role,
+  "adjusted_ebit",
+  "Company-adjusted operating profit collapsed into statutory EBIT.",
+);
+assert.equal(
+  typedSource.statement_map.income_statement[4].role,
+  "depreciation_amortisation_and_impairment",
+  "A combined impairment line was admitted as pure D&A.",
+);
 
 const attributionIncome = manifest("income_statement", [
   { source_line_id: "is.net", ordinal: 1, raw_label: "Profit for the period", values: [100, 110, 120], material: true },
@@ -154,6 +271,16 @@ assert.deepEqual(
   [24, 26, 30],
   "The runtime writer did not derive the filed EBIT plus D&A bridge.",
 );
+assert.equal(
+  runtimeLanes.selected_ebitda_basis.semantic_role,
+  "reported_ebitda",
+  "Statutory EBIT plus compatible D&A was mislabeled as adjusted EBITDA.",
+);
+assert.equal(
+  runtimeLanes.selected_ebitda_basis.derivation,
+  "reported_ebit_plus_compatible_da",
+  "The selected EBITDA derivation was not sealed in provenance.",
+);
 assert.deepEqual(
   runtimeLanes.operating_metrics.capex.values.slice(0, 3),
   [5, 6, 7],
@@ -164,6 +291,76 @@ assert.deepEqual(runtimeLanes.debt_reconciliation.reported_opening_gross_debt, [
 assert.deepEqual(runtimeLanes.historical_supplement.prior_cash_and_cash_equivalents, [10, 12]);
 assert.equal(runtimeLanes.provenance.revenue.length, 3);
 assert.equal(runtimeLanes.provenance.revenue[0].document, income.source_id);
+
+const compiledBasisCase = compileCase(
+  result,
+  firstRunEvidence.case_evidence,
+).model_case;
+const compiledIncome = compiledBasisCase.statement_structure.income_statement;
+const compiledEbitda = compiledIncome.find(
+  (row) => row.semantic_role === "reported_ebitda",
+);
+assert(compiledEbitda, "The compiler did not type statutory EBIT plus D&A as reported EBITDA.");
+assert.equal(compiledEbitda.label, "EBITDA");
+assert.equal(compiledBasisCase.selected_ebitda_basis.row_id, compiledEbitda.row_id);
+assert.equal(compiledBasisCase.selected_ebitda_basis.impairment_included, false);
+const compiledFcfConversion = compiledBasisCase.statement_structure.cash_flow.find(
+  (row) => row.row_id === "free_cash_flow_conversion",
+);
+assert.equal(
+  compiledFcfConversion?.calculation?.refs?.[1],
+  compiledEbitda.row_id,
+  "FCF conversion did not consume the selected reported-EBITDA basis.",
+);
+
+const unsupportedIncome = manifest(
+  "income_statement",
+  income.rows.filter((row) => row.source_line_id !== "is.da"),
+);
+const unsupportedCashFlow = manifest(
+  "cash_flow",
+  cashFlow.rows.filter((row) => row.source_line_id !== "cf.da"),
+);
+const unsupportedCaseEvidence = {
+  face_statement_manifests: {
+    income_statement: [unsupportedIncome],
+    cash_flow: [unsupportedCashFlow],
+  },
+  lanes: { broker_pack: { metrics: { revenue: {} } } },
+};
+const unsupportedSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Unsupported EBITDA Test plc", reporting_currency: "GBP" },
+    consumption: {}, policies: {}, answers: [],
+  },
+  caseEvidence: unsupportedCaseEvidence,
+});
+const unsupportedRun = {
+  filings: structuredClone(firstRunEvidence.filings),
+  source_inventory: [unsupportedIncome, unsupportedCashFlow].map((item) => ({
+    source_id: item.source_id,
+    publication_date: "2026-03-01",
+  })),
+  broker_pack: {},
+  case_evidence: unsupportedCaseEvidence,
+};
+writeRuntimeEvidenceLanes({ evidence: unsupportedRun, caseSource: unsupportedSource });
+assert.equal(
+  unsupportedRun.case_evidence.lanes.selected_ebitda_basis,
+  undefined,
+  "The runtime writer invented an EBITDA basis without compatible D&A.",
+);
+const unsupportedCompiled = compileCase(
+  unsupportedSource,
+  unsupportedRun.case_evidence,
+).model_case;
+assert.equal(
+  unsupportedCompiled.statement_structure.income_statement.some((row) =>
+    ["reported_ebitda", "adjusted_ebitda"].includes(row.semantic_role),
+  ),
+  false,
+  "The compiler invented an unsupported EBITDA row.",
+);
 
 const richerEvidence = structuredClone(firstRunEvidence);
 const sealedOperatingLane = {
@@ -181,4 +378,4 @@ assert.deepEqual(
   "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 36 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 51 }, null, 2));

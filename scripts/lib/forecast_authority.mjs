@@ -36,6 +36,109 @@ export const FORECAST_AUTHORITY_METHODS = Object.freeze([
   "not_applicable",
 ]);
 
+function rankBoolean(value) {
+  if (value === true) return 2;
+  if (value === false) return 0;
+  return 1;
+}
+
+function rankNumber(value, fallback = 0) {
+  return Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+
+function rankDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return 0;
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function stableCandidateId(candidate) {
+  return String(
+    candidate?.stable_id ??
+      candidate?.observation_id ??
+      candidate?.source_id ??
+      `${candidate?.origin ?? "candidate"}:${candidate?.method ?? "unknown"}`,
+  );
+}
+
+function effectiveForecastPriority(candidate) {
+  if (candidate.method !== "explicit_zero") {
+    if (Object.hasOwn(FORECAST_AUTHORITY_PRIORITY, candidate.method)) {
+      return FORECAST_AUTHORITY_PRIORITY[candidate.method];
+    }
+    if (candidate.method === "schedule_link") return -200;
+    if (candidate.method === "accounting_identity") return -190;
+    if (candidate.method === "not_separately_forecast") return 900;
+    if (candidate.method === "not_applicable") return 910;
+    return 998;
+  }
+  // A sourced no-recurrence statement is positive evidence, not the weak
+  // last-rung inference represented by an unexplained zero.
+  if (candidate.source_kind === "company_reported") return 35;
+  if (candidate.source_kind === "user_supplied") return 60;
+  return FORECAST_AUTHORITY_PRIORITY.explicit_zero;
+}
+
+/**
+ * Return the complete deterministic rank proof for one independent forecast
+ * candidate. Compatibility dimensions deliberately precede evidence freshness
+ * and strength; the stable identifier is only the final deterministic tie.
+ */
+export function forecastAuthorityRankVector(candidate) {
+  return {
+    method_priority: effectiveForecastPriority(candidate),
+    definition_score: rankBoolean(candidate?.definition_compatible),
+    period_score:
+      rankBoolean(candidate?.period_compatible) +
+      Math.max(0, Math.min(1, rankNumber(candidate?.period_completeness))),
+    units_score: rankBoolean(candidate?.units_compatible),
+    freshness_timestamp: rankDate(
+      candidate?.freshness_date ??
+        candidate?.source_publication_date ??
+        candidate?.publication_date ??
+        candidate?.as_of_date,
+    ),
+    confidence_score: Math.max(
+      0,
+      Math.min(1, rankNumber(candidate?.confidence)),
+    ),
+    completeness_score: Math.max(
+      0,
+      Math.min(1, rankNumber(candidate?.completeness)),
+    ),
+    stable_id: stableCandidateId(candidate),
+  };
+}
+
+const FORECAST_RANK_DIMENSIONS = Object.freeze([
+  ["method_priority", 1],
+  ["definition_score", -1],
+  ["period_score", -1],
+  ["units_score", -1],
+  ["freshness_timestamp", -1],
+  ["confidence_score", -1],
+  ["completeness_score", -1],
+]);
+
+export function compareForecastAuthorityCandidates(left, right) {
+  const leftRank = forecastAuthorityRankVector(left);
+  const rightRank = forecastAuthorityRankVector(right);
+  for (const [dimension, direction] of FORECAST_RANK_DIMENSIONS) {
+    const difference = leftRank[dimension] - rightRank[dimension];
+    if (difference !== 0) return difference * direction;
+  }
+  return leftRank.stable_id.localeCompare(rightRank.stable_id);
+}
+
+export function forecastAuthorityDecidingDimension(winner, rejected) {
+  const winnerRank = forecastAuthorityRankVector(winner);
+  const rejectedRank = forecastAuthorityRankVector(rejected);
+  for (const [dimension] of FORECAST_RANK_DIMENSIONS) {
+    if (winnerRank[dimension] !== rejectedRank[dimension]) return dimension;
+  }
+  return winnerRank.stable_id !== rejectedRank.stable_id ? "stable_id" : "exact_tie";
+}
+
 const FORMULA_METHODS = new Set([
   "schedule_link",
   "accounting_identity",
@@ -59,6 +162,36 @@ const UNCALCULATED_METHODS = new Set([
   "not_separately_forecast",
   "not_applicable",
 ]);
+
+const PROTECTED_SAME_PERIOD_CASH_FLOW_ROLES = new Set([
+  "cash_generated_from_operations",
+  "cash_from_operations",
+  "cash_from_investing",
+  "cash_before_financing",
+  "cash_from_financing",
+  "net_change_in_cash",
+]);
+
+const SAME_PERIOD_IDENTITY_OPERATORS = new Set([
+  "sum",
+  "subtract",
+  "negate_sum",
+  "negate",
+  "link",
+]);
+
+const DIMENSIONLESS_STATEMENT_OPERATORS = new Set([
+  "growth",
+  "ratio",
+  "negated_ratio",
+]);
+
+function isAdditiveAmountRow(row) {
+  if (DIMENSIONLESS_STATEMENT_OPERATORS.has(row?.calculation?.operator)) {
+    return false;
+  }
+  return !row?.number_format || row.number_format === "amount";
+}
 
 const MATERIALITY_REQUIRED_METHODS = new Set([
   "actual_plus_remainder",
@@ -505,26 +638,7 @@ export function selectForecastAuthority(candidates) {
       candidate &&
       Object.hasOwn(FORECAST_AUTHORITY_PRIORITY, candidate.method),
   );
-  const effectivePriority = (candidate) => {
-    if (candidate.method !== "explicit_zero") {
-      return FORECAST_AUTHORITY_PRIORITY[candidate.method];
-    }
-    // A sourced no-recurrence statement is positive evidence, not the weak
-    // last-rung inference represented by an unexplained zero.  Company-backed
-    // zero therefore sits with company indications (but below explicit
-    // guidance), while a user-backed zero sits with visible user assumptions.
-    // Historical/unsourced zeros deliberately remain the weakest resolved
-    // candidate.  This prevents a generic carry-forward from overruling a
-    // cited statement that a programme or commitment has ended.
-    if (candidate.source_kind === "company_reported") return 35;
-    if (candidate.source_kind === "user_supplied") return 60;
-    return FORECAST_AUTHORITY_PRIORITY.explicit_zero;
-  };
-  return [...usable].sort(
-    (left, right) =>
-      effectivePriority(left) - effectivePriority(right) ||
-      String(left.source_id ?? "").localeCompare(String(right.source_id ?? "")),
-  )[0] ?? null;
+  return [...usable].sort(compareForecastAuthorityCandidates)[0] ?? null;
 }
 
 export function validateForecastAuthorities(modelCase, rows = []) {
@@ -925,6 +1039,192 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         errors.push(
           `${label} declares semantic_event_nonrecurrence without the required structured event role, source convention and as-of date.`,
         );
+      }
+    }
+  }
+
+  // Cash-flow activity totals are protected same-period identities, never
+  // independent forecast series. This source-level rule is the semantic twin
+  // of the workbook oracle: even a syntactically valid, fully receipted carry
+  // cannot replace the current-period activity equation.
+  const cashFlowRows = modelCase?.statement_structure?.cash_flow ?? [];
+  const cashFlowById = new Map(cashFlowRows.map((row) => [row.row_id, row]));
+  const cashRole = (row) => canonicalSemanticRole(row?.semantic_role ?? row?.row_id);
+  const samePeriodRule = (rule, rowId) =>
+    SAME_PERIOD_IDENTITY_OPERATORS.has(rule?.operator) &&
+    (rule.refs ?? []).length > 0 &&
+    !(rule.refs ?? []).includes(rowId);
+  for (const row of cashFlowRows) {
+    const role = cashRole(row);
+    if (!PROTECTED_SAME_PERIOD_CASH_FLOW_ROLES.has(role)) continue;
+    if (!samePeriodRule(row.calculation, row.row_id)) {
+      errors.push(
+        `cash_flow.${row.row_id} is a protected cash-flow identity but its ` +
+        "historical rule is absent, temporal or self-referential.",
+      );
+    }
+    if (role === "cash_before_financing") {
+      const memberRoles = new Set(
+        (row.calculation?.refs ?? [])
+          .map((rowId) => cashRole(cashFlowById.get(rowId))),
+      );
+      const exact =
+        memberRoles.size === 2 &&
+        memberRoles.has("cash_from_operations") &&
+        memberRoles.has("cash_from_investing");
+      if (!exact) {
+        errors.push(
+          `cash_flow.${row.row_id} is a protected cash-flow identity and must ` +
+          "sum exactly current-period operating and investing cash flow.",
+        );
+      }
+    }
+    if (role === "cash_from_investing") {
+      const totalIndex = cashFlowRows.indexOf(row);
+      const headerIndex = cashFlowRows.findIndex(
+        (candidate) => candidate.row_id === "investing_activities",
+      );
+      if (headerIndex >= 0 && totalIndex > headerIndex) {
+        const band = cashFlowRows.slice(headerIndex + 1, totalIndex);
+        const bandIds = new Set(band.map((candidate) => candidate.row_id));
+        const nestedFormulaMemberIds = new Set(
+          band.filter(isAdditiveAmountRow).flatMap((candidate) =>
+            (candidate.calculation?.refs ?? []).filter((rowId) =>
+              bandIds.has(rowId),
+            ),
+          ),
+        );
+        const topLevelMembers = band
+          .filter(
+            (candidate) =>
+              candidate.row_type !== "header" &&
+              isAdditiveAmountRow(candidate) &&
+              !nestedFormulaMemberIds.has(candidate.row_id) &&
+              (!candidate.parent_row_id || !bandIds.has(candidate.parent_row_id)),
+          )
+          .map((candidate) => candidate.row_id)
+          .sort();
+        const actualMembers = [...(row.calculation?.refs ?? [])].sort();
+        if (
+          topLevelMembers.length === 0 ||
+          JSON.stringify(actualMembers) !== JSON.stringify(topLevelMembers)
+        ) {
+          errors.push(
+            `cash_flow.${row.row_id} is a protected cash-flow identity but ` +
+            "does not sum exactly the current-period top-level investing members.",
+          );
+        }
+      }
+    }
+    for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+      const authority = resolveForecastAuthority(modelCase, row, forecastIndex);
+      if (authority.method !== "accounting_identity") {
+        errors.push(
+          `cash_flow.${row.row_id} is a protected cash-flow identity but ` +
+          `forecast period ${forecastIndex + 1} selects ${authority.method}.`,
+        );
+      }
+      const rule = periodRule(row, forecastIndex);
+      if (rule && !samePeriodRule(rule, row.row_id)) {
+        errors.push(
+          `cash_flow.${row.row_id} is a protected cash-flow identity but its ` +
+          `forecast period ${forecastIndex + 1} rule is temporal or self-referential.`,
+        );
+      }
+    }
+  }
+
+  // A filed aggregate has exactly one forecast owner per period. If the
+  // parent selects an independent forecast, every complete child must stand
+  // down; if the children own the forecast, the parent must remain the live
+  // accounting identity over those children. This check is intentionally
+  // section-local and role-free so issuer-defined aggregates receive the same
+  // treatment as familiar revenue or working-capital totals.
+  const absentMethods = new Set([
+    "not_separately_forecast",
+    "not_applicable",
+    "unresolved",
+  ]);
+  const independentOwner = (authority) =>
+    authority &&
+    !absentMethods.has(authority.method) &&
+    !["accounting_identity", "schedule_link"].includes(authority.method);
+  for (const section of ["income_statement", "cash_flow"]) {
+    const sectionRows = modelCase?.statement_structure?.[section] ?? [];
+    const localById = new Map(sectionRows.map((row) => [row.row_id, row]));
+    const hierarchyChildren = new Map();
+    for (const row of sectionRows) {
+      if (!row.parent_row_id || !localById.has(row.parent_row_id)) continue;
+      const members = hierarchyChildren.get(row.parent_row_id) ?? [];
+      members.push(row);
+      hierarchyChildren.set(row.parent_row_id, members);
+    }
+    for (const parent of sectionRows) {
+      const formulaChildren = parent.calculation?.operator === "sum"
+        ? (parent.calculation.refs ?? [])
+            .map((rowId) => localById.get(rowId))
+            .filter(Boolean)
+        : [];
+      const childById = new Map(
+        [...formulaChildren, ...(hierarchyChildren.get(parent.row_id) ?? [])]
+          .map((row) => [row.row_id, row]),
+      );
+      const children = [...childById.values()];
+      const sourceVisibleIdentity =
+        parent.historical_authority === "reported_total_reconciled" &&
+        (parent.source_line_ids ?? []).length > 0 &&
+        children.every(
+          (child) =>
+            (child.source_line_ids ?? []).length > 0 &&
+            ["source_input", "reported_total_reconciled"].includes(
+              child.historical_authority,
+            ),
+        );
+      const isAggregate =
+        children.length >= 2 &&
+        (
+          ["reported_parent", "derived_from_children"].includes(
+            parent.aggregation_authority,
+          ) ||
+          sourceVisibleIdentity
+        );
+      if (!isAggregate) continue;
+      for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+        const parentAuthority = resolveForecastAuthority(
+          modelCase,
+          parent,
+          forecastIndex,
+        );
+        const childAuthorities = children.map((child) => ({
+          child,
+          authority: resolveForecastAuthority(modelCase, child, forecastIndex),
+        }));
+        if (independentOwner(parentAuthority)) {
+          const liveChildren = childAuthorities.filter(
+            ({ authority }) => !absentMethods.has(authority.method),
+          );
+          if (liveChildren.length > 0) {
+            errors.push(
+              `${section}.${parent.row_id} has mixed aggregate forecast ownership in ` +
+              `period ${forecastIndex + 1}: parent method ${parentAuthority.method} ` +
+              `coexists with live children ${liveChildren
+                .map(({ child, authority }) => `${child.row_id}:${authority.method}`)
+                .join(", ")}.`,
+            );
+          }
+        } else if (parentAuthority.method === "accounting_identity") {
+          const absentChildren = childAuthorities.filter(
+            ({ authority }) => absentMethods.has(authority.method),
+          );
+          if (absentChildren.length > 0) {
+            errors.push(
+              `${section}.${parent.row_id} has incomplete children-owned forecast ` +
+              `authority in period ${forecastIndex + 1}: ${absentChildren
+                .map(({ child, authority }) => `${child.row_id}:${authority.method}`)
+                .join(", ")}.`,
+            );
+          }
+        }
       }
     }
   }

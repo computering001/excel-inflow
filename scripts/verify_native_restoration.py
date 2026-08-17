@@ -29,7 +29,7 @@ PKG_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 REL_OFFICE_DOCUMENT = f"{DOC_REL_NS}/officeDocument"
 REL_WORKSHEET = f"{DOC_REL_NS}/worksheet"
 
-NATIVE_SCHEMA = "native-excel-restoration-evidence/3.1"
+NATIVE_SCHEMA = "native-excel-restoration-evidence/3.2"
 POLICY_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "assets",
@@ -100,6 +100,8 @@ class Snapshot:
     formulas: Dict[str, str]
     sheet_names: List[str]
     calculation_settings: Dict[str, str]
+    used_cells_scanned: int
+    excel_error_cells: Dict[str, str]
     formula_signature: str
     numeric_signature: str
     structure_signature: str
@@ -194,6 +196,8 @@ def snapshot(path: str) -> Snapshot:
         values: Dict[str, float] = {}
         formulas: Dict[str, str] = {}
         structure_parts: List[object] = []
+        used_cells = set()
+        excel_error_cells: Dict[str, str] = {}
         for sheet_name, part in sheets:
             root = ET.fromstring(package.read(part))
             shared_masters: Dict[str, Tuple[str, str]] = {}
@@ -203,6 +207,7 @@ def snapshot(path: str) -> Snapshot:
                 if not address:
                     continue
                 key = f"{sheet_name}!{address}"
+                used_cells.add(key)
                 formula = cell.find(qname(MAIN_NS, "f"))
                 if formula is not None:
                     formula_type = formula.attrib.get("t")
@@ -217,6 +222,10 @@ def snapshot(path: str) -> Snapshot:
                         formulas[key] = formula.text or ""
                 cell_type = cell.attrib.get("t")
                 value = cell.find(qname(MAIN_NS, "v"))
+                if cell_type == "e":
+                    excel_error_cells[key] = (
+                        value.text if value is not None and value.text else "__MISSING_ERROR_CODE__"
+                    )
                 if (
                     value is not None
                     and value.text not in (None, "")
@@ -278,6 +287,8 @@ def snapshot(path: str) -> Snapshot:
         formulas=formulas,
         sheet_names=sheet_names,
         calculation_settings=calculation_settings,
+        used_cells_scanned=len(used_cells),
+        excel_error_cells=excel_error_cells,
         formula_signature=hash_json(formulas),
         numeric_signature=hash_json(values),
         structure_signature=hash_json(structure_parts),
@@ -410,6 +421,19 @@ def verify_sequence(
     states = [snapshot(path) for path in safe_files]
     failures = []
     control_key = f"Operating Model!{control_cell}"
+
+    for index, state in enumerate(states, start=1):
+        if state.used_cells_scanned <= 0:
+            failures.append(f"state {index} all-worksheet error scan visited zero used cells")
+        if state.excel_error_cells:
+            preview = ", ".join(
+                f"{cell}={error}"
+                for cell, error in sorted(state.excel_error_cells.items())[:8]
+            )
+            failures.append(
+                f"state {index} contains {len(state.excel_error_cells)} Excel error "
+                f"cell(s) across all worksheets: {preview}"
+            )
 
     actual_controls = [
         int(value) if value in (0.0, 1.0) else value
@@ -585,6 +609,13 @@ def verify_sequence(
                 "path": os.path.relpath(state.path, canonical_root).replace(os.sep, "/")
                 if canonical_root else os.path.basename(state.path),
                 "sha256": state.sha256,
+                "worksheets_scanned": len(state.sheet_names),
+                "used_cells_scanned": state.used_cells_scanned,
+                "excel_error_count": len(state.excel_error_cells),
+                "excel_error_cells": [
+                    f"{cell}={error}"
+                    for cell, error in sorted(state.excel_error_cells.items())
+                ],
             }
             for state in states
         ],
@@ -772,7 +803,9 @@ def main() -> int:
         "verifier independently reads OOXML caches and expanded formulas, binds "
         "state 1 back to the exact candidate, and requires repeated ON and OFF "
         "states to restore across every numeric cell without changing formulas, "
-        "calculation settings, conditional formatting or data validation."
+        "calculation settings, conditional formatting or data validation. Every "
+        "serialized used cell on every worksheet is also scanned for native Excel "
+        "error types in every saved state."
     )
 
     def candidate_record(

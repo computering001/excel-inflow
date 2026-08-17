@@ -32,7 +32,7 @@
  *     `instruction_strip_rules_runtime` (currently empty — the compiled
  *     central instructions carry no local-only commands); when a rule exists,
  *     it must match exactly once and the result is asserted.
- *  3. A closure that has moved since certification. The certification gate no
+ *  3. A runtime-code closure that has moved since certification. The gate no
  *     longer trusts a hand-set string alone: it recomputes a hash over the
  *     resolved script and asset closure and names the paths that changed.
  *  4. A package that has not been executed. After writing, the release is
@@ -54,9 +54,9 @@
  *                            [--development --smoke-case <case.json>]
  *                            [--skip-smoke]
  *
- *   --certify     Record the current closure hash only after hash-bound local
- *                 certification evidence and a real clean-root workbook build
- *                 have both passed against these exact sources.
+ *   --certify     Build and smoke an immutable certified package, create its
+ *                 deterministic archive, then emit a separate hash-bound
+ *                 attestation. The package is never mutated after sealing.
  *   --development Build an explicitly uncertified candidate from a
  *                 v2_development source tree. A real clean-root workbook smoke
  *                 is still mandatory; this mode never records or claims
@@ -76,6 +76,19 @@ import {
   sha256File,
   validateReleaseCertificationEvidence,
 } from "./lib/release_certification.mjs";
+import {
+  assertPackageMode,
+  productIdentity,
+  runtimeCodeClosureIdentity,
+} from "./lib/identity_vocabulary.mjs";
+import {
+  assertExternalArtifactPath,
+  buildReleasePackageAttestation,
+  completePackageInventoryIdentity,
+  createDeterministicPackageArchive,
+  verifyReleasePackageAttestation,
+  writeExternalReleasePackageAttestation,
+} from "./lib/release_package_attestation.mjs";
 
 const BUILTINS = new Set(builtinModules);
 
@@ -177,6 +190,26 @@ if (!skillDir || !outputDir) {
   process.exit(2);
 }
 
+const attestationOutputPath = certifyNow
+  ? path.resolve(options["attestation-out"] ?? `${path.resolve(outputDir)}.attestation.json`)
+  : null;
+const archiveOutputPath = certifyNow
+  ? path.resolve(options["archive-out"] ?? `${path.resolve(outputDir)}.tar`)
+  : null;
+if (certifyNow) {
+  assertExternalArtifactPath(outputDir, attestationOutputPath, "Release-package attestation");
+  assertExternalArtifactPath(outputDir, archiveOutputPath, "Package archive");
+  if (attestationOutputPath === archiveOutputPath) {
+    throw new Error("Release-package attestation and package archive paths must be distinct.");
+  }
+  for (const [label, target] of [
+    ["Release-package attestation", attestationOutputPath],
+    ["Package archive", archiveOutputPath],
+  ]) {
+    if (await exists(target)) throw new Error(`${label} already exists: ${target}`);
+  }
+}
+
 const scriptsDir = path.join(skillDir, "scripts");
 const assetsDir = path.join(skillDir, "assets");
 const referencesDir = path.join(skillDir, "references");
@@ -233,6 +266,47 @@ const pythonEntryPointNotes = deploymentProfile.python_entry_point_notes ?? {};
 const pythonEntrySmoke = deploymentProfile.python_entry_point_smoke ?? {};
 const pythonRuntime = deploymentProfile.python_runtime ?? {};
 const readerDecision = deploymentProfile.xlsx_reader_consolidation_decision ?? null;
+const packageMode = assertPackageMode(developmentNow ? "development" : "certified");
+
+function gitIdentity(args, environmentName) {
+  const override = process.env[environmentName];
+  if (override) return override;
+  const run = spawnSync("git", ["-C", skillDir, ...args], { encoding: "utf8" });
+  return run.status === 0 ? String(run.stdout).trim() || null : null;
+}
+
+const sourceCommit = gitIdentity(["rev-parse", "HEAD"], "EXCEL_INFLOW_SOURCE_COMMIT");
+const sourceTree = gitIdentity(["rev-parse", "HEAD^{tree}"], "EXCEL_INFLOW_SOURCE_TREE");
+const sourceRepository =
+  process.env.EXCEL_INFLOW_SOURCE_REPOSITORY ?? "computering001/excel-inflow";
+
+function deterministicBuildTimestamp() {
+  const explicit = process.env.EXCEL_INFLOW_BUILD_TIMESTAMP;
+  if (explicit) {
+    const parsed = new Date(explicit);
+    if (Number.isNaN(parsed.valueOf())) {
+      throw new Error("EXCEL_INFLOW_BUILD_TIMESTAMP must be an ISO-8601 timestamp.");
+    }
+    return parsed.toISOString();
+  }
+  const epoch = process.env.SOURCE_DATE_EPOCH;
+  if (epoch !== undefined) {
+    if (!/^\d+$/.test(epoch)) throw new Error("SOURCE_DATE_EPOCH must be whole seconds.");
+    return new Date(Number(epoch) * 1000).toISOString();
+  }
+  const run = spawnSync(
+    "git",
+    ["-C", skillDir, "show", "-s", "--format=%cI", "HEAD"],
+    { encoding: "utf8" },
+  );
+  const candidate = run.status === 0 ? String(run.stdout).trim() : "";
+  if (candidate && !Number.isNaN(new Date(candidate).valueOf())) {
+    return new Date(candidate).toISOString();
+  }
+  return "1970-01-01T00:00:00.000Z";
+}
+
+const generatedAt = deterministicBuildTimestamp();
 
 if (Object.keys(allowedPythonImports).length === 0) {
   throw new Error(
@@ -1042,31 +1116,39 @@ const closureFileList = [
     key: name,
     absolute: path.join(skillDir, name),
   })),
+  ...vendoredDependencies.flatMap((dependency) => [
+    {
+      key: posix(dependency.install_path),
+      absolute: path.join(skillDir, dependency.source),
+    },
+    {
+      key: posix(path.join(path.dirname(dependency.install_path), "package.json")),
+      absolute: path.join(skillDir, path.dirname(dependency.source), "package.json"),
+    },
+    {
+      key: posix(dependency.license_install_path),
+      absolute: path.join(skillDir, dependency.license_source),
+    },
+  ]),
 ].sort((a, b) => (a.key < b.key ? -1 : 1));
 
 const closureFileHashes = {};
 for (const item of closureFileList) {
   closureFileHashes[item.key] = sha256(await fs.readFile(item.absolute));
 }
-const closureDigest = sha256(
-  Buffer.from(
-    Object.entries(closureFileHashes)
-      .map(([key, hash]) => `${key} ${hash}\n`)
-      .join(""),
-    "utf8",
-  ),
-);
+const runtimeCodeClosure = runtimeCodeClosureIdentity(closureFileHashes);
+const closureDigest = runtimeCodeClosure.sha256;
 
 let certificationReceipt = null;
 if (certifyNow) {
   certificationReceipt = await validateReleaseCertificationEvidence({
     manifestPath: certificationEvidencePath,
-    closureHash: closureDigest,
+    runtimeCodeClosureSha256: closureDigest,
   });
   if (certificationReceipt.status !== "PASS") {
     throw new Error(
       [
-        "Certification evidence does not prove this exact closure.",
+        "Certification evidence does not prove this exact runtime-code closure.",
         ...certificationReceipt.findings.map(
           (item) => `  ${item.id}: ${item.message}`,
         ),
@@ -1075,25 +1157,24 @@ if (certifyNow) {
   }
 }
 
-if (certifyNow) {
-  runtimeManifest.certified_closure_sha256 = closureDigest;
-  runtimeManifest.certified_closure_files = closureFileHashes;
-  runtimeManifest.certified_closure_recorded_at = new Date().toISOString();
-  runtimeManifest.certified_closure_note =
-    "Hash over the resolved deployment host script+asset closure at the moment --certify was passed. It asserts only that these bytes are the ones the certification run saw; run the certification, then record. compile_skill_release.mjs recomputes and compares on every subsequent compile.";
-} else if (!developmentNow) {
-  const recordedDigest = runtimeManifest.certified_closure_sha256;
+if (!certifyNow && !developmentNow) {
+  const recordedDigest =
+    runtimeManifest.certified_runtime_code_closure_sha256 ??
+    runtimeManifest.certified_closure_sha256;
   if (!recordedDigest) {
     throw new Error(
       [
-        "assets/runtime-manifest.json reads local_production_certified but records no certified_closure_sha256.",
+        "assets/runtime-manifest.json reads local_production_certified but records no certified_runtime_code_closure_sha256.",
         "  A hand-set status string is not evidence that these sources are the certified ones.",
-        "  Re-run local certification, then compile once with --certify to record the closure hash.",
+        "  Re-run local certification, then compile once with --certify to record the runtime-code closure identity.",
       ].join("\n"),
     );
   }
   if (recordedDigest !== closureDigest) {
-    const recordedFiles = runtimeManifest.certified_closure_files ?? {};
+    const recordedFiles =
+      runtimeManifest.certified_runtime_code_closure_files ??
+      runtimeManifest.certified_closure_files ??
+      {};
     const changed = [];
     const added = [];
     const removed = [];
@@ -1106,13 +1187,13 @@ if (certifyNow) {
     }
     throw new Error(
       [
-        "The closure has moved since certification; this package is not the certified package.",
+        "The runtime-code closure has moved since certification; this package is not certified.",
         `  recorded ${recordedDigest}`,
         `  computed ${closureDigest}`,
         changed.length > 0 ? `  changed since certification: ${changed.sort().join(", ")}` : null,
         added.length > 0 ? `  added since certification: ${added.sort().join(", ")}` : null,
         removed.length > 0 ? `  removed since certification: ${removed.sort().join(", ")}` : null,
-        "  Re-run local certification against these sources, then compile with --certify.",
+        "  Re-run local certification against this runtime-code closure, then compile with --certify.",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -1310,6 +1391,12 @@ const compiledSkill = [
  * Emit
  * ------------------------------------------------------------------ */
 
+if (await exists(outputDir)) {
+  const outputStat = await fs.stat(outputDir);
+  if (!outputStat.isDirectory() || (await fs.readdir(outputDir)).length > 0) {
+    throw new Error(`Release output must be a new or empty directory: ${path.resolve(outputDir)}`);
+  }
+}
 await fs.mkdir(outputDir, { recursive: true });
 const files = [];
 
@@ -1733,7 +1820,7 @@ async function runSmokeTest() {
         await fs.readFile(path.join(validationDir, "validation-report.json"), "utf8"),
       );
       if (
-        !["PASS", "PASS_PENDING_MANUAL"].includes(validation.status) ||
+        validation.status !== "PASS_PENDING_MANUAL" ||
         Number(validation.total_violations) !== 0
       ) {
         throw new Error(
@@ -1741,7 +1828,9 @@ async function runSmokeTest() {
         );
       }
       workbookBuild = {
-        status: "PASS",
+        status: "PASS_PENDING_MANUAL",
+        evidence_class: "AUTOMATED_DEVELOPMENT_EVIDENCE_ONLY",
+        release_gate_status: "PENDING_NATIVE_EXCEL_AND_VISUAL_REVIEW",
         case_sha256: await sha256File(caseCopy),
         plan_sha256: await sha256File(planPath),
         workbook_sha256: await sha256File(workbookPath),
@@ -1768,21 +1857,12 @@ const smokeTest = skipSmoke
   ? { skipped: true, reason: "--skip-smoke was passed; this release has not been executed." }
   : await runSmokeTest();
 
-// Persist certification only after the clean-root smoke test has completed.
-// A failing smoke run must never leave a newly certified hash behind.
-if (certifyNow) {
-  if (smokeTest.workbookBuild?.status !== "PASS") {
-    throw new Error(
-      "Certification requires a PASS real clean-root workbook build, render and validation smoke.",
-    );
-  }
-  await fs.writeFile(
-    runtimeManifestPath,
-    `${JSON.stringify(runtimeManifest, null, 2)}\n`,
-    "utf8",
-  );
-  console.error(
-    `Recorded certified_closure_sha256 ${closureDigest} over ${closureFileList.length} files.`,
+if (
+  certifyNow &&
+  !["PASS", "PASS_PENDING_MANUAL"].includes(smokeTest.workbookBuild?.status)
+) {
+  throw new Error(
+    "Certification requires a zero-violation real clean-root workbook build whose portable validation remains explicitly PASS_PENDING_MANUAL; native and visual PASS are supplied only through the separate hash-bound certification evidence gate.",
   );
 }
 
@@ -1790,36 +1870,70 @@ if (certifyNow) {
  * Release manifest
  * ------------------------------------------------------------------ */
 
+const externalCertificationEvidenceReceipt = certificationReceipt
+  ? {
+      schemaVersion: certificationReceipt.schema_version,
+      status: certificationReceipt.status,
+      totalViolations: certificationReceipt.total_violations,
+      certifiedRuntimeCodeClosureSha256:
+        certificationReceipt.certified_runtime_code_closure_sha256,
+      certifiedClosureSha256: certificationReceipt.certified_closure_sha256,
+      manifestSha256: certificationReceipt.manifest.sha256,
+      evidence: Object.fromEntries(
+        Object.entries(certificationReceipt.evidence).map(([name, record]) => [
+          name,
+          { sha256: record.sha256 },
+        ]),
+      ),
+    }
+  : null;
+
 const manifest = {
   releaseName: `${deploymentProfile.release_name} v${runtimeManifest.skill_version}`,
   schemaVersion: 2,
-  packageMode: developmentNow ? "development" : "certified",
+  packageMode,
+  deploymentStatus: "not_installed",
   skillVersion: runtimeManifest.skill_version,
   templateVersion: runtimeManifest.template_version,
   sourceStatus: runtimeManifest.status,
-  generatedAt: new Date().toISOString(),
+  generatedAt,
   centralInstructionsWords: wordCount(centralInstructions),
   profile: "assets/deployment-profile.json",
+  identity: productIdentity({
+    repository: sourceRepository,
+    sourceCommit,
+    sourceTree,
+    packageMode,
+    deploymentStatus: "not_installed",
+    runtimeCodeClosureSha256: closureDigest,
+    certifiedRuntimeCodeClosureSha256: developmentNow ? null : closureDigest,
+    // Complete package, archive and installed-package identities are sealed by
+    // the external attestation/install phases. They must never be aliases for
+    // this narrower runtime-code closure.
+    completePackageInventorySha256: null,
+    archiveSha256: null,
+    installedPackageSha256: null,
+    installationIdentity: null,
+  }),
   certification: {
+    certifiedRuntimeCodeClosureSha256: developmentNow ? null : closureDigest,
+    runtimeCodeClosureSha256: closureDigest,
     certifiedClosureSha256: developmentNow ? null : closureDigest,
     currentClosureSha256: closureDigest,
     closureFileCount: closureFileList.length,
-    recordedAt: developmentNow ? null : (runtimeManifest.certified_closure_recorded_at ?? null),
+    recordedAt: developmentNow
+      ? null
+      : (certifyNow
+        ? generatedAt
+        : runtimeManifest.certified_runtime_code_closure_recorded_at ??
+        runtimeManifest.certified_closure_recorded_at ??
+        null),
     recertifiedByThisRun: certifyNow,
-    evidenceReceipt: certificationReceipt
-      ? {
-          schemaVersion: certificationReceipt.schema_version,
-          status: certificationReceipt.status,
-          totalViolations: certificationReceipt.total_violations,
-          certifiedClosureSha256: certificationReceipt.certified_closure_sha256,
-          manifestSha256: certificationReceipt.manifest.sha256,
-          evidence: Object.fromEntries(
-            Object.entries(certificationReceipt.evidence).map(([name, record]) => [
-              name,
-              { sha256: record.sha256 },
-            ]),
-          ),
-        }
+    // Evidence is deliberately external to the immutable package. Legacy
+    // readers may still encounter this field in older packages.
+    evidenceReceipt: null,
+    externalAttestationSchema: certifyNow
+      ? "release-package-attestation/1.0"
       : null,
   },
   closure: {
@@ -1904,5 +2018,56 @@ const manifest = {
 
 const manifestBuffer = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 await fs.writeFile(path.join(outputDir, "release-manifest.json"), manifestBuffer);
+
+if (certifyNow) {
+  // RELEASE-039: package construction ends at release-manifest.json. From this
+  // point on, certification is read-only over packageRoot and every output is
+  // forced outside it.
+  const sealedInventory = await completePackageInventoryIdentity(outputDir);
+  const archive = await createDeterministicPackageArchive({
+    packageRoot: outputDir,
+    archivePath: archiveOutputPath,
+  });
+  const attestation = await buildReleasePackageAttestation({
+    packageRoot: outputDir,
+    archive,
+    certificationEvidenceReceipt: externalCertificationEvidenceReceipt,
+    issuedAt: generatedAt,
+  });
+  if (
+    attestation.package.complete_package_inventory.sha256 !==
+    sealedInventory.sha256
+  ) {
+    throw new Error("Complete-package inventory moved before attestation emission.");
+  }
+  await writeExternalReleasePackageAttestation({
+    packageRoot: outputDir,
+    attestationPath: attestationOutputPath,
+    attestation,
+  });
+  const afterAttestation = await completePackageInventoryIdentity(outputDir);
+  if (afterAttestation.sha256 !== sealedInventory.sha256) {
+    throw new Error("Certified package bytes changed while external attestation was emitted.");
+  }
+  const verification = await verifyReleasePackageAttestation({
+    packageRoot: outputDir,
+    attestation,
+    archivePath: archiveOutputPath,
+  });
+  if (verification.status !== "PASS") {
+    throw new Error(
+      `External release-package attestation failed verification: ${verification.findings.join("; ")}`,
+    );
+  }
+  console.error(
+    JSON.stringify({
+      attestation: attestationOutputPath,
+      attestation_sha256: attestation.attestation_sha256,
+      complete_package_inventory_sha256: sealedInventory.sha256,
+      archive: archiveOutputPath,
+      archive_sha256: archive.sha256,
+    }),
+  );
+}
 
 console.log(path.join(outputDir, "release-manifest.json"));

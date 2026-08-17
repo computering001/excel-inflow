@@ -18,6 +18,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "ci-governance-read-only",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_governance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "decision-round-batching",
       "phase": "workflow",
       "runtime": "node",
@@ -31,6 +40,24 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_entity_identity_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "source-ingress-security",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_source_ingress_security_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "multipage-filing-extraction",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_multipage_filing_extraction_tests.py",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
@@ -92,6 +119,42 @@
       "phase": "economics",
       "runtime": "node",
       "script": "run_instrument_period_state_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "debt-class-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_debt_class_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "lease-roll-forward",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_lease_roll_forward_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "instrument-interest-lineage",
+      "phase": "economics",
+      "runtime": "python",
+      "script": "run_interest_lineage_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "interest-economics-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_interest_economics_contract_tests.mjs",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
@@ -204,6 +267,15 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
+    },
+    {
+      "id": "typed-filing-values-and-row-identity",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_typed_filing_value_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
     },
     {
       "id": "historical-normalisation",
@@ -465,6 +537,9 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_filings_pipeline_tests.mjs",
+      "requires": [
+        "CASES"
+      ],
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
@@ -721,6 +796,42 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "protected-identity-semantic-oracle",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "verify/run_protected_identity_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "reconciled-parent-portable-workbook",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_reconciled_parent_portable_workbook_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "native-excel-all-cell-error-scan",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_native_excel_error_scan_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "release-certification-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_certification_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "delivery-inventory",
       "phase": "proof",
       "runtime": "node",
@@ -764,6 +875,33 @@
       "phase": "proof",
       "runtime": "node",
       "script": "run_source_identity_tests.mjs"
+    },
+    {
+      "id": "typed-product-identity-vocabulary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_identity_vocabulary_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "immutable-release-package-attestation",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_package_attestation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "workbook-build-identity-quality-panel",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_workbook_quality_panel_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
     },
     {
       "id": "test-registry-contract",
@@ -826,6 +964,15 @@
       "test_class": "unit"
     },
     {
+      "id": "forecast-authority-ranking",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_authority_ranking_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "funded-acquisition-transaction",
       "phase": "economics",
       "runtime": "node",
@@ -862,6 +1009,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "broker-pdf-timeout-policy",
+      "phase": "performance",
+      "runtime": "python",
+      "script": "run_broker_pdf_timeout_policy_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "experience-trace-policy",
       "phase": "performance",
       "runtime": "python",
@@ -871,10 +1027,55 @@
       "test_class": "unit"
     },
     {
+      "id": "experience-trace-leaf-coverage",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_experience_trace_leaf_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-process-interpreter-lease-custody",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_custody_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "native-excel-number-format-compatibility",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_excel_number_format_compatibility_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-version-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_runtime_version_contract_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "host-experience-trace",
       "phase": "performance",
       "runtime": "python",
       "script": "run_host_experience_trace_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "ebitda-basis-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_ebitda_basis_contract_tests.mjs",
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
