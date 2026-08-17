@@ -160,10 +160,13 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
         ...process.env,
         PYTHONDONTWRITEBYTECODE: "1",
         // Node-authored integration tests may launch the shipping Python
-        // controller or Stage 4 themselves.  They must inherit the exact
-        // interpreter selected for this development gate rather than silently
-        // falling back to whichever `python3` happens to be on PATH.
+        // controller or Stage 4 themselves. They must inherit the exact
+        // custody inputs selected for this development-gate invocation rather
+        // than silently falling back to machine-local Codex fixtures/runtimes.
         EXCEL_INFLOW_TEST_PYTHON: python,
+        DEBT_OVERLAY_PYTHON: python,
+        ...(inputs.CASES ? { DEBT_OVERLAY_CASES_DIR: inputs.CASES } : {}),
+        ...(inputs.SOFFICE ? { SOFFICE_BIN: inputs.SOFFICE } : {}),
       },
     });
     return {
