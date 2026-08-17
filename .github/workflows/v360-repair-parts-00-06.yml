@@ -1,0 +1,60 @@
+name: v360 repair parts 00 and 06
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - .github/workflows/v360-repair-parts-00-06.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove exact stray trailing bytes and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          p0='publish/v360-recovery-complete/part00.b64'
+          p6='publish/v360-recovery-complete/part06.b64'
+          test "$(wc -c < "$p0")" -eq 7787
+          test "$(wc -c < "$p6")" -eq 7787
+          echo 'd2bc2a8d4a452cc85b62cc368ee444f4a4a4db1755d9f07db8a993728d8ee918  publish/v360-recovery-complete/part00.b64' | sha256sum -c -
+          echo '225fcf33a6380590a16847b12583b71bb4784552d7b6398909342dcfaa4a4358  publish/v360-recovery-complete/part06.b64' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          repairs = {
+              'publish/v360-recovery-complete/part00.b64': 'M',
+              'publish/v360-recovery-complete/part06.b64': '9',
+          }
+          for name, expected_tail in repairs.items():
+              p = Path(name)
+              value = p.read_text('ascii')
+              assert len(value) == 7787
+              assert value[-1] == expected_tail
+              p.write_text(value[:-1], 'ascii')
+          PY
+          test "$(wc -c < "$p0")" -eq 7786
+          test "$(wc -c < "$p6")" -eq 7786
+          echo 'f5b4943323914c3d27b29a34dcfb441351985b24ad3b22d68bed406901d1e405  publish/v360-recovery-complete/part00.b64' | sha256sum -c -
+          echo 'f73898babd0a3e3e4980355fc8664f17ad368a82934e18314586bc7625e10a3a  publish/v360-recovery-complete/part06.b64' | sha256sum -c -
+          cat publish/v360-recovery-complete/part*.b64 | tr -d '\n\r\t ' > /tmp/all.b64
+          test "$(wc -c < /tmp/all.b64)" -eq 124576
+          echo 'fa24f76ac907af6d0db50ee0827d9c268d55753800aa5e2248e4d0e3bc99060b  /tmp/all.b64' | sha256sum -c -
+      - name: Commit repaired chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add publish/v360-recovery-complete/part00.b64 publish/v360-recovery-complete/part06.b64
+          git commit -m 'Repair final v3.6 recovery payload bytes'
+          git push origin HEAD:agent/v360-publication-bridge
