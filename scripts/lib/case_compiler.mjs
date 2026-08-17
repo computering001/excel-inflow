@@ -794,6 +794,8 @@ function applyRoleRecipes(statementStructure) {
  */
 function applyDerivedStratum(modelCase, evidence = {}) {
   const derived = new Set();
+  const packMetrics = modelCase?.broker_pack?.metrics ?? {};
+  const packHas = (metricId) => Object.hasOwn(packMetrics, metricId);
   const sections = modelCase.statement_structure ?? {};
   const isRows = sections.income_statement ?? [];
   const cfRows = sections.cash_flow ?? [];
