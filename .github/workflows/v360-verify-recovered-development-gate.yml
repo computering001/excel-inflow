@@ -150,15 +150,33 @@ jobs:
         run: |
           set -euo pipefail
           export PATH="/tmp/v360-python/bin:$PATH"
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
-          rm -rf /tmp/excel-inflow-v3.6.0
+          rm -rf /tmp/v360-package-smoke /tmp/excel-inflow-v3.6.0
+          mkdir -p /tmp/v360-package-smoke
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases \
+            --emit-clean /tmp/v360-package-smoke/clean-evidence-run.json
+          node scripts/run_user_flow.mjs /tmp/v360-package-smoke/clean-evidence-run.json \
+            --out /tmp/v360-package-smoke/run \
+            --stop-after decisions \
+            --json > /tmp/v360-package-smoke/paused.json
+          smoke_case=/tmp/v360-package-smoke/run/stages/decisions/model-case.json
+          test -f "$smoke_case"
+          python3 - "$smoke_case" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          assert d.get('source_coverage',{}).get('classification_contract_version')=='evidence_v1'
+          assert d.get('statement_authority_contract_version')=='authority_v1'
+          assert d.get('forecast_authority_contract_version')=='waterfall_v1'
+          print('PACKAGE_SMOKE_CASE=PRODUCTION_CONTRACT_PASS')
+          PY
           node scripts/compile_skill_release.mjs \
             --skill . \
             --out /tmp/excel-inflow-v3.6.0 \
             --development \
-            --smoke-case test-fixtures/cases/standard-maximal-v2.json
+            --smoke-case "$smoke_case"
           python3 - <<'PY'
           import json
           from pathlib import Path
