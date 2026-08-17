@@ -213,9 +213,22 @@ function historicalValues(row) {
   );
 }
 
-function evaluatedHistoricalValues(row, rows) {
+function evaluatedHistoricalValues(
+  row,
+  rows,
+  { preferReportedReconciliations = false } = {},
+) {
   const byId = new Map((rows ?? []).map((candidate) => [candidate.row_id, candidate]));
   const evaluate = (candidate, periodIndex, visiting = new Set()) => {
+    // Cash-flow totals can depend on schedule-owned rows whose authoritative
+    // history is not reconstructible from this statement-local graph.  A
+    // reconciled filed total is therefore the terminal value for cash-flow
+    // cache materialisation. Income-statement rows deliberately keep the
+    // formula walk so the separate finance-authority bridge remains live.
+    const reported = preferReportedReconciliations
+      ? candidate?.reported_historical_values?.[periodIndex]
+      : null;
+    if (finite(reported)) return Number(reported);
     const literal = candidate?.values?.[periodIndex];
     if (
       !candidate?.calculation ||
@@ -269,10 +282,15 @@ function applyFiledFinanceHistoricalAuthority(modelCase, rows) {
   return nextRows;
 }
 
-function normaliseEvaluatedHistoricalValues(rows) {
+function normaliseEvaluatedHistoricalValues(
+  rows,
+  { preferReportedReconciliations = false } = {},
+) {
   const sourceRows = rows ?? [];
   return sourceRows.map((row) => {
-    const evaluated = evaluatedHistoricalValues(row, sourceRows);
+    const evaluated = evaluatedHistoricalValues(row, sourceRows, {
+      preferReportedReconciliations,
+    });
     if (
       row.historical_authority === "reported_total_reconciled" ||
       !row.calculation ||
@@ -982,6 +1000,7 @@ export function compileForecastPlan(
               rowsBySection?.[section] ?? [],
             )
           : rowsBySection?.[section] ?? [],
+        { preferReportedReconciliations: section === "cash_flow" },
       ),
     ]),
   );
@@ -1543,6 +1562,7 @@ export function materializeForecastPlan(modelCase, plan) {
             next.statement_structure?.[section] ?? [],
           )
         : next.statement_structure?.[section] ?? [],
+      { preferReportedReconciliations: section === "cash_flow" },
     );
     next.statement_structure[section] = sectionRows;
     rowsBySection.set(section, sectionRows);
