@@ -180,6 +180,19 @@ const SAME_PERIOD_IDENTITY_OPERATORS = new Set([
   "link",
 ]);
 
+const DIMENSIONLESS_STATEMENT_OPERATORS = new Set([
+  "growth",
+  "ratio",
+  "negated_ratio",
+]);
+
+function isAdditiveAmountRow(row) {
+  if (DIMENSIONLESS_STATEMENT_OPERATORS.has(row?.calculation?.operator)) {
+    return false;
+  }
+  return !row?.number_format || row.number_format === "amount";
+}
+
 const MATERIALITY_REQUIRED_METHODS = new Set([
   "actual_plus_remainder",
   "contractual_commitment",
@@ -1075,7 +1088,7 @@ export function validateForecastAuthorities(modelCase, rows = []) {
         const band = cashFlowRows.slice(headerIndex + 1, totalIndex);
         const bandIds = new Set(band.map((candidate) => candidate.row_id));
         const nestedFormulaMemberIds = new Set(
-          band.flatMap((candidate) =>
+          band.filter(isAdditiveAmountRow).flatMap((candidate) =>
             (candidate.calculation?.refs ?? []).filter((rowId) =>
               bandIds.has(rowId),
             ),
@@ -1085,6 +1098,7 @@ export function validateForecastAuthorities(modelCase, rows = []) {
           .filter(
             (candidate) =>
               candidate.row_type !== "header" &&
+              isAdditiveAmountRow(candidate) &&
               !nestedFormulaMemberIds.has(candidate.row_id) &&
               (!candidate.parent_row_id || !bandIds.has(candidate.parent_row_id)),
           )

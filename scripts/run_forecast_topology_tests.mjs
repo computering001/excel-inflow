@@ -426,6 +426,43 @@ assert(
   validateForecastAuthorities(protectedCashFlowCase, protectedCashFlowRows).length === 0,
   "Valid same-period protected cash-flow identities were rejected.",
 );
+const investingMemoCase = clone(protectedCashFlowCase);
+const investingMemoRows = investingMemoCase.statement_structure.cash_flow;
+const investingMemoTotalIndex = investingMemoRows.findIndex(
+  (candidate) => candidate.semantic_role === "cash_from_investing",
+);
+investingMemoRows.splice(investingMemoTotalIndex, 0,
+  row("investment_intensity", "Investment intensity", undefined, {
+    row_type: "calculation",
+    calculation: { operator: "ratio", refs: ["investment_alpha", "operating_member"] },
+    number_format: "percentage",
+  }),
+  row("investment_growth", "Investment growth", undefined, {
+    row_type: "calculation",
+    calculation: { operator: "growth", refs: ["investment_beta"] },
+    number_format: "percentage",
+  }),
+  row("investment_hurdle_rate", "Investment hurdle rate", [0.1, 0.1, 0.1, null, null, null], {
+    number_format: "rate",
+    forecast_period_authorities: direct(0.11),
+  }),
+);
+const investingMemoErrors = validateForecastAuthorities(investingMemoCase, investingMemoRows);
+assert(
+  investingMemoErrors.length === 0,
+  `A dimensionless investing memo was misclassified as a currency subtotal member: ${JSON.stringify(investingMemoErrors)}`,
+);
+const omittedCurrencyMember = clone(investingMemoCase);
+omittedCurrencyMember.statement_structure.cash_flow
+  .find((candidate) => candidate.semantic_role === "cash_from_investing")
+  .calculation.refs = ["investment_alpha"];
+assert(
+  validateForecastAuthorities(
+    omittedCurrencyMember,
+    omittedCurrencyMember.statement_structure.cash_flow,
+  ).some((error) => error.includes("top-level investing members")),
+  "A missing currency member escaped the protected investing identity beside a dimensionless memo.",
+);
 const nestedInvestingCase = clone(protectedCashFlowCase);
 const nestedInvestingRows = nestedInvestingCase.statement_structure.cash_flow;
 const investingTotalIndex = nestedInvestingRows.findIndex(
@@ -544,8 +581,8 @@ assert(
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 33,
-  mutations_caught: 6,
+  tests: 37,
+  mutations_caught: 7,
   captured_paths: topology.behavior_map.filter((entry) => entry.behavior === "captured_detail").length,
   cash_flow_event_method: state("cash_flow", "debt_fees", 0).method,
 }, null, 2));
