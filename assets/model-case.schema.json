@@ -196,6 +196,21 @@
       }
     },
     "other_interest": { "$ref": "#/$defs/series3" },
+    "other_interest_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "method", "basis_note"],
+      "properties": {
+        "contract_version": { "const": "residual-interest-authority/1.0" },
+        "method": { "enum": ["zero", "explicit_forecast_assumption", "historical_residual_carry", "broker_or_guidance"] },
+        "basis_note": { "type": "string", "minLength": 1 },
+        "source_ids": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
     "non_cash_interest": { "$ref": "#/$defs/series3" },
     "acquisition": {
       "$ref": "#/$defs/acquisition"

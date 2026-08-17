@@ -25,6 +25,7 @@ import {
 } from "./instrument_period_state.mjs";
 import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
 import { selectedEbitdaRow } from "./semantic_roles.mjs";
+import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
 
 const SOLVER_ITERATION_POLICY = solverIterationOptions();
 
@@ -1485,6 +1486,7 @@ export function validateCaseShape(modelCase) {
     }
   }
   errors.push(...validateLeasePolicy(modelCase));
+  errors.push(...validateResidualInterestAuthority(modelCase));
   if (modelCase.modules?.acquisition && !modelCase.acquisition) {
     errors.push("Acquisition module is enabled but acquisition inputs are absent.");
   }

@@ -3108,6 +3108,14 @@
     12.344,
     12.969
   ],
+  "other_interest_authority": {
+    "contract_version": "residual-interest-authority/1.0",
+    "method": "explicit_forecast_assumption",
+    "basis_note": "Synthetic explicit forecast assumption used to exercise the visible residual-interest authority path.",
+    "source_ids": [
+      "synthetic.interest.residual"
+    ]
+  },
   "non_cash_interest": [
     8.594,
     8.906,

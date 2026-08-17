@@ -82,6 +82,7 @@ export const PASSTHROUGH_LANES = Object.freeze([
   "historical_interest_reconciliation",
   "historical_supplement",
   "other_interest",
+  "other_interest_authority",
   "non_cash_interest",
   "acquisition",
   "fx",

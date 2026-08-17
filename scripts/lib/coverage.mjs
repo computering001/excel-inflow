@@ -12,6 +12,7 @@ import {
   CANONICAL_DEBT_CLASS_SET,
   isLegacyDebtClass,
 } from "./debt_class.mjs";
+import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -1522,6 +1523,26 @@ function instrumentChecks(modelCase) {
   return checks;
 }
 
+function residualInterestAuthorityChecks(modelCase) {
+  const errors = validateResidualInterestAuthority(modelCase);
+  if (errors.length === 0) {
+    return [
+      result(
+        "interest.residual_forecast_authority",
+        "PASS",
+        "Other / unallocated interest is zero or carries an explicit forecast authority.",
+      ),
+    ];
+  }
+  return errors.map((message, index) =>
+    result(
+      `interest.residual_forecast_authority.${index + 1}`,
+      "BLOCK",
+      message,
+    ),
+  );
+}
+
 /**
  * DEFECT 0.5 — GATE PLACEMENT, NOT A MISSING CAPABILITY.
  *
@@ -2226,6 +2247,7 @@ export function assessCoverage(modelCase) {
   checks.push(...forecastAuthorityChecks(modelCase));
   checks.push(...cashBucketStatementChecks(modelCase));
   checks.push(...instrumentChecks(modelCase));
+  checks.push(...residualInterestAuthorityChecks(modelCase));
   checks.push(...fxCoverageChecks(modelCase));
   checks.push(...debtReconciliationChecks(modelCase));
   checks.push(...historicalInterestChecks(modelCase));

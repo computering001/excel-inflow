@@ -87,6 +87,10 @@ import {
   isEbitdaSemanticRole,
   selectedEbitdaRow,
 } from "./lib/semantic_roles.mjs";
+import {
+  residualInterestAuthorityLabel,
+  resolvedResidualInterestAuthority,
+} from "./lib/residual_interest_authority.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -3122,6 +3126,8 @@ function configureOperatingModel(
   const balancingRcfEnabled = hasBalancingRcf(modelCase);
   const commercialPaperBackstopped =
     modelCase.rcf_policy?.commercial_paper_backstopped !== false;
+  const residualInterestAuthority =
+    resolvedResidualInterestAuthority(modelCase);
   // The model ends where the reader can see it end. There is no hidden
   // "MODEL BUILD SUPPORT" block below the interest schedule any more.
   const maxRow = rowPlan.visible_end_row;
@@ -7339,7 +7345,9 @@ function configureOperatingModel(
       leaseInterestBasis === "none"
         ? "Lease interest — not separately modelled"
         : "Lease interest",
-    other_unallocated_interest: "Other / unallocated interest",
+    other_unallocated_interest:
+      `Other / unallocated interest — ` +
+      residualInterestAuthorityLabel(residualInterestAuthority),
     interest_reported_total:
       historicalInterestBasisLabel(historicalInterestAuthority) ??
       "Filed finance expense (statement authority)",
@@ -7373,6 +7381,15 @@ function configureOperatingModel(
     // schedule. See the note there.
     interestScheduleRows.add(row);
   }
+  addCommentOnce(
+    workbook,
+    sheet,
+    `B${interestRows.other_unallocated_interest}`,
+    `Forecast authority: ${residualInterestAuthority.method}. ${residualInterestAuthority.basis_note}` +
+      ((residualInterestAuthority.source_ids ?? []).length > 0
+        ? ` Sources: ${residualInterestAuthority.source_ids.join(", ")}.`
+        : ""),
+  );
   for (const id of [
     "rcf_interest",
     "rcf_commitment_fee",
