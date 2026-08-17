@@ -211,7 +211,7 @@
         "integration_evidence": "PASS: a neutral production-shaped case rebuilds through plan compilation and emission with the issuer-defined parent formula-owned in G/H/I, filed totals retained separately, complete child membership, zero cache disagreements and a clean isolated development package smoke.",
         "semantic_oracle_evidence": "PASS: independent OOXML semantic oracle accepts the clean 6,014-cell workbook and blocks a mutation replacing H18 with a hardcode using OOXML_PROTECTED_IDENTITY_FORMULA_REQUIRED. The test uses neutral labels and no issuer exceptions.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_MICROSOFT_EXCEL_HOST",
-        "commit": "CURRENT_CHECKPOINT_PENDING"
+        "commit": "7d1d4c9"
       }
     },
     {
