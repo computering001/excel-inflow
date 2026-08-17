@@ -44,6 +44,76 @@ function roleOf(cell) {
  if(["debt_issuance","change_in_debt","additions_to_debt","acquisition_debt_proceeds"].includes(role)||["proceeds from borrowings","additions to debt","change in debt","acquisition debt proceeds"].includes(label))return"debt_proceeds";
  return null;
 }
+function definitionRole(definition) {
+ const role=normalise(definition?.semantic_role ?? definition?.row_id ?? definition?.movement_type).replaceAll(" ","_");
+ if(["acquisitions_net_of_cash","acquisition_consideration","purchase_consideration"].includes(role)) return "consideration";
+ if(["debt_issuance","additions_to_debt","acquisition_debt_proceeds"].includes(role)) return "debt_proceeds";
+ return null;
+}
+function statementDefinitions(rowPlan) {
+ return Object.values(rowPlan?.statement_rows ?? {}).flatMap(section=>Array.isArray(section)?section:[]);
+}
+function clearCachedFormula(sheet,address) {
+ const cell=sheet?.cellAt?.(address);
+ if(!cell||cell.formula===undefined)return false;
+ cell.cachedValue=undefined;
+ cell.cachedType=undefined;
+ return true;
+}
+
+/**
+ * Apply funded-acquisition transaction formulas to the in-memory portable
+ * PlanWorkbook before the final cache-evaluation pass.
+ *
+ * The package/captured-plan route historically patched the serialised plan at
+ * the end of the build.  The portable `--plan-only` route never crossed that
+ * hook, so its displayed N:P transaction formulas remained zero while solver
+ * caches already included the transaction.  That produced a workbook whose
+ * formulas and cached values disagreed.  This hook owns the portable route:
+ * transaction leaves are written into the existing acquisition/debt-issuance
+ * rows, downstream acyclic cash-flow caches are invalidated, and the normal
+ * `fillCachedValues` pass rebuilds those caches from the displayed formulas.
+ */
+export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
+ const sheet=workbook?.sheetByName?.("Operating Model");
+ if(!sheet)return{changed:0,reason:"operating-model-absent"};
+ const definitions=statementDefinitions(rowPlan);
+ const consideration=definitions.find(definition=>definitionRole(definition)==="consideration");
+ const debtProceeds=definitions.find(definition=>definitionRole(definition)==="debt_proceeds");
+ if(!consideration||!debtProceeds) throw new Error("Funded acquisition portable plan is missing the existing consideration or debt-issuance row.");
+ const targets=[
+  {definition:consideration,kind:"consideration"},
+  {definition:debtProceeds,kind:"debt_proceeds"},
+ ];
+ const adjustmentColumns=["N","O","P"];
+ const proFormaColumns=["S","T","U"];
+ let changed=0;
+ for(const {definition,kind} of targets){
+  for(const [index,column] of adjustmentColumns.entries()){
+   const address=`${column}${definition.row}`;
+   const flow=acquisitionTransactionFlows(modelCase,index);
+   const amount=kind==="consideration"?"-$P$5":"$P$8";
+   const headerRef=`${column}$6`;
+   const periodYear=`IF(${headerRef}>3000,YEAR(${headerRef}),${headerRef})`;
+   const formula=`=IF($P$4=0,0,IF(${periodYear}=$P$10,${amount},0))`;
+   if(!sheet.setFormulaText(address,formula)) throw new Error(`Funded acquisition target ${address} is not an existing formula cell.`);
+   const cached=kind==="consideration"?flow.consideration_cash_flow:flow.acquisition_debt_proceeds;
+   if(!sheet.setCachedValue(address,cached)) throw new Error(`Funded acquisition target ${address} rejected its cache.`);
+   clearCachedFormula(sheet,`${proFormaColumns[index]}${definition.row}`);
+   changed+=1;
+  }
+ }
+ // These are the only acyclic statement totals downstream of the two
+ // transaction leaves before ending cash. Clearing them is intentional: the
+ // ordinary plan evaluator will rebuild them from the now-visible formulas.
+ const dependentRoles=new Set(["cash_from_investing","change_in_debt","cash_from_financing","net_change_in_cash"]);
+ for(const definition of definitions){
+  if(!dependentRoles.has(String(definition?.row_id??definition?.semantic_role??"")))continue;
+  for(const column of [...adjustmentColumns,...proFormaColumns]) clearCachedFormula(sheet,`${column}${definition.row}`);
+ }
+ return{changed,consideration_row:consideration.row,debt_proceeds_row:debtProceeds.row};
+}
+
 export function applyFundedAcquisitionPlan(plan, modelCase) {
  const cells=collect(plan); if(cells.length===0)return{plan,changed:0,reason:"no-addressed-cells"};
  const controls={
@@ -70,4 +140,4 @@ export function applyFundedAcquisitionPlan(plan, modelCase) {
  if(changed===0) throw new Error("Funded acquisition plan contains no addressed consideration/proceeds forecast cells.");
  return{plan,changed,controls};
 }
-export default {applyFundedAcquisitionPlan};
+export default {applyFundedAcquisitionPlan,applyFundedAcquisitionWorkbook};
