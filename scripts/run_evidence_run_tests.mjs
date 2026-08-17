@@ -510,8 +510,31 @@ function installProposerNativeProvenance({ caseSource, caseEvidence, currency, u
 function buildCleanEvidenceRun(baseCase, fixture) {
   const modelCase = alignCaseToEvidence(baseCase, fixture.intake);
   modelCase.execution_profile = "reference_parity";
+  // Free-cash-flow conversion is a model ratio in this synthetic case, not an
+  // issuer-labelled face-statement line. The legacy fixture incorrectly put
+  // the derived ratio in source coverage; retaining that claim would require
+  // inventing a second visible filing row solely to satisfy lineage.
+  modelCase.source_coverage.cash_flow = modelCase.source_coverage.cash_flow.filter(
+    (entry) => entry.source_line_id !== "cf.free_cash_flow_conversion",
+  );
   modelCase.provenance ??= {};
   for (const section of ["income_statement", "cash_flow"]) {
+    const rowsById = new Map(
+      (modelCase.statement_structure?.[section] ?? []).map((row) => [row.row_id, row]),
+    );
+    // The synthetic case inventory predates the visible exact-lineage gate.
+    // Install only edges the fixture itself already declares: same section,
+    // mapped row id and issuer label. This exercises the production gate with
+    // complete evidence rather than bypassing it.
+    for (const coverage of modelCase.source_coverage?.[section] ?? []) {
+      for (const rowId of coverage.mapped_row_ids ?? []) {
+        const row = rowsById.get(rowId);
+        if (!row || normalizeLabel(row.label) !== normalizeLabel(coverage.label)) continue;
+        row.source_line_ids = [
+          ...new Set([...(row.source_line_ids ?? []), coverage.source_line_id]),
+        ];
+      }
+    }
     for (const row of modelCase.statement_structure?.[section] ?? []) {
       const historicalScheduleValues = (row.values ?? []).slice(0, 3);
       if (

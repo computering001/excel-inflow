@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
+import { sealForecastAuthorityLedger } from "./lib/forecast_authority_ledger.mjs";
 import {
   resolvedResidualInterestAuthority,
   validateResidualInterestAuthority,
@@ -50,16 +51,28 @@ assert(
   }).some((message) => /source_id/.test(message)),
 );
 
-const productionPath =
-  "/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/dmu-stage4-checkpoints-d0Zvbp/interrupted-run/stages/decisions/model-case.json";
-let productionCaseExercised = false;
+const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "excel-inflow-interest-fixture."));
+const productionPath = path.join(fixtureRoot, "model-case.json");
+execFileSync(
+  process.execPath,
+  [
+    fileURLToPath(new URL("./run_evidence_run_tests.mjs", import.meta.url)),
+    fileURLToPath(new URL("../test-fixtures/cases", import.meta.url)),
+    "--emit-compiled-case",
+    productionPath,
+    "--production",
+  ],
+  { stdio: "ignore" },
+);
+let productionCaseExercised = true;
 let feeValues = [];
-if (fs.existsSync(productionPath)) {
+try {
   productionCaseExercised = true;
   const modelCase = JSON.parse(fs.readFileSync(productionPath, "utf8"));
   migrateLegacyDebtClasses(modelCase);
   modelCase.rcf_policy.commitment_fee_convention = "bps_on_undrawn";
   modelCase.rcf_policy.commitment_fee_value = 125;
+  sealForecastAuthorityLedger(modelCase);
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "excel-inflow-interest-contract."));
   const casePath = path.join(root, "case.json");
@@ -114,6 +127,8 @@ if (fs.existsSync(productionPath)) {
         /Forecast authority: zero/.test(comment.text),
     ),
   );
+} finally {
+  fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
 
 console.log(

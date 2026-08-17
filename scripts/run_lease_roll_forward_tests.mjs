@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import {
   leaseForecast,
@@ -8,6 +13,7 @@ import {
   validateLeasePolicy,
 } from "./lib/lease_policy.mjs";
 import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
+import { sealForecastAuthorityLedger } from "./lib/forecast_authority_ledger.mjs";
 import { solveCase } from "./lib/solver.mjs";
 
 const baseCase = (leasePolicy, accountingBasis = "IFRS") => ({
@@ -90,30 +96,41 @@ for (const [label, mutate] of mutations) {
   assert.notDeepEqual(leaseProjectionErrors(simpleCase, projection), [], label);
 }
 
-const productionPath =
-  "/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/dmu-stage4-checkpoints-d0Zvbp/interrupted-run/stages/decisions/model-case.json";
-if (fs.existsSync(productionPath)) {
-  const productionCase = JSON.parse(fs.readFileSync(productionPath, "utf8"));
-  migrateLegacyDebtClasses(productionCase);
-  const solved = solveCase(productionCase);
-  assert.deepEqual(
-    solved.forecast.map((period) => period.ending_lease),
-    [20, 20, 20],
-  );
-  assert.deepEqual(
-    solved.forecast.map((period) => period.lease_principal),
-    [4, 4, 4],
-  );
-  assert.deepEqual(
-    solved.forecast.map((period) => period.lease_additions),
-    [4, 4, 4],
-  );
-  assert.deepEqual(
-    solved.forecast.map((period) => period.lease_interest),
-    [1, 1, 1],
-  );
-  assert.equal(solved.all_checks_pass, true);
-}
+const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "excel-inflow-lease-contract."));
+const productionPath = path.join(fixtureRoot, "model-case.json");
+execFileSync(
+  process.execPath,
+  [
+    fileURLToPath(new URL("./run_evidence_run_tests.mjs", import.meta.url)),
+    fileURLToPath(new URL("../test-fixtures/cases", import.meta.url)),
+    "--emit-compiled-case",
+    productionPath,
+    "--production",
+  ],
+  { stdio: "ignore" },
+);
+const productionCase = JSON.parse(fs.readFileSync(productionPath, "utf8"));
+migrateLegacyDebtClasses(productionCase);
+sealForecastAuthorityLedger(productionCase);
+const solved = solveCase(productionCase);
+assert.deepEqual(
+  solved.forecast.map((period) => period.ending_lease),
+  [20, 20, 20],
+);
+assert.deepEqual(
+  solved.forecast.map((period) => period.lease_principal),
+  [4, 4, 4],
+);
+assert.deepEqual(
+  solved.forecast.map((period) => period.lease_additions),
+  [4, 4, 4],
+);
+assert.deepEqual(
+  solved.forecast.map((period) => period.lease_interest),
+  [1, 1, 1],
+);
+assert.equal(solved.all_checks_pass, true);
+fs.rmSync(fixtureRoot, { recursive: true, force: true });
 
 console.log(
   JSON.stringify(
@@ -121,7 +138,7 @@ console.log(
       status: "PASS",
       checks: 31,
       mutations: mutations.map(([label]) => label),
-      production_case_exercised: fs.existsSync(productionPath),
+      production_case_exercised: true,
     },
     null,
     2,
