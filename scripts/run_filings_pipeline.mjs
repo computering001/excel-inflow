@@ -27,6 +27,7 @@ const execFileAsync = promisify(execFile);
 const REQUEST_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-extraction-request-v1.schema.json"), "utf8"));
 const RESPONSE_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-extraction-response-v1.schema.json"), "utf8"));
 const SOURCE_REGISTRY_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v1.schema.json"), "utf8"));
+const SOURCE_REGISTRY_SCHEMA_V2 = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v2.schema.json"), "utf8"));
 const RUNTIME_MANIFEST = JSON.parse(readFileSync(path.join(ASSETS, "filings-runtime-members.json"), "utf8"));
 const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
 
@@ -365,7 +366,9 @@ async function main() {
         requestPath,
         outDir: path.join(outputRoot, "acquisition"),
         extractionRequestSchema: REQUEST_SCHEMA,
-        sourceRegistrySchema: SOURCE_REGISTRY_SCHEMA,
+        sourceRegistrySchema: inputRequest.schema_version === "filings-acquisition-request/2.0"
+          ? SOURCE_REGISTRY_SCHEMA_V2
+          : SOURCE_REGISTRY_SCHEMA,
       });
       request = acquired.extractionRequest;
       effectiveRequestPath = acquired.extractionRequestPath;

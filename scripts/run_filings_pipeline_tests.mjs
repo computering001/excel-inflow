@@ -354,6 +354,30 @@ assert(
 );
 checks += 7;
 
+// v2 source modes are explicit: user_supplied excludes declared internal
+// sources rather than silently merging them into the extraction request.
+const sourceModeAcquisition = structuredClone(acquisition);
+sourceModeAcquisition.schema_version = "filings-acquisition-request/2.0";
+sourceModeAcquisition.run_id = "filings-acquisition-source-mode";
+sourceModeAcquisition.source_mode = "user_supplied";
+const sourceModePath = path.join(temp, "filings-acquisition-source-mode.json");
+await fs.writeFile(sourceModePath, `${JSON.stringify(sourceModeAcquisition, null, 2)}\n`);
+const sourceModeResponse = structuredClone(acquisitionResponse);
+sourceModeResponse.run_id = sourceModeAcquisition.run_id;
+sourceModeResponse.documents = sourceModeResponse.documents.filter((document) => document.source_id === "user_report");
+const sourceModeResponsePath = path.join(temp, "filings-acquisition-source-mode-response.json");
+await fs.writeFile(sourceModeResponsePath, `${JSON.stringify(sourceModeResponse, null, 2)}\n`);
+const sourceModeOutput = path.join(temp, "source-mode-run");
+await run([sourceModePath, "--out", sourceModeOutput, "--responses", sourceModeResponsePath]);
+const sourceModeState = JSON.parse(await fs.readFile(path.join(sourceModeOutput, "filings-run-state.json"), "utf8"));
+assert(sourceModeState.pipeline_status === "PASS", "explicit user-supplied filing source mode did not pass");
+const sourceModeRegistry = JSON.parse(await fs.readFile(sourceModeState.artifacts.filings_source_registry, "utf8"));
+assert(sourceModeRegistry.schema_version === "filings-source-registry/2.0", "v2 acquisition emitted the wrong source-registry contract");
+assert(sourceModeRegistry.acquisition_policy.source_mode === "user_supplied", "v2 source mode was not preserved in registry custody");
+assert(sourceModeRegistry.acquisition_policy.excluded_document_ids.join("|") === "runtime-report", "declared internal filing was not explicitly excluded from user-supplied mode");
+assert(Object.keys(sourceModeRegistry.documents).join("|") === "user-report", "v2 user-supplied mode materialised an internal filing");
+checks += 5;
+
 // Overlapping annuals may split period authority: the user-supplied latest
 // report owns its covered comparatives and an explicitly marked older support
 // report owns only the missing oldest period. The canonical topology remains

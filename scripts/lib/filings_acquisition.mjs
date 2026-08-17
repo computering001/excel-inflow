@@ -133,13 +133,27 @@ export async function acquireFilingsSources({
   if (errors.length > 0) throw new Error(`Filings acquisition request is invalid: ${errors.join("; ")}`);
   const root = path.resolve(outDir);
   const requestBase = path.dirname(path.resolve(requestPath));
-  const sourceMode = request.schema_version === "filings-acquisition-request/2.0" ? request.source_mode : "user_supplied";
-  const eligibleOrigins = sourceMode === "user_supplied" ? new Set(["user_supplied"]) : sourceMode === "internal" ? new Set(["official_declarative_url", "runtime_library"]) : new Set(["user_supplied"]);
+  const explicitSourceMode = request.schema_version === "filings-acquisition-request/2.0";
+  const sourceMode = explicitSourceMode ? request.source_mode : null;
+  const eligibleOrigins = !explicitSourceMode
+    ? null
+    : sourceMode === "user_supplied"
+      ? new Set(["user_supplied"])
+      : sourceMode === "internal"
+        ? new Set(["official_declarative_url", "runtime_library"])
+        : new Set(["user_supplied"]);
   if (sourceMode === "internal_fallback" && !request.fallback_reason) throw new Error("internal_fallback requires fallback_reason");
-  const selectedSources = request.sources.filter((source) => eligibleOrigins.has(source.origin));
+  // v1 is a compatibility contract: preserve its historical precedence model
+  // and materialise every declared source. v2 is the explicit source-mode
+  // constitution and never silently merges internal and user-supplied sets.
+  const selectedSources = explicitSourceMode
+    ? request.sources.filter((source) => eligibleOrigins.has(source.origin))
+    : [...request.sources];
   const selectedOrigins = new Set(selectedSources.map((source) => source.origin));
   if (selectedSources.length === 0) throw new Error(`No filing sources are eligible under source_mode=${sourceMode}`);
-  const excludedDocumentIds = request.sources.filter((source) => !eligibleOrigins.has(source.origin)).map((source) => source.document_id).sort();
+  const excludedDocumentIds = explicitSourceMode
+    ? request.sources.filter((source) => !eligibleOrigins.has(source.origin)).map((source) => source.document_id).sort()
+    : [];
   const materialised = [];
   for (const declaration of selectedSources) {
     let bytes;
