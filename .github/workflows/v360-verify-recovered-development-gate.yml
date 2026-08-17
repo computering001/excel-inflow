@@ -1,4 +1,4 @@
-# resolve zero-child arithmetic ambiguity and add a regression on the v3.6 target
+# focused regression proof of the final recovered v3.6 repairs before the full source-owned gate
 name: v360 verify recovered development gate
 
 on:
@@ -9,52 +9,35 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/excel-inflow-v360-rebuild
+          ref: d194222bdc2f7106e9e2a8f97c6cde1267a626e4
           fetch-depth: 0
-      - name: Require audited starting point
+      - name: Install validation dependencies
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = '273ecc0623d51386635cb515c9a0d4eae3b07b70'
-      - name: Canonicalise arithmetic families over informative children
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+      - name: Run focused regression seams
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/extract_filing_statements.py')
-          s=p.read_text()
-          old='''        unique = []\n        seen = set()\n        for family in families:\n            key = tuple(family)\n            if key not in seen:\n                seen.add(key); unique.append(family)\n        if len(unique) == 1:\n            matches[parent_index] = unique\n'''
-          new='''        # Zero-valued child rows cannot distinguish two otherwise identical\n        # arithmetic families. Canonicalise matches over informative children\n        # only: geometry can still attach an adjacent zero child in the caption\n        # pass, while the arithmetic proof owns the non-zero family. This avoids\n        # treating [A, B, C] and [A, B, C, zero_row] as contradictory proofs.\n        unique = []\n        seen = set()\n        for family in families:\n            informative = []\n            for index in family:\n                series = _finite_series(rows[index])\n                if series is not None and all(abs(value) <= 0.5000001 for value in series):\n                    continue\n                informative.append(index)\n            key = tuple(informative)\n            if len(key) < 2:\n                continue\n            if key not in seen:\n                seen.add(key); unique.append(informative)\n        if len(unique) == 1:\n            matches[parent_index] = unique\n'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-
-          t=Path('scripts/run_source_arithmetic_topology_tests.py')
-          q=t.read_text()
-          old_tail='''infer_source_arithmetic_links(mutated)\nassert not any(item.get("parent_source_line_id") for item in mutated)\nprint('{"status":"PASS","checks":4}')\n'''
-          new_tail='''infer_source_arithmetic_links(mutated)\nassert not any(item.get("parent_source_line_id") for item in mutated)\nneutral_separator = [\n    row("cf.pbt", "Profit before taxation", [150, 150, 150], 1),\n    row("cf.da", "Depreciation and amortisation", [50, 50, 50], 1),\n    row("cf.neutral", "Net finance result", [0, 0, 0], 0),\n    row("cf.addback", "Net finance costs add-back", [-5, -5, -5], 1),\n    row("cf.wc", "Change in working capital", [0, 0, 0], 1),\n    row("cf.cfo", "Cash generated from operations", [195, 195, 195], 0),\n]\ninfer_source_arithmetic_links(neutral_separator)\nassert neutral_separator[0]["parent_source_line_id"] == "cf.cfo"\nassert neutral_separator[1]["parent_source_line_id"] == "cf.cfo"\nassert neutral_separator[3]["parent_source_line_id"] == "cf.cfo"\nassert neutral_separator[2].get("parent_source_line_id") is None\nprint('{"status":"PASS","checks":5}')\n'''
-          assert q.count(old_tail)==1, q.count(old_tail)
-          t.write_text(q.replace(old_tail,new_tail,1))
-          PY
-          python3 -m py_compile scripts/extract_filing_statements.py scripts/run_source_arithmetic_topology_tests.py
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
+          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          node scripts/run_test_registry_contract_tests.mjs
           python3 scripts/run_source_arithmetic_topology_tests.py
-          git diff --check
-      - name: Commit arithmetic-family repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'excel-inflow-recovery-publisher'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/extract_filing_statements.py scripts/run_source_arithmetic_topology_tests.py
-          git commit -m 'Resolve neutral child subtotal arithmetic ambiguity'
-          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
-          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
+          python3 scripts/run_evidence_pipeline_tests.py
+          node scripts/run_filings_pipeline_tests.mjs
+          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
+          node scripts/run_decision_round_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+          echo 'FOCUSED_V360_REGRESSIONS=PASS'
