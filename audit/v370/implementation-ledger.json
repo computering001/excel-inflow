@@ -811,16 +811,16 @@
       "earliest_responsible_layer": "Central acquisition / RCF / interest join plus missing native error gate.",
       "candidate_files": "scripts/lib/funded_acquisition_plan.mjs; scripts/lib/funded_acquisition_runtime.mjs; scripts/lib/solver.mjs; scripts/build_dynamic_model.mjs",
       "acceptance_criterion": "Acquisition On produces zero Excel errors and reconciles all transaction flows; Off/On/Off/On restores exactly.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Acquisition On produces zero Excel errors and reconciles all transaction flows; Off/On/Off/On restores exactly.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced independently: an enabled portable workbook had 24 formula/cache disagreements across target revenue, EBITDA, D&A, capex, PBT, opening/ending cash and the RCF bridge; this is the cached-value precursor to the handed-over native #VALUE! cascade.",
+        "focused_test": "PASS: the new four-state portable workbook regression builds Off/On/Off/On, validates every formula cache, scans every cached cell for Excel errors, runs the independent semantic oracle, proves schedule-owned acquisition debt and requires repeated Off and On plans to restore byte-for-byte.",
+        "source_fix": "Acquisition driver aliases now bind issuer operating profit to EBIT; direct operating overlays feed pro-forma leaves without being overwritten by standalone period rules; basis-specific opening cash retains its own temporal chain; acquisition debt proceeds enter the non-RCF schedule, Change in Debt and pre-RCF bridge once; the portable hook no longer replaces the schedule link with a second debt hardcode.",
+        "integration_evidence": "PASS: acquisition portable workbook 14 checks across four states; acquisition solver 11/11 on both reference and compiled production cases; acquisition funding 12/12; funded transaction 16/16; statement classifier/topology, forecast topology 33/33, forecast behavior 33/33, authority ledger 6/6 and production user flow 14/14.",
+        "semantic_oracle_evidence": "PASS: all four rendered workbooks have complete formula/cache parity and pass the independent OOXML semantic oracle; the close-year plan links Change in Debt to the schedule total, schedule proceeds to the acquisition debt control, and cash before RCF to the proceeds line.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "5bb1106"
       }
     },
     {
