@@ -58,7 +58,7 @@ assert.equal(result.statement_map.income_statement.length, 5);
 assert.equal(result.statement_map.cash_flow.length, 10);
 assert.equal(result.statement_map.income_statement[0].role, "revenue");
 assert.equal(result.statement_map.income_statement[0].broker_metric_id, "revenue");
-assert.equal(result.statement_map.income_statement[2].role, "ebit");
+assert.equal(result.statement_map.income_statement[2].role, "operating_profit");
 assert.equal(result.statement_map.income_statement[3].role, "is_da_expense");
 assert.equal(result.statement_map.income_statement[4].role, "net_income");
 assert.equal(result.statement_map.cash_flow[0].role, "cash_flow_net_income");
@@ -108,6 +108,24 @@ const typedIncome = manifest("income_statement", [
     structural_role: "body",
     material: false,
   },
+  {
+    source_line_id: "is.core_operating_profit",
+    ordinal: 4,
+    raw_label: "Core operating profit",
+    values: [11, 12, 13],
+    value_states: ["reported_number", "reported_number", "reported_number"],
+    structural_role: "body",
+    material: true,
+  },
+  {
+    source_line_id: "is.combined_da_impairment",
+    ordinal: 5,
+    raw_label: "Depreciation, amortisation and impairment",
+    values: [-4, -5, -6],
+    value_states: ["reported_number", "reported_number", "reported_number"],
+    structural_role: "body",
+    material: true,
+  },
 ]);
 const typedEvidence = structuredClone(evidence);
 typedEvidence.face_statement_manifests.income_statement = [typedIncome];
@@ -143,6 +161,16 @@ assert.deepEqual(
   typedIncome.rows[2].values,
   [0, 0, 0],
   "Explicit reported zero was not preserved as numeric zero.",
+);
+assert.equal(
+  typedSource.statement_map.income_statement[3].role,
+  "adjusted_ebit",
+  "Company-adjusted operating profit collapsed into statutory EBIT.",
+);
+assert.equal(
+  typedSource.statement_map.income_statement[4].role,
+  "depreciation_amortisation_and_impairment",
+  "A combined impairment line was admitted as pure D&A.",
 );
 
 const attributionIncome = manifest("income_statement", [
@@ -246,4 +274,4 @@ assert.deepEqual(
   "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 40 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 42 }, null, 2));

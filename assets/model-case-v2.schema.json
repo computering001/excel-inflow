@@ -2367,6 +2367,16 @@
         "table_context": {
           "type": "string"
         },
+        "numeric_type": {
+          "enum": [
+            "currency",
+            "percentage",
+            "multiple",
+            "count",
+            "date",
+            "text"
+          ]
+        },
         "classification_status": {
           "enum": [
             "accepted",
@@ -2401,8 +2411,12 @@
                 "enum": [
                   "label",
                   "context",
+                  "statement",
                   "hierarchy",
                   "numeric",
+                  "numeric_type",
+                  "definition_basis",
+                  "structure",
                   "negative"
                 ]
               },

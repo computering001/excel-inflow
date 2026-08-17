@@ -10,13 +10,27 @@ const CORE_ROLE_ALIASES = Object.freeze({
     gross_profit: ["gross profit"],
     ebit: ["ebit", "earnings before interest and tax", "earnings before interest and taxes"],
     operating_profit: ["operating profit", "operating income"],
+    adjusted_ebit: [
+      "adjusted ebit",
+      "core ebit",
+      "underlying ebit",
+      "core operating profit",
+      "adjusted operating profit",
+      "underlying operating profit",
+    ],
+    reported_ebitda: ["ebitda", "reported ebitda"],
     adjusted_ebitda: ["adjusted ebitda", "core ebitda", "underlying ebitda"],
     depreciation_and_amortisation: [
       "depreciation and amortisation",
-      "depreciation amortisation and impairment",
-      "depreciation amortization and impairment",
       "depreciation and amortization",
     ],
+    depreciation_amortisation_and_impairment: [
+      "depreciation amortisation and impairment",
+      "depreciation amortization and impairment",
+      "depreciation and amortisation and impairment",
+      "depreciation and amortization and impairment",
+    ],
+    impairment_loss: ["impairment loss", "impairment charge", "goodwill impairment"],
     interest_income: ["finance income", "interest income"],
     interest_expense: ["finance expense", "interest expense", "finance costs"],
     pre_tax_income: [
@@ -111,8 +125,12 @@ const CORE_ROLE_ALIASES = Object.freeze({
     cash_flow_da: [
       "depreciation and amortisation",
       "depreciation and amortization",
+    ],
+    cash_flow_da_and_impairment: [
       "depreciation amortisation and impairment",
       "depreciation amortization and impairment",
+      "depreciation and amortisation and impairment",
+      "depreciation and amortization and impairment",
     ],
     cash_flow_tax_addback: [
       "income tax charge",
@@ -246,6 +264,15 @@ function contextualRole(section, row, role) {
       return "is_da_expense";
     }
   }
+  if (section === "cash_flow" && role === "depreciation_and_amortisation") {
+    return "cash_flow_da";
+  }
+  if (
+    section === "cash_flow" &&
+    role === "depreciation_amortisation_and_impairment"
+  ) {
+    return "cash_flow_da_and_impairment";
+  }
   return role;
 }
 
@@ -274,19 +301,51 @@ function proposeSection(caseEvidence, section, used) {
   );
 
   for (const { row } of lines) {
-    const deterministicRole = contextualRole(
-      section,
-      row,
-      coreRole(section, row.raw_label),
-    );
+    const aliasCandidate = coreRole(section, row.raw_label);
+    const numericType = /(?:margin|rate|percent|percentage)/i.test(row.raw_label ?? "")
+      ? "percentage"
+      : (row.values ?? []).some(
+          (value) => value !== null && value !== "" && Number.isFinite(Number(value)),
+        )
+        ? "currency"
+        : null;
+    const lineIndex = lines.findIndex((entry) => entry.row === row);
+    const neighbouringLabels = lines
+      .slice(Math.max(0, lineIndex - 1), lineIndex + 2)
+      .filter((entry) => entry.row !== row)
+      .map((entry) => entry.row.raw_label)
+      .filter(Boolean);
+    const parentLabel = row.parent_source_line_id
+      ? lines.find((entry) => entry.row.source_line_id === row.parent_source_line_id)?.row.raw_label
+      : null;
     const classification = classifyStatementLine({
       label: row.raw_label,
       section,
-      parent_label: null,
-      neighbouring_labels: [],
+      parent_label: parentLabel,
+      neighbouring_labels: neighbouringLabels,
+      numeric_type: numericType,
+      is_subtotal: row.is_subtotal === true,
     });
-    const role = deterministicRole ??
-      (classification.status === "accepted" ? classification.classified_role : null);
+    const contextualRoles = new Set([
+      "ebit",
+      "operating_profit",
+      "adjusted_ebit",
+      "reported_ebitda",
+      "adjusted_ebitda",
+      "depreciation_and_amortisation",
+      "depreciation_amortisation_and_impairment",
+      "cash_flow_da",
+      "cash_flow_da_and_impairment",
+      "impairment_loss",
+    ]);
+    const classifiedRole = classification.status === "accepted"
+      ? classification.classified_role
+      : null;
+    const role = contextualRole(
+      section,
+      row,
+      contextualRoles.has(aliasCandidate) ? classifiedRole : aliasCandidate ?? classifiedRole,
+    );
     roleBySource.set(row.source_line_id, role);
     rowIdBySource.set(
       row.source_line_id,
@@ -301,17 +360,6 @@ function proposeSection(caseEvidence, section, used) {
   // issuer prints no distinct EBIT line. If both are printed, preserve both
   // semantic nodes; collapsing them creates duplicate visible authority and
   // destroys the reported reconciliation surface.
-  if (
-    section === "income_statement" &&
-    ![...roleBySource.values()].includes("ebit")
-  ) {
-    const operatingProfit = [...roleBySource.entries()].find(
-      ([, role]) => role === "operating_profit",
-    );
-    if (operatingProfit) {
-      roleBySource.set(operatingProfit[0], "ebit");
-    }
-  }
   if (
     section === "cash_flow" &&
     ![...roleBySource.values()].includes("cash_flow_net_income")

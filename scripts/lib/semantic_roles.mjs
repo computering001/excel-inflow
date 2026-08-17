@@ -1,8 +1,7 @@
 /** Canonical semantic-role ownership shared across topology and forecast layers. */
 export const SEMANTIC_ROLE_ALIASES = Object.freeze({
-  operating_profit: "ebit",
-  operating_income: "ebit",
-  operating_loss: "ebit",
+  operating_income: "operating_profit",
+  operating_loss: "operating_profit",
   acquisition: "acquisitions_net_of_cash",
   acquisition_cost: "acquisitions_net_of_cash",
   business_combination: "acquisitions_net_of_cash",

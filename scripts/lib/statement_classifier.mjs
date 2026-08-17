@@ -30,6 +30,14 @@ function candidateFor(role, line) {
   const label = normalise(line.label);
   const labelWords = words(label);
   const context = contextText(line);
+  const numericType = line.numeric_type ??
+    (line.number_format === "percentage" || /(?:margin|rate|percent|percentage)/i.test(line.label ?? "")
+      ? "percentage"
+      : (line.values ?? []).some(
+          (value) => value !== null && value !== "" && Number.isFinite(Number(value)),
+        )
+        ? "currency"
+        : null);
   const evidence = [];
   let score = 0;
   const exact = role.aliases.some((alias) => phraseMatch(label, alias));
@@ -50,7 +58,7 @@ function candidateFor(role, line) {
   }
   if (role.sections.includes(line.section)) {
     score += 0.2;
-    evidence.push({ channel: "context", detail: `statement: ${line.section}`, score: 0.2 });
+    evidence.push({ channel: "statement", detail: `statement: ${line.section}`, score: 0.2 });
   } else {
     score -= 0.35;
     evidence.push({ channel: "context", detail: `wrong statement: ${line.section}`, score: -0.35 });
@@ -60,6 +68,32 @@ function candidateFor(role, line) {
   if (contextMatches.length > 0) {
     score += 0.12;
     evidence.push({ channel: "hierarchy", detail: `context tokens: ${contextMatches.join(", ")}`, score: 0.12 });
+  }
+  if (Array.isArray(role.numeric_types) && numericType) {
+    if (role.numeric_types.includes(numericType)) {
+      score += 0.1;
+      evidence.push({ channel: "numeric_type", detail: `numeric type: ${numericType}`, score: 0.1 });
+    } else {
+      score -= 0.6;
+      evidence.push({ channel: "negative", detail: `incompatible numeric type: ${numericType}`, score: -0.6 });
+    }
+  } else if (numericType === "currency") {
+    score += 0.05;
+    evidence.push({ channel: "numeric_type", detail: "statement currency value", score: 0.05 });
+  } else if (numericType === "percentage") {
+    score -= 0.45;
+    evidence.push({ channel: "negative", detail: "percentage cannot own a currency role", score: -0.45 });
+  }
+  if (
+    role.adjustment_basis === true &&
+    ["adjusted", "core", "underlying"].some((token) => labelWords.has(token))
+  ) {
+    score += 0.12;
+    evidence.push({ channel: "definition_basis", detail: "company-adjusted basis", score: 0.12 });
+  }
+  if (line.is_subtotal === true && ["operating_profit", "ebit", "adjusted_ebit", "reported_ebitda", "adjusted_ebitda"].includes(role.id)) {
+    score += 0.08;
+    evidence.push({ channel: "structure", detail: "source subtotal", score: 0.08 });
   }
   return { role: role.id, score: Math.max(0, Math.min(1, score)), evidence, high_impact: role.high_impact };
 }
@@ -82,8 +116,13 @@ export function classifyStatementLine(line) {
     return { taxonomy_version: TAXONOMY.contract_version, status: "unmapped", classified_role: null, confidence: 0, evidence: [], candidates: candidates.map(({ role, score }) => ({ role, score: Number(score.toFixed(2)) })) };
   }
   const channels = new Set(best.evidence.filter((item) => item.score > 0).map((item) => item.channel));
+  const substantiveChannels = new Set(
+    [...channels].filter(
+      (channel) => !["label", "statement", "definition_basis"].includes(channel),
+    ),
+  );
   const separated = !next || best.score - next.score >= 0.15;
-  const sufficientlySupported = !best.high_impact || channels.size >= 2;
+  const sufficientlySupported = !best.high_impact || substantiveChannels.size >= 1;
   const accepted = best.score >= 0.85 && separated && sufficientlySupported;
   return {
     taxonomy_version: TAXONOMY.contract_version,

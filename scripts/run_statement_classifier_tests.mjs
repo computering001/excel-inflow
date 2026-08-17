@@ -21,7 +21,7 @@ function hasBlock(report, prefix) {
 const classifierVersion = "statement-semantic-taxonomy.v1";
 
 function accepted(line) {
-  const result = classifyStatementLine(line);
+  const result = classifyStatementLine({ numeric_type: "currency", ...line });
   assert(result.status === "accepted", `Expected accepted ${line.label}: ${JSON.stringify(result)}`);
   return {
     classification_status: "accepted",
@@ -37,6 +37,12 @@ function accepted(line) {
 const positive = [
   ["Turnover", "income_statement", "revenue"],
   ["Cost of revenue", "income_statement", "cost_of_sales"],
+  ["Core operating profit", "income_statement", "adjusted_ebit"],
+  [
+    "Depreciation, amortisation and impairment",
+    "income_statement",
+    "depreciation_amortisation_and_impairment",
+  ],
   ["Exceptional impairment of goodwill", "income_statement", "impairment_loss"],
   ["Finance costs", "income_statement", "interest_expense"],
   ["Interest paid", "cash_flow", "cash_interest_paid"],
@@ -48,14 +54,49 @@ const positive = [
   ["Effect of exchange rate changes on cash", "cash_flow", "fx_effect_on_cash"],
 ];
 for (const [label, section, role] of positive) {
-  const result = classifyStatementLine({ label, section });
+  const result = classifyStatementLine({ label, section, numeric_type: "currency" });
   assert(result.status === "accepted" && result.classified_role === role,
     `Positive classification failed for ${label}: ${JSON.stringify(result)}`);
 }
+const aliasOnlyAdjusted = classifyStatementLine({
+  label: "Core operating profit",
+  section: "income_statement",
+});
+assert(
+  aliasOnlyAdjusted.status !== "accepted",
+  "A high-impact adjusted-profit alias became final authority without structural or numeric evidence.",
+);
+const unfamiliarAdjusted = classifyStatementLine({
+  label: "Core operating result",
+  section: "income_statement",
+  numeric_type: "currency",
+  is_subtotal: true,
+  neighbouring_labels: ["Operating profit reconciliation"],
+});
+assert(
+  unfamiliarAdjusted.status === "accepted" &&
+    unfamiliarAdjusted.classified_role === "adjusted_ebit",
+  `Contextually equivalent adjusted EBIT did not classify: ${JSON.stringify(unfamiliarAdjusted)}`,
+);
+const percentageProfit = classifyStatementLine({
+  label: "Core operating profit margin",
+  section: "income_statement",
+  numeric_type: "percentage",
+  is_subtotal: true,
+});
+assert(
+  percentageProfit.classified_role !== "adjusted_ebit",
+  "A percentage margin was admitted as a currency adjusted-EBIT row.",
+);
 for (const [label, section, forbiddenRole] of [
   ["Deferred tax", "cash_flow"],
   ["Impairment charge", "cash_flow", "capex"],
   ["Impairment charge", "income_statement", "other_non_cash"],
+  [
+    "Depreciation, amortisation and impairment",
+    "income_statement",
+    "depreciation_and_amortisation",
+  ],
   ["Operating lease interest paid", "cash_flow"],
 ]) {
   const result = classifyStatementLine({ label, section });
@@ -104,10 +145,20 @@ assert(
   interestSource,
   "Representative fixture needs a sourced finance-cost line feeding the interest-expense graph.",
 );
-Object.assign(interestSource, { label: "Finance costs", ...accepted({ label: "Finance costs", section: "income_statement" }) });
+Object.assign(interestSource, {
+  label: "Finance costs",
+  numeric_type: "currency",
+  ...accepted({ label: "Finance costs", section: "income_statement" }),
+});
 
 assert(validateCaseShape(fixture).length === 0, "Evidence fixture failed schema validation.");
-assert(assessCoverage(fixture).ready_to_build, "Evidence fixture did not pass baseline coverage.");
+const baselineCoverage = assessCoverage(fixture);
+assert(
+  baselineCoverage.ready_to_build,
+  `Evidence fixture did not pass baseline coverage: ${JSON.stringify(
+    baselineCoverage.checks.filter((check) => check.status === "BLOCK"),
+  )}`,
+);
 
 const orderInversion = clone(fixture);
 // Exercise the source-order compiler, not the sealed Stage-4 fast path. A
@@ -666,4 +717,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log("Statement classifier tests: PASS (7 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 13 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).");
+console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 13 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);

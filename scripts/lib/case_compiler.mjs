@@ -604,6 +604,13 @@ function compileSourceCoverage({ section, lines, entriesById, rowsBySourceLine, 
       page_or_note: line.page_or_note ?? manifest.page_or_note ?? "face statement",
       face_statement: true,
       material: line.material ?? null,
+      numeric_type: /(?:margin|rate|percent|percentage)/i.test(line.raw_label ?? "")
+        ? "percentage"
+        : (line.values ?? []).some(
+            (value) => value !== null && value !== "" && Number.isFinite(Number(value)),
+          )
+          ? "currency"
+          : "text",
       disposition: ["absorb", "expand"].includes(entry?.disposition) ? "aggregated" : "mapped",
       mapped_row_ids: expansionRowsByLine.get(line.source_line_id) ?? (target ? [target.row_id] : []),
     };
@@ -1018,6 +1025,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   const cfDaCandidates = cfRows.filter(
     (row) =>
       /depreciat|amortis|amortiz/i.test(row.label ?? "") &&
+      !/impair/i.test(row.label ?? "") &&
       !/grant/i.test(row.label ?? "") &&
       row.row_type === "input" &&
       (row.values ?? []).slice(0, 3).some((value) => Number.isFinite(Number(value))),

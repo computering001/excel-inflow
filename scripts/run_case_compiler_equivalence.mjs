@@ -559,7 +559,7 @@ export function deriveCaseSourceAndEvidence(modelCase) {
  */
 const JUSTIFIED = [
   // Full classification receipts on coverage entries (evidence_v1 standard).
-  /^source_coverage\.(income_statement|cash_flow)\[\d+\]\.(classifier_version|classification_candidates|classification_evidence|classification_confidence|classification_status|classification_review_status|classified_role|reason|mapping_method)\b/,
+  /^source_coverage\.(income_statement|cash_flow)\[\d+\]\.(classifier_version|classification_candidates|classification_evidence|classification_confidence|classification_status|classification_review_status|classified_role|reason|mapping_method|numeric_type)\b/,
   // waterfall_v1 + authority_v1 receipts and capture certificates on rows —
   // the compiled case carries the full production contract the legacy cohort
   // predates.  Only absent-in-certified paths qualify; a VALUE disagreement
