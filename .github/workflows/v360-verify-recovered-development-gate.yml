@@ -1,4 +1,4 @@
-# inspect acquisition overlay cells behind v3.6 formula/cache divergence
+# inspect cash-flow row identities before final funded-acquisition repair
 name: v360 verify recovered development gate
 
 on:
@@ -21,7 +21,7 @@ jobs:
           ref: 7c4791ff0ceb800be18f04cefc90056fd94aeebc
           fetch-depth: 0
       - run: python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
-      - name: Inspect acquisition overlay cells
+      - name: Generate portable workbook and print row-map identities
         shell: bash
         run: |
           set +e
@@ -31,19 +31,10 @@ jobs:
           python3 - <<'PY'
           import json,os
           from pathlib import Path
-          from openpyxl import load_workbook
-          root=Path(os.environ['ROOT_PATH']); p=root/'emit/model.xlsx'
-          f=load_workbook(p,data_only=False); v=load_workbook(p,data_only=True)
-          ws=f['Operating Model']; vs=v['Operating Model']
-          for row in range(48,63):
-              label=ws[f'B{row}'].value
-              vals=[]
-              for col in ['J','K','L','N','O','P','S','T','U']:
-                  vals.append(f"{col}{row}:F={ws[f'{col}{row}'].value!r}:V={vs[f'{col}{row}'].value!r}")
-              print('ROW',row,'LABEL',label,' | '.join(vals))
-          print('TRANSACTION CONTROLS')
-          for row in range(1,15):
-              print(row,ws[f'P{row}'].value,vs[f'P{row}'].value)
-          f.close();v.close()
+          root=Path(os.environ['ROOT_PATH'])
+          rp=json.loads(Path(str(root/'emit/model.xlsx')+'.row-map.json').read_text())
+          for r in rp['statement_rows']['cash_flow']:
+              if 48 <= int(r.get('row',0)) <= 62:
+                  print(json.dumps(r,sort_keys=True))
           PY
           exit 1
