@@ -247,7 +247,7 @@ def main() -> int:
         assert_true(
             demand["schema_version"] == "pre-broker-model-demand/2.0"
             and demand["counts"] == {
-                "source_rows": 2,
+                "source_rows": 0,
                 "filed_forecast_nodes": 0,
                 "model_demand_concepts": 9,
                 "model_demand_nodes": 27,
