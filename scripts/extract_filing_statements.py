@@ -457,13 +457,24 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
                 if candidate_level > level:
                     next_subtotal_by_level.pop(candidate_level, None)
         else:
-            # A same- or shallower-level non-total is a structural boundary.
-            # Do not let a later caption subtotal reach backwards across an
-            # intervening issuer aggregate or disclosure; that would let
-            # vocabulary override failed arithmetic proof and steal children.
-            for candidate_level in list(next_subtotal_by_level):
-                if candidate_level >= level:
-                    next_subtotal_by_level.pop(candidate_level, None)
+            # A same- or shallower-level valued non-total is a structural
+            # boundary. A valueless ratio/helper row (for example an EBITDA
+            # margin header) is not part of the filed arithmetic surface and
+            # must not sever an otherwise visible component -> subtotal edge.
+            # Keep general valueless headings fail-closed; only the ratio/helper
+            # vocabulary already excluded from subtotal ownership is transparent.
+            transparent_helper = (
+                _finite_series(row) is None
+                and re.search(
+                    r"(?:margin|rate|per share|reconciliation)\s*%?$",
+                    str(row.get("raw_label") or ""),
+                    re.I,
+                )
+            )
+            if not transparent_helper:
+                for candidate_level in list(next_subtotal_by_level):
+                    if candidate_level >= level:
+                        next_subtotal_by_level.pop(candidate_level, None)
 
 
 def extract_statement(
