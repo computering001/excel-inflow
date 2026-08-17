@@ -1,4 +1,4 @@
-# prove the sole remaining Stage-4 checkpoint seam on the repaired v3.6 target
+# run the complete repo-local v3.6 development gate on the exact repaired target
 name: v360 verify recovered development gate
 
 on:
@@ -30,19 +30,71 @@ jobs:
           /tmp/v360-python/bin/python -m pip install --upgrade pip >/dev/null
           /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy >/dev/null
           HOME=/tmp/isolated-home /tmp/v360-python/bin/python -c 'import fitz,openpyxl; print("HOME_INDEPENDENT_PYTHON=PASS",openpyxl.__version__)'
-      - name: Run Stage-4 content-addressed resume proof
+      - name: Verify source-owned registry contract
         shell: bash
         run: |
           set -euo pipefail
+          node scripts/run_test_registry_contract_tests.mjs
+      - name: Select every repo-local custody test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('assets/development-test-registry.json')
+          d=json.loads(p.read_text())
+          available={'CASES','REPRESENTATIVE','PYTHON','SOFFICE'}
+          selected=[]
+          excluded=[]
+          for t in d['tests']:
+              req=set(t.get('requires',[]))
+              if t['id']=='test-registry-contract':
+                  excluded.append((t['id'],['run-separately-before-filter']))
+              elif req <= available:
+                  selected.append(t)
+              else:
+                  excluded.append((t['id'],sorted(req-available)))
+          print('REGISTRY_TOTAL='+str(len(d['tests'])))
+          print('LOCAL_GATE_SELECTED='+str(len(selected)))
+          print('EXTERNAL_OR_SEPARATE='+str(len(excluded)))
+          for tid,why in excluded:
+              print('EXCLUDED_ID='+tid+' REASON='+','.join(why))
+          d['tests']=selected
+          p.write_text(json.dumps(d,indent=2)+'\n')
+          PY
+      - name: Run complete repo-local development gate
+        shell: bash
+        run: |
+          set +e
+          set -uo pipefail
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
-          rm -rf /tmp/v360-stage4-proof
-          node scripts/run_stage4_checkpoint_tests.mjs \
+          rm -rf /tmp/v360-development-gate
+          node scripts/run_development_gate.mjs \
             --cases test-fixtures/cases \
+            --representative test-fixtures/cases/standard-maximal-v2.json \
             --python /tmp/v360-python/bin/python \
             --soffice "$(command -v soffice)" \
-            --out /tmp/v360-stage4-proof
-          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
-          echo 'STAGE4_CONTENT_ADDRESSED_RESUME=PASS'
+            --concurrency 1 \
+            --timeout-ms 900000 \
+            --out /tmp/v360-development-gate
+          gate_exit=$?
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('/tmp/v360-development-gate/development-gate-report.json').read_text())
+          print('FINAL_GATE_STATUS='+d['status'])
+          print('PASS='+str(d['counts']['PASS']))
+          print('FAIL='+str(d['counts']['FAIL']))
+          print('BLOCKED='+str(d['counts']['BLOCKED']))
+          for r in d['results']:
+              if r['status']!='PASS':
+                  print('\n=== FAILED_ID='+r['id']+' STATUS='+r['status']+' ===')
+                  if r.get('command'): print('COMMAND='+' '.join(map(str,r['command'])))
+                  if r.get('stdout'): print('STDOUT_TAIL:\n'+r['stdout'][-6000:])
+                  if r.get('stderr'): print('STDERR_TAIL:\n'+r['stderr'][-10000:])
+          PY
+          exit $gate_exit
