@@ -1,4 +1,4 @@
-# inspect the synthetic filing hierarchy behind the remaining v3.6 controller failure
+# repair the audited filing-hierarchy boundary bug on the preserved v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -9,27 +9,45 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  repair:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: e0530e55cd74191b952b88f1ff17a08c73345cec
-      - name: Emit and inspect clean filing fixture
+          ref: agent/excel-inflow-v360-rebuild
+          fetch-depth: 0
+      - name: Require audited starting point
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean.json
-          node - <<'NODE'
-          const fs=require('fs'); const d=JSON.parse(fs.readFileSync('/tmp/clean.json','utf8'));
-          for (const m of d.filings.face_statement_manifests.income_statement) {
-            console.log('MANIFEST',m.source_id,m.statement_order);
-            for (const r of m.rows) console.log(JSON.stringify(r));
-          }
-          console.log('CASE_SOURCE_INCOME_MAP');
-          for (const r of d.case_source.statement_map.income_statement) console.log(JSON.stringify(r));
-          NODE
+          test "$(git rev-parse HEAD)" = 'e0530e55cd74191b952b88f1ff17a08c73345cec'
+      - name: Preserve subtotal ownership across valueless ratio rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/extract_filing_statements.py')
+          s=p.read_text()
+          old='''        else:\n            # A same- or shallower-level non-total is a structural boundary.\n            # Do not let a later caption subtotal reach backwards across an\n            # intervening issuer aggregate or disclosure; that would let\n            # vocabulary override failed arithmetic proof and steal children.\n            for candidate_level in list(next_subtotal_by_level):\n                if candidate_level >= level:\n                    next_subtotal_by_level.pop(candidate_level, None)\n'''
+          new='''        else:\n            # A same- or shallower-level valued non-total is a structural\n            # boundary. A valueless ratio/helper row (for example an EBITDA\n            # margin header) is not part of the filed arithmetic surface and\n            # must not sever an otherwise visible component -> subtotal edge.\n            # Keep general valueless headings fail-closed; only the ratio/helper\n            # vocabulary already excluded from subtotal ownership is transparent.\n            transparent_helper = (\n                _finite_series(row) is None\n                and re.search(\n                    r"(?:margin|rate|per share|reconciliation)\\s*%?$",\n                    str(row.get("raw_label") or ""),\n                    re.I,\n                )\n            )\n            if not transparent_helper:\n                for candidate_level in list(next_subtotal_by_level):\n                    if candidate_level >= level:\n                        next_subtotal_by_level.pop(candidate_level, None)\n'''
+          assert s.count(old)==1, s.count(old)
+          p.write_text(s.replace(old,new,1))
+          PY
+          python3 -m py_compile scripts/extract_filing_statements.py
+          git diff --check
+          git diff -- scripts/extract_filing_statements.py
+      - name: Commit hierarchy repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/extract_filing_statements.py
+          git commit -m 'Preserve filed subtotal hierarchy across ratio rows'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
+          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
