@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T17:51:29Z",
+  "recorded_at": "2026-08-17T17:56:22Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -265,16 +265,16 @@
       "earliest_responsible_layer": "Broker contract normalisation.",
       "candidate_files": "scripts/run_attachment_evidence_pipeline.py; scripts/lib/run_constitution_graph.mjs; scripts/run_broker_pipeline.py; scripts/broker_terminal_recovery.py",
       "acceptance_criterion": "A fresh v2 graph passes the complete producer-consumer path through selected authority and workbook emission.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "A fresh v2 graph passes the complete producer-consumer path through selected authority and workbook emission.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "PASS_RED: a fresh producer-shaped /2.0 graph was rejected by run constitution as the wrong version and by selected-cell recovery as a v1-only contract.",
+        "focused_test": "PASS: run constitution 16 positive plus 5 mutations; demand selection 18/18; evidence pipeline 24/24; Tier-1 v1/v2 demand parity; model-owned demand 3/3; native preflight 4/4; degraded broker controller 75/75.",
+        "source_fix": "Both runtime languages now use a version-aware pre-broker demand reader normalized to canonical-pre-broker-demand/1.0 nodes; constitution, broker controller and terminal selected-cell recovery consume only that canonical form.",
+        "integration_evidence": "PASS: the attachment producer emits /2.0, the real broker controller accepts the fresh request, and v1/v2 selected-cell crosswalks resolve the same 72 source mappings. Workbook emission remains pending the integrated package pass.",
+        "semantic_oracle_evidence": "PASS: canonical matching accepts source-backed nodes by source identity and synthetic model-demand nodes by section/metric/period identity; stale graph hashes and disappearing nodes still fail closed.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "f0bf43e6c80aa270e670a1835d280517f2293b85"
       }
     },
     {
