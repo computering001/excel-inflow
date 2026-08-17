@@ -1,0 +1,50 @@
+{
+  "schema_version": "excel-inflow-v370-package-identity/1.0",
+  "recorded_at": "2026-08-17T17:12:00Z",
+  "source_commit": "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
+  "source_tree": "4ef68869f268e37e84aa9a78fd657a8e298bb04e",
+  "build_mode": "development",
+  "release_name": "Excel Inflow v3.6.0",
+  "production_certified": false,
+  "validation_status": "PASS_PENDING_MANUAL",
+  "first_attempt": {
+    "path": "audit/v370/baseline-package-a",
+    "status": "FAILED_EXPECTED_CUSTODY",
+    "input": "test-fixtures/cases/standard-maximal-v2.json",
+    "reason": "Fixture lacks production source and authority contracts; partial output retained for audit."
+  },
+  "deterministic_builds": [
+    {
+      "path": "audit/v370/baseline-package-b",
+      "raw_manifest_sha256": "c844ad6e5e6b1f6292af03427a986976e0a1c31424e1c92ccaed4491869ca0fb"
+    },
+    {
+      "path": "audit/v370/baseline-package-c",
+      "raw_manifest_sha256": "89c542d7b8dd453e22c75710e620bbc6672ae3fb21b5686d73740c6faa229aa8"
+    }
+  ],
+  "comparison": {
+    "raw_manifest_difference": [
+      "generatedAt",
+      "smokeTest.isolatedRoot"
+    ],
+    "all_other_package_files_byte_identical": true,
+    "normalized_manifest_algorithm": "Remove generatedAt and smokeTest.isolatedRoot, then SHA-256 canonical JSON with sorted object keys and one trailing newline.",
+    "normalized_manifest_sha256": "72b89e5f7258ad9ca50116a25819afaccf120080883e29de99cd892acb92a388",
+    "manifest_files_count": 287,
+    "canonical_manifest_files_array_sha256": "172e7b48ca2229195da837dd2e53d4e712d7eda2742fad394f872f04ff169719"
+  },
+  "closure": {
+    "current_closure_sha256": "c70839f018adeadc306a2cbc555484719645a66da425d87b2ab692a13656051c",
+    "closure_file_count": 271,
+    "certified_closure_sha256": null
+  },
+  "smoke_workbook": {
+    "case_sha256": "a8129e07e59be176d59ad01782903570bb5bdfcac351930db7eb3d985d9fdbf2",
+    "plan_sha256": "e7436e2e0fa0270b009c7ad532587f648d5d63cfbb4f9e2cded6cc0309959822",
+    "workbook_sha256": "c434a52e8e68ae23f826279eb83dcce9a457f44d58626aefbe7b200cfabeec99",
+    "validation_status": "PASS_PENDING_MANUAL",
+    "total_violations": 0,
+    "native_excel_evidence": "NOT_AVAILABLE"
+  }
+}

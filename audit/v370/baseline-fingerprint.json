@@ -1,0 +1,62 @@
+{
+  "schema_version": "excel-inflow-v370-baseline-fingerprint/1.0",
+  "recorded_at": "2026-08-17T17:12:00Z",
+  "repository": {
+    "remote": "https://github.com/computering001/excel-inflow.git",
+    "branch": "agent/excel-inflow-v370-repair-clean",
+    "commit": "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
+    "tree": "4ef68869f268e37e84aa9a78fd657a8e298bb04e"
+  },
+  "runtime": {
+    "node": {
+      "executable": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "version": "v22.23.2"
+    },
+    "python": {
+      "executable": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
+    },
+    "soffice": {
+      "executable": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "version": "LibreOfficeDev 26.8 alpha"
+    }
+  },
+  "handover": {
+    "root": "/Users/archiepreston/Downloads/Excel_Inflow_v370_Handover_2026-08-17",
+    "manifest_verified": true,
+    "risk_register_sha256": "f4b9275b680d114e3daf228db20476d48dd68f9c4764730c479e0237e46be22e"
+  },
+  "baseline_gate": {
+    "command": [
+      "node",
+      "scripts/run_development_gate.mjs",
+      "--cases",
+      "test-fixtures/cases",
+      "--representative",
+      "test-fixtures/cases/standard-maximal-v2.json",
+      "--python",
+      "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "--soffice",
+      "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+      "--concurrency",
+      "3",
+      "--timeout-ms",
+      "900000",
+      "--out",
+      "audit/v370/baseline-gate"
+    ],
+    "environment": {
+      "DEBT_OVERLAY_CASES_DIR": "test-fixtures/cases",
+      "DEBT_OVERLAY_PYTHON": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "EXCEL_INFLOW_TEST_PYTHON": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "SOFFICE_BIN": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice"
+    },
+    "report": "audit/v370/baseline-gate/development-gate-report.json",
+    "report_sha256": "1d205f4b94a367cf458f6b79a2ad9cb6c3c79a8315ba8ad2d6a12e6df922a5e2",
+    "counts": {
+      "PASS": 64,
+      "FAIL": 0,
+      "BLOCKED": 7
+    },
+    "registry_test_count": 71
+  }
+}

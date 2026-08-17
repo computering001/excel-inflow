@@ -1,0 +1,1247 @@
+{
+  "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
+  "recorded_at": "2026-08-17T17:12:00Z",
+  "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
+  "repository": {
+    "remote": "https://github.com/computering001/excel-inflow.git",
+    "branch": "agent/excel-inflow-v370-repair-clean",
+    "baseline_commit": "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
+    "baseline_tree": "4ef68869f268e37e84aa9a78fd657a8e298bb04e",
+    "remote_main_verified": true,
+    "failed_branch": {
+      "name": "agent/excel-inflow-v370-semantic-repair",
+      "commit": "d90bf07c8b72f73a9389f615bed988639dc9d6f2",
+      "disposition": "NOT_USED",
+      "product_diff_from_main": false,
+      "workflow_only_files": [
+        ".github/workflows/v370-atomic-cashflow-repair.yml",
+        ".github/workflows/v370-atomic-cashflow-repair-v2.yml"
+      ]
+    }
+  },
+  "custody": {
+    "handover_manifest_verified": true,
+    "risk_register_sha256": "f4b9275b680d114e3daf228db20476d48dd68f9c4764730c479e0237e46be22e",
+    "evidence_read_order_completed": true,
+    "original_screenshots_inspected": true,
+    "confidentiality_rule": "Screenshots and company-specific derived data remain outside this public repository; only neutral invariants and fixtures may be committed."
+  },
+  "baseline_gate": {
+    "status": "INCOMPLETE_EXTERNAL_CUSTODY",
+    "full_report": "audit/v370/baseline-gate/development-gate-report.json",
+    "report_sha256": "1d205f4b94a367cf458f6b79a2ad9cb6c3c79a8315ba8ad2d6a12e6df922a5e2",
+    "counts": {
+      "PASS": 64,
+      "FAIL": 0,
+      "BLOCKED": 7
+    },
+    "filtered_handover_claim": "63/63 repository-local tests passed after seven external tests were temporarily removed from the registry; that receipt is not the unfiltered 71-test result.",
+    "golden_actions_performed": false,
+    "native_excel_actions_performed": false,
+    "release_actions_performed": false
+  },
+  "baseline_package": {
+    "first_attempt": {
+      "output": "audit/v370/baseline-package-a",
+      "status": "FAILED_EXPECTED_CUSTODY",
+      "reason": "The standard-maximal-v2 fixture lacks the production source and authority contracts required by compile_skill_release."
+    },
+    "reproducible_attempts": [
+      "audit/v370/baseline-package-b",
+      "audit/v370/baseline-package-c"
+    ],
+    "package_mode": "development",
+    "validation_status": "PASS_PENDING_MANUAL",
+    "production_certified": false,
+    "current_closure_sha256": "c70839f018adeadc306a2cbc555484719645a66da425d87b2ab692a13656051c",
+    "smoke_case_sha256": "a8129e07e59be176d59ad01782903570bb5bdfcac351930db7eb3d985d9fdbf2",
+    "plan_sha256": "e7436e2e0fa0270b009c7ad532587f648d5d63cfbb4f9e2cded6cc0309959822",
+    "workbook_sha256": "c434a52e8e68ae23f826279eb83dcce9a457f44d58626aefbe7b200cfabeec99",
+    "normalized_manifest_sha256": "72b89e5f7258ad9ca50116a25819afaccf120080883e29de99cd892acb92a388",
+    "deterministic_after_volatile_metadata_normalization": true
+  },
+  "source_anchor_audit": [
+    {
+      "risks": [
+        "ROW-008",
+        "AUTH-035"
+      ],
+      "anchor": "valueLess(row) treats absent/all-null/all-empty values as structurally valueless",
+      "location": "scripts/lib/case_source_proposer.mjs:264",
+      "state": "PRESENT_UNCHANGED"
+    },
+    {
+      "risks": [
+        "BROKER-003"
+      ],
+      "anchor": "Forecast Waterfall sets brokerDisabled and removes broker ownership/consumption",
+      "locations": [
+        "scripts/lib/case_compiler.mjs:2513",
+        "scripts/lib/coverage.mjs:2009",
+        "scripts/lib/broker_anchor.mjs:382"
+      ],
+      "state": "PRESENT_UNCHANGED"
+    },
+    {
+      "risks": [
+        "BROKER-004"
+      ],
+      "anchor": "producer emits demand /2.0 while run_constitution_graph and broker pipeline require /1.0",
+      "locations": [
+        "scripts/run_attachment_evidence_pipeline.py:419",
+        "scripts/lib/run_constitution_graph.mjs:275",
+        "scripts/run_broker_pipeline.py:1118",
+        "scripts/broker_terminal_recovery.py:273"
+      ],
+      "state": "PRESENT_UNCHANGED"
+    },
+    {
+      "risks": [
+        "KPI-005"
+      ],
+      "anchor": "compiler authors visible EBITDA proxy labels",
+      "locations": [
+        "scripts/lib/case_compiler.mjs:1066",
+        "scripts/lib/case_compiler.mjs:1074"
+      ],
+      "state": "PRESENT_UNCHANGED"
+    },
+    {
+      "risks": [
+        "DEBT-020",
+        "DEBT-021"
+      ],
+      "anchor": "unmatched non-empty descriptions default to other_debt",
+      "location": "scripts/propose_dcs_crosswalk.py:73",
+      "state": "PRESENT_UNCHANGED"
+    }
+  ],
+  "p0_root_cause_map": [
+    {
+      "risks": [
+        "FACE-001",
+        "FACE-002"
+      ],
+      "symptom": "reported aggregate and complete children remain independent historical/forecast authorities",
+      "earliest_responsible_layer": "statement hierarchy plus historical/forecast aggregate ownership compilation",
+      "repair_boundary": "typed semantic graph and compiler ownership selection; never emitted cells"
+    },
+    {
+      "risks": [
+        "BROKER-003"
+      ],
+      "symptom": "Forecast Waterfall disables compatible broker evidence",
+      "earliest_responsible_layer": "broker control semantics",
+      "repair_boundary": "selection/consumption doctrine before forecast authority materialization"
+    },
+    {
+      "risks": [
+        "BROKER-004"
+      ],
+      "symptom": "fresh v2 broker demand cannot traverse v1-only consumers",
+      "earliest_responsible_layer": "pre-broker demand contract normalization",
+      "repair_boundary": "one version-aware reader normalized to a canonical internal node form"
+    },
+    {
+      "risks": [
+        "CF-009",
+        "CF-010"
+      ],
+      "symptom": "protected cash-flow totals accept carry-forward forecast authority",
+      "earliest_responsible_layer": "protected cash-flow identity and aggregate ownership compilation",
+      "repair_boundary": "semantic row graph/row plan formula authority"
+    },
+    {
+      "risks": [
+        "CF-011"
+      ],
+      "symptom": "acquisition cash-flow row binds to an unrelated FX row",
+      "earliest_responsible_layer": "funded acquisition semantic binding",
+      "repair_boundary": "acquisition plan/runtime row identity; never physical row numbers"
+    },
+    {
+      "risks": [
+        "ACQ-030"
+      ],
+      "symptom": "acquisition and pro-forma columns calculate #VALUE!",
+      "earliest_responsible_layer": "central acquisition, RCF and interest join",
+      "repair_boundary": "typed transaction graph plus solver/emitter contract"
+    },
+    {
+      "risks": [
+        "VALID-032",
+        "VALID-033"
+      ],
+      "symptom": "cached-value validation can precede native recalculation evidence",
+      "earliest_responsible_layer": "release certification policy and native evidence binding",
+      "repair_boundary": "validator/oracle evidence model and promotion gate"
+    }
+  ],
+  "implementation_order": [
+    "independent semantic mutations",
+    "typed values and row identity",
+    "contextual ontology",
+    "historical and forecast aggregate ownership",
+    "protected cash-flow identities",
+    "broker control semantics and v2 continuity",
+    "EBIT/EBITDA hierarchy",
+    "debt classification and labels",
+    "interest, RCF and leases",
+    "acquisition and pro forma",
+    "runtime, carrier and security",
+    "immutable package and read-only CI",
+    "full cohort, package build and installed-host evidence"
+  ],
+  "risks": [
+    {
+      "id": "FACE-001",
+      "severity": "P0",
+      "domain": "Income statement",
+      "finding": "Issuer-defined Product Revenue is delivered as a historical hardcode even where its complete reported children reconcile to it.",
+      "evidence": "Workbook values and Show-Formulas views show Product Sales + Alliance Revenue = Product Revenue, while Product Revenue remains a blue source input.",
+      "earliest_responsible_layer": "Statement hierarchy / historical authority compilation.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/case_source_proposer.mjs; scripts/lib/statement_topology.mjs",
+      "acceptance_criterion": "When complete reported children reconcile in all historical periods, the visible parent is a formula, the filed total is retained as reconciliation evidence, and a mutation to hardcode the parent fails.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "When complete reported children reconcile in all historical periods, the visible parent is a formula, the filed total is retained as reconciliation evidence, and a mutation to hardcode the parent fails.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "FACE-002",
+      "severity": "P0",
+      "domain": "Income statement",
+      "finding": "Product Revenue and its children each own independent forecasts.",
+      "evidence": "The forecast columns apply historical-delta formulas to Product Sales, Alliance Revenue and Product Revenue simultaneously.",
+      "earliest_responsible_layer": "Forecast ownership / aggregate capture topology.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "BROKER-003",
+      "severity": "P0",
+      "domain": "Broker integration",
+      "finding": "The visible control Forecast Waterfall disables broker consumption in the current compiler.",
+      "evidence": "case_compiler.mjs sets brokerDisabled when broker_case === \"Forecast Waterfall\", removes broker ownership and iterates zero pack metrics. The delivered workbook then uses historical inference despite three broker tabs.",
+      "earliest_responsible_layer": "Consumption doctrine control semantics.",
+      "candidate_files": "scripts/lib/case_compiler.mjs",
+      "acceptance_criterion": "Selecting Forecast Waterfall consumes compatible broker authorities or explicitly records rejection; it never disables them merely because of the control label.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Selecting Forecast Waterfall consumes compatible broker authorities or explicitly records rejection; it never disables them merely because of the control label.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "BROKER-004",
+      "severity": "P0",
+      "domain": "Broker integration",
+      "finding": "The producer emits pre-broker demand v2 while important consumers remain v1-only.",
+      "evidence": "run_attachment_evidence_pipeline.py emits /2.0; run_constitution_graph.mjs, run_broker_pipeline.py and a path in broker_terminal_recovery.py require /1.0.",
+      "earliest_responsible_layer": "Broker contract normalisation.",
+      "candidate_files": "scripts/run_attachment_evidence_pipeline.py; scripts/lib/run_constitution_graph.mjs; scripts/run_broker_pipeline.py; scripts/broker_terminal_recovery.py",
+      "acceptance_criterion": "A fresh v2 graph passes the complete producer-consumer path through selected authority and workbook emission.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "A fresh v2 graph passes the complete producer-consumer path through selected authority and workbook emission.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "KPI-005",
+      "severity": "P1",
+      "domain": "EBITDA",
+      "finding": "The product explicitly authors the visible labels EBITDA proxy and EBITDA proxy margin.",
+      "evidence": "Source anchor in case_compiler.mjs and workbook face.",
+      "earliest_responsible_layer": "Derived KPI presentation contract.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/semantic_roles.mjs",
+      "acceptance_criterion": "The face uses EBITDA / Adjusted EBITDA according to actual economic definition; derivation status stays in provenance.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "The face uses EBITDA / Adjusted EBITDA according to actual economic definition; derivation status stays in provenance.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "KPI-006",
+      "severity": "P1",
+      "domain": "EBITDA",
+      "finding": "The EBITDA bridge can add impairment because the D&A candidate accepts a combined depreciation, amortisation and impairment row.",
+      "evidence": "Workbook bridge uses the combined row; compiler candidate regex matches depreciation/amortisation and does not reject impairment.",
+      "earliest_responsible_layer": "KPI semantic decomposition.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/statement_classifier.mjs",
+      "acceptance_criterion": "Pure EBITDA adds only compatible D&A; impairment is a separate adjustment and is included only in an explicitly labelled adjusted measure.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Pure EBITDA adds only compatible D&A; impairment is a separate adjustment and is included only in an explicitly labelled adjusted measure.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "KPI-007",
+      "severity": "P1",
+      "domain": "EBITDA",
+      "finding": "Company-adjusted EBIT / Core Operating profit is not represented as a distinct concept.",
+      "evidence": "The current role set collapses reported operating profit, EBIT and adjusted measures too aggressively.",
+      "earliest_responsible_layer": "Economic ontology.",
+      "candidate_files": "scripts/lib/semantic_roles.mjs; assets/economic-ontology-v2.json; scripts/lib/statement_classifier.mjs",
+      "acceptance_criterion": "Reported EBIT, adjusted EBIT, reported EBITDA and adjusted EBITDA are separately typed and bridged.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Reported EBIT, adjusted EBIT, reported EBITDA and adjusted EBITDA are separately typed and bridged.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "ROW-008",
+      "severity": "P1",
+      "domain": "Source extraction",
+      "finding": "A body row with unresolved numeric values is proposed as a header.",
+      "evidence": "case_source_proposer.mjs valueLess(row) returns true when values are absent and proposeSection sets header:true; workbook shows fair-value movements and share-award payments as headings.",
+      "earliest_responsible_layer": "Row typing / source value states.",
+      "candidate_files": "scripts/lib/case_source_proposer.mjs; scripts/extract_filing_statements.py",
+      "acceptance_criterion": "Header status requires positive structural evidence; unresolved body rows remain body rows with unresolved values.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Header status requires positive structural evidence; unresolved body rows remain body rows with unresolved values.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-009",
+      "severity": "P0",
+      "domain": "Cash flow",
+      "finding": "Net cash outflow from investing is carried forward from the prior year instead of summing current-period investing rows.",
+      "evidence": "Show-Formulas screenshots show J82=I82, K82=J82, L82=K82 while capex and interest received change.",
+      "earliest_responsible_layer": "Cash-flow protected identities.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-010",
+      "severity": "P0",
+      "domain": "Cash flow",
+      "finding": "Net cash before financing activities is carried forward rather than calculated as CFO + CFI.",
+      "evidence": "Show-Formulas screenshots show J84=I84 etc.",
+      "earliest_responsible_layer": "Cash-flow protected identities.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-011",
+      "severity": "P0",
+      "domain": "Cash flow",
+      "finding": "Acquisition of subsidiaries, net of cash acquired, references the Exchange rate effects row.",
+      "evidence": "Targeted crop shows forecast row 65 linking to row 101.",
+      "earliest_responsible_layer": "Acquisition / statement row binding.",
+      "candidate_files": "scripts/lib/funded_acquisition_plan.mjs; scripts/lib/funded_acquisition_runtime.mjs; scripts/lib/row_plan.mjs; scripts/build_dynamic_model.mjs",
+      "acceptance_criterion": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-012",
+      "severity": "P1",
+      "domain": "Cash flow",
+      "finding": "Working-capital parent and detail rows remain forecast-live together.",
+      "evidence": "Workbook forecasts receivables, inventory and payables while Change in working capital also exists as parent.",
+      "earliest_responsible_layer": "Forecast capture ownership.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Default overlay mode forecasts one parent working-capital line; historical children remain visible and forecast children are blank/captured.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Default overlay mode forecasts one parent working-capital line; historical children remain visible and forecast children are blank/captured.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-013",
+      "severity": "P1",
+      "domain": "Cash flow",
+      "finding": "Detailed debt issuance / repayment / RCF rows remain forecast-live on the cash-flow face.",
+      "evidence": "Workbook carries detailed financing rows rather than one top-level Change in Debt forecast tied to the schedule.",
+      "earliest_responsible_layer": "Schedule ownership and presentation.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs; scripts/lib/solver.mjs",
+      "acceptance_criterion": "Instrument detail lives in the debt schedule; cash-flow forecast uses one schedule-linked Change in Debt line.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Instrument detail lives in the debt schedule; cash-flow forecast uses one schedule-linked Change in Debt line.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-014",
+      "severity": "P1",
+      "domain": "Cash flow",
+      "finding": "RCF draw and repayment are omitted from the visible financing subtotal.",
+      "evidence": "The displayed CFF SUM ranges skip the RCF rows.",
+      "earliest_responsible_layer": "Cash-flow formula emission.",
+      "candidate_files": "scripts/lib/row_plan.mjs; scripts/build_dynamic_model.mjs; scripts/lib/solver.mjs",
+      "acceptance_criterion": "RCF movements enter CFF, net change in cash, closing cash and debt exactly once.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "RCF movements enter CFF, net change in cash, closing cash and debt exactly once.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-015",
+      "severity": "P1",
+      "domain": "Cash flow",
+      "finding": "Event-driven rows recur through carry-forward or trend.",
+      "evidence": "Disposal gains, contingent consideration, NCI payments, hedge movements and other event rows repeat in forecast.",
+      "earliest_responsible_layer": "Forecast behaviour classification.",
+      "candidate_files": "scripts/lib/forecast_behavior.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/semantic_roles.mjs",
+      "acceptance_criterion": "Non-recurring events cannot use carry-forward, historical average or historical trend without explicit recurrence evidence.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Non-recurring events cannot use carry-forward, historical average or historical trend without explicit recurrence evidence.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-016",
+      "severity": "P1",
+      "domain": "Cash flow",
+      "finding": "Cash tax paid is silently linked to P&L tax expense.",
+      "evidence": "case_compiler.mjs fallback wiring links cash_tax_paid to tax_expense; workbook mirrors the tax charge.",
+      "earliest_responsible_layer": "Cash-tax forecast policy.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs",
+      "acceptance_criterion": "Cash tax uses source / guidance / broker / driver authority; P&L tax fallback is explicit and labelled.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Cash tax uses source / guidance / broker / driver authority; P&L tax fallback is explicit and labelled.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-017",
+      "severity": "P2",
+      "domain": "Cash flow",
+      "finding": "A source artefact row labelled F-5 appears on the visible model face.",
+      "evidence": "Workbook screenshot.",
+      "earliest_responsible_layer": "Extraction decoration / footnote handling.",
+      "candidate_files": "scripts/extract_filing_statements.py; scripts/lib/case_source_proposer.mjs",
+      "acceptance_criterion": "Footnote and source-reference tokens are retained in provenance, not rendered as economic rows.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Footnote and source-reference tokens are retained in provenance, not rendered as economic rows.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CF-018",
+      "severity": "P1",
+      "domain": "Cash flow",
+      "finding": "Cash generated from operations bypasses the visible working-capital parent and sums child rows directly.",
+      "evidence": "Workbook formula omits the parent and references the children.",
+      "earliest_responsible_layer": "Formula graph / aggregate consumption.",
+      "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Downstream identities consume the selected parent authority and do not bypass it.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Downstream identities consume the selected parent authority and do not bypass it.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "DEBT-019",
+      "severity": "P1",
+      "domain": "Debt schedule",
+      "finding": "Bonds, bank borrowings, overdrafts and the RCF are misclassified, many under Other Debt.",
+      "evidence": "Workbook debt schedule.",
+      "earliest_responsible_layer": "DCS classification and cross-layer enum mismatch.",
+      "candidate_files": "scripts/propose_dcs_crosswalk.py; scripts/lib/instrument_display.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Canonical class is consistent from extraction through display; unresolved material instruments are unclassified-review, never silently Other Debt.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Canonical class is consistent from extraction through display; unresolved material instruments are unclassified-review, never silently Other Debt.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "DEBT-020",
+      "severity": "P1",
+      "domain": "Debt schedule",
+      "finding": "The DCS classifier defaults every non-empty unmatched description to other_debt.",
+      "evidence": "propose_dcs_crosswalk.py classify_type returns other_debt on any remaining text.",
+      "earliest_responsible_layer": "Debt-class fallback policy.",
+      "candidate_files": "scripts/propose_dcs_crosswalk.py",
+      "acceptance_criterion": "Other Debt requires affirmative evidence; default is unclassified with a blocking/review receipt.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Other Debt requires affirmative evidence; default is unclassified with a blocking/review receipt.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "DEBT-021",
+      "severity": "P1",
+      "domain": "Debt schedule",
+      "finding": "Debt class vocabularies differ across layers.",
+      "evidence": "DCS emits fixed_bond/floating_loan while display/grouping recognises bond/senior_notes/term_loan/bank_debt.",
+      "earliest_responsible_layer": "Canonical debt ontology.",
+      "candidate_files": "scripts/propose_dcs_crosswalk.py; scripts/lib/instrument_display.mjs; scripts/lib/row_plan.mjs; assets/dcs-export.schema.json",
+      "acceptance_criterion": "One enum is used by extraction, model case, schedule, display and validator.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "One enum is used by extraction, model case, schedule, display and validator.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "DEBT-022",
+      "severity": "P1",
+      "domain": "Debt schedule",
+      "finding": "Visible instrument names remain long legal/source strings and truncate before the useful distinguisher.",
+      "evidence": "Workbook schedule.",
+      "earliest_responsible_layer": "Instrument display construction.",
+      "candidate_files": "scripts/lib/instrument_display.mjs",
+      "acceptance_criterion": "Face label is structured Type + rate/margin + maturity; full legal name and identifier remain in comments/provenance.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Face label is structured Type + rate/margin + maturity; full legal name and identifier remain in comments/provenance.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "DEBT-023",
+      "severity": "P2",
+      "domain": "Debt schedule",
+      "finding": "A universal debt-grouping helper is named and documented as CRH-specific.",
+      "evidence": "row_plan.mjs CRH_DEBT_GROUPS / crhDebtGroupKey.",
+      "earliest_responsible_layer": "Architecture ownership / generic product abstraction.",
+      "candidate_files": "scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Generic issuer-independent grouping functions replace company-named product logic.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Generic issuer-independent grouping functions replace company-named product logic.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "LEASE-024",
+      "severity": "P1",
+      "domain": "Leases",
+      "finding": "Forecast lease liability falls to zero while lease principal repayments continue.",
+      "evidence": "Workbook net debt and cash flow.",
+      "earliest_responsible_layer": "Lease schedule / policy integration.",
+      "candidate_files": "scripts/lib/lease_policy.mjs; scripts/lib/solver.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Opening liability, additions, interest, principal and closing liability reconcile in each period.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Opening liability, additions, interest, principal and closing liability reconcile in each period.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "INT-025",
+      "severity": "P1",
+      "domain": "Interest",
+      "finding": "Interest lineage validation only proves that a debt-row number appears somewhere in the formula.",
+      "evidence": "validate_dynamic_model.py tests str(plan[debt_row]) in formula.",
+      "earliest_responsible_layer": "Independent interest oracle.",
+      "candidate_files": "scripts/verify/validate_dynamic_model.py; scripts/verify/finance_proof.py",
+      "acceptance_criterion": "Validator proves same instrument, opening/average balance, movements, rate, benchmark, FX, timing and sign.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Validator proves same instrument, opening/average balance, movements, rate, benchmark, FX, timing and sign.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "INT-026",
+      "severity": "P1",
+      "domain": "Interest",
+      "finding": "RCF fees may be counted in instrument-modelled interest and again in gross interest expense.",
+      "evidence": "Visible formula ranges strongly suggest duplicate aggregation; zero fees hide the defect.",
+      "earliest_responsible_layer": "Interest aggregation.",
+      "candidate_files": "scripts/build_dynamic_model.mjs; scripts/lib/row_plan.mjs",
+      "acceptance_criterion": "Non-zero fee mutation proves each RCF fee component enters gross interest once.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Non-zero fee mutation proves each RCF fee component enters gross interest once.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "INT-027",
+      "severity": "P1",
+      "domain": "Interest",
+      "finding": "Lease interest is explicitly not separately modelled despite lease debt.",
+      "evidence": "Workbook interest schedule.",
+      "earliest_responsible_layer": "Lease / interest integration.",
+      "candidate_files": "scripts/lib/lease_policy.mjs; scripts/lib/solver.mjs",
+      "acceptance_criterion": "Lease interest is modelled or explicitly excluded with metric-basis disclosure and consistent debt treatment.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Lease interest is modelled or explicitly excluded with metric-basis disclosure and consistent debt treatment.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "INT-028",
+      "severity": "P2",
+      "domain": "Interest",
+      "finding": "Residual / unallocated interest is not controlled by a clear forecast authority.",
+      "evidence": "Workbook interest reconciliation.",
+      "earliest_responsible_layer": "Residual authority policy.",
+      "candidate_files": "scripts/lib/historical_interest_authority.mjs; scripts/lib/forecast_candidate_compiler.mjs",
+      "acceptance_criterion": "Residual reconciles reported finance expense and receives an explicit forecast authority or zero.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Residual reconciles reported finance expense and receives an explicit forecast authority or zero.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "ACQ-029",
+      "severity": "P1",
+      "domain": "Acquisition",
+      "finding": "Enterprise value, entry multiple and target EBITDA are all independently editable and visibly inconsistent.",
+      "evidence": "Acquisition control box: 10 EV, 10.0x, 500 EBITDA.",
+      "earliest_responsible_layer": "Acquisition input schema and control validation.",
+      "candidate_files": "scripts/lib/acquisition_policy.mjs; scripts/lib/funded_acquisition_plan.mjs; assets/model-case-v2.schema.json",
+      "acceptance_criterion": "Only two inputs are primary; the third is calculated; units/currency are explicit and activation blocks on inconsistency.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Only two inputs are primary; the third is calculated; units/currency are explicit and activation blocks on inconsistency.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "ACQ-030",
+      "severity": "P0",
+      "domain": "Acquisition",
+      "finding": "Adjustment and pro forma columns contain pervasive #VALUE! errors.",
+      "evidence": "Normal and Show-Formulas screenshots show errors across P&L, cash flow, debt, RCF and interest.",
+      "earliest_responsible_layer": "Central acquisition / RCF / interest join plus missing native error gate.",
+      "candidate_files": "scripts/lib/funded_acquisition_plan.mjs; scripts/lib/funded_acquisition_runtime.mjs; scripts/lib/solver.mjs; scripts/build_dynamic_model.mjs",
+      "acceptance_criterion": "Acquisition On produces zero Excel errors and reconciles all transaction flows; Off/On/Off/On restores exactly.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Acquisition On produces zero Excel errors and reconciles all transaction flows; Off/On/Off/On restores exactly.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "ACQ-031",
+      "severity": "P1",
+      "domain": "Acquisition",
+      "finding": "Target PBT is floored at zero in the acquisition logic.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Acquisition economics.",
+      "candidate_files": "scripts/lib/acquisition_policy.mjs; scripts/lib/funded_acquisition_plan.mjs",
+      "acceptance_criterion": "Negative target PBT is modelled or the unsupported case blocks explicitly; no silent floor.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Negative target PBT is modelled or the unsupported case blocks explicitly; no silent floor.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "VALID-032",
+      "severity": "P0",
+      "domain": "Validation",
+      "finding": "The main validator inspects cached values and does not recalculate the workbook.",
+      "evidence": "validate_dynamic_model.py documents this blind spot; native Excel later exposes errors.",
+      "earliest_responsible_layer": "Final workbook verification.",
+      "candidate_files": "scripts/verify/validate_dynamic_model.py; scripts/verify/workbook_semantic_oracle.py; scripts/verify_native_restoration.py",
+      "acceptance_criterion": "Final gate uses native Excel recalculation or equivalent external evidence and scans every relevant used cell.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Final gate uses native Excel recalculation or equivalent external evidence and scans every relevant used cell.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "VALID-033",
+      "severity": "P0",
+      "domain": "Validation",
+      "finding": "Native Excel restoration is manual and absence can still yield PASS_PENDING_MANUAL.",
+      "evidence": "Validator header and promotion receipt.",
+      "earliest_responsible_layer": "Release policy.",
+      "candidate_files": "scripts/verify/validate_dynamic_model.py; scripts/lib/release_certification.mjs",
+      "acceptance_criterion": "Development delivery clearly distinguishes pending-manual from pass; promotion cannot claim workbook validity without required native evidence.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Development delivery clearly distinguishes pending-manual from pass; promotion cannot claim workbook validity without required native evidence.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "AUTH-034",
+      "severity": "P1",
+      "domain": "Authority integrity",
+      "finding": "Forecast authority ledger verification compares stored hash to rebuilt expected hash without independently hashing the stored body.",
+      "evidence": "forecast_authority_ledger.mjs verifyForecastAuthorityLedger.",
+      "earliest_responsible_layer": "Ledger integrity.",
+      "candidate_files": "scripts/lib/forecast_authority_ledger.mjs",
+      "acceptance_criterion": "Verifier hashes actual stored body, hashes rebuilt expected body, and compares bodies and hashes independently.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Verifier hashes actual stored body, hashes rebuilt expected body, and compares bodies and hashes independently.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "AUTH-035",
+      "severity": "P1",
+      "domain": "Authority integrity",
+      "finding": "Missing source values can become numeric zero in parts of the pipeline.",
+      "evidence": "Prior source audit and historical behaviour.",
+      "earliest_responsible_layer": "Typed value semantics.",
+      "candidate_files": "scripts/lib/excel_value_semantics.mjs; scripts/extract_filing_statements.py; scripts/lib/case_compiler.mjs",
+      "acceptance_criterion": "Reported zero, dash, blank, N/A and unresolved are distinct; only explicit zero becomes zero.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Reported zero, dash, blank, N/A and unresolved are distinct; only explicit zero becomes zero.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "AUTH-036",
+      "severity": "P2",
+      "domain": "Authority integrity",
+      "finding": "Equal-rung authority selection can fall through to weak/stable identifier ordering.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Authority ranking.",
+      "candidate_files": "scripts/lib/forecast_authority.mjs; scripts/lib/forecast_candidate_compiler.mjs",
+      "acceptance_criterion": "Definition, period, units, freshness, confidence and completeness rank before stable ID.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Definition, period, units, freshness, confidence and completeness rank before stable ID.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "CARRIER-037",
+      "severity": "P1",
+      "domain": "Runtime state",
+      "finding": "A carrier proves its own source identity fields exist but does not compare them with the active installation identity.",
+      "evidence": "run_carrier.mjs verifyRunCarrier.",
+      "earliest_responsible_layer": "Resume identity binding.",
+      "candidate_files": "scripts/lib/run_carrier.mjs; scripts/lib/source_identity.mjs",
+      "acceptance_criterion": "Resume requires active source commit, tree, closure, package mode and installation identity match, or an explicit migration receipt.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Resume requires active source commit, tree, closure, package mode and installation identity match, or an explicit migration receipt.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "RELEASE-038",
+      "severity": "P1",
+      "domain": "Release",
+      "finding": "Package mode vocabulary conflicts: one path expects production while build/certification uses certified/development.",
+      "evidence": "source_identity.mjs and prior release audit.",
+      "earliest_responsible_layer": "Release identity.",
+      "candidate_files": "scripts/lib/source_identity.mjs; scripts/lib/release_certification.mjs; scripts/compile_skill_release.mjs",
+      "acceptance_criterion": "One package-mode enum and separate deployment-status enum are used consistently.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "One package-mode enum and separate deployment-status enum are used consistently.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "RELEASE-039",
+      "severity": "P1",
+      "domain": "Release",
+      "finding": "Certification hashes a conceptual closure and then mutates metadata inside that closure.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Immutable attestation.",
+      "candidate_files": "scripts/lib/release_certification.mjs; scripts/compile_skill_release.mjs",
+      "acceptance_criterion": "Build immutable package, hash it, then emit a separate external attestation; certified bytes never change.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Build immutable package, hash it, then emit a separate external attestation; certified bytes never change.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "IDENTITY-040",
+      "severity": "P1",
+      "domain": "Release",
+      "finding": "Source, runtime and package layers use competing closure definitions.",
+      "evidence": "Prior source audit and promotion receipt fields.",
+      "earliest_responsible_layer": "Package identity vocabulary.",
+      "candidate_files": "scripts/compile_skill_release.mjs; scripts/lib/runtime_isolation.mjs; scripts/lib/source_identity.mjs",
+      "acceptance_criterion": "Distinct named identities exist for source tree, runtime code closure, complete package inventory, archive and installed package.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Distinct named identities exist for source tree, runtime code closure, complete package inventory, archive and installed package.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "RUNTIME-041",
+      "severity": "P1",
+      "domain": "Runtime",
+      "finding": "The vNext controller uses weaker subprocess handling than the robust process-tree helper already in the repository.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Process supervision.",
+      "candidate_files": "scripts/run_excel_inflow_vnext.mjs; scripts/lib/process_tree.mjs",
+      "acceptance_criterion": "Timeout terminates descendants, verifies none survive, preserves logs and does not release state early.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Timeout terminates descendants, verifies none survive, preserves logs and does not release state early.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "RUNTIME-042",
+      "severity": "P2",
+      "domain": "Runtime",
+      "finding": "Subordinate paths invoke bare python3 rather than a top-level selected interpreter.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Interpreter custody.",
+      "candidate_files": "scripts/run_excel_inflow_vnext.mjs; subordinate Python launch sites",
+      "acceptance_criterion": "One resolved Python executable is passed through every subprocess.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "One resolved Python executable is passed through every subprocess.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "RUNTIME-043",
+      "severity": "P1",
+      "domain": "Runtime",
+      "finding": "A dead cross-host lease can remain live and strand a run.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Lease expiry and takeover.",
+      "candidate_files": "scripts/lib/runtime_isolation.mjs; scripts/lib/run_store.mjs",
+      "acceptance_criterion": "Lease has heartbeat, expiry, host/session identity and auditable takeover.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Lease has heartbeat, expiry, host/session identity and auditable takeover.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "TRACE-044",
+      "severity": "P2",
+      "domain": "Runtime",
+      "finding": "The root trace span can mask unowned time and inflate classified coverage.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Experience trace accounting.",
+      "candidate_files": "scripts/lib/experience_trace.mjs; scripts/experience_trace.py",
+      "acceptance_criterion": "Coverage is computed from leaf work and explicit waits; gaps remain visible.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Coverage is computed from leaf work and explicit waits; gaps remain visible.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "SECURITY-045",
+      "severity": "P1",
+      "domain": "Security",
+      "finding": "Local filing paths are not sufficiently constrained to approved attachment roots.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Source ingress.",
+      "candidate_files": "scripts/lib/filings_acquisition.mjs; scripts/lib/attachment_ingress.mjs",
+      "acceptance_criterion": "Canonical paths must remain under declared roots; symlink escapes, devices and non-regular files are rejected.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Canonical paths must remain under declared roots; symlink escapes, devices and non-regular files are rejected.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "SECURITY-046",
+      "severity": "P1",
+      "domain": "Security",
+      "finding": "Official-domain trust and URL fetching are too caller-dependent and insufficiently bounded.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Remote source acquisition.",
+      "candidate_files": "scripts/lib/filings_acquisition.mjs; scripts/lib/attachment_ingress.mjs",
+      "acceptance_criterion": "Independent allowlist authority, private-IP and rebinding protection, redirect revalidation, byte/time limits and content checks.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Independent allowlist authority, private-IP and rebinding protection, redirect revalidation, byte/time limits and content checks.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "EXTRACT-047",
+      "severity": "P1",
+      "domain": "Source extraction",
+      "finding": "Statement extraction is page-local and type-insensitive for long/multi-page statements.",
+      "evidence": "Prior audit and workbook row-type failures.",
+      "earliest_responsible_layer": "Filing extraction.",
+      "candidate_files": "scripts/extract_filing_statements.py; scripts/lib/face_statement_manifest.mjs",
+      "acceptance_criterion": "Multi-page continuity, repeated-header removal, typed values, units and source order are preserved.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Multi-page continuity, repeated-header removal, typed values, units and source order are preserved.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "PERF-048",
+      "severity": "P2",
+      "domain": "Broker runtime",
+      "finding": "Native broker PDF timeout is too aggressive and can force unnecessary degradation.",
+      "evidence": "Prior source audit.",
+      "earliest_responsible_layer": "Broker runtime policy.",
+      "candidate_files": "scripts/run_broker_pipeline.py; scripts/broker_terminal_recovery.py",
+      "acceptance_criterion": "Timeouts are evidence-size aware, supervised and observable; valid recovery is not prematurely abandoned.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "Timeouts are evidence-size aware, supervised and observable; valid recovery is not prematurely abandoned.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "GOV-049",
+      "severity": "P1",
+      "domain": "Governance",
+      "finding": "Current CI and repair workflows do not provide durable read-only protection and recent workflows attempted to author product source.",
+      "evidence": "Current repair branch contains two source-writing workflows; all failed.",
+      "earliest_responsible_layer": "Repository governance.",
+      "candidate_files": ".github/workflows; scripts/run_development_gate.mjs",
+      "acceptance_criterion": "PR/main CI is read-only; product source is edited locally and pushed normally; obsolete write workflows are removed/archived.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "PR/main CI is read-only; product source is edited locally and pushed normally; obsolete write workflows are removed/archived.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    },
+    {
+      "id": "UX-050",
+      "severity": "P2",
+      "domain": "User experience",
+      "finding": "Workbook does not disclose selected broker houses, fallback count, rejected evidence or degraded mode.",
+      "evidence": "Workbook face.",
+      "earliest_responsible_layer": "Quality disclosure.",
+      "candidate_files": "scripts/build_dynamic_model.mjs; scripts/lib/row_plan.mjs; scripts/lib/live_delivery_attestation.mjs",
+      "acceptance_criterion": "A compact Build Identity / Quality panel states source identity, broker status, selected metrics, fallbacks and outstanding certification.",
+      "status": "OPEN",
+      "implementation": {
+        "invariant": "A compact Build Identity / Quality panel states source identity, broker status, selected metrics, fallbacks and outstanding certification.",
+        "baseline_reproduction": "PENDING",
+        "focused_test": "PENDING",
+        "source_fix": "PENDING",
+        "integration_evidence": "PENDING",
+        "semantic_oracle_evidence": "PENDING",
+        "native_excel_evidence": "PENDING",
+        "commit": null
+      }
+    }
+  ]
+}
