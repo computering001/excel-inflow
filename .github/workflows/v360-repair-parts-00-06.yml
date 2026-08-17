@@ -1,4 +1,5 @@
-name: v360 repair parts 00 and 06
+# repair complete three-part mismatch set
+name: v360 repair parts 00 06 13
 
 on:
   push:
@@ -19,33 +20,35 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Remove exact stray trailing bytes and verify
+      - name: Apply exact byte repairs and verify aggregate
         shell: bash
         run: |
           set -euo pipefail
           p0='publish/v360-recovery-complete/part00.b64'
           p6='publish/v360-recovery-complete/part06.b64'
+          p13='publish/v360-recovery-complete/part13.b64'
           test "$(wc -c < "$p0")" -eq 7787
           test "$(wc -c < "$p6")" -eq 7787
+          test "$(wc -c < "$p13")" -eq 7786
           echo 'd2bc2a8d4a452cc85b62cc368ee444f4a4a4db1755d9f07db8a993728d8ee918  publish/v360-recovery-complete/part00.b64' | sha256sum -c -
           echo '225fcf33a6380590a16847b12583b71bb4784552d7b6398909342dcfaa4a4358  publish/v360-recovery-complete/part06.b64' | sha256sum -c -
+          echo '5443ed8d71b382a27b52686030d77ca1ba836c8567e6b3127e111b8acca12e2c  publish/v360-recovery-complete/part13.b64' | sha256sum -c -
           python3 - <<'PY'
           from pathlib import Path
-          repairs = {
-              'publish/v360-recovery-complete/part00.b64': 'M',
-              'publish/v360-recovery-complete/part06.b64': '9',
-          }
-          for name, expected_tail in repairs.items():
-              p = Path(name)
-              value = p.read_text('ascii')
-              assert len(value) == 7787
-              assert value[-1] == expected_tail
-              p.write_text(value[:-1], 'ascii')
+          p0 = Path('publish/v360-recovery-complete/part00.b64')
+          p6 = Path('publish/v360-recovery-complete/part06.b64')
+          p13 = Path('publish/v360-recovery-complete/part13.b64')
+          v0 = p0.read_text('ascii'); assert len(v0) == 7787 and v0[-1] == 'M'; p0.write_text(v0[:-1], 'ascii')
+          v6 = p6.read_text('ascii'); assert len(v6) == 7787 and v6[-1] == '9'; p6.write_text(v6[:-1], 'ascii')
+          v13 = p13.read_text('ascii'); assert len(v13) == 7786 and v13[2497] == 'l'; p13.write_text(v13[:2497] + 'p' + v13[2498:], 'ascii')
           PY
           test "$(wc -c < "$p0")" -eq 7786
           test "$(wc -c < "$p6")" -eq 7786
+          test "$(wc -c < "$p13")" -eq 7786
           echo 'f5b4943323914c3d27b29a34dcfb441351985b24ad3b22d68bed406901d1e405  publish/v360-recovery-complete/part00.b64' | sha256sum -c -
           echo 'f73898babd0a3e3e4980355fc8664f17ad368a82934e18314586bc7625e10a3a  publish/v360-recovery-complete/part06.b64' | sha256sum -c -
+          echo 'aeebb2f5355c2b48f66deaeb2422dd8406b59c625ebb8476491114c9da293de8  publish/v360-recovery-complete/part13.b64' | sha256sum -c -
+          sha256sum -c publish/v360-recovery-complete/expected.sha256
           cat publish/v360-recovery-complete/part*.b64 | tr -d '\n\r\t ' > /tmp/all.b64
           test "$(wc -c < /tmp/all.b64)" -eq 124576
           echo 'fa24f76ac907af6d0db50ee0827d9c268d55753800aa5e2248e4d0e3bc99060b  /tmp/all.b64' | sha256sum -c -
@@ -55,6 +58,6 @@ jobs:
           set -euo pipefail
           git config user.name 'excel-inflow-recovery-publisher'
           git config user.email 'actions@users.noreply.github.com'
-          git add publish/v360-recovery-complete/part00.b64 publish/v360-recovery-complete/part06.b64
-          git commit -m 'Repair final v3.6 recovery payload bytes'
+          git add publish/v360-recovery-complete/part00.b64 publish/v360-recovery-complete/part06.b64 publish/v360-recovery-complete/part13.b64
+          git commit -m 'Repair complete v3.6 recovery payload bytes'
           git push origin HEAD:agent/v360-publication-bridge
