@@ -1,4 +1,4 @@
-# isolate forecast-authority ledger drift at the decisions -> Stage-4 handoff
+# repair the audited selected-authority materialization ledger seam on recovered v3.6
 name: v360 verify recovered development gate
 
 on:
@@ -9,49 +9,52 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: bf39afb5e513431f87b02d85488fe93b0a10b5e1
+          ref: agent/excel-inflow-v360-rebuild
           fetch-depth: 0
-      - name: Compare sealed and current authority ledgers
+      - name: Require exact audited target
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/v360-ledger
-          mkdir -p /tmp/v360-ledger
-          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/v360-ledger/clean-evidence-run.json
-          node scripts/run_user_flow.mjs /tmp/v360-ledger/clean-evidence-run.json \
-            --out /tmp/v360-ledger/run --stop-after decisions --json > /tmp/v360-ledger/paused.json
-          case_path=/tmp/v360-ledger/run/stages/decisions/model-case.json
-          CASE_PATH="$case_path" node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          import { buildForecastAuthorityLedger } from './scripts/lib/forecast_authority_ledger.mjs';
-          const modelCase=JSON.parse(fs.readFileSync(process.env.CASE_PATH,'utf8'));
-          const actual=modelCase.forecast_authority_ledger;
-          const expected=buildForecastAuthorityLedger(modelCase);
-          console.log('ACTUAL_SHA='+actual?.ledger_sha256);
-          console.log('EXPECTED_SHA='+expected.ledger_sha256);
-          console.log('STAGE_THREE_ANSWERS='+JSON.stringify(modelCase.stage_three_answers??{}));
-          console.log('ANSWERS='+JSON.stringify(modelCase.answers??{}));
-          console.log('BROKER_CASE='+JSON.stringify(modelCase.controls?.broker_case));
-          const key=(r)=>`${r.section}|${r.row_id}|${r.period_end}`;
-          const a=new Map((actual?.rows??[]).map(r=>[key(r),r]));
-          const e=new Map(expected.rows.map(r=>[key(r),r]));
-          const keys=[...new Set([...a.keys(),...e.keys()])].sort();
-          let n=0;
-          for(const k of keys){
-            const ar=a.get(k), er=e.get(k);
-            if(JSON.stringify(ar)!==JSON.stringify(er)){
-              n++;
-              console.log('LEDGER_DIFF='+JSON.stringify({key:k,actual:ar??null,expected:er??null}));
-            }
-          }
-          console.log('LEDGER_DIFF_COUNT='+n);
-          JS
+          test "$(git rev-parse HEAD)" = 'bf39afb5e513431f87b02d85488fe93b0a10b5e1'
+      - name: Seal authority ledger at selected-contract materializer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/lib/forecast_candidate_compiler.mjs')
+          s=p.read_text()
+          marker='''import { observationsForConcept } from "./forecast_observation.mjs";\n'''
+          addition='''import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";\n'''
+          assert s.count(marker)==1, s.count(marker)
+          assert addition not in s
+          s=s.replace(marker, marker+addition, 1)
+          old='''  return materializeForecastPlan(modelCase, sealedPlan);\n}\n\nexport function validateForecastPlanCaseParity'''
+          new='''  const materialized = materializeForecastPlan(modelCase, sealedPlan);\n  // This function is the sole selected-authority economic writer. The sealed\n  // contract replaces provisional row authorities, so the forecast-authority\n  // ledger must be resealed here, at the mutator, before the case can cross\n  // into question planning or the solver. Later unreceipted mutations remain\n  // fail-closed because verification rebuilds the ledger from the live case.\n  sealForecastAuthorityLedger(materialized);\n  return materialized;\n}\n\nexport function validateForecastPlanCaseParity'''
+          assert s.count(old)==1, s.count(old)
+          p.write_text(s.replace(old,new,1))
+          PY
+          node --check scripts/lib/forecast_candidate_compiler.mjs
+          git diff --check
+          node scripts/run_forecast_authority_ledger_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+      - name: Commit audited ledger ownership repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/lib/forecast_candidate_compiler.mjs
+          git commit -m 'Seal ledger after selected authority materialization'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
+          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
