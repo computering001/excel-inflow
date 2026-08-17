@@ -84,7 +84,14 @@ async function fixture(root) {
           path.join(root, `native-${profile}-${testIndex}-state-${state}.xlsx`),
           `${profile}:${testIndex}:${state}`,
         );
-        files.push({ path: path.basename(record.path), sha256: record.sha256 });
+        files.push({
+          path: path.basename(record.path),
+          sha256: record.sha256,
+          worksheets_scanned: 3,
+          used_cells_scanned: 100,
+          excel_error_count: 0,
+          excel_error_cells: [],
+        });
       }
       const signature = sha(`${profile}:${testIndex}:signature`);
       tests.push({
@@ -177,7 +184,7 @@ async function fixture(root) {
   };
 
   const nativeExcel = {
-    schema_version: "native-excel-restoration-evidence/3.1",
+    schema_version: "native-excel-restoration-evidence/3.2",
     status: "PASS",
     diagnostic_only: false,
     application: "Microsoft Excel for Windows",
@@ -353,6 +360,18 @@ try {
     nativeSelfHash(data.reports.native_excel);
     await rewriteEvidence(data, "native_excel");
   }, "native_excel.schema");
+  await mutation("native-missing-used-cell-scan", async (data) => {
+    delete data.reports.native_excel.candidates[0].tests[0].files[0].used_cells_scanned;
+    nativeSelfHash(data.reports.native_excel);
+    await rewriteEvidence(data, "native_excel");
+  }, "native_excel.schema");
+  await mutation("native-excel-error-cell", async (data) => {
+    const state = data.reports.native_excel.candidates[0].tests[0].files[0];
+    state.excel_error_count = 1;
+    state.excel_error_cells = ["Forward Curves!XFD1048576=#REF!"];
+    nativeSelfHash(data.reports.native_excel);
+    await rewriteEvidence(data, "native_excel");
+  }, "excel_error_scan");
   await mutation("native-policy-mismatch", async (data) => {
     data.reports.native_excel.economic_solve_policy_sha256 = "b".repeat(64);
     nativeSelfHash(data.reports.native_excel);
@@ -373,6 +392,15 @@ try {
     nativeSelfHash(data.reports.native_excel);
     await rewriteEvidence(data, "native_excel");
   }, "duplicate");
+  await mutation("native-tampered-state-workbook", async (data) => {
+    const state = data.reports.native_excel.candidates[0].tests[0].files[0];
+    await fs.appendFile(path.join(path.dirname(data.manifestPath), state.path), "tamper", "utf8");
+  }, "native_excel.candidate.0.test.0.file.0");
+  await mutation("native-report-required", async ({ manifestPath }) => {
+    const value = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    delete value.evidence.native_excel;
+    await writeJson(manifestPath, value);
+  }, "manifest.schema");
   for (const [name, reportName, expectedId] of [
     ["cohort-closure", "frozen_cohort", "frozen_cohort"],
     ["finance-closure", "finance_proof_mutations", "finance_mutations.closure"],

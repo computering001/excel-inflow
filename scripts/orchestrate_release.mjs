@@ -825,10 +825,19 @@ async function main() {
       if (!result.ok) return fail("N13 portable independent validation failed.", { stdout: result.stdout.slice(-4000), stderr: result.stderr.slice(-4000) });
       const report = await json(validationReport);
       const violations = Number(report.total_violations ?? report.summary?.total_violations ?? 0);
-      if (!["PASS", "PASS_PENDING_MANUAL"].includes(report.status) || violations !== 0) {
-        return fail("N13 independent validation report did not clear with zero violations.", { report_status: report.status, total_violations: violations });
+      if (report.status !== "PASS_PENDING_MANUAL" || violations !== 0) {
+        return fail("N13 portable validation must remain explicitly pending native Excel and visual review.", { report_status: report.status, total_violations: violations });
       }
-      return { status: "PASS", detail: { report_status: report.status, total_violations: violations, execution: executionPolicy } };
+      return {
+        status: "PASS",
+        detail: {
+          report_status: report.status,
+          evidence_class: "AUTOMATED_DEVELOPMENT_EVIDENCE_ONLY",
+          release_gate_status: "PENDING_NATIVE_EXCEL_AND_VISUAL_REVIEW",
+          total_violations: violations,
+          execution: executionPolicy,
+        },
+      };
     },
   });
   if (!step.ok) return step.result;
@@ -934,7 +943,9 @@ async function main() {
     action: async () => {
       const report = {
         schema_version: "stage4-verification-summary/1.0",
-        status: "PASS",
+        status: "PASS_PENDING_MANUAL",
+        evidence_class: "AUTOMATED_DEVELOPMENT_EVIDENCE_ONLY",
+        release_gate_status: "PENDING_NATIVE_EXCEL_AND_VISUAL_REVIEW",
         total_violations: 0,
         execution_policy: executionPolicy,
         reports: {
@@ -946,7 +957,16 @@ async function main() {
         },
       };
       await writeIsolationJson(verificationSummary, report);
-      return { status: "PASS", detail: { report_count: 5, total_violations: 0 } };
+      return {
+        status: "PASS",
+        detail: {
+          report_status: report.status,
+          evidence_class: report.evidence_class,
+          release_gate_status: report.release_gate_status,
+          report_count: 5,
+          total_violations: 0,
+        },
+      };
     },
   });
   if (!step.ok) return step.result;

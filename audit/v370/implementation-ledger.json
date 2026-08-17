@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T18:17:07Z",
+  "recorded_at": "2026-08-17T18:55:39Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -265,16 +265,16 @@
       "earliest_responsible_layer": "Broker contract normalisation.",
       "candidate_files": "scripts/run_attachment_evidence_pipeline.py; scripts/lib/run_constitution_graph.mjs; scripts/run_broker_pipeline.py; scripts/broker_terminal_recovery.py",
       "acceptance_criterion": "A fresh v2 graph passes the complete producer-consumer path through selected authority and workbook emission.",
-      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "A fresh v2 graph passes the complete producer-consumer path through selected authority and workbook emission.",
         "baseline_reproduction": "PASS_RED: a fresh producer-shaped /2.0 graph was rejected by run constitution as the wrong version and by selected-cell recovery as a v1-only contract.",
         "focused_test": "PASS: run constitution 16 positive plus 5 mutations; demand selection 18/18; evidence pipeline 24/24; Tier-1 v1/v2 demand parity; model-owned demand 3/3; native preflight 4/4; degraded broker controller 75/75.",
-        "source_fix": "Both runtime languages now use a version-aware pre-broker demand reader normalized to canonical-pre-broker-demand/1.0 nodes; constitution, broker controller and terminal selected-cell recovery consume only that canonical form.",
-        "integration_evidence": "PASS: the attachment producer emits /2.0, the real broker controller accepts the fresh request, v1/v2 selected-cell crosswalks resolve the same 72 source mappings, and the degraded controller-to-portable-workbook path emits PASS_PENDING_MANUAL with zero violations. Exact installed-host package certification remains pending.",
+        "source_fix": "Both runtime languages now use a version-aware pre-broker demand reader normalized to canonical-pre-broker-demand/1.0 nodes; constitution, broker controller and terminal selected-cell recovery consume only that canonical form. The JavaScript and Python normalizers are also included in the computed deployment closure and per-package dependency policy.",
+        "integration_evidence": "PASS: the attachment producer emits /2.0, the real broker controller accepts the fresh request, v1/v2 selected-cell crosswalks resolve the same 72 source mappings, and the degraded controller-to-portable-workbook path emits PASS_PENDING_MANUAL with zero violations. A clean-root development package now compiles and executes a real production-contract case with the normalized demand modules present. Exact installed-host certification remains pending.",
         "semantic_oracle_evidence": "PASS: canonical matching accepts source-backed nodes by source identity and synthetic model-demand nodes by section/metric/period identity; stale graph hashes and disappearing nodes still fail closed.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
-        "commit": "f0bf43e6c80aa270e670a1835d280517f2293b85"
+        "commit": "f0bf43e6c80aa270e670a1835d280517f2293b85 (normalization); CURRENT_CHECKPOINT_PENDING (deployment closure)"
       }
     },
     {
@@ -853,16 +853,16 @@
       "earliest_responsible_layer": "Final workbook verification.",
       "candidate_files": "scripts/verify/validate_dynamic_model.py; scripts/verify/workbook_semantic_oracle.py; scripts/verify_native_restoration.py",
       "acceptance_criterion": "Final gate uses native Excel recalculation or equivalent external evidence and scans every relevant used cell.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Final gate uses native Excel recalculation or equivalent external evidence and scans every relevant used cell.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at the baseline parser boundary: OOXML cells with t=e were expressly excluded from the numeric cache map and no parallel error-state inventory existed, so native #REF!/#VALUE! cells could disappear from restoration comparisons.",
+        "focused_test": "PASS: all-worksheet native error scanner 6/6; release-certification contract 25/25 including missing-scan, injected-error, missing-native-report, duplicate-state and tampered-state mutations.",
+        "source_fix": "Native evidence schema 3.2 requires every one of the twenty saved restoration workbooks to report positive worksheet and used-cell scan counts and exactly zero Excel error cells. The stdlib OOXML reader visits every serialized cell on every worksheet and fails each state on any native error type.",
+        "integration_evidence": "PASS: real Stage-4 interruption/recovery suite 7/7; clean-root development package compiles and executes a production-contract case with PASS_PENDING_MANUAL, zero violations and explicit pending native/visual release status.",
+        "semantic_oracle_evidence": "PASS: a synthetic two-sheet OOXML mutation places #REF! at Forward Curves!XFD1048576; the independent scanner detects it outside the operating sheet and at the furthest valid used-cell coordinate, while the clean counterpart remains error-free.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_MICROSOFT_EXCEL_HOST",
+        "commit": "CURRENT_CHECKPOINT_PENDING"
       }
     },
     {
@@ -874,16 +874,16 @@
       "earliest_responsible_layer": "Release policy.",
       "candidate_files": "scripts/verify/validate_dynamic_model.py; scripts/lib/release_certification.mjs",
       "acceptance_criterion": "Development delivery clearly distinguishes pending-manual from pass; promotion cannot claim workbook validity without required native evidence.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Development delivery clearly distinguishes pending-manual from pass; promotion cannot claim workbook validity without required native evidence.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in release orchestration and clean-root smoke: a validator status of PASS or PASS_PENDING_MANUAL was accepted interchangeably and the aggregate build checkpoint rewrote either result to PASS.",
+        "focused_test": "PASS: release-certification contract 25/25 rejects absent or malformed native evidence; Stage-4 checkpoint recovery 7/7 retains the explicit PASS_PENDING_MANUAL delivery state.",
+        "source_fix": "Portable orchestration and clean-root smoke now require exactly PASS_PENDING_MANUAL when no native or visual evidence is supplied, and persist AUTOMATED_DEVELOPMENT_EVIDENCE_ONLY plus PENDING_NATIVE_EXCEL_AND_VISUAL_REVIEW. Certified packaging still requires the hash-bound native report and all other release evidence.",
+        "integration_evidence": "PASS: the isolated development release manifest records workbookBuild.status and validation_status as PASS_PENDING_MANUAL, no certified closure, no evidence receipt and the explicit pending release gate; removing native_excel from a certification manifest fails schema validation.",
+        "semantic_oracle_evidence": "PASS: policy mutations cannot promote a cached-value-only result because development and certification are disjoint package modes with distinct required statuses and evidence closures.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_MICROSOFT_EXCEL_HOST",
+        "commit": "CURRENT_CHECKPOINT_PENDING"
       }
     },
     {

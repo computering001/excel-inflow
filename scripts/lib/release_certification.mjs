@@ -242,12 +242,12 @@ async function visualReview(report, reportPath, closureHash, findings) {
 
 async function nativeExcel(report, reportPath, closureHash, findings) {
   schemaFindings(NATIVE_EXCEL_SCHEMA, report, "native_excel", findings);
-  if (report.schema_version !== "native-excel-restoration-evidence/3.1" ||
+  if (report.schema_version !== "native-excel-restoration-evidence/3.2" ||
       report.status !== "PASS" || report.diagnostic_only !== false ||
       report.certified_closure_sha256 !== closureHash ||
       Number(report.total_violations) !== 0 ||
       JSON.stringify(report.tolerance_policy) !== JSON.stringify(TOLERANCE_POLICY)) {
-    findings.push(finding("native_excel", "Native evidence must be v3.1, closure-bound, non-diagnostic, zero-violation and metric-toleranced."));
+    findings.push(finding("native_excel", "Native evidence must be v3.2, closure-bound, non-diagnostic, zero-violation, metric-toleranced and all-cell error-scanned."));
   }
   if (!validDateTime(report.generated_at)) {
     findings.push(finding("native_excel.generated_at", "Native evidence generated_at must be an RFC 3339 date-time."));
@@ -315,6 +315,15 @@ async function nativeExcel(report, reportPath, closureHash, findings) {
         if (!absolute || (absolute !== reportRoot && !absolute.startsWith(`${reportRoot}${path.sep}`))) {
           findings.push(finding(`${testPrefix}.file.${fileIndex}.path`, "Native state evidence must remain under the evidence directory."));
           continue;
+        }
+        if (!Number.isInteger(file.worksheets_scanned) || file.worksheets_scanned <= 0 ||
+            !Number.isInteger(file.used_cells_scanned) || file.used_cells_scanned <= 0 ||
+            file.excel_error_count !== 0 || !Array.isArray(file.excel_error_cells) ||
+            file.excel_error_cells.length !== 0) {
+          findings.push(finding(
+            `${testPrefix}.file.${fileIndex}.excel_error_scan`,
+            "Every worksheet and serialized used cell must be scanned with zero native Excel error cells.",
+          ));
         }
         if (statePaths.has(absolute)) {
           findings.push(finding(`${testPrefix}.file.${fileIndex}.duplicate`, "Each native restoration state must be a distinct evidence file."));

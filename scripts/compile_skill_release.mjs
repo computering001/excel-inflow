@@ -1733,7 +1733,7 @@ async function runSmokeTest() {
         await fs.readFile(path.join(validationDir, "validation-report.json"), "utf8"),
       );
       if (
-        !["PASS", "PASS_PENDING_MANUAL"].includes(validation.status) ||
+        validation.status !== "PASS_PENDING_MANUAL" ||
         Number(validation.total_violations) !== 0
       ) {
         throw new Error(
@@ -1741,7 +1741,9 @@ async function runSmokeTest() {
         );
       }
       workbookBuild = {
-        status: "PASS",
+        status: "PASS_PENDING_MANUAL",
+        evidence_class: "AUTOMATED_DEVELOPMENT_EVIDENCE_ONLY",
+        release_gate_status: "PENDING_NATIVE_EXCEL_AND_VISUAL_REVIEW",
         case_sha256: await sha256File(caseCopy),
         plan_sha256: await sha256File(planPath),
         workbook_sha256: await sha256File(workbookPath),
@@ -1771,9 +1773,9 @@ const smokeTest = skipSmoke
 // Persist certification only after the clean-root smoke test has completed.
 // A failing smoke run must never leave a newly certified hash behind.
 if (certifyNow) {
-  if (smokeTest.workbookBuild?.status !== "PASS") {
+  if (!["PASS", "PASS_PENDING_MANUAL"].includes(smokeTest.workbookBuild?.status)) {
     throw new Error(
-      "Certification requires a PASS real clean-root workbook build, render and validation smoke.",
+      "Certification requires a zero-violation real clean-root workbook build whose portable validation remains explicitly PASS_PENDING_MANUAL; native and visual PASS are supplied only through the separate hash-bound certification evidence gate.",
     );
   }
   await fs.writeFile(

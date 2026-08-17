@@ -314,6 +314,7 @@
     "lib/plan_builder.mjs",
     "lib/plan_values.mjs",
     "lib/plausibility_acknowledgements.mjs",
+    "lib/pre_broker_demand.mjs",
     "lib/process_tree.mjs",
     "lib/public_test_run.mjs",
     "lib/rcf_policy.mjs",
@@ -722,6 +723,7 @@
     "verify/workbook_semantic_oracle.py",
     "verify/xlsx.py",
     "verify/verify_delivery.py",
+    "pre_broker_demand.py",
     "experience_trace.py",
     "rebind_broker_native_preflight.py"
   ],
@@ -858,6 +860,10 @@
     "broker_terminal_recovery.py": {
       "may_import_third_party": [],
       "reason": "The broker terminal-recovery helper is stdlib-only and proves negative model consumption from immutable candidate cells and the canonical metric dictionary; it neither reads PDFs nor authors visual or semantic judgments."
+    },
+    "pre_broker_demand.py": {
+      "may_import_third_party": [],
+      "reason": "The shared pre-broker demand normalizer is stdlib-only and reduces a sealed demand graph to the canonical broker-independent material states without reading source documents or authoring evidence."
     },
     "broker_work_graph.py": {
       "may_import_third_party": [],
