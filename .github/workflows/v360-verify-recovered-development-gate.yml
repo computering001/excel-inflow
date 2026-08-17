@@ -1,4 +1,4 @@
-# correct the audited v2 demand-graph test expectation on the preserved v3.6 target
+# focused proof of final recovered v3.6 repairs before the full source-owned gate
 name: v360 verify recovered development gate
 
 on:
@@ -9,46 +9,38 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 90
     steps:
-      - name: Check out v3.6 target
+      - name: Check out repaired v3.6 target
         uses: actions/checkout@v4
         with:
-          ref: agent/excel-inflow-v360-rebuild
+          ref: e0530e55cd74191b952b88f1ff17a08c73345cec
           fetch-depth: 0
-      - name: Require audited starting point
+      - name: Install runtime
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = '5ee90b02796719624c119777ef3e81bb4e61d763'
-      - name: Correct v2 demand graph test expectation
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+      - name: Run focused recovered seams
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/run_evidence_pipeline_tests.py')
-          s=p.read_text()
-          old='''            demand["schema_version"] == "pre-broker-model-demand/2.0"\n            and demand["counts"] == {\n                "source_rows": 2,\n                "filed_forecast_nodes": 0,\n                "model_demand_concepts": 9,\n                "model_demand_nodes": 27,\n                "material_model_demand_nodes": 27,\n            }\n'''
-          new='''            demand["schema_version"] == "pre-broker-model-demand/2.0"\n            and demand["counts"] == {\n                "source_rows": 0,\n                "filed_forecast_nodes": 0,\n                "model_demand_concepts": 9,\n                "model_demand_nodes": 27,\n                "material_model_demand_nodes": 27,\n            }\n'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-          PY
-          python3 -m py_compile scripts/run_evidence_pipeline_tests.py
-          git diff --check
-          git diff -- scripts/run_evidence_pipeline_tests.py
-      - name: Commit corrected test custody
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'excel-inflow-recovery-publisher'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/run_evidence_pipeline_tests.py
-          git commit -m 'Correct v2 broker demand test custody'
-          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
-          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
+          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          export SOFFICE_BIN="$(command -v soffice)"
+          node scripts/run_test_registry_contract_tests.mjs
+          python3 scripts/run_evidence_pipeline_tests.py
+          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
+          node scripts/run_decision_round_tests.mjs
+          node scripts/run_filings_pipeline_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+          echo 'FOCUSED_V360_REPAIR_SEAMS=PASS'
