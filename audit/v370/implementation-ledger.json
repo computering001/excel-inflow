@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T17:40:59Z",
+  "recorded_at": "2026-08-17T17:43:26Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -412,16 +412,16 @@
       "earliest_responsible_layer": "Acquisition / statement row binding.",
       "candidate_files": "scripts/lib/funded_acquisition_plan.mjs; scripts/lib/funded_acquisition_runtime.mjs; scripts/lib/row_plan.mjs; scripts/build_dynamic_model.mjs",
       "acceptance_criterion": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in both funded-acquisition output adapters: the portable workbook accepted an investing total bound to FX instead of consideration, and the captured plan accepted a second physical consideration row.",
+        "focused_test": "PASS: funded-acquisition transaction suite 14/14 covers disabled zero, close-year consideration, semantic investing ownership, no FX dependency and one N:P physical target.",
+        "source_fix": "The portable row-plan route requires exactly one consideration and debt-proceeds row, exactly one investing total, one consideration membership and no FX member; the captured-plan route requires one complete N:P row per transaction role.",
+        "integration_evidence": "PASS: economics phase gate 3/3 and two frozen compiler cases with zero compile, economic or plan diffs.",
+        "semantic_oracle_evidence": "PASS: binding is derived from semantic role/row identity, never workbook row number; duplicate and FX-bound mutations both fail closed.",
+        "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
+        "commit": "f6d9ca3"
       }
     },
     {
