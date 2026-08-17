@@ -1,3 +1,4 @@
+import { canonicalSemanticRole, isStructuredEventRole } from "./semantic_roles.mjs";
 import { resolveBrokerForecastSelection } from "./broker_anchor.mjs";
 import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
 
@@ -78,6 +79,8 @@ const MATERIALITY_REQUIRED_METHODS = new Set([
 const SCHEDULE_OWNED_ROLES = new Set(Object.keys(SCHEDULE_PRODUCER_BY_ROLE));
 
 const STRUCTURAL_EVENT_ROLES = new Set([
+  "acquisitions_net_of_cash",
+  "acquisitions_net_of_cash",
   "acquisition_cost",
   "business_combination",
   "disposal",
@@ -93,7 +96,8 @@ export function isStructuredSemanticEvent(row) {
   return (
     ["debt_issuance_cost", "other_cash_debt_movement"].includes(
       row?.movement_type,
-    ) || STRUCTURAL_EVENT_ROLES.has(row?.semantic_role)
+    ) || STRUCTURAL_EVENT_ROLES.has(canonicalSemanticRole(row?.semantic_role)) ||
+    isStructuredEventRole(row?.semantic_role)
   );
 }
 

@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict'; import {resolveSourceIdentity} from './lib/source_identity.mjs';
+const id=await resolveSourceIdentity({skillRoot:new URL('../',import.meta.url).pathname,overrides:{source_commit:'a'.repeat(40),source_tree:'b'.repeat(40),repository:'computering001/excel-inflow'}}); assert.equal(id.schema_version,'source-identity/1.0'); assert.equal(id.source_commit,'a'.repeat(40)); assert.equal(id.source_tree,'b'.repeat(40)); assert.equal(id.package_mode,'development'); assert.ok(id.current_closure_sha256); console.log(JSON.stringify({status:'PASS',checks:5}));

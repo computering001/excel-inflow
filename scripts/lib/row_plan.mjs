@@ -25,6 +25,7 @@ import {
   forecastRowMateriality,
   isScheduleOwnedForecastRole,
 } from "./forecast_authority.mjs";
+import { verifyForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import {
   assertStatementTopology,
   deriveStatementIndentMap,
@@ -3648,6 +3649,7 @@ export function benchmarkCurvePlan(modelCase) {
 }
 
 export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {}) {
+  if (modelCase?.forecast_authority_ledger_version) verifyForecastAuthorityLedger(modelCase);
   const compiledInstrumentPeriodState = instrumentPeriodState ??
     (Number(modelCase.contract_version) === 2
       ? compileInstrumentPeriodState(modelCase)

@@ -4,38 +4,87 @@
   "title": "Excel Inflow broker-document extraction request",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "documents"],
+  "required": [
+    "schema_version",
+    "run_id",
+    "documents"
+  ],
   "properties": {
-    "schema_version": { "const": "broker-extraction-request/1.0" },
-    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "schema_version": {
+      "const": "broker-extraction-request/1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
     "model_context": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["as_of", "reporting_currency", "units", "forecast_periods", "model_demand_graph"],
+      "required": [
+        "as_of",
+        "reporting_currency",
+        "units",
+        "forecast_periods",
+        "model_demand_graph"
+      ],
       "properties": {
-        "as_of": { "type": "string", "format": "date" },
-        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-        "units": { "enum": ["units", "thousands", "millions", "billions"] },
+        "as_of": {
+          "type": "string",
+          "format": "date"
+        },
+        "reporting_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "units": {
+          "enum": [
+            "units",
+            "thousands",
+            "millions",
+            "billions"
+          ]
+        },
         "forecast_periods": {
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": "string", "format": "date" }
+          "items": {
+            "type": "string",
+            "format": "date"
+          }
         },
         "model_demand_graph": {
           "type": "object",
-          "description": "The complete filings-derived demand graph compiled before broker extraction and independently re-bound to the final model-demand graph.",
-          "required": ["schema_version", "forecast_periods", "nodes", "graph_sha256"],
+          "description": "Model-owned demand compiled after filing topology; v2 adds synthetic/derived model concepts while preserving v1 compatibility.",
+          "required": [
+            "schema_version",
+            "forecast_periods",
+            "nodes",
+            "graph_sha256"
+          ],
           "properties": {
-            "schema_version": { "const": "pre-broker-model-demand/1.0" },
+            "schema_version": {
+              "enum": [
+                "pre-broker-model-demand/1.0",
+                "pre-broker-model-demand/2.0"
+              ]
+            },
             "forecast_periods": {
               "type": "array",
               "minItems": 3,
               "maxItems": 3,
-              "items": { "type": "string", "format": "date" }
+              "items": {
+                "type": "string",
+                "format": "date"
+              }
             },
-            "nodes": { "type": "array" },
-            "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            "nodes": {
+              "type": "array"
+            },
+            "graph_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
           }
         }
       }
@@ -57,11 +106,26 @@
           "published_date"
         ],
         "properties": {
-          "document_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-          "house_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
-          "house_name": { "type": "string", "minLength": 1 },
-          "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
-          "path": { "type": "string", "minLength": 1 },
+          "document_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "house_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "house_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
           "media_type": {
             "enum": [
               "application/pdf",
@@ -76,9 +140,23 @@
               "image/jpeg"
             ]
           },
-          "published_date": { "type": "string", "format": "date" },
-          "password": { "type": ["string", "null"] },
-          "expected_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+          "published_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expected_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
         }
       }
     }

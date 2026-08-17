@@ -20,12 +20,16 @@ import {
   validatePreBrokerDemandCoverage,
 } from "./lib/run_constitution_graph.mjs";
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
+import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
+
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const CONTROLLER_VERSION = "excel-inflow-vnext/1.0";
 let ACTIVE_RUNTIME_CLOSURE = null;
 let ACTIVE_PERFORMANCE = null;
+let ACTIVE_EXPERIENCE_TRACE = null;
+let ACTIVE_EXPERIENCE_ROOT_SPAN = null;
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
@@ -136,6 +140,13 @@ async function checkpoint(id, status, target = null) {
 }
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
+  if (ACTIVE_EXPERIENCE_TRACE && ACTIVE_EXPERIENCE_ROOT_SPAN) {
+    ACTIVE_EXPERIENCE_TRACE.end(ACTIVE_EXPERIENCE_ROOT_SPAN, status === "PASS_PENDING_MANUAL" ? "PASS" : status);
+    ACTIVE_EXPERIENCE_ROOT_SPAN = null;
+    const experienceTracePath = path.join(out, "experience-trace.json");
+    await writeExperienceTrace(experienceTracePath, ACTIVE_EXPERIENCE_TRACE.finish());
+    artifacts = { ...artifacts, experience_trace: experienceTracePath };
+  }
   if (ACTIVE_PERFORMANCE) {
     ACTIVE_PERFORMANCE.total_duration_ms = Date.now() - ACTIVE_PERFORMANCE.started_epoch_ms;
   }
@@ -200,6 +211,8 @@ async function main() {
     throw new Error("vNext run output must be outside the immutable skill tree.");
   }
   await fs.mkdir(out, { recursive: true });
+  ACTIVE_EXPERIENCE_TRACE = createExperienceTrace({ runId: path.basename(out), scope: "vnext_controller" });
+  ACTIVE_EXPERIENCE_ROOT_SPAN = ACTIVE_EXPERIENCE_TRACE.start("vnext_controller", "run_excel_inflow_vnext", "excel_inflow_active");
   ACTIVE_RUNTIME_CLOSURE = await runtimeClosure();
   const pythonCommand = String(options.python ?? process.env.PYTHON ?? "python3");
   const pythonProbe = await run(pythonCommand, [

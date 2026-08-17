@@ -2,6 +2,7 @@
   "schema_version": "broker-runtime-members/1.0",
   "members": [
     "scripts/run_broker_pipeline.py",
+    "scripts/rebind_broker_native_preflight.py",
     "scripts/broker_terminal_recovery.py",
     "scripts/broker_period_recovery.py",
     "scripts/broker_work_graph.py",

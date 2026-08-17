@@ -1,3 +1,4 @@
+import { canonicalSemanticRole } from "./semantic_roles.mjs";
 const SECTIONS = new Set(["income_statement", "cash_flow"]);
 
 // A statement has one economic conclusion even when its forecast happens to be
@@ -79,7 +80,7 @@ function isIndentAnchor(row) {
     row.row_type === "header" ||
     row.style_role === "header" ||
     row.style_role === "total" ||
-    HEADLINE_TOTAL_ROLES.has(row.semantic_role) ||
+    HEADLINE_TOTAL_ROLES.has(canonicalSemanticRole(row.semantic_role)) ||
     DERIVED_PRESENTATION_OPERATORS.has(row.calculation?.operator)
   );
 }
@@ -120,7 +121,7 @@ export function compileSectionConclusionOwnership(rows, section) {
     (row) =>
       row.row_type !== "header" &&
       row.projection_status !== "evidence_only" &&
-      row.semantic_role === requiredRole,
+      canonicalSemanticRole(row.semantic_role) === requiredRole,
   );
   const owner = owners.length === 1 ? owners[0] : null;
   const closure = owner ? dependencyClosure(rows, owner.row_id) : new Set();

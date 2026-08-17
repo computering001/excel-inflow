@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Installed-host usable-broker canary receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_identity",
+    "raw_pdf_sha256",
+    "host_response_sha256",
+    "selected_cells",
+    "workbook_sha256",
+    "workbook_consumption"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "installed-host-broker-canary/1.0"
+    },
+    "status": {
+      "const": "PASS"
+    },
+    "source_identity": {
+      "type": "object"
+    },
+    "raw_pdf_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "host_response_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "selected_cells": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    },
+    "workbook_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "workbook_consumption": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

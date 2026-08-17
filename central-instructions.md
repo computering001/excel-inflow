@@ -240,10 +240,7 @@ This entry rule still applies when the request already names the company or
 includes attachments; the supplied information is consumed after the canonical
 screen is shown.
 
-The entry screen asks for the COMPANY ONLY. Filings are auto-pulled where the
-runtime carries a filings library or public-filings access (user-supplied
-filings always take precedence; a company whose filings cannot be pulled or
-supplied blocks at intake). Broker research is optional, but the Brokers
+The entry screen asks for the COMPANY ONLY. Filings use an explicit source mode. `internal` is the production default: Rogo/runtime-library/public-filings sourcing owns the filing set. `user_supplied` is an intentional override only when the user explicitly directs the run to use supplied filings. `internal_fallback` records a user-supplied fallback plus the failed internal-source reason. Never silently merge internal and user-supplied filing sets. A company whose mandatory filings cannot be sourced under the selected mode blocks at intake. Broker research is optional, but the Brokers
 milestone is not optional: it must close through either 1-10 supplied reports
 or the exact recorded choice `continue without brokers`. Zero attachments,
 silence, a missing picker or an unavailable research library never implies
@@ -278,13 +275,7 @@ certification belongs to the versioned installation transaction, never to an
 ordinary end-user invocation. After the Company screen is visible, later
 milestones may perform their declared checks and persist their normal receipts.
 
-The entry screen collects the company only; the remaining pack arrives at
-its own stage as the screen states. Where the runtime carries a filings
-library or public-filings access, AUTO-PULL the last three full-year filings
-for the resolved issuer and present what was pulled on the intake receipt
-for confirmation; user-supplied filings always take precedence, and a
-company whose filings cannot be pulled or supplied blocks at intake rather
-than proceeding on fragments. A prior
+The entry screen collects the company only; the remaining pack arrives at its own stage as the screen states. Under `source_mode=internal`, AUTO-PULL the last three full-year filings for the resolved issuer and record the selected filing identities on the intake receipt. Under `source_mode=user_supplied`, use only the explicitly selected user filing set. Under `source_mode=internal_fallback`, use the declared fallback set and preserve the internal-source failure reason. User attachments do not override internally sourced filings merely by existing. A prior
 case file and known transaction assumptions are optional. Resolve fiscal year
 end, reporting currency, units and period range from the filings; never ask the
 user to confirm them. For autonomous testing, use only UK- or Irish-listed
@@ -792,6 +783,12 @@ never create or refresh its own baseline. LibreOffice/Carlito proves regression
 and clipping, not exact Excel/Calibri appearance; native Excel review remains
 separate evidence.
 
+### Evidence concurrency and runtime attribution
+
+Once issuer identity is known, filings sourcing, DCS parsing and broker-native preflight may run concurrently. Broker preflight may hash, archive, extract native text/tables/geometry and render pages, but it cannot select model authority until the filings-derived canonical model-demand graph exists. The final broker lane rebinds reusable native preflight evidence to that graph by raw-document hash; if reuse cannot be proved exactly, fall back to the canonical full broker extraction.
+
+Every user-visible run writes an `experience-trace/1.0`. Time is classified as `excel_inflow_active`, `known_external_wait` or `unknown`. Known Rogo/model-host/source-retrieval waits remain visible in end-user wall time but are not treated as unowned Excel Inflow work. Initial release coverage is at least 95% classified, with 98% the engineering target. Unknown gaps above 30 seconds warn, above 120 seconds require investigation and above 300 seconds block certification unless reclassified from evidence as a known external/platform wait. These thresholds never justify skipping validation.
+
 ## Completion
 Deliver one workbook, its normalised case, its evidence-run receipt and a concise
 summary naming the selected standardised profile, broker anchor, assumptions,
@@ -884,13 +881,7 @@ node scripts/propose_case_source.mjs <minimal-declarations.json> <case-evidence.
 node scripts/verify/recalc_second_opinion.mjs --before <emitted.xlsx> --after <raw-after.xlsx> --before-map <before.json> --after-map <raw-after.json> --out <receipt.json> [--soffice-identity <sha256>]
 ```
 
-The preferred filing input is `filings-acquisition-request/1.0`. It is a
-declarative registry, never a search instruction: sources are user-supplied
-paths, runtime-library paths, or explicit HTTPS issuer/regulator URLs with an
-allowed-domain set. The controller materialises every source by SHA-256 and
-then invokes the same extraction lane. User-supplied sources own every period
-they cover ahead of retrieved or runtime-library sources. Overlapping annuals
-may supply different periods only through the sealed `period_authority` ledger;
+The preferred filing input is `filings-acquisition-request/2.0`. It is a declarative source-mode registry, never a search instruction. `internal` sources are runtime-library paths or explicit HTTPS issuer/regulator URLs with an allowed-domain set; `user_supplied` paths are eligible only in the explicit override mode; `internal_fallback` preserves both the fallback custody and the failed internal-source reason. The controller materialises every selected source by SHA-256 and then invokes the same extraction lane. Overlapping annuals within the selected source mode may supply different periods only through the sealed `period_authority` ledger;
 the latest selected filing remains the canonical statement topology, while an
 older report must be explicitly marked `selected_period_authority_support`.
 Restated comparatives still require the numeric historical bridge. Stable

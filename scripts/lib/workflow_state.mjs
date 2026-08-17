@@ -211,3 +211,16 @@ export function normaliseUserFlowResult(result) {
   });
   return value;
 }
+
+export function assertPublicStateOwnership(value) {
+  const status = value?.status ?? value?.response_status ?? null;
+  const blockerClass = value?.blocker_class ?? value?.blockerClass ?? null;
+  const userBlocking = value?.user_blocking ?? value?.userBlocking ?? null;
+  if (status === "ACTION_REQUIRED" && !["USER_DECISION", "USER_EVIDENCE", "FATAL_SOURCE"].includes(blockerClass)) {
+    throw new Error(`ACTION_REQUIRED cannot be owned by ${blockerClass ?? "no blocker class"}.`);
+  }
+  if (blockerClass === "INTERNAL_WORK" && userBlocking === true) {
+    throw new Error("INTERNAL_WORK cannot be user-blocking.");
+  }
+  return value;
+}

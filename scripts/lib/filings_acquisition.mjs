@@ -74,7 +74,8 @@ async function fetchDeclaredUrl(rawUrl, allowedDomains) {
 
 function acquisitionErrors(request) {
   const errors = [];
-  if (request?.schema_version !== "filings-acquisition-request/1.0") errors.push("wrong schema_version");
+  if (!["filings-acquisition-request/1.0", "filings-acquisition-request/2.0"].includes(request?.schema_version)) errors.push("wrong schema_version");
+  if (request?.schema_version === "filings-acquisition-request/2.0" && !["internal", "user_supplied", "internal_fallback"].includes(request?.source_mode)) errors.push("source_mode is invalid");
   if (!request?.run_id) errors.push("run_id is absent");
   if (!request?.company?.name) errors.push("company.name is absent");
   if (!request?.filing_facts || typeof request.filing_facts !== "object") errors.push("filing_facts is absent");
@@ -132,8 +133,15 @@ export async function acquireFilingsSources({
   if (errors.length > 0) throw new Error(`Filings acquisition request is invalid: ${errors.join("; ")}`);
   const root = path.resolve(outDir);
   const requestBase = path.dirname(path.resolve(requestPath));
+  const sourceMode = request.schema_version === "filings-acquisition-request/2.0" ? request.source_mode : "user_supplied";
+  const eligibleOrigins = sourceMode === "user_supplied" ? new Set(["user_supplied"]) : sourceMode === "internal" ? new Set(["official_declarative_url", "runtime_library"]) : new Set(["user_supplied"]);
+  if (sourceMode === "internal_fallback" && !request.fallback_reason) throw new Error("internal_fallback requires fallback_reason");
+  const selectedSources = request.sources.filter((source) => eligibleOrigins.has(source.origin));
+  const selectedOrigins = new Set(selectedSources.map((source) => source.origin));
+  if (selectedSources.length === 0) throw new Error(`No filing sources are eligible under source_mode=${sourceMode}`);
+  const excludedDocumentIds = request.sources.filter((source) => !eligibleOrigins.has(source.origin)).map((source) => source.document_id).sort();
   const materialised = [];
-  for (const declaration of request.sources) {
+  for (const declaration of selectedSources) {
     let bytes;
     let finalUrl = null;
     let declaredPath = null;
@@ -200,10 +208,18 @@ export async function acquireFilingsSources({
   const extractionRequestPath = path.join(root, "filings-extraction-request.json");
   await atomicWrite(extractionRequestPath, canonicalBytes(extractionRequest));
   const registryBody = {
-    schema_version: "filings-source-registry/1.0",
+    schema_version: request.schema_version === "filings-acquisition-request/2.0" ? "filings-source-registry/2.0" : "filings-source-registry/1.0",
     run_id: request.run_id,
     company: structuredClone(request.company),
-    acquisition_policy: {
+    acquisition_policy: request.schema_version === "filings-acquisition-request/2.0" ? {
+      search_performed: false,
+      source_mode: sourceMode,
+      selected_origins: [...selectedOrigins].sort(),
+      excluded_document_ids: excludedDocumentIds,
+      official_urls_must_be_declarative: true,
+      content_addressed: true,
+      ordering: ["user_supplied", "official_declarative_url", "runtime_library"],
+    } : {
       search_performed: false,
       user_supplied_precedence: true,
       official_urls_must_be_declarative: true,

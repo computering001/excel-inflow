@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import atexit
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,7 @@ from archive_broker_pages import archive_pdf_pages
 from delivery_constitution import assert_broker_failure_degrades
 from workflow_state import assert_state, assert_transition
 from zero_broker_authority import apply_zero_broker_authority
+from experience_trace import ExperienceTrace, write_trace
 
 
 HERE = Path(__file__).resolve().parent
@@ -362,6 +364,77 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
     }
 
 
+def _model_owned_broker_demand(*, request: dict[str, Any], spec: dict[str, Any], filings: dict[str, Any]) -> dict[str, Any]:
+    historical = list(filings.get("historical_periods") or [])
+    forecast = list(filings.get("forecast_periods") or [])
+    if len(forecast) != 3 or not historical or not filings.get("reporting_currency") or not filings.get("units"):
+        raise ValueError("Model-owned broker demand requires complete filings period/currency/unit context.")
+    ontology_path = ROOT / "assets" / "economic-ontology-v2.json"
+    ontology = read_json(ontology_path, "economic ontology")
+    metric_ids = list(ontology.get("standard_broker_demand") or [])
+    rows_by_metric: dict[str, tuple[str, dict[str, Any]]] = {}
+    for section in ("income_statement", "cash_flow"):
+        for row in filings.get(section) or []:
+            candidates = [row.get("broker_metric_id"), row.get("semantic_role"), row.get("row_id")]
+            for candidate in candidates:
+                if candidate in metric_ids and candidate not in rows_by_metric:
+                    rows_by_metric[str(candidate)] = (section, row)
+    nodes: list[dict[str, Any]] = []
+    source_rows: set[str] = set()
+    for metric_id in metric_ids:
+        section, row = rows_by_metric.get(metric_id, ("income_statement" if metric_id in {"revenue","ebit","adjusted_ebitda","depreciation_and_amortisation","effective_tax_rate"} else "cash_flow", {}))
+        source_line_id = str(row.get("source_line_id") or row.get("row_id") or "").strip() or None
+        if source_line_id:
+            source_rows.add(source_line_id)
+        label = str(row.get("label") or metric_id.replace("_", " ").title())
+        source_backed = bool(source_line_id)
+        definition_signature = sha256_value({
+            "metric_id": metric_id,
+            "section": section,
+            "source_line_id": source_line_id,
+            "label": label,
+            "units": filings["units"],
+            "reporting_currency": filings["reporting_currency"],
+        })
+        for index, period_end in enumerate(forecast):
+            nodes.append({
+                "node_id": f"model_demand.{metric_id}.fy{index + 1}",
+                "node_kind": "model_demand",
+                "section": section,
+                "source_line_id": source_line_id,
+                "metric_id": metric_id,
+                "label": label,
+                "parent_label": row.get("parent_label"),
+                "period_end": period_end,
+                "material": True,
+                "source_backed": source_backed,
+                "broker_demand_eligible": True,
+                "house_requirement": "headline_anchor" if metric_id in {"ebit", "adjusted_ebitda"} else "required",
+                "allowed_authorities": ["company_guidance", "selected_broker", "user_assumption", "historical_inference", "explicit_zero"],
+                "definition_signature_sha256": definition_signature,
+                "consumer_ids": [f"forecast_authority.{metric_id}.{period_end}"],
+            })
+    nodes.sort(key=lambda item: item["node_id"])
+    body = {
+        "schema_version": "pre-broker-model-demand/2.0",
+        "run_id": str(request.get("run_id") or spec.get("run_id") or "unknown"),
+        "as_of": historical[-1],
+        "reporting_currency": filings["reporting_currency"],
+        "units": filings["units"],
+        "forecast_periods": forecast,
+        "ontology_sha256": sha256_file(ontology_path),
+        "nodes": nodes,
+        "counts": {
+            "source_rows": len(source_rows),
+            "filed_forecast_nodes": 0,
+            "model_demand_concepts": len(metric_ids),
+            "model_demand_nodes": len(nodes),
+            "material_model_demand_nodes": len(nodes),
+        },
+    }
+    return {**body, "graph_sha256": sha256_value(body)}
+
+
 def broker_declaration_with_model_context(
     *,
     spec: dict[str, Any],
@@ -369,30 +442,22 @@ def broker_declaration_with_model_context(
     output_root: Path,
     filings_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Bind the optional broker lane to the mandatory company period basis.
+    """Bind the optional broker lane to the canonical model-owned demand graph.
 
-    This lets the broker controller close lawfully with zero selected authority
-    even when no model-host crosswalk is available. The source request remains
-    immutable; a derived request is written inside the run folder and included
-    in the broker lane cache key.
+    Existing content-addressed v1 requests remain resumable. New controller work
+    emits v2 demand only after mandatory filings topology has resolved, so
+    derived/synthetic Tier-1 concepts are not lost merely because no literal
+    filing row bears the canonical name.
     """
     declaration = json.loads(json.dumps(spec.get("broker") or {}))
     request_path = resolve(spec_path.parent, declaration.get("request_path"))
     if not request_path or not request_path.is_file():
         return declaration
     request = read_json(request_path, "broker request")
-    if (
-        isinstance(request.get("model_context"), dict)
-        and isinstance(request["model_context"].get("model_demand_graph"), dict)
-    ):
-        # A model host may resume with the exact graph authored by an earlier
-        # controller pass.  Preserve that graph as a first-class artifact just
-        # as the freshly compiled path does; returning the declaration early
-        # made a valid resumed broker request appear to have skipped the
-        # mandatory pre-broker graph stage.
-        demand_graph = request["model_context"]["model_demand_graph"]
+    existing_graph = (request.get("model_context") or {}).get("model_demand_graph")
+    if isinstance(existing_graph, dict) and existing_graph.get("schema_version") in {"pre-broker-model-demand/1.0", "pre-broker-model-demand/2.0"}:
         demand_path = output_root / "internal-requests" / "pre-broker-model-demand.json"
-        atomic_json(demand_path, demand_graph)
+        atomic_json(demand_path, existing_graph)
         derived_path = output_root / "internal-requests" / "broker-extraction-request.json"
         atomic_json(derived_path, request)
         declaration["request_path"] = str(derived_path)
@@ -412,74 +477,15 @@ def broker_declaration_with_model_context(
         if bundle_path.is_file():
             bundle = read_json(bundle_path, "filings evidence bundle for broker model context")
             filings = bundle.get("filings") or filings
-    historical = list(filings.get("historical_periods") or [])
-    forecast = list(filings.get("forecast_periods") or [])
-    if (
-        len(forecast) != 3
-        or not historical
-        or not filings.get("reporting_currency")
-        or not filings.get("units")
-    ):
+    try:
+        demand_graph = _model_owned_broker_demand(request=request, spec=spec, filings=filings)
+    except ValueError:
         return declaration
-    demand_nodes: list[dict[str, Any]] = []
-    for section in ("income_statement", "cash_flow"):
-        for row in filings.get(section) or []:
-            source_line_id = str(row.get("source_line_id") or "").strip()
-            label = str(row.get("label") or "").strip()
-            values = row.get("values") or []
-            if not source_line_id or not label or not any(value is not None for value in values):
-                continue
-            definition_sha = sha256_value({
-                "section": section,
-                "source_line_id": source_line_id,
-                "label": label,
-                "parent_label": row.get("parent_label"),
-                "units": filings["units"],
-            })
-            for index, period_end in enumerate(forecast):
-                demand_nodes.append({
-                    "node_id": f"{section}.{source_line_id}.fy{index + 1}",
-                    "section": section,
-                    "source_line_id": source_line_id,
-                    "label": label,
-                    "parent_label": row.get("parent_label"),
-                    "period_end": period_end,
-                    "material": row.get("material") is True,
-                    "has_historical_value": True,
-                    "allowed_authorities": [
-                        "company_guidance",
-                        "selected_broker",
-                        "historical_inference",
-                        "parent_capture",
-                        "user_assumption",
-                        "explicit_zero",
-                    ],
-                    "definition_signature_sha256": definition_sha,
-                })
-    demand_nodes.sort(key=lambda item: item["node_id"])
-    demand_body = {
-        "schema_version": "pre-broker-model-demand/1.0",
-        "run_id": str(request.get("run_id") or spec.get("run_id") or "unknown"),
-        "as_of": historical[-1],
-        "reporting_currency": filings["reporting_currency"],
-        "units": filings["units"],
-        "forecast_periods": forecast,
-        "nodes": demand_nodes,
-        "counts": {
-            "source_rows": len({item["source_line_id"] for item in demand_nodes}),
-            "forecast_nodes": len(demand_nodes),
-            "material_nodes": sum(1 for item in demand_nodes if item["material"]),
-        },
-    }
-    demand_graph = {
-        **demand_body,
-        "graph_sha256": sha256_value(demand_body),
-    }
     request["model_context"] = {
-        "as_of": historical[-1],
-        "reporting_currency": filings["reporting_currency"],
-        "units": filings["units"],
-        "forecast_periods": forecast,
+        "as_of": demand_graph["as_of"],
+        "reporting_currency": demand_graph["reporting_currency"],
+        "units": demand_graph["units"],
+        "forecast_periods": demand_graph["forecast_periods"],
         "model_demand_graph": demand_graph,
     }
     demand_path = output_root / "internal-requests" / "pre-broker-model-demand.json"
@@ -489,7 +495,6 @@ def broker_declaration_with_model_context(
     declaration["request_path"] = str(derived_path)
     declaration["model_demand_path"] = str(demand_path)
     return declaration
-
 
 def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dict[str, Path]) -> dict[str, Any]:
     declarations: dict[str, Any] = {}
@@ -749,7 +754,7 @@ def apply_filings_lane(
         else None
     )
     if acquisition_registry is not None:
-        if acquisition_registry.get("schema_version") != "filings-source-registry/1.0":
+        if acquisition_registry.get("schema_version") not in {"filings-source-registry/1.0", "filings-source-registry/2.0"}:
             raise ValueError("Filings source registry has the wrong schema version")
         registry_body = {
             key: value for key, value in acquisition_registry.items()
@@ -1140,6 +1145,52 @@ def write_state(
     }, sort_keys=True))
 
 
+
+_TELEMETRY_STARTED_AT = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+_TELEMETRY_STARTED_MONOTONIC = time.monotonic()
+atexit.register(lambda: _write_process_telemetry("FAIL" if getattr(sys, "last_value", None) else "PASS"))
+
+def _write_process_telemetry(status: str) -> None:
+    directory = os.environ.get("EXCEL_INFLOW_TELEMETRY_DIR")
+    if not directory:
+        return
+    try:
+        import hashlib
+        import datetime as dt
+        target_dir = Path(directory).resolve(); target_dir.mkdir(parents=True, exist_ok=True)
+        ended_at = dt.datetime.now(dt.timezone.utc).isoformat()
+        trace = {
+            "schema_version": "excel-inflow-run-telemetry/1.0",
+            "trace_id": os.environ.get("EXCEL_INFLOW_TRACE_ID") or f"trace.python.{os.getpid()}",
+            "run_id": os.environ.get("EXCEL_INFLOW_RUN_ID"),
+            "component": "attachment_evidence_pipeline",
+            "process_id": os.getpid(),
+            "parent_span_id": os.environ.get("EXCEL_INFLOW_PARENT_SPAN_ID"),
+            "user_submitted_at": os.environ.get("EXCEL_INFLOW_USER_SUBMITTED_AT") or _TELEMETRY_STARTED_AT,
+            "process_started_at": _TELEMETRY_STARTED_AT,
+            "process_ended_at": ended_at,
+            "visible_response_at": None,
+            "source_identity": None,
+            "spans": [{
+                "span_id": f"span.python.{os.getpid()}", "parent_span_id": os.environ.get("EXCEL_INFLOW_PARENT_SPAN_ID"),
+                "name": "process", "kind": "process", "owner": "attachment_evidence_pipeline",
+                "started_at": _TELEMETRY_STARTED_AT, "ended_at": ended_at,
+                "duration_ms": max(0, round((time.monotonic() - _TELEMETRY_STARTED_MONOTONIC) * 1000)),
+                "status": "OK" if status == "PASS" else "ERROR", "attributes": {},
+            }],
+            "events": [], "status": status,
+            "process_duration_ms": max(0, round((time.monotonic() - _TELEMETRY_STARTED_MONOTONIC) * 1000)),
+            "user_visible_duration_ms": None,
+        }
+        body = json.dumps(trace, sort_keys=True, separators=(",", ":")) + "\n"
+        trace["telemetry_sha256"] = hashlib.sha256(body.encode("utf8")).hexdigest()
+        target = target_dir / f"attachment_evidence_pipeline-{os.getpid()}.json"
+        temporary = target.with_suffix(target.suffix + ".tmp")
+        temporary.write_text(json.dumps(trace, indent=2, sort_keys=True) + "\n", "utf8")
+        temporary.replace(target)
+    except Exception:
+        pass
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("spec")
@@ -1151,6 +1202,15 @@ def main() -> int:
     output_root.mkdir(parents=True, exist_ok=True)
     state_path = output_root / "attachment-evidence-run-state.json"
     spec = read_json(spec_path, "attachment evidence controller spec")
+    experience_trace = ExperienceTrace(run_id=str(spec.get("run_id") or output_root.name), scope="attachment_evidence_controller")
+    experience_span = experience_trace.span("attachment_evidence_pipeline", "run_attachment_evidence_pipeline", "excel_inflow_active")
+    experience_span.__enter__()
+    def _finish_experience_trace() -> None:
+        try:
+            experience_span.__exit__(None, None, None)
+        finally:
+            write_trace(output_root / "experience-trace.json", experience_trace.finish())
+    atexit.register(_finish_experience_trace)
     if spec.get("schema_version") != "attachment-evidence-controller/1.0":
         raise ValueError("Attachment evidence controller spec has the wrong schema version")
     if (

@@ -391,7 +391,9 @@ if (brokerState !== "explicit_skip") {
   await writeJson(brokerExtractionRequest, brokerRequest);
 
   if (brokerState === "usable") {
-    // Simulate the installed model-host semantic response from the raw PDF.
+    // Deterministic downstream semantic fixture derived from raw-PDF candidates.
+    // This does not certify the installed model-host semantic seam; release certification
+    // requires a separate installed-host-broker-canary receipt.
     // The staging controller discovers the canonical table/candidate IDs;
     // nothing downstream (pack, source tables or model lane) is pre-authored.
     const stagingRoot = path.join(out, "broker-model-host-staging");
@@ -969,7 +971,8 @@ console.log(JSON.stringify({
   public_entrypoint: "scripts/run_excel_inflow_vnext.mjs",
   preauthored_statement_map: false,
   preauthored_compiler_lanes: false,
-  preauthored_broker_crosswalk: false,
+  preauthored_broker_crosswalk: brokerState === "usable",
+  broker_semantic_host_mode: brokerState === "usable" ? "deterministic_component_fixture" : "not_applicable",
   preauthored_broker_pack: false,
   preauthored_dcs_projection: false,
   raw_statement_rows: rawStatementCounts,

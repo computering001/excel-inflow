@@ -9,7 +9,7 @@
   },
   "policy_binding": {
     "schema_version": "economic-solve-policy/1.0",
-    "canonical_sha256": "a4c8020a7307408148bb2eb9d44b8b593bdedc768d2c0c61a476e79fd5faae5b",
+    "canonical_sha256": "28de6c7fc600908b074650bef603fe3f722ce870c2f9b4c0b65a28762e2e2b26",
     "hash_encoding": "sha256_canonical_json",
     "tolerance_source": "native_tolerances_by_class"
   },

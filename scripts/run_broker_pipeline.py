@@ -1087,6 +1087,7 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--responses")
     parser.add_argument("--crosswalk")
+    parser.add_argument("--native-preflight", help="Demand-independent native extraction bundle to reuse when source hashes match")
     parser.add_argument(
         "--close-optional",
         action="store_true",
@@ -1189,6 +1190,17 @@ def main() -> int:
     extract_receipt = output_root / f"extract-{key}.receipt.json"
     extract_input = sha256_bytes(canonical_bytes({"request": request_digest, "sources": sources, "runtime": runtime_digest}))
     extract_reused = reusable(bundle_path, extract_receipt, extract_input)
+    if not extract_reused and args.native_preflight:
+        try:
+            preflight = Path(args.native_preflight).resolve()
+            run([sys.executable, str(HERE / "rebind_broker_native_preflight.py"), str(preflight), str(request_path), "--out", str(bundle_path)], {0})
+            seal_checkpoint(bundle_path, extract_receipt, extract_input)
+            extract_reused = True
+        except Exception:
+            # Optimization is never allowed to reduce liveness or evidence quality.
+            extract_reused = False
+            if bundle_path.exists():
+                bundle_path.unlink()
     if not extract_reused:
         run([sys.executable, str(HERE / "extract_broker_evidence.py"), str(request_path), "--out", str(extraction_root)], {0, 2})
         if not bundle_path.is_file():

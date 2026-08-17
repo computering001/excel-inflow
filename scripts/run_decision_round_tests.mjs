@@ -16,7 +16,7 @@ if (supplied) {
 } else {
   const cases = path.resolve(
     process.env.DEBT_OVERLAY_CASES_DIR ??
-      "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+      "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases",
   );
   const generated = path.join(
     await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-decision-round.")),

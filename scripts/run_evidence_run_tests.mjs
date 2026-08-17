@@ -19,7 +19,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const casesDirectory = path.resolve(
   process.argv[2] ??
     process.env.DEBT_OVERLAY_CASES_DIR ??
-    "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+    "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases",
 );
 
 const clone = (value) => structuredClone(value);

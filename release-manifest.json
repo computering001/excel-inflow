@@ -1,17 +1,17 @@
 {
-  "releaseName": "Excel Inflow v3.5.0",
+  "releaseName": "Excel Inflow v3.6.0",
   "schemaVersion": 2,
   "packageMode": "development",
-  "skillVersion": "3.5.0",
+  "skillVersion": "3.6.0",
   "templateVersion": "4.0.0-dynamic",
   "sourceStatus": "v2_development",
-  "generatedAt": "2026-08-16T07:37:57.082Z",
-  "centralInstructionsWords": 7641,
+  "generatedAt": "2026-08-17T06:14:33.549Z",
+  "centralInstructionsWords": 7845,
   "profile": "assets/deployment-profile.json",
   "certification": {
     "certifiedClosureSha256": null,
-    "currentClosureSha256": "b79cb913d73288e759a79c3f8bfd5b6b626bff1598ada158ff8566a4146a379d",
-    "closureFileCount": 250,
+    "currentClosureSha256": "30279f8b2e36ea11fd8a20677955d5a76e3c6448fa0e071ab6238c38531cc069",
+    "closureFileCount": 271,
     "recordedAt": null,
     "recertifiedByThisRun": false,
     "evidenceReceipt": null
@@ -66,6 +66,7 @@
       "scripts/lib/acquisition_policy.mjs",
       "scripts/lib/attachment_ingress.mjs",
       "scripts/lib/broker_anchor.mjs",
+      "scripts/lib/broker_headline_policy.mjs",
       "scripts/lib/broker_intake_choice.mjs",
       "scripts/lib/broker_metric_dictionary.mjs",
       "scripts/lib/broker_preview.mjs",
@@ -80,6 +81,7 @@
       "scripts/lib/evidence_resolution_v2.mjs",
       "scripts/lib/evidence_run.mjs",
       "scripts/lib/excel_value_semantics.mjs",
+      "scripts/lib/experience_trace.mjs",
       "scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/filings_acquisition.mjs",
       "scripts/lib/fixed_point_constitution.mjs",
@@ -92,11 +94,14 @@
       "scripts/lib/flow_runtime.mjs",
       "scripts/lib/flow_screens.mjs",
       "scripts/lib/forecast_authority.mjs",
+      "scripts/lib/forecast_authority_ledger.mjs",
       "scripts/lib/forecast_behavior.mjs",
       "scripts/lib/forecast_candidate_compiler.mjs",
       "scripts/lib/forecast_observation.mjs",
       "scripts/lib/forecast_producer_contract.mjs",
       "scripts/lib/formula_dsl.mjs",
+      "scripts/lib/funded_acquisition_plan.mjs",
+      "scripts/lib/funded_acquisition_runtime.mjs",
       "scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/historical_normalisation.mjs",
       "scripts/lib/instrument_display.mjs",
@@ -124,7 +129,9 @@
       "scripts/lib/run_store.mjs",
       "scripts/lib/runtime_isolation.mjs",
       "scripts/lib/semantic_graph.mjs",
+      "scripts/lib/semantic_roles.mjs",
       "scripts/lib/solver.mjs",
+      "scripts/lib/source_identity.mjs",
       "scripts/lib/statement_classifier.mjs",
       "scripts/lib/statement_topology.mjs",
       "scripts/lib/user_flow_controller.mjs",
@@ -172,6 +179,7 @@
       "assets/delivery-constitution-v1.json",
       "assets/delivery-constitution-v1.schema.json",
       "assets/deployment-profile.json",
+      "assets/economic-ontology-v2.json",
       "assets/economic-solve-policy.v1.json",
       "assets/equation-graph.v1.json",
       "assets/evidence-resolution-v2.schema.json",
@@ -189,6 +197,7 @@
       "assets/public-test-run-v1.schema.json",
       "assets/real-filing-canary-expectations-v1.schema.json",
       "assets/run-scoped-broker-concept-v1.schema.json",
+      "assets/runtime-manifest.json",
       "assets/standardised-design-runtime.v2.json",
       "assets/standardised-design-runtime.v3.json",
       "assets/standardised-design-runtime.v4.json",
@@ -197,6 +206,7 @@
       "assets/workflow-state-contract-v1.json"
     ],
     "assetsDeclaredOnly": [
+      "assets/architecture-ownership-v2.json",
       "assets/attachment-evidence-controller.schema.json",
       "assets/attachment-evidence-run-state.schema.json",
       "assets/authority-projection-overrides.v3.json",
@@ -217,10 +227,12 @@
       "assets/broker-run-state.schema.json",
       "assets/broker-semantic-verification-report.schema.json",
       "assets/broker-source-tables.schema.json",
+      "assets/broker-state-machine-v2.json",
       "assets/broker-surface-census.schema.json",
       "assets/broker-table-engine-result.schema.json",
       "assets/broker-terminal-materiality-review.schema.json",
       "assets/broker-work-graph-v1.schema.json",
+      "assets/canonical-model-graph-v2.json",
       "assets/case-source.schema.json",
       "assets/content-addressed-artifact-ref-v1.schema.json",
       "assets/convergence-contract.v1.json",
@@ -237,21 +249,28 @@
       "assets/dcs-source-tables-v1.schema.json",
       "assets/economic-solve-policy.v1.schema.json",
       "assets/equation-graph.v1.schema.json",
+      "assets/experience-trace-v1.schema.json",
       "assets/filings-acquisition-request-v1.schema.json",
+      "assets/filings-acquisition-request-v2.schema.json",
       "assets/filings-extraction-request-v1.schema.json",
       "assets/filings-extraction-response-v1.schema.json",
       "assets/filings-run-state.schema.json",
       "assets/filings-runtime-members.json",
       "assets/filings-source-registry-v1.schema.json",
+      "assets/filings-source-registry-v2.schema.json",
+      "assets/forecast-authority-ledger-v2.schema.json",
       "assets/forecast-plan-v2.schema.json",
+      "assets/host-experience-envelope-v1.schema.json",
       "assets/lineage-exceptions.json",
       "assets/model-demand-graph-v1.schema.json",
       "assets/model-ir-v3.schema.json",
       "assets/native-excel-evidence-v3.schema.json",
+      "assets/performance-policy-v1.json",
+      "assets/pre-broker-model-demand-v2.schema.json",
       "assets/product-constitution-v1.schema.json",
+      "assets/product-delivery-constitution-v2.json",
       "assets/row-taxonomy-v2.json",
       "assets/run-constitution-graph-v1.schema.json",
-      "assets/runtime-manifest.json",
       "assets/selected-authority-contract-v1.schema.json"
     ],
     "resourceRoots": [],
@@ -265,6 +284,7 @@
       "scripts/build_dynamic_model.mjs -> scripts/lib/economic_solve_policy.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/formula_dsl.mjs",
+      "scripts/build_dynamic_model.mjs -> scripts/lib/funded_acquisition_plan.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/build_dynamic_model.mjs -> scripts/lib/instrument_display.mjs",
@@ -297,6 +317,7 @@
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/attachment_ingress.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/broker_headline_policy.mjs -> scripts/lib/semantic_roles.mjs",
       "scripts/lib/broker_preview.mjs -> scripts/lib/broker_metric_dictionary.mjs",
       "scripts/lib/broker_preview.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/broker_supervisor.mjs -> scripts/lib/delivery_constitution.mjs",
@@ -304,8 +325,10 @@
       "scripts/lib/case_compiler.mjs -> scripts/lib/coverage.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/face_statement_manifest.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/forecast_authority_ledger.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/forecast_behavior.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/forecast_candidate_compiler.mjs",
+      "scripts/lib/case_compiler.mjs -> scripts/lib/funded_acquisition_runtime.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/row_plan.mjs",
       "scripts/lib/case_compiler.mjs -> scripts/lib/run_scoped_broker_concepts.mjs",
@@ -370,13 +393,20 @@
       "scripts/lib/flow_screens.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/forecast_authority.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/forecast_authority.mjs -> scripts/lib/forecast_producer_contract.mjs",
+      "scripts/lib/forecast_authority.mjs -> scripts/lib/semantic_roles.mjs",
+      "scripts/lib/forecast_authority_ledger.mjs -> scripts/lib/forecast_behavior.mjs",
+      "scripts/lib/forecast_authority_ledger.mjs -> scripts/lib/run_store.mjs",
+      "scripts/lib/forecast_authority_ledger.mjs -> scripts/lib/semantic_roles.mjs",
       "scripts/lib/forecast_behavior.mjs -> scripts/lib/forecast_producer_contract.mjs",
       "scripts/lib/forecast_behavior.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/forecast_behavior.mjs -> scripts/lib/semantic_roles.mjs",
       "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/broker_anchor.mjs",
+      "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/broker_headline_policy.mjs",
       "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/forecast_authority.mjs",
       "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/forecast_observation.mjs",
       "scripts/lib/forecast_candidate_compiler.mjs -> scripts/lib/forecast_producer_contract.mjs",
       "scripts/lib/forecast_observation.mjs -> scripts/lib/json_schema.mjs",
+      "scripts/lib/funded_acquisition_plan.mjs -> scripts/lib/acquisition_policy.mjs",
       "scripts/lib/intake.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/layered_graph_constitution.mjs -> scripts/lib/equation_graph.mjs",
       "scripts/lib/layered_graph_constitution.mjs -> scripts/lib/forecast_authority.mjs",
@@ -415,6 +445,7 @@
       "scripts/lib/row_plan.mjs -> scripts/lib/broker_anchor.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/design_contract.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/row_plan.mjs -> scripts/lib/forecast_authority_ledger.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/instrument_period_state.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/rcf_policy.mjs",
@@ -422,6 +453,7 @@
       "scripts/lib/row_plan.mjs -> scripts/lib/statement_classifier.mjs",
       "scripts/lib/row_plan.mjs -> scripts/lib/statement_topology.mjs",
       "scripts/lib/run_carrier.mjs -> scripts/lib/runtime_isolation.mjs",
+      "scripts/lib/run_carrier.mjs -> scripts/lib/source_identity.mjs",
       "scripts/lib/run_constitution_graph.mjs -> scripts/lib/forecast_producer_contract.mjs",
       "scripts/lib/run_constitution_graph.mjs -> scripts/lib/json_schema.mjs",
       "scripts/lib/semantic_graph.mjs -> scripts/lib/forecast_authority.mjs",
@@ -435,6 +467,7 @@
       "scripts/lib/solver.mjs -> scripts/lib/economic_solve_policy.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/equation_graph.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/forecast_authority.mjs",
+      "scripts/lib/solver.mjs -> scripts/lib/forecast_authority_ledger.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/historical_interest_authority.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/historical_normalisation.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/instrument_period_state.mjs",
@@ -442,6 +475,7 @@
       "scripts/lib/solver.mjs -> scripts/lib/lease_policy.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/rcf_policy.mjs",
       "scripts/lib/solver.mjs -> scripts/lib/row_plan.mjs",
+      "scripts/lib/statement_topology.mjs -> scripts/lib/semantic_roles.mjs",
       "scripts/lib/user_flow_controller.mjs -> scripts/lib/flow_runtime.mjs",
       "scripts/lib/user_flow_controller.mjs -> scripts/lib/run_store.mjs",
       "scripts/lib/validation_invariants.mjs -> scripts/lib/instrument_period_state.mjs",
@@ -469,6 +503,7 @@
       "scripts/run_equation_graph_tests.mjs -> scripts/lib/equation_graph.mjs",
       "scripts/run_equation_graph_tests.mjs -> scripts/lib/solver.mjs",
       "scripts/run_evidence_resolution_v2_tests.mjs -> scripts/lib/evidence_resolution_v2.mjs",
+      "scripts/run_excel_inflow_vnext.mjs -> scripts/lib/experience_trace.mjs",
       "scripts/run_excel_inflow_vnext.mjs -> scripts/lib/json_schema.mjs",
       "scripts/run_excel_inflow_vnext.mjs -> scripts/lib/optional_broker_circuit_breaker.mjs",
       "scripts/run_excel_inflow_vnext.mjs -> scripts/lib/run_constitution_graph.mjs",
@@ -531,35 +566,26 @@
   "pythonClosure": {
     "method": "ast walk of import / from-import, relative levels resolved; never a regex",
     "interpreter": {
-      "selected": "python3.12",
+      "selected": "python3",
       "candidates": [
         {
           "candidate": "python3.12",
-          "version": "3.12.13",
-          "packages": {
-            "openpyxl": "3.1.5",
-            "fitz": "1.28.2",
-            "PIL": "12.3.0",
-            "numpy": "2.3.5",
-            "jsonschema": null,
-            "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
-            "reportlab": "4.4.9"
-          },
-          "usable": true,
-          "reason": "selected"
+          "version": null,
+          "packages": null,
+          "usable": false,
+          "reason": "did not run (ENOENT)"
         },
         {
           "candidate": "python3",
-          "version": "3.12.13",
+          "version": "3.13.5",
           "packages": {
             "openpyxl": "3.1.5",
-            "fitz": "1.28.2",
+            "fitz": "1.26.7",
             "PIL": "12.3.0",
             "numpy": "2.3.5",
-            "jsonschema": null,
+            "jsonschema": "4.26.0",
             "pdfplumber": "0.11.9",
-            "pypdf": "6.10.0",
+            "pypdf": "5.9.0",
             "reportlab": "4.4.9"
           },
           "usable": true,
@@ -571,6 +597,7 @@
       "scripts/run_broker_pipeline.py",
       "scripts/migrate_broker_run_state.py",
       "scripts/run_attachment_evidence_pipeline.py",
+      "scripts/rebind_broker_native_preflight.py",
       "scripts/run_dcs_pipeline.py",
       "scripts/extract_filing_statements.py",
       "scripts/propose_dcs_crosswalk.py",
@@ -595,6 +622,7 @@
       "scripts/verify/verify_delivery.py"
     ],
     "entryPointsUncommandedByInstructions": [
+      "scripts/rebind_broker_native_preflight.py",
       "scripts/run_dcs_pipeline.py",
       "scripts/extract_filing_statements.py",
       "scripts/propose_dcs_crosswalk.py",
@@ -628,11 +656,13 @@
       "scripts/emit/render.py",
       "scripts/emit/styles.py",
       "scripts/emit/verify.py",
+      "scripts/experience_trace.py",
       "scripts/extract_broker_evidence.py",
       "scripts/extract_dcs_evidence.py",
       "scripts/extract_filing_statements.py",
       "scripts/migrate_broker_run_state.py",
       "scripts/propose_dcs_crosswalk.py",
+      "scripts/rebind_broker_native_preflight.py",
       "scripts/render/__init__.py",
       "scripts/render/baseline.py",
       "scripts/render/calibrate.py",
@@ -680,11 +710,13 @@
       "compile_dcs_evidence.py",
       "delivery_constitution.py",
       "emit",
+      "experience_trace.py",
       "extract_broker_evidence.py",
       "extract_dcs_evidence.py",
       "extract_filing_statements.py",
       "migrate_broker_run_state.py",
       "propose_dcs_crosswalk.py",
+      "rebind_broker_native_preflight.py",
       "render",
       "run_attachment_evidence_pipeline.py",
       "run_broker_pipeline.py",
@@ -722,6 +754,8 @@
       "scripts/emit/verify.py -> scripts/emit/__init__.py (package-init)",
       "scripts/extract_broker_evidence.py -> scripts/broker_terminal_recovery.py (absolute-internal)",
       "scripts/migrate_broker_run_state.py -> scripts/run_broker_pipeline.py (absolute-internal)",
+      "scripts/rebind_broker_native_preflight.py -> scripts/broker_terminal_recovery.py (absolute-internal)",
+      "scripts/rebind_broker_native_preflight.py -> scripts/extract_broker_evidence.py (absolute-internal)",
       "scripts/render/baseline.py -> scripts/render/__init__.py (package-init)",
       "scripts/render/baseline.py -> scripts/render/pdfdoc.py (relative)",
       "scripts/render/baseline.py -> scripts/render/xlsx_model.py (relative)",
@@ -767,6 +801,7 @@
       "scripts/render/xlsx_model.py -> scripts/render/textfit.py (relative)",
       "scripts/run_attachment_evidence_pipeline.py -> scripts/archive_broker_pages.py (absolute-internal)",
       "scripts/run_attachment_evidence_pipeline.py -> scripts/delivery_constitution.py (absolute-internal)",
+      "scripts/run_attachment_evidence_pipeline.py -> scripts/experience_trace.py (absolute-internal)",
       "scripts/run_attachment_evidence_pipeline.py -> scripts/workflow_state.py (absolute-internal)",
       "scripts/run_attachment_evidence_pipeline.py -> scripts/zero_broker_authority.py (absolute-internal)",
       "scripts/run_broker_pipeline.py -> scripts/broker_period_recovery.py (absolute-internal)",
@@ -820,6 +855,9 @@
       ],
       "delivery-constitution-v1.json": [
         "scripts/delivery_constitution.py"
+      ],
+      "economic-ontology-v2.json": [
+        "scripts/run_attachment_evidence_pipeline.py"
       ],
       "economic-solve-policy.v1.json": [
         "scripts/verify/validate_dynamic_model.py"
@@ -875,7 +913,8 @@
           "extract_broker_evidence.py:1495 (fitz, deferred)",
           "extract_broker_evidence.py:596 (fitz, deferred)",
           "extract_broker_evidence.py:1211 (fitz, deferred)",
-          "extract_broker_evidence.py:1661 (fitz, deferred)",
+          "extract_broker_evidence.py:1666 (fitz, deferred)",
+          "extract_broker_evidence.py:1780 (fitz, deferred)",
           "archive_broker_pages.py:32 (fitz, deferred)",
           "render/pdfdoc.py:26 (fitz, deferred)",
           "render/pdfdoc.py:229 (fitz, deferred)",
@@ -932,7 +971,7 @@
         ],
         "sites": [
           "extract_broker_evidence.py:1066 (openpyxl, deferred)",
-          "extract_broker_evidence.py:1666 (openpyxl, deferred)",
+          "extract_broker_evidence.py:1671 (openpyxl, deferred)",
           "emit/render.py:26 (openpyxl, top-level)",
           "emit/render.py:27 (openpyxl.comments, top-level)",
           "emit/render.py:28 (openpyxl.formatting.rule, top-level)",
@@ -1155,6 +1194,14 @@
           "verify"
         ],
         "reason": "The image-check stage reads the rendered PDF, not the workbook object model, so it has no use for openpyxl and render/xlsx_model.py says so explicitly. Kept out of emit and verify so a render change cannot move either of them."
+      },
+      "experience_trace.py": {
+        "may_import_third_party": [],
+        "reason": "The controller experience-trace helper is stdlib-only and records wall-clock ownership spans without reading or interpreting financial evidence."
+      },
+      "rebind_broker_native_preflight.py": {
+        "may_import_third_party": [],
+        "reason": "The native-preflight rebinder is stdlib-only at its own boundary; it reuses already-declared broker extraction helpers and either proves exact source/demand compatibility or falls back to the ordinary full extraction path."
       }
     }
   },
@@ -1257,8 +1304,8 @@
   "smokeTest": {
     "isolatedRoot": "(temporary, removed)",
     "nodeExecutable": "node",
-    "nodeVersion": "v24.19.0",
-    "pythonExecutable": "python3.12",
+    "nodeVersion": "v22.16.0",
+    "pythonExecutable": "python3",
     "results": [
       {
         "target": "closure probe",
@@ -1442,7 +1489,7 @@
       },
       {
         "target": "python closure import probe",
-        "modules": 56,
+        "modules": 58,
         "allResolvedInsideRelease": true
       },
       {
@@ -1459,6 +1506,12 @@
       },
       {
         "target": "scripts/run_attachment_evidence_pipeline.py",
+        "status": 0,
+        "matchedDeclaredOutput": true,
+        "resolved": true
+      },
+      {
+        "target": "scripts/rebind_broker_native_preflight.py",
         "status": 0,
         "matchedDeclaredOutput": true,
         "resolved": true
@@ -1598,18 +1651,18 @@
       {
         "target": "real clean-root workbook build",
         "status": "PASS",
-        "case_sha256": "f4a0fb5f4b89b54a9978c2444baa28e3f9a4e7970c2876c7cabea388306fc6c4",
-        "plan_sha256": "88451e62dd6ae8add83e9522566a830f111f3c7e62a3ff52504e7990f529768f",
-        "workbook_sha256": "50a28eb8fe1a351e3e09f07c448264fb655d7cfd35a6fe7659f98d27af2f34f7",
+        "case_sha256": "b9b374d81343e74ce5b30ce7c7938cef27b5a2d9849c5c88dc1ab486680969b8",
+        "plan_sha256": "7ef615ac9f25107cb59e829f7cf79f0e75598f554cd02d6a708c558d9b1dd97c",
+        "workbook_sha256": "beab88458ac0cf5d23d7d8fadc9372f50b86fea090b2de6d1d246c8ad5de5cc6",
         "validation_status": "PASS_PENDING_MANUAL",
         "total_violations": 0
       }
     ],
     "workbookBuild": {
       "status": "PASS",
-      "case_sha256": "f4a0fb5f4b89b54a9978c2444baa28e3f9a4e7970c2876c7cabea388306fc6c4",
-      "plan_sha256": "88451e62dd6ae8add83e9522566a830f111f3c7e62a3ff52504e7990f529768f",
-      "workbook_sha256": "50a28eb8fe1a351e3e09f07c448264fb655d7cfd35a6fe7659f98d27af2f34f7",
+      "case_sha256": "b9b374d81343e74ce5b30ce7c7938cef27b5a2d9849c5c88dc1ab486680969b8",
+      "plan_sha256": "7ef615ac9f25107cb59e829f7cf79f0e75598f554cd02d6a708c558d9b1dd97c",
+      "workbook_sha256": "beab88458ac0cf5d23d7d8fadc9372f50b86fea090b2de6d1d246c8ad5de5cc6",
       "validation_status": "PASS_PENDING_MANUAL",
       "total_violations": 0
     }
@@ -1639,21 +1692,21 @@
   "files": [
     {
       "path": "central-instructions.md",
-      "sha256": "cdedce5eb9fe8ad0b034afb49e0184affdb194ace42c549bd52d1c8b70a135b8",
-      "bytes": 57585,
-      "words": 7641
+      "sha256": "9e4b98ce8cfad2a092139b006e156b369b090e7dc0f1d243abeed6aed73eaba0",
+      "bytes": 59205,
+      "words": 7845
     },
     {
       "path": "SKILL.md",
-      "sha256": "daf7b754704e2b7ac2f9e47f88f6c1a5cf10c75f43ccea9ffca4ed443615ba3a",
-      "bytes": 58072,
-      "words": 7710
+      "sha256": "e76681ef86d4714ab1b30f96ae12ee7e234e423597bf6b183786b495ee53a232",
+      "bytes": 59692,
+      "words": 7914
     },
     {
       "path": "references/runtime-core.md",
-      "sha256": "35efd5db2a153514efe61c05937dbe5c906905e31c0e80b1192b2cf69444e141",
-      "bytes": 57605,
-      "words": 7643
+      "sha256": "78416190593198711f9a8a7dfa0d60a2e646211f69ba292bb959c461a228d268",
+      "bytes": 59225,
+      "words": 7847
     },
     {
       "path": "references/model-contract.md",
@@ -1675,9 +1728,9 @@
     },
     {
       "path": "references/acquisition.md",
-      "sha256": "e51780cc4585a02426f07878334fbbcd1eded7e90aa7c9907c713f253dbf81c9",
-      "bytes": 5284,
-      "words": 795
+      "sha256": "2f74006c5e4fb11e7a83d8566aca87a4a5515b58e631a58e136eb46ea3ec5661",
+      "bytes": 5911,
+      "words": 879
     },
     {
       "path": "references/advanced-history-and-fx.md",
@@ -1699,9 +1752,9 @@
     },
     {
       "path": "references/model-intent.md",
-      "sha256": "6051d608f45964435d9d02f5d32d766421010249490216d7647793b2ed6373c4",
-      "bytes": 41292,
-      "words": 5969
+      "sha256": "fc108a2ec0292f754799a176ccae37f2f5d2f36b5404432e464b241e3c3fdc63",
+      "bytes": 41330,
+      "words": 5973
     },
     {
       "path": "references/development-and-release-loop.md",
@@ -1714,6 +1767,12 @@
       "sha256": "94dfdacd8b14d1962edb94859eeca5a4b1d7b892b3b0cd086f8d07b4bef82fe4",
       "bytes": 51087,
       "words": 7249
+    },
+    {
+      "path": "assets/architecture-ownership-v2.json",
+      "sha256": "cb5b7c17b0e6e1858f93e9f9aaf6ba4763a03f6bb51036f015fb95b945cae613",
+      "bytes": 857,
+      "words": null
     },
     {
       "path": "assets/attachment-evidence-controller.schema.json",
@@ -1729,8 +1788,8 @@
     },
     {
       "path": "assets/attachment-evidence-runtime-members.json",
-      "sha256": "6dae73506e351d66669f6c474dedae81febb7d68ffb94d5bb0ca48cc7773d534",
-      "bytes": 3074,
+      "sha256": "80fbbd55bf417d1fc45fb0711c0b75aec3ce45da3d28f74919feef2de40718e1",
+      "bytes": 3559,
       "words": null
     },
     {
@@ -1777,14 +1836,14 @@
     },
     {
       "path": "assets/broker-extraction-bundle.schema.json",
-      "sha256": "e1bc8f83fabe51c19c0f5e1e0b5062f7b5a0ee8729b4ed8133e369faaed7ce62",
-      "bytes": 23554,
+      "sha256": "036ad22b3d8282974863b56c58bba0b0151f2de1a117d3c4fd463e4c1174c2f0",
+      "bytes": 24141,
       "words": null
     },
     {
       "path": "assets/broker-extraction-request.schema.json",
-      "sha256": "ee3a03cb728d11d8cf87a7bd8964bd86a03b9c026d41f0a5e64764d173cf85ec",
-      "bytes": 3288,
+      "sha256": "b3df20eb7515896fc2fcee8171ad04f0e16c09c4b3cbebe85e4043ffd4a5f1ff",
+      "bytes": 4159,
       "words": null
     },
     {
@@ -1849,8 +1908,8 @@
     },
     {
       "path": "assets/broker-runtime-members.json",
-      "sha256": "7d1d5172d5b0b2c63b0a6ecd00684a216b0c9bbc1ba3f9e5b2364b9312431643",
-      "bytes": 1767,
+      "sha256": "126adbbd6eec1d6e9dca04dc0c8cc0b7d6c53d3ec56cf4fa73cc0a4f6a4efb56",
+      "bytes": 1816,
       "words": null
     },
     {
@@ -1863,6 +1922,12 @@
       "path": "assets/broker-source-tables.schema.json",
       "sha256": "e783878dd760bbf6e8d764bfb7c63e48790482d8046ad820cc81a467b83642a1",
       "bytes": 6947,
+      "words": null
+    },
+    {
+      "path": "assets/broker-state-machine-v2.json",
+      "sha256": "6f6f3efa4533ac618f5e04582f88d4f5c6e9e12263872dd65a8518ad99032a06",
+      "bytes": 1203,
       "words": null
     },
     {
@@ -1908,6 +1973,12 @@
       "words": null
     },
     {
+      "path": "assets/canonical-model-graph-v2.json",
+      "sha256": "f80e447bef3e9f110ee5e3f39bf7db91a24d31b45cc2803f4d7f03e65de4e79a",
+      "bytes": 1060,
+      "words": null
+    },
+    {
       "path": "assets/case-source.schema.json",
       "sha256": "5665f2e65fa3f6f8ef72f06cc318089c7f6aaee23c7bf4d93a8fee59514740a8",
       "bytes": 15824,
@@ -1927,7 +1998,7 @@
     },
     {
       "path": "assets/convergence-contract.v1.json",
-      "sha256": "3725e9a3f1203b9cf58b3cb1122261214dbc230fef483d0e52e6ca48ff11d7aa",
+      "sha256": "e3c9732407a2588317c56a119f176128f0be275e11d63d05ef9e52376f31c00d",
       "bytes": 6041,
       "words": null
     },
@@ -2017,20 +2088,26 @@
     },
     {
       "path": "assets/deployment-profile.json",
-      "sha256": "9b1fb56a2b379cac777887a400f4fa274066d06d6e1d64e8fe1b29e78b3943fa",
-      "bytes": 54091,
+      "sha256": "8a4e41b1f062582cf057220c972a58a56912b28c01421b304177a85790801e67",
+      "bytes": 58672,
+      "words": null
+    },
+    {
+      "path": "assets/economic-ontology-v2.json",
+      "sha256": "305144fb0d27fbf2915a3870670ad9cbad64d8ebdb130a7ad367aaf25b12ee2c",
+      "bytes": 772,
       "words": null
     },
     {
       "path": "assets/economic-solve-policy.v1.json",
-      "sha256": "c65771872526c5bc9917c7f4311cc211bbd72907dab3f080ad82ee44a808e9e5",
-      "bytes": 1660,
+      "sha256": "6174cecb0080c4fda66008a0f62f6ed52026e97ad45c279a021b6a3ca485d20b",
+      "bytes": 1903,
       "words": null
     },
     {
       "path": "assets/economic-solve-policy.v1.schema.json",
-      "sha256": "a26f9510b34253971b066bc8896b8cb864d07d29c1dccd200473c99f18e3ebd1",
-      "bytes": 3396,
+      "sha256": "e2a868b3595a5ad3d31afe149edf794e4140d1d276eb605314ffa12a4f5b3817",
+      "bytes": 4173,
       "words": null
     },
     {
@@ -2064,9 +2141,21 @@
       "words": null
     },
     {
+      "path": "assets/experience-trace-v1.schema.json",
+      "sha256": "eab4e58e6a42cefc5710787c70d7e8fe8a78a9651fcd6c00316bdd896d572675",
+      "bytes": 2743,
+      "words": null
+    },
+    {
       "path": "assets/filings-acquisition-request-v1.schema.json",
       "sha256": "777d9bc3ae1ef122b18b21e3430b6eedc9791a27c05c12b4205a36fdbae637f8",
       "bytes": 3881,
+      "words": null
+    },
+    {
+      "path": "assets/filings-acquisition-request-v2.schema.json",
+      "sha256": "7e2df94d2047fdcb078dca0cdcd94208eb428742227930ac7d1029d0f26ede3b",
+      "bytes": 6135,
       "words": null
     },
     {
@@ -2089,14 +2178,26 @@
     },
     {
       "path": "assets/filings-runtime-members.json",
-      "sha256": "14fb55ad6bb529a2925c71c5600b7f6add1b7ac066d9beefc5c16ec61bdc91f4",
-      "bytes": 666,
+      "sha256": "658151f0711b4d42e810fe3f80bded9c441bced89a80b6c32dcce94ccbd2430c",
+      "bytes": 776,
       "words": null
     },
     {
       "path": "assets/filings-source-registry-v1.schema.json",
       "sha256": "ba826ff29d3a41206e4004ebfc2c5745cc34bc8098d845a4bdcfec40df050e17",
       "bytes": 2977,
+      "words": null
+    },
+    {
+      "path": "assets/filings-source-registry-v2.schema.json",
+      "sha256": "68c1bf00c67ceddde04e8315f0ab3085d33274e27554c7b6255a6efc7010e291",
+      "bytes": 4875,
+      "words": null
+    },
+    {
+      "path": "assets/forecast-authority-ledger-v2.schema.json",
+      "sha256": "79c498a6ad37656ac4f04b0f93a018da18b438bc0c6c1ced6a6a84118b937277",
+      "bytes": 1002,
       "words": null
     },
     {
@@ -2118,6 +2219,12 @@
       "words": null
     },
     {
+      "path": "assets/host-experience-envelope-v1.schema.json",
+      "sha256": "58fadd51c5695411d18848d7acb0a4cc1fb58030cecf3ad292f576260fabfa8a",
+      "bytes": 1028,
+      "words": null
+    },
+    {
       "path": "assets/instrument-period-state-v1.schema.json",
       "sha256": "fa12bde6c72d0bb20a01537e19bfb18dc1834b5b28a695ce63ddbb9b70b8eac0",
       "bytes": 7148,
@@ -2131,8 +2238,8 @@
     },
     {
       "path": "assets/model-case-v2.schema.json",
-      "sha256": "c4de0553e885bc90d08bb2c34b8ab9815161c8ad47d8c3643783fadc7c10b308",
-      "bytes": 91368,
+      "sha256": "fa45d22def12de52c20e1a4268c9df8537fc82298e00404813231509118c8f16",
+      "bytes": 93205,
       "words": null
     },
     {
@@ -2160,6 +2267,12 @@
       "words": null
     },
     {
+      "path": "assets/performance-policy-v1.json",
+      "sha256": "fa497f3b9d9bbdd17c356224c5187bdaca2511bb2395da4381ba5b27c3d4feba",
+      "bytes": 962,
+      "words": null
+    },
+    {
       "path": "assets/plan.schema.json",
       "sha256": "0a45ce26b2e2f0cd8065eacbd0bc766fe5e0aa0d0e95fa2b4dedf2cc1c154301",
       "bytes": 21491,
@@ -2172,6 +2285,12 @@
       "words": null
     },
     {
+      "path": "assets/pre-broker-model-demand-v2.schema.json",
+      "sha256": "a54f19b3091895ce556722721af43a7d4eefaf478cf75c74c9bc61ef24099ef3",
+      "bytes": 3324,
+      "words": null
+    },
+    {
       "path": "assets/product-constitution-v1.json",
       "sha256": "ad7fbde7f9dfff53a459c2d7b41fca9110e07d771070b095ffad44bc02e03b14",
       "bytes": 3014,
@@ -2181,6 +2300,12 @@
       "path": "assets/product-constitution-v1.schema.json",
       "sha256": "7dd2076754db7d81eaf40135b266ac2115839a9c565f8138ca8a1533efd90fa7",
       "bytes": 1356,
+      "words": null
+    },
+    {
+      "path": "assets/product-delivery-constitution-v2.json",
+      "sha256": "e1a8ee033fdb39560c7308f01d98e92865657d98713ed42bac2bb097e05c4b81",
+      "bytes": 950,
       "words": null
     },
     {
@@ -2221,8 +2346,8 @@
     },
     {
       "path": "assets/runtime-manifest.json",
-      "sha256": "e66571448f04f54a3c5bb1ed546ac2b39203795296b176fc5f707d11ad577f07",
-      "bytes": 903,
+      "sha256": "89bc5e3f84803514578ed9e460571bc83559b4bf740397f4bee1fbd4d0f4efc9",
+      "bytes": 963,
       "words": null
     },
     {
@@ -2299,8 +2424,8 @@
     },
     {
       "path": "scripts/broker_terminal_recovery.py",
-      "sha256": "b613babbb93425f392333ef19262bfa2a1bc069bd85010e28e2d8848a54bf749",
-      "bytes": 54079,
+      "sha256": "98d0db936e8ddd8c338cf6951b1dbccb46e16f3156f0365ab0095e2c83fb6c7a",
+      "bytes": 54620,
       "words": null
     },
     {
@@ -2311,8 +2436,8 @@
     },
     {
       "path": "scripts/build_dynamic_model.mjs",
-      "sha256": "71088ddea9e1ee05238cc0c840f362313070544fd3c7f5bdb2faef34be34ca08",
-      "bytes": 517769,
+      "sha256": "797203347f6d09ff8a57185fc910eb414119b278e7ee104eb670184240329011",
+      "bytes": 517894,
       "words": null
     },
     {
@@ -2436,9 +2561,15 @@
       "words": null
     },
     {
+      "path": "scripts/experience_trace.py",
+      "sha256": "ea2fd2f1862a61a4ab6fa467c125316d3067bc15f54c47a4a3dc2c1660c02e8c",
+      "bytes": 3681,
+      "words": null
+    },
+    {
       "path": "scripts/extract_broker_evidence.py",
-      "sha256": "cc8b00d5b912b2fd6e1a07c2c2f7f66cd86f5966fbcb361033c2350c148ee2da",
-      "bytes": 82942,
+      "sha256": "33c69d9c832864cbcf6bdda7b691c94e4e1fb622568ce498a5a6a8a6e6bf197b",
+      "bytes": 93192,
       "words": null
     },
     {
@@ -2449,8 +2580,8 @@
     },
     {
       "path": "scripts/extract_filing_statements.py",
-      "sha256": "c70e5c5f2f7332519038462aa9746a7ad287036b5de8819ef9b36f4f424d1968",
-      "bytes": 23578,
+      "sha256": "aedbf7d8a82f59c0f1492312fc8387222f3a4c512e151e84cc7cd2049acb4925",
+      "bytes": 28110,
       "words": null
     },
     {
@@ -2461,8 +2592,8 @@
     },
     {
       "path": "scripts/lib/acquisition_policy.mjs",
-      "sha256": "4cc8a21bea79c71a75ba946c45fa1216b5b7b6c3daa4832c2d5c576d1ca4dd33",
-      "bytes": 3646,
+      "sha256": "96b3a01a2a956a650af829532649ea8eb5676ca4737e1505190eb873cac9ffff",
+      "bytes": 6100,
       "words": null
     },
     {
@@ -2475,6 +2606,12 @@
       "path": "scripts/lib/broker_anchor.mjs",
       "sha256": "dee7cdf058d2c1518d2d7e96b458e139acc9ae20e4f24d15af7726a41826f2d2",
       "bytes": 25472,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/broker_headline_policy.mjs",
+      "sha256": "a1e91cff2a0dd43e8ad3b119ff8c0dc1fb3c1804b57f6eb34a66d1760af0b97c",
+      "bytes": 2959,
       "words": null
     },
     {
@@ -2503,8 +2640,8 @@
     },
     {
       "path": "scripts/lib/case_compiler.mjs",
-      "sha256": "2cc6b33aceac2b9c4e44b74017bcbf6e02e40e58a5675a09315419d0b75ae54f",
-      "bytes": 147572,
+      "sha256": "4a4519f7778b42717ae8500f9dc876b31f67f1b16299bfe6c730f0a20a297d08",
+      "bytes": 147978,
       "words": null
     },
     {
@@ -2562,6 +2699,12 @@
       "words": null
     },
     {
+      "path": "scripts/lib/experience_trace.mjs",
+      "sha256": "a8ca571d28cfdd79b50504dd184d2e05bc98382f38b906fba0727334ea699067",
+      "bytes": 3207,
+      "words": null
+    },
+    {
       "path": "scripts/lib/face_statement_manifest.mjs",
       "sha256": "f917d0d93692c574b344e55c85ac9e5669a1161acb82c8f1542e89d4fe9e718f",
       "bytes": 1693,
@@ -2569,8 +2712,8 @@
     },
     {
       "path": "scripts/lib/filings_acquisition.mjs",
-      "sha256": "55e4a985600a429b97934500f54df084f38f4f61f3b7e9b631a74c38de88074e",
-      "bytes": 10779,
+      "sha256": "53a5c80ae66db5938866455d161fb1e8e1ed9b0b1088c683154740a976c88746",
+      "bytes": 12415,
       "words": null
     },
     {
@@ -2629,20 +2772,26 @@
     },
     {
       "path": "scripts/lib/forecast_authority.mjs",
-      "sha256": "a6e7cbbc4e7340d69f28d868057b74294577e4d2ee397c53b7ebf8c12e3a2d7a",
-      "bytes": 38465,
+      "sha256": "e2112f69d56f94b9a1973880f3317b07b9e685859b6be72ad2425db4c0aa7846",
+      "bytes": 38682,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/forecast_authority_ledger.mjs",
+      "sha256": "54ae4f1bc2b1fa5a71ae29eeede334a77213cd0fce56bca53b85d179934df737",
+      "bytes": 4837,
       "words": null
     },
     {
       "path": "scripts/lib/forecast_behavior.mjs",
-      "sha256": "f6f06b790b9d67a50e7d74382b277eea1d9c65e2fd92d297c8685196a850e652",
-      "bytes": 21079,
+      "sha256": "33831d14203be3e5abf7a1b2890182dc88d88dfb833e41a8e65a26aba55ff6bb",
+      "bytes": 21307,
       "words": null
     },
     {
       "path": "scripts/lib/forecast_candidate_compiler.mjs",
-      "sha256": "4ef0ea723690fd8a4f5357bb9667ff3da4ab3f09d53babc56ccb9f15ef594505",
-      "bytes": 62333,
+      "sha256": "caa57e346eee8dcb9914bd1e1f64e504d4b27036635485dd753b6c741d2fce40",
+      "bytes": 62622,
       "words": null
     },
     {
@@ -2653,14 +2802,26 @@
     },
     {
       "path": "scripts/lib/forecast_producer_contract.mjs",
-      "sha256": "2860fe1b21127f845ac78750a2fb3af055d9af534b5e25f1101bdb501f0bb87a",
-      "bytes": 5849,
+      "sha256": "5161cc302772ed05b5d9772686836d50c2174f353214f47441012420952c3fef",
+      "bytes": 5929,
       "words": null
     },
     {
       "path": "scripts/lib/formula_dsl.mjs",
       "sha256": "61ad44a1f07b0db8964a88b542778af380055b7acab7be91c77b9b885fed4cff",
       "bytes": 8982,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/funded_acquisition_plan.mjs",
+      "sha256": "c4d3c21df2002fc745ed51982696ac8db80f61ae58f60630200abfbf405bef85",
+      "bytes": 5439,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/funded_acquisition_runtime.mjs",
+      "sha256": "7fc48f0df5ba335893746c08a1e6d4313cc09ad243c9523a6cec905236c13fe9",
+      "bytes": 1487,
       "words": null
     },
     {
@@ -2785,14 +2946,14 @@
     },
     {
       "path": "scripts/lib/row_plan.mjs",
-      "sha256": "3914b42873c69873df226f8d31fbdf62acd17f6be0e8a518e2e124c8c5e57819",
-      "bytes": 170978,
+      "sha256": "1f18816e04f072adcd5dd32dc23269477a9f0fb3d10f1a498885659260abd818",
+      "bytes": 171153,
       "words": null
     },
     {
       "path": "scripts/lib/run_carrier.mjs",
-      "sha256": "fcb6ede1c6d9c10232d227e8f33cdcb0daab92c5a9b1939711e57a268e79fe04",
-      "bytes": 12143,
+      "sha256": "653ac0e0f08f08475cffe4dcd9fbaa7e154cb629c45c63678a13604991a0fbdd",
+      "bytes": 12844,
       "words": null
     },
     {
@@ -2826,9 +2987,21 @@
       "words": null
     },
     {
+      "path": "scripts/lib/semantic_roles.mjs",
+      "sha256": "0345ead8fd462e9d9cdef8874296291bfea2bd0c3ea333e2fd0c24f76576133b",
+      "bytes": 1053,
+      "words": null
+    },
+    {
       "path": "scripts/lib/solver.mjs",
-      "sha256": "f4db1a317c804089bba0242f9b76c5387a875d3e299fa608a207be26872ec88d",
-      "bytes": 125985,
+      "sha256": "9ab5a728d9ac036dde646c78a6a83503bba131a91069df9a9fa6d773d2a0d027",
+      "bytes": 128248,
+      "words": null
+    },
+    {
+      "path": "scripts/lib/source_identity.mjs",
+      "sha256": "f42db47bd50b5b08c8da3a04456cdf03ab19ef58d66a0b39e39ca8a7f4e25615",
+      "bytes": 2678,
       "words": null
     },
     {
@@ -2839,8 +3012,8 @@
     },
     {
       "path": "scripts/lib/statement_topology.mjs",
-      "sha256": "c6d30a4b70210f528675f6b3eb1ed022e5984747b4dbb9cd26a4dc8ba6f8f919",
-      "bytes": 28015,
+      "sha256": "41b2208315e234efdc7bafb2aac7152859f770901b23942031d3ac7b1f5e54f0",
+      "bytes": 28123,
       "words": null
     },
     {
@@ -2857,8 +3030,8 @@
     },
     {
       "path": "scripts/lib/workflow_state.mjs",
-      "sha256": "54cf5e1b2f3512b1215ab68122fb03f3574514d9c36ea92dec7bd6d62e90f0e0",
-      "bytes": 7201,
+      "sha256": "d553e8b5efe7e106717928971177104da5a5c98c900e983fb0bb55ff7726d58b",
+      "bytes": 7842,
       "words": null
     },
     {
@@ -2883,6 +3056,12 @@
       "path": "scripts/propose_dcs_crosswalk.py",
       "sha256": "7478fdcef01da7185ea334aeecd7355a70c6d54090aeda775adb2b28aa398f99",
       "bytes": 19218,
+      "words": null
+    },
+    {
+      "path": "scripts/rebind_broker_native_preflight.py",
+      "sha256": "fb978e45f378c8e76d9e69d39a79a45a0aebf0db65565769f31c51453afa625b",
+      "bytes": 2785,
       "words": null
     },
     {
@@ -2965,8 +3144,8 @@
     },
     {
       "path": "scripts/run_attachment_evidence_pipeline.py",
-      "sha256": "94c96ae77feeaa716d89895ea2ddcf6a6855e21bda0660a2d407ddc3f8e47b3b",
-      "bytes": 68621,
+      "sha256": "f991a93017b5eb9996fe398a3200f3aa01dc1225c2c5f30a8ee2dca68c75c7f9",
+      "bytes": 72762,
       "words": null
     },
     {
@@ -2989,8 +3168,8 @@
     },
     {
       "path": "scripts/run_broker_pipeline.py",
-      "sha256": "bac503690de3efbaf7273064c21f45aad90e79adc40caf1d5ab93c1463ad1d8b",
-      "bytes": 107536,
+      "sha256": "067f4cee4f105dfea3ce8ac6484e5a9e976c56b6f8001b45d7205f6f7a7c1c88",
+      "bytes": 108272,
       "words": null
     },
     {
@@ -3025,14 +3204,14 @@
     },
     {
       "path": "scripts/run_excel_inflow_vnext.mjs",
-      "sha256": "d34f62498899e1ddd6635ac136a2ca21c742598b7ada4a08e4e63b39c213c634",
-      "bytes": 20539,
+      "sha256": "fc6df89ac1430dfee04ae6d4224952410f99cb5368d7333b04977d2aab9a1d7b",
+      "bytes": 21402,
       "words": null
     },
     {
       "path": "scripts/run_filings_pipeline.mjs",
-      "sha256": "2fbfd72d880c8ecaed9c54e2eb969ec378ee231bd583796d3ff3068570eb482f",
-      "bytes": 27196,
+      "sha256": "6247caaf89d621703c2bcec7af2706504b6c97e2d6b1d11ef400747bfc508202",
+      "bytes": 27239,
       "words": null
     },
     {
@@ -3067,8 +3246,8 @@
     },
     {
       "path": "scripts/run_raw_input_black_box_canary.mjs",
-      "sha256": "0ac20078083d9cdf0b7fccd913955cf095527652e176aa8f1242bfbab246d20e",
-      "bytes": 43754,
+      "sha256": "f52deadc0c8efdfd51565c3dd09cedaea3552cd90a180924c518cf8225e876f6",
+      "bytes": 44044,
       "words": null
     },
     {
@@ -3091,8 +3270,8 @@
     },
     {
       "path": "scripts/run_user_flow.mjs",
-      "sha256": "5d6549e9eed984b20633c6c25244f0e835cbfc1adc606caf093925392aa44213",
-      "bytes": 81605,
+      "sha256": "277720990c61739b4982ab16e40c436dfcf7ece2c7787655736fad8e32de942e",
+      "bytes": 81606,
       "words": null
     },
     {

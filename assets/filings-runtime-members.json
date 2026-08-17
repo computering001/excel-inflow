@@ -13,6 +13,8 @@
     "assets/filings-source-registry-v1.schema.json",
     "assets/filings-extraction-request-v1.schema.json",
     "assets/filings-extraction-response-v1.schema.json",
-    "assets/filings-run-state.schema.json"
+    "assets/filings-run-state.schema.json",
+    "assets/filings-acquisition-request-v2.schema.json",
+    "assets/filings-source-registry-v2.schema.json"
   ]
 }

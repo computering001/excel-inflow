@@ -78,16 +78,9 @@ is never overwritten.
 
 ## Funding and debt
 
-This is a debt overlay, not a sources-and-uses schedule. The overlay has zero
-direct transaction cash-flow effect. Enterprise value is
-used only to infer the target's operating contribution. Add the supplied
-acquisition debt amount directly to the pro-forma debt balance in the close
-year and hold it flat for the rest of the three-year forecast. Do not create an
-unmatched financing inflow, a purchase-consideration outflow, an equity
-residual, financing-proceeds row, acquisition amortisation or an acquisition
-maturity. Ordinary target operating contribution and incremental interest may
-affect the combined cash/RCF solve through the income statement and operating
-cash flow; they are not direct acquisition funding or consideration cash flows.
+This remains a lightweight debt overlay rather than a full sources-and-uses or purchase-accounting model. Enterprise value is used once as the purchase-consideration proxy and also to infer the target's operating contribution. The close-year acquisition adjustment records the full consideration as an investing cash outflow; the separately supplied acquisition-debt amount records one financing inflow and one persistent debt balance. Any residual consideration is funded through existing cash and the ordinary RCF waterfall. No automatic equity plug is invented.
+
+Add the supplied acquisition debt amount directly to the pro-forma debt balance in the close year and hold it flat for the rest of the three-year forecast. Use the existing Change in Debt / Additions to debt adjustment row for the financing proceeds; do not create a second financing-proceeds line that would duplicate the cash flow. Likewise, record the consideration exactly once in investing cash. Do not create any additional unmatched financing inflow, duplicate purchase-consideration outflow, equity residual, acquisition amortisation or acquisition maturity. Ordinary target operating contribution and incremental interest affect the combined cash/RCF solve through the income statement and operating cash flow alongside those explicit close-date transaction flows.
 
 ```text
 average acquisition debt = (opening balance + closing balance) / 2
@@ -118,7 +111,7 @@ Confirm:
 - off state returns an exact zero in every adjustment cell, leaves standalone
   untouched and makes each pro-forma column equal its standalone column;
 - formula text is present and unchanged in both the on and off states;
-- the acquisition overlay has zero direct cash-flow effect;
+- transaction value enters investing cash once and acquisition debt enters financing cash once;
 - the debt amount enters gross debt, net debt, interest and leverage once;
 - close-year operating contribution and interest use the close-month fraction;
 - pro-forma net debt includes the dedicated acquisition debt;

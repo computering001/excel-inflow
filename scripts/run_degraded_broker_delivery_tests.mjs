@@ -22,12 +22,12 @@ const ROOT = path.resolve(HERE, "..");
 const cases = path.resolve(
   process.argv[2] ??
     process.env.DEBT_OVERLAY_CASES_DIR ??
-    "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+    "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases",
 );
 const python = process.env.EXCEL_INFLOW_TEST_PYTHON ?? "python3";
 const soffice = path.resolve(
   process.env.SOFFICE_BIN ??
-    "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "fixtures/external/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
 );
 const out = path.resolve(
   process.argv[3] ??

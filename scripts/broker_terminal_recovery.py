@@ -116,8 +116,8 @@ def compile_broker_demand_contract(model_context: dict[str, Any]) -> dict[str, A
     an instruction to transcribe an entire research pack.
     """
     graph = model_context.get("model_demand_graph") if isinstance(model_context, dict) else None
-    if not isinstance(graph, dict) or graph.get("schema_version") != "pre-broker-model-demand/1.0":
-        raise ValueError("Broker recovery requires pre-broker-model-demand/1.0.")
+    if not isinstance(graph, dict) or graph.get("schema_version") not in {"pre-broker-model-demand/1.0", "pre-broker-model-demand/2.0"}:
+        raise ValueError("Broker recovery requires pre-broker-model-demand/1.0 or /2.0.")
     graph_body = {key: value for key, value in graph.items() if key != "graph_sha256"}
     if graph.get("graph_sha256") != canonical_hash(graph_body):
         raise ValueError("Pre-broker model-demand graph hash does not match its payload.")
@@ -128,13 +128,23 @@ def compile_broker_demand_contract(model_context: dict[str, Any]) -> dict[str, A
     dictionary = _metric_dictionary()
     aliases = _auto_exact_aliases(dictionary)
     demanded: dict[str, set[str]] = {}
+    v2 = graph.get("schema_version") == "pre-broker-model-demand/2.0"
     for node in graph.get("nodes") or []:
-        if "selected_broker" not in (node.get("allowed_authorities") or []):
-            continue
-        label = normalized_label(node.get("label"))
-        metric_id = aliases.get(label)
-        if metric_id:
-            demanded.setdefault(metric_id, set()).add(label)
+        if v2:
+            if node.get("node_kind") != "model_demand" or node.get("broker_demand_eligible") is not True:
+                continue
+            metric_id = str(node.get("metric_id") or "")
+            if not metric_id:
+                continue
+            label = normalized_label(node.get("label"))
+            demanded.setdefault(metric_id, set()).add(label or metric_id)
+        else:
+            if "selected_broker" not in (node.get("allowed_authorities") or []):
+                continue
+            label = normalized_label(node.get("label"))
+            metric_id = aliases.get(label)
+            if metric_id:
+                demanded.setdefault(metric_id, set()).add(label)
 
     discovery_by_metric: dict[str, set[str]] = {metric_id: set() for metric_id in demanded}
     for alias, metric_id in aliases.items():

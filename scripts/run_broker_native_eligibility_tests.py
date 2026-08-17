@@ -82,5 +82,5 @@ source = (HERE / "extract_broker_evidence.py").read_text("utf-8")
 assert "unselected_house_recovery" in source
 assert "archive_only = not selected_targets or unselected_house_recovery" in source
 assert "archive_only = not selected_targets or unselected_house\n" not in source
-assert "native_quality_ranked_one_house_then_zero_authority" in source
+assert "quality_ranked_native_then_one_recovery_frontier" in source
 print({"status": "PASS", "checks": 5})

@@ -5,7 +5,7 @@
     "debt_maturities_roll": { "allowed_values": [0, 1], "display": { "0": "Off", "1": "On" }, "native_sequence": [1, 0, 1, 0, 1] },
     "acquisition": { "allowed_values": [0, 1], "display": { "0": "Off", "1": "On" }, "native_sequence": [1, 0, 1, 0, 1] }
   },
-  "solver": { "max_iterations": 200, "absolute_tolerance": 1e-8, "relative_tolerance": 1e-12, "non_convergence": "BLOCK" },
+  "solver": { "max_iterations": 200, "absolute_tolerance": 1e-8, "relative_tolerance": 1e-12, "non_convergence": "BLOCK", "two_cycle_detection": true, "damping_factors": [0.5, 0.25], "monotone_boundary_fallback": { "enabled": true, "method": "deterministic_bisection", "declared_boundaries_only": true, "current_cash_rcf_boundary": "analytic_min_max_projection" } },
   "workbook_calculation": { "calc_id": "191029", "calc_mode": "auto", "full_calc_on_load": true, "force_full_calc": true, "iterate": true, "iterate_count": 200, "iterate_delta": 1e-6 },
   "native_tolerances": { "currency": 1e-6, "ratio": 1e-9, "percentage": 1e-10, "control": 0, "default": 1e-9, "relative": 1e-12 },
   "circularity_roles": {

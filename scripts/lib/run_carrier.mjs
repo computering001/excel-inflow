@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { resolveSourceIdentity } from "./source_identity.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -11,7 +12,8 @@ import {
   validateRunId,
 } from "./runtime_isolation.mjs";
 
-export const RUN_CARRIER_SCHEMA = "debt-model-run-carrier/2.0";
+export const RUN_CARRIER_SCHEMA = "debt-model-run-carrier/3.0";
+export const LEGACY_RUN_CARRIER_SCHEMA = "debt-model-run-carrier/2.0";
 export const RUN_CARRIER_FILE = "run-carrier.json";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -99,6 +101,7 @@ export async function writeRunCarrier({
   brokerConfirmationPath = null,
   status,
   artifacts = {},
+  sourceIdentity = null,
 }) {
   const canonicalRunRoot = await canonicalPathThroughExistingAncestor(runRoot);
   const token = requireToken(workspaceToken);
@@ -201,6 +204,9 @@ export async function writeRunCarrier({
     run_identity_hash: identity.identity.identity_hash,
     issuer_identity: normalisedIssuer,
     issuer_identity_hash: sha256Bytes(canonicalJson(normalisedIssuer)),
+    source_identity: sourceIdentity ?? await resolveSourceIdentity({ skillRoot }),
+    telemetry_trace_id: process.env.EXCEL_INFLOW_TRACE_ID ?? null,
+    user_submitted_at: process.env.EXCEL_INFLOW_USER_SUBMITTED_AT ?? null,
     broker_intake_state: brokerIntakeChoiceSnapshot
       ? "choice_recorded"
       : "awaiting_choice",
@@ -255,7 +261,12 @@ export async function verifyRunCarrier({
   } catch (error) {
     throw new Error(`Run carrier is not readable JSON: ${error.message}`);
   }
-  if (carrier.schema_version !== RUN_CARRIER_SCHEMA) throw new Error("Run carrier schema does not match.");
+  if (![RUN_CARRIER_SCHEMA, LEGACY_RUN_CARRIER_SCHEMA].includes(carrier.schema_version)) throw new Error("Run carrier schema does not match.");
+  if (carrier.schema_version === RUN_CARRIER_SCHEMA) {
+    for (const field of ["source_commit", "source_tree", "current_closure_sha256", "package_mode"]) {
+      if (!carrier.source_identity?.[field]) throw new Error(`Run carrier source identity is missing ${field}.`);
+    }
+  }
   if (carrier.controller_version !== controllerVersion) throw new Error("Run carrier controller version does not match.");
   validateRunId(carrier.run_id);
   if (carrier.carrier_hash !== sha256Bytes(canonicalJson(carrierBody(carrier)))) {

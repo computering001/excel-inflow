@@ -358,7 +358,7 @@ async function main() {
   let request = inputRequest;
   let effectiveRequestPath = requestPath;
   const acquisitionArtifacts = {};
-  if (inputRequest.schema_version === "filings-acquisition-request/1.0") {
+  if (["filings-acquisition-request/1.0", "filings-acquisition-request/2.0"].includes(inputRequest.schema_version)) {
     try {
       const acquired = await acquireFilingsSources({
         request: inputRequest,

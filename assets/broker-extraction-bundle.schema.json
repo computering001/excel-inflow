@@ -56,10 +56,25 @@
         "maximum_recovery_house_count"
       ],
       "properties": {
-        "schema_version": { "const": "broker-selected-house-recovery/1.0" },
-        "policy": { "const": "latest_supplied_house_then_zero_authority" },
-        "selected_house_id": { "type": "string", "minLength": 1 },
-        "maximum_recovery_house_count": { "const": 1 }
+        "schema_version": {
+          "const": "broker-selected-house-recovery/1.0"
+        },
+        "policy": {
+          "const": "quality_ranked_native_then_one_recovery_frontier"
+        },
+        "selected_house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_recovery_house_count": {
+          "const": 1
+        },
+        "house_ranking": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
       }
     },
     "canonical_tables_sha256": {
@@ -78,7 +93,9 @@
     },
     "canonical_findings": {
       "type": "array",
-      "items": { "type": "object" }
+      "items": {
+        "type": "object"
+      }
     },
     "vision_conflict_manifests": {
       "type": "array",
@@ -507,13 +524,17 @@
             "selected_cell_recovery_required",
             "archive_only_not_demanded",
             "archive_only_unselected_house",
-            "native_candidate"
+            "native_candidate",
+            "archive_only_unselected_house_recovery"
           ]
         },
         "selected_demand_metric_ids": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "whole_surface_numeric_token_count": {
           "type": [
@@ -644,6 +665,18 @@
               }
             }
           }
+        },
+        "recovery_prohibited": {
+          "type": "boolean"
+        },
+        "native_recovery_required": {
+          "type": "boolean"
+        },
+        "native_recovery_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },

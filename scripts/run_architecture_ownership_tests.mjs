@@ -1,0 +1,2 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict'; import fs from 'node:fs'; const a=JSON.parse(fs.readFileSync(new URL('../assets/architecture-ownership-v2.json',import.meta.url),'utf8')); assert.equal(a.schema_version,'architecture-ownership/2.0'); assert.equal(a.owners.length,7); assert.equal(new Set(a.owners.map(x=>x.owner_id)).size,7); assert.equal(new Set(a.owners.map(x=>x.canonical)).size,7); console.log(JSON.stringify({status:'PASS',checks:4}));

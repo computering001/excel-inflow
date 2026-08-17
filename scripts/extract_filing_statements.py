@@ -317,6 +317,95 @@ def nearest_values(runs: list[dict[str, Any]], columns: list[float]) -> list[flo
     return assigned
 
 
+def _finite_series(row: dict[str, Any]) -> list[float] | None:
+    values = row.get("values")
+    if not isinstance(values, list) or len(values) != 3:
+        return None
+    result: list[float] = []
+    for value in values:
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(number):
+            return None
+        result.append(number)
+    return result
+
+
+def _series_sum_matches(parent: list[float], children: list[list[float]]) -> bool:
+    if len(children) < 2:
+        return False
+    calculated = [sum(series[index] for series in children) for index in range(3)]
+    # Filing faces are commonly rounded to whole millions or one decimal place.
+    # Source-visible arithmetic is therefore proved within display precision,
+    # not machine epsilon.  A 0.5-unit envelope is conservative for whole-unit
+    # presentation while still rejecting economically different relationships.
+    return all(
+        math.isclose(calculated[index], parent[index], rel_tol=1e-9, abs_tol=0.5000001)
+        for index in range(3)
+    )
+
+
+def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
+    """Bind unique source-visible arithmetic independent of issuer wording.
+
+    Geometry supplies candidate families and all three historical values prove
+    the edge. Both total-last and total-first filing shapes are supported. A
+    relationship is materialised only when one candidate family matches; an
+    ambiguous equality remains unowned rather than guessed.
+    """
+    matches: dict[int, list[list[int]]] = {}
+    for parent_index, parent_row in enumerate(rows):
+        parent_values = _finite_series(parent_row)
+        if parent_values is None:
+            continue
+        parent_level = int(parent_row.get("hierarchy_level") or 0)
+        families: list[list[int]] = []
+        for direction in (-1, 1):
+            indexes: list[int] = []
+            cursor = parent_index + direction
+            while 0 <= cursor < len(rows) and len(indexes) < 10:
+                candidate = rows[cursor]
+                level = int(candidate.get("hierarchy_level") or 0)
+                if level <= parent_level:
+                    break
+                if level == parent_level + 1 and _finite_series(candidate) is not None:
+                    indexes.append(cursor)
+                cursor += direction
+            if direction < 0:
+                indexes.reverse()
+            for start in range(len(indexes)):
+                for end in range(start + 2, len(indexes) + 1):
+                    family = indexes[start:end]
+                    child_values = [_finite_series(rows[index]) for index in family]
+                    if all(series is not None for series in child_values) and _series_sum_matches(
+                        parent_values, child_values,  # type: ignore[arg-type]
+                    ):
+                        families.append(family)
+        unique = []
+        seen = set()
+        for family in families:
+            key = tuple(family)
+            if key not in seen:
+                seen.add(key); unique.append(family)
+        if len(unique) == 1:
+            matches[parent_index] = unique
+
+    claimed_children: set[int] = set()
+    for parent_index, families in matches.items():
+        family = families[0]
+        if any(index in claimed_children for index in family):
+            continue
+        parent_id = rows[parent_index]["source_line_id"]
+        rows[parent_index]["is_subtotal"] = True
+        for index in family:
+            if not rows[index].get("parent_source_line_id"):
+                rows[index]["parent_source_line_id"] = parent_id
+                claimed_children.add(index)
+
 def is_subtotal_label(label: str) -> bool:
     """Recognise visible accounting totals without relying on issuer wording alone.
 
@@ -338,6 +427,13 @@ def is_subtotal_label(label: str) -> bool:
 
 
 def infer_parent_links(rows: list[dict[str, Any]]) -> None:
+    """Bind source arithmetic first, then use captions only as fallback.
+
+    Arithmetic ownership is issuer-language independent.  The legacy caption
+    walk is retained only for rows that remain unowned after structural proof.
+    """
+    infer_source_arithmetic_links(rows)
+
     """Bind indented face rows to the next visible subtotal one level above.
 
     Face statements normally print components before their total.  Walking
@@ -349,7 +445,7 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
     next_subtotal_by_level: dict[int, str] = {}
     for row in reversed(rows):
         level = int(row.get("hierarchy_level") or 0)
-        if level > 0:
+        if level > 0 and not row.get("parent_source_line_id"):
             parent = next_subtotal_by_level.get(level - 1)
             if parent:
                 row["parent_source_line_id"] = parent
@@ -357,10 +453,17 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
         # is a total.  Unknown labels are preserved but do not invent families.
         if row.get("is_subtotal"):
             next_subtotal_by_level[level] = row["source_line_id"]
-        # Do not discard deeper subtotal candidates merely because an
-        # unrelated, unindented disclosure appears between a component and its
-        # printed parent.  Issuers commonly interleave ratios or supplemental
-        # subtotals on the face statement.
+            for candidate_level in list(next_subtotal_by_level):
+                if candidate_level > level:
+                    next_subtotal_by_level.pop(candidate_level, None)
+        else:
+            # A same- or shallower-level non-total is a structural boundary.
+            # Do not let a later caption subtotal reach backwards across an
+            # intervening issuer aggregate or disclosure; that would let
+            # vocabulary override failed arithmetic proof and steal children.
+            for candidate_level in list(next_subtotal_by_level):
+                if candidate_level >= level:
+                    next_subtotal_by_level.pop(candidate_level, None)
 
 
 def extract_statement(

@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import { acquisitionTransactionFlows } from "./lib/acquisition_policy.mjs";
+import { applyFundedAcquisitionRows, fundedAcquisitionCandidate, fundedAcquisitionExcelFormula } from "./lib/funded_acquisition_runtime.mjs";
+const modelCase={periods:[{status:"historical",date:"2023-12-31"},{status:"historical",date:"2024-12-31"},{status:"historical",date:"2025-12-31"},{status:"forecast",date:"2026-12-31"},{status:"forecast",date:"2027-12-31"},{status:"forecast",date:"2028-12-31"}],acquisition:{enabled:true,transaction_enterprise_value:1000,acquisition_debt_amount:400,close_year:2027},statement_structure:{cash_flow:[{row_id:"cfi",label:"Cash from investing",semantic_role:"cash_from_investing",calculation:{operator:"sum",refs:[]}},{row_id:"cff",label:"Cash from financing",semantic_role:"cash_from_financing",calculation:{operator:"sum",refs:[]}}]}};
+assert.deepEqual(acquisitionTransactionFlows(modelCase,0).net_direct_cash_flow,0);
+assert.equal(acquisitionTransactionFlows(modelCase,1).consideration_cash_flow,-1000);
+assert.equal(acquisitionTransactionFlows(modelCase,1).acquisition_debt_proceeds,400);
+assert.equal(acquisitionTransactionFlows(modelCase,1).residual_cash_or_rcf_funding,600);
+applyFundedAcquisitionRows(modelCase);
+const consideration=modelCase.statement_structure.cash_flow.find(r=>r.semantic_role==="acquisition_consideration");
+const proceeds=modelCase.statement_structure.cash_flow.find(r=>r.semantic_role==="acquisition_debt_proceeds");
+assert.ok(modelCase.statement_structure.cash_flow.find(r=>r.row_id==="cfi").calculation.refs.includes(consideration.row_id));
+assert.ok(modelCase.statement_structure.cash_flow.find(r=>r.row_id==="cff").calculation.refs.includes(proceeds.row_id));
+assert.equal(fundedAcquisitionCandidate(modelCase,consideration,1).value,-1000);
+assert.match(fundedAcquisitionExcelFormula("consideration","O"),/-\$P\$5/);
+assert.match(fundedAcquisitionExcelFormula("debt_proceeds","O"),/\$P\$8/);
+const mutated=structuredClone(modelCase);mutated.acquisition.transaction_enterprise_value=1100;
+assert.equal(fundedAcquisitionCandidate(mutated,consideration,1).value,-1100);
+console.log(JSON.stringify({status:"PASS",checks:11}));

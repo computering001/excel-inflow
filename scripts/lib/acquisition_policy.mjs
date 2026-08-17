@@ -101,3 +101,44 @@ export function ensureIllustrativeAcquisitionCase(modelCase) {
   };
   return modelCase;
 }
+
+
+export const ACQUISITION_TRANSACTION_MODE = "funded_transaction";
+
+function finiteAcquisitionValue(value, fallback = 0) {
+  return value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+function acquisitionInput(modelCase, names, fallback = null) {
+  const roots = [modelCase?.acquisition, modelCase?.acquisition_case, modelCase?.acquisition_overlay, modelCase?.transaction, modelCase?.controls, modelCase?.assumptions];
+  for (const root of roots) {
+    if (!root || typeof root !== "object") continue;
+    for (const name of names) if (root[name] !== undefined && root[name] !== null) return root[name];
+    for (const value of Object.values(root)) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+      for (const name of names) if (value[name] !== undefined && value[name] !== null) return value[name];
+    }
+  }
+  return fallback;
+}
+export function acquisitionTransactionFlows(modelCase, forecastIndex) {
+  const periods = (modelCase?.periods ?? []).filter((period) => period?.status === "forecast");
+  const period = periods[forecastIndex];
+  const closeYear = Number(acquisitionInput(modelCase, ["close_year", "acquisition_close_year"], 0));
+  const periodYear = Number(String(period?.date ?? period?.label ?? "").slice(0, 4));
+  const enabledRaw = acquisitionInput(modelCase, ["enabled", "adjustment_columns_on", "acquisition_on", "acquisition_case"], false);
+  const enabled = enabledRaw === true || enabledRaw === 1 || String(enabledRaw).toLowerCase() === "on";
+  const atClose = enabled && periodYear === closeYear;
+  const consideration = atClose ? finiteAcquisitionValue(acquisitionInput(modelCase, ["transaction_enterprise_value", "transaction_value", "enterprise_value"], 0)) : 0;
+  const debtProceeds = atClose ? finiteAcquisitionValue(acquisitionInput(modelCase, ["acquisition_debt_amount", "acquisition_debt", "debt_amount"], 0)) : 0;
+  return {
+    schema_version: "funded-acquisition-transaction/1.0",
+    mode: ACQUISITION_TRANSACTION_MODE,
+    forecast_index: forecastIndex,
+    at_close: atClose,
+    consideration_cash_flow: -Math.abs(consideration),
+    acquisition_debt_proceeds: Math.abs(debtProceeds),
+    direct_transaction_cash_flow: -Math.abs(consideration),
+    net_direct_cash_flow: -Math.abs(consideration) + Math.abs(debtProceeds),
+    residual_cash_or_rcf_funding: Math.max(0, Math.abs(consideration) - Math.abs(debtProceeds)),
+  };
+}

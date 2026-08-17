@@ -1,84 +1,28 @@
 #!/usr/bin/env python3
-"""Prove that a filing-sparse demand graph still requests the core broker surface."""
+"""Prove v2 model-owned demand carries the complete core surface without widening v1."""
 from __future__ import annotations
-
-import hashlib
-import importlib.util
-import json
+import hashlib, importlib.util, json
 from pathlib import Path
-
-HERE = Path(__file__).resolve().parent
-SPEC = importlib.util.spec_from_file_location(
-    "broker_extractor", HERE / "extract_broker_evidence.py"
-)
+HERE=Path(__file__).resolve().parent
+SPEC=importlib.util.spec_from_file_location("broker_extractor", HERE/"extract_broker_evidence.py")
 assert SPEC and SPEC.loader
-broker = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(broker)
-
-periods = ["2026-12-31", "2027-12-31", "2028-12-31"]
-labels = [("revenue", "Revenue"), ("ebit", "EBIT"), ("dividends", "Dividends")]
-nodes = [
-    {
-        "node_id": f"{metric}.fy{index + 1}",
-        "section": "cash_flow" if metric == "dividends" else "income_statement",
-        "source_line_id": f"source.{metric}",
-        "label": label,
-        "parent_label": None,
-        "period_end": period,
-        "material": True,
-        "has_historical_value": True,
-        "allowed_authorities": ["selected_broker", "historical_inference"],
-        "definition_signature_sha256": hashlib.sha256(metric.encode()).hexdigest(),
-    }
-    for metric, label in labels
-    for index, period in enumerate(periods)
-]
-body = {
-    "schema_version": "pre-broker-model-demand/1.0",
-    "run_id": "tier1_demand_test",
-    "as_of": "2025-12-31",
-    "reporting_currency": "USD",
-    "units": "millions",
-    "forecast_periods": periods,
-    "nodes": nodes,
-    "counts": {
-        "source_rows": len(labels),
-        "forecast_nodes": len(nodes),
-        "material_nodes": len(nodes),
-    },
-}
-body["graph_sha256"] = hashlib.sha256(
-    (json.dumps({k: v for k, v in body.items() if k != "graph_sha256"}, sort_keys=True, separators=(",", ":")) + "\n").encode()
-).hexdigest()
-context = {
-    "as_of": body["as_of"],
-    "reporting_currency": body["reporting_currency"],
-    "units": body["units"],
-    "forecast_periods": periods,
-    "model_demand_graph": body,
-}
-compiled = broker.compile_broker_demand_contract(context)
-closed = broker.ensure_core_broker_demand_contract(compiled)
-metric_ids = {
-    str(target.get("metric_id") or target.get("concept_id") or "")
-    for target in closed.get("targets", [])
-}
-required = {
-    "revenue",
-    "ebit",
-    "adjusted_ebitda",
-    "depreciation_and_amortisation",
-    "effective_tax_rate",
-    "capex",
-    "change_in_working_capital",
-    "dividends",
-}
-assert required <= metric_ids, sorted(required - metric_ids)
-assert len(closed["targets"]) == len({
-    str(target.get("metric_id") or target.get("concept_id") or target)
-    for target in closed["targets"]
-})
-source = (HERE / "extract_broker_evidence.py").read_text("utf-8")
-assert "ensure_core_broker_demand_contract(" in source
-assert "compile_broker_demand_contract(request.get(\"model_context\") or {})" in source
-print({"status": "PASS", "required_metrics": sorted(required)})
+broker=importlib.util.module_from_spec(SPEC); SPEC.loader.exec_module(broker)
+periods=["2026-12-31","2027-12-31","2028-12-31"]
+required={"revenue","ebit","adjusted_ebitda","depreciation_and_amortisation","effective_tax_rate","capex","change_in_working_capital","dividends","share_buybacks"}
+def seal(body):
+    return {**body,"graph_sha256":hashlib.sha256((json.dumps(body,sort_keys=True,separators=(",",":"))+"\n").encode()).hexdigest()}
+# Legacy v1 remains exactly as authored.
+v1_nodes=[{"node_id":f"revenue.fy{i+1}","section":"income_statement","source_line_id":"source.revenue","label":"Revenue","parent_label":None,"period_end":period,"material":True,"has_historical_value":True,"allowed_authorities":["selected_broker"],"definition_signature_sha256":"a"*64} for i,period in enumerate(periods)]
+v1=seal({"schema_version":"pre-broker-model-demand/1.0","run_id":"v1","as_of":"2025-12-31","reporting_currency":"USD","units":"millions","forecast_periods":periods,"nodes":v1_nodes,"counts":{"source_rows":1,"forecast_nodes":3,"material_nodes":3}})
+v1_contract=broker.ensure_core_broker_demand_contract(broker.compile_broker_demand_contract({"forecast_periods":periods,"model_demand_graph":v1}))
+assert {t["metric_id"] for t in v1_contract["targets"]}=={"revenue"}
+# v2 graph explicitly owns the full controlled economic vocabulary.
+v2_nodes=[]
+for metric in sorted(required):
+    for i,period in enumerate(periods):
+        v2_nodes.append({"node_id":f"{metric}.fy{i+1}","node_kind":"model_demand","metric_id":metric,"label":metric.replace("_"," ").title(),"period_end":period,"broker_demand_eligible":True})
+v2=seal({"schema_version":"pre-broker-model-demand/2.0","run_id":"v2","as_of":"2025-12-31","reporting_currency":"USD","units":"millions","forecast_periods":periods,"nodes":v2_nodes,"counts":{"source_rows":0,"forecast_nodes":len(v2_nodes),"material_nodes":len(v2_nodes)}})
+v2_contract=broker.ensure_core_broker_demand_contract(broker.compile_broker_demand_contract({"forecast_periods":periods,"model_demand_graph":v2}))
+metric_ids={t["metric_id"] for t in v2_contract["targets"]}
+assert required<=metric_ids, sorted(required-metric_ids)
+print({"status":"PASS","v1_metrics":sorted({t["metric_id"] for t in v1_contract["targets"]}),"v2_metrics":sorted(metric_ids)})

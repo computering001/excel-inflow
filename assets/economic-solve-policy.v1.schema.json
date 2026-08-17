@@ -18,12 +18,25 @@
     "solver": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["max_iterations", "absolute_tolerance", "relative_tolerance", "non_convergence"],
+      "required": ["max_iterations", "absolute_tolerance", "relative_tolerance", "non_convergence", "two_cycle_detection", "damping_factors", "monotone_boundary_fallback"],
       "properties": {
         "max_iterations": { "type": "integer", "minimum": 1 },
         "absolute_tolerance": { "type": "number", "exclusiveMinimum": 0 },
         "relative_tolerance": { "type": "number", "minimum": 0 },
-        "non_convergence": { "const": "BLOCK" }
+        "non_convergence": { "const": "BLOCK" },
+        "two_cycle_detection": { "const": true },
+        "damping_factors": { "type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{ "const": 0.5 }, { "const": 0.25 }], "items": false },
+        "monotone_boundary_fallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "method", "declared_boundaries_only", "current_cash_rcf_boundary"],
+          "properties": {
+            "enabled": { "const": true },
+            "method": { "const": "deterministic_bisection" },
+            "declared_boundaries_only": { "const": true },
+            "current_cash_rcf_boundary": { "const": "analytic_min_max_projection" }
+          }
+        }
       }
     },
     "workbook_calculation": {

@@ -1,3 +1,4 @@
+import { applyFundedAcquisitionRows } from "./funded_acquisition_runtime.mjs";
 /**
  * The case compiler — the v3 organ that makes the model case a DERIVED
  * artifact.  Stage 3 authors a case-source (declarations only: identity,
@@ -27,6 +28,7 @@ import { classifyStatementLine } from "./statement_classifier.mjs";
 import { validateCaseShape } from "./solver.mjs";
 import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
+import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import { isRankedTotalIdentity } from "./row_plan.mjs";
 import { applyTier1AnchorOwnership } from "./broker_anchor.mjs";
 import {
@@ -3550,7 +3552,12 @@ export function compileCase(caseSource, evidence = {}) {
     },
     findings: report.findings,
   };
-  return { model_case: modelCase, report: compileReport };
+  const finalCase = applyFundedAcquisitionRows(modelCase);
+  const forecastPeriods = (finalCase.periods ?? []).filter((period) => period?.status === "forecast");
+  if (forecastPeriods.length === 3) {
+    sealForecastAuthorityLedger(finalCase);
+  }
+  return { model_case: finalCase, report: compileReport };
 }
 
 export default { compileCase, CASE_COMPILE_REPORT_VERSION, PASSTHROUGH_LANES };

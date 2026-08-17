@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { applyFundedAcquisitionPlan } from "./lib/funded_acquisition_plan.mjs";
 
 import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
@@ -12007,6 +12008,7 @@ async function main(packaging = null) {
   // workbook that does not exist.
   const planPath = `${outputPath}.plan.json`;
   const plan = await extractPlan(outputPath, { caseId: modelCase.case_id });
+applyFundedAcquisitionPlan(plan, modelCase);
   // Deterministic on purpose: a wall clock here would make two builds of the
   // same case differ, and the renderer stamps docProps from this very field.
   plan.generator = {

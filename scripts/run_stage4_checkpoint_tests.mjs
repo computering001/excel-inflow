@@ -59,7 +59,7 @@ async function resolvePython(explicit) {
   const candidates = [
     explicit,
     process.env.DEBT_OVERLAY_PYTHON,
-    "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "fixtures/external/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
     "python3",
   ].filter(Boolean);
   for (const candidate of candidates) {
@@ -73,7 +73,7 @@ async function resolveSoffice(explicit) {
   const candidates = [
     explicit,
     process.env.SOFFICE_BIN,
-    "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "fixtures/external/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
     "soffice",
   ].filter(Boolean);
   for (const candidate of candidates) {
@@ -110,7 +110,7 @@ const out = options.out
 const cases = path.resolve(
   options.cases ??
   process.env.DEBT_OVERLAY_CASES_DIR ??
-  "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+  "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases",
 );
 const python = await resolvePython(options.python);
 const soffice = await resolveSoffice(options.soffice);

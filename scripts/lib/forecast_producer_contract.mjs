@@ -53,6 +53,8 @@ function formulaWitness(state, candidate) {
     "historical_average",
     "linear_historical_trend",
     "historical_trend",
+    "funded_acquisition_consideration",
+    "funded_acquisition_debt_proceeds",
   ].includes(spec?.operator) && Boolean(spec?.row_id ?? state?.row_id);
   const executable = Boolean(
     spec &&

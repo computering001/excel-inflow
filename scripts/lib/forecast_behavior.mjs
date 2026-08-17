@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
+import { canonicalSemanticRole, isStructuredEventRole } from "./semantic_roles.mjs";
 
 const SCHEMA = JSON.parse(fs.readFileSync(
   new URL("../../assets/forecast-behavior-map-v1.schema.json", import.meta.url),
@@ -80,7 +81,7 @@ const IDENTITY_ROLES = new Set([
 ]);
 
 const NON_RECURRING_ROLES = new Set([
-  "acquisition", "acquisition_cost", "business_combination", "disposal",
+  "acquisitions_net_of_cash", "acquisition", "acquisition_cost", "business_combination", "disposal",
   "litigation", "legal_settlement", "restructuring", "impairment_loss",
   "exceptional_item", "discontinued_operation",
 ]);
@@ -91,6 +92,7 @@ const LUMPY_ROLES = new Set([
 ]);
 
 const DRIVER_ROLES = new Set([
+  "acquisition_consideration", "acquisition_debt_proceeds",
   "opening_cash",
   "change_in_working_capital", "cash_taxes", "tax_expense",
   "depreciation_and_amortisation", "depreciation", "amortisation",
@@ -118,7 +120,7 @@ function includesAny(text, phrases) {
 }
 
 function roleOf(row) {
-  return normalise(row?.semantic_role ?? row?.classified_role ?? row?.role).replaceAll(" ", "_");
+  return canonicalSemanticRole(row?.semantic_role ?? row?.classified_role ?? row?.role);
 }
 
 function sourceRows(modelCase, row, section) {
@@ -256,7 +258,7 @@ function classifySignals(modelCase, row, section, rows) {
     return result;
   }
 
-  if (NON_RECURRING_ROLES.has(role)) {
+  if (NON_RECURRING_ROLES.has(role) || isStructuredEventRole(role)) {
     add("row_semantics", "non_recurring_semantic_role", "non_recurring_event", 0.96);
   }
   if (
@@ -271,7 +273,7 @@ function classifySignals(modelCase, row, section, rows) {
     add("movement_type", "discrete_financing_transaction", "non_recurring_event", 0.97);
   }
   const structuredEvent =
-    NON_RECURRING_ROLES.has(role) ||
+    (NON_RECURRING_ROLES.has(role) || isStructuredEventRole(role)) ||
     ["debt issuance cost", "other cash debt movement"].includes(
       normalise(row?.movement_type),
     );

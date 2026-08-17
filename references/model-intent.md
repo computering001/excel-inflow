@@ -621,7 +621,7 @@ Keep acquisition debt outstanding after closing for the remainder of the
 three-year forecast. The slim overlay has no acquisition repayment or maturity
 input.
 
-The lightweight overlay has zero direct transaction cash-flow effect and does
+The lightweight overlay has one close-year consideration outflow and one acquisition-debt financing inflow and does
 not build an incomplete sources-and-uses cash leg.
 Transaction enterprise value infers target operating metrics. Acquisition debt
 is added to the pro-forma debt balance, net debt, interest and leverage, but does

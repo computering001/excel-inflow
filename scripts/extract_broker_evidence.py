@@ -880,15 +880,15 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             demand_contract,
             opaque_image=bool(sparse and material_image),
         )
-        # The preview/selection contract chooses at most one coherent house
-        # for model authority.  Every other supplied report is still retained
-        # page-for-page, but it must be archive-only regardless of whether its
-        # native lane happens to look complete.  Restricting this only to pages
-        # that already needed vision let canonical reconciliation later re-arm
-        # OCR for an unselected house, expanding optional work after selection
-        # and breaking the one-house runtime/performance invariant.
-        unselected_house = descriptor.get("house_id") != vision_house_id
-        archive_only = not selected_targets or unselected_house
+        # All houses receive cheap native inspection. Native-clean compatible
+        # cells remain eligible regardless of which house is later chosen for
+        # the single expensive recovery frontier. Only unresolved recovery work
+        # is house-bounded; publication date never decides native eligibility.
+        unselected_house_recovery = (
+            vision_required and vision_house_id is not None and
+            descriptor.get("house_id") != vision_house_id
+        )
+        archive_only = not selected_targets or unselected_house_recovery
         if archive_only:
             # The raw PDF, native text, geometry, census and page image remain
             # preserved.  What closes is only model-facing reconciliation for
@@ -1049,7 +1049,7 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
             "vision_reason": vision_reason,
             "model_demand_status": (
                 "selected_cell_recovery_required" if vision_required
-                else "archive_only_unselected_house" if unselected_house
+                else "archive_only_unselected_house" if unselected_house_recovery
                 else "archive_only_not_demanded" if archive_only
                 else "native_candidate"
             ),
@@ -1544,6 +1544,11 @@ def extract_readable_pdf_fallback(
         census_ref = writer.write_json(
             f"census/page-{page_index + 1:04d}.json", "surface_census", census
         )
+        selected_targets = demand_targets_for_surface(
+            "", [], demand_contract, opaque_image=True
+        )
+        if descriptor.get("house_id") != vision_house_id:
+            selected_targets = []
         task = {
             "schema_version": "broker-vision-task/1.0",
             "document_id": descriptor["document_id"],
@@ -1670,6 +1675,228 @@ def tool_versions() -> dict[str, Any]:
     return versions
 
 
+CORE_BROKER_DEMANDS = (
+    ("revenue", "Revenue", ("revenue", "sales", "turnover")),
+    ("ebit", "EBIT / Operating Profit", ("ebit", "operating profit", "operating income")),
+    ("adjusted_ebitda", "Adjusted EBITDA", ("adjusted ebitda", "ebitda")),
+    ("depreciation_and_amortisation", "Depreciation and amortisation", ("d&a", "depreciation", "amortisation")),
+    ("effective_tax_rate", "Effective tax rate", ("effective tax rate", "tax rate")),
+    ("capex", "Capital expenditure", ("capex", "capital expenditure")),
+    ("change_in_working_capital", "Change in working capital", ("working capital", "change in working capital")),
+    ("dividends", "Dividends", ("dividend", "dividends")),
+)
+
+
+def _canonical_contract_hash(value: object) -> str:
+    return hashlib.sha256(
+        (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+    ).hexdigest()
+
+
+def augment_core_broker_demand_contract(contract: dict[str, Any]) -> dict[str, Any]:
+    """Ensure the debt-overlay Tier-1 surface exists before broker recovery."""
+    output = json.loads(json.dumps(contract))
+    targets = output.setdefault("targets", [])
+    existing = {str(item.get("metric_id") or item.get("concept_id") or "") for item in targets}
+    periods = list(output.get("forecast_periods") or [])
+    for metric_id, label, aliases in CORE_BROKER_DEMANDS:
+        if metric_id in existing:
+            continue
+        targets.append({
+            "target_id": f"tier1.{metric_id}",
+            "metric_id": metric_id,
+            "concept_id": metric_id,
+            "label": label,
+            "search_terms": list(aliases),
+            "aliases": list(aliases),
+            "forecast_periods": periods,
+            "periods": periods,
+            "material": True,
+            "tier": 1,
+        })
+    graph_text = json.dumps(output.get("model_demand_graph") or output, sort_keys=True).lower()
+    if any(term in graph_text for term in ("buyback", "share repurchase", "share_repurchase")) and "share_buybacks" not in existing:
+        targets.append({
+            "target_id": "tier1.share_buybacks", "metric_id": "share_buybacks",
+            "concept_id": "share_buybacks", "label": "Share buybacks",
+            "search_terms": ["share buybacks", "share repurchases", "buybacks"],
+            "aliases": ["share buybacks", "share repurchases", "buybacks"],
+            "forecast_periods": periods, "periods": periods, "material": True, "tier": 1,
+        })
+    output.pop("contract_sha256", None)
+    output["contract_sha256"] = _canonical_contract_hash(output)
+    return output
+
+
+
+def ensure_core_broker_demand_contract(contract: dict[str, Any]) -> dict[str, Any]:
+    """Compatibility seam; v2 model demand is already complete by construction.
+
+    Legacy v1 carriers must retain their original demand semantics.  Widening an
+    old graph by cloning targets would silently change a resumed run.
+    """
+    return json.loads(json.dumps(contract))
+
+
+def _recovery_search_terms(demand_contract: dict[str, Any]) -> set[str]:
+    terms: set[str] = set()
+    for target in demand_contract.get("targets", []):
+        for key in ("metric_id", "concept_id", "label", "source_label"):
+            value = target.get(key)
+            if isinstance(value, str) and value.strip():
+                terms.add(normalise_text(value))
+        for value in target.get("aliases", []) or target.get("search_terms", []) or []:
+            if isinstance(value, str) and value.strip():
+                terms.add(normalise_text(value))
+    return {term for term in terms if term}
+
+
+def _native_house_metrics(document: dict[str, Any]) -> set[str]:
+    metrics: set[str] = set()
+    for surface in document.get("surfaces", []):
+        if (surface.get("lane_status") or {}).get("vision") == "required":
+            continue
+        metrics.update(
+            str(value)
+            for value in surface.get("selected_demand_metric_ids", [])
+            if value
+        )
+    return metrics
+
+
+def _select_recovery_house_from_request(
+    request: dict[str, Any], request_dir: Path, demand_contract: dict[str, Any],
+) -> str:
+    """Choose one recovery frontier from cheap native evidence for every house."""
+    terms = _recovery_search_terms(demand_contract)
+    ranked: list[tuple[tuple[int, int, int, str, str, str], str]] = []
+    for descriptor in request.get("documents", []):
+        source_path = Path(str(descriptor.get("path") or ""))
+        if not source_path.is_absolute():
+            source_path = (request_dir / source_path).resolve()
+        native_text = ""
+        try:
+            if descriptor.get("media_type") == "application/pdf" and source_path.is_file():
+                import fitz  # type: ignore
+                with fitz.open(source_path) as document:
+                    native_text = "\n".join(page.get_text("text") or "" for page in document)
+        except Exception:
+            native_text = ""
+        normalized = normalise_text(native_text)
+        demand_hits = sum(1 for term in terms if term and term in normalized)
+        numeric_tokens = len(re.findall(r"(?<![A-Za-z])[-+]?\(?\d[\d.,]*%?\)?", native_text))
+        score = (
+            demand_hits,
+            min(numeric_tokens, 10000),
+            min(len(native_text), 1_000_000),
+            str(descriptor.get("published_date") or ""),
+            str(descriptor.get("house_id") or ""),
+            str(descriptor.get("document_id") or ""),
+        )
+        ranked.append((score, str(descriptor.get("house_id") or "")))
+    if not ranked:
+        raise ValueError("Broker extraction request contains no documents.")
+    ranked.sort(reverse=True)
+    if not ranked[0][1]:
+        raise ValueError("No broker house is available for bounded recovery selection.")
+    return ranked[0][1]
+
+
+def _select_recovery_house_from_documents(
+    documents: list[dict[str, Any]],
+    descriptors: list[dict[str, Any]],
+    demand_contract: dict[str, Any],
+) -> tuple[str, list[dict[str, Any]]]:
+    """Rank verified native usefulness; publication date is only a late tie-breaker."""
+    descriptor_by_id = {str(item.get("document_id")): item for item in descriptors}
+    demanded = {
+        str(item.get("metric_id") or item.get("concept_id"))
+        for item in demand_contract.get("targets", [])
+    }
+    rows: list[dict[str, Any]] = []
+    for document in documents:
+        descriptor = descriptor_by_id.get(str(document.get("document_id")), {})
+        native = _native_house_metrics(document)
+        unresolved = sum(
+            1
+            for surface in document.get("surfaces", [])
+            if (surface.get("lane_status") or {}).get("vision") == "required"
+        )
+        native_tables = sum(
+            1
+            for table in document.get("tables", [])
+            if table.get("model_use") != "prohibited"
+            and table.get("authority_role") != "archive_only"
+        )
+        material_coverage = len(native & demanded)
+        rows.append({
+            "house_id": str(document.get("house_id") or descriptor.get("house_id") or ""),
+            "document_id": str(document.get("document_id") or ""),
+            "published_date": str(descriptor.get("published_date") or ""),
+            "native_demand_coverage": material_coverage,
+            "material_demand_coverage": material_coverage,
+            "native_metric_ids": sorted(native & demanded),
+            "unresolved_surface_count": unresolved,
+            "native_table_count": native_tables,
+            "material_contradiction_count": 0,
+        })
+    rows.sort(
+        key=lambda item: (
+            -item["material_contradiction_count"],
+            item["material_demand_coverage"],
+            item["native_demand_coverage"],
+            -item["unresolved_surface_count"],
+            item["native_table_count"],
+            item["published_date"],
+            item["house_id"],
+            item["document_id"],
+        ),
+        reverse=True,
+    )
+    if not rows or not rows[0]["house_id"]:
+        raise ValueError("No broker house is available for bounded recovery selection.")
+    for rank, row in enumerate(rows, 1):
+        row["rank"] = rank
+    return rows[0]["house_id"], rows
+
+
+def select_recovery_house_id(
+    source: Any, context: Any, demand_contract: dict[str, Any],
+) -> Any:
+    """Compatibility dispatcher for preflight and post-extraction quality ranking."""
+    if isinstance(source, dict):
+        return _select_recovery_house_from_request(source, Path(context), demand_contract)
+    return _select_recovery_house_from_documents(list(source), list(context), demand_contract)
+
+
+def enforce_one_recovery_frontier(documents: list[dict[str, Any]], selected_house_id: str) -> None:
+    for document in documents:
+        if str(document.get("house_id") or "") == selected_house_id:
+            continue
+        for surface in document.get("surfaces", []):
+            if (surface.get("lane_status") or {}).get("vision") != "required":
+                continue
+            surface.setdefault("lane_status", {})["vision"] = "not_required"
+            surface["model_demand_status"] = "archive_only_unselected_house_recovery"
+            surface["selected_demand_metric_ids"] = []
+            surface["recovery_prohibited"] = True
+            surface_id = surface.get("surface_id")
+            for table in document.get("tables", []):
+                if table.get("surface_id") != surface_id:
+                    continue
+                if table.get("authority_role") in {"native_structured_authority", "bounded_native"}:
+                    continue
+                table["authority_role"] = "archive_only"
+                table["model_use"] = "prohibited"
+        document["extraction_status"] = (
+            "needs_vision"
+            if any(
+                (surface.get("lane_status") or {}).get("vision") == "required"
+                for surface in document.get("surfaces", [])
+            )
+            else "complete"
+        )
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("request", help="broker-extraction-request/1.0 JSON")
@@ -1680,16 +1907,12 @@ def main() -> int:
     output_root = Path(args.out).resolve()
     request = json.loads(request_path.read_text("utf-8"))
     validate_request(request)
-    demand_contract = compile_broker_demand_contract(request.get("model_context") or {})
-    vision_house_id = str(sorted(
-        request["documents"],
-        key=lambda item: (
-            str(item.get("published_date") or ""),
-            str(item.get("house_id") or ""),
-            str(item.get("document_id") or ""),
-        ),
-        reverse=True,
-    )[0]["house_id"])
+    demand_contract = ensure_core_broker_demand_contract(
+        compile_broker_demand_contract(request.get("model_context") or {})
+    )
+    vision_house_id = select_recovery_house_id(
+        request, request_path.parent, demand_contract
+    )
     output_root.mkdir(parents=True, exist_ok=True)
 
     documents: list[dict[str, Any]] = []
@@ -1747,6 +1970,13 @@ def main() -> int:
                     "message": f"primary: {error}; rendered fallback: {fallback_error}",
                 })
 
+    house_ranking: list[dict[str, Any]] = []
+    if documents:
+        _, house_ranking = _select_recovery_house_from_documents(
+            documents, request["documents"], demand_contract
+        )
+        enforce_one_recovery_frontier(documents, vision_house_id)
+
     unresolved = sum(
         1
         for document in documents
@@ -1801,9 +2031,10 @@ def main() -> int:
         "selected_cell_demand_contract": demand_contract,
         "selected_cell_recovery_policy": {
             "schema_version": "broker-selected-house-recovery/1.0",
-            "policy": "latest_supplied_house_then_zero_authority",
+            "policy": "quality_ranked_native_then_one_recovery_frontier",
             "selected_house_id": vision_house_id,
             "maximum_recovery_house_count": 1,
+            "house_ranking": house_ranking,
         },
         "artifact_root": str(output_root),
         "documents": documents,

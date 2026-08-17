@@ -30,7 +30,7 @@ import { solveCase } from "./lib/solver.mjs";
 import { hashValue } from "./lib/run_store.mjs";
 
 const casesDirectory = path.resolve(
-  process.argv[2] ?? "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+  process.argv[2] ?? "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases",
 );
 const onlyCase = process.argv[3] ?? null;
 const clone = (value) => structuredClone(value);
@@ -566,6 +566,9 @@ const JUSTIFIED = [
   // on any of these is a real divergence.
   /^statement_structure\.(income_statement|cash_flow)\[[^\]]+\]\.(historical_authority|forecast_period_authorities|forecast_period_calculations|forecast_capture_parent_id|forecast_capture_mode|forecast_capture_note|forecast_capture_certificates|formula_authority|aggregation_authority|source_line_ids)\b/,
   /^statement_structure_compiled_version$/,
+  // v3.6 seals the row-period forecast authority as an additive, content-addressed ledger.
+  /^forecast_authority_ledger_version$/,
+  /^forecast_authority_ledger(?:\.|$)/,
   // Named default for legacy DCS lanes without a balance-basis declaration.
   /^instruments\[\d+\]\.balance_basis$/,
   // Newly compiled cases state the balancing-facility mode explicitly. Legacy

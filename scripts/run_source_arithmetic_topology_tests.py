@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+from extract_filing_statements import infer_source_arithmetic_links
+
+def row(identifier, label, values, level):
+    return {"source_line_id": identifier, "raw_label": label, "values": values, "hierarchy_level": level, "is_subtotal": False}
+
+def assert_family(label):
+    rows = [
+        row("is.product_sales", "Product Sales", [100, 120, 140], 1),
+        row("is.alliance_revenue", "Alliance Revenue", [10, 12, 14], 1),
+        row("is.parent", label, [110, 132, 154], 0),
+    ]
+    infer_source_arithmetic_links(rows)
+    assert rows[0]["parent_source_line_id"] == "is.parent"
+    assert rows[1]["parent_source_line_id"] == "is.parent"
+    assert rows[2]["is_subtotal"] is True
+
+assert_family("Product Revenue")
+assert_family("Whatever the issuer calls this aggregate")
+parent_first = [
+    row("is.parent", "Operating family", [110, 132, 154], 0),
+    row("is.a", "A", [100, 120, 140], 1), row("is.b", "B", [10, 12, 14], 1),
+]
+infer_source_arithmetic_links(parent_first)
+assert all(item.get("parent_source_line_id") == "is.parent" for item in parent_first[1:])
+mutated = [
+    row("is.a", "A", [100, 120, 140], 1), row("is.b", "B", [10, 12, 14], 1),
+    row("is.parent", "Aggregate", [111, 132, 154], 0),
+]
+infer_source_arithmetic_links(mutated)
+assert not any(item.get("parent_source_line_id") for item in mutated)
+print('{"status":"PASS","checks":4}')

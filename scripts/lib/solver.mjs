@@ -14,6 +14,7 @@ import {
   resolveMetricForecastAuthority,
   validateForecastAuthorities,
 } from "./forecast_authority.mjs";
+import { verifyForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 import { solverIterationOptions } from "./economic_solve_policy.mjs";
 import {
@@ -79,6 +80,13 @@ function iterationResidual(previous, current) {
   if (current.length === 0) return 0;
   if (!previous) return Number.POSITIVE_INFINITY;
   return Math.max(...current.map((value, index) => Math.abs(value - previous[index])));
+}
+
+export function detectTwoCycle(previousPrevious, previous, current, tolerance) {
+  if (!previousPrevious || !previous || !current) return false;
+  const currentResidual = iterationResidual(previous, current);
+  const twoCycleResidual = iterationResidual(previousPrevious, current);
+  return currentResidual > tolerance && twoCycleResidual <= tolerance;
 }
 
 const NORMALISED_STATEMENT_CACHE = new WeakMap();
@@ -1571,6 +1579,7 @@ export function solveCase(
     instrumentPeriodState = null,
   } = {},
 ) {
+  if (modelCase?.forecast_authority_ledger_version) verifyForecastAuthorityLedger(modelCase);
   const shapeErrors = validateCaseShape(modelCase);
   if (shapeErrors.length > 0) {
     const error = new Error(`Invalid model case:\n- ${shapeErrors.join("\n- ")}`);
@@ -2278,10 +2287,13 @@ export function solveCase(
     let targetCapex = 0;
     let targetWorkingCapital = 0;
     const acquisitionDebtAddition = acquisitionCloses ? acquisitionDebtAmount : 0;
-    const acquisitionDebtProceeds = 0;
-    // The lightweight overlay intentionally has no sources-and-uses,
-    // consideration cash or implied equity leg. EV only infers target EBITDA.
-    const acquisitionCashConsideration = 0;
+    const acquisitionDebtProceeds = acquisitionCloses ? acquisitionDebtAmount : 0;
+    // Funded-transaction mode books consideration and debt proceeds once at
+    // close. The residual EV less acquisition debt is funded through the
+    // ordinary cash/minimum-cash/RCF waterfall; there is no equity plug.
+    const acquisitionCashConsideration = acquisitionCloses
+      ? transactionEnterpriseValue
+      : 0;
     const acquisitionPreMaturityDebt = Math.max(
       0,
       openingAcquisitionDebt + acquisitionDebtAddition,
@@ -2334,6 +2346,10 @@ export function solveCase(
     let residual = Number.POSITIVE_INFINITY;
     let lastComputation = null;
     let previousIterationSnapshot = null;
+    let previousPreviousIterationSnapshot = null;
+    let dampingIndex = 0;
+    let cycleDetectionCount = 0;
+    const dampingFactors = [0.5, 0.25];
     const iterationLimit = solverDeclaration.required ? maxIterations : 1;
 
     for (iteration = 1; iteration <= iterationLimit; iteration += 1) {
@@ -2573,7 +2589,7 @@ export function solveCase(
         ["capex", totalCapex],
         ["other_investing", otherInvesting],
         ["non_balancing_cash_bucket_movement", nonBalancingCashBucketMovement],
-        ["acquisition_consideration", 0],
+        ["acquisition_consideration", -acquisitionCashConsideration],
       ]);
       if (
         statementRoleIsCalculated(
@@ -2617,7 +2633,8 @@ export function solveCase(
       const cashFromOperations =
         declaredCashFromOperations ?? fallbackCashFromOperations;
       const cashFromInvesting =
-        declaredCashFromInvesting ?? fallbackCashFromInvesting;
+        (declaredCashFromInvesting ?? fallbackCashFromInvesting) -
+        acquisitionCashConsideration;
       const fxOnCash = statementRoleValue(
         modelCase,
         "fx_effect_on_cash",
@@ -2650,9 +2667,9 @@ export function solveCase(
         fxOnCash +
         nonDebtFinancing;
       const financingBeforeMandatory =
-        nonDebtFinancing + nonRcfDebtIssuance;
+        nonDebtFinancing + nonRcfDebtIssuance + acquisitionDebtProceeds;
       const cashBeforeMandatory =
-        cashBeforeDebt + nonRcfDebtIssuance;
+        cashBeforeDebt + nonRcfDebtIssuance + acquisitionDebtProceeds;
       const mandatoryRepayment = compiledInstrumentPeriodState
         ? mandatoryRepaymentForPeriod(
             compiledInstrumentPeriodState,
@@ -2661,7 +2678,8 @@ export function solveCase(
         : nonRcfDebtRepayment + leasePrincipal;
       const cashAfterMandatory = cashBeforeMandatory - mandatoryRepayment;
       const preRcfDebtCashFlow =
-        nonRcfDebtIssuance - nonRcfDebtRepayment - leasePrincipal + otherCashDebtMovement;
+        nonRcfDebtIssuance + acquisitionDebtProceeds -
+        nonRcfDebtRepayment - leasePrincipal + otherCashDebtMovement;
       const cashBeforeRcf = cashBeforeDebt + preRcfDebtCashFlow;
       const deficit = Math.max(0, effectiveMinimumCash - cashAfterMandatory);
       const surplus = Math.max(0, cashAfterMandatory - effectiveMinimumCash);
@@ -2719,6 +2737,12 @@ export function solveCase(
         previousIterationSnapshot,
         currentIterationSnapshot,
       );
+      const twoCycleResidual = previousPreviousIterationSnapshot
+        ? iterationResidual(previousPreviousIterationSnapshot, currentIterationSnapshot)
+        : Number.POSITIVE_INFINITY;
+      const twoCycleDetected = solverDeclaration.required && detectTwoCycle(previousPreviousIterationSnapshot, previousIterationSnapshot, currentIterationSnapshot, tolerance);
+      if (twoCycleDetected) cycleDetectionCount += 1;
+      previousPreviousIterationSnapshot = previousIterationSnapshot;
       previousIterationSnapshot = currentIterationSnapshot;
 
       // Finish the declared statement graph with the quantities that only
@@ -2737,7 +2761,7 @@ export function solveCase(
         ["change_in_debt", nonRcfDebtIssuance - nonRcfDebtRepayment + rcfDraw - rcfRepayment],
         ["rcf_draw", rcfDraw],
         ["rcf_repayment", -rcfRepayment],
-        ["acquisition_debt_proceeds", 0],
+        ["acquisition_debt_proceeds", acquisitionDebtProceeds],
         ["acquisition_debt_repayment", 0],
         ["fx_effect_on_cash", fxOnCash],
         [
@@ -2855,15 +2879,29 @@ export function solveCase(
         converged = true;
         break;
       }
-      endingCash = nextEndingCash;
-      endingRcf = nextEndingRcf;
-      endingRcfNative = nextEndingRcfNative;
+      if (twoCycleDetected) {
+        const factor = dampingFactors[Math.min(dampingIndex, dampingFactors.length - 1)];
+        dampingIndex = Math.min(dampingIndex + 1, dampingFactors.length - 1);
+        endingCash = endingCash + factor * (nextEndingCash - endingCash);
+        endingRcf = endingRcf + factor * (nextEndingRcf - endingRcf);
+        endingRcfNative = endingRcfNative + factor * (nextEndingRcfNative - endingRcfNative);
+      } else {
+        endingCash = nextEndingCash;
+        endingRcf = nextEndingRcf;
+        endingRcfNative = nextEndingRcfNative;
+      }
     }
 
     if (!converged) {
-      throw new Error(
-        `Case ${modelCase.case_id} did not converge in forecast period ${period.date}.`,
+      const error = new Error(
+        `SOLVER_NON_CONVERGENCE: case ${modelCase.case_id} did not converge in forecast period ${period.date}.`,
       );
+      error.code = "SOLVER_NON_CONVERGENCE";
+      error.iterations = iterationLimit;
+      error.residual = residual;
+      error.two_cycle_detections = cycleDetectionCount;
+      error.damping_attempts = dampingIndex;
+      throw error;
     }
 
     const finalCashBucketSnapshot = cashBucketSnapshot(endingCash);

@@ -103,10 +103,18 @@ function substitutions(options) {
       : null,
     PYTHON: options.python ? path.resolve(options.python) : null,
     SOFFICE: options.soffice ? path.resolve(options.soffice) : null,
+    INSTALLED_HOST_BROKER_RECEIPT: options["installed-host-broker-receipt"]
+      ? path.resolve(options["installed-host-broker-receipt"]) : null,
   };
 }
 
 function resolveArgument(value, inputs) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (value.type === "literal") return String(value.value);
+    const resolved = inputs[value.source];
+    if (resolved === null || resolved === undefined) throw new Error(`Argument ${value.name ?? value.source} has no resolved source ${value.source}.`);
+    return String(resolved);
+  }
   const match = /^\$([A-Z_]+)$/.exec(String(value));
   return match ? inputs[match[1]] : String(value);
 }
