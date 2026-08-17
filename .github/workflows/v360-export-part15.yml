@@ -1,0 +1,27 @@
+name: v360 export part15
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - .github/workflows/v360-export-part15.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record part15 identity
+        run: |
+          wc -c publish/v360-recovery-complete/part15.b64
+          sha256sum publish/v360-recovery-complete/part15.b64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v360-part15-current
+          path: publish/v360-recovery-complete/part15.b64
+          retention-days: 1
