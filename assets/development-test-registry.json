@@ -97,6 +97,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "debt-class-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_debt_class_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "forecast-behavior",
       "phase": "forecast",
       "runtime": "node",

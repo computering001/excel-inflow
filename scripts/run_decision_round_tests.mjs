@@ -43,7 +43,7 @@ if (supplied) {
     instrument_id: `decision_round_note_${index + 1}`,
     source_row: `decision.round.${index + 1}`,
     description: `Senior notes ${index + 1}`,
-    instrument_type: "fixed_bond",
+    instrument_type: "bond_fixed",
     currency: base.issuer.reporting_currency,
     outstanding_amount: 50,
     maturity_date: `${2026 + (index % 3)}-12-31`,

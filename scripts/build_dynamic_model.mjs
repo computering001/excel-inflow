@@ -22,6 +22,7 @@ import { assessCoverage } from "./lib/coverage.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { instrumentDisplayLabel } from "./lib/instrument_display.mjs";
 import { compileInstrumentPeriodState } from "./lib/instrument_period_state.mjs";
+import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
 import { presentationEpoch, sharedHorizontalGrammar } from "./lib/design_contract.mjs";
 // IMPORTED, NOT REIMPLEMENTED. The Brokers sheet states how many named houses
 // supply each metric, and the broker-anchor rule DECIDES on that same number. A
@@ -3119,6 +3120,8 @@ function configureOperatingModel(
   curveRows,
 ) {
   const balancingRcfEnabled = hasBalancingRcf(modelCase);
+  const commercialPaperBackstopped =
+    modelCase.rcf_policy?.commercial_paper_backstopped !== false;
   // The model ends where the reader can see it end. There is no hidden
   // "MODEL BUILD SUPPORT" block below the interest schedule any more.
   const maxRow = rowPlan.visible_end_row;
@@ -5221,8 +5224,10 @@ function configureOperatingModel(
     undrawn_rcf: balancingRcfEnabled
       ? "Undrawn RCF"
       : "Undrawn balancing facility — none",
-    drawn_commercial_paper: balancingRcfEnabled
+    drawn_commercial_paper: balancingRcfEnabled && commercialPaperBackstopped
       ? "Less: drawn commercial paper"
+      : balancingRcfEnabled
+        ? "Commercial paper — not RCF-backed (not deducted)"
       : "Commercial paper against RCF backstop — none",
     year_end_cash: explicitCashBuckets
       ? "Liquidity-eligible cash"
@@ -5709,7 +5714,11 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `${column}${debtRows.total_liquidity}`,
-        `=${column}${debtRows.undrawn_rcf}+${column}${debtRows.drawn_commercial_paper}+${column}${debtRows.year_end_cash}`,
+        `=${column}${debtRows.undrawn_rcf}+` +
+          (commercialPaperBackstopped
+            ? `${column}${debtRows.drawn_commercial_paper}+`
+            : "") +
+          `${column}${debtRows.year_end_cash}`,
       );
     }
   }
@@ -5944,7 +5953,11 @@ function configureOperatingModel(
     applyFormula(
       sheet,
       `${column}${debtRows.total_liquidity}`,
-      `=${column}${debtRows.undrawn_rcf}+${column}${debtRows.drawn_commercial_paper}+${column}${debtRows.year_end_cash}`,
+      `=${column}${debtRows.undrawn_rcf}+` +
+        (commercialPaperBackstopped
+          ? `${column}${debtRows.drawn_commercial_paper}+`
+          : "") +
+        `${column}${debtRows.year_end_cash}`,
     );
 
     const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
@@ -6043,7 +6056,10 @@ function configureOperatingModel(
             : `=${col}${endingCashRow}`;
         case "total_liquidity":
           return (
-            `=${col}${debtRows.undrawn_rcf}+${col}${debtRows.drawn_commercial_paper}+` +
+            `=${col}${debtRows.undrawn_rcf}+` +
+            (commercialPaperBackstopped
+              ? `${col}${debtRows.drawn_commercial_paper}+`
+              : "") +
             `${col}${debtRows.year_end_cash}`
           );
         default:
@@ -11867,6 +11883,11 @@ async function main(packaging = null) {
     }
   };
   assertThreePlusThree(rawModelCase, "Pre-compile period gate");
+  // Previously compiled model cases may carry the retired v3.6 class tokens.
+  // Migrate them once, visibly, before any validator or schedule consumer sees
+  // the register. Unknown values become `unclassified` and are then stopped by
+  // coverage; they never inherit an economic or presentation fallback.
+  migrateLegacyDebtClasses(rawModelCase);
   ensureIllustrativeAcquisitionCase(rawModelCase);
   const validationErrors = validateCaseShape(rawModelCase);
   if (validationErrors.length > 0) {

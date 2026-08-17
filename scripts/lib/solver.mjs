@@ -3014,7 +3014,10 @@ export function solveCase(
       total_liquidity:
         finalCashBucketSnapshot.liquidity_cash +
         undrawnRcf -
-        (balancingRcfEnabled ? drawnCommercialPaper : 0),
+        (balancingRcfEnabled &&
+        modelCase.rcf_policy?.commercial_paper_backstopped !== false
+          ? drawnCommercialPaper
+          : 0),
       iterations: iteration,
       converged,
       residual,

@@ -23,7 +23,7 @@ const periods = [
 function instrument(instrumentId, overrides = {}) {
   return {
     instrument_id: instrumentId,
-    class: "fixed_bond",
+    class: "bond_fixed",
     currency: "GBP",
     balance_basis: "native_principal",
     opening_balance: 100,

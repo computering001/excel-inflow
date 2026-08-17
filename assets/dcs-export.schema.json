@@ -174,14 +174,19 @@
         },
         "instrument_type": {
           "enum": [
-            "fixed_bond",
-            "floating_loan",
+            "bond_fixed",
+            "bond_floating",
+            "term_loan_fixed",
+            "term_loan_floating",
             "commercial_paper",
             "securitisation",
             "rcf",
-            "other_debt"
+            "lease_liability",
+            "overdraft",
+            "other_explicit",
+            "unclassified"
           ],
-          "description": "Deliberately identical to model-case-v2 instrument.class, with nothing added. A row the model cannot represent as one of these six must be mapped by the adapter and the mapping stated, rather than admitted here and silently dropped later. Finance and operating leases are NOT debt instruments for this purpose — they are handled by the case's lease_policy — so a lease row belongs in the filings path, not in this export."
+          "description": "Canonical debt-class ontology shared with model-case-v2. unclassified is a review state and blocks production; other_explicit requires affirmative source wording. Legacy class names are accepted only by the explicit adapter before this contract."
         },
         "currency": {
           "type": "string",

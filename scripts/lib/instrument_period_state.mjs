@@ -1,14 +1,20 @@
+import { assertCanonicalDebtClass } from "./debt_class.mjs";
+
 const DAY_MS = 86_400_000;
 const EPSILON = 1e-9;
 
 const FAMILY_BY_CLASS = Object.freeze({
-  fixed_bond: "bond",
-  floating_loan: "term_loan",
+  bond_fixed: "bond",
+  bond_floating: "bond",
+  term_loan_fixed: "term_loan",
+  term_loan_floating: "term_loan",
   commercial_paper: "commercial_paper",
   securitisation: "securitisation",
   rcf: "revolving_credit_facility",
-  other_debt: "other_debt",
   lease_liability: "lease",
+  overdraft: "overdraft",
+  other_explicit: "other_debt",
+  unclassified: "unclassified_review",
 });
 
 const DEFINITION_NODE_TEMPLATES = Object.freeze([
@@ -391,8 +397,12 @@ export function maturityApplies({
 }
 
 function instrumentStates(modelCase, instrument, forecastPeriods) {
-  if (!FAMILY_BY_CLASS[instrument.class] || instrument.class === "lease_liability") {
-    throw new Error(`Unsupported debt class ${instrument.class} for ${instrument.instrument_id}.`);
+  const debtClass = assertCanonicalDebtClass(instrument.class);
+  if (
+    !FAMILY_BY_CLASS[debtClass] ||
+    ["lease_liability", "unclassified"].includes(debtClass)
+  ) {
+    throw new Error(`Unsupported debt class ${debtClass} for ${instrument.instrument_id}.`);
   }
   const balanceBasis = instrument.balance_basis ?? "native_principal";
   if (!["native_principal", "reporting_currency_carrying_value"].includes(balanceBasis)) {
@@ -464,8 +474,8 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       instrument_id: instrument.instrument_id,
       period_id: forecastPeriods[index].date,
       period_index: index,
-      class: instrument.class,
-      family: FAMILY_BY_CLASS[instrument.class],
+      class: debtClass,
+      family: FAMILY_BY_CLASS[debtClass],
       currency: instrument.currency,
       balance_basis: balanceBasis,
       opening: amount(opening, translation.opening_rate),

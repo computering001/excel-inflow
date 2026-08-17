@@ -402,12 +402,17 @@
         "name": { "type": "string", "minLength": 1 },
         "class": {
           "enum": [
-            "fixed_bond",
-            "floating_loan",
+            "bond_fixed",
+            "bond_floating",
+            "term_loan_fixed",
+            "term_loan_floating",
             "commercial_paper",
             "securitisation",
             "rcf",
-            "other_debt"
+            "lease_liability",
+            "overdraft",
+            "other_explicit",
+            "unclassified"
           ]
         },
         "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },

@@ -52,6 +52,7 @@ import {
   ebitdaBasis,
   selectedEbitdaRow,
 } from "./semantic_roles.mjs";
+import { migrateLegacyDebtClasses } from "./debt_class.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CASE_SOURCE_SCHEMA = JSON.parse(
@@ -3259,6 +3260,18 @@ export function compileCase(caseSource, evidence = {}) {
   };
   for (const lane of PASSTHROUGH_LANES) {
     if (lanes[lane] !== undefined) modelCase[lane] = clone(lanes[lane]);
+  }
+  const debtClassMigrations = migrateLegacyDebtClasses(modelCase);
+  for (const migration of debtClassMigrations) {
+    report.add(
+      "instruments.debt_class_migrated",
+      migration.mapping === "legacy_alias" ? "WARN" : "BLOCK",
+      `${migration.instrument_id}: debt class ${JSON.stringify(migration.source_class)} mapped to ${migration.canonical_class}.`,
+      migration.mapping === "legacy_alias"
+        ? "Re-extract the DCS lane under debt-class-ontology/1.0 to remove the compatibility migration."
+        : "Classify the instrument from affirmative type and pricing evidence before compilation.",
+      migration,
+    );
   }
   modelCase.provenance = compileFilingProvenance({
     existing: modelCase.provenance,

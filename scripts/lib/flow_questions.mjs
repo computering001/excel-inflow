@@ -130,11 +130,12 @@ function applyFacilityCommitment(modelCase, row, committed) {
 }
 
 function applyCommercialPaperBackstop(modelCase, backstopped) {
-  if (backstopped) return modelCase;
-  for (const instrument of modelCase.instruments ?? []) {
-    if (instrument.class === "commercial_paper") {
-      instrument.class = "other_debt";
-    }
+  // Backstop eligibility changes liquidity, never the instrument's economic
+  // class. Commercial paper remains commercial paper in either answer.
+  if (!backstopped && modelCase.rcf_policy) {
+    modelCase.rcf_policy.commercial_paper_backstopped = false;
+  } else if (backstopped && modelCase.rcf_policy) {
+    modelCase.rcf_policy.commercial_paper_backstopped = true;
   }
   return modelCase;
 }
@@ -758,12 +759,17 @@ function describeRow(row) {
   // Keyed on the export's `instrument_type`, whose enum is deliberately
   // identical to model-case-v2's instrument.class.
   const byType = {
-    fixed_bond: "notes",
-    floating_loan: "term loan",
+    bond_fixed: "fixed-rate notes",
+    bond_floating: "floating-rate notes",
+    term_loan_fixed: "fixed-rate term loan",
+    term_loan_floating: "floating-rate term loan",
     commercial_paper: "commercial paper",
     securitisation: "securitisation",
     rcf: "facility",
-    other_debt: "borrowings",
+    lease_liability: "lease liability",
+    overdraft: "overdraft",
+    other_explicit: "other borrowings",
+    unclassified: "unclassified borrowing",
   };
   return byType[row.instrument_type] ?? "borrowings";
 }

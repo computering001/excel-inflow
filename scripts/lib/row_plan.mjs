@@ -27,6 +27,10 @@ import {
 } from "./forecast_authority.mjs";
 import { verifyForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import {
+  debtClassGroup,
+  debtClassGroupLabel,
+} from "./debt_class.mjs";
+import {
   assertStatementTopology,
   deriveStatementIndentMap,
   materializeStatementPresentationTree,
@@ -3519,44 +3523,22 @@ function semanticSlug(value) {
     .replaceAll(/^_+|_+$/g, "");
 }
 
-// CRH groups the debt register by INSTRUMENT KIND, never by currency:
-// Bonds -> Bank Debt -> Other Debt, each closed by a "Total ..." subtotal.
-// `display_group` in the case files splits USD/EUR notes apart, so it is
-// deliberately ignored here; an explicit `debt_group` override still wins.
-const CRH_DEBT_GROUPS = [
+// The product groups every issuer's debt register by the canonical instrument
+// class, never by currency or company name. Unclassified rows retain their own
+// visible review group and can never disappear into Other Debt.
+export const DEBT_PRESENTATION_GROUPS = Object.freeze([
   { key: "bonds", label: "Bonds" },
   { key: "bank_debt", label: "Bank Debt" },
   { key: "other_debt", label: "Other Debt" },
-];
+  { key: "unclassified_review", label: "Unclassified — review required" },
+]);
 
-export function crhDebtGroupKey(instrument) {
-  const explicit = String(instrument?.debt_group ?? "").trim().toLowerCase();
-  const token = explicit || String(instrument?.class ?? "").toLowerCase();
-  if (!token) return "other_debt";
-  if (
-    token.includes("bond") ||
-    token.includes("note") ||
-    token.includes("debenture")
-  ) {
-    return "bonds";
-  }
-  if (
-    token.includes("loan") ||
-    token.includes("bank") ||
-    token.includes("term") ||
-    token.includes("overdraft") ||
-    token.includes("securiti")
-  ) {
-    return "bank_debt";
-  }
-  return "other_debt";
+export function debtPresentationGroupKey(instrument) {
+  return debtClassGroup(instrument?.class);
 }
 
-export function crhDebtGroupLabel(instrument) {
-  const key = crhDebtGroupKey(instrument);
-  return (
-    CRH_DEBT_GROUPS.find((group) => group.key === key)?.label ?? "Other Debt"
-  );
+export function debtPresentationGroupLabel(instrument) {
+  return debtClassGroupLabel(instrument?.class);
 }
 
 /**
@@ -3924,9 +3906,9 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
   const debtGroups = [];
   const groupByLabel = new Map();
   if (groupedDebtPresentation) {
-    for (const definition of CRH_DEBT_GROUPS) {
+    for (const definition of DEBT_PRESENTATION_GROUPS) {
       const instrumentIds = sorted
-        .filter((instrument) => crhDebtGroupKey(instrument) === definition.key)
+        .filter((instrument) => debtPresentationGroupKey(instrument) === definition.key)
         .map((instrument) => instrument.instrument_id);
       if (instrumentIds.length === 0) continue;
       const group = {
@@ -3954,7 +3936,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     : sorted;
   for (const instrument of orderedInstruments) {
     const displayGroup = groupedDebtPresentation
-      ? crhDebtGroupLabel(instrument)
+      ? debtPresentationGroupLabel(instrument)
       : null;
     const group = displayGroup ? groupByLabel.get(displayGroup) : null;
     if (group && group.header_row === null) {

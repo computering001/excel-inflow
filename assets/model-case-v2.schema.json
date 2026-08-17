@@ -97,6 +97,26 @@
       "$ref": "#/$defs/ebitdaBasis",
       "description": "The exact reported or company-adjusted EBITDA definition consumed by leverage, coverage, acquisition and FCF conversion. Legacy schedule IDs do not override this semantic authority."
     },
+    "debt_class_contract_version": {
+      "const": "debt-class-ontology/1.0"
+    },
+    "debt_class_migrations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instrument_id", "source_class", "canonical_class", "mapping"],
+        "properties": {
+          "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+          "source_class": { "type": ["string", "null"] },
+          "canonical_class": {
+            "enum": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "rcf", "commercial_paper", "securitisation", "lease_liability", "overdraft", "other_explicit", "unclassified"]
+          },
+          "mapping": { "enum": ["legacy_alias", "unrecognised_to_review"] }
+        }
+      }
+    },
     "stage_three_answers": {
       "type": "object",
       "description": "Canonical settled stage-3 decisions carried by the case across chats and rebuilds. Keys are stable question IDs and values are stable option IDs.",
@@ -1170,6 +1190,11 @@
           "type": "number",
           "minimum": 0,
           "description": "Opening drawn balance in the matched RCF instrument's native currency. It must equal that instrument's opening_balance before any FX translation."
+        },
+        "commercial_paper_backstopped": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether outstanding commercial paper consumes the named RCF's liquidity headroom. This changes liquidity only; it never reclassifies commercial paper as another debt class."
         },
         "commitment_fee_convention": {
           "enum": [
@@ -2966,12 +2991,17 @@
         },
         "class": {
           "enum": [
-            "fixed_bond",
-            "floating_loan",
+            "bond_fixed",
+            "bond_floating",
+            "term_loan_fixed",
+            "term_loan_floating",
             "commercial_paper",
             "securitisation",
             "rcf",
-            "other_debt"
+            "lease_liability",
+            "overdraft",
+            "other_explicit",
+            "unclassified"
           ]
         },
         "currency": {

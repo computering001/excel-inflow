@@ -8,6 +8,10 @@ import { coreConsumptionIds } from "./broker_metric_dictionary.mjs";
 import { resolveHistoricalInterestAuthority } from "./historical_interest_authority.mjs";
 import { compileOpeningInstrumentState } from "./instrument_period_state.mjs";
 import { isBalancingRcf } from "./rcf_policy.mjs";
+import {
+  CANONICAL_DEBT_CLASS_SET,
+  isLegacyDebtClass,
+} from "./debt_class.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -1185,6 +1189,23 @@ function instrumentChecks(modelCase) {
       );
     }
     ids.add(id);
+    if (!CANONICAL_DEBT_CLASS_SET.has(instrument.class)) {
+      checks.push(
+        result(
+          `instrument.${id}.class_vocabulary`,
+          "BLOCK",
+          `${id} uses ${JSON.stringify(instrument.class)}; debt classes must be canonical before model compilation${isLegacyDebtClass(instrument.class) ? " (legacy alias detected)" : ""}.`,
+        ),
+      );
+    } else if (instrument.class === "unclassified") {
+      checks.push(
+        result(
+          `instrument.${id}.class_review`,
+          "BLOCK",
+          `${id} is unclassified and requires an explicit reviewed debt class before production.`,
+        ),
+      );
+    }
     if (!instrument.name) {
       checks.push(
         result(`instrument.${id}.name`, "BLOCK", `${id} has no name.`),

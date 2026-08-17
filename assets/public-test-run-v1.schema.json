@@ -245,7 +245,7 @@
       "properties": {
         "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
         "description": { "type": "string", "minLength": 1 },
-        "instrument_type": { "enum": ["fixed_bond", "floating_loan", "rcf", "commercial_paper", "securitisation", "other_debt"] },
+        "instrument_type": { "enum": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "rcf", "commercial_paper", "securitisation", "lease_liability", "overdraft", "other_explicit", "unclassified"] },
         "outstanding_amount": { "type": "number", "minimum": 0 },
         "reporting_currency_carrying_amount": { "type": "number", "minimum": 0 },
         "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },

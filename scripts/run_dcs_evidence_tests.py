@@ -52,7 +52,7 @@ def build_csv(path: Path) -> None:
         ["Instrument", "Type", "Currency", "Outstanding", "Maturity", "Rate Type", "Coupon", "Reference Rate", "Margin Bps", "All In Rate", "Facility Limit", "Drawn", "Committed", "Native Principal", "FX Rate", "Balance Basis", "Fee Convention", "Fee Value", "Interest Settlement", "Debt Classification", "Amortisation Schedule", "Refinancing Intent", "Next Call Date", "Backstop For Paper", "Issue Date", "Price", "YTW", "OAS"],
         ["Commercial Paper", "commercial_paper", "USD", 0, "2027-06-30", "", "", "", "", "", "", "", "", "", "", "reporting_currency_carrying_value", "", "", "cash", json.dumps({"include_in_gross_debt": True, "include_in_net_debt": True}), "[]", "repaid", "", "", "2026-01-02", 100, 0.04, 55],
         ["Committed RCF", "rcf", "USD", 0, "2029-12-31", "floating", "", "SOFR 3M", 100, "", 1000, 0, "true", "", "", "reporting_currency_carrying_value", "bps_on_undrawn", 25, "cash", json.dumps({"include_in_gross_debt": True, "include_in_net_debt": True}), "[]", "refinanced", "", "true", "2024-05-01", 100, 0.03, 75],
-        ["EUR Senior Notes", "fixed_bond", "EUR", "", "2030-09", "fixed", 0.05, "", "", "", "", "", "", 400, 1.25, "native_principal", "", "", "cash", json.dumps({"include_in_gross_debt": True, "include_in_net_debt": True}), json.dumps([{"date": "2028-12-31", "amount": 50}]), "repaid", "2029-09-15", "", "2025-09-15", 98.5, 0.052, 120],
+        ["EUR Senior Notes", "bond_fixed", "EUR", "", "2030-09", "fixed", 0.05, "", "", "", "", "", "", 400, 1.25, "native_principal", "", "", "cash", json.dumps({"include_in_gross_debt": True, "include_in_net_debt": True}), json.dumps([{"date": "2028-12-31", "amount": 50}]), "repaid", "2029-09-15", "", "2025-09-15", 98.5, 0.052, 120],
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
         csv.writer(handle).writerows(rows)
@@ -104,7 +104,7 @@ def build_crosswalk(source: dict[str, Any], manifest: dict[str, Any]) -> dict[st
     def common(row: int) -> list[dict[str, Any]]:
         return [
             authority("description", f"s001!A{row}", {2: "Commercial Paper", 3: "Committed RCF", 4: "EUR Senior Notes"}[row]),
-            authority("instrument_type", f"s001!B{row}", {2: "commercial_paper", 3: "rcf", 4: "fixed_bond"}[row]),
+            authority("instrument_type", f"s001!B{row}", {2: "commercial_paper", 3: "rcf", 4: "bond_fixed"}[row]),
             authority("currency", f"s001!C{row}", {2: "USD", 3: "USD", 4: "EUR"}[row]),
             authority("maturity", f"s001!E{row}", {2: "2027-06-30", 3: "2029-12-31", 4: "2030-09"}[row], precision="month" if row == 4 else "exact"),
             authority("rate_type", f"s001!F{row}", {2: "manual_all_in", 3: "floating", 4: "fixed"}[row]),

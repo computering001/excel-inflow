@@ -2400,7 +2400,7 @@
       "instrument_id": "sncc_bond_2033",
       "display_order": 1,
       "name": "$80m 5.000% senior notes due Jun-2033",
-      "class": "fixed_bond",
+      "class": "bond_fixed",
       "currency": "USD",
       "opening_balance": 80,
       "maturity_date": "2033-06-30",
