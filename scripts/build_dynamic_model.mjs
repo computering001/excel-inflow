@@ -3917,7 +3917,21 @@ function configureOperatingModel(
 
   for (const definition of allStatementRows) {
     if (definition.row_type === "header") continue;
-    const values = rowValues(modelCase, definition);
+    const ordinaryValues = rowValues(modelCase, definition);
+    // A compiled authority case keeps a filed subtotal separately from the
+    // row's calculation inputs. Historical ending cash is the one legacy
+    // balance whose filed observation owns the visible historical cell; the
+    // cash-flow identity takes over only in forecast periods. Mirror the direct
+    // legacy `values` path so FY1 opening cash and interest consume one source.
+    const values =
+      !explicitCashBuckets &&
+      definition.semantic_role === "ending_cash" &&
+      Array.isArray(definition.reported_historical_values)
+        ? [
+            ...definition.reported_historical_values,
+            ...ordinaryValues.slice(3),
+          ]
+        : ordinaryValues;
     // The revolver legs exist only where the forecast waterfall exists. A
     // history with no sourced draw or repayment has nothing to calculate —
     // the cells are structurally empty and render grey-blank, never as

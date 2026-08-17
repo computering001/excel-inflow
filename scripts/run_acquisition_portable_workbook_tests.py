@@ -35,6 +35,21 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
         )
 
 
+def run_expect_failure(command: list[str]) -> str:
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=600,
+        check=False,
+    )
+    assert completed.returncode != 0, (
+        f"Mutation unexpectedly passed: {' '.join(command)}"
+    )
+    return f"{completed.stdout}\n{completed.stderr}"
+
+
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -139,6 +154,8 @@ def main() -> int:
     controls = row_map["controls"]
     consideration_row = statement_row(row_map, "acquisitions_net_of_cash")
     change_in_debt_row = statement_row(row_map, "change_in_debt")
+    opening_cash_row = statement_row(row_map, "opening_cash")
+    ending_cash_row = statement_row(row_map, "ending_cash")
     pre_tax_income_row = statement_row(row_map, "pre_tax_income")
     tax_expense_row = statement_row(row_map, "tax_expense")
     debt_total_row = int(row_map["debt_summary_rows"]["total_change_in_debt"])
@@ -174,6 +191,50 @@ def main() -> int:
     ].get("f", "")
     assert on_cells[f"{pro_forma_column}{change_in_debt_row}"].get("v") == float(
         source["acquisition"]["acquisition_debt_amount"]
+    )
+
+    ending_cash_definition = next(
+        definition
+        for definition in source["statement_structure"]["cash_flow"]
+        if definition.get("semantic_role") == "ending_cash"
+    )
+    filed_ending_cash = float(ending_cash_definition["reported_historical_values"][2])
+    assert on_cells[f"I{ending_cash_row}"].get("v") == filed_ending_cash
+    for column, prior_column in (("J", "I"), ("S", "R")):
+        address = f"{column}{opening_cash_row}"
+        assert on_cells[address].get("f") == f"{prior_column}{ending_cash_row}"
+        assert on_cells[address].get("v") == filed_ending_cash
+
+    mutated_plan = json.loads(json.dumps(states[1][3]))
+    mutated_cells = operating_cells(mutated_plan)
+    mutated_address = f"J{opening_cash_row}"
+    mutated_cells[mutated_address]["v"] = filed_ending_cash + 1
+    mutation_plan_path = output / "opening-cash-cache-mutation.plan.json"
+    mutation_workbook_path = output / "opening-cash-cache-mutation.xlsx"
+    mutation_plan_path.write_text(
+        json.dumps(mutated_plan, indent=2) + "\n", encoding="utf-8"
+    )
+    run(
+        [
+            sys.executable,
+            "-m",
+            "emit",
+            "build",
+            str(mutation_plan_path),
+            "--out",
+            str(mutation_workbook_path),
+        ],
+        env={**os.environ, "PYTHONPATH": str(HERE)},
+    )
+    mutation_output = run_expect_failure(
+        [
+            "node",
+            str(HERE / "validate_cache_parity.mjs"),
+            str(mutation_workbook_path),
+        ]
+    )
+    assert mutated_address in mutation_output, (
+        "Opening-cash cache mutation did not surface at its changed formula cell"
     )
 
     amount_basis = (
@@ -234,10 +295,11 @@ def main() -> int:
         "schema_version": "acquisition-portable-workbook-test/1.0",
         "status": "PASS",
         "states": [state[0] for state in states],
-        "checks": 36,
+        "checks": 43,
         "close_year": close_year,
         "change_in_debt_row_id": "change_in_debt",
         "portable_formula_cache_parity": "PASS",
+        "opening_cash_cache_mutation": "BLOCKED",
         "semantic_oracle": "PASS",
         "native_excel": "NOT_AVAILABLE_IN_PORTABLE_TEST",
     }

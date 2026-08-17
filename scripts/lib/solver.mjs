@@ -863,12 +863,19 @@ export function normalisedCashBuckets(modelCase) {
     }));
   }
   const cash = modelCase.cash_policy ?? {};
-  const filedEndingCash = (
+  const filedEndingCashRow = (
     modelCase.statement_structure?.cash_flow ?? []
   ).find(
     (row) =>
       row.semantic_role === "ending_cash" || row.row_id === "ending_cash",
-  )?.values;
+  );
+  // Direct legacy cases keep the filed closing balance in `values`; compiled
+  // authority cases retain it separately because the visible row also owns a
+  // forecast identity.  They are the same historical source fact and must feed
+  // the same FY1 cash opening.
+  const filedEndingCash = Array.isArray(filedEndingCashRow?.values)
+    ? filedEndingCashRow.values
+    : filedEndingCashRow?.reported_historical_values;
   const filedHistoricalCash = [0, 1, 2].map((index) => {
     const value = filedEndingCash?.[index];
     return value !== null && value !== undefined && Number.isFinite(Number(value))
