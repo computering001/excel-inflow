@@ -371,6 +371,24 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
                 candidate = rows[cursor]
                 level = int(candidate.get("hierarchy_level") or 0)
                 if level <= parent_level:
+                    # A same-level, non-subtotal line that is numerically zero
+                    # in every reported period is an arithmetically neutral
+                    # separator, not proof that a visible subtotal family ended.
+                    # Skip it only inside the three-period arithmetic search; it
+                    # is never promoted to a child and caption fallback remains
+                    # conservative. This covers filing surfaces that print a
+                    # zero net-finance/result line between operating cash-flow
+                    # components while preserving the issuer's proved subtotal.
+                    series = _finite_series(candidate)
+                    neutral_separator = (
+                        level == parent_level
+                        and not candidate.get("is_subtotal")
+                        and series is not None
+                        and all(abs(value) <= 0.5000001 for value in series)
+                    )
+                    if neutral_separator:
+                        cursor += direction
+                        continue
                     break
                 if level == parent_level + 1 and _finite_series(candidate) is not None:
                     indexes.append(cursor)
