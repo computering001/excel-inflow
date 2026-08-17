@@ -349,16 +349,16 @@
       "earliest_responsible_layer": "Row typing / source value states.",
       "candidate_files": "scripts/lib/case_source_proposer.mjs; scripts/extract_filing_statements.py",
       "acceptance_criterion": "Header status requires positive structural evidence; unresolved body rows remain body rows with unresolved values.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Header status requires positive structural evidence; unresolved body rows remain body rows with unresolved values.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in run_case_source_proposer_tests.mjs: unresolved body row was emitted with header=true.",
+        "focused_test": "PASS: run_case_source_proposer_tests.mjs 40/40; run_typed_filing_value_tests.py 13/13.",
+        "source_fix": "Extractor now seals structural_role from positive hierarchy evidence; proposer consumes only explicit header evidence.",
+        "integration_evidence": "PASS: filings pipeline 41 checks; evidence-run compiler; case authorship boundary; two-case compiler equivalence with zero economic/plan diffs.",
+        "semantic_oracle_evidence": "NOT_APPLICABLE_SOURCE_ROW_IDENTITY",
+        "native_excel_evidence": "NOT_APPLICABLE_NO_FORMULA_EVALUATION",
+        "commit": "e8bc4b9"
       }
     },
     {
@@ -373,13 +373,13 @@
       "status": "OPEN",
       "implementation": {
         "invariant": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
+        "baseline_reproduction": "FAIL reproduced: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
+        "focused_test": "PASS guardrail: protected-identity unit checks 4/4 and real-workbook adversarial mutations 8/8.",
         "source_fix": "PENDING",
         "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
+        "semantic_oracle_evidence": "PASS: 9d24f24 requires formula ownership, same-period members and no protected prior-period dependency.",
         "native_excel_evidence": "PENDING",
-        "commit": null
+        "commit": "9d24f24 (guardrail only; economic source repair remains open)"
       }
     },
     {
@@ -394,13 +394,13 @@
       "status": "OPEN",
       "implementation": {
         "invariant": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
+        "baseline_reproduction": "FAIL reproduced generically: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
+        "focused_test": "PASS guardrail: protected-identity unit checks 4/4 and real-workbook adversarial mutations 8/8.",
         "source_fix": "PENDING",
         "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
+        "semantic_oracle_evidence": "PASS: 9d24f24 rejects prior-period and missing-member protected identities.",
         "native_excel_evidence": "PENDING",
-        "commit": null
+        "commit": "9d24f24 (guardrail only; economic source repair remains open)"
       }
     },
     {
@@ -916,16 +916,16 @@
       "earliest_responsible_layer": "Typed value semantics.",
       "candidate_files": "scripts/lib/excel_value_semantics.mjs; scripts/extract_filing_statements.py; scripts/lib/case_compiler.mjs",
       "acceptance_criterion": "Reported zero, dash, blank, N/A and unresolved are distinct; only explicit zero becomes zero.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Reported zero, dash, blank, N/A and unresolved are distinct; only explicit zero becomes zero.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in typed proposer fixture: absent/null states collapsed into the valueless-header path.",
+        "focused_test": "PASS: zero, dash, N/A, partial blank, unresolved body and structural heading mutations all preserve distinct states.",
+        "source_fix": "Typed value_states are sealed by the manifest digest and carried into model-case historical source-state custody; only reported_zero carries numeric zero.",
+        "integration_evidence": "PASS: filings pipeline 41 checks; evidence-run compiler; two-case compiler equivalence and plan equality.",
+        "semantic_oracle_evidence": "NOT_APPLICABLE_SOURCE_VALUE_CUSTODY",
+        "native_excel_evidence": "NOT_APPLICABLE_NO_FORMULA_EVALUATION",
+        "commit": "e8bc4b9"
       }
     },
     {
