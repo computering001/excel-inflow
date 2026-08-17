@@ -2636,6 +2636,16 @@ function rateFormula(
     const row = curveRows.manualRates?.[instrument.instrument_id];
     if (row) {
       const column = ["F", "G", "H"][forecastIndex];
+      if (visibleRateCell) {
+        // Column D is the instrument's visible, source-owned all-in rate.  The
+        // Forward Curves row carries only the period-to-period movement from
+        // that anchor.  Referencing both preserves a varying manual rate series
+        // without letting an identically valued support-sheet cell impersonate
+        // the instrument's own pricing term.
+        return forecastIndex === 0
+          ? visibleRateCell
+          : `(${visibleRateCell}+'Forward Curves'!${column}${row}-'Forward Curves'!F${row})`;
+      }
       return `'Forward Curves'!${column}${row}`;
     }
   }
@@ -4395,6 +4405,16 @@ function configureOperatingModel(
           `${proFormaColumn}${definition.row}`,
           nonBalancingBucketMovementFormula(proFormaColumn, prior),
         );
+      } else if (definition.semantic_role === "change_in_debt") {
+        // The pro-forma cash-flow statement consumes the pro-forma debt
+        // schedule's cash-movement answer directly.  Reconstructing it as
+        // standalone plus adjustment leaves the right cache but loses the
+        // schedule-owned lineage asserted everywhere else in the workbook.
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${proFormaColumn}${debtRows.total_change_in_debt}`,
+        );
       } else if (
         definition.forecast_treatment === "broker" &&
         definition.broker_metric_id
@@ -4448,12 +4468,6 @@ function configureOperatingModel(
           sheet,
           `${proFormaColumn}${definition.row}`,
           `=-${proFormaColumn}${waterfallRows.rcf_repayment_waterfall}`,
-        );
-      } else if (definition.semantic_role === "change_in_debt") {
-        applyFormula(
-          sheet,
-          `${proFormaColumn}${definition.row}`,
-          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
         );
       } else if (
         [

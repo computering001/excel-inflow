@@ -98,6 +98,7 @@ execFileSync("node", ["scripts/build_dynamic_model.mjs", caseOut, "--out", planW
 });
 const planPath = `${planWorkbook}.plan.json`;
 const plan = JSON.parse(await fs.readFile(planPath, "utf8"));
+const rowMap = JSON.parse(await fs.readFile(`${planWorkbook}.row-map.json`, "utf8"));
 const namesInPlan = plan.workbook.sheets.map((sheet) => sheet.name);
 check(!namesInPlan.includes("> Brokers"), "page-image mode must not emit the obsolete broker divider");
 const brokerSheets = plan.workbook.sheets.filter((sheet) => /^B\d{2} /.test(sheet.name));
@@ -118,6 +119,46 @@ check(
   brokerSheets[0].images[0].anchor === "B4" && brokerSheets[0].images[1].anchor === "V4",
   "broker pages must run horizontally from left to right",
 );
+const operatingSheet = plan.workbook.sheets.find((sheet) => sheet.name === "Operating Model");
+const changeInDebt = rowMap.statement_rows.cash_flow.find(
+  (row) => row.semantic_role === "change_in_debt",
+);
+const totalChangeInDebtRow = rowMap.debt_summary_rows.total_change_in_debt;
+const isOwnedScheduleLink = (formula, column) =>
+  String(formula ?? "").replaceAll("$", "") === `${column}${totalChangeInDebtRow}`;
+for (const column of ["S", "T", "U"]) {
+  check(
+    isOwnedScheduleLink(operatingSheet.cells[`${column}${changeInDebt.row}`]?.f, column),
+    `${column}${changeInDebt.row} must consume the pro-forma debt schedule's own cash-movement answer`,
+  );
+}
+check(
+  !isOwnedScheduleLink(`J${changeInDebt.row}+N${changeInDebt.row}`, "S"),
+  "standalone-plus-adjustment mutation escaped change-in-debt lineage",
+);
+const manualAllInPlans = rowMap.instruments.filter((instrumentPlan) =>
+  modelCase.instruments.some(
+    (instrument) =>
+      instrument.instrument_id === instrumentPlan.instrument_id &&
+      instrument.rate_type === "manual_all_in",
+  ),
+);
+check(manualAllInPlans.length > 0, "fixture must exercise a manual all-in instrument");
+for (const instrumentPlan of manualAllInPlans) {
+  const ownRate = `D${instrumentPlan.interest_row}`;
+  const hasOwnRate = (formula) => String(formula ?? "").replaceAll("$", "").includes(ownRate);
+  for (const column of ["J", "K", "L", "S", "T", "U"]) {
+    const formula = operatingSheet.cells[`${column}${instrumentPlan.interest_row}`]?.f;
+    check(
+      hasOwnRate(formula),
+      `${column}${instrumentPlan.interest_row} must price from its own visible all-in rate`,
+    );
+  }
+  check(
+    !hasOwnRate("'Forward Curves'!F9"),
+    "support-sheet-only rate mutation escaped manual all-in lineage",
+  );
+}
 execFileSync("python3", ["-m", "emit", "build", planPath, "--out", workbook], {
   cwd: path.join(path.resolve("."), "scripts"), stdio: "pipe",
   env: { ...process.env, PYTHONPATH: path.join(path.resolve("."), "scripts") },
@@ -174,4 +215,4 @@ try {
   tamperBlocked = true;
 }
 check(tamperBlocked, "a stale broker page-image hash must block rendering");
-console.log(JSON.stringify({ status: "PASS", houses: names.length, pages: media.length, horizontal_pages: 2, screenshot_only_tabs: brokerSheets.length, calculation_dependencies: 0, oracle: "PASS", validator_violations: 0, tamper_blocked: true, root }));
+console.log(JSON.stringify({ status: "PASS", houses: names.length, pages: media.length, horizontal_pages: 2, screenshot_only_tabs: brokerSheets.length, calculation_dependencies: 0, formula_lineage_checks: 10, formula_lineage_mutations_caught: 2, oracle: "PASS", validator_violations: 0, tamper_blocked: true, root }));

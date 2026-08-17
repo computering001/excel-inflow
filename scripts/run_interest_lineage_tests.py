@@ -65,6 +65,9 @@ fixed = (
 )
 assert findings(fixed) == []
 
+manual_all_in = fixed
+assert findings(manual_all_in, rate_type="ALL-IN") == []
+
 floating_foreign = (
     "=IF($C$5=0,0,-MAX(0,$D81+$J82+$J84+$J85-MIN(MAX(0,$D81+$J82+$J84+$J85),$J83)+$J86/2)"
     "*(MAX($J$120,$J$121)+$D$133)*'Forward Curves'!F7*"
@@ -91,6 +94,15 @@ for mutation_id, formula in mutations.items():
     observed = findings(formula)
     assert observed, "%s escaped the interest-lineage oracle" % mutation_id
     results[mutation_id] = sorted({item["issue"] for item in observed})
+
+manual_all_in_without_own_rate = manual_all_in.replace(
+    "$D$123", "'Forward Curves'!F9"
+)
+observed = findings(manual_all_in_without_own_rate, rate_type="ALL-IN")
+assert observed, "support-sheet-only all-in rate escaped the interest-lineage oracle"
+results["manual-all-in-own-rate-missing"] = sorted(
+    {item["issue"] for item in observed}
+)
 
 floating_mutations = {
     "missing-issuance": floating_foreign.replace("+$J82", ""),
@@ -125,7 +137,7 @@ results["reporting-carrying-double-fx"] = sorted(
 
 summary = {
     "status": "PASS",
-    "positive_checks": 2,
+    "positive_checks": 3,
     "mutations_caught": len(results),
     "mutations": results,
 }
