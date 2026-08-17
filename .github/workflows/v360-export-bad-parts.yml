@@ -1,0 +1,29 @@
+name: v360 export bad parts
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - .github/workflows/v360-export-bad-parts.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record identities
+        run: |
+          wc -c publish/v360-recovery-complete/part00.b64 publish/v360-recovery-complete/part06.b64
+          sha256sum publish/v360-recovery-complete/part00.b64 publish/v360-recovery-complete/part06.b64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v360-bad-parts-current
+          path: |
+            publish/v360-recovery-complete/part00.b64
+            publish/v360-recovery-complete/part06.b64
+          retention-days: 1
