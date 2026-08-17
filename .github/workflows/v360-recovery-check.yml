@@ -1,0 +1,42 @@
+name: v360 recovery check
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reconstruct staged v3.6 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          find publish/v360 -type f -name 'patch.part*.b64' -print | sort -V > /tmp/parts.txt
+          cat $(cat /tmp/parts.txt) | tr -d '\n\r' > /tmp/v360.patch.b64
+          base64 -d /tmp/v360.patch.b64 > /tmp/v360.patch.gz
+          gzip -t /tmp/v360.patch.gz
+          gzip -dc /tmp/v360.patch.gz > /tmp/v360.patch
+          printf 'parts='; wc -l < /tmp/parts.txt
+          printf 'b64_bytes='; wc -c < /tmp/v360.patch.b64
+          printf 'gzip_bytes='; wc -c < /tmp/v360.patch.gz
+          printf 'patch_bytes='; wc -c < /tmp/v360.patch
+          sha256sum /tmp/v360.patch.b64 /tmp/v360.patch.gz /tmp/v360.patch
+      - name: Verify patch applies to exact v3.5 base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach /tmp/v360-source ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd
+          git -C /tmp/v360-source apply --check /tmp/v360.patch
+          git -C /tmp/v360-source apply /tmp/v360.patch
+          echo "tree=$(git -C /tmp/v360-source write-tree)"
+          git -C /tmp/v360-source status --short
