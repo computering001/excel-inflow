@@ -1,4 +1,4 @@
-# finish explicit filing source-mode compatibility on the recovered v3.6 target
+# focused regression proof of the completed recovered v3.6 filing/source-mode repairs
 name: v360 verify recovered development gate
 
 on:
@@ -9,65 +9,35 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/excel-inflow-v360-rebuild
+          ref: fdfdea50dce4b228e35e5263ece366e60203a8cc
           fetch-depth: 0
-      - name: Require audited starting point
+      - name: Install validation dependencies
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = '364b486dcb9afac587821abf032efb36cce21e53'
-      - name: Repair v1 compatibility and v2 registry routing
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+      - name: Run focused regression seams
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          p=Path('scripts/lib/filings_acquisition.mjs')
-          s=p.read_text()
-          old='''  const sourceMode = request.schema_version === "filings-acquisition-request/2.0" ? request.source_mode : "user_supplied";\n  const eligibleOrigins = sourceMode === "user_supplied" ? new Set(["user_supplied"]) : sourceMode === "internal" ? new Set(["official_declarative_url", "runtime_library"]) : new Set(["user_supplied"]);\n  if (sourceMode === "internal_fallback" && !request.fallback_reason) throw new Error("internal_fallback requires fallback_reason");\n  const selectedSources = request.sources.filter((source) => eligibleOrigins.has(source.origin));\n  const selectedOrigins = new Set(selectedSources.map((source) => source.origin));\n  if (selectedSources.length === 0) throw new Error(`No filing sources are eligible under source_mode=${sourceMode}`);\n  const excludedDocumentIds = request.sources.filter((source) => !eligibleOrigins.has(source.origin)).map((source) => source.document_id).sort();\n'''
-          new='''  const explicitSourceMode = request.schema_version === "filings-acquisition-request/2.0";\n  const sourceMode = explicitSourceMode ? request.source_mode : null;\n  const eligibleOrigins = !explicitSourceMode\n    ? null\n    : sourceMode === "user_supplied"\n      ? new Set(["user_supplied"])\n      : sourceMode === "internal"\n        ? new Set(["official_declarative_url", "runtime_library"])\n        : new Set(["user_supplied"]);\n  if (sourceMode === "internal_fallback" && !request.fallback_reason) throw new Error("internal_fallback requires fallback_reason");\n  // v1 is a compatibility contract: preserve its historical precedence model\n  // and materialise every declared source. v2 is the explicit source-mode\n  // constitution and never silently merges internal and user-supplied sets.\n  const selectedSources = explicitSourceMode\n    ? request.sources.filter((source) => eligibleOrigins.has(source.origin))\n    : [...request.sources];\n  const selectedOrigins = new Set(selectedSources.map((source) => source.origin));\n  if (selectedSources.length === 0) throw new Error(`No filing sources are eligible under source_mode=${sourceMode}`);\n  const excludedDocumentIds = explicitSourceMode\n    ? request.sources.filter((source) => !eligibleOrigins.has(source.origin)).map((source) => source.document_id).sort()\n    : [];\n'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-
-          p=Path('scripts/run_filings_pipeline.mjs')
-          s=p.read_text()
-          old='''const SOURCE_REGISTRY_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v1.schema.json"), "utf8"));\n'''
-          new='''const SOURCE_REGISTRY_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v1.schema.json"), "utf8"));\nconst SOURCE_REGISTRY_SCHEMA_V2 = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v2.schema.json"), "utf8"));\n'''
-          assert s.count(old)==1, s.count(old)
-          s=s.replace(old,new,1)
-          old='''        extractionRequestSchema: REQUEST_SCHEMA,\n        sourceRegistrySchema: SOURCE_REGISTRY_SCHEMA,\n'''
-          new='''        extractionRequestSchema: REQUEST_SCHEMA,\n        sourceRegistrySchema: inputRequest.schema_version === "filings-acquisition-request/2.0"\n          ? SOURCE_REGISTRY_SCHEMA_V2\n          : SOURCE_REGISTRY_SCHEMA,\n'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-
-          p=Path('scripts/run_filings_pipeline_tests.mjs')
-          s=p.read_text()
-          marker='''// Overlapping annuals may split period authority: the user-supplied latest\n'''
-          assert s.count(marker)==1, s.count(marker)
-          insert='''// v2 source modes are explicit: user_supplied excludes declared internal\n// sources rather than silently merging them into the extraction request.\nconst sourceModeAcquisition = structuredClone(acquisition);\nsourceModeAcquisition.schema_version = "filings-acquisition-request/2.0";\nsourceModeAcquisition.run_id = "filings-acquisition-source-mode";\nsourceModeAcquisition.source_mode = "user_supplied";\nconst sourceModePath = path.join(temp, "filings-acquisition-source-mode.json");\nawait fs.writeFile(sourceModePath, `${JSON.stringify(sourceModeAcquisition, null, 2)}\\n`);\nconst sourceModeResponse = structuredClone(acquisitionResponse);\nsourceModeResponse.run_id = sourceModeAcquisition.run_id;\nsourceModeResponse.documents = sourceModeResponse.documents.filter((document) => document.source_id === "user_report");\nconst sourceModeResponsePath = path.join(temp, "filings-acquisition-source-mode-response.json");\nawait fs.writeFile(sourceModeResponsePath, `${JSON.stringify(sourceModeResponse, null, 2)}\\n`);\nconst sourceModeOutput = path.join(temp, "source-mode-run");\nawait run([sourceModePath, "--out", sourceModeOutput, "--responses", sourceModeResponsePath]);\nconst sourceModeState = JSON.parse(await fs.readFile(path.join(sourceModeOutput, "filings-run-state.json"), "utf8"));\nassert(sourceModeState.pipeline_status === "PASS", "explicit user-supplied filing source mode did not pass");\nconst sourceModeRegistry = JSON.parse(await fs.readFile(sourceModeState.artifacts.filings_source_registry, "utf8"));\nassert(sourceModeRegistry.schema_version === "filings-source-registry/2.0", "v2 acquisition emitted the wrong source-registry contract");\nassert(sourceModeRegistry.acquisition_policy.source_mode === "user_supplied", "v2 source mode was not preserved in registry custody");\nassert(sourceModeRegistry.acquisition_policy.excluded_document_ids.join("|") === "runtime-report", "declared internal filing was not explicitly excluded from user-supplied mode");\nassert(Object.keys(sourceModeRegistry.documents).join("|") === "user-report", "v2 user-supplied mode materialised an internal filing");\nchecks += 5;\n\n'''
-          p.write_text(s.replace(marker,insert+marker,1))
-          PY
-          node --check scripts/lib/filings_acquisition.mjs
-          node --check scripts/run_filings_pipeline.mjs
-          node --check scripts/run_filings_pipeline_tests.mjs
-          git diff --check
-      - name: Commit source-mode completion
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'excel-inflow-recovery-publisher'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/lib/filings_acquisition.mjs scripts/run_filings_pipeline.mjs scripts/run_filings_pipeline_tests.mjs
-          git commit -m 'Complete explicit filing source-mode runtime'
-          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
-          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
+          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          node scripts/run_test_registry_contract_tests.mjs
+          python3 scripts/run_source_arithmetic_topology_tests.py
+          python3 scripts/run_evidence_pipeline_tests.py
+          node scripts/run_filings_pipeline_tests.mjs
+          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
+          node scripts/run_decision_round_tests.mjs
+          node scripts/run_user_flow_tests.mjs
+          echo 'FOCUSED_V360_REGRESSIONS=PASS'
