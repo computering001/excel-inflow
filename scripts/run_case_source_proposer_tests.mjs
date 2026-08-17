@@ -5,6 +5,7 @@ import {
   writeRuntimeEvidenceLanes,
 } from "./lib/case_source_proposer.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
+import { compileCase } from "./lib/case_compiler.mjs";
 
 function manifest(statement, rows) {
   const value = {
@@ -270,6 +271,16 @@ assert.deepEqual(
   [24, 26, 30],
   "The runtime writer did not derive the filed EBIT plus D&A bridge.",
 );
+assert.equal(
+  runtimeLanes.selected_ebitda_basis.semantic_role,
+  "reported_ebitda",
+  "Statutory EBIT plus compatible D&A was mislabeled as adjusted EBITDA.",
+);
+assert.equal(
+  runtimeLanes.selected_ebitda_basis.derivation,
+  "reported_ebit_plus_compatible_da",
+  "The selected EBITDA derivation was not sealed in provenance.",
+);
 assert.deepEqual(
   runtimeLanes.operating_metrics.capex.values.slice(0, 3),
   [5, 6, 7],
@@ -280,6 +291,76 @@ assert.deepEqual(runtimeLanes.debt_reconciliation.reported_opening_gross_debt, [
 assert.deepEqual(runtimeLanes.historical_supplement.prior_cash_and_cash_equivalents, [10, 12]);
 assert.equal(runtimeLanes.provenance.revenue.length, 3);
 assert.equal(runtimeLanes.provenance.revenue[0].document, income.source_id);
+
+const compiledBasisCase = compileCase(
+  result,
+  firstRunEvidence.case_evidence,
+).model_case;
+const compiledIncome = compiledBasisCase.statement_structure.income_statement;
+const compiledEbitda = compiledIncome.find(
+  (row) => row.semantic_role === "reported_ebitda",
+);
+assert(compiledEbitda, "The compiler did not type statutory EBIT plus D&A as reported EBITDA.");
+assert.equal(compiledEbitda.label, "EBITDA");
+assert.equal(compiledBasisCase.selected_ebitda_basis.row_id, compiledEbitda.row_id);
+assert.equal(compiledBasisCase.selected_ebitda_basis.impairment_included, false);
+const compiledFcfConversion = compiledBasisCase.statement_structure.cash_flow.find(
+  (row) => row.row_id === "free_cash_flow_conversion",
+);
+assert.equal(
+  compiledFcfConversion?.calculation?.refs?.[1],
+  compiledEbitda.row_id,
+  "FCF conversion did not consume the selected reported-EBITDA basis.",
+);
+
+const unsupportedIncome = manifest(
+  "income_statement",
+  income.rows.filter((row) => row.source_line_id !== "is.da"),
+);
+const unsupportedCashFlow = manifest(
+  "cash_flow",
+  cashFlow.rows.filter((row) => row.source_line_id !== "cf.da"),
+);
+const unsupportedCaseEvidence = {
+  face_statement_manifests: {
+    income_statement: [unsupportedIncome],
+    cash_flow: [unsupportedCashFlow],
+  },
+  lanes: { broker_pack: { metrics: { revenue: {} } } },
+};
+const unsupportedSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Unsupported EBITDA Test plc", reporting_currency: "GBP" },
+    consumption: {}, policies: {}, answers: [],
+  },
+  caseEvidence: unsupportedCaseEvidence,
+});
+const unsupportedRun = {
+  filings: structuredClone(firstRunEvidence.filings),
+  source_inventory: [unsupportedIncome, unsupportedCashFlow].map((item) => ({
+    source_id: item.source_id,
+    publication_date: "2026-03-01",
+  })),
+  broker_pack: {},
+  case_evidence: unsupportedCaseEvidence,
+};
+writeRuntimeEvidenceLanes({ evidence: unsupportedRun, caseSource: unsupportedSource });
+assert.equal(
+  unsupportedRun.case_evidence.lanes.selected_ebitda_basis,
+  undefined,
+  "The runtime writer invented an EBITDA basis without compatible D&A.",
+);
+const unsupportedCompiled = compileCase(
+  unsupportedSource,
+  unsupportedRun.case_evidence,
+).model_case;
+assert.equal(
+  unsupportedCompiled.statement_structure.income_statement.some((row) =>
+    ["reported_ebitda", "adjusted_ebitda"].includes(row.semantic_role),
+  ),
+  false,
+  "The compiler invented an unsupported EBITDA row.",
+);
 
 const richerEvidence = structuredClone(firstRunEvidence);
 const sealedOperatingLane = {
@@ -297,4 +378,4 @@ assert.deepEqual(
   "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 42 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 51 }, null, 2));

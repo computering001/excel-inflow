@@ -103,6 +103,7 @@ const COMPONENT_SUM_IDS = new Set([
 // total can never silently lose its weight.
 const BLOCK_SUBTOTAL_IDS = new Set([
   "adjusted_ebitda",
+  "reported_ebitda",
   "cash_from_operations",
   "cash_from_investing",
   "cash_from_financing",
@@ -213,7 +214,7 @@ const SECTION_RANKS = {
 const SECTION_HEADLINES = {
   [RANK_SECTION.INCOME_STATEMENT]: [
     ["revenue"],
-    ["adjusted_ebitda"],
+    ["adjusted_ebitda", "reported_ebitda"],
     ["operating_profit", "ebit"],
     ["net_income"],
   ],
@@ -377,6 +378,7 @@ const RANKED_TOTAL_ROLES = new Set([
   "operating_profit",
   "ebit",
   "adjusted_ebitda",
+  "reported_ebitda",
   "pre_tax_income",
   "net_income",
   "cash_from_operations",
@@ -2522,6 +2524,7 @@ function projectIncomeStatementToDebtOverlay(modelCase, rows) {
   // not, by itself, a reason to render a row.
   const requiredOutputRoles = new Set([
     "adjusted_ebitda",
+    "reported_ebitda",
     "depreciation_and_amortisation",
     "owners_of_parent",
     "non_controlling_interests",
@@ -2849,6 +2852,7 @@ function applyAnchoredSlimForecast(modelCase, rows, anchorSelection) {
       [
         "ebit",
         "adjusted_ebitda",
+        "reported_ebitda",
         "depreciation_and_amortisation",
         "recurring_disclosed_adjustments",
       ].includes(row.semantic_role)
@@ -3070,6 +3074,7 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
     "operating_profit",
     "ebit",
     "adjusted_ebitda",
+    "reported_ebitda",
     "pre_tax_income",
     "tax_expense",
     "net_income",

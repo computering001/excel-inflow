@@ -277,7 +277,10 @@ function observationCandidates(observationInput, row, forecastIndex, windowStart
     if (!method || !finite(observation.value)) continue;
     if (method === "broker_consensus") {
       const headline = brokerHeadlineEligibility(row, observationInput);
-      if (!headline.eligible && ["ebit", "adjusted_ebitda"].includes(headline.role)) continue;
+      if (
+        !headline.eligible &&
+        ["ebit", "adjusted_ebitda", "reported_ebitda"].includes(headline.role)
+      ) continue;
     }
     candidates.push({ method, origin: "forecast_observation", source_kind: method === "broker_consensus" ? "broker" : method === "user_assumption" ? "user_supplied" : "company_guidance", value: Number(observation.value), source_id: observation.source_id, as_of_date: observation.reported_through ?? observation.period_end, observation_id: observation.observation_id, source_bindings: [observation.source_id], note: `Selected from forecast observation ${observation.observation_id}.` });
   }
@@ -547,6 +550,7 @@ function independentlyForecastedParent(modelCase, parent, forecastIndex) {
       "ebit",
       "ebitda",
       "adjusted_ebitda",
+      "reported_ebitda",
       "depreciation_and_amortisation",
     ].includes(parent.semantic_role) &&
     Boolean(

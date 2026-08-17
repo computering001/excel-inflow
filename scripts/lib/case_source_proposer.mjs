@@ -624,8 +624,14 @@ export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
   const ebit = firstMappedHistoricalSeries({
     caseSource, caseEvidence, roles: ["ebit", "operating_profit"],
   });
+  const adjustedEbit = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["adjusted_ebit"],
+  });
   const reportedAdjustedEbitda = firstMappedHistoricalSeries({
     caseSource, caseEvidence, roles: ["adjusted_ebitda"],
+  });
+  const reportedEbitda = firstMappedHistoricalSeries({
+    caseSource, caseEvidence, roles: ["reported_ebitda"],
   });
   const da = firstMappedHistoricalSeries({
     caseSource,
@@ -633,9 +639,47 @@ export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
     roles: ["depreciation_and_amortisation", "cash_flow_da", "is_da_expense"],
     absolute: true,
   });
-  const adjustedEbitda = reportedAdjustedEbitda.some((value) => value !== null)
-    ? reportedAdjustedEbitda
-    : addSeries(ebit, da);
+  const complete = (series) => series.every(
+    (value) => value !== null && Number.isFinite(Number(value)),
+  );
+  let selectedEbitda;
+  let selectedEbitdaBasis;
+  if (complete(reportedAdjustedEbitda)) {
+    selectedEbitda = reportedAdjustedEbitda;
+    selectedEbitdaBasis = {
+      semantic_role: "adjusted_ebitda",
+      label: "Adjusted EBITDA",
+      derivation: "company_reported",
+      source_roles: ["adjusted_ebitda"],
+    };
+  } else if (complete(reportedEbitda)) {
+    selectedEbitda = reportedEbitda;
+    selectedEbitdaBasis = {
+      semantic_role: "reported_ebitda",
+      label: "EBITDA",
+      derivation: "company_reported",
+      source_roles: ["reported_ebitda"],
+    };
+  } else if (complete(adjustedEbit) && complete(da)) {
+    selectedEbitda = addSeries(adjustedEbit, da);
+    selectedEbitdaBasis = {
+      semantic_role: "adjusted_ebitda",
+      label: "Adjusted EBITDA",
+      derivation: "company_adjusted_ebit_plus_compatible_da",
+      source_roles: ["adjusted_ebit", "depreciation_and_amortisation"],
+    };
+  } else if (complete(ebit) && complete(da)) {
+    selectedEbitda = addSeries(ebit, da);
+    selectedEbitdaBasis = {
+      semantic_role: "reported_ebitda",
+      label: "EBITDA",
+      derivation: "reported_ebit_plus_compatible_da",
+      source_roles: ["ebit", "depreciation_and_amortisation"],
+    };
+  } else {
+    selectedEbitda = [null, null, null];
+    selectedEbitdaBasis = null;
+  }
   const workingCapital = firstMappedHistoricalSeries({
     caseSource, caseEvidence, roles: ["change_in_working_capital"],
   });
@@ -650,20 +694,29 @@ export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
   });
   lanes.operating_metrics ??= {
     revenue: runtimeMetric(revenue, "Historical values projected from the sealed filed revenue authority; forecasts are written by the authority resolver."),
-    adjusted_ebitda: runtimeMetric(adjustedEbitda, "Historical adjusted EBITDA is reported when present, otherwise the visible EBIT plus D&A bridge; forecasts are written by the authority resolver."),
+    // `adjusted_ebitda` is retained as the v2 transport key.  Its economic
+    // definition is not inferred from that legacy key; the sealed selected
+    // basis below controls the statement label and every denominator.
+    adjusted_ebitda: runtimeMetric(selectedEbitda, "Historical values use the sealed selected EBITDA basis; forecasts are written by the authority resolver."),
     depreciation_and_amortisation: runtimeMetric(da, "Historical D&A projected from the sealed filed statement authority; forecasts are written by the authority resolver."),
     change_in_working_capital: runtimeMetric(workingCapital, "Historical working-capital movement projected from the sealed cash-flow authority; forecasts are written by the authority resolver."),
     capex: runtimeMetric(capex, "Historical capex projected on the model outflow basis from the sealed cash-flow authority; forecasts are written by the authority resolver."),
     tax: runtimeMetric(tax, "Historical tax projected on the model expense basis from the sealed statement authority; forecasts are written by the authority resolver."),
   };
+  if (selectedEbitdaBasis) {
+    lanes.selected_ebitda_basis ??= {
+      ...selectedEbitdaBasis,
+      transport_metric_id: "adjusted_ebitda",
+      impairment_included: false,
+    };
+  }
   lanes.provenance ??= {};
   const sourceInventory = new Map(
     (evidence.source_inventory ?? []).map((source) => [source.source_id, source]),
   );
   const provenanceRoles = {
     revenue: ["revenue"],
-    adjusted_ebitda: reportedAdjustedEbitda.some((value) => value !== null)
-      ? ["adjusted_ebitda"] : ["ebit", "operating_profit"],
+    adjusted_ebitda: selectedEbitdaBasis?.source_roles ?? [],
     depreciation_and_amortisation: [
       "depreciation_and_amortisation", "cash_flow_da", "is_da_expense",
     ],
@@ -684,8 +737,8 @@ export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
       units: [caseSource.identity.reporting_currency, caseSource.identity.units]
         .filter(Boolean).join(" "),
       source_label: record.row.raw_label,
-      transformation: metricId === "adjusted_ebitda" && roles[0] !== "adjusted_ebitda"
-        ? "Compiler-owned historical EBIT plus D&A bridge from sealed filed authorities."
+      transformation: metricId === "adjusted_ebitda" && selectedEbitdaBasis?.derivation !== "company_reported"
+        ? `Compiler-owned ${selectedEbitdaBasis?.label ?? "EBITDA"} bridge from sealed filed authorities (${selectedEbitdaBasis?.derivation ?? "unsupported"}).`
         : "Directly projected from the sealed face-statement authority.",
     }));
   }

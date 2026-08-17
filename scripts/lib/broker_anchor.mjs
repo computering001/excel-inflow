@@ -281,6 +281,7 @@ export function applyTier1AnchorOwnership(modelCase) {
   const PROFIT_AUTHORITY_ROLES = new Set([
     "ebit",
     "adjusted_ebitda",
+    "reported_ebitda",
     "operating_profit",
     "pre_tax_income",
     "net_income",

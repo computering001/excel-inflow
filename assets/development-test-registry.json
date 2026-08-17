@@ -925,6 +925,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "ebitda-basis-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_ebitda_basis_contract_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "solver-hardening",
       "phase": "economic",
       "runtime": "node",

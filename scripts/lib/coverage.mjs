@@ -357,6 +357,20 @@ function requiredRoleChecks(modelCase) {
         );
       }
     }
+    if (section === "income_statement") {
+      for (const alternatives of
+        PRODUCTION_CONTRACT.statement_coverage
+          .required_income_statement_role_groups ?? []) {
+        if (alternatives.some((role) => present.has(role))) continue;
+        checks.push(
+          result(
+            `statement_role.${section}.${alternatives.join("_or_")}`,
+            "BLOCK",
+            `${section} requires one of: ${alternatives.join(", ")}.`,
+          ),
+        );
+      }
+    }
   }
   return checks;
 }
@@ -1967,10 +1981,10 @@ function brokerChecks(modelCase) {
     visiting.delete(rowId);
     return pass;
   };
-  const declaredAuthorityPass = ["ebit", "adjusted_ebitda"].every((role) => {
-    const row = rowForRole(role);
-    return Boolean(row && resolvable(row.row_id));
-  });
+  const declaredAuthorityPass = [
+    rowForRole("ebit"),
+    rowForRole("adjusted_ebitda") ?? rowForRole("reported_ebitda"),
+  ].every((row) => Boolean(row && resolvable(row.row_id)));
   anchorCoverage.sort(
     (left, right) =>
       right.populated - left.populated ||

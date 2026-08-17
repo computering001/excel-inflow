@@ -83,8 +83,10 @@
       "pre_tax_income",
       "tax_expense",
       "net_income",
-      "depreciation_and_amortisation",
-      "adjusted_ebitda"
+      "depreciation_and_amortisation"
+    ],
+    "required_income_statement_role_groups": [
+      ["adjusted_ebitda", "reported_ebitda"]
     ],
     "required_cash_flow_roles": [
       "cash_flow_net_income",

@@ -48,6 +48,10 @@ import {
   validateForecastPlanCaseParity,
 } from "./forecast_candidate_compiler.mjs";
 import { applyRunScopedBrokerConcepts } from "./run_scoped_broker_concepts.mjs";
+import {
+  ebitdaBasis,
+  selectedEbitdaRow,
+} from "./semantic_roles.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CASE_SOURCE_SCHEMA = JSON.parse(
@@ -68,6 +72,7 @@ export const PASSTHROUGH_LANES = Object.freeze([
   "controls",
   "coverage_policy",
   "operating_metrics",
+  "selected_ebitda_basis",
   "forecast_assumptions",
   "instruments",
   "instrument_authority_contract_version",
@@ -812,7 +817,6 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // structural channel, exactly as it was under hand authorship, but now the
   // stratum recipes consume it instead of prose doctrine.
   const role = (id) => roleIndex.get(id) ?? rowIdIndex.get(id) ?? null;
-  const packHas = (metricId) => Boolean(modelCase.broker_pack?.metrics?.[metricId]);
   const operatingMetricHistory = (metricId) => {
     const values = modelCase.operating_metrics?.[metricId]?.values ?? [];
     return values.slice(0, 3).every((value) => value !== null && Number.isFinite(Number(value)))
@@ -825,6 +829,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     rows.splice(index + 1, 0, ...newRows);
     for (const row of newRows) {
       derived.add(row.row_id);
+      rowIdIndex.set(row.row_id, row);
       if (row.semantic_role) roleIndex.set(row.semantic_role, row);
     }
     return true;
@@ -835,6 +840,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     rows.splice(index, 0, ...newRows);
     for (const row of newRows) {
       derived.add(row.row_id);
+      rowIdIndex.set(row.row_id, row);
       if (row.semantic_role) roleIndex.set(row.semantic_role, row);
     }
     return true;
@@ -1022,9 +1028,13 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     delete financeResult.values;
   }
 
-  // The EBITDA bridge: minted whenever the pack can price a headline anchor
-  // and the operating-profit level exists to bridge from.
-  const operatingProfit = role("ebit") ?? role("operating_profit");
+  // The EBITDA bridge follows the economic hierarchy, not a generic proxy:
+  // a company-adjusted EBIT base produces Adjusted EBITDA; statutory EBIT or
+  // operating profit produces reported EBITDA.  A directly reported EBITDA
+  // row always wins over a compiler-derived one.
+  const adjustedEbitBase = role("adjusted_ebit");
+  const operatingProfit = adjustedEbitBase ?? role("ebit") ?? role("operating_profit");
+  const existingEbitda = selectedEbitdaRow(isRows);
   // The bridge's D&A evidence is the cash-flow statement's filed D&A line;
   // where the issuer splits continuing/discontinued, the model's stated basis
   // is continuing operations.
@@ -1059,22 +1069,25 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       : null;
   if (
     operatingProfit &&
-    !role("adjusted_ebitda") &&
+    !existingEbitda &&
     (
       cfDaGroupValues ||
-      operatingMetricHistory("depreciation_and_amortisation") ||
-      packHas("adjusted_ebitda") ||
-      packHas("depreciation_and_amortisation")
+      operatingMetricHistory("depreciation_and_amortisation")
     )
   ) {
     const historicalDa = cfDaGroupValues ?? operatingMetricHistory("depreciation_and_amortisation");
     const daValues = historicalDa
       ? [...historicalDa, null, null, null]
       : [null, null, null, null, null, null];
+    const derivedEbitdaRole = adjustedEbitBase
+      ? "adjusted_ebitda"
+      : "reported_ebitda";
+    const derivedEbitdaId = derivedEbitdaRole;
+    const derivedBasis = ebitdaBasis({ semantic_role: derivedEbitdaRole });
     const bridgeRows = [
       {
         row_id: "ebitda_bridge_header",
-        label: "EBITDA bridge",
+        label: `${derivedBasis.label} bridge`,
         row_type: "header",
         style_role: "subsection",
       },
@@ -1094,18 +1107,26 @@ function applyDerivedStratum(modelCase, evidence = {}) {
         indent: 1,
       },
       {
-        row_id: "adjusted_ebitda",
-        label: "EBITDA proxy",
+        row_id: derivedEbitdaId,
+        label: derivedBasis.label,
         row_type: "calculation",
         calculation: { operator: "sum", refs: ["bridge_operating_profit", "depreciation_and_amortisation"] },
-        semantic_role: "adjusted_ebitda",
+        semantic_role: derivedEbitdaRole,
+        ebitda_basis: {
+          ...derivedBasis,
+          derivation: adjustedEbitBase
+            ? "company_adjusted_ebit_plus_compatible_da"
+            : "reported_ebit_plus_compatible_da",
+          source_row_ids: [operatingProfit.row_id, "depreciation_and_amortisation"],
+          impairment_included: false,
+        },
         style_role: "total",
       },
       {
-        row_id: "adjusted_ebitda_margin",
-        label: "EBITDA proxy margin",
+        row_id: `${derivedEbitdaId}_margin`,
+        label: derivedBasis.margin_label,
         row_type: "calculation",
-        calculation: { operator: "ratio", refs: ["adjusted_ebitda", revenue?.row_id ?? operatingProfit.row_id] },
+        calculation: { operator: "ratio", refs: [derivedEbitdaId, revenue?.row_id ?? operatingProfit.row_id] },
         number_format: "percentage",
         style_role: "subsection",
       },
@@ -1371,6 +1392,26 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     }
   }
 
+  // A directly reported EBITDA line may not carry its own display ratio.  The
+  // ratio is minted only from the selected basis and visibly names that basis.
+  {
+    const selected = selectedEbitdaRow(isRows);
+    if (selected && revenue) {
+      const basis = ebitdaBasis(selected);
+      const marginId = `${selected.row_id}_margin`;
+      if (!isRows.some((row) => row.row_id === marginId)) {
+        insertAfter(isRows, selected.row_id, [{
+          row_id: marginId,
+          label: basis.margin_label,
+          row_type: "calculation",
+          calculation: { operator: "ratio", refs: [selected.row_id, revenue.row_id] },
+          number_format: "percentage",
+          style_role: "subsection",
+        }]);
+      }
+    }
+  }
+
   // Ensure-recipes for identities the issuer may either file or omit: when
   // the row exists it is converted to its identity form; when absent and its
   // ingredients exist, doctrine elsewhere mints it.
@@ -1606,7 +1647,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // The free-cash-flow block closes the statement.
   const endingCash = role("ending_cash");
   const capexRow = role("capex");
-  const adjustedEbitda = role("adjusted_ebitda");
+  const adjustedEbitda = selectedEbitdaRow(isRows);
   if (endingCash && cfo && capexRow && !cfRows.some((row) => row.row_id === "free_cash_flow")) {
     const block = [
       {
@@ -1625,7 +1666,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       ...(adjustedEbitda
         ? [{
             row_id: "free_cash_flow_conversion",
-            label: "Free cash flow conversion",
+            label: `Free cash flow / ${ebitdaBasis(adjustedEbitda).label}`,
             row_type: "calculation",
             calculation: { operator: "ratio", refs: ["free_cash_flow", adjustedEbitda.row_id] },
             number_format: "percentage",
@@ -1690,7 +1731,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       delete target.values;
     };
     const revenueRow = role("revenue");
-    const adjRow = role("adjusted_ebitda");
+    const adjRow = selectedEbitdaRow(isRows);
     const taxRow = role("tax_expense");
     const preTaxRow = role("pre_tax_income");
     const ntiRow = role("non_trading_items");
@@ -1698,7 +1739,13 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     const opBase = rowIdIndex.get("operating_profit") ?? role("ebit");
     if (revenueRow) {
       ensure("revenue_growth", { operator: "growth", refs: [revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
-      if (adjRow) ensure("adjusted_ebitda_margin", { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
+      if (adjRow) {
+        const basis = ebitdaBasis(adjRow);
+        const marginId = `${adjRow.row_id}_margin`;
+        ensure(marginId, { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
+        const marginRow = rowIdIndex.get(marginId);
+        if (marginRow) marginRow.label = basis.margin_label;
+      }
     }
     if (taxRow && preTaxRow) {
       ensure("effective_tax_rate", {
@@ -1727,6 +1774,8 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     const fcfRow = rowIdIndex.get("free_cash_flow");
     if (fcfRow && adjRow) {
       ensure("free_cash_flow_conversion", { operator: "ratio", refs: [fcfRow.row_id, adjRow.row_id], number_format: "percentage", style_role: "subsection" });
+      const conversion = rowIdIndex.get("free_cash_flow_conversion");
+      if (conversion) conversion.label = `Free cash flow / ${ebitdaBasis(adjRow).label}`;
     }
     if (fcfRow && !cfRows.some((row) => row.row_id === "free_cash_flow_header")) {
       insertBefore(cfRows, fcfRow.row_id, [{
@@ -1747,6 +1796,22 @@ function applyDerivedStratum(modelCase, evidence = {}) {
     } else {
       row.historical_authority ??= "derived_formula";
     }
+  }
+  const selectedBasis = selectedEbitdaRow(isRows);
+  if (selectedBasis) {
+    const basis = ebitdaBasis(selectedBasis);
+    selectedBasis.ebitda_basis ??= {
+      ...basis,
+      derivation: selectedBasis.calculation
+        ? "declared_formula"
+        : "company_reported",
+      source_row_ids: selectedBasis.calculation?.refs ?? [selectedBasis.row_id],
+      impairment_included: false,
+    };
+    modelCase.selected_ebitda_basis = {
+      row_id: selectedBasis.row_id,
+      ...selectedBasis.ebitda_basis,
+    };
   }
   return derived;
 }
@@ -1907,6 +1972,7 @@ const TOTAL_STYLE_ROLES = new Set([
   "net_income",
   "net_income_common",
   "adjusted_ebitda",
+  "reported_ebitda",
   "adjusted_ebitda_bridge_total",
   "cash_flow_profit_before_tax",
   "cash_from_operations",
@@ -2009,6 +2075,7 @@ const CAPTURE_HEADLINE_ROLES = new Set([
   "ebit",
   "ebitda",
   "adjusted_ebitda",
+  "reported_ebitda",
   "depreciation_and_amortisation",
 ]);
 
@@ -2593,6 +2660,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   const CONSUMABLE_ROLES = new Set([
     "revenue",
     "adjusted_ebitda",
+    "reported_ebitda",
     "effective_tax_rate",
     "depreciation_and_amortisation",
     "change_in_working_capital",
@@ -2624,7 +2692,7 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     row.forecast_calculation = calculation;
   };
   const ebit = byRole.get("ebit");
-  const adjustedEbitda = byRole.get("adjusted_ebitda");
+  const adjustedEbitda = selectedEbitdaRow(allRows);
   const da = byRole.get("depreciation_and_amortisation");
   const statOp = rowsById.get("operating_profit");
   const ntiForOp = rowsById.get("non_trading_items");
@@ -3430,7 +3498,7 @@ export function compileCase(caseSource, evidence = {}) {
       // sealed case carries broker links only on the consumable set.
       if (
         row.broker_metric_id &&
-        !["revenue", "adjusted_ebitda", "effective_tax_rate",
+        !["revenue", "adjusted_ebitda", "reported_ebitda", "effective_tax_rate",
           "depreciation_and_amortisation", "change_in_working_capital",
           "capex", "dividends", "share_buybacks"].includes(row.broker_metric_id) &&
         // ebit remains a real evidence binding in four shapes: a declared

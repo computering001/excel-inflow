@@ -976,7 +976,10 @@ function graphEdges(nodes, rowPlan) {
   ]) {
     link(consumer, precedent);
   }
-  link("mechanical.leverage_adjusted_ebitda", statement("adjusted_ebitda"));
+  link(
+    "mechanical.leverage_adjusted_ebitda",
+    statement("adjusted_ebitda") ?? statement("reported_ebitda"),
+  );
   link(statement("interest_expense"), "mechanical.gross_interest_expense");
   link(statement("interest_income"), "mechanical.interest_income_schedule");
   link(statement("cash_interest_paid"), "mechanical.cash_interest_paid");

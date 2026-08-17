@@ -81,6 +81,11 @@ import {
 } from "./lib/historical_interest_authority.mjs";
 import { workbookCalcProperties } from "./lib/economic_solve_policy.mjs";
 import { coreConsumptionIds } from "./lib/broker_metric_dictionary.mjs";
+import {
+  ebitdaBasis,
+  isEbitdaSemanticRole,
+  selectedEbitdaRow,
+} from "./lib/semantic_roles.mjs";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
@@ -790,6 +795,28 @@ function applyTotalHierarchy(
       sheet.getRange(address).format.borders = borders;
     }
   }
+}
+
+export function creditMetricEbitdaPresentation(
+  statementRows,
+  leverageNetDebtLabel,
+) {
+  const row = selectedEbitdaRow(statementRows);
+  if (!row) {
+    throw new Error(
+      "The debt overlay requires a selected EBITDA basis for leverage and coverage.",
+    );
+  }
+  const label = ebitdaBasis(row).label;
+  return {
+    row,
+    label,
+    company_reported_ebitda: `${label} (as above)`,
+    company_reported_leverage: `Net debt (company reported) / ${label}`,
+    net_debt_excluding_leases_leverage: `Net debt (excl. leases) / ${label}`,
+    net_debt_leverage: `${leverageNetDebtLabel} / ${label}`,
+    coverage: `${label} / net interest expense`,
+  };
 }
 
 /**
@@ -2689,7 +2716,7 @@ function acquisitionDerivedDrivers(modelCase, rowPlan) {
       }) ?? null
     );
   };
-  const ebitda = byRole("adjusted_ebitda");
+  const ebitda = selectedEbitdaRow(definitions);
   const drivers = {
     revenue: byRole("revenue"),
     ebitda,
@@ -2974,7 +3001,7 @@ function acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan) {
     );
     if (!growth && Number(modelCase.acquisition?.enabled ?? 0) === 1) {
       throw new Error(
-        "Acquisition target growth requires a standalone adjusted-EBITDA semantic row.",
+        "Acquisition target growth requires a standalone selected-EBITDA semantic row.",
       );
     }
     const priorPeriodEnd =
@@ -2989,7 +3016,7 @@ function acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan) {
     Number(modelCase.acquisition?.enabled ?? 0) === 1
   ) {
     throw new Error(
-      "Acquisition target growth requires a standalone adjusted-EBITDA semantic row.",
+      "Acquisition target growth requires a standalone selected-EBITDA semantic row.",
     );
   }
   return `$P$${c.target_ebitda}${growthFactors
@@ -3028,7 +3055,9 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
       `IFERROR(${fullEbitda}/${margin}*${factor},0),0)`
     );
   }
-  if (role === "adjusted_ebitda") return `=${fullEbitda}*${factor}`;
+  if (isEbitdaSemanticRole(role)) {
+    return `=${fullEbitda}*${factor}`;
+  }
   if (role === "depreciation_and_amortisation") {
     // D&A is a percentage of a driver, and the percentage is the target's own —
     // the line sitting against the D&A row when the company prints one, the
@@ -3285,6 +3314,7 @@ function configureOperatingModel(
   const acquisition = modelCase.acquisition ?? {};
   const fy1AdjustedEbitda = Number(
     modelCase.operating_metrics?.adjusted_ebitda?.values?.[3] ??
+      modelCase.operating_metrics?.reported_ebitda?.values?.[3] ??
       modelCase.operating_metrics?.ebitda?.values?.[3] ??
       0,
   );
@@ -5115,6 +5145,12 @@ function configureOperatingModel(
           ? "Lease liabilities — assumes new leases replace principal repaid"
           : "Lease liabilities — after assumed new lease additions"
         : "Lease liabilities — amortising, no new leases assumed";
+  const selectedEbitdaPresentation = creditMetricEbitdaPresentation(
+    allStatementRows,
+    leverageNetDebtLabel,
+  );
+  const selectedEbitda = selectedEbitdaPresentation.row;
+  const selectedEbitdaLabel = selectedEbitdaPresentation.label;
   const debtLabels = {
     acquisition_debt_header: "Acquisition debt",
     acquisition_debt: "Acquisition term debt",
@@ -5163,15 +5199,17 @@ function configureOperatingModel(
     net_debt_company_reported: "Net debt (company reported)",
     // Restated, not re-derived: the multiple beneath it divides two rows the
     // reader can see, exactly as the model block's multiples do.
-    company_reported_adjusted_ebitda: "Adjusted EBITDA (as above)",
+    company_reported_adjusted_ebitda:
+      selectedEbitdaPresentation.company_reported_ebitda,
     net_debt_company_reported_to_adjusted_ebitda:
-      "Net debt (company reported) / Adjusted EBITDA",
-    leverage_adjusted_ebitda: "Adjusted EBITDA",
+      selectedEbitdaPresentation.company_reported_leverage,
+    leverage_adjusted_ebitda: selectedEbitdaLabel,
     net_debt_excluding_leases_to_adjusted_ebitda:
-      "Net debt (excl. leases) / Adjusted EBITDA",
-    net_debt_to_adjusted_ebitda: `${leverageNetDebtLabel} / Adjusted EBITDA`,
+      selectedEbitdaPresentation.net_debt_excluding_leases_leverage,
+    net_debt_to_adjusted_ebitda:
+      selectedEbitdaPresentation.net_debt_leverage,
     leverage_net_interest: "Net interest expense",
-    adjusted_ebitda_to_net_interest: "Adjusted EBITDA / net interest expense",
+    adjusted_ebitda_to_net_interest: selectedEbitdaPresentation.coverage,
     mandatory_debt_repayments: "Mandatory debt repayments",
     ...Object.fromEntries(
       bridgeComponents.map((component, index) => [
@@ -5582,7 +5620,7 @@ function configureOperatingModel(
   // income statement — so the multiple reconciles on screen. Net interest is
   // shown as a positive cost (the income statement carries it as a negative),
   // which is what makes the coverage ratio read straight off the two rows.
-  const leverageEbitdaRow = statementByRole.get("adjusted_ebitda").row;
+  const leverageEbitdaRow = selectedEbitda.row;
   const netInterestLegs = ["interest_expense", "interest_income"]
     .map((role) => statementByRole.get(role)?.row)
     .filter(Boolean);
@@ -10111,6 +10149,11 @@ function statementSolverValues(
     ["opening_cash", cashFlowOpeningCash],
     ["ending_cash", cashFlowEndingCash],
   ]);
+  const selectedEbitdaRole =
+    modelCase.selected_ebitda_basis?.semantic_role ??
+    selectedEbitdaRow(rowPlan.statement_rows.income_statement)?.semantic_role ??
+    "adjusted_ebitda";
+  semantic.set(selectedEbitdaRole, result.adjusted_ebitda);
   for (const [role, value] of [
     [
       "cash_interest_paid",

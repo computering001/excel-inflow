@@ -24,6 +24,7 @@ import {
   mandatoryRepaymentForPeriod,
 } from "./instrument_period_state.mjs";
 import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
+import { selectedEbitdaRow } from "./semantic_roles.mjs";
 
 const SOLVER_ITERATION_POLICY = solverIterationOptions();
 
@@ -107,6 +108,14 @@ function normalisedStatementDefinitions(modelCase) {
     ]);
   }
   return NORMALISED_STATEMENT_CACHE.get(modelCase);
+}
+
+function selectedEbitdaRole(modelCase) {
+  return (
+    modelCase?.selected_ebitda_basis?.semantic_role ??
+    selectedEbitdaRow(normalisedStatementDefinitions(modelCase))?.semantic_role ??
+    "adjusted_ebitda"
+  );
 }
 
 function asSeries3(value, fallback = 0) {
@@ -1844,7 +1853,9 @@ export function solveCase(
     const derivedMetric = anchorPlan?.selection?.derived ?? null;
     const bridgeAddbacks = anchorPlan?.addbackTotals?.[forecastIndex] ?? 0;
     const brokerEbitda = () => {
-      const declared = declaredStatementGraph.resolveRole("adjusted_ebitda");
+      const declared = declaredStatementGraph.resolveRole(
+        selectedEbitdaRole(modelCase),
+      );
       return declared === null ? metricValue(
         modelCase,
         "adjusted_ebitda",
@@ -2407,6 +2418,7 @@ export function solveCase(
       // what permits a PBT-led issuer to derive EBIT backwards through solved
       // interest, and then derive EBITDA through D&A, without inventing an
       // EBITDA hardcode or a company-specific branch.
+      const ebitdaRole = selectedEbitdaRole(modelCase);
       const operatingOverrides = new Map([
         ["revenue", revenue],
         ["interest_income", interestIncome],
@@ -2414,7 +2426,7 @@ export function solveCase(
         ["recurring_disclosed_adjustments", adjustments],
       ]);
       for (const [role, supplied] of [
-        ["adjusted_ebitda", suppliedEbitda],
+        [ebitdaRole, suppliedEbitda],
         ["depreciation_and_amortisation", suppliedDa],
         ["ebit", suppliedEbit],
       ]) {
@@ -2437,7 +2449,7 @@ export function solveCase(
           suppliedDa,
       );
       ebitda = Number(
-        operatingGraph.resolveRole("adjusted_ebitda") ?? suppliedEbitda,
+        operatingGraph.resolveRole(ebitdaRole) ?? suppliedEbitda,
       );
 
       if (
@@ -2559,7 +2571,7 @@ export function solveCase(
         (interestIncomeInInvesting ? interestIncome : 0);
       const statementOverrides = new Map([
         ["revenue", revenue + targetRevenue * acquisitionTiming],
-        ["adjusted_ebitda", ebitda + targetEbitda * acquisitionTiming],
+        [ebitdaRole, ebitda + targetEbitda * acquisitionTiming],
         ["depreciation_and_amortisation", totalDa],
         ["ebit", totalEbit],
         ["interest_income", interestIncome],
