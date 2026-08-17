@@ -711,16 +711,16 @@
       "earliest_responsible_layer": "Independent interest oracle.",
       "candidate_files": "scripts/verify/validate_dynamic_model.py; scripts/verify/finance_proof.py",
       "acceptance_criterion": "Validator proves same instrument, opening/average balance, movements, rate, benchmark, FX, timing and sign.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Validator proves same instrument, opening/average balance, movements, rate, benchmark, FX, timing and sign.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: validate_dynamic_model.py accepted an instrument interest formula whenever the decimal text of debt_row appeared anywhere in the formula, without proving the referenced cell, instrument, balance basis or arithmetic role.",
+        "focused_test": "PASS: instrument-interest lineage accepts fixed and floating/foreign positives and rejects 10 mutations covering wrong-instrument opening, wrong rate, positive sign, missing maturity/roll control, missing issuance, missing amortisation, wrong benchmark, missing floor, missing average FX and reporting-carrying-value double FX.",
+        "source_fix": "The independent Python validator now reconstructs each period's required physical lineage from the row map and typed instrument-period state. It proves the same instrument opening and movement rows, own rate/spread, benchmark and floor, contractual timing, maturity control, average FX convention and expense sign in standalone and pro-forma formulas.",
+        "integration_evidence": "PASS: a freshly rendered XLSX passes the new instrument-interest-lineage check, all 35 automated workbook checks and independent solver parity with zero violations; finance proof passes 171 comparisons.",
+        "semantic_oracle_evidence": "PASS: the oracle reads formula text rather than cached results and rejects cross-instrument or missing semantic dependencies even when a coordinated cache could still show the expected number.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "6f668a1"
       }
     },
     {
@@ -732,16 +732,16 @@
       "earliest_responsible_layer": "Interest aggregation.",
       "candidate_files": "scripts/build_dynamic_model.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Non-zero fee mutation proves each RCF fee component enters gross interest once.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Non-zero fee mutation proves each RCF fee component enters gross interest once.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced from the handed-over workbook aggregation: zero RCF fees masked whether the visible RCF subtotal and its two children were all included in gross interest.",
+        "focused_test": "PASS: a 125bp commitment-fee mutation prices 1.25 in each forecast year and asserts Total RCF fees equals drawn interest plus commitment fee while gross interest references the subtotal once and neither child directly, across J:U.",
+        "source_fix": "RCF drawn interest and commitment fee remain separate visible rows closed by Total RCF fees. Gross interest uses disjoint ranges that include the RCF subtotal but skip its two children; instrument-modelled interest excludes the balancing RCF.",
+        "integration_evidence": "PASS: the non-zero fee production plan solves all three years and gross interest equals instrument + RCF interest + RCF fee + lease + acquisition + residual + non-cash interest exactly once.",
+        "semantic_oracle_evidence": "PASS: formula assertions inspect the aggregation graph independently of cached values, while finance proof mutations reject direct corruption of both RCF interest and commitment-fee caches.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "6f668a1"
       }
     },
     {
@@ -753,16 +753,16 @@
       "earliest_responsible_layer": "Lease / interest integration.",
       "candidate_files": "scripts/lib/lease_policy.mjs; scripts/lib/solver.mjs",
       "acceptance_criterion": "Lease interest is modelled or explicitly excluded with metric-basis disclosure and consistent debt treatment.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Lease interest is modelled or explicitly excluded with metric-basis disclosure and consistent debt treatment.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in the handed-over workbook: lease debt was included in net debt/leverage while the interest schedule stated lease interest was not separately modelled.",
+        "focused_test": "PASS: lease roll-forward tests cover total-liability, separately supplied and none interest bases, reject an unsupported US GAAP total-liability basis and mutate both the interest-bearing balance and average-balance interest calculation.",
+        "source_fix": "Lease interest now resolves through an explicit accounting-basis policy. IFRS total liability and separately supplied interest-bearing liability are priced on average opening/closing balances; none is a deliberate disclosed exclusion. US GAAP total-liability treatment requires explicit separate reclassification evidence.",
+        "integration_evidence": "PASS: the production solver and workbook both calculate lease interest 1/1/1 from average liability 20 at 5%, and gross interest includes that row once while lease debt remains in the selected debt metrics.",
+        "semantic_oracle_evidence": "PASS: leaseProjectionErrors independently recomputes the interest basis and amount; finance proof compares the same result to the emitted workbook and rejects a lease-liability mutation.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "6f668a1"
       }
     },
     {
@@ -774,16 +774,16 @@
       "earliest_responsible_layer": "Residual authority policy.",
       "candidate_files": "scripts/lib/historical_interest_authority.mjs; scripts/lib/forecast_candidate_compiler.mjs",
       "acceptance_criterion": "Residual reconciles reported finance expense and receives an explicit forecast authority or zero.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Residual reconciles reported finance expense and receives an explicit forecast authority or zero.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: other_interest was a bare three-number series; non-zero values had no typed method, basis note or source binding even though the row was presented as the residual forecast authority.",
+        "focused_test": "PASS: residual-interest authority tests accept an absent authority only for a zero series, reject a bare non-zero series, reject zero authority over non-zero values, require source IDs for broker/guidance and accept a typed explicit assumption.",
+        "source_fix": "residual-interest-authority/1.0 types zero, explicit forecast assumption, historical residual carry and broker/guidance methods. Solver and coverage block invalid authority; case compilation preserves it; the workbook label and comment disclose the selected method, note and source IDs.",
+        "integration_evidence": "PASS: the production workbook visibly labels Other / unallocated interest — zero and attaches the zero-authority explanation; the non-zero standard fixture carries an explicit typed assumption and validates against model-case-v2.",
+        "semantic_oracle_evidence": "PASS: non-zero residual interest cannot enter solve or build without the independent authority validator passing; historical residual carry also requires the historical reconciliation it claims to extend.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "6f668a1"
       }
     },
     {
