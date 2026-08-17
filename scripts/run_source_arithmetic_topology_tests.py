@@ -30,12 +30,12 @@ mutated = [
 infer_source_arithmetic_links(mutated)
 assert not any(item.get("parent_source_line_id") for item in mutated)
 neutral_separator = [
-    row("cf.pbt", "Profit before taxation", [150, 150, 150], 1),
-    row("cf.da", "Depreciation and amortisation", [50, 50, 50], 1),
+    row("cf.pbt", "Profit before taxation", [150, 150, 150], 3),
+    row("cf.da", "Depreciation and amortisation", [50, 50, 50], 3),
     row("cf.neutral", "Net finance result", [0, 0, 0], 0),
-    row("cf.addback", "Net finance costs add-back", [-5, -5, -5], 1),
-    row("cf.wc", "Change in working capital", [0, 0, 0], 1),
-    row("cf.cfo", "Cash generated from operations", [195, 195, 195], 0),
+    row("cf.addback", "Net finance costs add-back", [-5, -5, -5], 3),
+    row("cf.wc", "Change in working capital", [0, 0, 0], 3),
+    row("cf.cfo", "Cash generated from operations", [195, 195, 195], 2),
 ]
 infer_source_arithmetic_links(neutral_separator)
 assert neutral_separator[0]["parent_source_line_id"] == "cf.cfo"

@@ -381,7 +381,7 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
                     # components while preserving the issuer's proved subtotal.
                     series = _finite_series(candidate)
                     neutral_separator = (
-                        level == parent_level
+                        level <= parent_level
                         and not candidate.get("is_subtotal")
                         and series is not None
                         and all(abs(value) <= 0.5000001 for value in series)
