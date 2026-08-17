@@ -1,4 +1,4 @@
-# diagnose the broker page-image validator failure on the exact repaired v3.6 target
+# diagnose the two statement-arithmetic differences on the exact repaired v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -27,13 +27,36 @@ jobs:
           set -euo pipefail
           python3 -m pip install --upgrade pip
           python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
-      - name: Run broker page evidence and expose validator report
+      - name: Run broker page evidence and inspect T51/T62 authority
         shell: bash
         run: |
           set +e
           node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
           test_exit=$?
-          echo "TEST_EXIT=$test_exit"
-          echo 'VALIDATION REPORTS:'
-          find /tmp -path '*/broker-page-evidence-*/validator/validation-report.json' -print -exec cat {} \;
+          root="$(find /tmp -maxdepth 1 -type d -name 'broker-page-evidence-*' | head -1)"
+          echo "ROOT=$root TEST_EXIT=$test_exit"
+          export ROOT_PATH="$root"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          from openpyxl import load_workbook
+          root=Path(os.environ['ROOT_PATH'])
+          wb=load_workbook(root/'emit/model.xlsx', data_only=False, read_only=False)
+          wv=load_workbook(root/'emit/model.xlsx', data_only=True, read_only=False)
+          ws=wb['Operating Model']; vs=wv['Operating Model']
+          for addr in ['T51','T62']:
+              print(addr, 'FORMULA=', ws[addr].value, 'CACHED=', vs[addr].value)
+          wb.close(); wv.close()
+          plan=json.loads(Path(str(root/'emit/model.xlsx')+'.plan.json').read_text())
+          rp=json.loads(Path(str(root/'emit/model.xlsx')+'.row-map.json').read_text())
+          print('ROW51_DEF=', json.dumps(next((r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s] if r.get('row')==51),None),sort_keys=True))
+          print('ROW62_DEF=', json.dumps(next((r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s] if r.get('row')==62),None),sort_keys=True))
+          for addr in ['T51','T62']:
+              row=int(addr[1:])
+              defs=[r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s] if r.get('row')==row]
+              if defs:
+                  d=defs[0]
+                  print('DEF',addr,json.dumps(d,sort_keys=True))
+          print('VALIDATOR=',(root/'validator/validation-report.json').read_text())
+          PY
           exit $test_exit
