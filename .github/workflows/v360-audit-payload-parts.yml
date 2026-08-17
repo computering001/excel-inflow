@@ -1,0 +1,32 @@
+name: v360 audit payload parts
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - .github/workflows/v360-audit-payload-parts.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print exact part identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq -w 0 15); do
+            p="publish/v360-recovery-complete/part${i}.b64"
+            printf '%s ' "$p"
+            wc -c < "$p" | tr -d '\n'
+            printf ' '
+            sha256sum "$p" | awk '{print $1}'
+          done
+          cat publish/v360-recovery-complete/part*.b64 | tr -d '\n\r\t ' > /tmp/all.b64
+          printf 'aggregate_size='; wc -c < /tmp/all.b64
+          sha256sum /tmp/all.b64
