@@ -215,7 +215,7 @@ if (options.help) {
   process.exit(0);
 }
 const registry = JSON.parse(await fs.readFile(REGISTRY_PATH, "utf8"));
-if (registry.schema_version !== "development-test-registry/1.0") {
+if (registry.schema_version !== "development-test-registry/2.0") {
   throw new Error("Development-test registry has the wrong schema version.");
 }
 const knownPhases = [...new Set(registry.tests.map((test) => test.phase))].sort();
