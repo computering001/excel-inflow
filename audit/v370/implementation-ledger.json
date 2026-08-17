@@ -454,16 +454,16 @@
       "earliest_responsible_layer": "Schedule ownership and presentation.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs; scripts/lib/solver.mjs",
       "acceptance_criterion": "Instrument detail lives in the debt schedule; cash-flow forecast uses one schedule-linked Change in Debt line.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Instrument detail lives in the debt schedule; cash-flow forecast uses one schedule-linked Change in Debt line.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced by the handed-over workbook: debt issuance, repayment and RCF legs are all forecast-live on the cash-flow face instead of being represented by one schedule-owned parent.",
+        "focused_test": "PASS: statement classifier/topology proves all four debt/RCF children are captured and blank, Change in Debt owns three schedule_link authorities, and every historical/forecast financing rule consumes the parent exactly once; forecast topology 33/33 and forecast behavior 33/33 pass.",
+        "source_fix": "The row-plan compiler now transfers debt forecast authority to Change in Debt, clears direct child forecasts, rewires every historical and period-specific consumer to the parent, and emits the parent from the debt schedule total. Funded-acquisition debt proceeds bind to the consolidated parent while the instrument detail remains in the debt and liquidity schedules.",
+        "integration_evidence": "PASS: production user flow 14/14 and funded-acquisition transaction tests 16/16; portable plan build has zero unresolved caches, the rendered workbook agrees on 1,186/1,186 formula caches, and the independent physical semantic oracle passes 5,993 cells.",
+        "semantic_oracle_evidence": "PASS: authority follows semantic role, declared parentage and schedule ownership rather than issuer labels or row numbers; the row-map records one schedule-owned Change in Debt line and four not_separately_forecast child certificates.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "50e8b41"
       }
     },
     {
@@ -475,16 +475,16 @@
       "earliest_responsible_layer": "Cash-flow formula emission.",
       "candidate_files": "scripts/lib/row_plan.mjs; scripts/build_dynamic_model.mjs; scripts/lib/solver.mjs",
       "acceptance_criterion": "RCF movements enter CFF, net change in cash, closing cash and debt exactly once.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "RCF movements enter CFF, net change in cash, closing cash and debt exactly once.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced by the handed-over workbook: the visible financing subtotal range skips the separately forecast RCF draw and repayment rows.",
+        "focused_test": "PASS: statement classifier/topology mutates historical and forecast financing rules and requires each to reference Change in Debt once with no debt or RCF child reference; production decisions assert the same four captured detail roles.",
+        "source_fix": "RCF draw and repayment are folded into the Change in Debt historical family, retained in the liquidity schedule, captured on the cash-flow forecast face, and consumed through the parent's schedule total. This gives CFF, net cash movement, closing cash and debt one common path with no parallel child path.",
+        "integration_evidence": "PASS: the portable workbook emits J55=J97, J60=SUM(J53:J55), and blank J56:J59; cache parity agrees on all 1,186 formulas and the physical semantic oracle passes.",
+        "semantic_oracle_evidence": "PASS: typed debt/RCF roles and formula membership prove the single path independent of captions and cell positions; adversarial direct-child references fail the topology tests.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "50e8b41"
       }
     },
     {
@@ -559,16 +559,16 @@
       "earliest_responsible_layer": "Formula graph / aggregate consumption.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Downstream identities consume the selected parent authority and do not bypass it.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Downstream identities consume the selected parent authority and do not bypass it.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced by the handed-over workbook: cash generated from operations references working-capital child movements while bypassing the visible Change in Working Capital parent.",
+        "focused_test": "PASS: the statement classifier suite now injects a synthetic parent bypass into the historical rule and all three forecast-period rules, then requires normalization to replace every child reference with exactly one parent reference.",
+        "source_fix": "Constituent consolidation now rewires calculation, forecast_calculation and every forecast_period_calculations rule, so all downstream cash-generation identities consume the selected working-capital parent rather than its captured children.",
+        "integration_evidence": "PASS: statement topology, production user flow 14/14, portable plan construction, 1,186/1,186 cache parity and the independent workbook semantic oracle all pass.",
+        "semantic_oracle_evidence": "PASS: the regression uses declared working-capital membership with synthetic neutral row identities and fails any historical or forecast formula that bypasses the parent.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "50e8b41"
       }
     },
     {
