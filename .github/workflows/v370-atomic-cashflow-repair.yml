@@ -1,0 +1,233 @@
+name: v370 atomic protected cash-flow repair
+
+on:
+  push:
+    branches:
+      - agent/excel-inflow-v370-semantic-repair
+    paths:
+      - .github/workflows/v370-atomic-cashflow-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v370-atomic-cashflow-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/excel-inflow-v370-semantic-repair
+          fetch-depth: 0
+
+      - name: Require pristine v3.6 product baseline plus this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='456ca1fa5006dc8ecd586b1149f8865b8769ab52'
+          changed="$(git diff --name-only "$base"..HEAD)"
+          test "$changed" = '.github/workflows/v370-atomic-cashflow-repair.yml' || {
+            echo 'Unexpected pre-existing v3.7 branch changes:' >&2
+            printf '%s\n' "$changed" >&2
+            exit 1
+          }
+
+      - name: Apply protected cash-flow identity repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/lib/case_compiler.mjs')
+          text = path.read_text('utf-8')
+
+          anchor = '''/**\n * The derived stratum: rows the filings never print but the model requires —\n'''
+          assert text.count(anchor) == 1, text.count(anchor)
+          helper = r'''/**
+ * Protect the cash-flow spine before forecast authority is compiled.
+ *
+ * A filed activity total is an accounting identity, never an independent
+ * forecast series.  The source may print detailed children, nested aggregates
+ * and the total itself; the workbook must keep the reported total only as
+ * reconciliation evidence and calculate the live row from the current-period
+ * top-level members.  This is deliberately section-graph based rather than
+ * caption- or issuer-specific.
+ */
+export function enforceProtectedCashFlowIdentities(modelCase) {
+  const rows = modelCase?.statement_structure?.cash_flow ?? [];
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const byRole = new Map(
+    rows.filter((row) => row.semantic_role).map((row) => [row.semantic_role, row]),
+  );
+  const resolve = (id) => byRole.get(id) ?? byId.get(id) ?? null;
+
+  const topLevelBandRefs = (headerId, total) => {
+    if (!total) return [];
+    const headerIndex = rows.findIndex((row) => row.row_id === headerId);
+    const totalIndex = rows.indexOf(total);
+    if (headerIndex < 0 || totalIndex <= headerIndex) return [];
+    const candidates = rows
+      .slice(headerIndex + 1, totalIndex)
+      .filter((row) => row.row_type !== 'header' && row.operation_scope !== 'not_applicable');
+    const candidateIds = new Set(candidates.map((row) => row.row_id));
+    const consumed = new Set();
+    for (const parent of candidates) {
+      for (const ref of parent.calculation?.refs ?? []) {
+        if (candidateIds.has(ref)) consumed.add(ref);
+      }
+    }
+    const nested = new Set(
+      candidates
+        .filter((row) => row.parent_row_id && candidateIds.has(row.parent_row_id))
+        .map((row) => row.row_id),
+    );
+    return candidates
+      .filter((row) => !consumed.has(row.row_id) && !nested.has(row.row_id))
+      .map((row) => row.row_id);
+  };
+
+  const forceIdentity = (row, refs) => {
+    if (!row || refs.length === 0) return false;
+    const historical = (row.values ?? []).slice(0, 3);
+    if (historical.some((value) => value !== null && value !== undefined)) {
+      row.reported_historical_values ??= [...historical];
+      row.historical_authority = 'reported_total_reconciled';
+    } else {
+      row.historical_authority = 'derived_formula';
+    }
+    row.row_type = 'calculation';
+    row.calculation = { operator: 'sum', refs: [...refs] };
+    row.forecast_treatment = 'formula';
+    delete row.values;
+    delete row.forecast_calculation;
+    delete row.forecast_period_calculations;
+    delete row.forecast_period_authorities;
+    delete row.broker_metric_id;
+    return true;
+  };
+
+  const changed = [];
+  const cfi = resolve('cash_from_investing');
+  const cfiRefs = topLevelBandRefs('investing_activities', cfi);
+  if (forceIdentity(cfi, cfiRefs)) changed.push(cfi.row_id);
+
+  const cfo = resolve('cash_from_operations');
+  const cashBeforeFinancing = resolve('cash_before_financing');
+  if (cfo && cfi && forceIdentity(cashBeforeFinancing, [cfo.row_id, cfi.row_id])) {
+    changed.push(cashBeforeFinancing.row_id);
+  }
+
+  const cff = resolve('cash_from_financing');
+  const cffRefs = topLevelBandRefs('financing_activities', cff);
+  if (forceIdentity(cff, cffRefs)) changed.push(cff.row_id);
+
+  return Object.freeze({ changed: Object.freeze(changed) });
+}
+
+'''
+          text = text.replace(anchor, helper + anchor, 1)
+
+          call_anchor = '''  for (const rowId of applyDeclaredDerivedRows(modelCase, caseSource, report)) {\n    derivedRowIds.add(rowId);\n  }\n  // Late reconciled naming:'''
+          assert text.count(call_anchor) == 1, text.count(call_anchor)
+          call_replacement = '''  for (const rowId of applyDeclaredDerivedRows(modelCase, caseSource, report)) {\n    derivedRowIds.add(rowId);\n  }\n  // The filed cash-flow activity totals are protected identities before the\n  // forecast compiler sees them. This prevents a reported subtotal from\n  // acquiring carry-forward/trend authority merely because source parentage\n  // was incomplete.\n  enforceProtectedCashFlowIdentities(modelCase);\n  // Late reconciled naming:'''
+          text = text.replace(call_anchor, call_replacement, 1)
+          path.write_text(text, 'utf-8')
+          PY
+
+          cat > scripts/run_v370_cash_flow_identity_tests.mjs <<'JS'
+          #!/usr/bin/env node
+          import assert from 'node:assert/strict';
+          import { enforceProtectedCashFlowIdentities } from './lib/case_compiler.mjs';
+
+          const input = (row_id, values, extra={}) => ({ row_id, row_type:'input', values:[...values], ...extra });
+          const calc = (row_id, refs, extra={}) => ({ row_id, row_type:'calculation', calculation:{operator:'sum', refs:[...refs]}, ...extra });
+          const modelCase = {
+            statement_structure: {
+              income_statement: [],
+              cash_flow: [
+                { row_id:'investing_activities', row_type:'header' },
+                input('acquisitions_net_of_cash', [-10,-20,-30,null,null,null]),
+                calc('capex', ['ppe_purchases','intangible_purchases'], { semantic_role:'capex' }),
+                input('ppe_purchases', [-100,-110,-120,null,null,null], { parent_row_id:'capex' }),
+                input('intangible_purchases', [-20,-25,-30,null,null,null], { parent_row_id:'capex' }),
+                input('interest_received', [5,6,7,null,null,null]),
+                input('cash_from_investing', [-125,-149,-173,-173,-173,-173], {
+                  semantic_role:'cash_from_investing',
+                  forecast_period_authorities:[
+                    {method:'carry_forward'}, {method:'carry_forward'}, {method:'carry_forward'},
+                  ],
+                }),
+                input('cash_before_financing', [200,220,240,240,240,240], {
+                  semantic_role:'cash_before_financing',
+                  forecast_period_authorities:[
+                    {method:'carry_forward'}, {method:'carry_forward'}, {method:'carry_forward'},
+                  ],
+                }),
+                { row_id:'financing_activities', row_type:'header' },
+                calc('change_in_debt', ['debt_issuance','debt_repayment','rcf_draw','rcf_repayment'], { semantic_role:'change_in_debt' }),
+                input('debt_issuance', [50,40,30,null,null,null], { parent_row_id:'change_in_debt' }),
+                input('debt_repayment', [-70,-60,-50,null,null,null], { parent_row_id:'change_in_debt' }),
+                calc('rcf_draw', [], { semantic_role:'rcf_draw', parent_row_id:'change_in_debt' }),
+                calc('rcf_repayment', [], { semantic_role:'rcf_repayment', parent_row_id:'change_in_debt' }),
+                input('dividends', [-25,-30,-35,null,null,null]),
+                input('cash_from_financing', [-45,-50,-55,-55,-55,-55], {
+                  semantic_role:'cash_from_financing',
+                  forecast_period_authorities:[
+                    {method:'carry_forward'}, {method:'carry_forward'}, {method:'carry_forward'},
+                  ],
+                }),
+                calc('cash_from_operations', ['operating_component'], { semantic_role:'cash_from_operations' }),
+                input('operating_component', [325,369,413,null,null,null]),
+              ],
+            },
+          };
+
+          const result = enforceProtectedCashFlowIdentities(modelCase);
+          const rows = new Map(modelCase.statement_structure.cash_flow.map((row)=>[row.row_id,row]));
+
+          assert.deepEqual(result.changed, ['cash_from_investing','cash_before_financing','cash_from_financing']);
+          assert.deepEqual(rows.get('cash_from_investing').calculation, {
+            operator:'sum', refs:['acquisitions_net_of_cash','capex','interest_received'],
+          });
+          assert.deepEqual(rows.get('cash_before_financing').calculation, {
+            operator:'sum', refs:['cash_from_operations','cash_from_investing'],
+          });
+          assert.deepEqual(rows.get('cash_from_financing').calculation, {
+            operator:'sum', refs:['change_in_debt','dividends'],
+          });
+          assert.equal(rows.get('cash_from_investing').historical_authority, 'reported_total_reconciled');
+          assert.deepEqual(rows.get('cash_from_investing').reported_historical_values, [-125,-149,-173]);
+          assert.equal('values' in rows.get('cash_from_investing'), false);
+          assert.equal('forecast_period_authorities' in rows.get('cash_from_investing'), false);
+          assert.equal('forecast_period_authorities' in rows.get('cash_before_financing'), false);
+          assert.equal('forecast_period_authorities' in rows.get('cash_from_financing'), false);
+          assert.ok(rows.get('change_in_debt').calculation.refs.includes('rcf_draw'));
+          assert.ok(rows.get('change_in_debt').calculation.refs.includes('rcf_repayment'));
+          console.log(JSON.stringify({status:'PASS', checks:12}));
+          JS
+          chmod +x scripts/run_v370_cash_flow_identity_tests.mjs
+
+          node --check scripts/lib/case_compiler.mjs
+          node --check scripts/run_v370_cash_flow_identity_tests.mjs
+          node scripts/run_v370_cash_flow_identity_tests.mjs
+          node scripts/run_case_compiler_mutation_tests.mjs
+          node scripts/run_forecast_topology_tests.mjs
+          node scripts/run_nonrecurring_forecast_policy_tests.mjs
+          git diff --check
+
+      - name: Commit only the passing atomic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Excel Inflow v3.7 repair'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/lib/case_compiler.mjs scripts/run_v370_cash_flow_identity_tests.mjs
+          git diff --cached --check
+          git commit -m 'Protect cash-flow activity identities from forecast carry-forward'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v370-semantic-repair
+          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
