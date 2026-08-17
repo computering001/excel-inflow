@@ -9,6 +9,7 @@ import {
   selectForecastAuthority,
 } from "./forecast_authority.mjs";
 import { observationsForConcept } from "./forecast_observation.mjs";
+import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import {
   resolveAnchorPlanDecision,
   resolveBrokerForecastSelection,
@@ -1347,7 +1348,14 @@ export function materializeSelectedAuthorityContract(modelCase, contract) {
     status: unresolvedMaterialCount === 0 ? "PASS" : "BLOCKED",
     unresolved_material_count: unresolvedMaterialCount,
   };
-  return materializeForecastPlan(modelCase, sealedPlan);
+  const materialized = materializeForecastPlan(modelCase, sealedPlan);
+  // This function is the sole selected-authority economic writer. The sealed
+  // contract replaces provisional row authorities, so the forecast-authority
+  // ledger must be resealed here, at the mutator, before the case can cross
+  // into question planning or the solver. Later unreceipted mutations remain
+  // fail-closed because verification rebuilds the ledger from the live case.
+  sealForecastAuthorityLedger(materialized);
+  return materialized;
 }
 
 export function validateForecastPlanCaseParity(modelCase, plan) {
