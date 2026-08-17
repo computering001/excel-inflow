@@ -72,6 +72,61 @@ def demand_graph(labels: list[str]) -> dict[str, Any]:
     return {**body, "graph_sha256": canonical_hash(body)}
 
 
+def demand_graph_v2(labels: list[str]) -> dict[str, Any]:
+    metric_by_label = {
+        "Revenue": "revenue",
+        "EBIT": "ebit",
+        "Depreciation and amortisation": "depreciation_and_amortisation",
+        "Effective tax rate": "effective_tax_rate",
+        "Capital expenditure": "capex",
+        "Change in working capital": "change_in_working_capital",
+        "Dividends paid": "dividends",
+        "Share buybacks": "share_buybacks",
+    }
+    nodes = []
+    for row_index, label in enumerate(labels):
+        metric_id = metric_by_label[label]
+        section = "cash_flow" if metric_id in {
+            "capex", "change_in_working_capital", "dividends", "share_buybacks"
+        } else "income_statement"
+        for period_index, period_end in enumerate(FORECAST_PERIODS):
+            nodes.append({
+                "node_id": f"model_demand.{metric_id}.fy{period_index + 1}",
+                "node_kind": "model_demand",
+                "section": section,
+                "source_line_id": f"s{row_index}",
+                "metric_id": metric_id,
+                "label": label,
+                "parent_label": None,
+                "period_end": period_end,
+                "material": True,
+                "source_backed": True,
+                "broker_demand_eligible": True,
+                "house_requirement": "headline_anchor" if metric_id == "ebit" else "required",
+                "allowed_authorities": ["selected_broker", "historical_inference"],
+                "definition_signature_sha256": "c" * 64,
+                "consumer_ids": [f"forecast_authority.{metric_id}.{period_end}"],
+            })
+    body = {
+        "schema_version": "pre-broker-model-demand/2.0",
+        "run_id": "broker_demand_selection_v2",
+        "as_of": "2026-12-31",
+        "reporting_currency": "USD",
+        "units": "millions",
+        "forecast_periods": FORECAST_PERIODS,
+        "ontology_sha256": "d" * 64,
+        "nodes": nodes,
+        "counts": {
+            "source_rows": len(labels),
+            "filed_forecast_nodes": 0,
+            "model_demand_concepts": len(labels),
+            "model_demand_nodes": len(nodes),
+            "material_model_demand_nodes": len(nodes),
+        },
+    }
+    return {**body, "graph_sha256": canonical_hash(body)}
+
+
 def context(labels: list[str]) -> dict[str, Any]:
     return {
         "as_of": "2026-12-31",
@@ -79,6 +134,16 @@ def context(labels: list[str]) -> dict[str, Any]:
         "units": "millions",
         "forecast_periods": FORECAST_PERIODS,
         "model_demand_graph": demand_graph(labels),
+    }
+
+
+def context_v2(labels: list[str]) -> dict[str, Any]:
+    return {
+        "as_of": "2026-12-31",
+        "reporting_currency": "USD",
+        "units": "millions",
+        "forecast_periods": FORECAST_PERIODS,
+        "model_demand_graph": demand_graph_v2(labels),
     }
 
 
@@ -153,6 +218,12 @@ def main() -> int:
         check(compiled.returncode == 0, f"real broker pack compiler rejected selection: {compiled.stderr or compiled.stdout}"); checks += 1
         pack = json.loads((root / "pack" / "broker-pack.json").read_text("utf-8"))
         check(pack["recommended_primary_house_id"] == "alpha", "deterministic primary house was not selected"); checks += 1
+
+        v2_crosswalk, v2_receipt = compile_demand_selected_crosswalk(
+            source, context_v2(labels), bundle_sha256=source_sha,
+        )
+        check(v2_receipt["status"] == "PASS", "fresh v2 demand did not reach selected broker authority"); checks += 1
+        check(len(v2_crosswalk["mappings"]) == 72, "v2 demand selected a different broker surface from v1"); checks += 1
 
         limited, limited_receipt = compile_demand_selected_crosswalk(
             source, context([label for label in labels if label != "Share buybacks"]),

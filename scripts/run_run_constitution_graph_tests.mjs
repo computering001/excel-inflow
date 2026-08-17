@@ -140,6 +140,54 @@ const preBrokerDemand = {
   graph_sha256: createHash("sha256").update(`${JSON.stringify(canonical(preBrokerBody))}\n`).digest("hex"),
 };
 assert.equal(validatePreBrokerDemandCoverage(preBrokerDemand, demand).valid, true);
+const preBrokerV2Body = {
+  schema_version: "pre-broker-model-demand/2.0",
+  run_id: modelCase.case_id,
+  as_of: "2025-12-31",
+  reporting_currency: "USD",
+  units: "millions",
+  forecast_periods: demand.forecast_periods,
+  ontology_sha256: "2".repeat(64),
+  nodes: demand.nodes
+    .filter((node) => node.node_kind === "forecast_state")
+    .map((node) => ({
+      node_id: `model_demand.${node.concept_id}.${node.period_end}`,
+      node_kind: "model_demand",
+      section: node.section,
+      source_line_id: node.source_line_ids[0] ?? null,
+      metric_id: node.concept_id,
+      label: node.concept_id,
+      parent_label: null,
+      period_end: node.period_end,
+      material: node.material,
+      source_backed: node.source_line_ids.length > 0,
+      broker_demand_eligible: true,
+      house_requirement: ["ebit", "adjusted_ebitda"].includes(node.concept_id)
+        ? "headline_anchor"
+        : "required",
+      allowed_authorities: ["selected_broker", "historical_inference"],
+      definition_signature_sha256: "3".repeat(64),
+      consumer_ids: [node.node_id],
+    })),
+  counts: {
+    source_rows: 4,
+    filed_forecast_nodes: 0,
+    model_demand_concepts: 4,
+    model_demand_nodes: 12,
+    material_model_demand_nodes: 12,
+  },
+};
+const preBrokerDemandV2 = {
+  ...preBrokerV2Body,
+  graph_sha256: createHash("sha256")
+    .update(`${JSON.stringify(canonical(preBrokerV2Body))}\n`)
+    .digest("hex"),
+};
+assert.equal(
+  validatePreBrokerDemandCoverage(preBrokerDemandV2, demand).valid,
+  true,
+  "Fresh pre-broker demand v2 did not survive into final model authority.",
+);
 const demandWithCompilerIdentity = structuredClone(demand);
 demandWithCompilerIdentity.nodes.push({
   ...structuredClone(demand.nodes.find((node) => node.node_kind === "forecast_state")),
@@ -241,4 +289,4 @@ const detachedProduct = structuredClone(constitution);
 detachedProduct.product_constitution_sha256 = "0".repeat(64);
 assert.equal(validateRunConstitutionGraph(detachedProduct).valid, false);
 
-process.stdout.write(`${JSON.stringify({ status: "PASS", positive_checks: 15, adversarial_mutations: 5, total_violations: 0 }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ status: "PASS", positive_checks: 16, adversarial_mutations: 5, total_violations: 0 }, null, 2)}\n`);
