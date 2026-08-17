@@ -68,10 +68,12 @@ jobs:
         run: |
           set +e
           set -uo pipefail
+          export PATH="/tmp/v360-python/bin:$PATH"
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
+          python3 -c 'import fitz,openpyxl; print("GATE_PATH_PYTHON=PASS",openpyxl.__version__)'
           rm -rf /tmp/v360-development-gate
           node scripts/run_development_gate.mjs \
             --cases test-fixtures/cases \
