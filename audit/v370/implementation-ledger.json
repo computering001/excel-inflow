@@ -1215,16 +1215,16 @@
       "earliest_responsible_layer": "Repository governance.",
       "candidate_files": ".github/workflows; scripts/run_development_gate.mjs",
       "acceptance_criterion": "PR/main CI is read-only; product source is edited locally and pushed normally; obsolete write workflows are removed/archived.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "PR/main CI is read-only; product source is edited locally and pushed normally; obsolete write workflows are removed/archived.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: seal-universal-broker-matrix.yml granted contents and pull-request write permissions, rewrote product files in Python, deleted its own workflow, committed every worktree change and pushed the repair branch from CI.",
+        "focused_test": "PASS: CI governance lint proves the sole workflow has pull-request/main triggers, contents: read and no mutation patterns; four injected write-permission, git-commit, release-compiler and heredoc mutations are rejected.",
+        "source_fix": "The obsolete source-authoring workflow is removed. Its replacement is a read-only PR/main verification workflow that runs source-owned governance, registry, authority, acquisition and filing-extraction tests and has no remote mutation permission.",
+        "integration_evidence": "PASS: workflow YAML parses, governance lint 5/5 with four mutations, registry contract 3/3 and every command named by the read-only workflow passes locally.",
+        "semantic_oracle_evidence": "NOT_APPLICABLE_REPOSITORY_GOVERNANCE",
+        "native_excel_evidence": "NOT_APPLICABLE; REMOTE_CI_EXECUTION_PENDING_BRANCH_PUSH",
+        "commit": "eb5ffe7"
       }
     },
     {
