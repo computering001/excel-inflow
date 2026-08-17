@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T17:12:00Z",
+  "recorded_at": "2026-08-17T18:20:00Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -307,16 +307,16 @@
       "earliest_responsible_layer": "KPI semantic decomposition.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/statement_classifier.mjs",
       "acceptance_criterion": "Pure EBITDA adds only compatible D&A; impairment is a separate adjustment and is included only in an explicitly labelled adjusted measure.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Pure EBITDA adds only compatible D&A; impairment is a separate adjustment and is included only in an explicitly labelled adjusted measure.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in the source-proposer mutation: a combined depreciation, amortisation and impairment disclosure was assigned to the pure D&A role.",
+        "focused_test": "PASS: statement classifier 13 positive/5 adversarial plus topology mutations; source proposer 42/42; semantic closure 11/11.",
+        "source_fix": "The ontology and taxonomy now type combined D&A-plus-impairment separately; the EBITDA compiler independently rejects impairment-bearing cash-flow candidates.",
+        "integration_evidence": "PASS: forecast behavior 28/28 with seven mutations; broker dynamic concepts 11/11; two-case compiler and plan equivalence with zero economic or hard plan diffs.",
+        "semantic_oracle_evidence": "PASS: combined D&A-plus-impairment cannot classify or compile as the pure EBITDA bridge component; impairment is sealed as non-pure in economic-ontology-v2.",
+        "native_excel_evidence": "NOT_APPLICABLE_SEMANTIC_SOURCE_LAYER",
+        "commit": "bbff905"
       }
     },
     {
@@ -328,16 +328,16 @@
       "earliest_responsible_layer": "Economic ontology.",
       "candidate_files": "scripts/lib/semantic_roles.mjs; assets/economic-ontology-v2.json; scripts/lib/statement_classifier.mjs",
       "acceptance_criterion": "Reported EBIT, adjusted EBIT, reported EBITDA and adjusted EBITDA are separately typed and bridged.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Reported EBIT, adjusted EBIT, reported EBITDA and adjusted EBITDA are separately typed and bridged.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in classifier and semantic-closure tests: Core Operating Profit lacked an adjusted-EBIT concept and statutory operating profit canonicalised to EBIT.",
+        "focused_test": "PASS: alias-only high-impact labels abstain; contextual Core Operating Result classifies as adjusted EBIT; percentage margins are rejected; semantic closure 11/11.",
+        "source_fix": "Statutory operating profit, reported EBIT, adjusted EBIT, reported EBITDA and adjusted EBITDA now retain distinct ontology identities; broker headline compatibility is applied locally rather than by global collapse.",
+        "integration_evidence": "PASS: source proposer 42/42; statement classifier/topology suite; forecast behavior 28/28; broker dynamic concepts 11/11; frozen two-case compiler and plan equivalence.",
+        "semantic_oracle_evidence": "PASS: high-impact classification requires evidence beyond label, statement and adjustment wording; semantic closure proves operating profit and adjusted EBIT remain distinct from EBIT.",
+        "native_excel_evidence": "NOT_APPLICABLE_ONTOLOGY_LAYER",
+        "commit": "bbff905"
       }
     },
     {
