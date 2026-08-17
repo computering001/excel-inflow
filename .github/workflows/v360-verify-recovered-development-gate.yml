@@ -1,4 +1,4 @@
-# verify the repaired v3.6 target branch with every test whose custody inputs are repo-local
+# diagnose every repo-local v3.6 gate failure without mutating the target branch
 name: v360 verify recovered development gate
 
 on:
@@ -50,7 +50,7 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
 
-      - name: Select every test with repo-local custody
+      - name: Select repo-local tests for diagnostic gate
         shell: bash
         run: |
           set -euo pipefail
@@ -64,23 +64,24 @@ jobs:
           excluded=[]
           for t in d['tests']:
               req=set(t.get('requires',[]))
-              if req <= available:
+              if req <= available and t['id'] != 'test-registry-contract':
                   selected.append(t)
               else:
-                  excluded.append((t['id'], sorted(req-available)))
+                  why=['self-contract-run-separately'] if t['id']=='test-registry-contract' else sorted(req-available)
+                  excluded.append((t['id'], why))
           print('REGISTRY_TOTAL='+str(len(d['tests'])))
-          print('SELECTED_LOCAL_CUSTODY='+str(len(selected)))
-          print('EXCLUDED_EXTERNAL='+str(len(excluded)))
-          for tid,missing in excluded:
-              print('EXCLUDED_ID='+tid+' MISSING='+','.join(missing))
+          print('SELECTED_DIAGNOSTIC='+str(len(selected)))
+          print('EXCLUDED='+str(len(excluded)))
+          for tid,why in excluded:
+              print('EXCLUDED_ID='+tid+' REASON='+','.join(why))
           d['tests']=selected
           p.write_text(json.dumps(d,indent=2)+'\n')
           PY
 
-      - name: Run repaired v3.6 development gate
+      - name: Run diagnostic gate and print every failure
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           rm -rf /tmp/v360-development-gate
           node scripts/run_development_gate.mjs \
             --cases test-fixtures/cases \
@@ -90,6 +91,7 @@ jobs:
             --concurrency 1 \
             --timeout-ms 900000 \
             --out /tmp/v360-development-gate
+          gate_exit=$?
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -98,12 +100,15 @@ jobs:
           print('PASS='+str(d['counts']['PASS']))
           print('FAIL='+str(d['counts']['FAIL']))
           print('BLOCKED='+str(d['counts']['BLOCKED']))
-          if d['status']!='PASS':
-              for r in d['results']:
-                  if r['status']!='PASS':
-                      print('FAILED_ID='+r['id'])
-                      print('STATUS='+r['status'])
-                      print((r.get('stdout') or '')[-3000:])
-                      print((r.get('stderr') or '')[-5000:])
-              raise SystemExit(1)
+          for r in d['results']:
+              if r['status']!='PASS':
+                  print('\n=== FAILED_ID='+r['id']+' STATUS='+r['status']+' ===')
+                  if r.get('command'):
+                      print('COMMAND='+' '.join(map(str,r['command'])))
+                  if r.get('stdout'):
+                      print('STDOUT_TAIL:\n'+r['stdout'][-5000:])
+                  if r.get('stderr'):
+                      print('STDERR_TAIL:\n'+r['stderr'][-8000:])
+          if d['status']!='PASS': raise SystemExit(1)
           PY
+          exit $gate_exit
