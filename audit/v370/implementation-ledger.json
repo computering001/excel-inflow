@@ -274,7 +274,7 @@
         "integration_evidence": "PASS: the attachment producer emits /2.0, the real broker controller accepts the fresh request, v1/v2 selected-cell crosswalks resolve the same 72 source mappings, and the degraded controller-to-portable-workbook path emits PASS_PENDING_MANUAL with zero violations. A clean-root development package now compiles and executes a real production-contract case with the normalized demand modules present. Exact installed-host certification remains pending.",
         "semantic_oracle_evidence": "PASS: canonical matching accepts source-backed nodes by source identity and synthetic model-demand nodes by section/metric/period identity; stale graph hashes and disappearing nodes still fail closed.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
-        "commit": "f0bf43e6c80aa270e670a1835d280517f2293b85 (normalization); CURRENT_CHECKPOINT_PENDING (deployment closure)"
+        "commit": "f0bf43e6c80aa270e670a1835d280517f2293b85 (normalization); 55c829d (deployment closure)"
       }
     },
     {
@@ -862,7 +862,7 @@
         "integration_evidence": "PASS: real Stage-4 interruption/recovery suite 7/7; clean-root development package compiles and executes a production-contract case with PASS_PENDING_MANUAL, zero violations and explicit pending native/visual release status.",
         "semantic_oracle_evidence": "PASS: a synthetic two-sheet OOXML mutation places #REF! at Forward Curves!XFD1048576; the independent scanner detects it outside the operating sheet and at the furthest valid used-cell coordinate, while the clean counterpart remains error-free.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_MICROSOFT_EXCEL_HOST",
-        "commit": "CURRENT_CHECKPOINT_PENDING"
+        "commit": "55c829d"
       }
     },
     {
@@ -883,7 +883,7 @@
         "integration_evidence": "PASS: the isolated development release manifest records workbookBuild.status and validation_status as PASS_PENDING_MANUAL, no certified closure, no evidence receipt and the explicit pending release gate; removing native_excel from a certification manifest fails schema validation.",
         "semantic_oracle_evidence": "PASS: policy mutations cannot promote a cached-value-only result because development and certification are disjoint package modes with distinct required statuses and evidence closures.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_MICROSOFT_EXCEL_HOST",
-        "commit": "CURRENT_CHECKPOINT_PENDING"
+        "commit": "55c829d"
       }
     },
     {
