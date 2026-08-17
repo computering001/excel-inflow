@@ -1173,16 +1173,16 @@
       "earliest_responsible_layer": "Filing extraction.",
       "candidate_files": "scripts/extract_filing_statements.py; scripts/lib/face_statement_manifest.mjs",
       "acceptance_criterion": "Multi-page continuity, repeated-header removal, typed values, units and source order are preserved.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Multi-page continuity, repeated-header removal, typed values, units and source order are preserved.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: statement_window ended at the heading page boundary and resolved one shared column geometry, so continuation rows, shifted page geometry and repeated headers were either truncated or admitted without typed page/unit custody.",
+        "focused_test": "PASS: forced two-page extraction 14/14 preserves nine rows across shifted page geometry, removes repeated title/year/unit lines, retains typed zero/dash/N/A states and rejects eight required-field, row, unit and state mutations.",
+        "source_fix": "Current extraction emits face-statement-manifest/1.1. Adjacent pages join only through a positive continuation certificate; columns resolve per page; currency, normalized units, exact printed unit labels and ordered source pages are hash-bound; missing reporting basis blocks extraction.",
+        "integration_evidence": "PASS: typed filing custody 21/21, case-source proposer 51/51, source arithmetic 9/9, independent arithmetic oracle 2/2 and arithmetic topology 5/5; evidence-run compatibility accepts sealed legacy 1.0 while current extraction is fail-closed 1.1.",
+        "semantic_oracle_evidence": "PASS: the focused suite invokes the exact production filingManifestCustodyErrors validator, which proves adjacent ordered pages, page coverage, reporting-basis equality, typed value/value-state consistency, contiguous source order and digest binding for clean and mutated manifests.",
+        "native_excel_evidence": "NOT_APPLICABLE_SOURCE_EXTRACTION; REBUILT_PACKAGE_PENDING",
+        "commit": "02a11c2"
       }
     },
     {
