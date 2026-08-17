@@ -76,6 +76,11 @@ import {
   sha256File,
   validateReleaseCertificationEvidence,
 } from "./lib/release_certification.mjs";
+import {
+  assertPackageMode,
+  productIdentity,
+  runtimeCodeClosureIdentity,
+} from "./lib/identity_vocabulary.mjs";
 
 const BUILTINS = new Set(builtinModules);
 
@@ -233,6 +238,19 @@ const pythonEntryPointNotes = deploymentProfile.python_entry_point_notes ?? {};
 const pythonEntrySmoke = deploymentProfile.python_entry_point_smoke ?? {};
 const pythonRuntime = deploymentProfile.python_runtime ?? {};
 const readerDecision = deploymentProfile.xlsx_reader_consolidation_decision ?? null;
+const packageMode = assertPackageMode(developmentNow ? "development" : "certified");
+
+function gitIdentity(args, environmentName) {
+  const override = process.env[environmentName];
+  if (override) return override;
+  const run = spawnSync("git", ["-C", skillDir, ...args], { encoding: "utf8" });
+  return run.status === 0 ? String(run.stdout).trim() || null : null;
+}
+
+const sourceCommit = gitIdentity(["rev-parse", "HEAD"], "EXCEL_INFLOW_SOURCE_COMMIT");
+const sourceTree = gitIdentity(["rev-parse", "HEAD^{tree}"], "EXCEL_INFLOW_SOURCE_TREE");
+const sourceRepository =
+  process.env.EXCEL_INFLOW_SOURCE_REPOSITORY ?? "computering001/excel-inflow";
 
 if (Object.keys(allowedPythonImports).length === 0) {
   throw new Error(
@@ -1042,31 +1060,39 @@ const closureFileList = [
     key: name,
     absolute: path.join(skillDir, name),
   })),
+  ...vendoredDependencies.flatMap((dependency) => [
+    {
+      key: posix(dependency.install_path),
+      absolute: path.join(skillDir, dependency.source),
+    },
+    {
+      key: posix(path.join(path.dirname(dependency.install_path), "package.json")),
+      absolute: path.join(skillDir, path.dirname(dependency.source), "package.json"),
+    },
+    {
+      key: posix(dependency.license_install_path),
+      absolute: path.join(skillDir, dependency.license_source),
+    },
+  ]),
 ].sort((a, b) => (a.key < b.key ? -1 : 1));
 
 const closureFileHashes = {};
 for (const item of closureFileList) {
   closureFileHashes[item.key] = sha256(await fs.readFile(item.absolute));
 }
-const closureDigest = sha256(
-  Buffer.from(
-    Object.entries(closureFileHashes)
-      .map(([key, hash]) => `${key} ${hash}\n`)
-      .join(""),
-    "utf8",
-  ),
-);
+const runtimeCodeClosure = runtimeCodeClosureIdentity(closureFileHashes);
+const closureDigest = runtimeCodeClosure.sha256;
 
 let certificationReceipt = null;
 if (certifyNow) {
   certificationReceipt = await validateReleaseCertificationEvidence({
     manifestPath: certificationEvidencePath,
-    closureHash: closureDigest,
+    runtimeCodeClosureSha256: closureDigest,
   });
   if (certificationReceipt.status !== "PASS") {
     throw new Error(
       [
-        "Certification evidence does not prove this exact closure.",
+        "Certification evidence does not prove this exact runtime-code closure.",
         ...certificationReceipt.findings.map(
           (item) => `  ${item.id}: ${item.message}`,
         ),
@@ -1076,24 +1102,38 @@ if (certifyNow) {
 }
 
 if (certifyNow) {
+  const runtimeCodeClosureRecordedAt = new Date().toISOString();
+  const runtimeCodeClosureNote =
+    "Identity over the declared executable and machine-contract package subset at the moment --certify was passed. It is not the complete-package, archive or installed-package identity.";
+  runtimeManifest.certified_runtime_code_closure_sha256 = closureDigest;
+  runtimeManifest.certified_runtime_code_closure_files = closureFileHashes;
+  runtimeManifest.certified_runtime_code_closure_recorded_at =
+    runtimeCodeClosureRecordedAt;
+  runtimeManifest.certified_runtime_code_closure_note = runtimeCodeClosureNote;
+  // Certification evidence schema v1 compatibility fields. RELEASE-039 moves
+  // this receipt outside the package and removes the self-referential aliases.
   runtimeManifest.certified_closure_sha256 = closureDigest;
   runtimeManifest.certified_closure_files = closureFileHashes;
-  runtimeManifest.certified_closure_recorded_at = new Date().toISOString();
-  runtimeManifest.certified_closure_note =
-    "Hash over the resolved deployment host script+asset closure at the moment --certify was passed. It asserts only that these bytes are the ones the certification run saw; run the certification, then record. compile_skill_release.mjs recomputes and compares on every subsequent compile.";
+  runtimeManifest.certified_closure_recorded_at = runtimeCodeClosureRecordedAt;
+  runtimeManifest.certified_closure_note = runtimeCodeClosureNote;
 } else if (!developmentNow) {
-  const recordedDigest = runtimeManifest.certified_closure_sha256;
+  const recordedDigest =
+    runtimeManifest.certified_runtime_code_closure_sha256 ??
+    runtimeManifest.certified_closure_sha256;
   if (!recordedDigest) {
     throw new Error(
       [
-        "assets/runtime-manifest.json reads local_production_certified but records no certified_closure_sha256.",
+        "assets/runtime-manifest.json reads local_production_certified but records no certified_runtime_code_closure_sha256.",
         "  A hand-set status string is not evidence that these sources are the certified ones.",
-        "  Re-run local certification, then compile once with --certify to record the closure hash.",
+        "  Re-run local certification, then compile once with --certify to record the runtime-code closure identity.",
       ].join("\n"),
     );
   }
   if (recordedDigest !== closureDigest) {
-    const recordedFiles = runtimeManifest.certified_closure_files ?? {};
+    const recordedFiles =
+      runtimeManifest.certified_runtime_code_closure_files ??
+      runtimeManifest.certified_closure_files ??
+      {};
     const changed = [];
     const added = [];
     const removed = [];
@@ -1106,13 +1146,13 @@ if (certifyNow) {
     }
     throw new Error(
       [
-        "The closure has moved since certification; this package is not the certified package.",
+        "The runtime-code closure has moved since certification; this package is not certified.",
         `  recorded ${recordedDigest}`,
         `  computed ${closureDigest}`,
         changed.length > 0 ? `  changed since certification: ${changed.sort().join(", ")}` : null,
         added.length > 0 ? `  added since certification: ${added.sort().join(", ")}` : null,
         removed.length > 0 ? `  removed since certification: ${removed.sort().join(", ")}` : null,
-        "  Re-run local certification against these sources, then compile with --certify.",
+        "  Re-run local certification against this runtime-code closure, then compile with --certify.",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -1784,7 +1824,7 @@ if (certifyNow) {
     "utf8",
   );
   console.error(
-    `Recorded certified_closure_sha256 ${closureDigest} over ${closureFileList.length} files.`,
+    `Recorded certified_runtime_code_closure_sha256 ${closureDigest} over ${closureFileList.length} files.`,
   );
 }
 
@@ -1795,24 +1835,49 @@ if (certifyNow) {
 const manifest = {
   releaseName: `${deploymentProfile.release_name} v${runtimeManifest.skill_version}`,
   schemaVersion: 2,
-  packageMode: developmentNow ? "development" : "certified",
+  packageMode,
+  deploymentStatus: "not_installed",
   skillVersion: runtimeManifest.skill_version,
   templateVersion: runtimeManifest.template_version,
   sourceStatus: runtimeManifest.status,
   generatedAt: new Date().toISOString(),
   centralInstructionsWords: wordCount(centralInstructions),
   profile: "assets/deployment-profile.json",
+  identity: productIdentity({
+    repository: sourceRepository,
+    sourceCommit,
+    sourceTree,
+    packageMode,
+    deploymentStatus: "not_installed",
+    runtimeCodeClosureSha256: closureDigest,
+    certifiedRuntimeCodeClosureSha256: developmentNow ? null : closureDigest,
+    // Complete package, archive and installed-package identities are sealed by
+    // the external attestation/install phases. They must never be aliases for
+    // this narrower runtime-code closure.
+    completePackageInventorySha256: null,
+    archiveSha256: null,
+    installedPackageSha256: null,
+    installationIdentity: null,
+  }),
   certification: {
+    certifiedRuntimeCodeClosureSha256: developmentNow ? null : closureDigest,
+    runtimeCodeClosureSha256: closureDigest,
     certifiedClosureSha256: developmentNow ? null : closureDigest,
     currentClosureSha256: closureDigest,
     closureFileCount: closureFileList.length,
-    recordedAt: developmentNow ? null : (runtimeManifest.certified_closure_recorded_at ?? null),
+    recordedAt: developmentNow
+      ? null
+      : (runtimeManifest.certified_runtime_code_closure_recorded_at ??
+        runtimeManifest.certified_closure_recorded_at ??
+        null),
     recertifiedByThisRun: certifyNow,
     evidenceReceipt: certificationReceipt
       ? {
           schemaVersion: certificationReceipt.schema_version,
           status: certificationReceipt.status,
           totalViolations: certificationReceipt.total_violations,
+          certifiedRuntimeCodeClosureSha256:
+            certificationReceipt.certified_runtime_code_closure_sha256,
           certifiedClosureSha256: certificationReceipt.certified_closure_sha256,
           manifestSha256: certificationReceipt.manifest.sha256,
           evidence: Object.fromEntries(

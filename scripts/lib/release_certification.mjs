@@ -382,15 +382,24 @@ function frozenCohort(report, closureHash, findings) {
   }
 }
 
-export async function validateReleaseCertificationEvidence({ manifestPath, closureHash, authorityHashes = AUTHORITY }) {
+export async function validateReleaseCertificationEvidence({
+  manifestPath,
+  runtimeCodeClosureSha256 = null,
+  // Compatibility input for evidence schema v1. New callers must use the
+  // identity-specific name so this proof cannot be mistaken for complete
+  // package, archive or installed-package certification.
+  closureHash = null,
+  authorityHashes = AUTHORITY,
+}) {
   const findings = [];
+  const runtimeCodeClosureHash = runtimeCodeClosureSha256 ?? closureHash;
   const testOverrideRequested = authorityHashes !== AUTHORITY;
   if (testOverrideRequested && process.env.EXCEL_INFLOW_RELEASE_CERT_TEST_MODE !== "1") {
     findings.push(finding("authority.override", "Immutable V4 authority identities cannot be overridden outside the adversarial contract test."));
     authorityHashes = AUTHORITY;
   }
-  if (!SHA256.test(String(closureHash ?? ""))) {
-    return { status: "FAIL", total_violations: 1, findings: [finding("closure", "A lowercase SHA-256 closure hash is required.")] };
+  if (!SHA256.test(String(runtimeCodeClosureHash ?? ""))) {
+    return { status: "FAIL", total_violations: 1, findings: [finding("runtime_code_closure", "A lowercase SHA-256 runtime-code closure identity is required.")] };
   }
   const absoluteManifest = path.resolve(manifestPath);
   const root = path.dirname(absoluteManifest);
@@ -402,32 +411,36 @@ export async function validateReleaseCertificationEvidence({ manifestPath, closu
       schema_version: "release-certification-evidence-receipt/1.0",
       status: "FAIL",
       total_violations: 1,
-      certified_closure_sha256: closureHash,
+      certified_runtime_code_closure_sha256: runtimeCodeClosureHash,
+      certified_closure_sha256: runtimeCodeClosureHash,
       manifest: { path: absoluteManifest, sha256: null },
       evidence: {},
       findings: [finding("manifest.read", "Certification-evidence manifest could not be read as JSON.", { error: error.message })],
     };
   }
   schemaFindings(MANIFEST_SCHEMA, manifest, "manifest", findings);
-  if (manifest.certified_closure_sha256 !== closureHash) {
-    findings.push(finding("manifest.closure", "Evidence manifest is not bound to the computed closure."));
+  const manifestRuntimeCodeClosure =
+    manifest.certified_runtime_code_closure_sha256 ?? manifest.certified_closure_sha256;
+  if (manifestRuntimeCodeClosure !== runtimeCodeClosureHash) {
+    findings.push(finding("manifest.closure", "Evidence manifest is not bound to the computed runtime-code closure."));
   }
   const entries = {};
   for (const name of REQUIRED_EVIDENCE) {
     entries[name] = await boundJson(root, manifest.evidence?.[name], `evidence.${name}`, findings);
   }
-  if (entries.exact_maximal) await exactAuthority(entries.exact_maximal.value, entries.exact_maximal.filename, "standard-maximal", closureHash, "authority.maximal", findings, authorityHashes);
-  if (entries.exact_net_cash) await exactAuthority(entries.exact_net_cash.value, entries.exact_net_cash.filename, "standard-net-cash", closureHash, "authority.net_cash", findings, authorityHashes);
-  if (entries.native_excel) await nativeExcel(entries.native_excel.value, entries.native_excel.filename, closureHash, findings);
-  if (entries.visual_review) await visualReview(entries.visual_review.value, entries.visual_review.filename, closureHash, findings);
-  if (entries.frozen_cohort) frozenCohort(entries.frozen_cohort.value, closureHash, findings);
-  if (entries.finance_proof_mutations) await financeMutations(entries.finance_proof_mutations.value, entries.finance_proof_mutations.filename, closureHash, findings);
-  if (entries.source_parity) await sourceParity(entries.source_parity.value, entries.source_parity.filename, closureHash, findings);
+  if (entries.exact_maximal) await exactAuthority(entries.exact_maximal.value, entries.exact_maximal.filename, "standard-maximal", runtimeCodeClosureHash, "authority.maximal", findings, authorityHashes);
+  if (entries.exact_net_cash) await exactAuthority(entries.exact_net_cash.value, entries.exact_net_cash.filename, "standard-net-cash", runtimeCodeClosureHash, "authority.net_cash", findings, authorityHashes);
+  if (entries.native_excel) await nativeExcel(entries.native_excel.value, entries.native_excel.filename, runtimeCodeClosureHash, findings);
+  if (entries.visual_review) await visualReview(entries.visual_review.value, entries.visual_review.filename, runtimeCodeClosureHash, findings);
+  if (entries.frozen_cohort) frozenCohort(entries.frozen_cohort.value, runtimeCodeClosureHash, findings);
+  if (entries.finance_proof_mutations) await financeMutations(entries.finance_proof_mutations.value, entries.finance_proof_mutations.filename, runtimeCodeClosureHash, findings);
+  if (entries.source_parity) await sourceParity(entries.source_parity.value, entries.source_parity.filename, runtimeCodeClosureHash, findings);
   return {
     schema_version: "release-certification-evidence-receipt/1.0",
     status: findings.length === 0 ? "PASS" : "FAIL",
     total_violations: findings.length,
-    certified_closure_sha256: closureHash,
+    certified_runtime_code_closure_sha256: runtimeCodeClosureHash,
+    certified_closure_sha256: runtimeCodeClosureHash,
     manifest: { path: absoluteManifest, sha256: await sha256File(absoluteManifest) },
     evidence: Object.fromEntries(Object.entries(entries).filter(([, value]) => value).map(([name, value]) => [name, { path: value.filename, sha256: value.sha256 }])),
     findings,

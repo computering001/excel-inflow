@@ -2,6 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import {
+  DECLARED_RUNTIME_INTEGRITY_SCHEMA,
+  runtimeCodeClosureIdentity,
+} from "./identity_vocabulary.mjs";
 
 const RUN_IDENTITY_SCHEMA = "debt-runtime-identity/1.0";
 const RUN_LEASE_SCHEMA = "debt-runtime-lease/1.0";
@@ -473,7 +477,7 @@ async function addVendoredRuntimeFiles({ canonicalSkillRoot, profile, files }) {
   }
 }
 
-export async function computeDeclaredRuntimeClosure(skillRoot) {
+export async function computeDeclaredRuntimeIntegrity(skillRoot) {
   const canonicalSkillRoot = await canonicalPathThroughExistingAncestor(skillRoot);
   const profilePath = path.join(canonicalSkillRoot, "assets", "deployment-profile.json");
   const profile = JSON.parse(await fs.readFile(profilePath, "utf8"));
@@ -500,24 +504,37 @@ export async function computeDeclaredRuntimeClosure(skillRoot) {
   }
   await addVendoredRuntimeFiles({ canonicalSkillRoot, profile, files });
   const ordered = canonicalise(files);
+  const runtimeCodeFiles = Object.fromEntries(
+    Object.entries(ordered).filter(
+      ([name]) => name !== "SKILL.md" && !name.startsWith("references/"),
+    ),
+  );
+  const runtimeCodeClosure = runtimeCodeClosureIdentity(runtimeCodeFiles);
   return Object.freeze({
-    schema_version: "declared-runtime-closure/1.0",
+    schema_version: DECLARED_RUNTIME_INTEGRITY_SCHEMA,
+    identity_kind: "declared_runtime_integrity",
     skill_root: canonicalSkillRoot,
     file_count: Object.keys(ordered).length,
     files: ordered,
     digest: sha256Value(ordered),
+    runtime_code_closure: runtimeCodeClosure,
   });
 }
 
+// Compatibility name retained for installed callers. The returned object now
+// names the full process-integrity inventory separately from its executable
+// runtime-code closure, so neither can be mistaken for a package identity.
+export const computeDeclaredRuntimeClosure = computeDeclaredRuntimeIntegrity;
+
 export async function captureRuntimeIntegrity(skillRoot) {
-  return computeDeclaredRuntimeClosure(skillRoot);
+  return computeDeclaredRuntimeIntegrity(skillRoot);
 }
 
 export async function assertRuntimeIntegrityUnchanged(before, skillRoot) {
   if (!before || !SHA256.test(String(before.digest))) {
     throw new Error("A valid pre-run declared-runtime digest is required.");
   }
-  const after = await computeDeclaredRuntimeClosure(skillRoot);
+  const after = await computeDeclaredRuntimeIntegrity(skillRoot);
   if (after.digest !== before.digest) {
     const changed = [];
     const names = new Set([...Object.keys(before.files ?? {}), ...Object.keys(after.files ?? {})]);

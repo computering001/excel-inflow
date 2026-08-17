@@ -11,11 +11,13 @@
     "acquisition_policy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["search_performed", "user_supplied_precedence", "official_urls_must_be_declarative", "content_addressed", "ordering"],
+      "required": ["search_performed", "user_supplied_precedence", "official_urls_must_be_declarative", "official_domain_authority", "local_root_authority", "content_addressed", "ordering"],
       "properties": {
         "search_performed": { "const": false },
         "user_supplied_precedence": { "const": true },
         "official_urls_must_be_declarative": { "const": true },
+        "official_domain_authority": { "const": "excel-inflow-official-filings-v1" },
+        "local_root_authority": { "const": "controller_request_directory" },
         "content_addressed": { "const": true },
         "ordering": {
           "type": "array",

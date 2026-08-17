@@ -326,9 +326,23 @@ async function exactEnvironmentProbe({ python, soffice, integrity, runDir }) {
     release_identity: releaseManifest ? {
       name: releaseManifest.releaseName ?? null,
       skill_version: releaseManifest.skillVersion ?? null,
-      package_mode: releaseManifest.packageMode ?? null,
-      current_closure_sha256: releaseManifest.certification?.currentClosureSha256 ?? null,
-      certified_closure_sha256: releaseManifest.certification?.certifiedClosureSha256 ?? null,
+      package_mode: releaseManifest.identity?.package?.mode ?? releaseManifest.packageMode ?? null,
+      deployment_status:
+        releaseManifest.identity?.deployment?.status ??
+        releaseManifest.deploymentStatus ??
+        null,
+      runtime_code_closure_sha256:
+        releaseManifest.identity?.package?.runtime_code_closure?.sha256 ??
+        releaseManifest.certification?.runtimeCodeClosureSha256 ??
+        releaseManifest.certification?.currentClosureSha256 ??
+        null,
+      certified_runtime_code_closure_sha256:
+        releaseManifest.identity?.package?.runtime_code_closure?.certified_sha256 ??
+        releaseManifest.certification?.certifiedRuntimeCodeClosureSha256 ??
+        releaseManifest.certification?.certifiedClosureSha256 ??
+        null,
+      complete_package_inventory_sha256:
+        releaseManifest.identity?.package?.complete_package_inventory?.sha256 ?? null,
     } : null,
     node: process.version,
     python: python.runtime,

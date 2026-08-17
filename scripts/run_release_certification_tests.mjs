@@ -318,10 +318,11 @@ try {
   const valid = await fixture(path.join(root, "valid"));
   const pass = await validateReleaseCertificationEvidence({
     manifestPath: valid.manifestPath,
-    closureHash: CLOSURE,
+    runtimeCodeClosureSha256: CLOSURE,
     authorityHashes: valid.authorityHashes,
   });
   assert.equal(pass.status, "PASS", JSON.stringify(pass.findings));
+  assert.equal(pass.certified_runtime_code_closure_sha256, CLOSURE);
   tests += 1;
 
   delete process.env.EXCEL_INFLOW_RELEASE_CERT_TEST_MODE;

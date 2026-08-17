@@ -9,6 +9,9 @@ import { promisify } from "node:util";
 import { validateJsonSchema } from "./json_schema.mjs";
 import { canonicalise, canonicalJson, hashValue } from "./run_store.mjs";
 import {
+  readApprovedRegularFile,
+} from "./source_ingress_security.mjs";
+import {
   FACE_STATEMENT_SECTIONS,
   faceStatementManifestDigest,
 } from "./face_statement_manifest.mjs";
@@ -757,13 +760,25 @@ export async function readJsonFile(filePath, label) {
   }
 }
 
+function parseJsonBytes(bytes, label) {
+  try {
+    return JSON.parse(bytes.toString("utf8"));
+  } catch (error) {
+    throw new Error(`${label} is not readable JSON: ${error.message}`);
+  }
+}
+
 function requireString(value, label) {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required.`);
   return value.trim();
 }
 
-function resolved(specDir, supplied, label) {
-  return path.resolve(specDir, requireString(supplied, label));
+async function readResolved(specDir, supplied, label) {
+  return await readApprovedRegularFile({
+    candidate: path.resolve(specDir, requireString(supplied, label)),
+    approvedRoots: [specDir],
+    label,
+  });
 }
 
 function parseCsv(bytes, label) {
@@ -844,8 +859,9 @@ async function compileAttachment({ descriptor, sourceById, specDir, evidence }) 
     throw new Error(`Attachment ${attachmentId} has unsupported adapter domain ${domain}.`);
   }
   const format = requireString(adapter.format, `Attachment ${attachmentId}.adapter.format`).toLowerCase();
-  const rawPath = resolved(specDir, descriptor.path, `Attachment ${attachmentId}.path`);
-  const raw = await fs.readFile(rawPath);
+  const rawSource = await readResolved(specDir, descriptor.path, `Attachment ${attachmentId}.path`);
+  const rawPath = rawSource.path;
+  const raw = rawSource.bytes;
   const rawSha256 = sha256(raw);
   if (descriptor.expected_sha256 && descriptor.expected_sha256 !== rawSha256) {
     throw new Error(`Attachment ${attachmentId} expected_sha256 does not match its bytes.`);
@@ -878,9 +894,10 @@ async function compileAttachment({ descriptor, sourceById, specDir, evidence }) 
       kind: controllerOwnedRawDcs ? "controller_owned_raw" : "raw_archive",
     };
   } else if (domain === "document_extraction") {
-    const extractionPath = resolved(specDir, adapter.extraction_path, `Attachment ${attachmentId}.adapter.extraction_path`);
-    const extractionBytes = await fs.readFile(extractionPath);
-    const extraction = await readJsonFile(extractionPath, `Extraction for attachment ${attachmentId}`);
+    const extractionSource = await readResolved(specDir, adapter.extraction_path, `Attachment ${attachmentId}.adapter.extraction_path`);
+    const extractionPath = extractionSource.path;
+    const extractionBytes = extractionSource.bytes;
+    const extraction = parseJsonBytes(extractionBytes, `Extraction for attachment ${attachmentId}`);
     if (extraction.attachment_id !== attachmentId || extraction.raw_sha256 !== rawSha256) {
       throw new Error(`Extraction for attachment ${attachmentId} is not bound to the supplied raw bytes.`);
     }
@@ -889,11 +906,12 @@ async function compileAttachment({ descriptor, sourceById, specDir, evidence }) 
     }
     normalizedArtifact = { path: path.basename(extractionPath), sha256: sha256(extractionBytes), kind: "explicit_extraction" };
   } else {
-    const normalizedPath = format === "json" && !adapter.normalized_path
-      ? rawPath
-      : resolved(specDir, adapter.normalized_path, `Attachment ${attachmentId}.adapter.normalized_path`);
-    const normalisedBytes = await fs.readFile(normalizedPath);
-    normalized = await readJsonFile(normalizedPath, `Normalized attachment ${attachmentId}`);
+    const normalizedSource = format === "json" && !adapter.normalized_path
+      ? rawSource
+      : await readResolved(specDir, adapter.normalized_path, `Attachment ${attachmentId}.adapter.normalized_path`);
+    const normalizedPath = normalizedSource.path;
+    const normalisedBytes = normalizedSource.bytes;
+    normalized = parseJsonBytes(normalisedBytes, `Normalized attachment ${attachmentId}`);
     validateNormalised(normalized, domain, `Normalized attachment ${attachmentId}`);
     normalizedArtifact = { path: path.basename(normalizedPath), sha256: sha256(normalisedBytes), kind: "normalized_json" };
     const expected = domain === "factset_dcs" ? evidence.dcs_export : evidence.broker_pack;
@@ -919,13 +937,14 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
     throw new Error("broker_evidence must be an object when supplied.");
   }
   const artifact = async (field, label) => {
-    const artifactPath = resolved(specDir, declaration[field], `broker_evidence.${field}`);
-    const bytes = await fs.readFile(artifactPath);
+    const source = await readResolved(specDir, declaration[field], `broker_evidence.${field}`);
+    const artifactPath = source.path;
+    const bytes = source.bytes;
     return {
       path: artifactPath,
       bytes,
       sha256: sha256(bytes),
-      json: await readJsonFile(artifactPath, label),
+      json: parseJsonBytes(bytes, label),
     };
   };
   const runState = await artifact(
@@ -1819,13 +1838,14 @@ export async function compileDcsEvidence({
     throw new Error("dcs_evidence must be an object when supplied.");
   }
   const artifact = async (field, label) => {
-    const artifactPath = resolved(specDir, declaration[field], `dcs_evidence.${field}`);
-    const bytes = await fs.readFile(artifactPath);
+    const source = await readResolved(specDir, declaration[field], `dcs_evidence.${field}`);
+    const artifactPath = source.path;
+    const bytes = source.bytes;
     return {
       path: artifactPath,
       bytes,
       sha256: sha256(bytes),
-      json: await readJsonFile(artifactPath, label),
+      json: parseJsonBytes(bytes, label),
     };
   };
   const runState = await artifact("run_state_path", "DCS controller run state");
@@ -2140,12 +2160,19 @@ export async function compileDcsEvidence({
 }
 
 export async function compileAttachmentIngress({ specPath }) {
-  const absoluteSpec = path.resolve(specPath);
-  const specDir = path.dirname(absoluteSpec);
-  const spec = await readJsonFile(absoluteSpec, "Ingress spec");
+  const requestedSpec = path.resolve(specPath);
+  const specDir = path.dirname(requestedSpec);
+  const specSource = await readApprovedRegularFile({
+    candidate: requestedSpec,
+    approvedRoots: [specDir],
+    label: "Ingress spec",
+  });
+  const absoluteSpec = specSource.path;
+  const spec = parseJsonBytes(specSource.bytes, "Ingress spec");
   if (spec.schema_version !== INGRESS_SCHEMA_VERSION) throw new Error("Unsupported attachment ingress spec.");
-  const evidencePath = resolved(specDir, spec.evidence_run_path, "evidence_run_path");
-  const evidence = await readJsonFile(evidencePath, "Evidence-run template");
+  const evidenceSource = await readResolved(specDir, spec.evidence_run_path, "evidence_run_path");
+  const evidencePath = evidenceSource.path;
+  const evidence = parseJsonBytes(evidenceSource.bytes, "Evidence-run template");
   if (!Array.isArray(spec.attachments) || spec.attachments.length === 0) throw new Error("Ingress spec must include attachments.");
   const sourceById = new Map((evidence.source_inventory ?? []).map((source) => [source.source_id, source]));
   if (sourceById.size !== (evidence.source_inventory ?? []).length) throw new Error("Evidence-run template has duplicate source ids.");
@@ -2249,13 +2276,13 @@ export async function compileAttachmentIngress({ specPath }) {
       0,
     );
     if (expectedCount === 0) continue;
-    const extractionPath = resolved(
+    const extractionSource = await readResolved(
       specDir,
       descriptor.adapter.extraction_path,
       `Attachment ${descriptor.attachment_id}.adapter.extraction_path`,
     );
-    const extraction = await readJsonFile(
-      extractionPath,
+    const extraction = parseJsonBytes(
+      extractionSource.bytes,
       `Extraction for attachment ${descriptor.attachment_id}`,
     );
     for (const section of FACE_STATEMENT_SECTIONS) {

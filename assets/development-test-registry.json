@@ -45,6 +45,24 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "source-ingress-security",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_source_ingress_security_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "multipage-filing-extraction",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_multipage_filing_extraction_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "layered-graph-constitution",
       "phase": "graph",
       "runtime": "node",
@@ -854,6 +872,15 @@
       "phase": "proof",
       "runtime": "node",
       "script": "run_source_identity_tests.mjs"
+    },
+    {
+      "id": "typed-product-identity-vocabulary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_identity_vocabulary_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
     },
     {
       "id": "test-registry-contract",
