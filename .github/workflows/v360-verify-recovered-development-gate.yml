@@ -1,4 +1,4 @@
-# inspect the native raw cash-flow hierarchy produced by the v3.6 filing extractor
+# widen neutral-separator arithmetic proof only where three-period equality remains unique
 name: v360 verify recovered development gate
 
 on:
@@ -9,32 +9,52 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: d194222bdc2f7106e9e2a8f97c6cde1267a626e4
-      - name: Install extraction dependency
-        run: python3 -m pip install pymupdf
-      - name: Expose resolved native cash-flow manifest
+          ref: agent/excel-inflow-v360-rebuild
+          fetch-depth: 0
+      - name: Require audited starting point
         shell: bash
         run: |
           set -euo pipefail
-          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
-          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          test "$(git rev-parse HEAD)" = 'd194222bdc2f7106e9e2a8f97c6cde1267a626e4'
+      - name: Treat zero non-subtotals as arithmetic-neutral separators at any shallower indent
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('scripts/run_filings_pipeline_tests.mjs')
+          p=Path('scripts/extract_filing_statements.py')
           s=p.read_text()
-          needle='const resolvedEvidence = JSON.parse(await fs.readFile(topResolved.artifacts.resolved_evidence_template, "utf8"));\n'
-          assert s.count(needle)==1
-          insert='console.log("RAW_CASH_FLOW_MANIFEST=" + JSON.stringify(resolvedEvidence.filings.face_statement_manifests.cash_flow, null, 2));\nprocess.exit(0);\n'
-          p.write_text(s.replace(needle,needle+insert,1))
+          old='''                    neutral_separator = (\n                        level == parent_level\n                        and not candidate.get("is_subtotal")\n                        and series is not None\n                        and all(abs(value) <= 0.5000001 for value in series)\n                    )\n'''
+          new='''                    neutral_separator = (\n                        level <= parent_level\n                        and not candidate.get("is_subtotal")\n                        and series is not None\n                        and all(abs(value) <= 0.5000001 for value in series)\n                    )\n'''
+          assert s.count(old)==1, s.count(old)
+          p.write_text(s.replace(old,new,1))
+
+          t=Path('scripts/run_source_arithmetic_topology_tests.py')
+          q=t.read_text()
+          old='''neutral_separator = [\n    row("cf.pbt", "Profit before taxation", [150, 150, 150], 1),\n    row("cf.da", "Depreciation and amortisation", [50, 50, 50], 1),\n    row("cf.neutral", "Net finance result", [0, 0, 0], 0),\n    row("cf.addback", "Net finance costs add-back", [-5, -5, -5], 1),\n    row("cf.wc", "Change in working capital", [0, 0, 0], 1),\n    row("cf.cfo", "Cash generated from operations", [195, 195, 195], 0),\n]\n'''
+          new='''neutral_separator = [\n    row("cf.pbt", "Profit before taxation", [150, 150, 150], 3),\n    row("cf.da", "Depreciation and amortisation", [50, 50, 50], 3),\n    row("cf.neutral", "Net finance result", [0, 0, 0], 0),\n    row("cf.addback", "Net finance costs add-back", [-5, -5, -5], 3),\n    row("cf.wc", "Change in working capital", [0, 0, 0], 3),\n    row("cf.cfo", "Cash generated from operations", [195, 195, 195], 2),\n]\n'''
+          assert q.count(old)==1, q.count(old)
+          t.write_text(q.replace(old,new,1))
           PY
-          node scripts/run_filings_pipeline_tests.mjs
+          python3 -m py_compile scripts/extract_filing_statements.py scripts/run_source_arithmetic_topology_tests.py
+          python3 scripts/run_source_arithmetic_topology_tests.py
+          git diff --check
+      - name: Commit proven hierarchy repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/extract_filing_statements.py scripts/run_source_arithmetic_topology_tests.py
+          git commit -m 'Recover subtotal arithmetic across neutral indent breaks'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
+          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
