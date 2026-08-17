@@ -1,4 +1,4 @@
-# focused proof of the final v3.6 recovery repairs before the full gate
+# expose the exact v2 demand graph used by the stale evidence assertion
 name: v360 verify recovered development gate
 
 on:
@@ -14,34 +14,22 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
-      - name: Check out repaired v3.6 target
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: 5ee90b02796719624c119777ef3e81bb4e61d763
-          fetch-depth: 0
-      - name: Install runtime
+      - name: Print demand graph at failing assertion
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libreoffice
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-      - name: Run focused repaired seams
-        shell: bash
-        env:
-          DEBT_OVERLAY_CASES_DIR: ${{ github.workspace }}/test-fixtures/cases
-          DEBT_OVERLAY_PYTHON: /usr/bin/python3
-          EXCEL_INFLOW_TEST_PYTHON: /usr/bin/python3
-        run: |
-          set -euo pipefail
-          export SOFFICE_BIN="$(command -v soffice)"
-          node scripts/run_test_registry_contract_tests.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/run_evidence_pipeline_tests.py')
+          s=p.read_text()
+          needle='        demand = context["model_demand_graph"]\n'
+          assert s.count(needle)==1
+          s=s.replace(needle,needle+'        print("DEMAND_GRAPH=" + json.dumps(demand, sort_keys=True))\n',1)
+          p.write_text(s)
+          PY
           python3 scripts/run_evidence_pipeline_tests.py
-          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
-          node scripts/run_decision_round_tests.mjs
-          node scripts/run_filings_pipeline_tests.mjs
-          node scripts/run_user_flow_tests.mjs
-          echo 'FOCUSED_V360_REPAIR_SEAMS=PASS'
