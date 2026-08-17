@@ -166,6 +166,8 @@ try:
         "a" * 64,
         ["2023", "2024", "2025"],
         set(),
+        "USD",
+        "millions",
     )
 finally:
     extractor.statement_window = original_statement_window
