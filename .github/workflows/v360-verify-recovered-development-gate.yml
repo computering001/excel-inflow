@@ -1,4 +1,4 @@
-# repair the audited broker-selection forecast-ledger reseal seam on recovered v3.6
+# prove the repaired forecast-ledger transition through N6 and Stage-4 checkpoint recovery
 name: v360 verify recovered development gate
 
 on:
@@ -9,47 +9,60 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/excel-inflow-v360-rebuild
+          ref: bf39afb5e513431f87b02d85488fe93b0a10b5e1
           fetch-depth: 0
-      - name: Require audited starting point
+      - name: Install isolated Stage-4 runtime
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 'fdfdea50dce4b228e35e5263ece366e60203a8cc'
-      - name: Reseal forecast authority after canonical broker selection
+          sudo apt-get update
+          sudo apt-get install -y libreoffice python3-venv
+          python3 -m venv /tmp/v360-python
+          /tmp/v360-python/bin/python -m pip install --upgrade pip
+          /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+      - name: Prove N6 forecast ledger is sealed to current authority graph
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/lib/broker_preview.mjs')
-          s=p.read_text()
-          import_marker='import { hashFile, hashValue } from "./run_store.mjs";\n'
-          assert s.count(import_marker)==1
-          s=s.replace(import_marker,import_marker+'import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";\n',1)
-          old='''  modelCase.stage_three_answers = {\n    ...(modelCase.stage_three_answers ?? {}),\n    "broker.primary_house": verified.selection.house_id,\n    "broker.preview_sha256": preview.preview_sha256,\n  };\n  return modelCase;\n}\n'''
-          new='''  modelCase.stage_three_answers = {\n    ...(modelCase.stage_three_answers ?? {}),\n    "broker.primary_house": verified.selection.house_id,\n    "broker.preview_sha256": preview.preview_sha256,\n  };\n  // Broker confirmation is a canonical forecast-authority transition. In\n  // forecast-waterfall mode it deliberately removes broker writers and\n  // reactivates the row-owned formula/historical fallback. Any existing\n  // forecast-authority ledger therefore belongs to the pre-selection graph\n  // and must be resealed here, at the mutator that changed that graph.\n  // Downstream solvers remain fail-closed: any later unreceipted mutation still\n  // causes verifyForecastAuthorityLedger() to reject the case.\n  if (modelCase.forecast_authority_ledger) {\n    sealForecastAuthorityLedger(modelCase);\n  }\n  return modelCase;\n}\n'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-          PY
-          node --check scripts/lib/broker_preview.mjs
-          git diff --check
-      - name: Commit ledger transition repair
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean-evidence-run.json
+          rm -rf /tmp/n6-run
+          node scripts/run_user_flow.mjs /tmp/clean-evidence-run.json --out /tmp/n6-run --stop-after decisions --json >/tmp/paused.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { verifyForecastAuthorityLedger } from './scripts/lib/forecast_authority_ledger.mjs';
+          import { runReleaseN0N9 } from './scripts/lib/release_nodes.mjs';
+          const evidence=JSON.parse(fs.readFileSync('/tmp/clean-evidence-run.json','utf8'));
+          const modelCase=JSON.parse(fs.readFileSync('/tmp/n6-run/stages/decisions/model-case.json','utf8'));
+          const verified=verifyForecastAuthorityLedger(modelCase);
+          if(!verified.valid) throw new Error(verified.errors.join('; '));
+          console.log('LEDGER_SHA='+verified.ledger.ledger_sha256);
+          const result=runReleaseN0N9({modelCase,dcsExport:evidence.dcs_export??evidence.export??evidence.dcs??null,brokerPack:evidence.broker_pack??evidence.broker??null,filings:evidence.filings??null});
+          const n6=result.gates.find(g=>g.id==='N6');
+          console.log('N6='+JSON.stringify(n6));
+          if(n6?.status!=='PASS') throw new Error('N6 did not pass');
+          NODE
+      - name: Prove Stage-4 interruption, resume and checkpoint invalidation
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name 'excel-inflow-recovery-publisher'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/lib/broker_preview.mjs
-          git commit -m 'Reseal forecast authority after broker selection'
-          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
-          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
+          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
+          export SOFFICE_BIN="$(command -v soffice)"
+          rm -rf /tmp/v360-stage4-proof
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases test-fixtures/cases \
+            --python /tmp/v360-python/bin/python \
+            --soffice "$(command -v soffice)" \
+            --out /tmp/v360-stage4-proof
+          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
