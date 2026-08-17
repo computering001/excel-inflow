@@ -1,0 +1,51 @@
+name: v360 recovery prefix
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Recover complete gzip prefix from staged payload
+        shell: bash
+        run: |
+          set -uo pipefail
+          find publish/v360 -type f -name 'patch.part*.b64' -print | sort -V > /tmp/parts.txt
+          cat $(cat /tmp/parts.txt) | tr -d '\n\r' > /tmp/v360.patch.b64
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/v360.patch.b64')
+          s=p.read_text('ascii')
+          missing=(-len(s))%4
+          p.write_text(s + ('='*missing),'ascii')
+          Path('/tmp/payload-metadata.txt').write_text(f'parts={len(Path("/tmp/parts.txt").read_text().splitlines())}\nbase64_chars_unpadded={len(s)}\npadding_added={missing}\n')
+          PY
+          base64 -d /tmp/v360.patch.b64 > /tmp/v360.patch.gz || true
+          gzip -dc /tmp/v360.patch.gz > /tmp/v360-prefix.patch 2>/tmp/gzip-error.txt || true
+          wc -c /tmp/v360.patch.b64 /tmp/v360.patch.gz /tmp/v360-prefix.patch >> /tmp/payload-metadata.txt
+          sha256sum /tmp/v360.patch.b64 /tmp/v360.patch.gz /tmp/v360-prefix.patch >> /tmp/payload-metadata.txt
+          tail -n 80 /tmp/v360-prefix.patch > /tmp/prefix-tail.txt
+          cat /tmp/payload-metadata.txt
+          cat /tmp/gzip-error.txt || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v360-recovery-prefix
+          path: |
+            /tmp/v360-prefix.patch
+            /tmp/v360.patch.gz
+            /tmp/payload-metadata.txt
+            /tmp/gzip-error.txt
+            /tmp/prefix-tail.txt
+          retention-days: 1
+          if-no-files-found: error
