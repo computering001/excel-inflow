@@ -1,4 +1,4 @@
-# inspect cash-flow row identities before final funded-acquisition repair
+# apply the two audited final v3.6 repairs on the preserved target branch
 name: v360 verify recovered development gate
 
 on:
@@ -9,32 +9,69 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out v3.6 target
+        uses: actions/checkout@v4
         with:
-          ref: 7c4791ff0ceb800be18f04cefc90056fd94aeebc
+          ref: agent/excel-inflow-v360-rebuild
           fetch-depth: 0
-      - run: python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
-      - name: Generate portable workbook and print row-map identities
+      - name: Require audited starting point
         shell: bash
         run: |
-          set +e
-          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
-          root="$(find /tmp -maxdepth 1 -type d -name 'broker-page-evidence-*' | head -1)"
-          export ROOT_PATH="$root"
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'c646784292ab684eae5a534d941590398b3e50fd'
+      - name: Patch portable acquisition hook and v2 evidence assertion
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
-          import json,os
           from pathlib import Path
-          root=Path(os.environ['ROOT_PATH'])
-          rp=json.loads(Path(str(root/'emit/model.xlsx')+'.row-map.json').read_text())
-          for r in rp['statement_rows']['cash_flow']:
-              if 48 <= int(r.get('row',0)) <= 62:
-                  print(json.dumps(r,sort_keys=True))
+
+          build=Path('scripts/build_dynamic_model.mjs')
+          text=build.read_text()
+          old='import { applyFundedAcquisitionPlan } from "./lib/funded_acquisition_plan.mjs";'
+          new='import { applyFundedAcquisitionPlan, applyFundedAcquisitionWorkbook } from "./lib/funded_acquisition_plan.mjs";'
+          assert text.count(old)==1, text.count(old)
+          text=text.replace(old,new,1)
+          marker='  // PASS TWO — everything still uncached: the Brokers selector, and any\n'
+          assert text.count(marker)==1, text.count(marker)
+          insertion=(
+              '  // The solver already owns the pro-forma economics, but the portable plan\n'
+              '  // must expose the funded transaction in the same N:P component rows that\n'
+              '  // those economics assume. Apply it after solver caches are installed, then\n'
+              '  // invalidate only the acyclic cash-flow closure so PASS TWO rebuilds caches\n'
+              '  // from the displayed formulas rather than preserving hidden transaction cash.\n'
+              '  applyFundedAcquisitionWorkbook(emission.workbook, rowPlan, modelCase);\n\n'
+          )
+          text=text.replace(marker,insertion+marker,1)
+          build.write_text(text)
+
+          test=Path('scripts/run_evidence_pipeline_tests.py')
+          text=test.read_text()
+          old='''            demand["schema_version"] == "pre-broker-model-demand/1.0"\n            and demand["counts"] == {\n                "source_rows": 2,\n                "forecast_nodes": 6,\n                "material_nodes": 6,\n            }\n'''
+          new='''            demand["schema_version"] == "pre-broker-model-demand/2.0"\n            and demand["counts"] == {\n                "source_rows": 2,\n                "filed_forecast_nodes": 0,\n                "model_demand_concepts": 9,\n                "model_demand_nodes": 27,\n                "material_model_demand_nodes": 27,\n            }\n'''
+          assert text.count(old)==1, text.count(old)
+          text=text.replace(old,new,1)
+          test.write_text(text)
           PY
-          exit 1
+          node --check scripts/build_dynamic_model.mjs
+          node --check scripts/lib/funded_acquisition_plan.mjs
+          python3 -m py_compile scripts/run_evidence_pipeline_tests.py
+          git diff --check
+          git diff --stat
+      - name: Commit repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/build_dynamic_model.mjs scripts/run_evidence_pipeline_tests.py
+          git commit -m 'Complete portable v3.6 recovery repairs'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
+          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
