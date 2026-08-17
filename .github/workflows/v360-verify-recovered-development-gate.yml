@@ -1,4 +1,4 @@
-# diagnose every repo-local v3.6 gate failure without mutating the target branch
+# diagnose the broker page-image validator failure on the exact repaired v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -14,101 +14,26 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 30
     steps:
       - name: Check out exact repaired v3.6 target
         uses: actions/checkout@v4
         with:
           ref: 8f92ec0c978c0a141b86046dfc702a99170a9087
           fetch-depth: 0
-
-      - name: Verify registry/runner contract repair
+      - name: Install Python validation dependencies
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json,re
-          from pathlib import Path
-          registry=json.loads(Path('assets/development-test-registry.json').read_text())
-          runner=Path('scripts/run_development_gate.mjs').read_text()
-          m=re.search(r'registry\.schema_version\s*!==\s*"([^"]+)"',runner)
-          actual=registry.get('schema_version')
-          expected=m.group(1) if m else None
-          print('REGISTRY_SCHEMA='+str(actual))
-          print('RUNNER_SCHEMA='+str(expected))
-          assert actual == 'development-test-registry/2.0'
-          assert expected == actual
-          PY
-          node scripts/run_test_registry_contract_tests.mjs
-
-      - name: Install test runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libreoffice
           python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
-
-      - name: Select repo-local tests for diagnostic gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          p=Path('assets/development-test-registry.json')
-          d=json.loads(p.read_text())
-          available={'CASES','REPRESENTATIVE','PYTHON','SOFFICE'}
-          selected=[]
-          excluded=[]
-          for t in d['tests']:
-              req=set(t.get('requires',[]))
-              if req <= available and t['id'] != 'test-registry-contract':
-                  selected.append(t)
-              else:
-                  why=['self-contract-run-separately'] if t['id']=='test-registry-contract' else sorted(req-available)
-                  excluded.append((t['id'], why))
-          print('REGISTRY_TOTAL='+str(len(d['tests'])))
-          print('SELECTED_DIAGNOSTIC='+str(len(selected)))
-          print('EXCLUDED='+str(len(excluded)))
-          for tid,why in excluded:
-              print('EXCLUDED_ID='+tid+' REASON='+','.join(why))
-          d['tests']=selected
-          p.write_text(json.dumps(d,indent=2)+'\n')
-          PY
-
-      - name: Run diagnostic gate and print every failure
+          python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
+      - name: Run broker page evidence and expose validator report
         shell: bash
         run: |
           set +e
-          set -uo pipefail
-          rm -rf /tmp/v360-development-gate
-          node scripts/run_development_gate.mjs \
-            --cases test-fixtures/cases \
-            --representative test-fixtures/cases/standard-maximal-v2.json \
-            --python "$(command -v python3)" \
-            --soffice "$(command -v soffice)" \
-            --concurrency 1 \
-            --timeout-ms 900000 \
-            --out /tmp/v360-development-gate
-          gate_exit=$?
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          d=json.loads(Path('/tmp/v360-development-gate/development-gate-report.json').read_text())
-          print('GATE_STATUS='+d['status'])
-          print('PASS='+str(d['counts']['PASS']))
-          print('FAIL='+str(d['counts']['FAIL']))
-          print('BLOCKED='+str(d['counts']['BLOCKED']))
-          for r in d['results']:
-              if r['status']!='PASS':
-                  print('\n=== FAILED_ID='+r['id']+' STATUS='+r['status']+' ===')
-                  if r.get('command'):
-                      print('COMMAND='+' '.join(map(str,r['command'])))
-                  if r.get('stdout'):
-                      print('STDOUT_TAIL:\n'+r['stdout'][-5000:])
-                  if r.get('stderr'):
-                      print('STDERR_TAIL:\n'+r['stderr'][-8000:])
-          PY
-          exit $gate_exit
+          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
+          test_exit=$?
+          echo "TEST_EXIT=$test_exit"
+          echo 'VALIDATION REPORTS:'
+          find /tmp -path '*/broker-page-evidence-*/validator/validation-report.json' -print -exec cat {} \;
+          exit $test_exit
