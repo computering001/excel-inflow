@@ -1,4 +1,4 @@
-# isolate the N6 semantic-gate failure before the final Stage-4 checkpoint proof
+# isolate forecast-authority ledger drift behind the last recovered v3.6 Stage-4 failure
 name: v360 verify recovered development gate
 
 on:
@@ -20,7 +20,7 @@ jobs:
         with:
           ref: fdfdea50dce4b228e35e5263ece366e60203a8cc
           fetch-depth: 0
-      - name: Build Stage-3 state and print N6 detail
+      - name: Build Stage-3 state and diff sealed vs current forecast ledger
         shell: bash
         run: |
           set -euo pipefail
@@ -28,22 +28,30 @@ jobs:
           node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean-evidence-run.json
           rm -rf /tmp/n6-run
           node scripts/run_user_flow.mjs /tmp/clean-evidence-run.json --out /tmp/n6-run --stop-after decisions --json > /tmp/paused.json
-          cat /tmp/paused.json
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          import { runReleaseN0N9 } from './scripts/lib/release_nodes.mjs';
-          const evidence=JSON.parse(fs.readFileSync('/tmp/clean-evidence-run.json','utf8'));
-          const modelCase=JSON.parse(fs.readFileSync('/tmp/n6-run/stages/decisions/model-case.json','utf8'));
-          const candidates={
-            dcsExport: evidence.dcs_export ?? evidence.export ?? evidence.dcs ?? null,
-            brokerPack: evidence.broker_pack ?? evidence.broker ?? null,
-            filings: evidence.filings ?? null,
-          };
-          console.log('EVIDENCE_KEYS='+Object.keys(evidence).join(','));
-          console.log('CASE_SOURCE_COVERAGE='+JSON.stringify(modelCase.source_coverage ?? null));
-          console.log('CASE_ANSWERS='+JSON.stringify(modelCase.answers ?? modelCase.stage_three_answers ?? null));
-          const result=runReleaseN0N9({modelCase,...candidates});
-          console.log('RELEASE_STATUS='+result.status);
-          const n6=result.gates.find(g=>g.id==='N6');
-          console.log('N6='+JSON.stringify(n6,null,2));
+          import { buildForecastAuthorityLedger } from './scripts/lib/forecast_authority_ledger.mjs';
+          const mc=JSON.parse(fs.readFileSync('/tmp/n6-run/stages/decisions/model-case.json','utf8'));
+          const sealed=mc.forecast_authority_ledger;
+          const current=buildForecastAuthorityLedger(mc);
+          console.log('SEALED_SHA='+sealed.ledger_sha256);
+          console.log('CURRENT_SHA='+current.ledger_sha256);
+          const key=r=>`${r.section}|${r.row_id}|${r.period_end}`;
+          const a=new Map(sealed.rows.map(r=>[key(r),r]));
+          const b=new Map(current.rows.map(r=>[key(r),r]));
+          for(const k of [...new Set([...a.keys(),...b.keys()])].sort()){
+            const left=a.get(k), right=b.get(k);
+            if(JSON.stringify(left)!==JSON.stringify(right)){
+              console.log('DIFF_KEY='+k);
+              console.log('SEALED='+JSON.stringify(left));
+              console.log('CURRENT='+JSON.stringify(right));
+            }
+          }
+          for(const section of ['income_statement','cash_flow']){
+            for(const row of mc.statement_structure?.[section]??[]){
+              if(row.broker_metric_id || row.forecast_treatment==='broker' || (row.forecast_period_authorities??[]).some(x=>x?.method==='broker')){
+                console.log('BROKER_ROW='+JSON.stringify({section,row_id:row.row_id,semantic_role:row.semantic_role,broker_metric_id:row.broker_metric_id,forecast_treatment:row.forecast_treatment,forecast_period_authorities:row.forecast_period_authorities}));
+              }
+            }
+          }
           NODE
