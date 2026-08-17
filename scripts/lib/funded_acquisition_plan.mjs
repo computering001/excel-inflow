@@ -78,9 +78,17 @@ export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
  const sheet=workbook?.sheetByName?.("Operating Model");
  if(!sheet)return{changed:0,reason:"operating-model-absent"};
  const definitions=statementDefinitions(rowPlan);
- const consideration=definitions.find(definition=>definitionRole(definition)==="consideration");
- const debtProceeds=definitions.find(definition=>definitionRole(definition)==="debt_proceeds");
- if(!consideration||!debtProceeds) throw new Error("Funded acquisition portable plan is missing the existing consideration or debt-issuance row.");
+ const considerationRows=definitions.filter(definition=>definitionRole(definition)==="consideration");
+ const debtProceedsRows=definitions.filter(definition=>definitionRole(definition)==="debt_proceeds");
+ if(considerationRows.length!==1||debtProceedsRows.length!==1) throw new Error("Funded acquisition portable plan must contain exactly one existing consideration row and one debt-issuance row.");
+ const consideration=considerationRows[0];
+ const debtProceeds=debtProceedsRows[0];
+ const investingRows=definitions.filter(definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="cash_from_investing");
+ if(investingRows.length!==1) throw new Error("Funded acquisition portable plan must contain exactly one investing cash-flow total.");
+ const investingRefs=investingRows[0]?.calculation?.refs??[];
+ const considerationRefCount=investingRefs.filter(reference=>reference===consideration.row_id).length;
+ const fxRowIds=new Set(definitions.filter(definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="fx_effect_on_cash").map(definition=>definition.row_id));
+ if(considerationRefCount!==1||investingRefs.some(reference=>fxRowIds.has(reference))) throw new Error("Funded acquisition consideration must be owned exactly once by investing cash flow and must never bind to the FX-effect row.");
  const targets=[
   {definition:consideration,kind:"consideration"},
   {definition:debtProceeds,kind:"debt_proceeds"},
@@ -125,9 +133,15 @@ export function applyFundedAcquisitionPlan(plan, modelCase) {
  // Canonical geometry remains a deterministic fallback, but discovered controls win.
  controls.enabled??="$P$4";controls.transaction??="$P$5";controls.debt??="$P$8";controls.close_year??="$P$10";
  const forecastColumns=["N","O","P"];
+ const transactionCells=cells.map(cell=>({cell,kind:roleOf(cell)})).filter(({cell,kind})=>kind&&forecastColumns.includes(cell.address.column));
+ for(const kind of ["consideration","debt_proceeds"]){
+  const owned=transactionCells.filter(target=>target.kind===kind);
+  const rows=new Set(owned.map(target=>target.cell.address.row));
+  const columns=new Set(owned.map(target=>target.cell.address.column));
+  if(rows.size!==1||owned.length!==3||forecastColumns.some(column=>!columns.has(column))) throw new Error(`Funded acquisition captured plan must contain exactly one ${kind} row across N:P; duplicate or incomplete physical binding detected.`);
+ }
  let changed=0;
- for(const cell of cells){
-  const kind=roleOf(cell); if(!kind||!forecastColumns.includes(cell.address.column))continue;
+ for(const {cell,kind} of transactionCells){
   const index=forecastColumns.indexOf(cell.address.column);const flow=acquisitionTransactionFlows(modelCase,index);
   const headerCandidates=cells.filter(candidate=>candidate.address.column===cell.address.column&&candidate.address.row<cell.address.row&&candidate.address.row<=15&&candidate.value!==null);
   const header=headerCandidates.sort((a,b)=>b.address.row-a.address.row)[0];const headerRef=header?`${cell.address.column}$${header.address.row}`:`${cell.address.column}$6`;
