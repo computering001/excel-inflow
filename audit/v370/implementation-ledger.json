@@ -1236,16 +1236,16 @@
       "earliest_responsible_layer": "Quality disclosure.",
       "candidate_files": "scripts/build_dynamic_model.mjs; scripts/lib/row_plan.mjs; scripts/lib/live_delivery_attestation.mjs",
       "acceptance_criterion": "A compact Build Identity / Quality panel states source identity, broker status, selected metrics, fallbacks and outstanding certification.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "A compact Build Identity / Quality panel states source identity, broker status, selected metrics, fallbacks and outstanding certification.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced on the workbook face: the Brokers sheet exposed raw grids and, only for page-layout evidence, a partial evidence-status block; ordinary workbooks did not disclose source identity, selected houses/metrics, fallback or rejected-evidence counts, degraded mode or the outstanding certification gate.",
+        "focused_test": "PASS: workbook quality panel 23/23, including a degraded authority fixture with fallbacks, rejected evidence, quarantined cells and unresolved authority plus a full emitted-plan inspection.",
+        "source_fix": "The central Brokers sheet now always emits a compact BUILD IDENTITY / QUALITY panel. It states case/source identity, broker selection and house count, selected metrics, forecast fallbacks, rejected/quarantined evidence, quality mode and pending native Excel/visual certification.",
+        "integration_evidence": "PASS: the registered synthetic integration test builds the standard maximal workbook plan in Forecast Waterfall mode and locates every contiguous disclosure row and value on the emitted Brokers sheet; registry contract 3/3, broker dynamic concepts 11/11 with four mutations and forecast behavior 33/33 with seven mutations pass.",
+        "semantic_oracle_evidence": "PASS: the pure disclosure contract independently counts fallback and rejected authority rows, adds quarantined source cells, exposes unresolved authority and cannot label a Forecast Waterfall case STANDARD.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_VISUAL_REVIEW",
+        "commit": "6d5c561"
       }
     }
   ]
