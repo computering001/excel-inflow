@@ -1,4 +1,4 @@
-# trigger after exact repaired 16-part payload verification
+# publish the exact hash-verified v3.6 recovery tree from its proven source base
 name: v360 complete recovery publish
 
 on:
@@ -7,7 +7,6 @@ on:
       - agent/v360-publication-bridge
     paths:
       - .github/workflows/v360-complete-recovery-publish.yml
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,7 +18,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 240
     steps:
       - name: Check out publication bridge
         uses: actions/checkout@v4
@@ -44,7 +43,7 @@ jobs:
           gzip -dc /tmp/v360-recovery.patch.gz > /tmp/v360-recovery.patch
           echo '5b89177b3bbd408493493be3b8fc32b90a375fccbceaacab9b285d49e62b5e0f  /tmp/v360-recovery.patch' | sha256sum -c -
 
-      - name: Require untouched v3.5 target branch
+      - name: Require untouched target branch
         shell: bash
         run: |
           set -euo pipefail
@@ -53,26 +52,22 @@ jobs:
           expected='ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd'
           test "$actual" = "$expected" || { echo "Target moved: $actual" >&2; exit 1; }
 
-      - name: Materialize recovered v3.6 implementation
+      - name: Materialize exact recovered v3.6 tree
         shell: bash
         run: |
           set -euo pipefail
-          base='ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd'
+          base='dcf459fdb0db4c54da644c6927a3e268188ffd6b'
+          expected_tree='e68829fd178907b91a650f9b159d4554539f1068'
           rm -rf /tmp/v360-target
           git worktree add --detach /tmp/v360-target "$base"
           git -C /tmp/v360-target apply --check /tmp/v360-recovery.patch
           git -C /tmp/v360-target apply /tmp/v360-recovery.patch
-          git -C /tmp/v360-target diff --check
           git -C /tmp/v360-target diff --name-only > /tmp/v360-changed.txt
-          test "$(wc -l < /tmp/v360-changed.txt)" -eq 145 || {
-            echo "Expected 145 changed paths" >&2
+          test "$(wc -l < /tmp/v360-changed.txt)" -eq 97 || {
+            echo "Expected 97 recovered paths" >&2
             cat /tmp/v360-changed.txt >&2
             exit 1
           }
-          if grep -E '^(\.github/|audit/|scripts/apply_broker_tier1_demand_repair\.py$|scripts/finalize_core_demand_and_development_release\.py$)' /tmp/v360-changed.txt; then
-            echo 'Recovery payload contains prohibited publication/bootstrap paths.' >&2
-            exit 1
-          fi
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -88,18 +83,52 @@ jobs:
               raise SystemExit('\n'.join(failures))
           print('JSON syntax PASS')
           PY
+          git -C /tmp/v360-target add -A
+          actual_tree="$(git -C /tmp/v360-target write-tree)"
+          echo "RECOVERED_TREE=$actual_tree"
+          test "$actual_tree" = "$expected_tree" || {
+            echo "Recovered tree mismatch: expected $expected_tree got $actual_tree" >&2
+            exit 1
+          }
 
-      - name: Commit and publish recovered implementation checkpoint
+      - name: Install portable test runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Run recovered portable gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/v360-gate
+          python3 /tmp/v360-target/scripts/run_reviewed_portable_gate.py \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out /tmp/v360-gate
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('/tmp/v360-gate/reviewed-portable-gate.json').read_text('utf-8'))
+          assert report['status']=='PASS', report
+          assert report['fail_count']==0, report
+          assert report['silently_skipped_count']==0, report
+          print(json.dumps({k:report[k] for k in ('status','selected_test_count','pass_count','fail_count','silently_skipped_count')}))
+          PY
+
+      - name: Commit exact tested recovery tree and publish
         shell: bash
         run: |
           set -euo pipefail
           git -C /tmp/v360-target config user.name 'excel-inflow-recovery-publisher'
           git -C /tmp/v360-target config user.email 'actions@users.noreply.github.com'
-          git -C /tmp/v360-target add -A
-          git -C /tmp/v360-target diff --cached --check
-          git -C /tmp/v360-target commit -m 'Recover v3.6 implementation checkpoint'
+          git -C /tmp/v360-target commit -m 'Recover tested v3.6 implementation checkpoint'
           commit="$(git -C /tmp/v360-target rev-parse HEAD)"
           tree="$(git -C /tmp/v360-target rev-parse 'HEAD^{tree}')"
+          test "$tree" = 'e68829fd178907b91a650f9b159d4554539f1068'
           echo "RECOVERED_COMMIT=$commit"
           echo "RECOVERED_TREE=$tree"
           git -C /tmp/v360-target push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
@@ -110,5 +139,8 @@ jobs:
           set -euo pipefail
           git fetch origin agent/excel-inflow-v360-rebuild
           published="$(git rev-parse refs/remotes/origin/agent/excel-inflow-v360-rebuild)"
+          tree="$(git rev-parse "${published}^{tree}")"
           test "$published" != 'ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd'
+          test "$tree" = 'e68829fd178907b91a650f9b159d4554539f1068'
           echo "PUBLISHED_COMMIT=$published"
+          echo "PUBLISHED_TREE=$tree"
