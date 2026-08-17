@@ -1,4 +1,4 @@
-# inspect the synthetic cash-flow hierarchy behind the remaining v3.6 controller failure
+# repair the audited neutral-separator cash-flow hierarchy bug on the v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -9,27 +9,45 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  repair:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 4d871ca1cad6aa3e586ff3b74204e5bbc71a080a
-      - name: Emit and inspect clean cash-flow fixture
+          ref: agent/excel-inflow-v360-rebuild
+          fetch-depth: 0
+      - name: Require audited starting point
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean.json
-          node - <<'NODE'
-          const fs=require('fs'); const d=JSON.parse(fs.readFileSync('/tmp/clean.json','utf8'));
-          for (const m of d.filings.face_statement_manifests.cash_flow) {
-            console.log('MANIFEST',m.source_id,m.statement_order);
-            for (const r of m.rows) console.log(JSON.stringify(r));
-          }
-          console.log('CASE_SOURCE_CASH_FLOW_MAP');
-          for (const r of d.case_source.statement_map.cash_flow) console.log(JSON.stringify(r));
-          NODE
+          test "$(git rev-parse HEAD)" = '4d871ca1cad6aa3e586ff3b74204e5bbc71a080a'
+      - name: Allow neutral source rows inside uniquely proved subtotal families
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/extract_filing_statements.py')
+          s=p.read_text()
+          old='''                level = int(candidate.get("hierarchy_level") or 0)\n                if level <= parent_level:\n                    break\n                if level == parent_level + 1 and _finite_series(candidate) is not None:\n                    indexes.append(cursor)\n                cursor += direction\n'''
+          new='''                level = int(candidate.get("hierarchy_level") or 0)\n                if level <= parent_level:\n                    # A same-level, non-subtotal line that is numerically zero\n                    # in every reported period is an arithmetically neutral\n                    # separator, not proof that a visible subtotal family ended.\n                    # Skip it only inside the three-period arithmetic search; it\n                    # is never promoted to a child and caption fallback remains\n                    # conservative. This covers filing surfaces that print a\n                    # zero net-finance/result line between operating cash-flow\n                    # components while preserving the issuer's proved subtotal.\n                    series = _finite_series(candidate)\n                    neutral_separator = (\n                        level == parent_level\n                        and not candidate.get("is_subtotal")\n                        and series is not None\n                        and all(abs(value) <= 0.5000001 for value in series)\n                    )\n                    if neutral_separator:\n                        cursor += direction\n                        continue\n                    break\n                if level == parent_level + 1 and _finite_series(candidate) is not None:\n                    indexes.append(cursor)\n                cursor += direction\n'''
+          assert s.count(old)==1, s.count(old)
+          p.write_text(s.replace(old,new,1))
+          PY
+          python3 -m py_compile scripts/extract_filing_statements.py
+          git diff --check
+          git diff -- scripts/extract_filing_statements.py
+      - name: Commit cash-flow hierarchy repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'excel-inflow-recovery-publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add scripts/extract_filing_statements.py
+          git commit -m 'Preserve subtotal arithmetic across neutral source rows'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
+          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
