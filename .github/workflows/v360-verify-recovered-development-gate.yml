@@ -1,4 +1,4 @@
-# verify the last Stage-4 checkpoint seam using a HOME-independent Python runtime
+# diagnose the last Stage-4 checkpoint seam with a HOME-independent Python runtime
 name: v360 verify recovered development gate
 
 on:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  diagnose:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -30,18 +30,29 @@ jobs:
           /tmp/v360-python/bin/python -m pip install --upgrade pip
           /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
           HOME=/tmp/v360-isolated-home /tmp/v360-python/bin/python -c 'import openpyxl, pymupdf, PIL, numpy; print(openpyxl.__version__)'
-      - name: Run Stage-4 checkpoint interruption and recovery
+      - name: Reproduce Stage-4 failure and dump exact state
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
-          rm -rf /tmp/v360-stage4-proof
+          out=/tmp/v360-stage4-diagnostic
+          rm -rf "$out"
           node scripts/run_stage4_checkpoint_tests.mjs \
             --cases test-fixtures/cases \
             --python /tmp/v360-python/bin/python \
             --soffice "$(command -v soffice)" \
-            --out /tmp/v360-stage4-proof
-          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
+            --out "$out"
+          test_exit=$?
+          echo "STAGE4_TEST_EXIT=$test_exit"
+          echo '--- result/build JSON ---'
+          find "$out" -type f \( -name 'user-flow-result.json' -o -name 'build-result.json' -o -name 'stage4-checkpoint-test-report.json' \) -print -exec sh -c 'cat "$1"; echo' _ {} \;
+          echo '--- .stage4 files ---'
+          find "$out" -path '*/.stage4/*' -type f -print | sort
+          echo '--- .stage4 receipt contents ---'
+          find "$out" -path '*/.stage4/receipts/*.json' -type f -print -exec sh -c 'cat "$1"; echo' _ {} \;
+          echo '--- likely gate/receipt files ---'
+          find "$out" -type f \( -name '*gate*.json' -o -name '*receipt*.json' -o -name '*result*.json' \) -print | sort
+          exit $test_exit
