@@ -1,4 +1,4 @@
-# trigger exact suffix repair
+# trigger exact internal insertion repair
 name: v360 repair part15
 
 on:
@@ -6,7 +6,6 @@ on:
     branches:
       - agent/v360-publication-bridge
     paths:
-      - publish/v360-recovery-complete/part15.suffix
       - .github/workflows/v360-repair-part15.yml
   workflow_dispatch:
 
@@ -21,15 +20,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Append exact missing suffix and verify
+      - name: Insert exact missing 36-byte segment and verify
         shell: bash
         run: |
           set -euo pipefail
           target='publish/v360-recovery-complete/part15.b64'
-          suffix='publish/v360-recovery-complete/part15.suffix'
           test "$(wc -c < "$target")" -eq 7750
-          test "$(wc -c < "$suffix")" -eq 36
-          cat "$suffix" >> "$target"
+          echo 'c2a27fe767a45f25daf0e5ed95eb2d71c272f26ffc0d97051485b38de7b6f0f6  publish/v360-recovery-complete/part15.b64' | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          target = Path('publish/v360-recovery-complete/part15.b64')
+          data = target.read_text('ascii')
+          insert = '0/q6KnM3uLreedcHhFQmOerB1QGGAEPg6gBD'
+          assert len(data) == 7750
+          assert len(insert) == 36
+          data = data[:5478] + insert + data[5478:]
+          target.write_text(data, 'ascii')
+          PY
           test "$(wc -c < "$target")" -eq 7786
           echo 'dfccdc536caa66c866d5fa0aecdd19ac06346ab2f16d8f78443af4d8c2d4691b  publish/v360-recovery-complete/part15.b64' | sha256sum -c -
       - name: Commit repaired chunk
