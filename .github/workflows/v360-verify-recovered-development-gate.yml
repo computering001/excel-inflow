@@ -1,4 +1,4 @@
-# expose the exact N6 gate evidence in the same portable runtime as the prior Stage-4 failure
+# isolate forecast-authority ledger drift at the decisions -> Stage-4 handoff
 name: v360 verify recovered development gate
 
 on:
@@ -14,53 +14,44 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           ref: bf39afb5e513431f87b02d85488fe93b0a10b5e1
           fetch-depth: 0
-      - name: Install exact portable runtime
+      - name: Compare sealed and current authority ledgers
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update >/dev/null
-          sudo apt-get install -y libreoffice python3-venv >/dev/null
-          python3 -m venv /tmp/v360-python
-          /tmp/v360-python/bin/python -m pip install --upgrade pip >/dev/null
-          /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy >/dev/null
-      - name: Emit exact N6 evidence
-        shell: bash
-        run: |
-          set -uo pipefail
-          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
-          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
-          export SOFFICE_BIN="$(command -v soffice)"
-          rm -rf /tmp/v360-n6
-          set +e
-          node scripts/run_stage4_checkpoint_tests.mjs \
-            --cases test-fixtures/cases \
-            --python /tmp/v360-python/bin/python \
-            --soffice "$(command -v soffice)" \
-            --out /tmp/v360-n6 \
-            > /tmp/v360-n6.stdout 2> /tmp/v360-n6.stderr
-          code=$?
-          set -e
-          echo "STAGE4_TEST_EXIT=$code"
-          semantic="$(find /tmp/v360-n6 -type f -path '*/.stage4/work/semantic_gates/n0-n9-gates.json' -print -quit)"
-          if [ -z "$semantic" ]; then
-            echo 'NO_SEMANTIC_ARTIFACT'
-            cat /tmp/v360-n6.stderr || true
-            exit 1
-          fi
-          /tmp/v360-python/bin/python - "$semantic" <<'PY'
-          import json,sys
-          d=json.load(open(sys.argv[1]))
-          n6=next(g for g in d['gates'] if g['id']=='N6')
-          print('N6_STATUS='+n6['status'])
-          print('N6_EXACT_JSON='+json.dumps(n6,sort_keys=True,separators=(',',':')))
-          PY
-          echo '--- stage4 stderr ---'
-          cat /tmp/v360-n6.stderr || true
-          exit 0
+          rm -rf /tmp/v360-ledger
+          mkdir -p /tmp/v360-ledger
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/v360-ledger/clean-evidence-run.json
+          node scripts/run_user_flow.mjs /tmp/v360-ledger/clean-evidence-run.json \
+            --out /tmp/v360-ledger/run --stop-after decisions --json > /tmp/v360-ledger/paused.json
+          case_path=/tmp/v360-ledger/run/stages/decisions/model-case.json
+          CASE_PATH="$case_path" node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import { buildForecastAuthorityLedger } from './scripts/lib/forecast_authority_ledger.mjs';
+          const modelCase=JSON.parse(fs.readFileSync(process.env.CASE_PATH,'utf8'));
+          const actual=modelCase.forecast_authority_ledger;
+          const expected=buildForecastAuthorityLedger(modelCase);
+          console.log('ACTUAL_SHA='+actual?.ledger_sha256);
+          console.log('EXPECTED_SHA='+expected.ledger_sha256);
+          console.log('STAGE_THREE_ANSWERS='+JSON.stringify(modelCase.stage_three_answers??{}));
+          console.log('ANSWERS='+JSON.stringify(modelCase.answers??{}));
+          console.log('BROKER_CASE='+JSON.stringify(modelCase.controls?.broker_case));
+          const key=(r)=>`${r.section}|${r.row_id}|${r.period_end}`;
+          const a=new Map((actual?.rows??[]).map(r=>[key(r),r]));
+          const e=new Map(expected.rows.map(r=>[key(r),r]));
+          const keys=[...new Set([...a.keys(),...e.keys()])].sort();
+          let n=0;
+          for(const k of keys){
+            const ar=a.get(k), er=e.get(k);
+            if(JSON.stringify(ar)!==JSON.stringify(er)){
+              n++;
+              console.log('LEDGER_DIFF='+JSON.stringify({key:k,actual:ar??null,expected:er??null}));
+            }
+          }
+          console.log('LEDGER_DIFF_COUNT='+n);
+          JS
