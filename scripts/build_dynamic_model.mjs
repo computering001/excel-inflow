@@ -3620,6 +3620,14 @@ function configureOperatingModel(
       const mandatory = debtRows.mandatory_debt_repayments;
       return Number.isInteger(mandatory) ? `=-${column}${mandatory}` : "=0";
     }
+    if (role === "change_in_debt") {
+      if (!Number.isInteger(debtRows.total_change_in_debt)) {
+        throw new Error(
+          "Change in Debt requires the debt schedule's total cash-movement row.",
+        );
+      }
+      return `=${column}${debtRows.total_change_in_debt}`;
+    }
     if (role === "rcf_draw") return `=${column}${waterfallRows.rcf_draw_waterfall}`;
     if (role === "rcf_repayment") {
       return `=-${column}${waterfallRows.rcf_repayment_waterfall}`;
@@ -4021,6 +4029,8 @@ function configureOperatingModel(
           case "debt_repayment":
           case "lease_principal":
             return "=0";
+          case "change_in_debt":
+            return `=${adjustmentColumn}${debtRows.total_change_in_debt}`;
           default:
             return null;
         }
@@ -4282,6 +4292,12 @@ function configureOperatingModel(
           sheet,
           `${proFormaColumn}${definition.row}`,
           `=-${proFormaColumn}${waterfallRows.rcf_repayment_waterfall}`,
+        );
+      } else if (definition.semantic_role === "change_in_debt") {
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
         );
       } else if (
         [

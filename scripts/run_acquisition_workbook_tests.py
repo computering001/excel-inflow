@@ -63,7 +63,7 @@ def main()->int:
     assert "Operating Model" in formulas.sheetnames
     ws=formulas["Operating Model"]; vws=values["Operating Model"]
     consideration_rows=find_rows(ws,{"direct acquisition cash flow","acquisition consideration","purchase consideration"})
-    debt_rows=find_rows(ws,{"acquisition debt proceeds","acquisition financing proceeds"})
+    debt_rows=find_rows(ws,{"change in debt","acquisition debt proceeds","acquisition financing proceeds"})
     assert consideration_rows,"No acquisition-consideration row was emitted"
     assert debt_rows,"No acquisition-debt-proceeds row was emitted"
     consideration_formulas=[cell.value for row in consideration_rows for cell in formula_cells(ws,row)]

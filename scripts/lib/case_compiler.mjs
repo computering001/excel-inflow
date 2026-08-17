@@ -1948,6 +1948,7 @@ const SCHEDULE_ROLES = new Set([
   "net_finance_addback",
   "debt_issuance",
   "debt_repayment",
+  "change_in_debt",
   "rcf_draw",
   "rcf_repayment",
   "lease_principal",
@@ -2095,6 +2096,7 @@ function hasCompleteCompatibleBrokerAuthority(modelCase, row) {
 
 function hasDirectForecastAuthority(modelCase, row) {
   if (!row) return false;
+  if (SCHEDULE_ROLES.has(row.semantic_role)) return true;
   if (
     (row.broker_metric_id || row.forecast_treatment === "broker") &&
     hasCompleteCompatibleBrokerAuthority(modelCase, row)
@@ -2308,7 +2310,13 @@ export function compileForecastCaptureTopology(
       if (row.row_type === "header") continue;
       if (restoreDerivedDisplayIdentity(row)) continue;
       if (derivedRowIds.has(row.row_id)) continue;
-      if (CAPTURE_REQUIRED_ROLES.has(row.semantic_role)) continue;
+      const scheduleDetailCapturedByChangeInDebt =
+        SCHEDULE_ROLES.has(row.semantic_role) &&
+        rowsById.get(row.parent_row_id)?.semantic_role === "change_in_debt";
+      if (
+        CAPTURE_REQUIRED_ROLES.has(row.semantic_role) &&
+        !scheduleDetailCapturedByChangeInDebt
+      ) continue;
       if (row.broker_metric_id || row.forecast_calculation) continue;
       if ((row.forecast_period_calculations ?? []).some(Boolean)) continue;
       if (

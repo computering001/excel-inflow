@@ -1105,6 +1105,7 @@ function markForecastCapturedBy(
   note,
   mode = "semantic_scope",
   modelCase = null,
+  replaceDirectAuthority = false,
 ) {
   if (CAPTURE_PROTECTED_SPINE_ROLES.has(row?.semantic_role)) return false;
   const explicit = row.forecast_period_authorities;
@@ -1123,7 +1124,16 @@ function markForecastCapturedBy(
             authority.method,
           ),
       ));
-  if (hasDirectAuthority) return false;
+  if (hasDirectAuthority && !replaceDirectAuthority) return false;
+  if (replaceDirectAuthority) {
+    delete row.broker_metric_id;
+    delete row.forecast_calculation;
+    delete row.forecast_period_calculations;
+    delete row.forecast_period_authorities;
+    if (Array.isArray(row.values)) {
+      row.values = [...row.values.slice(0, 3), null, null, null];
+    }
+  }
   const material = modelCase ? forecastRowMateriality(modelCase, row) : null;
   row.forecast_treatment = "uncalculated";
   row.formula_authority = "intentionally_blank";
@@ -1484,19 +1494,57 @@ function foldRevolverIntoChangeInDebt(rows, consolidated) {
   }
   for (const row of rows) {
     if (row === consolidated) continue;
-    const parentRefs = row.calculation?.refs;
-    if (
-      !Array.isArray(parentRefs) ||
-      !parentRefs.some((ref) => revolverIds.has(ref))
-    ) {
-      continue;
+    for (const rule of [
+      row.calculation,
+      row.forecast_calculation,
+      ...(row.forecast_period_calculations ?? []),
+    ]) {
+      if (
+        !Array.isArray(rule?.refs) ||
+        !rule.refs.some((ref) => revolverIds.has(ref))
+      ) {
+        continue;
+      }
+      const rewired = [];
+      for (const ref of rule.refs) {
+        const next = revolverIds.has(ref) ? consolidated.row_id : ref;
+        if (!rewired.includes(next)) rewired.push(next);
+      }
+      rule.refs = rewired;
     }
-    const rewired = [];
-    for (const ref of parentRefs) {
-      const next = revolverIds.has(ref) ? consolidated.row_id : ref;
-      if (!rewired.includes(next)) rewired.push(next);
-    }
-    row.calculation = { ...row.calculation, refs: rewired };
+  }
+}
+
+function transferDebtForecastAuthorityToParent(modelCase, rows, consolidated) {
+  consolidated.forecast_period_authorities = [0, 1, 2].map(() => ({
+    method: "schedule_link",
+    source_kind: "schedule",
+    material: true,
+    note:
+      "The debt and liquidity schedules jointly own the single visible Change in Debt forecast line.",
+  }));
+  consolidated.forecast_treatment = "formula";
+  delete consolidated.forecast_calculation;
+  delete consolidated.forecast_period_calculations;
+  if (Array.isArray(consolidated.values)) {
+    consolidated.values = [
+      ...consolidated.values.slice(0, 3),
+      null,
+      null,
+      null,
+    ];
+  }
+  const children = new Set(consolidated.calculation?.refs ?? []);
+  for (const row of rows) {
+    if (!children.has(row.row_id)) continue;
+    markForecastCapturedBy(
+      row,
+      consolidated.row_id,
+      `Forecast debt detail is owned by the debt schedule and represented once in ${consolidated.label}.`,
+      "semantic_scope",
+      modelCase,
+      true,
+    );
   }
 }
 
@@ -1634,9 +1682,9 @@ function assertNoDuplicateStatementFamily(rows, section = "statement") {
  *   level 2  a constituent beneath a DECLARED consolidated line — Change in
  *            Working Capital or Change in Debt. Those lines are themselves
  *            ordinary body parents (level 1), so their explicit children land
- *            one further in. Forecast debt children remain live schedule links;
- *            WC children may be blank and grey only when the forecast parent
- *            carries their full economic scope.
+ *            one further in. Forecast children may be blank and grey only when
+ *            the visible parent carries their full economic scope; Change in
+ *            Debt is the single schedule-owned financing forecast line.
  *
  * A ref that is itself an anchor is skipped, so `Adjusted EBITDA = Operating
  * Profit + ...` does not push Operating Profit — a total in its own right —
@@ -1864,9 +1912,9 @@ function consolidateConstituents(rows, spec) {
   for (const row of constituents) {
     row.indent = Math.max(1, Number(row.indent ?? 0));
     row.display_role = "component";
-    // Parentage is a presentation and audit relationship, not a forecast-
-    // capture decision. Change in Debt keeps every child live and formula-
-    // driven, but those children still belong beneath its visible aggregate.
+    // Parentage records the presentation and audit relationship. Forecast
+    // capture is an explicit policy choice below: WC and debt use one visible
+    // parent forecast while retaining historical child detail beneath it.
     row.parent_row_id = consolidated.row_id;
     row.aggregation_role ??=
       consolidated.aggregation_authority === "reported_parent"
@@ -1880,6 +1928,9 @@ function consolidateConstituents(rows, spec) {
         row,
         consolidated.row_id,
         `Forecast detail is captured by ${consolidated.label}.`,
+        "semantic_scope",
+        null,
+        spec.replaceDirectForecastWithParent === true,
       );
     }
   }
@@ -1888,16 +1939,24 @@ function consolidateConstituents(rows, spec) {
   // consolidated line instead.
   for (const row of rows) {
     if (row === consolidated) continue;
-    const refs = row.calculation?.refs;
-    if (!Array.isArray(refs) || !refs.some((ref) => constituentIdSet.has(ref))) {
-      continue;
+    for (const rule of [
+      row.calculation,
+      row.forecast_calculation,
+      ...(row.forecast_period_calculations ?? []),
+    ]) {
+      if (
+        !Array.isArray(rule?.refs) ||
+        !rule.refs.some((ref) => constituentIdSet.has(ref))
+      ) {
+        continue;
+      }
+      const rewired = [];
+      for (const ref of rule.refs) {
+        const next = constituentIdSet.has(ref) ? consolidated.row_id : ref;
+        if (!rewired.includes(next)) rewired.push(next);
+      }
+      rule.refs = rewired;
     }
-    const rewired = [];
-    for (const ref of refs) {
-      const next = constituentIdSet.has(ref) ? consolidated.row_id : ref;
-      if (!rewired.includes(next)) rewired.push(next);
-    }
-    row.calculation = { ...row.calculation, refs: rewired };
   }
   return consolidated;
 }
@@ -2349,11 +2408,10 @@ function selectSingleCashFlowRoot(modelCase, rows) {
 
 /**
  * The consolidated Change in Debt line must LINK DOWN to the debt schedule, not
- * carry its own hardcode. It does that through its constituents: the compiler
- * drives the `debt_issuance` and `debt_repayment` roles off the instrument
- * issuance and repayment rows in the debt schedule. If the company's own
- * presentation has neither, add them so the linkage is structural rather than
- * incidental.
+ * carry its own hardcode. The visible parent owns the forecast link; its
+ * issuance and repayment children preserve the filed historical audit trail
+ * but are captured in forecast. If the company's own presentation has neither
+ * child, add them so the historical family is structural rather than incidental.
  */
 function ensureDebtScheduleLinkage(rows, consolidated) {
   const byId = new Map(rows.map((row) => [row.row_id, row]));
@@ -3029,11 +3087,10 @@ function captureChildrenOfDirectForecastParents(modelCase, rows) {
       JSON.stringify(left.refs ?? []) === JSON.stringify(right.refs ?? []),
     );
   for (const parent of rows) {
-    // Change in Debt is the visible sum of four live schedule producers:
-    // issuance, mandatory repayment, RCF draw and RCF repayment.  Capturing
-    // those children in the parent would grey the very audit trail the row is
-    // meant to expose and would make the financing statement bypass its own
-    // components.
+    // Change in Debt is an independent schedule-owned parent. Its issuance,
+    // mandatory-repayment, RCF-draw and RCF-repayment children are historical
+    // audit detail captured by that one forecast line, so they must not be
+    // collapsed again as if the parent were an ordinary calculated subtotal.
     if (parent.semantic_role === "change_in_debt") continue;
     const refs = parent.calculation?.refs ?? [];
     // A per-period materialisation of the row's own accounting identity is
@@ -3359,9 +3416,9 @@ export function normaliseStatementRows(
       captureForecastInParent: true,
     });
 
-    // DYNAMIC 2 — Change in Debt. Same shape: additions, repayments, issuance
-    // costs, commercial paper and other debt movements stay on the face; the
-    // consolidated line sums them and links down to the debt schedule.
+    // DYNAMIC 2 — Change in Debt. Additions, repayments, issuance costs,
+    // commercial paper and other debt movements stay on the face in history;
+    // the consolidated parent becomes the single debt-schedule forecast line.
     const changeInDebt = consolidateConstituents(rows, {
       row_id: "change_in_debt",
       label: "Change in Debt",
@@ -3370,13 +3427,16 @@ export function normaliseStatementRows(
       presentation_style_role: "subsection",
       aggregation_authority: "derived_from_children",
       childEconomicClass: "financing",
+      captureForecastInParent: true,
+      replaceDirectForecastWithParent: true,
     });
     if (changeInDebt) {
       ensureDebtScheduleLinkage(rows, changeInDebt);
-      // The revolver legs join the run.  Every child remains a visible
-      // schedule-linked producer and the parent sums the children; the old
-      // parent-bypass made the forecast impossible to audit line by line.
+      // The revolver legs join the historical audit run, while their forecast
+      // economics are captured by the single schedule-linked parent. This
+      // prevents the financing statement from consuming both parent and legs.
       foldRevolverIntoChangeInDebt(rows, changeInDebt);
+      transferDebtForecastAuthorityToParent(modelCase, rows, changeInDebt);
     }
   }
   // The acquisition case is a debt-overlay balance-sheet module. It never
@@ -4196,10 +4256,9 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
   //
   // Every structural row is allocated unconditionally. The issuance waterfall
   // row used to exist only when an instrument carried sourced issuance, which
-  // left the statement's Change in Debt issuance child with no schedule row
-  // to reference and collapsed it to a literal zero — a dead audit trail on a
-  // row the contract requires to stay a live schedule-owned producer. A
-  // no-issuance case now simply shows the schedule row summing to nothing.
+  // left the statement's Change in Debt parent without a complete schedule
+  // bridge. A no-issuance case now simply shows the schedule row summing to
+  // nothing while the parent remains the sole statement forecast authority.
   for (const id of [
     "cash_before_debt",
     "non_rcf_debt_proceeds",

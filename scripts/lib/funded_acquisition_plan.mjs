@@ -47,7 +47,7 @@ function roleOf(cell) {
 function definitionRole(definition) {
  const role=normalise(definition?.semantic_role ?? definition?.row_id ?? definition?.movement_type).replaceAll(" ","_");
  if(["acquisitions_net_of_cash","acquisition_consideration","purchase_consideration"].includes(role)) return "consideration";
- if(["debt_issuance","additions_to_debt","acquisition_debt_proceeds"].includes(role)) return "debt_proceeds";
+ if(["debt_issuance","change_in_debt","additions_to_debt","acquisition_debt_proceeds"].includes(role)) return "debt_proceeds";
  return null;
 }
 function statementDefinitions(rowPlan) {
@@ -79,8 +79,14 @@ export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
  if(!sheet)return{changed:0,reason:"operating-model-absent"};
  const definitions=statementDefinitions(rowPlan);
  const considerationRows=definitions.filter(definition=>definitionRole(definition)==="consideration");
- const debtProceedsRows=definitions.filter(definition=>definitionRole(definition)==="debt_proceeds");
- if(considerationRows.length!==1||debtProceedsRows.length!==1) throw new Error("Funded acquisition portable plan must contain exactly one existing consideration row and one debt-issuance row.");
+ const debtProceedsCandidates=definitions.filter(definition=>definitionRole(definition)==="debt_proceeds");
+ const consolidatedDebtRows=debtProceedsCandidates.filter(
+  definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="change_in_debt",
+ );
+ const debtProceedsRows=consolidatedDebtRows.length>0
+  ? consolidatedDebtRows
+  : debtProceedsCandidates.filter(definition=>!definition.forecast_capture_parent_id);
+ if(considerationRows.length!==1||debtProceedsRows.length!==1) throw new Error("Funded acquisition portable plan must contain exactly one existing consideration row and one consolidated debt-proceeds row.");
  const consideration=considerationRows[0];
  const debtProceeds=debtProceedsRows[0];
  const investingRows=definitions.filter(definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="cash_from_investing");
@@ -101,8 +107,8 @@ export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
    const address=`${column}${definition.row}`;
    const flow=acquisitionTransactionFlows(modelCase,index);
    const amount=kind==="consideration"?"-$P$5":"$P$8";
-   const headerRef=`${column}$6`;
-   const periodYear=`IF(${headerRef}>3000,YEAR(${headerRef}),${headerRef})`;
+   const periodYear=Number(String(modelCase.periods?.[index+3]?.date??"").slice(0,4));
+   if(!Number.isInteger(periodYear)) throw new Error(`Funded acquisition period ${index+1} has no calendar-year end.`);
    const formula=`=IF($P$4=0,0,IF(${periodYear}=$P$10,${amount},0))`;
    if(!sheet.setFormulaText(address,formula)) throw new Error(`Funded acquisition target ${address} is not an existing formula cell.`);
    const cached=kind==="consideration"?flow.consideration_cash_flow:flow.acquisition_debt_proceeds;

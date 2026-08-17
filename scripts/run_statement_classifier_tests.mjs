@@ -500,6 +500,131 @@ for (const childId of capex.calculation?.refs ?? []) {
   );
 }
 
+const workingCapitalParent = parentFirstCash.find(
+  (row) => row.semantic_role === "change_in_working_capital",
+);
+const workingCapitalChildren = new Set(
+  parentFirstCash
+    .filter((row) => row.forecast_capture_parent_id === workingCapitalParent?.row_id)
+    .map((row) => row.row_id),
+);
+const cashGeneratedPlanRow = parentFirstCash.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+if (workingCapitalChildren.size > 0) {
+  assert(
+    cashGeneratedPlanRow?.calculation?.refs?.includes(workingCapitalParent.row_id) &&
+      cashGeneratedPlanRow.calculation.refs.every((ref) => !workingCapitalChildren.has(ref)),
+    "Cash generated from operations bypassed the selected working-capital parent.",
+  );
+}
+
+const workingCapitalBypassCase = clone(fixture);
+delete workingCapitalBypassCase.statement_structure_compiled_version;
+const workingCapitalBypassRows = workingCapitalBypassCase.statement_structure.cash_flow;
+const bypassParent = workingCapitalBypassRows.find(
+  (row) => row.semantic_role === "change_in_working_capital",
+);
+const bypassChildren = [
+  {
+    row_id: "working_capital_receivables_regression",
+    label: "Receivables movement",
+    row_type: "input",
+    values: [-3, -4, -5, null, null, null],
+    economic_class: "working_capital",
+    movement_type: "working_capital_movement",
+  },
+  {
+    row_id: "working_capital_inventory_regression",
+    label: "Inventory movement",
+    row_type: "input",
+    values: [-2, -3, -4, null, null, null],
+    economic_class: "working_capital",
+    movement_type: "working_capital_movement",
+  },
+];
+Object.assign(bypassParent, {
+  row_type: "subtotal",
+  aggregation_authority: "derived_from_children",
+  calculation: { operator: "sum", refs: bypassChildren.map((row) => row.row_id) },
+});
+workingCapitalBypassRows.splice(
+  workingCapitalBypassRows.indexOf(bypassParent) + 1,
+  0,
+  ...bypassChildren,
+);
+const bypassCashGenerated = workingCapitalBypassRows.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+bypassCashGenerated.calculation.refs = [
+  ...bypassCashGenerated.calculation.refs.filter((ref) => ref !== bypassParent.row_id),
+  ...bypassChildren.map((row) => row.row_id),
+];
+bypassCashGenerated.forecast_period_calculations = [0, 1, 2].map(() => ({
+  operator: "sum",
+  refs: [...bypassCashGenerated.calculation.refs],
+}));
+const repairedWorkingCapitalBypass = normaliseStatementRows(
+  workingCapitalBypassCase,
+  "cash_flow",
+);
+const repairedCashGenerated = repairedWorkingCapitalBypass.find(
+  (row) => row.row_id === "cash_generated_from_operations",
+);
+const repairedWorkingCapitalRules = [
+  repairedCashGenerated.calculation,
+  ...(repairedCashGenerated.forecast_period_calculations ?? []),
+];
+assert(
+  repairedWorkingCapitalRules.every(
+    (rule) =>
+      rule.refs.filter((ref) => ref === bypassParent.row_id).length === 1 &&
+      rule.refs.every(
+        (ref) => !bypassChildren.some((child) => child.row_id === ref),
+      ),
+  ),
+  "A historical or forecast cash-generation rule bypassed the working-capital parent.",
+);
+
+const changeInDebt = parentFirstCash.find(
+  (row) => row.semantic_role === "change_in_debt",
+);
+const debtChildren = parentFirstCash.filter(
+  (row) => row.forecast_capture_parent_id === changeInDebt?.row_id,
+);
+assert(
+  changeInDebt?.forecast_period_authorities?.every(
+    (authority) => authority.method === "schedule_link",
+  ) &&
+    ["debt_issuance", "debt_repayment", "rcf_draw", "rcf_repayment"].every(
+      (role) => debtChildren.some((row) => row.semantic_role === role),
+    ) &&
+    debtChildren.every(
+      (row) =>
+        row.forecast_treatment === "uncalculated" &&
+        (row.values ?? []).slice(3, 6).every((value) => value === null),
+    ),
+  "Debt and RCF forecast detail did not transfer to one schedule-linked Change in Debt parent.",
+);
+const financingTotal = parentFirstCash.find(
+  (row) => row.semantic_role === "cash_from_financing",
+);
+const financingRules = [
+  financingTotal?.calculation,
+  financingTotal?.forecast_calculation,
+  ...(financingTotal?.forecast_period_calculations ?? []),
+].filter(Boolean);
+const debtChildIds = new Set(debtChildren.map((row) => row.row_id));
+assert(
+  financingRules.length > 0 &&
+    financingRules.every(
+      (rule) =>
+        rule.refs.filter((ref) => ref === changeInDebt.row_id).length === 1 &&
+        rule.refs.every((ref) => !debtChildIds.has(ref)),
+    ),
+  "Financing cash flow bypassed Change in Debt or counted a debt/RCF leg twice.",
+);
+
 const legacyCashTaxCase = clone(fixture);
 delete legacyCashTaxCase.statement_structure_compiled_version;
 const legacyCashTaxRows = legacyCashTaxCase.statement_structure.cash_flow;
@@ -802,4 +927,4 @@ if (hierarchyOutput) {
   }
 }
 
-console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 15 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);
+console.log(`Statement classifier tests: PASS (${positive.length} positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 19 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).`);

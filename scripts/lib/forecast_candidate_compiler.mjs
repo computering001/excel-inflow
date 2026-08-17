@@ -536,6 +536,7 @@ const INDEPENDENT_CAPTURE_METHODS = new Set([
 
 function independentlyForecastedParent(modelCase, parent, forecastIndex) {
   if (!parent) return false;
+  if (isScheduleOwnedForecastRole(parent.semantic_role)) return true;
   if (brokerCandidate(modelCase, parent, forecastIndex)) return true;
   const declared = declaredCandidate(parent, forecastIndex);
   if (declared && INDEPENDENT_CAPTURE_METHODS.has(declared.method)) return true;

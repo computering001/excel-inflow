@@ -45,9 +45,16 @@ const rowPlan = {
         row: 65,
       },
       {
+        row_id: "change_in_debt",
+        semantic_role: "change_in_debt",
+        row: 70,
+      },
+      {
         row_id: "debt_issuance",
         semantic_role: "debt_issuance",
-        row: 70,
+        row: 71,
+        forecast_treatment: "uncalculated",
+        forecast_capture_parent_id: "change_in_debt",
       },
       {
         row_id: "cash_from_investing",
@@ -62,7 +69,7 @@ const rowPlan = {
         row_id: "cash_from_financing",
         semantic_role: "cash_from_financing",
         row: 90,
-        calculation: { operator: "sum", refs: ["debt_issuance"] },
+        calculation: { operator: "sum", refs: ["change_in_debt"] },
       },
       {
         row_id: "fx_effect_on_cash",
@@ -108,6 +115,8 @@ assert.equal(workbookResult.changed, 6);
 assert.match(cells.get("O65").formula, /-\$P\$5/);
 assert.doesNotMatch(cells.get("O65").formula, /101|fx/i);
 assert.equal(cells.get("O65").cachedValue, -1482.5);
+assert.match(cells.get("O70").formula, /\$P\$8/);
+assert.equal(workbookResult.debt_proceeds_row, 70);
 
 const fxBoundPlan = structuredClone(rowPlan);
 fxBoundPlan.statement_rows.cash_flow.find(
@@ -132,8 +141,8 @@ const capturedPlan = {
       cells: addressedCells(65),
     },
     {
-      row_id: "debt_issuance",
-      semantic_role: "debt_issuance",
+      row_id: "change_in_debt",
+      semantic_role: "change_in_debt",
       cells: addressedCells(70),
     },
     {
@@ -156,4 +165,4 @@ assert.throws(
   "The captured-plan route accepted a second physical consideration row.",
 );
 
-console.log(JSON.stringify({status:"PASS",checks:14}));
+console.log(JSON.stringify({status:"PASS",checks:16}));

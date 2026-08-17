@@ -263,6 +263,46 @@ await test("no-question production path pauses after decisions", async () => {
       (changeInDebt.calculation?.refs ?? []).length > 0,
     "compiler-created Change in Debt does not declare its historical formula authority",
   );
+  const debtDetailRoles = new Set([
+    "debt_issuance",
+    "debt_repayment",
+    "rcf_draw",
+    "rcf_repayment",
+  ]);
+  const debtDetails = modelCase.statement_structure.cash_flow.filter(
+    (row) => debtDetailRoles.has(row.semantic_role),
+  );
+  assert(
+    changeInDebt.forecast_period_authorities.every(
+      (authority) => authority.method === "schedule_link",
+    ) &&
+      debtDetails.length === 4 &&
+      debtDetails.every(
+        (row) =>
+          row.forecast_capture_parent_id === changeInDebt.row_id &&
+          row.forecast_period_authorities.every(
+            (authority) => authority.method === "not_separately_forecast",
+          ),
+      ),
+    "debt/RCF forecast authority did not transfer to the consolidated schedule-linked parent",
+  );
+  const financingTotal = modelCase.statement_structure.cash_flow.find(
+    (row) => row.semantic_role === "cash_from_financing",
+  );
+  const financingRules = [
+    financingTotal?.calculation,
+    ...(financingTotal?.forecast_period_calculations ?? []),
+  ].filter(Boolean);
+  assert(
+    financingRules.every(
+      (rule) =>
+        rule.refs.filter((ref) => ref === changeInDebt.row_id).length === 1 &&
+        rule.refs.every(
+          (ref) => !debtDetails.some((row) => row.row_id === ref),
+        ),
+    ),
+    "financing cash flow bypasses Change in Debt or counts a schedule leg twice",
+  );
 });
 
 await test("run carrier references the canonical evidence snapshot without copying it", async () => {
