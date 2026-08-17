@@ -1,4 +1,4 @@
-# isolate the exact N6 semantic failure on recovered v3.6 without exercising later Stage-4 work
+# expose the exact N6 gate evidence in the same portable runtime as the prior Stage-4 failure
 name: v360 verify recovered development gate
 
 on:
@@ -14,29 +14,21 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           ref: bf39afb5e513431f87b02d85488fe93b0a10b5e1
           fetch-depth: 0
-      - name: Install isolated semantic-gate Python runtime
+      - name: Install exact portable runtime
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y libreoffice python3-venv >/dev/null
           python3 -m venv /tmp/v360-python
           /tmp/v360-python/bin/python -m pip install --upgrade pip >/dev/null
           /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy >/dev/null
-          cat > /tmp/fake-soffice <<'SH'
-          #!/bin/sh
-          if [ "$1" = "--version" ]; then
-            echo 'LibreOffice 24.2.7.2 420(Build:2)'
-            exit 0
-          fi
-          echo 'fake-soffice should not be reached beyond N6' >&2
-          exit 97
-          SH
-          chmod +x /tmp/fake-soffice
       - name: Emit exact N6 evidence
         shell: bash
         run: |
@@ -44,29 +36,30 @@ jobs:
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
-          export SOFFICE_BIN="/tmp/fake-soffice"
+          export SOFFICE_BIN="$(command -v soffice)"
           rm -rf /tmp/v360-n6
           set +e
           node scripts/run_stage4_checkpoint_tests.mjs \
             --cases test-fixtures/cases \
             --python /tmp/v360-python/bin/python \
-            --soffice /tmp/fake-soffice \
+            --soffice "$(command -v soffice)" \
             --out /tmp/v360-n6 \
             > /tmp/v360-n6.stdout 2> /tmp/v360-n6.stderr
           code=$?
           set -e
           echo "STAGE4_TEST_EXIT=$code"
           semantic="$(find /tmp/v360-n6 -type f -path '*/.stage4/work/semantic_gates/n0-n9-gates.json' -print -quit)"
-          test -n "$semantic"
+          if [ -z "$semantic" ]; then
+            echo 'NO_SEMANTIC_ARTIFACT'
+            cat /tmp/v360-n6.stderr || true
+            exit 1
+          fi
           /tmp/v360-python/bin/python - "$semantic" <<'PY'
           import json,sys
-          p=sys.argv[1]
-          d=json.load(open(p))
+          d=json.load(open(sys.argv[1]))
           n6=next(g for g in d['gates'] if g['id']=='N6')
-          print('N6_EXACT_JSON='+json.dumps(n6,sort_keys=True))
           print('N6_STATUS='+n6['status'])
-          for c in n6.get('checks',[]):
-              print('N6_CHECK='+json.dumps(c,sort_keys=True))
+          print('N6_EXACT_JSON='+json.dumps(n6,sort_keys=True,separators=(',',':')))
           PY
           echo '--- stage4 stderr ---'
           cat /tmp/v360-n6.stderr || true
