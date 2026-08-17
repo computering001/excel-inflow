@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T18:55:39Z",
+  "recorded_at": "2026-08-17T19:02:34Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -202,16 +202,16 @@
       "earliest_responsible_layer": "Statement hierarchy / historical authority compilation.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/case_source_proposer.mjs; scripts/lib/statement_topology.mjs",
       "acceptance_criterion": "When complete reported children reconcile in all historical periods, the visible parent is a formula, the filed total is retained as reconciliation evidence, and a mutation to hardcode the parent fails.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "When complete reported children reconcile in all historical periods, the visible parent is a formula, the filed total is retained as reconciliation evidence, and a mutation to hardcode the parent fails.",
         "baseline_reproduction": "FAIL reproduced in the handed-over workbook: the reported parent remains a blue historical input despite exact child reconciliation.",
-        "focused_test": "PASS_AT_SOURCE: source arithmetic 9/9, topology 5/5 and independent arithmetic oracle 2/2 infer unfamiliar aggregate parentage and reject a one-period mismatch.",
-        "source_fix": "The clean baseline already carries generic three-period source arithmetic inference and reported_total_reconciled formula ownership; f3f53e7 adds the complementary single-owner forecast guard.",
-        "integration_evidence": "PASS_AT_COMPILER: statement topology/classifier suite and two frozen compiler cases prove reconciled historical totals retain formula ownership with zero economic diffs.",
-        "semantic_oracle_evidence": "PASS_AT_CONTRACT: protected formula mutations reject replacement hardcodes; repaired production workbook proof remains pending.",
-        "native_excel_evidence": "PENDING_REPAIRED_PACKAGE_AND_NATIVE_RECALCULATION",
-        "commit": null
+        "focused_test": "PASS: source arithmetic 9/9, topology 5/5 and independent arithmetic oracle 2/2 infer unfamiliar aggregate parentage and reject a one-period mismatch; the neutral portable-workbook proof adds 15 compiler/emitter/oracle checks.",
+        "source_fix": "Generic three-period source arithmetic inference and reported_total_reconciled formula ownership establish the sole writer; f3f53e7 adds the complementary single-owner forecast guard. The model-IR proof contract now seals every reconciled historical sum as a protected identity over its exact same-period member rows.",
+        "integration_evidence": "PASS: a neutral production-shaped case rebuilds through plan compilation and emission with the issuer-defined parent formula-owned in G/H/I, filed totals retained separately, complete child membership, zero cache disagreements and a clean isolated development package smoke.",
+        "semantic_oracle_evidence": "PASS: independent OOXML semantic oracle accepts the clean 6,014-cell workbook and blocks a mutation replacing H18 with a hardcode using OOXML_PROTECTED_IDENTITY_FORMULA_REQUIRED. The test uses neutral labels and no issuer exceptions.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_MICROSOFT_EXCEL_HOST",
+        "commit": "CURRENT_CHECKPOINT_PENDING"
       }
     },
     {

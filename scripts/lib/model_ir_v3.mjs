@@ -841,7 +841,7 @@ export function workbookSemanticProofContract(
     "net_change_in_cash",
     "ending_cash",
   ]);
-  const protectedFormulaIdentities = graphNodes.flatMap((node) => {
+  const roleProtectedFormulaIdentities = graphNodes.flatMap((node) => {
     if (!protectedIdentityRoles.has(node.semantic_role)) return [];
     const memberRows = authorisedDependencyEdges
       .filter(
@@ -861,6 +861,35 @@ export function workbookSemanticProofContract(
       period_relation: "same_period",
     }];
   });
+  const physicalStatementRows = ["income_statement", "cash_flow"].flatMap(
+    (section) => rowPlan.statement_rows?.[section] ?? [],
+  );
+  const physicalStatementById = new Map(
+    physicalStatementRows.map((row) => [row.row_id, row]),
+  );
+  const historicalColumns = rowPlan.columns?.historical ?? ["G", "H", "I"];
+  const reconciledHistoricalIdentities = graphNodes.flatMap((node) => {
+    const row = physicalStatementById.get(node.display_id);
+    const refs = row?.calculation?.refs ?? [];
+    if (
+      row?.historical_authority !== "reported_total_reconciled" ||
+      row?.calculation?.operator !== "sum" ||
+      refs.length === 0
+    ) return [];
+    const memberRows = refs.map((ref) => physicalRow(ref));
+    if (memberRows.some((memberRow) => !Number.isInteger(memberRow))) return [];
+    return [{
+      concept_id: `reported_total_reconciled:${node.display_id}`,
+      owner_row: node.row,
+      member_rows: [...new Set(memberRows)].sort((a, b) => a - b),
+      columns: [...historicalColumns],
+      period_relation: "same_period",
+    }];
+  });
+  const protectedFormulaIdentities = [
+    ...roleProtectedFormulaIdentities,
+    ...reconciledHistoricalIdentities,
+  ].sort((left, right) => portableCompare(left.concept_id, right.concept_id));
   const authorityByDisplayPeriod = new Map(
     modelIr.planes.authority.map((item) => [
       `${item.display_id}\u0000${item.forecast_index}`,

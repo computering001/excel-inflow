@@ -739,6 +739,33 @@
       "test_class": "unit"
     },
     {
+      "id": "reconciled-parent-portable-workbook",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_reconciled_parent_portable_workbook_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "native-excel-all-cell-error-scan",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_native_excel_error_scan_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "release-certification-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_certification_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "delivery-inventory",
       "phase": "proof",
       "runtime": "node",
