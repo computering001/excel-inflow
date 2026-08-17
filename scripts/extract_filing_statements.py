@@ -403,12 +403,25 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
                         parent_values, child_values,  # type: ignore[arg-type]
                     ):
                         families.append(family)
+        # Zero-valued child rows cannot distinguish two otherwise identical
+        # arithmetic families. Canonicalise matches over informative children
+        # only: geometry can still attach an adjacent zero child in the caption
+        # pass, while the arithmetic proof owns the non-zero family. This avoids
+        # treating [A, B, C] and [A, B, C, zero_row] as contradictory proofs.
         unique = []
         seen = set()
         for family in families:
-            key = tuple(family)
+            informative = []
+            for index in family:
+                series = _finite_series(rows[index])
+                if series is not None and all(abs(value) <= 0.5000001 for value in series):
+                    continue
+                informative.append(index)
+            key = tuple(informative)
+            if len(key) < 2:
+                continue
             if key not in seen:
-                seen.add(key); unique.append(family)
+                seen.add(key); unique.append(informative)
         if len(unique) == 1:
             matches[parent_index] = unique
 
