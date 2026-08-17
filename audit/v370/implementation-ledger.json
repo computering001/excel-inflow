@@ -690,16 +690,16 @@
       "earliest_responsible_layer": "Lease schedule / policy integration.",
       "candidate_files": "scripts/lib/lease_policy.mjs; scripts/lib/solver.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Opening liability, additions, interest, principal and closing liability reconcile in each period.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Opening liability, additions, interest, principal and closing liability reconcile in each period.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in the handed-over workbook: forecast lease liability dropped to zero while the cash-flow statement continued to show lease-principal repayments, so the balance and cash legs could not belong to one roll-forward.",
+        "focused_test": "PASS: lease roll-forward contract 31/31 covers simple roll-forward, flat replacement, sourced balance, exclusion, total-liability interest, separately supplied interest-bearing liabilities and US GAAP basis policy; five independent mutations break opening continuity, closing equation, interest basis, interest calculation and principal.",
+        "source_fix": "leaseProjectionErrors is now a first-class validator called by validateLeasePolicy. It independently proves each period's opening continuity, opening + additions - principal = closing, selected interest-bearing closing basis and average-balance effective-rate interest.",
+        "integration_evidence": "PASS: the production case solves to lease liability 20/20/20 with additions 4/4/4, principal 4/4/4 and interest 1/1/1; all solver checks pass. The portable plan emits J83=MAX(0,I83+J85-J84), J54=-J84 and J132=-AVERAGE(I83,J83)*C132 with zero unresolved caches.",
+        "semantic_oracle_evidence": "PASS: the oracle accepts a supplied projection rather than trusting leaseForecast output, so changing any independently meaningful balance, movement or interest leg is detected.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "24f0092"
       }
     },
     {
