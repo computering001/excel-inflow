@@ -1,3 +1,4 @@
+# trigger exact suffix repair
 name: v360 repair part15
 
 on:
@@ -6,6 +7,7 @@ on:
       - agent/v360-publication-bridge
     paths:
       - publish/v360-recovery-complete/part15.suffix
+      - .github/workflows/v360-repair-part15.yml
   workflow_dispatch:
 
 permissions:
