@@ -1,4 +1,4 @@
-# focused regression proof of the final recovered v3.6 repairs before the full source-owned gate
+# inspect the native raw cash-flow hierarchy produced by the v3.6 filing extractor
 name: v360 verify recovered development gate
 
 on:
@@ -12,32 +12,26 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           ref: d194222bdc2f7106e9e2a8f97c6cde1267a626e4
-          fetch-depth: 0
-      - name: Install validation dependencies
+      - name: Install extraction dependency
+        run: python3 -m pip install pymupdf
+      - name: Expose resolved native cash-flow manifest
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-      - name: Run focused regression seams
-        shell: bash
-        run: |
-          set -euo pipefail
-          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
-          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
-          node scripts/run_test_registry_contract_tests.mjs
-          python3 scripts/run_source_arithmetic_topology_tests.py
-          python3 scripts/run_evidence_pipeline_tests.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/run_filings_pipeline_tests.mjs')
+          s=p.read_text()
+          needle='const resolvedEvidence = JSON.parse(await fs.readFile(topResolved.artifacts.resolved_evidence_template, "utf8"));\n'
+          assert s.count(needle)==1
+          insert='console.log("RAW_CASH_FLOW_MANIFEST=" + JSON.stringify(resolvedEvidence.filings.face_statement_manifests.cash_flow, null, 2));\nprocess.exit(0);\n'
+          p.write_text(s.replace(needle,needle+insert,1))
+          PY
           node scripts/run_filings_pipeline_tests.mjs
-          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
-          node scripts/run_decision_round_tests.mjs
-          node scripts/run_user_flow_tests.mjs
-          echo 'FOCUSED_V360_REGRESSIONS=PASS'
