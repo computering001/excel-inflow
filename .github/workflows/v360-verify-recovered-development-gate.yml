@@ -1,4 +1,4 @@
-# trigger after workflow registration
+# inspect exact recovered gate contract before any target write
 name: v360 verify recovered development gate
 
 on:
@@ -14,12 +14,11 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Reconstruct exact recovered tree
+      - name: Reconstruct exact recovered tree and inspect gate contract
         shell: bash
         run: |
           set -euo pipefail
@@ -34,56 +33,20 @@ jobs:
           git -C /tmp/v360-target apply /tmp/v360.patch
           git -C /tmp/v360-target add -A
           test "$(git -C /tmp/v360-target write-tree)" = 'e68829fd178907b91a650f9b159d4554539f1068'
-      - name: Install runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libreoffice
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
-      - name: Inspect recovered source-owned registry
-        shell: bash
-        run: |
-          set -euo pipefail
           cd /tmp/v360-target
           python3 - <<'PY'
-          import json
+          import json,re
           from pathlib import Path
-          p=Path('assets/development-test-registry.json')
-          d=json.loads(p.read_text())
-          tests=d['tests']
-          standalone=[t for t in tests if not t.get('requires')]
-          external=[t for t in tests if t.get('requires')]
-          print('REGISTRY_TOTAL='+str(len(tests)))
-          print('STANDALONE_TOTAL='+str(len(standalone)))
-          print('EXTERNAL_TOTAL='+str(len(external)))
-          print('EXTERNAL_IDS='+','.join(t['id'] for t in external))
-          p.write_text(json.dumps({**d,'tests':standalone},indent=2)+'\n')
+          registry=json.loads(Path('assets/development-test-registry.json').read_text())
+          runner=Path('scripts/run_development_gate.mjs').read_text()
+          m=re.search(r'registry\.schema_version\s*!==\s*"([^"]+)"',runner)
+          print('RECOVERED_REGISTRY_SCHEMA='+str(registry.get('schema_version')))
+          print('RUNNER_EXPECTS_SCHEMA='+(m.group(1) if m else 'UNKNOWN'))
+          print('REGISTRY_TOTAL='+str(len(registry.get('tests',[]))))
+          print('CHANGED_GATE_FILES:')
           PY
-      - name: Run every self-contained recovered development test
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd /tmp/v360-target
-          node scripts/run_development_gate.mjs \
-            --python "$(command -v python3)" \
-            --soffice "$(command -v soffice)" \
-            --concurrency 1 \
-            --timeout-ms 600000 \
-            --out /tmp/v360-development-gate
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          d=json.loads(Path('/tmp/v360-development-gate/development-gate-report.json').read_text())
-          print('GATE_STATUS='+d['status'])
-          print('PASS='+str(d['counts']['PASS']))
-          print('FAIL='+str(d['counts']['FAIL']))
-          print('BLOCKED='+str(d['counts']['BLOCKED']))
-          if d['status']!='PASS':
-              for r in d['results']:
-                  if r['status']!='PASS':
-                      print('FAILED_ID='+r['id'])
-                      print((r.get('stderr') or '')[-4000:])
-              raise SystemExit(1)
-          PY
+          git diff --name-only dcf459fdb0db4c54da644c6927a3e268188ffd6b -- assets/development-test-registry.json scripts/run_development_gate.mjs scripts | grep -E 'development|gate|registry|source_arithmetic|broker_tier1|native_eligibility|release|preflight|trace|solver|authority|carrier|acquisition|non_recurring' || true
+          echo 'RUNNER_SCHEMA_LINES:'
+          grep -n 'schema_version' scripts/run_development_gate.mjs | head -20 || true
+          echo 'REGISTRY_HEAD:'
+          head -30 assets/development-test-registry.json
