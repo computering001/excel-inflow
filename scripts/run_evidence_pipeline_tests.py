@@ -245,11 +245,13 @@ def main() -> int:
         )
         demand = context["model_demand_graph"]
         assert_true(
-            demand["schema_version"] == "pre-broker-model-demand/1.0"
+            demand["schema_version"] == "pre-broker-model-demand/2.0"
             and demand["counts"] == {
                 "source_rows": 2,
-                "forecast_nodes": 6,
-                "material_nodes": 6,
+                "filed_forecast_nodes": 0,
+                "model_demand_concepts": 9,
+                "model_demand_nodes": 27,
+                "material_model_demand_nodes": 27,
             }
             and Path(declaration["model_demand_path"]).is_file(),
             "broker request was not bound to a filings-derived demand graph before extraction",

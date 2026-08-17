@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { applyFundedAcquisitionPlan } from "./lib/funded_acquisition_plan.mjs";
+import { applyFundedAcquisitionPlan, applyFundedAcquisitionWorkbook } from "./lib/funded_acquisition_plan.mjs";
 
 import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
@@ -11440,6 +11440,13 @@ export async function synthesisePlan({
   for (const [address, value] of solverCaches) {
     if (operatingModel.setCachedValue(address, value)) solverCachedCells += 1;
   }
+
+  // The solver already owns the pro-forma economics, but the portable plan
+  // must expose the funded transaction in the same N:P component rows that
+  // those economics assume. Apply it after solver caches are installed, then
+  // invalidate only the acyclic cash-flow closure so PASS TWO rebuilds caches
+  // from the displayed formulas rather than preserving hidden transaction cash.
+  applyFundedAcquisitionWorkbook(emission.workbook, rowPlan, modelCase);
 
   // PASS TWO — everything still uncached: the Brokers selector, and any
   // remaining same-sheet arithmetic. Cells inside the declared interest / debt
