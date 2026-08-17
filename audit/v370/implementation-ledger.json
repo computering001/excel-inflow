@@ -543,16 +543,16 @@
       "earliest_responsible_layer": "Extraction decoration / footnote handling.",
       "candidate_files": "scripts/extract_filing_statements.py; scripts/lib/case_source_proposer.mjs",
       "acceptance_criterion": "Footnote and source-reference tokens are retained in provenance, not rendered as economic rows.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Footnote and source-reference tokens are retained in provenance, not rendered as economic rows.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced from the handed-over workbook evidence and source path: a reference-only label such as F-5 passed the ordinary face-row extractor and could be minted into the economic row inventory.",
+        "focused_test": "PASS: typed filing tests now run 21 checks covering standalone F-5, inline F-5, Note-style references, an IFRS 16 non-reference control, and the actual extraction branch with a marker between two numeric rows.",
+        "source_fix": "The filing extractor now separates a narrow, issuer-independent source-reference grammar from economic labels. Reference-only lines never mint rows; inline markers are removed from labels; both forms remain attached to the adjacent source page note carried into provenance.",
+        "integration_evidence": "PASS: source arithmetic tests 9/9, independent arithmetic oracle 2/2, arithmetic topology 5/5 and case-source proposer 51/51 remain green after the extraction change.",
+        "semantic_oracle_evidence": "PASS: the focused extraction regression proves the sealed face-statement manifest contains exactly the two economic rows, contains no F-5 row, and retains 'source reference F-5' in the adjacent row's page_or_note provenance.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "66b19b7"
       }
     },
     {
