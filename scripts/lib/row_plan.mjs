@@ -2135,6 +2135,11 @@ function collapseEquivalentEbitOperatingProfit(rows) {
     }
     delete operatingProfit.forecast_calculation;
     delete operatingProfit.forecast_period_calculations;
+  } else if (ebit.broker_metric_id && !operatingProfit.broker_metric_id) {
+    // A rejected broker series is still evidence and must remain bound to the
+    // one surviving semantic answer. Preserve only the metric identity here;
+    // the survivor keeps its already-minted non-broker forecast mechanism.
+    operatingProfit.broker_metric_id = ebit.broker_metric_id;
   }
   // The surviving row owns both identities: solver and emitters that resolve
   // by the ebit role must land on the one visible answer.

@@ -352,6 +352,42 @@ assert(
   "An unsourced one-reference income-statement alias survived as a second visible authority.",
 );
 
+const rejectedBrokerRoleAlias = clone(fixture);
+const rejectedBrokerEbit = rejectedBrokerRoleAlias.statement_structure.income_statement
+  .find((row) => row.semantic_role === "ebit");
+Object.assign(rejectedBrokerEbit, {
+  row_type: "input",
+  values: [10, 11, 12, null, null, null],
+});
+delete rejectedBrokerEbit.calculation;
+rejectedBrokerEbit.broker_metric_id = "ebit";
+rejectedBrokerEbit.forecast_treatment = "formula";
+rejectedBrokerRoleAlias.statement_structure.income_statement.splice(
+  rejectedBrokerRoleAlias.statement_structure.income_statement.indexOf(
+    rejectedBrokerEbit,
+  ),
+  0,
+  {
+    row_id: "reported_operating_profit_alias",
+    label: "Reported operating profit",
+    semantic_role: "operating_profit",
+    row_type: "input",
+    values: [10, 11, 12, null, null, null],
+    source_line_ids: ["is.reported_operating_profit_alias"],
+  },
+);
+const rejectedBrokerProjection = normaliseStatementRows(
+  rejectedBrokerRoleAlias,
+  "income_statement",
+);
+const rejectedBrokerSurvivor = rejectedBrokerProjection.find(
+  (row) => row.role_aliases?.includes("ebit"),
+);
+assert(
+  rejectedBrokerSurvivor?.broker_metric_id === "ebit",
+  "A rejected broker metric lost its evidence binding when EBIT projected into an equivalent operating-profit row.",
+);
+
 const projectedRoleAlias = clone(fixture);
 const projectedEbitRow = projectedRoleAlias.statement_structure.income_statement
   .find((row) => row.semantic_role === "ebit");

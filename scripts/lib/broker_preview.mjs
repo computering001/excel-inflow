@@ -1129,12 +1129,34 @@ export function applyBrokerPreviewSelection(modelCase, preview, confirmation) {
     ...(modelCase.controls ?? {}),
     broker_case: verified.selection.house_name,
   };
-  if (verified.selection.house_id === "FORECAST_WATERFALL") {
+  if (
+    verified.selection.house_id === "FORECAST_WATERFALL" &&
+    preview.broker_authority_policy === "zero_broker"
+  ) {
     for (const section of ["income_statement", "cash_flow"]) {
       for (const row of modelCase.statement_structure?.[section] ?? []) {
-        delete row.broker_metric_id;
         if (row.forecast_treatment === "broker") {
           delete row.forecast_treatment;
+        }
+        const authorities = row.forecast_period_authorities ?? [];
+        const brokerPeriods = authorities
+          .map((authority, forecastIndex) =>
+            authority?.method === "broker_consensus" ? forecastIndex : -1,
+          )
+          .filter((forecastIndex) => forecastIndex >= 0);
+        if (brokerPeriods.length > 0) {
+          row.forecast_period_authorities = authorities.map(
+            (authority, forecastIndex) =>
+              brokerPeriods.includes(forecastIndex) ? null : authority,
+          );
+          if (row.forecast_period_authorities.every((authority) => !authority)) {
+            delete row.forecast_period_authorities;
+          }
+          if (Array.isArray(row.values)) {
+            for (const forecastIndex of brokerPeriods) {
+              row.values[forecastIndex + 3] = null;
+            }
+          }
         }
       }
     }

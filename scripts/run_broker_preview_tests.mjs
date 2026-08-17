@@ -507,9 +507,40 @@ await test("no coherent house succeeds through a zero-consumption forecast-water
   const accepted = confirmation(preview, "FORECAST_WATERFALL");
   const verified = verifyBrokerPreviewConfirmation(preview, accepted);
   assert(verified.valid && verified.selection.house_name === "Forecast Waterfall", verified.errors.join("; "));
-  const modelCase = { controls: { broker_case: "Consensus" } };
+  const modelCase = {
+    controls: { broker_case: "Consensus" },
+    statement_structure: {
+      income_statement: [{
+        row_id: "revenue",
+        semantic_role: "revenue",
+        broker_metric_id: "revenue",
+        forecast_treatment: "broker",
+      }],
+      cash_flow: [],
+    },
+  };
   applyBrokerPreviewSelection(modelCase, preview, accepted);
   assert(modelCase.controls.broker_case === "Forecast Waterfall", "forecast-waterfall selection was not applied");
+  const zeroAuthorityPreview = clone(preview);
+  zeroAuthorityPreview.broker_authority_policy = "zero_broker";
+  zeroAuthorityPreview.preview_sha256 = brokerPreviewSha256(zeroAuthorityPreview);
+  const zeroAuthorityConfirmation = confirmation(
+    zeroAuthorityPreview,
+    "FORECAST_WATERFALL",
+  );
+  const zeroAuthorityModelCase = clone(modelCase);
+  applyBrokerPreviewSelection(
+    zeroAuthorityModelCase,
+    zeroAuthorityPreview,
+    zeroAuthorityConfirmation,
+  );
+  assert(
+    zeroAuthorityModelCase.statement_structure.income_statement[0]
+      .broker_metric_id === "revenue" &&
+      zeroAuthorityModelCase.statement_structure.income_statement[0]
+        .forecast_treatment !== "broker",
+    "zero-broker selection erased the rejected metric evidence binding or left it as live authority",
+  );
   assert(
     resolveBrokerForecastSelection(modelCase, "revenue", 0).value === null,
     "forecast-waterfall mode consumed a broker cell",

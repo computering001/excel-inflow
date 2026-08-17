@@ -595,17 +595,18 @@ export function resolveAnchorPlanDecision(modelCase, rows) {
       selection,
     };
   }
+  if (!selection.supported) {
+    return {
+      status: "not_applicable",
+      reason:
+        "The declared broker headline has no usable full-period headline-plus-D&A authority; the ordinary forecast waterfall owns the fallback.",
+      selection,
+    };
+  }
   if (!hasBridgeRoles) {
     return {
       status: "unresolved",
       reason: "Broker anchor evidence exists but the statement does not declare the complete EBIT/Adjusted EBITDA/D&A identity.",
-      selection,
-    };
-  }
-  if (!selection.supported) {
-    return {
-      status: "unresolved",
-      reason: "No single headline metric plus D&A has usable coverage in all three forecast periods.",
       selection,
     };
   }

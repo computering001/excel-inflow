@@ -30,7 +30,13 @@ import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import { isRankedTotalIdentity } from "./row_plan.mjs";
-import { applyTier1AnchorOwnership } from "./broker_anchor.mjs";
+import {
+  applyTier1AnchorOwnership,
+  brokerMetricDefinitionSignature,
+  compareDefinitionSignatures,
+  resolveBrokerForecastSelection,
+  statementMetricDefinitionSignature,
+} from "./broker_anchor.mjs";
 import {
   ALLOWED_METHODS_BY_BEHAVIOR,
   classifyForecastBehavior,
@@ -2057,10 +2063,45 @@ function carriesStructuralEventSemantics(row) {
   );
 }
 
-function hasDirectForecastAuthority(row) {
+function hasCompleteCompatibleBrokerAuthority(modelCase, row) {
+  const packMetrics = modelCase?.broker_pack?.metrics ?? {};
+  const metricIds = [...new Set([
+    row?.broker_metric_id,
+    row?.semantic_role,
+    row?.row_id,
+  ].filter((metricId) =>
+    Boolean(metricId) &&
+    (metricId === row?.broker_metric_id || Object.hasOwn(packMetrics, metricId)),
+  ))];
+  return metricIds.some((metricId) => {
+    if (!packMetrics[metricId]) return false;
+    const compatibility = compareDefinitionSignatures(
+      brokerMetricDefinitionSignature(modelCase, metricId),
+      statementMetricDefinitionSignature(modelCase, [row], metricId),
+    );
+    if (!compatibility.compatible) return false;
+    return [0, 1, 2].every((forecastIndex) => {
+      const selection = resolveBrokerForecastSelection(
+        modelCase,
+        metricId,
+        forecastIndex,
+      );
+      return selection?.value !== null &&
+        selection?.value !== undefined &&
+        Number.isFinite(Number(selection.value));
+    });
+  });
+}
+
+function hasDirectForecastAuthority(modelCase, row) {
   if (!row) return false;
-  if (row.broker_metric_id) return true;
-  if (["broker", "hardcode", "zero"].includes(row.forecast_treatment)) {
+  if (
+    (row.broker_metric_id || row.forecast_treatment === "broker") &&
+    hasCompleteCompatibleBrokerAuthority(modelCase, row)
+  ) {
+    return true;
+  }
+  if (["hardcode", "zero"].includes(row.forecast_treatment)) {
     return true;
   }
   if (
@@ -2078,9 +2119,9 @@ function hasDirectForecastAuthority(row) {
   );
 }
 
-function hasLiveHeadlineForecastAuthority(row) {
+function hasLiveHeadlineForecastAuthority(modelCase, row) {
   return (
-    hasDirectForecastAuthority(row) ||
+    hasDirectForecastAuthority(modelCase, row) ||
     (CAPTURE_HEADLINE_ROLES.has(row?.semantic_role) &&
       (Boolean(row.forecast_calculation?.refs?.length) ||
         (row.forecast_period_calculations ?? []).some(
@@ -2089,9 +2130,9 @@ function hasLiveHeadlineForecastAuthority(row) {
   );
 }
 
-function mayResolveAsAggregate(row) {
+function mayResolveAsAggregate(modelCase, row) {
   if (!row) return false;
-  if (hasDirectForecastAuthority(row)) return true;
+  if (hasDirectForecastAuthority(modelCase, row)) return true;
   // A filed total with no formula is a single economic series and may resolve
   // through the ordinary evidence waterfall. This remains useful for direct
   // reported-parent captures (especially working capital), but it is NOT a
@@ -2297,7 +2338,7 @@ export function compileForecastCaptureTopology(
           parentsByChild,
           (candidate) =>
             candidate.row_id !== row.row_id &&
-            hasLiveHeadlineForecastAuthority(candidate) &&
+            hasLiveHeadlineForecastAuthority(modelCase, candidate) &&
             (CAPTURE_HEADLINE_ROLES.has(candidate.semantic_role) ||
               !candidate.calculation?.refs?.length ||
               candidate.broker_metric_id ||
@@ -2340,8 +2381,8 @@ export function compileForecastCaptureTopology(
             (parent) =>
               parent.membership_count === 1 &&
               (section === "income_statement"
-                ? mayResolveAsAggregate(rowsById.get(parent.parent_row_id))
-                : hasDirectForecastAuthority(rowsById.get(parent.parent_row_id))),
+                ? mayResolveAsAggregate(modelCase, rowsById.get(parent.parent_row_id))
+                : hasDirectForecastAuthority(modelCase, rowsById.get(parent.parent_row_id))),
           )
           .map((parent) => parent.parent_row_id);
         const hierarchyParent = row.parent_row_id && rowsById.has(row.parent_row_id)
@@ -2350,8 +2391,8 @@ export function compileForecastCaptureTopology(
         const hierarchyEligible =
           hierarchyParent &&
           (section === "income_statement"
-            ? mayResolveAsAggregate(hierarchyParent)
-            : hasDirectForecastAuthority(hierarchyParent));
+            ? mayResolveAsAggregate(modelCase, hierarchyParent)
+            : hasDirectForecastAuthority(modelCase, hierarchyParent));
         const directTargets = new Set([
           ...directFormulaParents,
           ...(hierarchyEligible ? [hierarchyParent.row_id] : []),
@@ -2392,7 +2433,7 @@ export function compileForecastCaptureTopology(
         const ebit = ebitIndex >= 0 ? rows[ebitIndex] : null;
         if (
           revenue &&
-          hasLiveHeadlineForecastAuthority(revenue) &&
+          hasLiveHeadlineForecastAuthority(modelCase, revenue) &&
           rowIndex >= 0 &&
           rowIndex < revenueIndex
         ) {
@@ -2400,7 +2441,7 @@ export function compileForecastCaptureTopology(
           statementBandCapture = true;
         } else if (
           ebit &&
-          hasLiveHeadlineForecastAuthority(ebit) &&
+          hasLiveHeadlineForecastAuthority(modelCase, ebit) &&
           rowIndex > revenueIndex &&
           rowIndex < ebitIndex
         ) {
@@ -2433,7 +2474,7 @@ export function compileForecastCaptureTopology(
           if (
             total &&
             headerIndex >= 0 &&
-            mayResolveAsAggregate(total) &&
+            mayResolveAsAggregate(modelCase, total) &&
             rowIndex > headerIndex &&
             rowIndex < totalIndex
           ) {
@@ -2578,8 +2619,12 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
   const da = byRole.get("depreciation_and_amortisation");
   const statOp = rowsById.get("operating_profit");
   const ntiForOp = rowsById.get("non_trading_items");
+  const independentHeadlineAuthority = [ebit, adjustedEbitda].some((row) =>
+    hasDirectForecastAuthority(modelCase, row),
+  );
   if (
     statOp && ebit && statOp !== ebit &&
+    independentHeadlineAuthority &&
     !statOp.calculation && !statOp.forecast_calculation
   ) {
     wire(
@@ -3375,14 +3420,17 @@ export function compileCase(caseSource, evidence = {}) {
         !["revenue", "adjusted_ebitda", "effective_tax_rate",
           "depreciation_and_amortisation", "change_in_working_capital",
           "capex", "dividends", "share_buybacks"].includes(row.broker_metric_id) &&
-        // ebit is a real consumption in exactly three shapes: a declared
+        // ebit remains a real evidence binding in four shapes: a declared
         // inline bridge pins the level (subtract-recipe circularity), the
         // pack is ebit-led (no adjusted_ebitda metric to anchor on), or the
-        // row is a formula-less reported level nothing else can forecast.
+        // row is a formula-less reported level nothing else can forecast. An
+        // unavailable or incompatible series is also retained so its explicit
+        // rejection survives any later EBIT/operating-profit projection.
         !(row.broker_metric_id === "ebit" &&
           (inlineBridgePinned.has(row.row_id) ||
             !Object.hasOwn(modelCase.broker_pack?.metrics ?? {}, "adjusted_ebitda") ||
-            !row.calculation))
+            !row.calculation ||
+            !hasCompleteCompatibleBrokerAuthority(modelCase, row)))
       ) {
         delete row.broker_metric_id;
         if (row.forecast_treatment === "broker") delete row.forecast_treatment;

@@ -390,6 +390,42 @@ assert(
   validateForecastAuthorities(nestedInvestingCase, nestedInvestingRows).length === 0,
   "A nested investing detail was misclassified as a second top-level subtotal member.",
 );
+const unavailableBrokerParent = {
+  case_id: "unavailable_broker_parent",
+  periods,
+  controls: { broker_case: "Forecast Waterfall" },
+  broker_pack: {
+    metrics: {
+      capex: {
+        provider_consensus: [null, null, null],
+        brokers: { "House A": [null, null, null] },
+      },
+    },
+  },
+  statement_structure: {
+    income_statement: [],
+    cash_flow: [
+      row("ppe_detail", "Issuer PP&E purchases", [-1, -2, -3, null, null, null]),
+      row("capex_parent", "Issuer capital expenditure", undefined, {
+        row_type: "calculation",
+        semantic_role: "capex",
+        broker_metric_id: "capex",
+        calculation: { operator: "sum", refs: ["ppe_detail"] },
+      }),
+    ],
+  },
+};
+const unavailableBrokerTopology = compileForecastCaptureTopology(
+  unavailableBrokerParent,
+);
+assert(
+  !unavailableBrokerParent.statement_structure.cash_flow[0].forecast_capture_parent_id &&
+    !unavailableBrokerTopology.behavior_map.some(
+      (entry) =>
+        entry.row_id === "ppe_detail" && entry.behavior === "captured_detail",
+    ),
+  "A broker-labelled aggregate with no usable values captured the child needed by its formula fallback.",
+);
 for (const protectedRole of ["cash_from_investing", "cash_before_financing"]) {
   const mutation = clone(protectedCashFlowCase);
   const protectedRow = mutation.statement_structure.cash_flow.find(
@@ -456,7 +492,7 @@ assert(
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 31,
+  tests: 32,
   mutations_caught: 6,
   captured_paths: topology.behavior_map.filter((entry) => entry.behavior === "captured_detail").length,
   cash_flow_event_method: state("cash_flow", "debt_fees", 0).method,
