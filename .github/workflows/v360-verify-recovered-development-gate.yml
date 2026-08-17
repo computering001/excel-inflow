@@ -1,4 +1,4 @@
-# inspect duplicate statement row identities behind v3.6 arithmetic validation
+# inspect acquisition overlay cells behind v3.6 formula/cache divergence
 name: v360 verify recovered development gate
 
 on:
@@ -20,9 +20,8 @@ jobs:
         with:
           ref: 7c4791ff0ceb800be18f04cefc90056fd94aeebc
           fetch-depth: 0
-      - name: Install Python dependencies
-        run: python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
-      - name: Generate page workbook and inspect row identities
+      - run: python3 -m pip install openpyxl pillow jsonschema lxml pymupdf numpy
+      - name: Inspect acquisition overlay cells
         shell: bash
         run: |
           set +e
@@ -33,21 +32,18 @@ jobs:
           import json,os
           from pathlib import Path
           from openpyxl import load_workbook
-          root=Path(os.environ['ROOT_PATH'])
-          rp=json.loads(Path(str(root/'emit/model.xlsx')+'.row-map.json').read_text())
-          rows=[r for s in ('income_statement','cash_flow') for r in rp['statement_rows'][s]]
-          ids=['capex','acquisitions_net_of_cash','cash_from_investing','cash_from_operations','cash_from_financing','net_change_in_cash']
-          wb=load_workbook(root/'emit/model.xlsx',data_only=False); wv=load_workbook(root/'emit/model.xlsx',data_only=True)
-          ws=wb['Operating Model']; vs=wv['Operating Model']
-          for rid in ids:
-              found=[r for r in rows if r.get('row_id')==rid]
-              print('ROW_ID',rid,'COUNT',len(found))
-              for r in found:
-                  addr='T'+str(r['row'])
-                  print(' ',addr,'formula=',ws[addr].value,'value=',vs[addr].value,'DEF=',json.dumps(r,sort_keys=True))
-          from collections import Counter
-          dup=[(k,v) for k,v in Counter(r.get('row_id') for r in rows).items() if v>1]
-          print('DUPLICATE_ROW_IDS=',dup)
-          wb.close();wv.close()
+          root=Path(os.environ['ROOT_PATH']); p=root/'emit/model.xlsx'
+          f=load_workbook(p,data_only=False); v=load_workbook(p,data_only=True)
+          ws=f['Operating Model']; vs=v['Operating Model']
+          for row in range(48,63):
+              label=ws[f'B{row}'].value
+              vals=[]
+              for col in ['J','K','L','N','O','P','S','T','U']:
+                  vals.append(f"{col}{row}:F={ws[f'{col}{row}'].value!r}:V={vs[f'{col}{row}'].value!r}")
+              print('ROW',row,'LABEL',label,' | '.join(vals))
+          print('TRANSACTION CONTROLS')
+          for row in range(1,15):
+              print(row,ws[f'P{row}'].value,vs[f'P{row}'].value)
+          f.close();v.close()
           PY
           exit 1
