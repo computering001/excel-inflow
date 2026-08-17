@@ -191,11 +191,35 @@ def main() -> int:
 
     target_formula = str(on_cells[f"P{controls['target_ebitda']}"].get("f", ""))
     expected_target_formula = (
-        f"IFERROR(P{controls['transaction_enterprise_value']}/"
-        f"P{controls['entry_ev_to_ebitda']},0)"
+        f"P{controls['transaction_enterprise_value']}/"
+        f"P{controls['entry_ev_to_ebitda']}"
     )
     assert target_formula == expected_target_formula
+    assert "IFERROR(" not in target_formula
     assert "MAX(" not in target_formula
+
+    operating_sheet = next(
+        sheet
+        for sheet in states[1][3]["workbook"]["sheets"]
+        if sheet["name"] == "Operating Model"
+    )
+    validations = {
+        record["sqref"]: record
+        for record in operating_sheet.get("data_validations", [])
+    }
+    for control_id in (
+        "transaction_enterprise_value",
+        "entry_ev_to_ebitda",
+    ):
+        address = f"P{controls[control_id]}"
+        validation = validations.get(address)
+        assert validation is not None, (
+            f"Acquisition valuation input {address} has no workbook-face validation"
+        )
+        assert validation.get("type") == "decimal"
+        assert validation.get("operator") == "greaterThan"
+        assert validation.get("formula1") == "0"
+        assert validation.get("show_error_message") is True
 
     for column in ("N", "O", "P"):
         tax_formula = str(on_cells[f"{column}{tax_expense_row}"].get("f", ""))
@@ -210,7 +234,7 @@ def main() -> int:
         "schema_version": "acquisition-portable-workbook-test/1.0",
         "status": "PASS",
         "states": [state[0] for state in states],
-        "checks": 25,
+        "checks": 36,
         "close_year": close_year,
         "change_in_debt_row_id": "change_in_debt",
         "portable_formula_cache_parity": "PASS",

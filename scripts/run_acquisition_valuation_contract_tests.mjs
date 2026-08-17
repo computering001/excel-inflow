@@ -42,7 +42,7 @@ assert.equal(
 );
 assert.equal(
   acquisitionTargetEbitdaFormula("P5", "P6"),
-  "=IFERROR(P5/P6,0)",
+  "=P5/P6",
 );
 
 const directTargetMutation = structuredClone(negativePbtCase);
@@ -67,6 +67,21 @@ assert.equal(acquisitionValuation(multipleMutation).target_ebitda, 5);
 const enterpriseValueMutation = structuredClone(negativePbtCase);
 enterpriseValueMutation.acquisition.transaction_enterprise_value = 200;
 assert.equal(acquisitionValuation(enterpriseValueMutation).target_ebitda, 20);
+
+const zeroEnterpriseValueMutation = structuredClone(negativePbtCase);
+zeroEnterpriseValueMutation.acquisition.transaction_enterprise_value = 0;
+assert.ok(
+  validateCaseShape(zeroEnterpriseValueMutation).some((message) =>
+    message.includes("transaction_enterprise_value greater than zero")),
+  "A zero transaction enterprise value escaped the acquisition case gate.",
+);
+const zeroMultipleMutation = structuredClone(negativePbtCase);
+zeroMultipleMutation.acquisition.entry_ev_to_ebitda = 0;
+assert.ok(
+  validateCaseShape(zeroMultipleMutation).some((message) =>
+    message.includes("entry_ev_to_ebitda greater than zero")),
+  "A zero entry multiple escaped the acquisition case gate.",
+);
 
 const offCase = structuredClone(negativePbtCase);
 offCase.acquisition.enabled = 0;
@@ -100,9 +115,9 @@ assert.ok(
 console.log(JSON.stringify({
   status: "PASS",
   fixture,
-  checks: 17,
+  checks: 19,
   valuation_authority: ACQUISITION_VALUATION_AUTHORITY,
   target_pre_tax_income: targetPreTaxIncome,
   target_tax_charge: targetTaxCharge,
-  mutations_rejected: 2,
+  mutations_rejected: 4,
 }, null, 2));

@@ -140,7 +140,12 @@ export function acquisitionTargetEbitdaFormula(
   enterpriseValueCell,
   entryMultipleCell,
 ) {
-  return `=IFERROR(${enterpriseValueCell}/${entryMultipleCell},0)`;
+  // Invalid valuation inputs must remain visible spreadsheet errors.  The case
+  // gate and face validations stop non-positive entries before build/use; an
+  // IFERROR fallback here would turn a corrupted denominator into fake zero
+  // EBITDA and let every downstream acquisition formula continue apparently
+  // clean.
+  return `=${enterpriseValueCell}/${entryMultipleCell}`;
 }
 
 export function ensureIllustrativeAcquisitionCase(modelCase) {

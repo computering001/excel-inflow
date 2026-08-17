@@ -3427,6 +3427,31 @@ function configureOperatingModel(
       styleEntryControl(`P${row}`, format);
     }
   }
+  for (const row of [
+    c.transaction_enterprise_value,
+    c.entry_ev_to_ebitda,
+  ]) {
+    sheet.getRange(`P${row}`).dataValidation = {
+      rule: {
+        type: "decimal",
+        operator: "greaterThan",
+        formula1: 0,
+      },
+      showErrorMessage: true,
+    };
+  }
+  addCommentOnce(
+    workbook,
+    sheet,
+    `N${c.transaction_enterprise_value}`,
+    "Primary valuation input. Must be greater than zero and uses the issuer reporting currency and scale shown in the label.",
+  );
+  addCommentOnce(
+    workbook,
+    sheet,
+    `N${c.entry_ev_to_ebitda}`,
+    "Primary valuation input. Must be greater than zero. Target EBITDA is calculated as enterprise value divided by this multiple with no zero fallback.",
+  );
   addCommentOnce(
     workbook,
     sheet,
