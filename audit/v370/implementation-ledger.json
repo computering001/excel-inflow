@@ -795,16 +795,16 @@
       "earliest_responsible_layer": "Acquisition input schema and control validation.",
       "candidate_files": "scripts/lib/acquisition_policy.mjs; scripts/lib/funded_acquisition_plan.mjs; assets/model-case-v2.schema.json",
       "acceptance_criterion": "Only two inputs are primary; the third is calculated; units/currency are explicit and activation blocks on inconsistency.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Only two inputs are primary; the third is calculated; units/currency are explicit and activation blocks on inconsistency.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in the handed-over acquisition controls: EV, entry multiple and target EBITDA were presented as inconsistent authorities and the amount basis was not stated beside the controls.",
+        "focused_test": "PASS: acquisition valuation contract 17/17 with two rejected third-input aliases; independent EV and multiple mutations rederive target EBITDA; the production portable workbook verifies the two input cells, one formula cell and explicit amount basis.",
+        "source_fix": "transaction_enterprise_value_and_entry_ev_to_ebitda/1.0 is the central valuation authority. The solver consumes its derived EBITDA, the workbook emits its formula, validation rejects direct or aliased target-EBITDA inputs, and EV, target EBITDA and acquisition debt each state reporting currency and units.",
+        "integration_evidence": "PASS: acquisition solver 11/11, funded transaction 16/16, acquisition funding 12/12, lease sentinel 31/31 with five mutations, interest sentinel 35/35 and production plan build with 0 unresolved caches.",
+        "semantic_oracle_evidence": "PASS: production Off/On/Off/On portable workbook 25/25 with cache parity and semantic oracle PASS; repeated states restore deterministically and the target formula is bound only to EV and entry multiple.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "3cefee3"
       }
     },
     {
@@ -837,16 +837,16 @@
       "earliest_responsible_layer": "Acquisition economics.",
       "candidate_files": "scripts/lib/acquisition_policy.mjs; scripts/lib/funded_acquisition_plan.mjs",
       "acceptance_criterion": "Negative target PBT is modelled or the unsupported case blocks explicitly; no silent floor.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Negative target PBT is modelled or the unsupported case blocks explicitly; no silent floor.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: solver target PBT used Math.max(0, ...) and the workbook tax adjustment used MAX(0, target PBT), silently deleting a target loss and its tax effect.",
+        "focused_test": "PASS: the negative-PBT contract reaches incremental PBT of -92.4367088608, preserves a -18.4873417722 inherited-rate tax benefit and proves both signed values flow through net income; two valuation-authority mutations are rejected.",
+        "source_fix": "Solver target PBT is now signed EBITDA less target interest, and the workbook tax adjustment consumes signed incremental PBT without MAX. The standalone effective rate therefore models the corresponding benefit rather than silently rewriting the loss to zero.",
+        "integration_evidence": "PASS: acquisition solver, funded transaction and funding integration suites remain green; lease and interest sentinels prove the signed change did not duplicate debt, lease or finance-cost economics.",
+        "semantic_oracle_evidence": "PASS: all three adjustment-period tax formulas in the rendered production plan contain no MAX and link directly to the same-column incremental PBT; four-state cache parity and workbook semantic oracle pass.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "3cefee3"
       }
     },
     {
