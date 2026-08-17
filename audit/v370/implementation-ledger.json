@@ -799,12 +799,12 @@
       "implementation": {
         "invariant": "Only two inputs are primary; the third is calculated; units/currency are explicit and activation blocks on inconsistency.",
         "baseline_reproduction": "FAIL reproduced in the handed-over acquisition controls: EV, entry multiple and target EBITDA were presented as inconsistent authorities and the amount basis was not stated beside the controls.",
-        "focused_test": "PASS: acquisition valuation contract 17/17 with two rejected third-input aliases; independent EV and multiple mutations rederive target EBITDA; the production portable workbook verifies the two input cells, one formula cell and explicit amount basis.",
-        "source_fix": "transaction_enterprise_value_and_entry_ev_to_ebitda/1.0 is the central valuation authority. The solver consumes its derived EBITDA, the workbook emits its formula, validation rejects direct or aliased target-EBITDA inputs, and EV, target EBITDA and acquisition debt each state reporting currency and units.",
+        "focused_test": "PASS: acquisition valuation contract 19/19 with four rejected mutations covering third-input aliases and non-positive EV/multiple; independent EV and multiple mutations rederive target EBITDA; the production portable workbook verifies two validated input cells, one raw division formula cell and explicit amount basis.",
+        "source_fix": "transaction_enterprise_value_and_entry_ev_to_ebitda/1.0 is the central valuation authority. The solver consumes its derived EBITDA, the workbook emits raw EV/multiple division without IFERROR, positive face validations surface invalid inputs, validation rejects direct or aliased target-EBITDA inputs, and all amounts state currency and units.",
         "integration_evidence": "PASS: acquisition solver 11/11, funded transaction 16/16, acquisition funding 12/12, lease sentinel 31/31 with five mutations, interest sentinel 35/35 and production plan build with 0 unresolved caches.",
-        "semantic_oracle_evidence": "PASS: production Off/On/Off/On portable workbook 25/25 with cache parity and semantic oracle PASS; repeated states restore deterministically and the target formula is bound only to EV and entry multiple.",
+        "semantic_oracle_evidence": "PASS: refreshed-ledger production Off/On/Off/On portable workbook 36/36 with cache parity and semantic oracle PASS; repeated states restore deterministically, the target formula has no fallback and both primary inputs carry positive decimal validations with visible error messages.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
-        "commit": "3cefee3"
+        "commit": "50939b5"
       }
     },
     {
@@ -942,16 +942,16 @@
       "earliest_responsible_layer": "Authority ranking.",
       "candidate_files": "scripts/lib/forecast_authority.mjs; scripts/lib/forecast_candidate_compiler.mjs",
       "acceptance_criterion": "Definition, period, units, freshness, confidence and completeness rank before stable ID.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Definition, period, units, freshness, confidence and completeness rank before stable ID.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced independently: equal-rung company guidance was sorted only by source_id, so an alphabetically early stale, low-confidence and definition-incompatible candidate won all three forecast periods over the exact fresh source.",
+        "focused_test": "PASS: canonical rank tests cover all six economic dimensions, both input orderings, wrong-currency evidence, declared-shell hydration, actual-plus-remainder pairing, exact stable-ID ties, two rank-proof mutations and order-invariant plan identity.",
+        "source_fix": "One comparator now ranks method, definition, period, currency/units, freshness, confidence and completeness before stable ID. Observation/source metadata flows into candidates; executable twins and remainder partners use the same ranking; canonical candidate identities replace insertion-order IDs.",
+        "integration_evidence": "PASS: forecast behavior 33/33 with seven mutations, topology 33/33 with six mutations, authority ledger 6/6, observation contract 13/13, run constitution 16/16 with five mutations, evidence resolution 29/29, registry 3/3, debt-class 44/44 and EBITDA-basis 24/24.",
+        "semantic_oracle_evidence": "PASS: every candidate carries a recomputable rank vector, the selected vector is sealed into plan state and materialized authority, the authority-ledger body hashes it, and tampered candidate/state rank proofs fail validation; reversing evidence order leaves the plan hash unchanged.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "bfe19ab"
       }
     },
     {
