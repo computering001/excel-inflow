@@ -970,6 +970,7 @@ async function main() {
       // from that sealed model and let the executable forecast resolver select
       // the next lawful rung during Stage 3.
       brokerSelectedCompilation = null;
+      activeCaseEvidence = validation.handoff.case_evidence;
       activeCaseCompileReport = validation.handoff.case_compile_report;
       activeModelCase = applyBrokerPreviewSelection(
         structuredClone(validation.handoff.model_case),
