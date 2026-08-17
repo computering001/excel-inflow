@@ -1203,7 +1203,7 @@ def main() -> int:
     state_path = output_root / "attachment-evidence-run-state.json"
     spec = read_json(spec_path, "attachment evidence controller spec")
     experience_trace = ExperienceTrace(run_id=str(spec.get("run_id") or output_root.name), scope="attachment_evidence_controller")
-    experience_span = experience_trace.span("attachment_evidence_pipeline", "run_attachment_evidence_pipeline", "excel_inflow_active")
+    experience_span = experience_trace.span("attachment_evidence_pipeline", "run_attachment_evidence_pipeline", "excel_inflow_active", metadata={"coverage_role": "root"})
     experience_span.__enter__()
     def _finish_experience_trace() -> None:
         try:
