@@ -95,9 +95,16 @@ export function applyFundedAcquisitionWorkbook(workbook,rowPlan,modelCase) {
  const considerationRefCount=investingRefs.filter(reference=>reference===consideration.row_id).length;
  const fxRowIds=new Set(definitions.filter(definition=>normalise(definition?.semantic_role??definition?.row_id).replaceAll(" ","_")==="fx_effect_on_cash").map(definition=>definition.row_id));
  if(considerationRefCount!==1||investingRefs.some(reference=>fxRowIds.has(reference))) throw new Error("Funded acquisition consideration must be owned exactly once by investing cash flow and must never bind to the FX-effect row.");
+ const consolidatedScheduleDebt=
+  normalise(debtProceeds?.semantic_role??debtProceeds?.row_id).replaceAll(" ","_")==="change_in_debt";
+ // The modern builder owns acquisition debt through the debt schedule and the
+ // Change in Debt parent already links to that schedule total. Replacing that
+ // link with a transaction hardcode would create a second financing writer and
+ // disconnect the cash sweep. Legacy captured plans without the consolidated
+ // parent still receive the direct proceeds formula for compatibility.
  const targets=[
   {definition:consideration,kind:"consideration"},
-  {definition:debtProceeds,kind:"debt_proceeds"},
+  ...(consolidatedScheduleDebt?[]:[{definition:debtProceeds,kind:"debt_proceeds"}]),
  ];
  const adjustmentColumns=["N","O","P"];
  const proFormaColumns=["S","T","U"];

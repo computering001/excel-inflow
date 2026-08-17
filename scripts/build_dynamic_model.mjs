@@ -2801,6 +2801,28 @@ function acquisitionRatioRowFormula(definition, column) {
   return `=${standaloneColumnFor(column)}${definition.row}`;
 }
 
+function acquisitionRoleForDefinition(definition) {
+  if (definition?.acquisition_driver_role) {
+    return definition.acquisition_driver_role;
+  }
+  const aliases = new Set([
+    definition?.semantic_role,
+    ...(definition?.role_aliases ?? []),
+  ]);
+  if (aliases.has("ebit")) return "ebit";
+  return definition?.semantic_role ?? null;
+}
+
+function acquisitionDirectProFormaRole(definition) {
+  return new Set([
+    "revenue",
+    "depreciation_and_amortisation",
+    "ebit",
+    "change_in_working_capital",
+    "capex",
+  ]).has(acquisitionRoleForDefinition(definition));
+}
+
 // THE NUMERIC TWIN OF THE TWO FUNCTIONS ABOVE.
 //
 // What every RATE row in the adjustment column caches. It has to reproduce
@@ -2994,9 +3016,7 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
   if (drivers.standalone_ratio_row_ids.has(definition.row_id)) {
     return acquisitionRatioRowFormula(definition, column);
   }
-  const role =
-    definition.acquisition_driver_role ??
-    definition.semantic_role;
+  const role = acquisitionRoleForDefinition(definition);
   if (role === "revenue") {
     const margin = acquisitionMarginExpression(drivers, column);
     if (!margin) return null;
@@ -4192,6 +4212,19 @@ function configureOperatingModel(
         // Pro forma is a presentation identity, not a second tax engine. The
         // incremental tax is calculated once in the adjustment column from
         // incremental PBT; this cell simply carries Standalone + Adjustment.
+        applyFormula(
+          sheet,
+          `${proFormaColumn}${definition.row}`,
+          `=${column}${definition.row}+${adjustmentColumn}${definition.row}`,
+        );
+      } else if (
+        acquisitionFormula &&
+        acquisitionDirectProFormaRole(definition)
+      ) {
+        // Acquisition operating leaves are written once in the adjustment
+        // block and then added to standalone. A historical/standalone formula
+        // on the same visible row (for example Capex = PPE purchases) must not
+        // rebuild pro forma from a child that deliberately has no deal overlay.
         applyFormula(
           sheet,
           `${proFormaColumn}${definition.row}`,
@@ -6215,25 +6248,6 @@ function configureOperatingModel(
       movementType === "maturity_repayment"
     );
   });
-  // Every non-issuance, non-RCF debt cash movement belongs in the pre-RCF
-  // bridge exactly once.  Restricting this row to maturities orphaned visible
-  // issuance costs and other debt transactions from ending cash even though
-  // they sat inside the face-statement Net Change in Debt subtotal.
-  const preRcfDebtStatementRows = debtMovementRows.filter((definition) => {
-    const role = definition.semantic_role;
-    const movementType = inferMovementType(definition);
-    return role !== "debt_issuance" && movementType !== "debt_issuance";
-  });
-  // The issuance leg mirrors the repayment leg: the sweep consumes the
-  // visible statement issuance child (which itself links to the waterfall
-  // proceeds row), so every live financing component enters ending cash
-  // through the face of the statement exactly once instead of being
-  // bypassed by a direct schedule read.
-  const issuanceStatementRows = financingRows.filter((definition) => {
-    const role = definition.semantic_role;
-    const movementType = inferMovementType(definition);
-    return role === "debt_issuance" || movementType === "debt_issuance";
-  });
   const leasePrincipalRows = financingRows.filter(
     (definition) => inferMovementType(definition) === "lease_principal",
   );
@@ -6241,8 +6255,8 @@ function configureOperatingModel(
     sumCellExpression(
       definitions.map((definition) => `${blockColumn}${definition.row}`),
     );
-  const nonRcfIssuanceTerms = (blockColumn, forecastIndex) =>
-    rowPlan.instruments
+  const nonRcfIssuanceTerms = (blockColumn, forecastIndex) => {
+    const terms = rowPlan.instruments
       .filter((plan) => {
         const instrument = instrumentById.get(plan.instrument_id);
         return (
@@ -6262,6 +6276,15 @@ function configureOperatingModel(
         );
         return rate === "1" ? cell : `${cell}*${rate}`;
       });
+    if (blockColumn !== FORECAST_COLUMNS[forecastIndex]) {
+      const adjustmentColumn = ADJUSTMENT_COLUMNS[forecastIndex];
+      terms.push(
+        `IF($P$${c.adjustments_enabled}=0,0,` +
+          `${acquisitionDrawFormula(adjustmentColumn, rowPlan)})`,
+      );
+    }
+    return terms;
+  };
   // Instrument maturity mechanics remain inside each visible balance formula.
   // The schedule exposes one aggregate cash requirement, not a repeated
   // technical helper row beneath every instrument.  The waterfall consumes
@@ -6440,18 +6463,15 @@ function configureOperatingModel(
             : "=0",
         );
       }
-      // The maturity mechanics live once in the visible debt schedule, then
-      // flow through the visible financing-statement repayment line(s).  The
-      // sweep consumes those statement lines rather than bypassing them and
-      // reading the schedule a second time.  This preserves one economic
-      // writer while keeping the face of the cash-flow statement fully
-      // traceable into ending cash.
+      // The statement's debt children are intentionally blank in forecast.
+      // The sweep therefore consumes the same visible schedule authorities as
+      // the consolidated Change in Debt parent: non-RCF proceeds above and the
+      // one mandatory-repayment total here. Reading the captured statement
+      // children would silently drop the transaction from cash.
       applyFormula(
         sheet,
         `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}`,
-        preRcfDebtStatementRows.length
-          ? `=${sumCells(blockColumn, preRcfDebtStatementRows)}`
-          : `=-${blockColumn}${mandatoryDebtRow}`,
+        `=-${blockColumn}${mandatoryDebtRow}`,
       );
       applyFormula(
         sheet,
@@ -6463,11 +6483,7 @@ function configureOperatingModel(
         `${blockColumn}${waterfallRows.cash_before_rcf}`,
         `=${blockColumn}${waterfallRows.cash_before_debt}+` +
           (Number.isInteger(waterfallRows.non_rcf_debt_proceeds)
-            ? `${
-                issuanceStatementRows.length
-                  ? `${sumCells(blockColumn, issuanceStatementRows).replace(/^=/, "")}+`
-                  : `${blockColumn}${waterfallRows.non_rcf_debt_proceeds}+`
-              }`
+            ? `${blockColumn}${waterfallRows.non_rcf_debt_proceeds}+`
             : "") +
           `${blockColumn}${waterfallRows.pre_rcf_debt_cash_flow}+` +
           `${blockColumn}${waterfallRows.lease_principal_waterfall}`,
@@ -6698,9 +6714,6 @@ function configureOperatingModel(
       // Existing issuer instruments are unchanged by the transaction, so the
       // same visible non-cash movement rows apply in the pro-forma block.
       const proFormaOtherNonCash = standaloneOtherNonCash;
-      const acquisitionDebtDelta =
-        `${proFormaColumn}${debtRows.acquisition_debt}-` +
-        `${index === 0 ? "R" : PRO_FORMA_COLUMNS[index - 1]}${debtRows.acquisition_debt}`;
       const cashMovementFormula = (blockColumn) => {
         const issuance = nonRcfIssuanceTerms(blockColumn, index);
         const terms = [
@@ -6739,8 +6752,7 @@ function configureOperatingModel(
           `${proFormaColumn}${fxRow}`,
           `=${proFormaColumn}${grossDebtRow}-${priorProFormaColumn}${grossDebtRow}` +
             `-${proFormaColumn}${changeRow}` +
-            `${proFormaOtherNonCash ? `-(${proFormaOtherNonCash})` : ""}` +
-            `-(${acquisitionDebtDelta})`,
+            `${proFormaOtherNonCash ? `-(${proFormaOtherNonCash})` : ""}`,
         );
         applyFormula(
           sheet,
@@ -10048,12 +10060,14 @@ function statementSolverValues(
     // are all n/a on a forecast basis — so the solver has to be told what it
     // holds, or it reads the blank constituents and caches a zero on the
     // headline debt movement. It is the whole CASH debt movement: scheduled
-    // draws and repayments plus both revolver legs. The acquisition overlay is
-    // deliberately a non-cash balance addition and is excluded.
+    // draws and repayments, acquisition term-debt proceeds and both revolver
+    // legs. The acquisition balance addition is a cash financing source and
+    // must enter this line exactly once.
     [
       "change_in_debt",
       result.non_rcf_issuance -
         result.non_rcf_repayment +
+        Number(result.acquisition_debt_proceeds ?? 0) +
         result.rcf_draw -
         result.rcf_repayment,
     ],
@@ -10129,8 +10143,7 @@ function statementSolverValues(
   );
   const valuesById = new Map();
   for (const definition of definitions) {
-    const solverRole =
-      definition.acquisition_driver_role ?? definition.semantic_role;
+    const solverRole = acquisitionRoleForDefinition(definition);
     const periodRulesDeclared = hasForecastPeriodCalculations(definition);
     const activeCalculation =
       forecastCalculationForIndex(definition, forecastIndex) ??
@@ -10166,8 +10179,16 @@ function statementSolverValues(
   if (acquisitionBaseValues) {
     for (const definition of definitions) {
       const periodRule = definition.forecast_period_calculations?.[forecastIndex] ?? null;
+      const acquisitionOverlay = acquisitionAdjustmentFormula(
+        modelCase,
+        definition,
+        ADJUSTMENT_COLUMNS[forecastIndex],
+        rowPlan,
+      );
       if (
         isStandaloneOnlyForecastRule(periodRule) &&
+        definition.semantic_role !== "opening_cash" &&
+        !acquisitionOverlay &&
         acquisitionBaseValues.has(definition.row_id)
       ) {
         valuesById.set(
@@ -10352,9 +10373,18 @@ function solverFormulaCaches(
       // Period-specific forecast rules reproduce the source workbook's
       // standalone dependency direction. They do not create a transaction
       // rule: adjustment is zero and pro forma equals standalone.
-      const standaloneOnlyPeriodRule = isStandaloneOnlyForecastRule(
-        definition.forecast_period_calculations?.[index] ?? null,
+      const acquisitionOverlay = acquisitionAdjustmentFormula(
+        modelCase,
+        definition,
+        adjustmentColumn,
+        rowPlan,
       );
+      const standaloneOnlyPeriodRule =
+        isStandaloneOnlyForecastRule(
+          definition.forecast_period_calculations?.[index] ?? null,
+        ) &&
+        definition.semantic_role !== "opening_cash" &&
+        !acquisitionOverlay;
       const proFormaValue = standaloneOnlyPeriodRule
         ? standaloneValue
         : proFormaValues.get(definition.row_id) ?? 0;
@@ -10606,6 +10636,7 @@ function solverFormulaCaches(
         total_change_in_debt:
           Number(result.non_rcf_issuance ?? 0) -
           Number(result.non_rcf_repayment ?? 0) +
+          Number(result.acquisition_debt_proceeds ?? 0) +
           Number(result.rcf_draw ?? 0) -
           Number(result.rcf_repayment ?? 0),
         mandatory_debt_repayments: Number(result.non_rcf_repayment ?? 0),
@@ -10696,7 +10727,9 @@ function solverFormulaCaches(
     }
     const waterfallValues = (result) => ({
       cash_before_debt: result.cash_before_debt,
-      non_rcf_debt_proceeds: result.non_rcf_issuance,
+      non_rcf_debt_proceeds:
+        Number(result.non_rcf_issuance ?? 0) +
+        Number(result.acquisition_debt_proceeds ?? 0),
       // Gross proceeds, mandatory repayments and lease principal are separate
       // visible rows. Never net one into another in the cache.
       pre_rcf_debt_cash_flow:

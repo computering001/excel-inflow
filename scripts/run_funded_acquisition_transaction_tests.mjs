@@ -83,7 +83,7 @@ const cells = new Map();
 for (const rowNumber of [65, 70]) {
   for (const column of ["N", "O", "P"]) {
     cells.set(`${column}${rowNumber}`, {
-      formula: "=0",
+      formula: rowNumber === 70 ? `=${column}97` : "=0",
       cachedValue: 0,
     });
   }
@@ -111,11 +111,11 @@ const workbookResult = applyFundedAcquisitionWorkbook(
   rowPlan,
   modelCase,
 );
-assert.equal(workbookResult.changed, 6);
+assert.equal(workbookResult.changed, 3);
 assert.match(cells.get("O65").formula, /-\$P\$5/);
 assert.doesNotMatch(cells.get("O65").formula, /101|fx/i);
 assert.equal(cells.get("O65").cachedValue, -1482.5);
-assert.match(cells.get("O70").formula, /\$P\$8/);
+assert.equal(cells.get("O70").formula, "=O97");
 assert.equal(workbookResult.debt_proceeds_row, 70);
 
 const fxBoundPlan = structuredClone(rowPlan);

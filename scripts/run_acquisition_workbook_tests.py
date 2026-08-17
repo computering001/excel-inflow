@@ -72,8 +72,18 @@ def main()->int:
     assert debt_formulas,"Acquisition debt proceeds has no formula cells"
     assert all("IF($P$4=0,0,0)" not in formula.replace(" ","") for formula in consideration_formulas+debt_formulas)
     assert any("$P$5" in formula and "-$P$5" in formula.replace(" ","") for formula in consideration_formulas),consideration_formulas
-    assert any("$P$8" in formula for formula in debt_formulas),debt_formulas
-    assert any("$P$10" in formula for formula in consideration_formulas+debt_formulas)
+    row_map_path=Path(f"{workbook}.row-map.json")
+    assert row_map_path.exists(),"Acquisition workbook is missing its row-map receipt"
+    row_map=json.loads(row_map_path.read_text("utf8"))
+    debt_total_row=int(row_map["debt_summary_rows"]["total_change_in_debt"])
+    waterfall_proceeds_row=int(row_map["waterfall_rows"]["non_rcf_debt_proceeds"])
+    assert any(
+      any(f"{column}{debt_total_row}" in formula for column in ("N","O","P"))
+      for formula in debt_formulas
+    ),debt_formulas
+    waterfall_formulas=[cell.value for cell in formula_cells(ws,waterfall_proceeds_row)]
+    assert any("$P$8" in formula for formula in waterfall_formulas),waterfall_formulas
+    assert any("$P$10" in formula for formula in consideration_formulas+waterfall_formulas)
 
     consideration_values=[value for row in consideration_rows for value in numeric_cells(vws,row)]
     debt_values=[value for row in debt_rows for value in numeric_cells(vws,row)]
