@@ -433,16 +433,16 @@
       "earliest_responsible_layer": "Forecast capture ownership.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Default overlay mode forecasts one parent working-capital line; historical children remain visible and forecast children are blank/captured.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Default overlay mode forecasts one parent working-capital line; historical children remain visible and forecast children are blank/captured.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced by the handed-over workbook: the visible working-capital parent and its receivables, inventory and payables children all carry forecast values.",
+        "focused_test": "PASS: both reported_parent and derived_from_children hierarchy authorities pass; six hierarchy mutations fail; reported-parent children are uncalculated; forecast behavior 33/33 rejects mixed aggregate ownership.",
+        "source_fix": "The source hierarchy compiler now preserves exactly one working-capital authority: a reported parent captures its visible historical workings, while a derived parent remains the formula over its contributing children.",
+        "integration_evidence": "PASS: statement classifier/topology suite, semantic graph membership and production user flow 14/14; the decisions case passes schema and coverage with a single aggregate authority.",
+        "semantic_oracle_evidence": "PASS: authority is selected from declared hierarchy and additive membership, independent of issuer labels or workbook row numbers.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "f3f53e7 (single aggregate forecast ownership); d7d659c (nested membership compatibility)"
       }
     },
     {
@@ -496,16 +496,16 @@
       "earliest_responsible_layer": "Forecast behaviour classification.",
       "candidate_files": "scripts/lib/forecast_behavior.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/semantic_roles.mjs",
       "acceptance_criterion": "Non-recurring events cannot use carry-forward, historical average or historical trend without explicit recurrence evidence.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Non-recurring events cannot use carry-forward, historical average or historical trend without explicit recurrence evidence.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced by the handed-over workbook: disposal, transaction and other discrete rows repeat through generic historical inference.",
+        "focused_test": "PASS: forecast behavior 33/33 classifies litigation and transaction costs as non_recurring_event under label reordering; forecast topology 33/33 selects sealed explicit_zero for debt fees and other transaction movements and rejects an unsealed zero.",
+        "source_fix": "Structured event semantics now constrain the forecast candidate set to evidenced recurrence methods or a sealed semantic-event zero; carry-forward, historical average and historical trend are excluded.",
+        "integration_evidence": "PASS: materialized forecast authorities validate with zero violations and production user flow passes 14/14.",
+        "semantic_oracle_evidence": "PASS: event ownership follows typed role and movement semantics rather than captions; the zero basis is independently revalidated as semantic_event_nonrecurrence.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "9008f5e (structured event policy in recovered baseline); d2136c1 (executable event fallback coverage)"
       }
     },
     {
@@ -517,16 +517,16 @@
       "earliest_responsible_layer": "Cash-tax forecast policy.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs",
       "acceptance_criterion": "Cash tax uses source / guidance / broker / driver authority; P&L tax fallback is explicit and labelled.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Cash tax uses source / guidance / broker / driver authority; P&L tax fallback is explicit and labelled.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: applyConsumptionDoctrine unconditionally minted cash-tax = P&L-tax before the evidence waterfall could select an independent authority.",
+        "focused_test": "PASS: forecast topology 33/33 proves explicit cash-tax guidance outranks a receipted cash-tax historical fallback and no selected formula references tax_expense; statement classifier/topology includes a legacy-link migration regression.",
+        "source_fix": "Cash tax was removed from P&L identity wiring, typed as driver_linked_flow, and routed through the ordinary source/guidance/broker/driver/historical hierarchy. Unsealed legacy rows drop the silent P&L link; sealed formula-owned periods migrate to a disclosed same-row fallback without erasing stronger direct periods.",
+        "integration_evidence": "PASS: materialization retains reviewer-facing fallback notes, forecast authority validation is clean, case-cohort comparison shows zero new hard plan diffs for the cash-tax change, and production user flow passes 14/14.",
+        "semantic_oracle_evidence": "PASS: the tests use the cash_taxes role and classifier evidence, mutate the historical pattern and guidance authority, and fail if any forecast dependency returns to tax_expense.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "cd27624"
       }
     },
     {
