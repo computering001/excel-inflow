@@ -11,6 +11,7 @@ import {
   validateForecastPlan,
   validateForecastPlanCaseParity,
 } from "./lib/forecast_candidate_compiler.mjs";
+import { validateForecastAuthorities } from "./lib/forecast_authority.mjs";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -133,6 +134,77 @@ assert(contractual.behavior === "contractual_flow", "Contractual movement metada
 
 const valid = validateForecastBehaviorMap(map);
 assert(valid.status === "PASS" && valid.total_violations === 0, `Baseline artifact is invalid: ${JSON.stringify(valid)}`);
+
+const directAuthorities = (prefix) => [0, 1, 2].map((forecastIndex) => ({
+  method: "user_assumption",
+  source_kind: "user_supplied",
+  source_id: `${prefix}-${forecastIndex + 1}`,
+  as_of_date: "2025-12-31",
+  value: 100 + forecastIndex,
+  material: true,
+  note: "Synthetic direct forecast authority for aggregate-ownership mutation testing.",
+}));
+const duplicateAggregateRows = [
+  {
+    row_id: "issuer_aggregate",
+    label: "Issuer-defined aggregate",
+    row_type: "subtotal",
+    calculation: { operator: "sum", refs: ["component_alpha", "component_beta"] },
+    historical_authority: "reported_total_reconciled",
+    reported_historical_values: [100, 110, 120],
+    source_line_ids: ["is.issuer_aggregate"],
+    forecast_period_authorities: directAuthorities("aggregate"),
+  },
+  {
+    row_id: "component_alpha",
+    label: "Component alpha",
+    row_type: "input",
+    values: [40, 44, 48, null, null, null],
+    historical_authority: "source_input",
+    source_line_ids: ["is.component_alpha"],
+    forecast_period_authorities: directAuthorities("alpha"),
+  },
+  {
+    row_id: "component_beta",
+    label: "Component beta",
+    row_type: "input",
+    values: [60, 66, 72, null, null, null],
+    historical_authority: "source_input",
+    source_line_ids: ["is.component_beta"],
+    forecast_period_authorities: directAuthorities("beta"),
+  },
+];
+const duplicateAggregateCase = {
+  statement_structure: { income_statement: duplicateAggregateRows, cash_flow: [] },
+};
+assert(
+  validateForecastAuthorities(duplicateAggregateCase, duplicateAggregateRows)
+    .some((error) => error.includes("mixed aggregate forecast ownership")),
+  "A reported aggregate and its complete children retained independent forecasts.",
+);
+const childrenOwnAggregateRows = clone(duplicateAggregateRows);
+delete childrenOwnAggregateRows[0].forecast_period_authorities;
+assert(
+  !validateForecastAuthorities(
+    { statement_structure: { income_statement: childrenOwnAggregateRows, cash_flow: [] } },
+    childrenOwnAggregateRows,
+  ).some((error) => error.includes("aggregate forecast ownership")),
+  "A valid children-own forecast mode was rejected.",
+);
+const parentOwnAggregateRows = clone(duplicateAggregateRows);
+for (const child of parentOwnAggregateRows.slice(1)) {
+  delete child.forecast_period_authorities;
+  child.row_type = "uncalculated";
+  child.forecast_treatment = "uncalculated";
+  child.forecast_capture_parent_id = "issuer_aggregate";
+}
+assert(
+  !validateForecastAuthorities(
+    { statement_structure: { income_statement: parentOwnAggregateRows, cash_flow: [] } },
+    parentOwnAggregateRows,
+  ).some((error) => error.includes("aggregate forecast ownership")),
+  "A valid parent-own forecast mode was rejected.",
+);
 
 // Candidate selection is tested on deliberately unfamiliar labels so the
 // result depends on semantic ownership and evidence, never caption matching.
@@ -466,7 +538,7 @@ for (const [name, mutate] of mutations) {
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 21 + mutations.length,
+  tests: 24 + mutations.length,
   adversarial_mutations_caught: mutations.length,
   total_violations: 0,
 }, null, 2));

@@ -929,6 +929,101 @@ export function validateForecastAuthorities(modelCase, rows = []) {
     }
   }
 
+  // A filed aggregate has exactly one forecast owner per period. If the
+  // parent selects an independent forecast, every complete child must stand
+  // down; if the children own the forecast, the parent must remain the live
+  // accounting identity over those children. This check is intentionally
+  // section-local and role-free so issuer-defined aggregates receive the same
+  // treatment as familiar revenue or working-capital totals.
+  const absentMethods = new Set([
+    "not_separately_forecast",
+    "not_applicable",
+    "unresolved",
+  ]);
+  const independentOwner = (authority) =>
+    authority &&
+    !absentMethods.has(authority.method) &&
+    !["accounting_identity", "schedule_link"].includes(authority.method);
+  for (const section of ["income_statement", "cash_flow"]) {
+    const sectionRows = modelCase?.statement_structure?.[section] ?? [];
+    const localById = new Map(sectionRows.map((row) => [row.row_id, row]));
+    const hierarchyChildren = new Map();
+    for (const row of sectionRows) {
+      if (!row.parent_row_id || !localById.has(row.parent_row_id)) continue;
+      const members = hierarchyChildren.get(row.parent_row_id) ?? [];
+      members.push(row);
+      hierarchyChildren.set(row.parent_row_id, members);
+    }
+    for (const parent of sectionRows) {
+      const formulaChildren = parent.calculation?.operator === "sum"
+        ? (parent.calculation.refs ?? [])
+            .map((rowId) => localById.get(rowId))
+            .filter(Boolean)
+        : [];
+      const childById = new Map(
+        [...formulaChildren, ...(hierarchyChildren.get(parent.row_id) ?? [])]
+          .map((row) => [row.row_id, row]),
+      );
+      const children = [...childById.values()];
+      const sourceVisibleIdentity =
+        parent.historical_authority === "reported_total_reconciled" &&
+        (parent.source_line_ids ?? []).length > 0 &&
+        children.every(
+          (child) =>
+            (child.source_line_ids ?? []).length > 0 &&
+            ["source_input", "reported_total_reconciled"].includes(
+              child.historical_authority,
+            ),
+        );
+      const isAggregate =
+        children.length >= 2 &&
+        (
+          ["reported_parent", "derived_from_children"].includes(
+            parent.aggregation_authority,
+          ) ||
+          sourceVisibleIdentity
+        );
+      if (!isAggregate) continue;
+      for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
+        const parentAuthority = resolveForecastAuthority(
+          modelCase,
+          parent,
+          forecastIndex,
+        );
+        const childAuthorities = children.map((child) => ({
+          child,
+          authority: resolveForecastAuthority(modelCase, child, forecastIndex),
+        }));
+        if (independentOwner(parentAuthority)) {
+          const liveChildren = childAuthorities.filter(
+            ({ authority }) => !absentMethods.has(authority.method),
+          );
+          if (liveChildren.length > 0) {
+            errors.push(
+              `${section}.${parent.row_id} has mixed aggregate forecast ownership in ` +
+              `period ${forecastIndex + 1}: parent method ${parentAuthority.method} ` +
+              `coexists with live children ${liveChildren
+                .map(({ child, authority }) => `${child.row_id}:${authority.method}`)
+                .join(", ")}.`,
+            );
+          }
+        } else if (parentAuthority.method === "accounting_identity") {
+          const absentChildren = childAuthorities.filter(
+            ({ authority }) => absentMethods.has(authority.method),
+          );
+          if (absentChildren.length > 0) {
+            errors.push(
+              `${section}.${parent.row_id} has incomplete children-owned forecast ` +
+              `authority in period ${forecastIndex + 1}: ${absentChildren
+                .map(({ child, authority }) => `${child.row_id}:${authority.method}`)
+                .join(", ")}.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   if (strict) {
     // Blanket-authority detector: many rows sharing one method and one
     // verbatim rationale is case-authoring boilerplate, not evidence. The
