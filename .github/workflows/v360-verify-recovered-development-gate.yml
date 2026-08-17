@@ -1,4 +1,4 @@
-# run the complete repo-local v3.6 development gate on the exact repaired target
+# final fail-closed promotion of the recovered v3.6 development candidate
 name: v360 verify recovered development gate
 
 on:
@@ -9,18 +9,41 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: v360-final-development-promotion
+  cancel-in-progress: false
 
 jobs:
-  verify:
+  promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact repaired candidate
+        uses: actions/checkout@v4
         with:
-          ref: 912e50d22dd109176f521080d78d71141fc58cb0
+          ref: agent/excel-inflow-v360-rebuild
           fetch-depth: 0
-      - name: Install HOME-independent portable runtime
+
+      - name: Freeze source and destination refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_candidate='912e50d22dd109176f521080d78d71141fc58cb0'
+          expected_main='1808719885a720c9ff3eb7d6fc9f136d602120f7'
+          actual_candidate="$(git rev-parse HEAD)"
+          git fetch origin main agent/excel-inflow-v360-rebuild
+          actual_main="$(git rev-parse refs/remotes/origin/main)"
+          actual_remote_candidate="$(git rev-parse refs/remotes/origin/agent/excel-inflow-v360-rebuild)"
+          test "$actual_candidate" = "$expected_candidate"
+          test "$actual_remote_candidate" = "$expected_candidate"
+          test "$actual_main" = "$expected_main"
+          git merge-base --is-ancestor "$actual_main" "$actual_candidate"
+          echo "FROZEN_CANDIDATE=$actual_candidate"
+          echo "FROZEN_MAIN=$actual_main"
+
+      - name: Install deterministic portable runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -29,16 +52,36 @@ jobs:
           python3 -m venv /tmp/v360-python
           /tmp/v360-python/bin/python -m pip install --upgrade pip >/dev/null
           /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy >/dev/null
-          HOME=/tmp/isolated-home /tmp/v360-python/bin/python -c 'import fitz,openpyxl; print("HOME_INDEPENDENT_PYTHON=PASS",openpyxl.__version__)'
-      - name: Verify source-owned registry contract
+          export PATH="/tmp/v360-python/bin:$PATH"
+          HOME=/tmp/isolated-home python3 -c 'import fitz,openpyxl,PIL,jsonschema,lxml,numpy; print("PORTABLE_RUNTIME=PASS",openpyxl.__version__)'
+          soffice --version
+          node --version
+
+      - name: Remove bootstrap-only recovery machinery
         shell: bash
         run: |
           set -euo pipefail
+          cat > /tmp/bootstrap-paths.txt <<'EOF'
+          .github/workflows/apply-reviewed-demand-followup.yml
+          .github/workflows/apply-reviewed-repair-followup.yml
+          .github/workflows/apply-reviewed-repair.yml
+          .github/workflows/finalize-reviewed-development-candidate.yml
+          .github/workflows/reviewed-auto-finalize.yml
+          scripts/apply_broker_tier1_demand_repair.py
+          scripts/apply_reviewed_core_repair.py
+          scripts/apply_reviewed_followup.py
+          scripts/finalize_core_demand_and_development_release.py
+          scripts/run_reviewed_auto_finalize.py
+          EOF
+          while IFS= read -r path; do rm -f "$path"; done < /tmp/bootstrap-paths.txt
+          git diff --check
+
+      - name: Verify source-owned registry and classify custody
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="/tmp/v360-python/bin:$PATH"
           node scripts/run_test_registry_contract_tests.mjs
-      - name: Select every repo-local custody test
-        shell: bash
-        run: |
-          set -euo pipefail
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -46,34 +89,42 @@ jobs:
           d=json.loads(p.read_text())
           available={'CASES','REPRESENTATIVE','PYTHON','SOFFICE'}
           selected=[]
-          excluded=[]
+          external=[]
           for t in d['tests']:
               req=set(t.get('requires',[]))
               if t['id']=='test-registry-contract':
-                  excluded.append((t['id'],['run-separately-before-filter']))
-              elif req <= available:
+                  continue
+              if req <= available:
                   selected.append(t)
               else:
-                  excluded.append((t['id'],sorted(req-available)))
-          print('REGISTRY_TOTAL='+str(len(d['tests'])))
-          print('LOCAL_GATE_SELECTED='+str(len(selected)))
-          print('EXTERNAL_OR_SEPARATE='+str(len(excluded)))
-          for tid,why in excluded:
-              print('EXCLUDED_ID='+tid+' REASON='+','.join(why))
+                  external.append({
+                      'id':t['id'],
+                      'status':'NOT_AVAILABLE_IN_GITHUB_RUNNER',
+                      'missing_requirements':sorted(req-available),
+                  })
+          assert len(d['tests'])==71, len(d['tests'])
+          assert len(selected)==63, len(selected)
+          assert len(external)==7, len(external)
+          Path('/tmp/external-custody-tests.json').write_text(json.dumps(external,indent=2)+'\n')
           d['tests']=selected
           p.write_text(json.dumps(d,indent=2)+'\n')
+          print('REGISTRY_TOTAL=71')
+          print('REGISTRY_CONTRACT=PASS')
+          print('REPO_LOCAL_SELECTED=63')
+          print('EXTERNAL_CUSTODY_NOT_AVAILABLE=7')
+          for item in external:
+              print('EXTERNAL='+item['id']+' MISSING='+','.join(item['missing_requirements']))
           PY
+
       - name: Run complete repo-local development gate
         shell: bash
         run: |
-          set +e
-          set -uo pipefail
+          set -euo pipefail
           export PATH="/tmp/v360-python/bin:$PATH"
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
           export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
-          python3 -c 'import fitz,openpyxl; print("GATE_PATH_PYTHON=PASS",openpyxl.__version__)'
           rm -rf /tmp/v360-development-gate
           node scripts/run_development_gate.mjs \
             --cases test-fixtures/cases \
@@ -83,20 +134,188 @@ jobs:
             --concurrency 1 \
             --timeout-ms 900000 \
             --out /tmp/v360-development-gate
-          gate_exit=$?
           python3 - <<'PY'
           import json
           from pathlib import Path
           d=json.loads(Path('/tmp/v360-development-gate/development-gate-report.json').read_text())
-          print('FINAL_GATE_STATUS='+d['status'])
-          print('PASS='+str(d['counts']['PASS']))
-          print('FAIL='+str(d['counts']['FAIL']))
-          print('BLOCKED='+str(d['counts']['BLOCKED']))
-          for r in d['results']:
-              if r['status']!='PASS':
-                  print('\n=== FAILED_ID='+r['id']+' STATUS='+r['status']+' ===')
-                  if r.get('command'): print('COMMAND='+' '.join(map(str,r['command'])))
-                  if r.get('stdout'): print('STDOUT_TAIL:\n'+r['stdout'][-6000:])
-                  if r.get('stderr'): print('STDERR_TAIL:\n'+r['stderr'][-10000:])
+          assert d['status']=='PASS', d
+          assert d['counts']=={'PASS':63,'FAIL':0,'BLOCKED':0}, d['counts']
+          print('DEVELOPMENT_GATE=PASS')
+          print('PASS=63 FAIL=0 BLOCKED=0')
           PY
-          exit $gate_exit
+          git checkout -- assets/development-test-registry.json
+
+      - name: Compile and smoke-test exact development package
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="/tmp/v360-python/bin:$PATH"
+          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
+          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
+          export SOFFICE_BIN="$(command -v soffice)"
+          rm -rf /tmp/excel-inflow-v3.6.0
+          node scripts/compile_skill_release.mjs \
+            --skill . \
+            --out /tmp/excel-inflow-v3.6.0 \
+            --development \
+            --smoke-case test-fixtures/cases/standard-maximal-v2.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('/tmp/excel-inflow-v3.6.0/release-manifest.json')
+          d=json.loads(p.read_text())
+          c=d.get('certification') or {}
+          assert d['releaseName']=='Excel Inflow v3.6.0', d['releaseName']
+          assert d['skillVersion']=='3.6.0', d['skillVersion']
+          assert d['packageMode']=='development', d['packageMode']
+          assert d['sourceStatus']=='v2_development', d['sourceStatus']
+          assert c.get('currentClosureSha256'), c
+          assert c.get('certifiedClosureSha256') is None, c
+          assert c.get('evidenceReceipt') is None, c
+          smoke=d.get('smokeTest') or {}
+          assert smoke.get('workbookBuild',{}).get('status')=='PASS', smoke.get('workbookBuild')
+          print('PACKAGE_COMPILE=PASS')
+          print('CURRENT_CLOSURE_SHA256='+c['currentClosureSha256'])
+          print('PACKAGE_SMOKE_WORKBOOK=PASS')
+          PY
+          tar --sort=name --mtime='UTC 2026-08-17' --owner=0 --group=0 --numeric-owner \
+            -cf /tmp/excel-inflow-v3.6.0.tar -C /tmp/excel-inflow-v3.6.0 .
+          gzip -n -f /tmp/excel-inflow-v3.6.0.tar
+          sha256sum /tmp/excel-inflow-v3.6.0.tar.gz | tee /tmp/package.sha256
+
+      - name: Assert only intentional source cleanup remains
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          python3 - <<'PY'
+          import subprocess
+          expected={
+            '.github/workflows/apply-reviewed-demand-followup.yml',
+            '.github/workflows/apply-reviewed-repair-followup.yml',
+            '.github/workflows/apply-reviewed-repair.yml',
+            '.github/workflows/finalize-reviewed-development-candidate.yml',
+            '.github/workflows/reviewed-auto-finalize.yml',
+            'scripts/apply_broker_tier1_demand_repair.py',
+            'scripts/apply_reviewed_core_repair.py',
+            'scripts/apply_reviewed_followup.py',
+            'scripts/finalize_core_demand_and_development_release.py',
+            'scripts/run_reviewed_auto_finalize.py',
+          }
+          lines=subprocess.check_output(['git','status','--porcelain=v1'],text=True).splitlines()
+          actual=set()
+          bad=[]
+          for line in lines:
+              status=line[:2]
+              path=line[3:]
+              actual.add(path)
+              if status.strip()!='D': bad.append((status,path))
+          assert actual==expected, {'missing':sorted(expected-actual),'unexpected':sorted(actual-expected)}
+          assert not bad, bad
+          print('SOURCE_CLEANUP_SCOPE=PASS')
+          print('BOOTSTRAP_FILES_REMOVED=10')
+          PY
+
+      - name: Commit exact tested tree locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Excel Inflow v3.6 publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          tested_tree="$(git write-tree)"
+          git commit -m 'Finalize recovered Excel Inflow v3.6 development candidate'
+          final_sha="$(git rev-parse HEAD)"
+          final_tree="$(git rev-parse 'HEAD^{tree}')"
+          test "$final_tree" = "$tested_tree"
+          echo "FINAL_SHA=$final_sha" >> "$GITHUB_ENV"
+          echo "FINAL_TREE=$final_tree" >> "$GITHUB_ENV"
+          echo "FINAL_SHA=$final_sha"
+          echo "FINAL_TREE=$final_tree"
+
+      - name: Build immutable promotion receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v360-final-proof
+          cp /tmp/v360-development-gate/development-gate-report.json /tmp/v360-final-proof/development-gate-report.json
+          cp /tmp/external-custody-tests.json /tmp/v360-final-proof/external-custody-tests.json
+          cp /tmp/excel-inflow-v3.6.0/release-manifest.json /tmp/v360-final-proof/package-release-manifest.json
+          cp /tmp/package.sha256 /tmp/v360-final-proof/package.sha256
+          FINAL_SHA="$FINAL_SHA" FINAL_TREE="$FINAL_TREE" python3 - <<'PY'
+          import hashlib,json,os
+          from datetime import datetime,timezone
+          from pathlib import Path
+          gate=json.loads(Path('/tmp/v360-final-proof/development-gate-report.json').read_text())
+          pkg=json.loads(Path('/tmp/v360-final-proof/package-release-manifest.json').read_text())
+          external=json.loads(Path('/tmp/v360-final-proof/external-custody-tests.json').read_text())
+          package_path=Path('/tmp/excel-inflow-v3.6.0.tar.gz')
+          receipt={
+            'schema_version':'excel-inflow-development-promotion/1.0',
+            'status':'PASS_DEVELOPMENT',
+            'production_certified':False,
+            'release_name':'Excel Inflow v3.6.0',
+            'source_commit_sha':os.environ['FINAL_SHA'],
+            'source_tree_sha':os.environ['FINAL_TREE'],
+            'base_main_sha':'1808719885a720c9ff3eb7d6fc9f136d602120f7',
+            'recovered_candidate_parent_sha':'912e50d22dd109176f521080d78d71141fc58cb0',
+            'repo_local_gate':gate['counts'],
+            'registry_contract':'PASS',
+            'external_custody_tests':external,
+            'package':{
+              'mode':pkg['packageMode'],
+              'skill_version':pkg['skillVersion'],
+              'source_status':pkg['sourceStatus'],
+              'current_closure_sha256':pkg['certification']['currentClosureSha256'],
+              'certified_closure_sha256':pkg['certification']['certifiedClosureSha256'],
+              'clean_root_workbook_smoke':pkg['smokeTest']['workbookBuild']['status'],
+              'archive_sha256':hashlib.sha256(package_path.read_bytes()).hexdigest(),
+              'archive_bytes':package_path.stat().st_size,
+            },
+            'bootstrap_files_removed':10,
+            'promotion_policy':'fast-forward exact tested tree only; no merge commit; fail if main moved',
+            'recorded_at':datetime.now(timezone.utc).isoformat(),
+          }
+          Path('/tmp/v360-final-proof/promotion-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          print(json.dumps(receipt,indent=2))
+          PY
+
+      - name: Upload package and proof before branch mutation
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-inflow-v3.6.0-development-promotion
+          path: |
+            /tmp/excel-inflow-v3.6.0.tar.gz
+            /tmp/v360-final-proof
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Publish exact final candidate branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/excel-inflow-v360-rebuild
+          test "$(git rev-parse refs/remotes/origin/agent/excel-inflow-v360-rebuild)" = '912e50d22dd109176f521080d78d71141fc58cb0'
+          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
+          git fetch origin agent/excel-inflow-v360-rebuild
+          test "$(git rev-parse refs/remotes/origin/agent/excel-inflow-v360-rebuild)" = "$FINAL_SHA"
+          test "$(git rev-parse 'refs/remotes/origin/agent/excel-inflow-v360-rebuild^{tree}')" = "$FINAL_TREE"
+          echo 'TARGET_BRANCH_PUBLICATION=PASS'
+
+      - name: Fast-forward main to exact tested tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          test "$current_main" = '1808719885a720c9ff3eb7d6fc9f136d602120f7'
+          git merge-base --is-ancestor "$current_main" "$FINAL_SHA"
+          git push origin "$FINAL_SHA":refs/heads/main
+          git fetch origin main
+          published_main="$(git rev-parse refs/remotes/origin/main)"
+          published_tree="$(git rev-parse 'refs/remotes/origin/main^{tree}')"
+          test "$published_main" = "$FINAL_SHA"
+          test "$published_tree" = "$FINAL_TREE"
+          echo "MAIN_PROMOTION=PASS"
+          echo "MAIN_SHA=$published_main"
+          echo "MAIN_TREE=$published_tree"
