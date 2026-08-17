@@ -1,4 +1,4 @@
-# trigger after exact part15 SHA repair
+# trigger after exact repaired 16-part payload verification
 name: v360 complete recovery publish
 
 on:
