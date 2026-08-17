@@ -1,0 +1,43 @@
+name: Read-only development gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install portable test dependencies
+        run: python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Prove CI is read-only
+        run: node scripts/run_ci_governance_tests.mjs
+
+      - name: Validate the source-owned test registry
+        run: node scripts/run_test_registry_contract_tests.mjs
+
+      - name: Run authority ranking mutations
+        run: node scripts/run_forecast_authority_ranking_tests.mjs
+
+      - name: Run acquisition valuation mutations
+        run: node scripts/run_acquisition_valuation_contract_tests.mjs
+
+      - name: Run typed filing extraction mutations
+        run: python3 scripts/run_typed_filing_value_tests.py

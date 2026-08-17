@@ -18,6 +18,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "ci-governance-read-only",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_governance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "decision-round-batching",
       "phase": "workflow",
       "runtime": "node",
