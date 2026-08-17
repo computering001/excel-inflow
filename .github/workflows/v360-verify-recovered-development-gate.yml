@@ -1,4 +1,4 @@
-# diagnose the last Stage-4 checkpoint seam with a HOME-independent Python runtime
+# isolate the N6 semantic-gate failure before the final Stage-4 checkpoint proof
 name: v360 verify recovered development gate
 
 on:
@@ -14,45 +14,36 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fdfdea50dce4b228e35e5263ece366e60203a8cc
           fetch-depth: 0
-      - name: Install isolated Stage-4 runtime
+      - name: Build Stage-3 state and print N6 detail
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libreoffice python3-venv
-          python3 -m venv /tmp/v360-python
-          /tmp/v360-python/bin/python -m pip install --upgrade pip
-          /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-          HOME=/tmp/v360-isolated-home /tmp/v360-python/bin/python -c 'import openpyxl, pymupdf, PIL, numpy; print(openpyxl.__version__)'
-      - name: Reproduce Stage-4 failure and dump exact state
-        shell: bash
-        run: |
-          set +e
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
-          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
-          export SOFFICE_BIN="$(command -v soffice)"
-          out=/tmp/v360-stage4-diagnostic
-          rm -rf "$out"
-          node scripts/run_stage4_checkpoint_tests.mjs \
-            --cases test-fixtures/cases \
-            --python /tmp/v360-python/bin/python \
-            --soffice "$(command -v soffice)" \
-            --out "$out"
-          test_exit=$?
-          echo "STAGE4_TEST_EXIT=$test_exit"
-          echo '--- result/build JSON ---'
-          find "$out" -type f \( -name 'user-flow-result.json' -o -name 'build-result.json' -o -name 'stage4-checkpoint-test-report.json' \) -print -exec sh -c 'cat "$1"; echo' _ {} \;
-          echo '--- .stage4 files ---'
-          find "$out" -path '*/.stage4/*' -type f -print | sort
-          echo '--- .stage4 receipt contents ---'
-          find "$out" -path '*/.stage4/receipts/*.json' -type f -print -exec sh -c 'cat "$1"; echo' _ {} \;
-          echo '--- likely gate/receipt files ---'
-          find "$out" -type f \( -name '*gate*.json' -o -name '*receipt*.json' -o -name '*result*.json' \) -print | sort
-          exit $test_exit
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean-evidence-run.json
+          rm -rf /tmp/n6-run
+          node scripts/run_user_flow.mjs /tmp/clean-evidence-run.json --out /tmp/n6-run --stop-after decisions --json > /tmp/paused.json
+          cat /tmp/paused.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { runReleaseN0N9 } from './scripts/lib/release_nodes.mjs';
+          const evidence=JSON.parse(fs.readFileSync('/tmp/clean-evidence-run.json','utf8'));
+          const modelCase=JSON.parse(fs.readFileSync('/tmp/n6-run/stages/decisions/model-case.json','utf8'));
+          const candidates={
+            dcsExport: evidence.dcs_export ?? evidence.export ?? evidence.dcs ?? null,
+            brokerPack: evidence.broker_pack ?? evidence.broker ?? null,
+            filings: evidence.filings ?? null,
+          };
+          console.log('EVIDENCE_KEYS='+Object.keys(evidence).join(','));
+          console.log('CASE_SOURCE_COVERAGE='+JSON.stringify(modelCase.source_coverage ?? null));
+          console.log('CASE_ANSWERS='+JSON.stringify(modelCase.answers ?? modelCase.stage_three_answers ?? null));
+          const result=runReleaseN0N9({modelCase,...candidates});
+          console.log('RELEASE_STATUS='+result.status);
+          const n6=result.gates.find(g=>g.id==='N6');
+          console.log('N6='+JSON.stringify(n6,null,2));
+          NODE
