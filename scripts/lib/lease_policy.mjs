@@ -80,6 +80,13 @@ export function validateLeasePolicy(modelCase) {
       errors.push(error.message);
     }
   }
+  if (errors.length === 0) {
+    try {
+      errors.push(...leaseProjectionErrors(modelCase));
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
   return errors;
 }
 
@@ -180,4 +187,118 @@ export function leaseForecast(modelCase) {
     openingInterestBearing = endingInterestBearing;
   }
   return periods;
+}
+
+/**
+ * Independently verify the typed lease schedule rather than trusting the
+ * producer that assembled it. A supplied projection makes this a mutation
+ * oracle in tests and in any downstream package validator.
+ */
+export function leaseProjectionErrors(
+  modelCase,
+  projection = leaseForecast(modelCase),
+) {
+  const policy = modelCase?.lease_policy ?? {};
+  const basis = resolvedLeaseInterestBasis(modelCase);
+  const rates = series3(
+    policy.effective_rate,
+    "lease_policy.effective_rate",
+    [0, 0, 0],
+  );
+  const historicalTotal = policy.historical_liabilities
+    ? series3(
+        policy.historical_liabilities,
+        "lease_policy.historical_liabilities",
+      )
+    : [0, 0, Number(policy.opening_liability ?? 0)];
+  const historicalInterestBearing =
+    basis === "separately_supplied"
+      ? series3(
+          policy.historical_interest_bearing_liabilities,
+          "lease_policy.historical_interest_bearing_liabilities",
+        )
+      : historicalTotal;
+  const errors = [];
+  const tolerance = 1e-8;
+  const near = (left, right) =>
+    Math.abs(Number(left) - Number(right)) <= tolerance;
+
+  if (!Array.isArray(projection) || projection.length !== 3) {
+    return ["lease projection must contain exactly three forecast periods."];
+  }
+
+  let expectedOpeningTotal = historicalTotal[2];
+  let expectedOpeningInterestBearing = historicalInterestBearing[2];
+  for (let index = 0; index < 3; index += 1) {
+    const period = projection[index] ?? {};
+    const prefix = `lease projection period ${index + 1}`;
+    for (const field of [
+      "opening_total",
+      "additions",
+      "principal_repayment",
+      "ending_total",
+      "opening_interest_bearing",
+      "ending_interest_bearing",
+      "interest",
+    ]) {
+      if (!Number.isFinite(Number(period[field]))) {
+        errors.push(`${prefix} ${field} must be numeric.`);
+      }
+    }
+    if (errors.some((message) => message.startsWith(prefix))) continue;
+
+    if (!near(period.opening_total, expectedOpeningTotal)) {
+      errors.push(`${prefix} opening total does not equal the prior closing liability.`);
+    }
+    if (!near(period.opening_interest_bearing, expectedOpeningInterestBearing)) {
+      errors.push(`${prefix} interest-bearing opening does not equal the prior closing basis.`);
+    }
+
+    if (policy.mode === "exclude") {
+      for (const field of [
+        "additions",
+        "principal_repayment",
+        "ending_total",
+        "ending_interest_bearing",
+        "interest",
+      ]) {
+        if (!near(period[field], 0)) {
+          errors.push(`${prefix} ${field} must be zero when leases are excluded.`);
+        }
+      }
+    } else {
+      const expectedEnding =
+        Number(period.opening_total) +
+        Number(period.additions) -
+        Number(period.principal_repayment);
+      if (!near(period.ending_total, expectedEnding)) {
+        errors.push(
+          `${prefix} closing liability does not equal opening + additions - principal.`,
+        );
+      }
+      const expectedEndingInterestBearing =
+        basis === "none"
+          ? 0
+          : basis === "separately_supplied"
+            ? Number(policy.forecast_interest_bearing_liabilities[index])
+            : Number(period.ending_total);
+      if (!near(period.ending_interest_bearing, expectedEndingInterestBearing)) {
+        errors.push(`${prefix} closing interest-bearing basis is inconsistent with ${basis}.`);
+      }
+      const expectedInterest =
+        basis === "none"
+          ? 0
+          : ((Number(period.opening_interest_bearing) +
+              Number(period.ending_interest_bearing)) /
+              2) *
+            rates[index];
+      if (!near(period.interest, expectedInterest)) {
+        errors.push(`${prefix} interest does not equal average interest-bearing liability times effective rate.`);
+      }
+    }
+
+    expectedOpeningTotal = Number(period.ending_total);
+    expectedOpeningInterestBearing = Number(period.ending_interest_bearing);
+  }
+  return errors;
 }

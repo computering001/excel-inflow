@@ -106,6 +106,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "lease-roll-forward",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_lease_roll_forward_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "forecast-behavior",
       "phase": "forecast",
       "runtime": "node",

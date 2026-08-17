@@ -1,0 +1,129 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import fs from "node:fs";
+
+import {
+  leaseForecast,
+  leaseProjectionErrors,
+  validateLeasePolicy,
+} from "./lib/lease_policy.mjs";
+import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
+import { solveCase } from "./lib/solver.mjs";
+
+const baseCase = (leasePolicy, accountingBasis = "IFRS") => ({
+  issuer: { accounting_basis: accountingBasis },
+  lease_policy: leasePolicy,
+});
+const rounded = (values) => values.map((value) => Number(value.toFixed(6)));
+const common = {
+  historical_liabilities: [80, 90, 100],
+  principal_repayment: [10, 12, 14],
+  additions: [15, 18, 21],
+  effective_rate: [0.05, 0.05, 0.05],
+  include_in_gross_debt: true,
+  include_in_net_debt: true,
+  include_in_leverage: true,
+};
+
+const simpleCase = baseCase({ ...common, mode: "simple_roll_forward" });
+const simple = leaseForecast(simpleCase);
+assert.deepEqual(simple.map((period) => period.opening_total), [100, 105, 111]);
+assert.deepEqual(simple.map((period) => period.ending_total), [105, 111, 118]);
+assert.deepEqual(simple.map((period) => period.additions), [15, 18, 21]);
+assert.deepEqual(simple.map((period) => period.principal_repayment), [10, 12, 14]);
+assert.deepEqual(rounded(simple.map((period) => period.interest)), [5.125, 5.4, 5.725]);
+assert.deepEqual(leaseProjectionErrors(simpleCase, simple), []);
+assert.deepEqual(validateLeasePolicy(simpleCase), []);
+
+const flatCase = baseCase({ ...common, mode: "flat_replacement" });
+const flat = leaseForecast(flatCase);
+assert.deepEqual(flat.map((period) => period.ending_total), [100, 100, 100]);
+assert.deepEqual(flat.map((period) => period.additions), [10, 12, 14]);
+assert.deepEqual(leaseProjectionErrors(flatCase, flat), []);
+
+const sourcedCase = baseCase({
+  ...common,
+  mode: "sourced_balance",
+  forecast_liabilities: [95, 85, 70],
+});
+const sourced = leaseForecast(sourcedCase);
+assert.deepEqual(sourced.map((period) => period.ending_total), [95, 85, 70]);
+assert.deepEqual(sourced.map((period) => period.additions), [5, 2, -1]);
+assert.deepEqual(leaseProjectionErrors(sourcedCase, sourced), []);
+
+const separateCase = baseCase({
+  ...common,
+  mode: "simple_roll_forward",
+  interest_basis: "separately_supplied",
+  historical_interest_bearing_liabilities: [30, 28, 25],
+  forecast_interest_bearing_liabilities: [22, 18, 15],
+});
+const separate = leaseForecast(separateCase);
+assert.deepEqual(
+  rounded(separate.map((period) => period.interest)),
+  [1.175, 1, 0.825],
+);
+assert.deepEqual(leaseProjectionErrors(separateCase, separate), []);
+
+const excludedCase = baseCase({ ...common, mode: "exclude" });
+const excluded = leaseForecast(excludedCase);
+assert.deepEqual(excluded.map((period) => period.ending_total), [0, 0, 0]);
+assert.deepEqual(excluded.map((period) => period.interest), [0, 0, 0]);
+assert.deepEqual(leaseProjectionErrors(excludedCase, excluded), []);
+
+const usGaapInvalid = baseCase(
+  { ...common, mode: "simple_roll_forward", interest_basis: "total_liability" },
+  "US_GAAP",
+);
+assert(validateLeasePolicy(usGaapInvalid).some((message) => /US GAAP/.test(message)));
+
+const mutations = [
+  ["opening continuity", (projection) => { projection[1].opening_total += 1; }],
+  ["closing equation", (projection) => { projection[0].ending_total += 1; }],
+  ["interest-bearing basis", (projection) => { projection[2].ending_interest_bearing += 1; }],
+  ["interest calculation", (projection) => { projection[0].interest += 1; }],
+  ["principal leg", (projection) => { projection[2].principal_repayment += 1; }],
+];
+for (const [label, mutate] of mutations) {
+  const projection = structuredClone(simple);
+  mutate(projection);
+  assert.notDeepEqual(leaseProjectionErrors(simpleCase, projection), [], label);
+}
+
+const productionPath =
+  "/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/dmu-stage4-checkpoints-d0Zvbp/interrupted-run/stages/decisions/model-case.json";
+if (fs.existsSync(productionPath)) {
+  const productionCase = JSON.parse(fs.readFileSync(productionPath, "utf8"));
+  migrateLegacyDebtClasses(productionCase);
+  const solved = solveCase(productionCase);
+  assert.deepEqual(
+    solved.forecast.map((period) => period.ending_lease),
+    [20, 20, 20],
+  );
+  assert.deepEqual(
+    solved.forecast.map((period) => period.lease_principal),
+    [4, 4, 4],
+  );
+  assert.deepEqual(
+    solved.forecast.map((period) => period.lease_additions),
+    [4, 4, 4],
+  );
+  assert.deepEqual(
+    solved.forecast.map((period) => period.lease_interest),
+    [1, 1, 1],
+  );
+  assert.equal(solved.all_checks_pass, true);
+}
+
+console.log(
+  JSON.stringify(
+    {
+      status: "PASS",
+      checks: 31,
+      mutations: mutations.map(([label]) => label),
+      production_case_exercised: fs.existsSync(productionPath),
+    },
+    null,
+    2,
+  ),
+);
