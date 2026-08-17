@@ -919,44 +919,6 @@ async function main() {
       );
     }
   }
-  const stage2Inputs = {
-    stage1_receipt: receipt1.receipt_hash,
-    evidence_validation: await hashFile(stage1Validation),
-    broker_confirmation:
-      productionBrokerPreviewRequired && stage2BrokerConfirmation
-        ? await hashFile(stage2BrokerConfirmation)
-        : hashValue({ pending: productionBrokerPreviewRequired }),
-    runtime: runtimeDigests.evidence_review,
-  };
-  const stage2Outputs = {
-    intake_result: stage2Result,
-    ...(productionBrokerPreviewRequired
-      ? {
-          broker_preview: brokerPreviewPath,
-          broker_preview_screen: brokerPreviewScreenPath,
-          broker_pack: brokerPackArtifactPath,
-          broker_source_tables: brokerSourceTablesArtifactPath,
-          broker_crosswalk_receipt: brokerCrosswalkReceiptArtifactPath,
-          broker_confirmation_template: brokerConfirmationTemplatePath,
-          ...(stage2BrokerConfirmation
-            ? {
-                broker_confirmation: stage2BrokerConfirmation,
-                broker_selected_case_evidence: brokerSelectedCaseEvidencePath,
-                broker_selected_compile_report: brokerSelectedCompileReportPath,
-              }
-            : {}),
-        }
-      : {}),
-  };
-  const cached2 = await readUsableStage({
-    runDir,
-    runId,
-    stageId: "evidence_review",
-    inputHashes: stage2Inputs,
-    previousReceiptHash: receipt1.receipt_hash,
-    outputs: stage2Outputs,
-  });
-  let receipt2;
   if (
     brokerSelectedCompilation &&
     brokerSelectedCompilation.report?.status !== "clean"
@@ -1021,6 +983,44 @@ async function main() {
       activeCaseCompileReport,
     );
   }
+  const stage2Inputs = {
+    stage1_receipt: receipt1.receipt_hash,
+    evidence_validation: await hashFile(stage1Validation),
+    broker_confirmation:
+      productionBrokerPreviewRequired && stage2BrokerConfirmation
+        ? await hashFile(stage2BrokerConfirmation)
+        : hashValue({ pending: productionBrokerPreviewRequired }),
+    runtime: runtimeDigests.evidence_review,
+  };
+  const stage2Outputs = {
+    intake_result: stage2Result,
+    ...(productionBrokerPreviewRequired
+      ? {
+          broker_preview: brokerPreviewPath,
+          broker_preview_screen: brokerPreviewScreenPath,
+          broker_pack: brokerPackArtifactPath,
+          broker_source_tables: brokerSourceTablesArtifactPath,
+          broker_crosswalk_receipt: brokerCrosswalkReceiptArtifactPath,
+          broker_confirmation_template: brokerConfirmationTemplatePath,
+          ...(stage2BrokerConfirmation
+            ? {
+                broker_confirmation: stage2BrokerConfirmation,
+                broker_selected_case_evidence: brokerSelectedCaseEvidencePath,
+                broker_selected_compile_report: brokerSelectedCompileReportPath,
+              }
+            : {}),
+        }
+      : {}),
+  };
+  const cached2 = await readUsableStage({
+    runDir,
+    runId,
+    stageId: "evidence_review",
+    inputHashes: stage2Inputs,
+    previousReceiptHash: receipt1.receipt_hash,
+    outputs: stage2Outputs,
+  });
+  let receipt2;
   const freshIntakeResult = runIntake({
     intake: validation.handoff.intake,
     draftCase: activeModelCase,
