@@ -86,7 +86,17 @@ export function verifyForecastAuthorityLedger(modelCase) {
   }
   const expected=buildForecastAuthorityLedger(modelCase);
   const actual=modelCase.forecast_authority_ledger;
-  if (actual.ledger_sha256!==expected.ledger_sha256 || canonicalJson({...actual,ledger_sha256:undefined})===null) {
+  const {ledger_sha256:actualStoredSha,...actualBody}=actual;
+  const {ledger_sha256:expectedStoredSha,...expectedBody}=expected;
+  const actualBodySha=hashValue(actualBody);
+  const expectedBodySha=hashValue(expectedBody);
+  const bodiesMatch=canonicalJson(actualBody)===canonicalJson(expectedBody);
+  if (
+    actualStoredSha!==actualBodySha ||
+    expectedStoredSha!==expectedBodySha ||
+    actualBodySha!==expectedBodySha ||
+    !bodiesMatch
+  ) {
     throw new Error(`forecast authority ledger drift: expected ${expected.ledger_sha256}, received ${actual.ledger_sha256}`);
   }
   return actual;
