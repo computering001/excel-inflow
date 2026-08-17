@@ -1,4 +1,4 @@
-# focused proof of final recovered v3.6 repairs before the full source-owned gate
+# inspect the synthetic filing hierarchy behind the remaining v3.6 controller failure
 name: v360 verify recovered development gate
 
 on:
@@ -12,35 +12,24 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
-      - name: Check out repaired v3.6 target
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: e0530e55cd74191b952b88f1ff17a08c73345cec
-          fetch-depth: 0
-      - name: Install runtime
+      - name: Emit and inspect clean filing fixture
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libreoffice
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-      - name: Run focused recovered seams
-        shell: bash
-        run: |
-          set -euo pipefail
-          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
-          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
-          export SOFFICE_BIN="$(command -v soffice)"
-          node scripts/run_test_registry_contract_tests.mjs
-          python3 scripts/run_evidence_pipeline_tests.py
-          node scripts/run_broker_page_evidence_tests.mjs test-fixtures/cases/standard-maximal-v2.json
-          node scripts/run_decision_round_tests.mjs
-          node scripts/run_filings_pipeline_tests.mjs
-          node scripts/run_user_flow_tests.mjs
-          echo 'FOCUSED_V360_REPAIR_SEAMS=PASS'
+          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean.json
+          node - <<'NODE'
+          const fs=require('fs'); const d=JSON.parse(fs.readFileSync('/tmp/clean.json','utf8'));
+          for (const m of d.filings.face_statement_manifests.income_statement) {
+            console.log('MANIFEST',m.source_id,m.statement_order);
+            for (const r of m.rows) console.log(JSON.stringify(r));
+          }
+          console.log('CASE_SOURCE_INCOME_MAP');
+          for (const r of d.case_source.statement_map.income_statement) console.log(JSON.stringify(r));
+          NODE
