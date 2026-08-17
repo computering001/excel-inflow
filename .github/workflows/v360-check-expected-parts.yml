@@ -1,0 +1,30 @@
+name: v360 check expected payload parts
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - .github/workflows/v360-check-expected-parts.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare all chunks to expected hashes
+        shell: bash
+        run: |
+          set -u
+          sha256sum -c publish/v360-recovery-complete/expected.sha256
+          status=$?
+          for i in $(seq -w 0 15); do
+            p="publish/v360-recovery-complete/part${i}.b64"
+            printf '%s size=' "$p"
+            wc -c < "$p"
+          done
+          exit $status
