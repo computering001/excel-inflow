@@ -1,4 +1,4 @@
-# full repo-local source-owned gate for the completed recovered v3.6 target
+# diagnose the last Stage-4 checkpoint failure on the completed recovered v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -12,17 +12,15 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 45
     steps:
-      - name: Check out completed v3.6 target
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: fdfdea50dce4b228e35e5263ece366e60203a8cc
           fetch-depth: 0
-
-      - name: Install portable validation runtime
+      - name: Install Stage-4 runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -30,77 +28,31 @@ jobs:
           sudo apt-get install -y libreoffice
           python3 -m pip install --upgrade pip
           python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-
-      - name: Verify source-owned registry contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/run_test_registry_contract_tests.mjs
-
-      - name: Select every test whose custody inputs are repo-local
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          p=Path('assets/development-test-registry.json')
-          d=json.loads(p.read_text())
-          available={'CASES','REPRESENTATIVE','PYTHON','SOFFICE'}
-          selected=[]
-          excluded=[]
-          for t in d['tests']:
-              req=set(t.get('requires',[]))
-              if t['id']=='test-registry-contract':
-                  excluded.append((t['id'],['run-separately-before-filter']))
-              elif req <= available:
-                  selected.append(t)
-              else:
-                  excluded.append((t['id'],sorted(req-available)))
-          print('REGISTRY_TOTAL='+str(len(d['tests'])))
-          print('LOCAL_GATE_SELECTED='+str(len(selected)))
-          print('EXTERNAL_OR_SEPARATE='+str(len(excluded)))
-          for tid,why in excluded:
-              print('EXCLUDED_ID='+tid+' REASON='+','.join(why))
-          d['tests']=selected
-          p.write_text(json.dumps(d,indent=2)+'\n')
-          PY
-
-      - name: Run full repo-local development gate
+      - name: Reproduce Stage-4 interruption and dump internal state
         shell: bash
         run: |
           set +e
-          set -uo pipefail
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
           export DEBT_OVERLAY_PYTHON="$(command -v python3)"
           export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
           export SOFFICE_BIN="$(command -v soffice)"
-          rm -rf /tmp/v360-development-gate
-          node scripts/run_development_gate.mjs \
+          out=/tmp/v360-stage4-diagnostic
+          rm -rf "$out"
+          node scripts/run_stage4_checkpoint_tests.mjs \
             --cases test-fixtures/cases \
-            --representative test-fixtures/cases/standard-maximal-v2.json \
             --python "$(command -v python3)" \
             --soffice "$(command -v soffice)" \
-            --concurrency 1 \
-            --timeout-ms 900000 \
-            --out /tmp/v360-development-gate
-          gate_exit=$?
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          d=json.loads(Path('/tmp/v360-development-gate/development-gate-report.json').read_text())
-          print('FINAL_GATE_STATUS='+d['status'])
-          print('PASS='+str(d['counts']['PASS']))
-          print('FAIL='+str(d['counts']['FAIL']))
-          print('BLOCKED='+str(d['counts']['BLOCKED']))
-          for r in d['results']:
-              if r['status']!='PASS':
-                  print('\n=== FAILED_ID='+r['id']+' STATUS='+r['status']+' ===')
-                  if r.get('command'):
-                      print('COMMAND='+' '.join(map(str,r['command'])))
-                  if r.get('stdout'):
-                      print('STDOUT_TAIL:\n'+r['stdout'][-6000:])
-                  if r.get('stderr'):
-                      print('STDERR_TAIL:\n'+r['stderr'][-10000:])
-          PY
-          exit $gate_exit
+            --out "$out"
+          test_exit=$?
+          echo "STAGE4_TEST_EXIT=$test_exit"
+          echo '--- user-flow result ---'
+          find "$out" -name user-flow-result.json -print -exec cat {} \;
+          echo '--- build-result ---'
+          find "$out" -name build-result.json -print -exec cat {} \;
+          echo '--- stage4 filesystem ---'
+          find "$out" -path '*/.stage4/*' -maxdepth 12 -type f -printf '%p\n' | sort
+          echo '--- receipt contents ---'
+          find "$out" -path '*/.stage4/receipts/*.json' -type f -print -exec sh -c 'cat "$1"; echo' _ {} \;
+          echo '--- orchestrator logs/receipts outside .stage4 ---'
+          find "$out" -type f \( -name '*gate*.json' -o -name '*receipt*.json' -o -name '*result*.json' \) -print | sort
+          exit $test_exit
