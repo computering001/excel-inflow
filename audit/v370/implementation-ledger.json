@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T18:03:07Z",
+  "recorded_at": "2026-08-17T18:17:07Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -244,16 +244,16 @@
       "earliest_responsible_layer": "Consumption doctrine control semantics.",
       "candidate_files": "scripts/lib/case_compiler.mjs",
       "acceptance_criterion": "Selecting Forecast Waterfall consumes compatible broker authorities or explicitly records rejection; it never disables them merely because of the control label.",
-      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Selecting Forecast Waterfall consumes compatible broker authorities or explicitly records rejection; it never disables them merely because of the control label.",
         "baseline_reproduction": "PASS_RED: broker preview regression proved Forecast Waterfall returned null and disabled a fully supported anchor solely because of the control label; projection regression proved the same label erased compatible supplemental observations.",
-        "focused_test": "PASS: broker preview 14/14; forecast behavior 33/33; forecast authority ledger 6/6; forecast topology 30/30; broker dynamic concepts 11/11.",
-        "source_fix": "Forecast Waterfall now selects the compatible per-metric consensus rung, case compilation no longer deletes or skips broker ownership, explicit zero-broker failure policy is typed separately, and fallback authorities persist broker rejection reasons.",
-        "integration_evidence": "PASS: product constitution and broker exit fault-injection suites preserve explicit zero-broker degradation while ordinary Forecast Waterfall retains compatible broker evidence. Full workbook delivery remains pending the integrated gate pass.",
-        "semantic_oracle_evidence": "PASS: generic GBP/USD definition mismatch is rejected and receipted without company labels, row numbers or workbook cells; compatible multi-house revenue and anchor evidence is consumed under Forecast Waterfall.",
+        "focused_test": "PASS: broker preview 14/14; forecast behavior 33/33; forecast authority ledger 6/6; forecast topology 32/32; broker dynamic concepts 11/11; production user flow 14/14.",
+        "source_fix": "Forecast Waterfall now selects the compatible per-metric consensus rung, case compilation captures children only under complete definition-compatible broker parents, zero-authority headline fallback remains acyclic and executable, rejected metric bindings survive semantic row projection, and the final degraded state is sealed before restart reuse.",
+        "integration_evidence": "PASS: degraded broker delivery preserves five houses/four raw tables, compiles the zero-value case cleanly, and emits both forecast-waterfall and zero-broker workbooks as PASS_PENDING_MANUAL with zero violations; deterministic restart, answer replay and tamper invalidation pass 14/14.",
+        "semantic_oracle_evidence": "PASS: generic GBP/USD definition mismatch is rejected and receipted without company labels, row numbers or workbook cells; compatible multi-house evidence is consumed, while an unavailable aggregate cannot capture its formula children or create an EBIT/EBITDA cycle.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
-        "commit": "c262167dea2ab0a92497268078ac45386bca7274"
+        "commit": "c262167dea2ab0a92497268078ac45386bca7274 (control semantics); 520fd4c (stable Stage-2 seal); 39ed90b (decision replay fallback); d2136c1 (executable zero-broker waterfall)"
       }
     },
     {
@@ -271,7 +271,7 @@
         "baseline_reproduction": "PASS_RED: a fresh producer-shaped /2.0 graph was rejected by run constitution as the wrong version and by selected-cell recovery as a v1-only contract.",
         "focused_test": "PASS: run constitution 16 positive plus 5 mutations; demand selection 18/18; evidence pipeline 24/24; Tier-1 v1/v2 demand parity; model-owned demand 3/3; native preflight 4/4; degraded broker controller 75/75.",
         "source_fix": "Both runtime languages now use a version-aware pre-broker demand reader normalized to canonical-pre-broker-demand/1.0 nodes; constitution, broker controller and terminal selected-cell recovery consume only that canonical form.",
-        "integration_evidence": "PASS: the attachment producer emits /2.0, the real broker controller accepts the fresh request, and v1/v2 selected-cell crosswalks resolve the same 72 source mappings. Workbook emission remains pending the integrated package pass.",
+        "integration_evidence": "PASS: the attachment producer emits /2.0, the real broker controller accepts the fresh request, v1/v2 selected-cell crosswalks resolve the same 72 source mappings, and the degraded controller-to-portable-workbook path emits PASS_PENDING_MANUAL with zero violations. Exact installed-host package certification remains pending.",
         "semantic_oracle_evidence": "PASS: canonical matching accepts source-backed nodes by source identity and synthetic model-demand nodes by section/metric/period identity; stale graph hashes and disappearing nodes still fail closed.",
         "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
         "commit": "f0bf43e6c80aa270e670a1835d280517f2293b85"
