@@ -1,0 +1,86 @@
+{
+  "schema_version": "excel-inflow-source-test-report/1.0",
+  "recorded_at": "2026-08-17T21:22:05Z",
+  "tested_product_commit": "593c45d55346557aa7ae4a11f7802ed003a177e7",
+  "tested_product_tree": "51e3ac1da8cce04d8590d8543ddffeec29b35439",
+  "command": [
+    "node",
+    "scripts/run_development_gate.mjs",
+    "--phase",
+    "all",
+    "--cases",
+    "test-fixtures/cases",
+    "--representative",
+    "test-fixtures/cases/standard-maximal-v2.json",
+    "--python",
+    "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "--soffice",
+    "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "--concurrency",
+    "4",
+    "--timeout-ms",
+    "600000"
+  ],
+  "full_report_external_path": "/tmp/excel-inflow-v370-final-gate-clean.skdx8w/development-gate-report.json",
+  "full_report_sha256": "d24bce3fd501a9d59ae409717ce3fa54208395eb36e2ecf5a39c394940236095",
+  "status": "LIMITED_DEVELOPMENT_CANDIDATE",
+  "counts": {
+    "PASS": 85,
+    "FAIL": 1,
+    "BLOCKED": 7
+  },
+  "passing_scope": [
+    "source typing, statement topology and forecast authority",
+    "broker demand, degraded delivery and workbook page evidence",
+    "cash-flow identities, acquisition, debt, interest, leases and solver",
+    "workbook semantic, finance, cache and native-format compatibility",
+    "runtime identity, process custody, Stage 4 interruption and exact resume",
+    "release identity, package attestation and repository governance"
+  ],
+  "failures": [
+    {
+      "id": "case-compiler-equivalence",
+      "classification": "STALE_REPOSITORY_CERTIFICATION_FIXTURES",
+      "evidence": {
+        "economic_path_diffs": 7,
+        "compile_blocks": 18,
+        "failed_compiled_solves": 0,
+        "hard_plan_diffs": 0,
+        "failed_plan_compiles": 0
+      },
+      "reason": "The two repository certification snapshots predate typed debt-class, EBITDA-basis, classification-destination and residual-interest authority contracts. A compatibility experiment was rejected because it could not make the cohort equivalent without reinterpreting legacy EBITDA semantics.",
+      "disposition": "NOT_WAIVED; production certification remains blocked until a newly certified current-contract equivalence cohort exists."
+    }
+  ],
+  "blocked": [
+    {
+      "id": "fixed-point-multi-archetype",
+      "missing": ["FIXED_POINT_CASES_MANIFEST"]
+    },
+    {
+      "id": "broker-public-layout-corpus",
+      "missing": ["BROKER_CORPUS"]
+    },
+    {
+      "id": "broker-real-pack-completion",
+      "missing": ["BROKER_REAL_PACK_MANIFEST"]
+    },
+    {
+      "id": "universal-broker-delivery-matrix",
+      "missing": ["RAW_CANARY_EVIDENCE"]
+    },
+    {
+      "id": "raw-input-black-box-canary",
+      "missing": ["RAW_CANARY_EVIDENCE"]
+    },
+    {
+      "id": "real-raw-filing-black-box-canary",
+      "missing": ["RAW_CANARY_EVIDENCE", "REAL_FILINGS_REQUEST", "REAL_FILINGS_EXPECTATIONS"]
+    },
+    {
+      "id": "installed-host-usable-broker",
+      "missing": ["INSTALLED_HOST_BROKER_RECEIPT"]
+    }
+  ],
+  "promotion_effect": "Development package build and native review may proceed. Production certification and promotion may not be claimed."
+}

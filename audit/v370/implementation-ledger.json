@@ -1,12 +1,17 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T19:18:32Z",
+  "recorded_at": "2026-08-17T21:22:05Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
     "branch": "agent/excel-inflow-v370-repair-clean",
     "baseline_commit": "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
     "baseline_tree": "4ef68869f268e37e84aa9a78fd657a8e298bb04e",
+    "tested_product_commit": "593c45d55346557aa7ae4a11f7802ed003a177e7",
+    "tested_product_tree": "51e3ac1da8cce04d8590d8543ddffeec29b35439",
+    "candidate_version": "3.7.0",
+    "candidate_package_mode": "development",
+    "candidate_deployment_status": "not_installed",
     "remote_main_verified": true,
     "failed_branch": {
       "name": "agent/excel-inflow-v370-semantic-repair",
@@ -60,6 +65,52 @@
     "normalized_manifest_sha256": "72b89e5f7258ad9ca50116a25819afaccf120080883e29de99cd892acb92a388",
     "deterministic_after_volatile_metadata_normalization": true
   },
+  "final_source_gate": {
+    "status": "LIMITED_DEVELOPMENT_CANDIDATE",
+    "report": "audit/v370/final-source-test-report.json",
+    "full_report_external_path": "/tmp/excel-inflow-v370-final-gate-clean.skdx8w/development-gate-report.json",
+    "full_report_sha256": "d24bce3fd501a9d59ae409717ce3fa54208395eb36e2ecf5a39c394940236095",
+    "counts": {
+      "PASS": 85,
+      "FAIL": 1,
+      "BLOCKED": 7
+    },
+    "failure": "case-compiler-equivalence uses stale repository certification fixtures; the failure is retained and production certification remains blocked.",
+    "external_blocks": "Fixed-point cohort, broker corpora, raw canary evidence, real-filing inputs and installed-host receipt were not available.",
+    "golden_actions_performed": false,
+    "native_excel_actions_performed": false,
+    "release_actions_performed": false
+  },
+  "post_ledger_integration_repairs": [
+    {
+      "id": "NATIVE-051",
+      "commit": "5d5ee8b",
+      "finding": "Excel repaired styles.xml because the month control used an invalid thirteen-section custom number format.",
+      "repair": "The control now uses a native-compatible number format and the renderer rejects custom formats with more than four sections.",
+      "evidence": "Native Microsoft Excel reopened the rebuilt acquisition workbook without a repair prompt; the registered compatibility suite passes six checks and rejects three mutations."
+    },
+    {
+      "id": "CASH-CACHE-052",
+      "commits": ["28cdace", "8bedb68", "fa596c4"],
+      "finding": "Three compiler/materialisation paths ignored reconciled reported historical cash and minted stale opening-cash and interest caches.",
+      "repair": "Solver, Forecast Waterfall synchronisation and Stage 3 authority materialisation now preserve filed/reconciled cash as the terminal historical authority.",
+      "evidence": "Acquisition portable workbook passes 43 checks; degraded delivery and complete Stage 4 interruption/resume pass with cache parity 1,173/1,173 and finance proof 171/0."
+    },
+    {
+      "id": "RUNTIME-LEASE-053",
+      "commit": "9ceb9b2",
+      "finding": "A killed same-host controller left an unexpired heartbeat lease that blocked immediate verified resume even though its process was dead.",
+      "repair": "Same-host lease inspection distinguishes live, dead, zombie and PID-reused owners while cross-host heartbeat custody remains fail-closed.",
+      "evidence": "Runtime custody passes 23 checks and eight adversarial mutations; complete Stage 4 immediate resume passes."
+    },
+    {
+      "id": "CF-DIMENSION-054",
+      "commit": "593c45d",
+      "finding": "Dimensionless ratio/growth memos inside a cash-flow band were incorrectly treated as currency subtotal members.",
+      "repair": "Non-additive memo rows are excluded before nested and top-level protected-identity membership comparison; genuine amount rows remain mandatory.",
+      "evidence": "Forecast topology passes 37 checks and seven mutations, including removal of a genuine currency member."
+    }
+  ],
   "source_anchor_audit": [
     {
       "risks": [
@@ -74,26 +125,26 @@
       "risks": [
         "BROKER-003"
       ],
-      "anchor": "Forecast Waterfall sets brokerDisabled and removes broker ownership/consumption",
+      "anchor": "Forecast Waterfall broker authority is selected by compatible per-metric consensus and every rejection is retained",
       "locations": [
-        "scripts/lib/case_compiler.mjs:2513",
-        "scripts/lib/coverage.mjs:2009",
-        "scripts/lib/broker_anchor.mjs:382"
+        "scripts/lib/case_compiler.mjs",
+        "scripts/lib/forecast_authority.mjs",
+        "scripts/lib/broker_anchor.mjs"
       ],
-      "state": "PRESENT_UNCHANGED"
+      "state": "REPAIRED_AND_MUTATION_PROVEN"
     },
     {
       "risks": [
         "BROKER-004"
       ],
-      "anchor": "producer emits demand /2.0 while run_constitution_graph and broker pipeline require /1.0",
+      "anchor": "pre-broker demand v1/v2 is normalized once at ingress to the current internal contract",
       "locations": [
-        "scripts/run_attachment_evidence_pipeline.py:419",
-        "scripts/lib/run_constitution_graph.mjs:275",
-        "scripts/run_broker_pipeline.py:1118",
-        "scripts/broker_terminal_recovery.py:273"
+        "scripts/run_attachment_evidence_pipeline.py",
+        "scripts/lib/run_constitution_graph.mjs",
+        "scripts/run_broker_pipeline.py",
+        "scripts/broker_terminal_recovery.py"
       ],
-      "state": "PRESENT_UNCHANGED"
+      "state": "REPAIRED_AND_FULL_V2_PATH_PROVEN"
     },
     {
       "risks": [
@@ -228,7 +279,7 @@
       "earliest_responsible_layer": "Forecast ownership / aggregate capture topology.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
-      "status": "CLOSED",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_GATES_PENDING_NATIVE_CERTIFICATION",
       "implementation": {
         "invariant": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
         "baseline_reproduction": "FAIL reproduced in run_forecast_behavior_tests.mjs: a source-visible reported parent and both complete children retained independent user-assumption authorities.",
@@ -379,9 +430,9 @@
       "implementation": {
         "invariant": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
         "baseline_reproduction": "FAIL reproduced: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
-        "focused_test": "PASS: forecast topology 31/31 covers semantic prior-period mutation and nested investing detail; protected-identity OOXML checks 4/4 and real-workbook adversarial mutations 8/8.",
-        "source_fix": "Protected investing cash flow must resolve as accounting_identity; its source formula must be non-temporal and sum exactly the top-level rows in the investing statement band, excluding nested formula members from that top-level set.",
-        "integration_evidence": "PASS: forecast phase gate 6/6, both frozen compiler cases solve with zero compile/economic/plan diffs, and the production no-question user flow reaches the decisions checkpoint.",
+        "focused_test": "PASS: forecast topology 37 checks with seven mutations covers semantic prior-period mutation, nested investing detail and dimensionless memo exclusion; protected-identity OOXML checks 4/4 and real-workbook adversarial mutations 8/8.",
+        "source_fix": "Protected investing cash flow must resolve as accounting_identity; its source formula must be non-temporal and sum exactly the top-level amount rows in the investing statement band. Nested formula members and dimensionless ratio/growth/rate/multiple memos are excluded before membership comparison.",
+        "integration_evidence": "PASS: the current 93-test source gate passes forecast topology, protected-identity oracle, degraded delivery, Stage 4 resume and production user flow. The separate legacy case-equivalence snapshots remain failed and are not cited as current evidence.",
         "semantic_oracle_evidence": "PASS: 9d24f24 enforces workbook formula ownership/current-period membership; 14dceb9 enforces the matching semantic authority before emission.",
         "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
         "commit": "14dceb9 (source repair); 9d24f24 (independent workbook guardrail); d7d659c (nested-member compatibility)"
@@ -396,13 +447,13 @@
       "earliest_responsible_layer": "Cash-flow protected identities.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
-      "status": "CLOSED",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_GATES_PENDING_NATIVE_CERTIFICATION",
       "implementation": {
         "invariant": "Cash before financing is a same-period formula and cannot receive direct forecast authority.",
         "baseline_reproduction": "FAIL reproduced generically: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
         "focused_test": "PASS: forecast topology 30/30 rejects a receipted cash-before-financing carry and accepts the valid current-period identity.",
         "source_fix": "Cash before financing must resolve as accounting_identity and its same-period formula must reference exactly operating plus investing cash flow.",
-        "integration_evidence": "PASS: forecast phase gate 6/6 and two-case compiler equivalence with zero blocks or diffs.",
+        "integration_evidence": "PASS: the current 93-test source gate passes forecast topology, protected-identity oracle, degraded delivery, Stage 4 resume and production user flow. The separate legacy case-equivalence snapshots remain failed and are not cited as current evidence.",
         "semantic_oracle_evidence": "PASS: semantic and OOXML layers independently reject prior-period ownership and missing current-period members.",
         "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
         "commit": "14dceb9 (source repair); 9d24f24 (independent workbook guardrail)"
@@ -417,13 +468,13 @@
       "earliest_responsible_layer": "Acquisition / statement row binding.",
       "candidate_files": "scripts/lib/funded_acquisition_plan.mjs; scripts/lib/funded_acquisition_runtime.mjs; scripts/lib/row_plan.mjs; scripts/build_dynamic_model.mjs",
       "acceptance_criterion": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
-      "status": "CLOSED",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_GATES_PENDING_NATIVE_CERTIFICATION",
       "implementation": {
         "invariant": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
         "baseline_reproduction": "FAIL reproduced in both funded-acquisition output adapters: the portable workbook accepted an investing total bound to FX instead of consideration, and the captured plan accepted a second physical consideration row.",
         "focused_test": "PASS: funded-acquisition transaction suite 14/14 covers disabled zero, close-year consideration, semantic investing ownership, no FX dependency and one N:P physical target; source proposer 42/42 binds the filed FX cash line independently.",
         "source_fix": "The portable row-plan route requires exactly one consideration and debt-proceeds row, exactly one investing total, one consideration membership and no FX member; the captured-plan route requires one complete N:P row per transaction role; filed FX-effect aliases bind only to fx_effect_on_cash.",
-        "integration_evidence": "PASS: economics phase gate 3/3, two frozen compiler cases with zero compile/economic/plan diffs, and the production no-question user flow reaches the decisions checkpoint.",
+        "integration_evidence": "PASS: funded-acquisition, acquisition solver and acquisition portable-workbook suites pass, including Off/On/Off/On restoration. The current full source gate passes the production user flow; the separate legacy case-equivalence snapshots remain failed and are not cited as current evidence.",
         "semantic_oracle_evidence": "PASS: binding is derived from semantic role/row identity, never workbook row number; duplicate and FX-bound mutations both fail closed.",
         "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
         "commit": "f6d9ca3 (transaction binding); e8e3d1a (filed FX-role binding)"
