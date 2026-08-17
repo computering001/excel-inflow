@@ -1866,6 +1866,31 @@
           "minimum": 0,
           "maximum": 1
         },
+        "selection_rank": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method_priority",
+            "definition_score",
+            "period_score",
+            "units_score",
+            "freshness_timestamp",
+            "confidence_score",
+            "completeness_score",
+            "stable_id"
+          ],
+          "properties": {
+            "method_priority": { "type": "number" },
+            "definition_score": { "type": "number" },
+            "period_score": { "type": "number" },
+            "units_score": { "type": "number" },
+            "freshness_timestamp": { "type": "number" },
+            "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+            "completeness_score": { "type": "number", "minimum": 0, "maximum": 1 },
+            "stable_id": { "type": "string" }
+          },
+          "description": "Canonical economic quality proof used to resolve equal-rung candidates before the stable identifier tie-break."
+        },
         "material": {
           "type": "boolean"
         },

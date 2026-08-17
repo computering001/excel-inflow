@@ -907,6 +907,15 @@
       "test_class": "unit"
     },
     {
+      "id": "forecast-authority-ranking",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_authority_ranking_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "funded-acquisition-transaction",
       "phase": "economics",
       "runtime": "node",

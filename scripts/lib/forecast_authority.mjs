@@ -36,6 +36,109 @@ export const FORECAST_AUTHORITY_METHODS = Object.freeze([
   "not_applicable",
 ]);
 
+function rankBoolean(value) {
+  if (value === true) return 2;
+  if (value === false) return 0;
+  return 1;
+}
+
+function rankNumber(value, fallback = 0) {
+  return Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+
+function rankDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return 0;
+  const timestamp = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function stableCandidateId(candidate) {
+  return String(
+    candidate?.stable_id ??
+      candidate?.observation_id ??
+      candidate?.source_id ??
+      `${candidate?.origin ?? "candidate"}:${candidate?.method ?? "unknown"}`,
+  );
+}
+
+function effectiveForecastPriority(candidate) {
+  if (candidate.method !== "explicit_zero") {
+    if (Object.hasOwn(FORECAST_AUTHORITY_PRIORITY, candidate.method)) {
+      return FORECAST_AUTHORITY_PRIORITY[candidate.method];
+    }
+    if (candidate.method === "schedule_link") return -200;
+    if (candidate.method === "accounting_identity") return -190;
+    if (candidate.method === "not_separately_forecast") return 900;
+    if (candidate.method === "not_applicable") return 910;
+    return 998;
+  }
+  // A sourced no-recurrence statement is positive evidence, not the weak
+  // last-rung inference represented by an unexplained zero.
+  if (candidate.source_kind === "company_reported") return 35;
+  if (candidate.source_kind === "user_supplied") return 60;
+  return FORECAST_AUTHORITY_PRIORITY.explicit_zero;
+}
+
+/**
+ * Return the complete deterministic rank proof for one independent forecast
+ * candidate. Compatibility dimensions deliberately precede evidence freshness
+ * and strength; the stable identifier is only the final deterministic tie.
+ */
+export function forecastAuthorityRankVector(candidate) {
+  return {
+    method_priority: effectiveForecastPriority(candidate),
+    definition_score: rankBoolean(candidate?.definition_compatible),
+    period_score:
+      rankBoolean(candidate?.period_compatible) +
+      Math.max(0, Math.min(1, rankNumber(candidate?.period_completeness))),
+    units_score: rankBoolean(candidate?.units_compatible),
+    freshness_timestamp: rankDate(
+      candidate?.freshness_date ??
+        candidate?.source_publication_date ??
+        candidate?.publication_date ??
+        candidate?.as_of_date,
+    ),
+    confidence_score: Math.max(
+      0,
+      Math.min(1, rankNumber(candidate?.confidence)),
+    ),
+    completeness_score: Math.max(
+      0,
+      Math.min(1, rankNumber(candidate?.completeness)),
+    ),
+    stable_id: stableCandidateId(candidate),
+  };
+}
+
+const FORECAST_RANK_DIMENSIONS = Object.freeze([
+  ["method_priority", 1],
+  ["definition_score", -1],
+  ["period_score", -1],
+  ["units_score", -1],
+  ["freshness_timestamp", -1],
+  ["confidence_score", -1],
+  ["completeness_score", -1],
+]);
+
+export function compareForecastAuthorityCandidates(left, right) {
+  const leftRank = forecastAuthorityRankVector(left);
+  const rightRank = forecastAuthorityRankVector(right);
+  for (const [dimension, direction] of FORECAST_RANK_DIMENSIONS) {
+    const difference = leftRank[dimension] - rightRank[dimension];
+    if (difference !== 0) return difference * direction;
+  }
+  return leftRank.stable_id.localeCompare(rightRank.stable_id);
+}
+
+export function forecastAuthorityDecidingDimension(winner, rejected) {
+  const winnerRank = forecastAuthorityRankVector(winner);
+  const rejectedRank = forecastAuthorityRankVector(rejected);
+  for (const [dimension] of FORECAST_RANK_DIMENSIONS) {
+    if (winnerRank[dimension] !== rejectedRank[dimension]) return dimension;
+  }
+  return winnerRank.stable_id !== rejectedRank.stable_id ? "stable_id" : "exact_tie";
+}
+
 const FORMULA_METHODS = new Set([
   "schedule_link",
   "accounting_identity",
@@ -522,26 +625,7 @@ export function selectForecastAuthority(candidates) {
       candidate &&
       Object.hasOwn(FORECAST_AUTHORITY_PRIORITY, candidate.method),
   );
-  const effectivePriority = (candidate) => {
-    if (candidate.method !== "explicit_zero") {
-      return FORECAST_AUTHORITY_PRIORITY[candidate.method];
-    }
-    // A sourced no-recurrence statement is positive evidence, not the weak
-    // last-rung inference represented by an unexplained zero.  Company-backed
-    // zero therefore sits with company indications (but below explicit
-    // guidance), while a user-backed zero sits with visible user assumptions.
-    // Historical/unsourced zeros deliberately remain the weakest resolved
-    // candidate.  This prevents a generic carry-forward from overruling a
-    // cited statement that a programme or commitment has ended.
-    if (candidate.source_kind === "company_reported") return 35;
-    if (candidate.source_kind === "user_supplied") return 60;
-    return FORECAST_AUTHORITY_PRIORITY.explicit_zero;
-  };
-  return [...usable].sort(
-    (left, right) =>
-      effectivePriority(left) - effectivePriority(right) ||
-      String(left.source_id ?? "").localeCompare(String(right.source_id ?? "")),
-  )[0] ?? null;
+  return [...usable].sort(compareForecastAuthorityCandidates)[0] ?? null;
 }
 
 export function validateForecastAuthorities(modelCase, rows = []) {

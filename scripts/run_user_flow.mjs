@@ -1515,6 +1515,7 @@ async function main() {
         behaviorMap,
         observationLedger:
           validation.handoff?.forecast_observation_ledger ?? null,
+        sourceInventory: evidenceRun?.source_inventory ?? [],
       },
     );
     const forecastPlanErrors = validateForecastPlan(
