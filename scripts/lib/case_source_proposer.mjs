@@ -166,8 +166,11 @@ const CORE_ROLE_ALIASES = Object.freeze({
     ],
     fx_effect_on_cash: [
       "exchange rate effects",
+      "effect of exchange rate changes on cash",
       "effect of exchange rate changes on cash and cash equivalents",
       "effects of exchange rate changes on cash and cash equivalents",
+      "effect of foreign exchange on cash",
+      "exchange differences on cash",
     ],
     share_buybacks: [
       "purchase of own shares",

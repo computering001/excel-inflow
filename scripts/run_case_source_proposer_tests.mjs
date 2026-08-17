@@ -80,6 +80,29 @@ assert.equal(new Set([
   ...result.statement_map.cash_flow,
 ].map((row) => row.row_id)).size, 15);
 
+const fxCashFlow = manifest("cash_flow", [
+  {
+    source_line_id: "cf.fx_effect",
+    ordinal: 1,
+    raw_label: "Effect of exchange rate changes on cash",
+    values: [1, -2, 3],
+    material: true,
+  },
+]);
+const fxEvidence = structuredClone(evidence);
+fxEvidence.face_statement_manifests.cash_flow = [fxCashFlow];
+const fxSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "FX Identity Test plc", reporting_currency: "GBP" },
+  },
+  caseEvidence: fxEvidence,
+});
+assert.equal(
+  fxSource.statement_map.cash_flow[0].role,
+  "fx_effect_on_cash",
+  "A filed FX effect line lost the semantic role required by the cash identity.",
+);
+
 const typedIncome = manifest("income_statement", [
   {
     source_line_id: "is.unresolved_body",
