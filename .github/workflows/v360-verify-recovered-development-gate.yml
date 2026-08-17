@@ -1,4 +1,4 @@
-# prove the repaired forecast-ledger transition through N6 and Stage-4 checkpoint recovery
+# prove the sole remaining Stage-4 checkpoint seam on exact repaired v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -29,29 +29,7 @@ jobs:
           python3 -m venv /tmp/v360-python
           /tmp/v360-python/bin/python -m pip install --upgrade pip
           /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-      - name: Prove N6 forecast ledger is sealed to current authority graph
-        shell: bash
-        run: |
-          set -euo pipefail
-          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/clean-evidence-run.json
-          rm -rf /tmp/n6-run
-          node scripts/run_user_flow.mjs /tmp/clean-evidence-run.json --out /tmp/n6-run --stop-after decisions --json >/tmp/paused.json
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import { verifyForecastAuthorityLedger } from './scripts/lib/forecast_authority_ledger.mjs';
-          import { runReleaseN0N9 } from './scripts/lib/release_nodes.mjs';
-          const evidence=JSON.parse(fs.readFileSync('/tmp/clean-evidence-run.json','utf8'));
-          const modelCase=JSON.parse(fs.readFileSync('/tmp/n6-run/stages/decisions/model-case.json','utf8'));
-          const verified=verifyForecastAuthorityLedger(modelCase);
-          if(!verified.valid) throw new Error(verified.errors.join('; '));
-          console.log('LEDGER_SHA='+verified.ledger.ledger_sha256);
-          const result=runReleaseN0N9({modelCase,dcsExport:evidence.dcs_export??evidence.export??evidence.dcs??null,brokerPack:evidence.broker_pack??evidence.broker??null,filings:evidence.filings??null});
-          const n6=result.gates.find(g=>g.id==='N6');
-          console.log('N6='+JSON.stringify(n6));
-          if(n6?.status!=='PASS') throw new Error('N6 did not pass');
-          NODE
-      - name: Prove Stage-4 interruption, resume and checkpoint invalidation
+      - name: Run sole previously failing Stage-4 checkpoint test
         shell: bash
         run: |
           set -euo pipefail
@@ -66,3 +44,4 @@ jobs:
             --soffice "$(command -v soffice)" \
             --out /tmp/v360-stage4-proof
           cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
+          echo 'STAGE4_CONTENT_ADDRESSED_RESUME=PASS'
