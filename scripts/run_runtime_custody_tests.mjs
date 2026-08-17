@@ -76,6 +76,29 @@ function expiredForeignLease(overrides = {}) {
   };
 }
 
+function currentHostLease(overrides = {}) {
+  const hostBody = {
+    hostname: os.hostname(),
+    platform: os.platform(),
+    architecture: os.arch(),
+  };
+  const now = Date.now();
+  return expiredForeignLease({
+    pid: process.pid,
+    host_identity: {
+      ...hostBody,
+      host_id: sha256(JSON.stringify(canonicalise(hostBody), null, 2)),
+    },
+    acquired_at: new Date(now - 60_000).toISOString(),
+    heartbeat_at: new Date(now).toISOString(),
+    expires_at: new Date(now + 60_000).toISOString(),
+    lease_duration_ms: 120_000,
+    heartbeat_interval_ms: 30_000,
+    heartbeat_sequence: 1,
+    ...overrides,
+  });
+}
+
 async function installLease(runRoot, lease) {
   const leaseDirectory = path.join(runRoot, RUNTIME_ISOLATION_CONSTANTS.lease_directory);
   await fs.mkdir(leaseDirectory, { recursive: true });
@@ -190,8 +213,9 @@ try {
     live.lease.schema_version === "debt-runtime-lease/1.1" &&
     live.lease.host_identity?.host_id &&
     live.lease.session_identity_hash &&
+    (process.platform === "win32" || live.lease.process_start_identity) &&
     live.lease.heartbeat_at && live.lease.expires_at,
-    "lease omitted heartbeat, expiry, host or session custody",
+    "lease omitted heartbeat, expiry, host, session or process-birth custody",
   );
   await new Promise((resolve) => setTimeout(resolve, 150));
   const renewed = JSON.parse(await fs.readFile(
@@ -211,6 +235,56 @@ try {
   checks += 1;
   mutations.push("live_lease_takeover_rejected");
   await releaseRunLease(liveRoot, live.token);
+
+  const deadLocalRoot = path.join(scratch, "dead-local-current-lease");
+  await fs.mkdir(deadLocalRoot);
+  await installLease(deadLocalRoot, currentHostLease({
+    pid: 2_147_483_647,
+    process_start_identity: "not-a-live-process",
+  }));
+  const deadLocalTakeover = await acquireRunLease(deadLocalRoot, {
+    owner: "dead-local-contender",
+    sessionId: "dead-local-session",
+    leaseDurationMs: 400,
+    heartbeatIntervalMs: 100,
+  });
+  const deadLocalReceipt = JSON.parse(await fs.readFile(
+    deadLocalTakeover.takeover_receipts[0],
+    "utf8",
+  ));
+  check(
+    deadLocalTakeover.recovered_stale &&
+    deadLocalReceipt.reason === "same_host_process_dead",
+    "a dead same-host owner remained live until heartbeat expiry",
+  );
+  await releaseRunLease(deadLocalRoot, deadLocalTakeover.token);
+  mutations.push("dead_same_host_pid_not_misclassified_live");
+
+  if (process.platform !== "win32") {
+    const reusedPidRoot = path.join(scratch, "reused-local-pid-lease");
+    await fs.mkdir(reusedPidRoot);
+    await installLease(reusedPidRoot, currentHostLease({
+      pid: process.pid,
+      process_start_identity: "different-process-birth",
+    }));
+    const reusedPidTakeover = await acquireRunLease(reusedPidRoot, {
+      owner: "reused-pid-contender",
+      sessionId: "reused-pid-session",
+      leaseDurationMs: 400,
+      heartbeatIntervalMs: 100,
+    });
+    const reusedPidReceipt = JSON.parse(await fs.readFile(
+      reusedPidTakeover.takeover_receipts[0],
+      "utf8",
+    ));
+    check(
+      reusedPidTakeover.recovered_stale &&
+      reusedPidReceipt.reason === "same_host_pid_reused",
+      "a reused same-host PID was accepted as the original lease owner",
+    );
+    await releaseRunLease(reusedPidRoot, reusedPidTakeover.token);
+    mutations.push("reused_same_host_pid_not_misclassified_live");
+  }
 
   const takeoverRoot = path.join(scratch, "expired-foreign-lease");
   await fs.mkdir(takeoverRoot);

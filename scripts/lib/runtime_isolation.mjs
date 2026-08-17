@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -304,6 +305,29 @@ function processIsLive(pid) {
   }
 }
 
+function observeLocalProcess(pid) {
+  if (process.platform === "win32" || !Number.isSafeInteger(pid) || pid <= 0) {
+    return null;
+  }
+  const observed = spawnSync(
+    "ps",
+    ["-p", String(pid), "-o", "stat=", "-o", "lstart="],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      env: { ...process.env, LC_ALL: "C", LANG: "C" },
+    },
+  );
+  if (observed.status !== 0) return null;
+  const match = String(observed.stdout ?? "").trim().match(/^(\S+)\s+(.+)$/);
+  if (!match) return null;
+  return Object.freeze({
+    state: match[1],
+    start_identity: match[2].replaceAll(/\s+/g, " ").trim(),
+    zombie: match[1].startsWith("Z"),
+  });
+}
+
 function positiveDuration(label, value, fallback) {
   const parsed = Number(value ?? fallback);
   if (!Number.isFinite(parsed) || parsed < 50 || parsed > MAX_LEASE_DURATION_MS) {
@@ -359,6 +383,8 @@ function leaseShapeIsCurrent(lease) {
     SHA256.test(String(lease.host_identity?.host_id ?? "")) &&
     lease.host_identity.host_id === sha256Value(hostBody) &&
     typeof lease.session_identity_hash === "string" && SHA256.test(lease.session_identity_hash) &&
+    (lease.process_start_identity === undefined || lease.process_start_identity === null ||
+      (typeof lease.process_start_identity === "string" && lease.process_start_identity.trim() !== "")) &&
     Number.isFinite(acquired) && Number.isFinite(heartbeat) && expiry !== null &&
     Number.isSafeInteger(lease.heartbeat_sequence) && lease.heartbeat_sequence >= 0 &&
     Number.isSafeInteger(lease.lease_duration_ms) &&
@@ -409,6 +435,22 @@ async function inspectLease(lease, leaseDirectory, now = Date.now()) {
       }
     }
     const expiry = leaseExpiryEpoch(lease);
+    if (lease.host_identity.hostname === os.hostname()) {
+      if (!processIsLive(lease.pid)) {
+        return { live: false, takeover_reason: "same_host_process_dead" };
+      }
+      const observedProcess = observeLocalProcess(lease.pid);
+      if (observedProcess?.zombie) {
+        return { live: false, takeover_reason: "same_host_process_zombie" };
+      }
+      if (
+        lease.process_start_identity &&
+        observedProcess?.start_identity &&
+        lease.process_start_identity !== observedProcess.start_identity
+      ) {
+        return { live: false, takeover_reason: "same_host_pid_reused" };
+      }
+    }
     if (now < expiry) return { live: true, takeover_reason: null };
     return { live: false, takeover_reason: "heartbeat_expired" };
   }
@@ -558,6 +600,7 @@ export async function acquireRunLease(runRoot, {
         token,
         host_identity: leaseHostIdentity(),
         session_identity_hash: sessionIdentity,
+        process_start_identity: observeLocalProcess(process.pid)?.start_identity ?? null,
         acquired_at: leaseTimestamp(now),
         heartbeat_at: leaseTimestamp(now),
         expires_at: leaseTimestamp(now + duration),
