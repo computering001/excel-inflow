@@ -374,6 +374,22 @@ assert(
   validateForecastAuthorities(protectedCashFlowCase, protectedCashFlowRows).length === 0,
   "Valid same-period protected cash-flow identities were rejected.",
 );
+const nestedInvestingCase = clone(protectedCashFlowCase);
+const nestedInvestingRows = nestedInvestingCase.statement_structure.cash_flow;
+const investingTotalIndex = nestedInvestingRows.findIndex(
+  (candidate) => candidate.semantic_role === "cash_from_investing",
+);
+nestedInvestingRows.splice(investingTotalIndex - 2, 0,
+  row("investment_alpha_detail", "Investment alpha detail", [-3, -4, -5, null, null, null], {
+    forecast_period_authorities: direct(-6),
+  }),
+);
+nestedInvestingRows.find((candidate) => candidate.row_id === "investment_alpha")
+  .calculation = { operator: "sum", refs: ["investment_alpha_detail"] };
+assert(
+  validateForecastAuthorities(nestedInvestingCase, nestedInvestingRows).length === 0,
+  "A nested investing detail was misclassified as a second top-level subtotal member.",
+);
 for (const protectedRole of ["cash_from_investing", "cash_before_financing"]) {
   const mutation = clone(protectedCashFlowCase);
   const protectedRow = mutation.statement_structure.cash_flow.find(
@@ -440,7 +456,7 @@ assert(
 
 console.log(JSON.stringify({
   status: "PASS",
-  tests: 30,
+  tests: 31,
   mutations_caught: 6,
   captured_paths: topology.behavior_map.filter((entry) => entry.behavior === "captured_detail").length,
   cash_flow_event_method: state("cash_flow", "debt_fees", 0).method,

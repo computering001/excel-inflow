@@ -990,10 +990,18 @@ export function validateForecastAuthorities(modelCase, rows = []) {
       if (headerIndex >= 0 && totalIndex > headerIndex) {
         const band = cashFlowRows.slice(headerIndex + 1, totalIndex);
         const bandIds = new Set(band.map((candidate) => candidate.row_id));
+        const nestedFormulaMemberIds = new Set(
+          band.flatMap((candidate) =>
+            (candidate.calculation?.refs ?? []).filter((rowId) =>
+              bandIds.has(rowId),
+            ),
+          ),
+        );
         const topLevelMembers = band
           .filter(
             (candidate) =>
               candidate.row_type !== "header" &&
+              !nestedFormulaMemberIds.has(candidate.row_id) &&
               (!candidate.parent_row_id || !bandIds.has(candidate.parent_row_id)),
           )
           .map((candidate) => candidate.row_id)
