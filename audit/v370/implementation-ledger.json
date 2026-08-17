@@ -112,9 +112,13 @@
         "DEBT-020",
         "DEBT-021"
       ],
-      "anchor": "unmatched non-empty descriptions default to other_debt",
-      "location": "scripts/propose_dcs_crosswalk.py:73",
-      "state": "PRESENT_UNCHANGED"
+      "anchor": "canonical debt ontology with affirmative Other Debt and blocking unclassified review",
+      "locations": [
+        "assets/debt-class-ontology-v1.json",
+        "scripts/lib/debt_class.mjs",
+        "scripts/propose_dcs_crosswalk.py"
+      ],
+      "state": "REPAIRED_921121F"
     }
   ],
   "p0_root_cause_map": [
@@ -581,16 +585,16 @@
       "earliest_responsible_layer": "DCS classification and cross-layer enum mismatch.",
       "candidate_files": "scripts/propose_dcs_crosswalk.py; scripts/lib/instrument_display.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Canonical class is consistent from extraction through display; unresolved material instruments are unclassified-review, never silently Other Debt.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Canonical class is consistent from extraction through display; unresolved material instruments are unclassified-review, never silently Other Debt.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: DCS emitted fixed_bond/floating_loan/other_debt while model, display and grouping layers recognised a different vocabulary and the grouping fallback silently assigned unmatched rows to Other Debt.",
+        "focused_test": "PASS: debt-class contract 44/44 covers every canonical class, every public/internal enum, explicit legacy migration, all presentation groups, structured labels, commercial-paper backstop integrity and the unclassified coverage blocker; DCS pipeline passes 21 positive checks and 6 mutations.",
+        "source_fix": "A versioned shared ontology now owns extraction, case, instrument-state, display, grouping and validation. Legacy tokens cross one explicit migration adapter with a receipt; unknown tokens become unclassified, and production coverage blocks them for review.",
+        "integration_evidence": "PASS: the legacy production case migrates at build entry and produces a portable plan with 236 historical caches, 816 solver caches, 161 evaluated caches, zero unresolved caches and solver checks passing.",
+        "semantic_oracle_evidence": "PASS: the independent DCS oracle rejects a coordinated source-labelled bond reclassification, enforces the canonical vocabulary and derives unclassified only when no affirmative class semantics match.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "921121f"
       }
     },
     {
@@ -602,16 +606,16 @@
       "earliest_responsible_layer": "Debt-class fallback policy.",
       "candidate_files": "scripts/propose_dcs_crosswalk.py",
       "acceptance_criterion": "Other Debt requires affirmative evidence; default is unclassified with a blocking/review receipt.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Other Debt requires affirmative evidence; default is unclassified with a blocking/review receipt.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: classify_type returned other_debt for every non-empty description left after its short heuristic chain.",
+        "focused_test": "PASS: DCS pipeline classification tests cover all 11 canonical outcomes; a vague loan/funding description is unclassified, carries instrument_type_review in the unresolved task and blocks as USER_EVIDENCE. Debt-class coverage independently blocks unclassified instruments.",
+        "source_fix": "other_explicit is emitted only for affirmative other-debt, other-borrowings, miscellaneous-borrowings or finance-obligation evidence. The unmatched default is unclassified with a visible review obligation.",
+        "integration_evidence": "PASS: the DCS controller remains resumable and deterministic, with all checkpoints reused on the identical restart and no violation in the positive run.",
+        "semantic_oracle_evidence": "PASS: the oracle independently computes affirmative class matches and permits unclassified only when none match; coordinated crosswalk and compiler-output tampering is rejected.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "921121f"
       }
     },
     {
@@ -623,16 +627,16 @@
       "earliest_responsible_layer": "Canonical debt ontology.",
       "candidate_files": "scripts/propose_dcs_crosswalk.py; scripts/lib/instrument_display.mjs; scripts/lib/row_plan.mjs; assets/dcs-export.schema.json",
       "acceptance_criterion": "One enum is used by extraction, model case, schedule, display and validator.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "One enum is used by extraction, model case, schedule, display and validator.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: five schemas and their consumers disagreed on fixed_bond, floating_loan, bond, senior_notes, term_loan and bank_debt.",
+        "focused_test": "PASS: debt-class contract compares the canonical ontology byte-for-set against DCS export, model-case-v2, instrument-period-state, public-test-run and legacy model-case schemas, and asserts direct consumers reject legacy aliases.",
+        "source_fix": "debt-class-ontology/1.0 defines bond_fixed, bond_floating, term_loan_fixed, term_loan_floating, rcf, commercial_paper, securitisation, lease_liability, overdraft, other_explicit and unclassified. All schemas and runtime consumers use those tokens.",
+        "integration_evidence": "PASS: instrument-period-state produces 39 states and 14 definition nodes with 13 mutations caught; opening-debt reconciliation, solver hardening and the legacy-case portable build pass.",
+        "semantic_oracle_evidence": "PASS: the DCS oracle loads the same versioned class set but independently derives the source semantics, rejecting both noncanonical vocabulary and semantically unsupported canonical choices.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "921121f"
       }
     },
     {
@@ -644,16 +648,16 @@
       "earliest_responsible_layer": "Instrument display construction.",
       "candidate_files": "scripts/lib/instrument_display.mjs",
       "acceptance_criterion": "Face label is structured Type + rate/margin + maturity; full legal name and identifier remain in comments/provenance.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Face label is structured Type + rate/margin + maturity; full legal name and identifier remain in comments/provenance.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: instrumentDisplayLabel began with the full source name and attempted local token corrections, so long legal names and identifiers remained the face authority.",
+        "focused_test": "PASS: structured-label tests cover fixed notes, floating term loans, RCF margin labels and non-maturing overdrafts; the source legal name is asserted unchanged.",
+        "source_fix": "The face label is now compiled only from the ontology type label, structured coupon or benchmark-plus-margin, and structured maturity. The sourced legal name is excluded from the face and retained unchanged for provenance/comments.",
+        "integration_evidence": "PASS: the production portable plan shows Senior Notes 5% due Jun-33 and RCF SOFR 3M + 60bp due Jun-30; comments on B71, B74 and B123 retain the complete sourced instrument names.",
+        "semantic_oracle_evidence": "PASS: tests mutate source prose independently of structured fields and require an identical structured label while preserving the untouched source name.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "921121f"
       }
     },
     {
@@ -665,16 +669,16 @@
       "earliest_responsible_layer": "Architecture ownership / generic product abstraction.",
       "candidate_files": "scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Generic issuer-independent grouping functions replace company-named product logic.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_SEMANTIC_AND_PORTABLE_PACKAGE_GATES",
       "implementation": {
         "invariant": "Generic issuer-independent grouping functions replace company-named product logic.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: the universal grouping table and functions were named CRH_DEBT_GROUPS, crhDebtGroupKey and crhDebtGroupLabel and used text heuristics plus an Other Debt fallback.",
+        "focused_test": "PASS: debt-class contract maps every canonical class to the expected generic group, gives unclassified its own review group and asserts the retired company-named symbols are absent.",
+        "source_fix": "Generic DEBT_PRESENTATION_GROUPS, debtPresentationGroupKey and debtPresentationGroupLabel now resolve only through the canonical ontology; there is no issuer name, prose heuristic or arbitrary fallback in grouping.",
+        "integration_evidence": "PASS: the production portable plan emits Bonds and Bank Debt groups from the same generic planner and produces their corresponding subtotal rows.",
+        "semantic_oracle_evidence": "PASS: grouping tests use neutral synthetic instruments across the complete class enum and fail if a legacy or unknown token reaches the planner without explicit migration/review.",
+        "native_excel_evidence": "PENDING_REBUILT_PACKAGE_AND_NATIVE_HOST",
+        "commit": "921121f"
       }
     },
     {
