@@ -37,10 +37,38 @@ try {
     await fs.realpath(valid),
   );
   checks += 1;
+
+  // A controller may persist a canonical artifact path while retaining an
+  // alias spelling for the approved root (/private/var vs /var on macOS).
+  // Prove this generically with an explicit directory alias on every host.
+  const canonicalApproved = path.join(temporary, "canonical-approved");
+  const approvedAlias = path.join(temporary, "approved-alias");
+  await fs.mkdir(canonicalApproved);
+  await fs.symlink(canonicalApproved, approvedAlias);
+  const canonicalArtifact = path.join(canonicalApproved, "canonical-filing.pdf");
+  await fs.writeFile(canonicalArtifact, "%PDF-1.7\ncanonical");
+  assert.equal(
+    await resolveApprovedRegularFile({
+      candidate: await fs.realpath(canonicalArtifact),
+      approvedRoots: [approvedAlias],
+      label: "canonical alias filing",
+    }),
+    await fs.realpath(canonicalArtifact),
+  );
+  checks += 1;
   await rejects(
     () => resolveApprovedRegularFile({ candidate: secret, approvedRoots: [approved], label: "traversal filing" }),
     /leaves its controller-approved local roots/,
     "parent traversal was accepted",
+  );
+  await rejects(
+    () => resolveApprovedRegularFile({
+      candidate: secret,
+      approvedRoots: [approvedAlias],
+      label: "canonical alias escape",
+    }),
+    /leaves its controller-approved local roots|resolves outside/,
+    "canonical approved-root alias widened custody to an outside file",
   );
   const escape = path.join(approved, "escape.pdf");
   await fs.symlink(secret, escape);
@@ -48,6 +76,17 @@ try {
     () => resolveApprovedRegularFile({ candidate: escape, approvedRoots: [approved], label: "symlink filing" }),
     /symbolic link|resolves outside/,
     "symlink escape was accepted",
+  );
+  const nestedEscape = path.join(approved, "nested-escape");
+  await fs.symlink(outside, nestedEscape);
+  await rejects(
+    () => resolveApprovedRegularFile({
+      candidate: path.join(nestedEscape, "secret.pdf"),
+      approvedRoots: [approved],
+      label: "intermediate symlink filing",
+    }),
+    /resolves outside/,
+    "an intermediate symlink escaped canonical containment",
   );
   await rejects(
     () => resolveApprovedRegularFile({ candidate: approved, approvedRoots: [approved], label: "directory filing" }),
