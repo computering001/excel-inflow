@@ -537,6 +537,9 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_filings_pipeline_tests.mjs",
+      "requires": [
+        "CASES"
+      ],
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
@@ -1038,6 +1041,15 @@
       "runtime": "node",
       "script": "run_runtime_custody_tests.mjs",
       "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "native-excel-number-format-compatibility",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_excel_number_format_compatibility_tests.py",
+      "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },

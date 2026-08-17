@@ -40,6 +40,40 @@ from openpyxl.styles.differential import DifferentialStyle
 _NO_SIDE = Side()
 
 
+def validate_number_format(value):
+    """Reject custom formats that native Excel will repair on open.
+
+    Excel number formats have at most four semicolon-delimited sections.  A
+    semicolon inside a quoted literal (or escaped with a backslash) is content,
+    not a section boundary.  openpyxl serialises overlong formats without
+    complaint, so this must be enforced before package emission.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"Number format must be text, received {value!r}.")
+    sections = 1
+    quoted = False
+    escaped = False
+    for character in value:
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
+        if character == '"':
+            quoted = not quoted
+            continue
+        if character == ";" and not quoted:
+            sections += 1
+    if quoted:
+        raise ValueError(f"Number format has an unterminated quoted literal: {value!r}.")
+    if sections > 4:
+        raise ValueError(
+            f"Number format has {sections} sections; native Excel accepts at most four: {value!r}."
+        )
+    return value
+
+
 def _color(value):
     """
     Plan colours are ARGB or RGB hex strings, upper case.
@@ -160,7 +194,9 @@ class StyleTable:
             self.fills.append(build_fill(record.get("fill")))
             self.borders.append(build_border(record.get("border")))
             self.alignments.append(build_alignment(record.get("alignment")))
-            self.number_formats.append(record.get("number_format") or "General")
+            self.number_formats.append(
+                validate_number_format(record.get("number_format") or "General")
+            )
 
     def __len__(self):
         return len(self.fonts)
@@ -211,5 +247,8 @@ def build_differential(record):
         from openpyxl.styles.differential import DifferentialStyle as _DS  # noqa: F401
         from openpyxl.styles.numbers import NumberFormat
 
-        kwargs["numFmt"] = NumberFormat(numFmtId=0, formatCode=record["number_format"])
+        kwargs["numFmt"] = NumberFormat(
+            numFmtId=0,
+            formatCode=validate_number_format(record["number_format"]),
+        )
     return DifferentialStyle(**kwargs)
