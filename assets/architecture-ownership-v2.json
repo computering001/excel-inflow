@@ -1,0 +1,13 @@
+{
+  "schema_version": "architecture-ownership/2.0",
+  "owners": [
+    {"owner_id": "product_delivery_constitution", "canonical": "assets/product-delivery-constitution-v2.json"},
+    {"owner_id": "semantic_ontology", "canonical": "assets/economic-ontology-v2.json"},
+    {"owner_id": "canonical_model_graph", "canonical": "assets/canonical-model-graph-v2.json"},
+    {"owner_id": "broker_state_machine", "canonical": "assets/broker-state-machine-v2.json"},
+    {"owner_id": "forecast_authority_ledger", "canonical": "scripts/lib/forecast_authority_ledger.mjs"},
+    {"owner_id": "run_carrier", "canonical": "scripts/lib/run_carrier.mjs"},
+    {"owner_id": "product_identity_vocabulary", "canonical": "assets/product-identity-v2.schema.json"}
+  ],
+  "rule": "policy may be repeated only in generated compatibility views or receipts; authoritative edits belong to exactly one owner"
+}

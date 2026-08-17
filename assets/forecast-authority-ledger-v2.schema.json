@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/forecast-authority-ledger-v2.schema.json",
+  "title": "Excel Inflow sealed forecast authority ledger v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "forecast_periods",
+    "status",
+    "rows",
+    "violations",
+    "ledger_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "forecast-authority-ledger/2.0"
+    },
+    "case_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "forecast_periods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "BLOCK"
+      ]
+    },
+    "rows": {
+      "type": "array"
+    },
+    "violations": {
+      "type": "array"
+    },
+    "ledger_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

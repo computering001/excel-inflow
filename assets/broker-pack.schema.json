@@ -1,0 +1,685 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-pack.schema.json",
+  "title": "Debt Overlay — required shape of a broker research set (stage 1 input, gated by node N0)",
+  "description": "THIS IS A REQUIREMENT, NOT A DESCRIPTION OF ANY BROKER'S OUTPUT FORMAT. Broker notes arrive as PDFs, spreadsheets and emails in as many layouts as there are houses; none of them will ever conform to this on its own. What this document states is the shape the model REQUIRES after extraction — the houses, the metrics, the three forecast years and the provenance that must survive the trip. An extractor or an adapter produces this; nothing downstream reads a raw note. Do not edit this contract to match whatever a particular house publishes.",
+  "x_contract_notes": {
+    "why_optional": "Broker research is optional model evidence. Zero to ten houses may be preserved. Eligibility is cell-derived after extraction: one complete primary-eligible house is enough to contribute broker authority, while partial houses remain supplemental or reference-only. If no safe broker observation survives, broker authority is zero and the ordinary forecast waterfall continues. Ten remains the operating cap because extraction and review cost scale with every additional source.",
+    "authority": "The broker set is authoritative for the forecast anchor and consensus lines ONLY. Never for anything historic. Historic figures come from the filings.",
+    "accepted_file_types": "A broker note may be supplied as PDF, OOXML spreadsheet, CSV, text/HTML/JSON, PNG or JPEG. Native text/cells are preferred. An image-only PDF or standalone image is accepted only through the hash-bound verified-image lane: two independent cell-addressed transcriptions must agree exactly, or a reviewed resolution must identify every disagreement. A raw OCR guess never satisfies the contract. Legacy binary Office files and message containers remain rejected; unwrap or resave the attachment first.",
+    "estimate_date_gap": "Every house carries published_date because a six-month-old estimate and last week's estimate are not equivalent evidence. The v2 case preserves the date, source filename and source id in broker_pack.house_metadata while keeping each numeric broker series unchanged. Evidence-run validation blocks if that metadata is dropped."
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pack_kind",
+    "as_of",
+    "reporting_currency",
+    "units",
+    "forecast_periods",
+    "metrics",
+    "houses"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "broker-pack/1.0"
+    },
+    "pack_kind": {
+      "const": "broker_forecast_set"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date",
+      "description": "When this set was assembled. Unlike the debt export's as_of this is NOT gated against a period end — a broker set is forward-looking and its collection date is properly recent. It is required so that the stage-5 read can state how current the consensus is, and so that a pack reused on a rebuild months later is visibly stale."
+    },
+    "source_label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human description of the set, e.g. 'Seven-house pack, notes dated Jan-Mar 2026'. Maps to model-case-v2 broker_pack.source_label, which is required there."
+    },
+    "reporting_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "description": "Currency of every currency-denominated estimate. Must equal the issuer's reporting currency — a house publishing in USD for a EUR reporter must be translated by the extractor, because the model has no per-house FX and would otherwise average across currencies."
+    },
+    "units": {
+      "enum": [
+        "units",
+        "thousands",
+        "millions"
+      ],
+      "description": "Scale of every currency-denominated estimate. Must equal the case issuer's units. Ratio and percent metrics are unaffected — see metric.unit_kind."
+    },
+    "forecast_periods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "format": "date"
+      },
+      "description": "The three forecast period ends every estimate array is aligned to, in order. Exactly three: the model is always 3 historical + 3 forecast years, fixed by rule and never asked. Estimates are aligned by POSITION, so a house whose note only covers two years carries null in the third slot rather than a shifted array."
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Catalogue of the metrics this pack carries, keyed by metric id. The key set is the vocabulary; a house's estimates may only use keys declared here. Required ids — read by scripts/lib/coverage.mjs: revenue, depreciation_and_amortisation, effective_tax_rate, capex, change_in_working_capital, dividends. Plus at least one of ebit / adjusted_ebitda. The rule selects exactly one headline anchor by period-specific broker breadth, uses D&A as the bridge driver and derives the other headline. EBIT and Adjusted EBITDA are never simultaneous independent inputs.",
+      "additionalProperties": {
+        "$ref": "#/$defs/metricDeclaration"
+      }
+    },
+    "run_scoped_concepts": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Hash-bound, run-local company-specific insertion contracts. These are executable only after independent validation; they do not extend the global broker dictionary.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "houses": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 10,
+      "description": "One entry per supplied house, from zero to ten. Eligibility is derived separately: a supplied house may be primary-eligible, supplemental or reference-only. A house appearing twice under different spellings is a duplicate, not a contributor, and N0 detects it by normalised name. An empty array is an explicit zero-broker-authority pack and must fall through to other forecast authorities.",
+      "items": {
+        "$ref": "#/$defs/house"
+      }
+    },
+    "provider_consensus": {
+      "type": "object",
+      "description": "Optional. A vendor-published consensus line per metric id, carried alongside the named houses and never mixed with them. Maps to brokerMetric.provider_consensus.",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "recommended_primary_house_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "eligibility_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_eligible_house_count",
+        "supplemental_eligible_house_count",
+        "reference_only_house_count",
+        "run_can_continue_without_broker_question"
+      ],
+      "properties": {
+        "primary_eligible_house_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "supplemental_eligible_house_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reference_only_house_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "run_can_continue_without_broker_question": {
+          "type": "boolean"
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "flex_elections": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "concept",
+          "rationale"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "concept": {
+            "enum": [
+              "lease_payments",
+              "committed_restructuring",
+              "impairment_addback",
+              "pension_contributions",
+              "disposal_proceeds",
+              "other_committed_flow"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis": {
+            "enum": [
+              "consensus",
+              "attributed"
+            ],
+            "description": "consensus: three or more houses under one definition, consumed as a pooled series. attributed: one or two houses; consumed as the named house's own series, rendered wearing the house's name so a single voice is never laundered into consensus clothing."
+          },
+          "source_house_id": {
+            "type": "string",
+            "description": "Required when basis is attributed: the house whose series the line consumes. That house must supply all three forecast periods - an attributed row has no pool to substitute from."
+          },
+          "confirmed_by_user": {
+            "type": "boolean",
+            "description": "Required true when basis is attributed: the inclusion is the user's call, recorded from the single consolidated Stage-2 question, never improvised by the run."
+          }
+        }
+      }
+    },
+    "election_gauge": {
+      "type": "array",
+      "description": "The on-the-record weighing of every cash-flow leaf concept any house printed: elected as consensus, included by name, candidate for the user's single question, or parked - with house counts and materiality against the headline anchor. Nothing silently dropped, nothing silently adopted.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "concept",
+          "display_label",
+          "supporting_house_ids",
+          "supporting_house_count",
+          "peak_abs_value",
+          "materiality_floor",
+          "bin"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "concept": {
+            "type": "string"
+          },
+          "display_label": {
+            "type": "string"
+          },
+          "supporting_house_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supporting_house_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "peak_abs_value": {
+            "type": "number"
+          },
+          "materiality_vs_anchor": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "materiality_floor": {
+            "type": "number"
+          },
+          "overlap_group": {
+            "type": "string"
+          },
+          "bin": {
+            "enum": [
+              "elected_consensus",
+              "included_attributed",
+              "candidate_attributed",
+              "eligible_consensus_unelected",
+              "parked_below_materiality",
+              "parked_inadmissible"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metricDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "unit_kind"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display label — 'Adj. EBITDA'. Required because model-case-v2 $defs/brokerMetric requires label and there is nowhere else to get one."
+        },
+        "unit_kind": {
+          "enum": [
+            "currency",
+            "ratio",
+            "percent_decimal"
+          ],
+          "description": "Which estimates are in the pack's currency and units, and which are not. effective_tax_rate is a ratio expressed as a decimal (0.21), not 21. Declared rather than inferred because a tax rate of 21 and a tax rate of 0.21 are both plausible-looking numbers."
+        },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+          "description": "Stable identity for the exact broker definition. Distinct reported, adjusted, restated, lease, cash-flow and scope definitions use distinct ids."
+        },
+        "semantic_role": {
+          "enum": [
+            "operating_forecast",
+            "cash_flow_forecast",
+            "debt_or_liquidity",
+            "leverage_or_coverage",
+            "interest_or_finance",
+            "lease",
+            "tax",
+            "management_guidance",
+            "broker_derived_estimate",
+            "valuation_market_data",
+            "presentation_only",
+            "metadata",
+            "other_model_check"
+          ]
+        },
+        "economic_domain": {
+          "enum": [
+            "operating", "cash_flow", "debt_liquidity", "leverage_coverage",
+            "interest_finance", "lease", "tax", "guidance", "valuation",
+            "presentation_metadata", "other"
+          ]
+        },
+        "concept_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "evidence_kind": {
+          "enum": [
+            "broker_estimate", "company_guidance", "broker_derived_estimate",
+            "partial_period", "calculated_check", "market_data",
+            "historical_observation", "non_numeric"
+          ]
+        },
+        "model_use": {
+          "enum": [
+            "active_input", "reference_only", "exact_duplicate",
+            "derived_input", "unresolved"
+          ]
+        },
+        "definition_fingerprint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "concept_id", "measurement_basis", "restatement_basis",
+            "cash_flow_basis", "lease_basis", "units", "currency",
+            "period_basis", "sign_convention", "accounting_basis",
+            "operating_scope"
+          ],
+          "properties": {
+            "concept_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+            "measurement_basis": {
+              "enum": ["reported", "adjusted", "core", "underlying", "statutory", "mixed", "unspecified"]
+            },
+            "restatement_basis": {
+              "enum": ["restated", "originally_reported", "not_applicable", "unspecified"]
+            },
+            "cash_flow_basis": { "enum": ["cfo", "fcf", "fcfe", "not_applicable", "unspecified"] },
+            "lease_basis": { "enum": ["including_leases", "excluding_leases", "not_applicable", "unspecified"] },
+            "units": { "type": ["string", "null"] },
+            "currency": { "type": ["string", "null"] },
+            "period_basis": { "enum": ["annual_forecast", "partial_period", "guidance", "non_periodic", "historical"] },
+            "sign_convention": { "enum": ["as_reported", "outflow_negative", "outflow_positive"] },
+            "accounting_basis": { "type": "string", "minLength": 1 },
+            "operating_scope": { "type": "string", "minLength": 1 }
+          }
+        },
+        "definition_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consensus_family": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$",
+          "description": "Optional family used to compare distinct definitions without asserting they are identical."
+        },
+        "definition_signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "metric_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accounting_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation_scope": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "adjustment_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "units": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fiscal_calendar": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "cash_flow_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "lease_basis": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "sign_convention": {
+          "enum": [
+            "as_reported",
+            "outflow_negative",
+            "outflow_positive"
+          ],
+          "description": "Optional but strongly advised for capex, change_in_working_capital and dividends, where houses disagree on sign and a sign error is a silent 2x in the cash bridge."
+        },
+        "model_disposition": {
+          "enum": [
+            "reference_only",
+            "rejected",
+            "not_applicable"
+          ],
+          "description": "Optional Stage-2 disposition for a preserved broker metric that is not an independent model input. Omit for a metric that remains eligible for Stage-3 mapping."
+        },
+        "model_disposition_reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required in practice whenever model_disposition is supplied; explains why the metric is retained as evidence but not consumed as a model authority."
+        }
+      }
+    },
+    "house": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "house_id",
+        "house_name",
+        "published_date",
+        "document",
+        "estimates"
+      ],
+      "properties": {
+        "house_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_]*$",
+          "description": "Normalised, stable key — 'jpmorgan', 'bnp_exane'. Unique within the pack. The display name is what the model prints; this is what it keys on, so that 'J.P. Morgan' and 'JPMorgan' cannot become two contributors."
+        },
+        "house_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "As printed — 'J.P. Morgan'. Maps to the key of model-case-v2 brokerMetric.brokers."
+        },
+        "published_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of the note. Required here; see x_contract_notes.estimate_date_gap for why it cannot currently round-trip into a v2 case."
+        },
+        "analyst": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "document": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "file_name",
+            "media_type",
+            "text_extractable"
+          ],
+          "description": "What the estimates were extracted from. This is the provenance basis for every broker figure in the model.",
+          "properties": {
+            "file_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "media_type": {
+              "enum": [
+                "application/pdf",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel.sheet.macroEnabled.12",
+                "text/csv",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                "text/plain",
+                "text/markdown",
+                "text/html",
+                "application/json",
+                "image/png",
+                "image/jpeg"
+              ],
+              "description": "The accepted list, enumerated so that an unaccepted type fails at upload rather than at extraction. See x_contract_notes.accepted_file_types for what is rejected and why."
+            },
+            "text_extractable": {
+              "type": "boolean",
+              "description": "Whether the raw document itself has a usable native text/cell layer. False is allowed only with a verified image extraction method and hash-bound evidence."
+            },
+            "extraction_method": {
+              "enum": [
+                "native",
+                "verified_image_transcription",
+                "mixed_verified",
+                "evidence_only_quarantine"
+              ],
+              "description": "How the normalized estimates were obtained. verified_image_transcription and mixed_verified require independently checked, cell-addressed image evidence."
+            },
+            "extraction_evidence_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "SHA-256 of the PASS broker-extraction bundle that proves the document, tables and image verification lane."
+            },
+            "page_reference": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Where in the document the estimates table sits. Becomes the G3 assertion basis."
+            }
+          }
+        },
+        "estimates": {
+          "type": "object",
+          "description": "Metric id to a three-element array aligned to forecast_periods. null means the house did not publish that year — it is NOT zero, and the anchor's contributor count treats a series of all nulls as no contribution. Every key must be declared in the pack's metrics catalogue.",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "eligibility": {
+          "enum": [
+            "primary_eligible",
+            "supplemental_eligible",
+            "reference_only",
+            "unusable"
+          ]
+        },
+        "verified_forecast_cell_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_primary_metrics": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "digest": {
+          "type": "array",
+          "description": "The standardised face of everything this house published: every mapped metric in dictionary order, the broker's verbatim caption, per-period values, per-value verification grade and source locations. Derived entirely from proven mapping receipts; carries no number the pack cannot trace.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metric_id",
+              "concept",
+              "display_label",
+              "verbatim_labels",
+              "consumed",
+              "values",
+              "grades",
+              "source_locations"
+            ],
+            "properties": {
+              "metric_id": {
+                "type": "string"
+              },
+              "concept": {
+                "type": "string"
+              },
+              "display_label": {
+                "type": "string"
+              },
+              "verbatim_labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unit_kind": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "definition_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "consumed": {
+                "type": "boolean"
+              },
+              "values": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "grades": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "enum": [
+                    "native",
+                    "dual_read",
+                    "adjudicated",
+                    "derived",
+                    null
+                  ]
+                }
+              },
+              "source_locations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "digest_coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mapped_concepts",
+            "dictionary_concepts",
+            "grade_counts"
+          ],
+          "properties": {
+            "mapped_concepts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "dictionary_concepts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "grade_counts": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "native": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "dual_read": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "adjudicated": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "derived": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
