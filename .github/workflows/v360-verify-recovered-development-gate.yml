@@ -1,4 +1,4 @@
-# diagnose the sole remaining Stage-4 checkpoint seam in the exact portable gate runtime
+# prove Stage-4 checkpoint recovery using a HOME-independent Python runtime
 name: v360 verify recovered development gate
 
 on:
@@ -20,60 +20,33 @@ jobs:
         with:
           ref: bf39afb5e513431f87b02d85488fe93b0a10b5e1
           fetch-depth: 0
-      - name: Install exact portable gate runtime
+      - name: Install HOME-independent portable runtime
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y libreoffice
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-      - name: Diagnose exact Stage-4 interruption boundary
+          sudo apt-get install -y libreoffice python3-venv
+          python3 -m venv /tmp/v360-python
+          /tmp/v360-python/bin/python -m pip install --upgrade pip
+          /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+          HOME=/tmp/isolated-home /tmp/v360-python/bin/python - <<'PY'
+          import fitz, openpyxl
+          print('HOME_INDEPENDENT_PYTHON=PASS')
+          print('OPENPYXL='+openpyxl.__version__)
+          PY
+      - name: Run sole Stage-4 checkpoint recovery test
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
-          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
+          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
-          rm -rf /tmp/v360-debug
-          mkdir -p /tmp/v360-debug
-          node scripts/run_evidence_run_tests.mjs test-fixtures/cases --emit-clean /tmp/v360-debug/clean-evidence-run.json
-          node scripts/run_user_flow.mjs /tmp/v360-debug/clean-evidence-run.json --out /tmp/v360-debug/run --stop-after decisions --json > /tmp/v360-debug/paused.json
-          real_soffice="$(command -v soffice)"
-          cat > /tmp/v360-debug/slow-soffice <<SH
-          #!/bin/sh
-          if [ "\$1" = "--version" ]; then
-            exec "$real_soffice" "\$@"
-          fi
-          sleep 30
-          exec "$real_soffice" "\$@"
-          SH
-          chmod +x /tmp/v360-debug/slow-soffice
-          set +e
-          node scripts/run_user_flow.mjs /tmp/v360-debug/clean-evidence-run.json \
-            --out /tmp/v360-debug/run \
-            --timeout 25000 \
-            --python "$(command -v python3)" \
-            --soffice /tmp/v360-debug/slow-soffice \
-            --json > /tmp/v360-debug/interrupted.json 2> /tmp/v360-debug/interrupted.stderr
-          code=$?
-          set -e
-          echo "FLOW_EXIT=$code"
-          echo '--- interrupted.json ---'
-          cat /tmp/v360-debug/interrupted.json || true
-          echo '--- interrupted.stderr ---'
-          cat /tmp/v360-debug/interrupted.stderr || true
-          echo '--- build-result ---'
-          cat /tmp/v360-debug/run/stages/build_checks/build-result.json || true
-          echo '--- environment-probe ---'
-          cat /tmp/v360-debug/run/build-*/environment-probe.json || true
-          echo '--- checkpoint files ---'
-          find /tmp/v360-debug/run/build-* -maxdepth 5 -type f -print | sort || true
-          echo '--- receipts ---'
-          for f in /tmp/v360-debug/run/build-*/.stage4/receipts/*.json; do
-            [ -f "$f" ] || continue
-            echo "### $f"
-            cat "$f"
-          done
-          exit 0
+          rm -rf /tmp/v360-stage4-proof
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases test-fixtures/cases \
+            --python /tmp/v360-python/bin/python \
+            --soffice "$(command -v soffice)" \
+            --out /tmp/v360-stage4-proof
+          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
+          echo 'STAGE4_CONTENT_ADDRESSED_RESUME=PASS'
