@@ -1,4 +1,4 @@
-# repair the audited selected-authority materialization ledger seam on recovered v3.6
+# prove the sole remaining Stage-4 checkpoint seam on the repaired v3.6 target
 name: v360 verify recovered development gate
 
 on:
@@ -9,52 +9,40 @@ on:
       - .github/workflows/v360-verify-recovered-development-gate.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  repair:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/excel-inflow-v360-rebuild
+          ref: 912e50d22dd109176f521080d78d71141fc58cb0
           fetch-depth: 0
-      - name: Require exact audited target
+      - name: Install HOME-independent portable runtime
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 'bf39afb5e513431f87b02d85488fe93b0a10b5e1'
-      - name: Seal authority ledger at selected-contract materializer
+          sudo apt-get update >/dev/null
+          sudo apt-get install -y libreoffice python3-venv >/dev/null
+          python3 -m venv /tmp/v360-python
+          /tmp/v360-python/bin/python -m pip install --upgrade pip >/dev/null
+          /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy >/dev/null
+          HOME=/tmp/isolated-home /tmp/v360-python/bin/python -c 'import fitz,openpyxl; print("HOME_INDEPENDENT_PYTHON=PASS",openpyxl.__version__)'
+      - name: Run Stage-4 content-addressed resume proof
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/lib/forecast_candidate_compiler.mjs')
-          s=p.read_text()
-          marker='''import { observationsForConcept } from "./forecast_observation.mjs";\n'''
-          addition='''import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";\n'''
-          assert s.count(marker)==1, s.count(marker)
-          assert addition not in s
-          s=s.replace(marker, marker+addition, 1)
-          old='''  return materializeForecastPlan(modelCase, sealedPlan);\n}\n\nexport function validateForecastPlanCaseParity'''
-          new='''  const materialized = materializeForecastPlan(modelCase, sealedPlan);\n  // This function is the sole selected-authority economic writer. The sealed\n  // contract replaces provisional row authorities, so the forecast-authority\n  // ledger must be resealed here, at the mutator, before the case can cross\n  // into question planning or the solver. Later unreceipted mutations remain\n  // fail-closed because verification rebuilds the ledger from the live case.\n  sealForecastAuthorityLedger(materialized);\n  return materialized;\n}\n\nexport function validateForecastPlanCaseParity'''
-          assert s.count(old)==1, s.count(old)
-          p.write_text(s.replace(old,new,1))
-          PY
-          node --check scripts/lib/forecast_candidate_compiler.mjs
-          git diff --check
-          node scripts/run_forecast_authority_ledger_tests.mjs
-          node scripts/run_forecast_topology_tests.mjs
-          node scripts/run_user_flow_tests.mjs test-fixtures/cases
-      - name: Commit audited ledger ownership repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'excel-inflow-recovery-publisher'
-          git config user.email 'actions@users.noreply.github.com'
-          git add scripts/lib/forecast_candidate_compiler.mjs
-          git commit -m 'Seal ledger after selected authority materialization'
-          git push origin HEAD:refs/heads/agent/excel-inflow-v360-rebuild
-          echo "REPAIRED_COMMIT=$(git rev-parse HEAD)"
+          export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
+          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
+          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
+          export SOFFICE_BIN="$(command -v soffice)"
+          rm -rf /tmp/v360-stage4-proof
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases test-fixtures/cases \
+            --python /tmp/v360-python/bin/python \
+            --soffice "$(command -v soffice)" \
+            --out /tmp/v360-stage4-proof
+          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
+          echo 'STAGE4_CONTENT_ADDRESSED_RESUME=PASS'
