@@ -7,6 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { validateJsonSchema } from "./json_schema.mjs";
+import { resolvePythonExecutable } from "./process_tree.mjs";
 import { canonicalise, canonicalJson, hashValue } from "./run_store.mjs";
 import {
   readApprovedRegularFile,
@@ -266,7 +267,11 @@ async function rerunPythonVerifier(scriptPath, argv, supplied, label) {
   );
   const output = path.join(temporary, "report.json");
   try {
-    await execFileAsync("python3", [scriptPath, ...argv, "--out", output], {
+    const selected = selectedIngressPythonExecutable();
+    const pythonExecutable = path.isAbsolute(selected)
+      ? selected
+      : await resolvePythonExecutable(selected);
+    await execFileAsync(pythonExecutable, [scriptPath, ...argv, "--out", output], {
       maxBuffer: 32 * 1024 * 1024,
     });
     const regenerated = await readJsonFile(output, `${label} regenerated report`);
@@ -278,6 +283,14 @@ async function rerunPythonVerifier(scriptPath, argv, supplied, label) {
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }
+}
+
+export function selectedIngressPythonExecutable(env = process.env) {
+  const selected = env.EXCEL_INFLOW_PYTHON ?? env.PYTHON ?? "python3";
+  if (env.EXCEL_INFLOW_PYTHON && !path.isAbsolute(selected)) {
+    throw new Error("EXCEL_INFLOW_PYTHON must be the top-level resolved absolute executable.");
+  }
+  return selected;
 }
 
 function canonicalPayloadSha256(value) {

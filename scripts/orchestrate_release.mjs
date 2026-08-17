@@ -540,7 +540,10 @@ async function main() {
     workspaceToken,
     issuerIdentity: { name: modelCase.issuer?.name ?? "Unknown issuer" },
   });
-  const lease = await acquireRunLease(runDir, { owner: `orchestrate_release:${runId}` });
+  const lease = await acquireRunLease(runDir, {
+    owner: `orchestrate_release:${runId}`,
+    sessionId: workspaceToken,
+  });
   const integrity = await captureRuntimeIntegrity(ROOT);
   ACTIVE_RUN_GUARD = { runDir, identity, lease, integrity };
   const runtimeHome = path.join(runDir, ".runtime-home");

@@ -24,6 +24,7 @@ const production = {
   certified_runtime_code_closure_sha256: identity.runtime_code_closure_sha256,
   certified_closure_sha256: identity.runtime_code_closure_sha256,
   certification_evidence_receipt: { status: "PASS" },
+  release_package_attestation_sha256: "e".repeat(64),
   installation_identity: "installed:fixture",
 };
 assert.doesNotThrow(() => assertCertifiedProductionIdentity(production));

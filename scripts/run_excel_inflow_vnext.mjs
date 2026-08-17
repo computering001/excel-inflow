@@ -11,7 +11,6 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
@@ -21,6 +20,7 @@ import {
 } from "./lib/run_constitution_graph.mjs";
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
+import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -106,27 +106,28 @@ async function writeJson(target, value) {
   await fs.rename(temporary, target);
 }
 
-function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000 } = {}) {
-  return new Promise((resolve, reject) => {
-    const started = Date.now();
-    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`${path.basename(command)} timed out after ${timeout} ms.`));
-    }, timeout);
-    child.on("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({ code, stdout, stderr, duration_ms: Date.now() - started });
-    });
-  });
+async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000 } = {}) {
+  const started = Date.now();
+  const spanId = ACTIVE_EXPERIENCE_TRACE?.start(
+    `subprocess:${path.basename(command)}`,
+    "run_excel_inflow_vnext",
+    "excel_inflow_active",
+    { parent_span_id: ACTIVE_EXPERIENCE_ROOT_SPAN, coverage_role: "leaf" },
+  );
+  try {
+    const result = await runProcessTree(command, args, { cwd, env, timeout });
+    if (spanId) {
+      ACTIVE_EXPERIENCE_TRACE.end(
+        spanId,
+        result.ok ? "PASS" : "FAIL",
+        { timed_out: result.timed_out, termination_verified: result.termination_verified },
+      );
+    }
+    return { ...result, duration_ms: Date.now() - started };
+  } catch (error) {
+    if (spanId) ACTIVE_EXPERIENCE_TRACE.end(spanId, "FAIL", { error: error.message });
+    throw error;
+  }
 }
 
 async function checkpoint(id, status, target = null) {
@@ -141,7 +142,12 @@ async function checkpoint(id, status, target = null) {
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
   if (ACTIVE_EXPERIENCE_TRACE && ACTIVE_EXPERIENCE_ROOT_SPAN) {
-    ACTIVE_EXPERIENCE_TRACE.end(ACTIVE_EXPERIENCE_ROOT_SPAN, status === "PASS_PENDING_MANUAL" ? "PASS" : status);
+    const traceStatus = status === "PASS_PENDING_MANUAL"
+      ? "PASS"
+      : ["BLOCKED", "NEEDS_USER_INPUT"].includes(status)
+        ? "BLOCKED"
+        : "FAIL";
+    ACTIVE_EXPERIENCE_TRACE.end(ACTIVE_EXPERIENCE_ROOT_SPAN, traceStatus);
     ACTIVE_EXPERIENCE_ROOT_SPAN = null;
     const experienceTracePath = path.join(out, "experience-trace.json");
     await writeExperienceTrace(experienceTracePath, ACTIVE_EXPERIENCE_TRACE.finish());
@@ -212,20 +218,30 @@ async function main() {
   }
   await fs.mkdir(out, { recursive: true });
   ACTIVE_EXPERIENCE_TRACE = createExperienceTrace({ runId: path.basename(out), scope: "vnext_controller" });
-  ACTIVE_EXPERIENCE_ROOT_SPAN = ACTIVE_EXPERIENCE_TRACE.start("vnext_controller", "run_excel_inflow_vnext", "excel_inflow_active");
+  ACTIVE_EXPERIENCE_ROOT_SPAN = ACTIVE_EXPERIENCE_TRACE.start(
+    "vnext_controller",
+    "run_excel_inflow_vnext",
+    "excel_inflow_active",
+    { coverage_role: "root" },
+  );
   ACTIVE_RUNTIME_CLOSURE = await runtimeClosure();
-  const pythonCommand = String(options.python ?? process.env.PYTHON ?? "python3");
+  const pythonCommand = await resolvePythonExecutable(
+    String(options.python ?? process.env.PYTHON ?? "python3"),
+    { cwd: ROOT, env: process.env, timeout: 30_000 },
+  );
   const pythonProbe = await run(pythonCommand, [
     "-c",
     "import os, openpyxl; print(os.path.dirname(os.path.dirname(openpyxl.__file__)))",
   ], { timeout: 30_000 });
   const pythonSite = pythonProbe.code === 0 ? pythonProbe.stdout.trim() : "";
-  const runtimeEnv = pythonSite
-    ? {
-        ...process.env,
-        PYTHONPATH: [pythonSite, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
-      }
-    : process.env;
+  const runtimeEnv = {
+    ...process.env,
+    PYTHON: pythonCommand,
+    EXCEL_INFLOW_PYTHON: pythonCommand,
+    ...(pythonSite
+      ? { PYTHONPATH: [pythonSite, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }
+      : {}),
+  };
   const checkpoints = [];
   const artifacts = {};
   let evidencePath;
@@ -329,7 +345,7 @@ async function main() {
   if (artifacts.broker_intake_choice) {
     firstArgs.push("--broker-intake-choice", path.resolve(artifacts.broker_intake_choice));
   }
-  if (options.python) firstArgs.push("--python", String(options.python));
+  firstArgs.push("--python", pythonCommand);
   if (options.soffice) firstArgs.push("--soffice", String(options.soffice));
   const firstExecution = await run(process.execPath, firstArgs, {
     timeout: 3_600_000,
@@ -354,7 +370,14 @@ async function main() {
       summary: {
         message: "The model decision delegate failed before writing a sealed result; no user re-upload is requested.",
         delegate_exit_code: firstExecution.code,
-        delegate_error: String(firstExecution.stderr || firstExecution.stdout || "missing result artifact").slice(-2000),
+        delegate_stdout: String(firstExecution.stdout ?? "").slice(-4000),
+        delegate_stderr: String(firstExecution.stderr ?? "").slice(-4000),
+        delegate_timed_out: firstExecution.timed_out,
+        delegate_termination_verified: firstExecution.termination_verified,
+        delegate_survivor_pids: firstExecution.survivor_pids,
+        delegate_error: String(
+          firstExecution.stderr || firstExecution.stdout || "missing result artifact",
+        ).slice(-2000),
       },
     });
   }
@@ -449,7 +472,7 @@ async function main() {
     workspaceToken,
     "--json",
   ];
-  if (options.python) resumeArgs.push("--python", String(options.python));
+  resumeArgs.push("--python", pythonCommand);
   if (options.soffice) resumeArgs.push("--soffice", String(options.soffice));
   const pausedResultSha256 = await sha256File(userFlowResultPath);
   const resumeExecution = await run(process.execPath, resumeArgs, {
@@ -480,6 +503,11 @@ async function main() {
         message: "The build delegate failed before writing a fresh sealed delivery result; no user re-upload is requested.",
         delegate_exit_code: resumeExecution.code,
         stale_result_rejected: resumedResultSha256 === pausedResultSha256,
+        delegate_stdout: String(resumeExecution.stdout ?? "").slice(-4000),
+        delegate_stderr: String(resumeExecution.stderr ?? "").slice(-4000),
+        delegate_timed_out: resumeExecution.timed_out,
+        delegate_termination_verified: resumeExecution.termination_verified,
+        delegate_survivor_pids: resumeExecution.survivor_pids,
         delegate_error: String(
           resumeExecution.stderr || resumeExecution.stdout || "missing fresh result artifact",
         ).slice(-2000),

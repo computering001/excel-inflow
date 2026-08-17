@@ -45,6 +45,7 @@ import {
 } from "./lib/run_store.mjs";
 import { runProcessTree } from "./lib/process_tree.mjs";
 import {
+  runCarrierMigrationStageInput,
   verifyRunCarrier,
   writeRunCarrier,
 } from "./lib/run_carrier.mjs";
@@ -440,6 +441,7 @@ async function main() {
     throw new Error(
       "Usage: run_user_flow.mjs <evidence-run.json> --out <run-dir> or " +
         "run_user_flow.mjs --carrier <run-carrier.json> --out <run-dir> " +
+        "[--carrier-migration-receipt <receipt.json>] " +
         "[--broker-intake-choice <choice.json>] [--broker-confirmation <confirmation.json>] [--answers <answers.txt|json>] " +
         "[--python <python>] [--soffice <path>] " +
         "[--run-id <id>] [--workspace-token <token>] " +
@@ -468,6 +470,10 @@ async function main() {
         carrierPath,
         controllerVersion: FLOW_CONTROLLER_VERSION,
         workspaceToken,
+        migrationReceiptPath:
+          typeof options["carrier-migration-receipt"] === "string"
+            ? path.resolve(options["carrier-migration-receipt"])
+            : null,
       });
     } catch (error) {
       // One class of carrier failure is not a caller error and should not read
@@ -552,11 +558,16 @@ async function main() {
     workspaceToken,
     issuerIdentity,
   });
-  const lease = await acquireRunLease(runDir, { owner: `run_user_flow:${runId}` });
+  const lease = await acquireRunLease(runDir, {
+    owner: `run_user_flow:${runId}`,
+    sessionId: workspaceToken,
+  });
   const integrity = await captureRuntimeIntegrity(ROOT);
   ACTIVE_RUN_GUARD = { runDir, identity, lease, integrity };
   const reusedStages = [];
   const runtimeDigests = stageRuntimeDigests(integrity);
+  const carrierMigrationInput = (stageId) =>
+    runCarrierMigrationStageInput(verifiedCarrier, stageId);
   let brokerIntakeChoicePath = null;
   if (typeof options["broker-intake-choice"] === "string") {
     brokerIntakeChoicePath = path.resolve(options["broker-intake-choice"]);
@@ -605,6 +616,7 @@ async function main() {
       ? { broker_intake_choice: await hashFile(brokerIntakeChoicePath) }
       : {}),
     runtime: runtimeDigests.inputs,
+    ...carrierMigrationInput("inputs"),
   };
   const stage1Outputs = {
     evidence_validation: stage1Validation,
@@ -992,6 +1004,7 @@ async function main() {
         ? await hashFile(stage2BrokerConfirmation)
         : hashValue({ pending: productionBrokerPreviewRequired }),
     runtime: runtimeDigests.evidence_review,
+    ...carrierMigrationInput("evidence_review"),
   };
   const stage2Outputs = {
     intake_result: stage2Result,
@@ -1443,6 +1456,7 @@ async function main() {
     stage2_receipt: receipt2.receipt_hash,
     answers: answerHash,
     runtime: runtimeDigests.decisions,
+    ...carrierMigrationInput("decisions"),
   };
   const stage3Outputs = {
     model_case: answeredCasePath,
@@ -1768,6 +1782,7 @@ async function main() {
     selected_authority_contract: await hashFile(selectedAuthorityContractPath),
     run_constitution_graph: await hashFile(runConstitutionGraphPath),
     runtime: runtimeDigests.build_checks,
+    ...carrierMigrationInput("build_checks"),
   };
   const stage4Outputs = {
     build_result: buildResultPath,
@@ -1993,6 +2008,7 @@ async function main() {
     model_case: caseHash,
     live_delivery_attestation: await hashFile(deliveryAttestationPath),
     runtime: runtimeDigests.delivery,
+    ...carrierMigrationInput("delivery"),
   };
   const stage5Outputs = {
     delivery_result: deliveryResultPath,

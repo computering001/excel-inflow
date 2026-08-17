@@ -8,11 +8,19 @@ import {
 } from "./identity_vocabulary.mjs";
 
 const RUN_IDENTITY_SCHEMA = "debt-runtime-identity/1.0";
-const RUN_LEASE_SCHEMA = "debt-runtime-lease/1.0";
+const RUN_LEASE_SCHEMA = "debt-runtime-lease/1.1";
+const LEGACY_RUN_LEASE_SCHEMA = "debt-runtime-lease/1.0";
 const IDENTITY_FILE = ".run-identity.json";
 const LEASE_DIRECTORY = ".run-lease";
 const LEASE_FILE = "lease.json";
+const LEASE_TAKEOVER_DIRECTORY = ".run-lease-takeovers";
 const LEASE_INITIALISATION_GRACE_MS = 30_000;
+const DEFAULT_LEASE_DURATION_MS = 300_000;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
+const MAX_LEASE_DURATION_MS = 3_600_000;
+const LEGACY_CROSS_HOST_EXPIRY_MS = 86_400_000;
+const PROCESS_SESSION_ID = randomUUID();
+const ACTIVE_LEASE_HEARTBEATS = new Map();
 const SAFE_RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const ISSUER_IDENTITY_FIELDS = Object.freeze([
@@ -296,6 +304,70 @@ function processIsLive(pid) {
   }
 }
 
+function positiveDuration(label, value, fallback) {
+  const parsed = Number(value ?? fallback);
+  if (!Number.isFinite(parsed) || parsed < 50 || parsed > MAX_LEASE_DURATION_MS) {
+    throw new Error(`${label} must be between 50 and ${MAX_LEASE_DURATION_MS} milliseconds.`);
+  }
+  return Math.floor(parsed);
+}
+
+function leaseHostIdentity() {
+  const body = {
+    hostname: os.hostname(),
+    platform: os.platform(),
+    architecture: os.arch(),
+  };
+  return Object.freeze({ ...body, host_id: sha256Value(body) });
+}
+
+function leaseSessionIdentity(sessionId) {
+  const source = String(
+    sessionId ??
+    process.env.EXCEL_INFLOW_WORKSPACE_TOKEN ??
+    process.env.CODEX_THREAD_ID ??
+    PROCESS_SESSION_ID,
+  );
+  return sha256Bytes(source);
+}
+
+function leaseTimestamp(epochMs) {
+  return new Date(epochMs).toISOString();
+}
+
+function leaseExpiryEpoch(lease) {
+  const parsed = Date.parse(String(lease?.expires_at ?? ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function leaseShapeIsCurrent(lease) {
+  const hostBody = {
+    hostname: lease?.host_identity?.hostname,
+    platform: lease?.host_identity?.platform,
+    architecture: lease?.host_identity?.architecture,
+  };
+  const acquired = Date.parse(String(lease?.acquired_at ?? ""));
+  const heartbeat = Date.parse(String(lease?.heartbeat_at ?? ""));
+  const expiry = leaseExpiryEpoch(lease);
+  return Boolean(
+    lease &&
+    lease.schema_version === RUN_LEASE_SCHEMA &&
+    typeof lease.owner === "string" && lease.owner.trim() !== "" &&
+    Number.isSafeInteger(lease.pid) && lease.pid > 0 &&
+    typeof lease.token === "string" && lease.token !== "" &&
+    lease.host_identity?.hostname &&
+    SHA256.test(String(lease.host_identity?.host_id ?? "")) &&
+    lease.host_identity.host_id === sha256Value(hostBody) &&
+    typeof lease.session_identity_hash === "string" && SHA256.test(lease.session_identity_hash) &&
+    Number.isFinite(acquired) && Number.isFinite(heartbeat) && expiry !== null &&
+    Number.isSafeInteger(lease.heartbeat_sequence) && lease.heartbeat_sequence >= 0 &&
+    Number.isSafeInteger(lease.lease_duration_ms) &&
+    lease.lease_duration_ms >= 50 && lease.lease_duration_ms <= MAX_LEASE_DURATION_MS &&
+    acquired <= heartbeat && heartbeat < expiry &&
+    expiry - heartbeat <= lease.lease_duration_ms + 1_000
+  );
+}
+
 async function readLease(leaseDirectory) {
   try {
     return JSON.parse(await fs.readFile(path.join(leaseDirectory, LEASE_FILE), "utf8"));
@@ -304,45 +376,202 @@ async function readLease(leaseDirectory) {
   }
 }
 
-async function leaseIsLive(lease, leaseDirectory) {
-  if (!lease || lease.schema_version !== RUN_LEASE_SCHEMA) {
+async function inspectLease(lease, leaseDirectory, now = Date.now()) {
+  if (!lease || ![RUN_LEASE_SCHEMA, LEGACY_RUN_LEASE_SCHEMA].includes(lease.schema_version)) {
     // mkdir is the atomic acquisition point; the owner writes lease.json
     // immediately afterwards. A competing invocation must not steal that
     // directory during this short installation window merely because the JSON
     // is not visible yet. Old unreadable directories remain recoverable.
     try {
       const stat = await fs.stat(leaseDirectory);
-      return Date.now() - stat.mtimeMs < LEASE_INITIALISATION_GRACE_MS;
+      const age = now - stat.mtimeMs;
+      return {
+        live: age < LEASE_INITIALISATION_GRACE_MS,
+        takeover_reason: age < LEASE_INITIALISATION_GRACE_MS
+          ? null
+          : "unreadable_lease_after_initialisation_grace",
+      };
     } catch {
-      return false;
+      return { live: false, takeover_reason: "lease_directory_absent" };
     }
   }
-  if (lease.hostname !== os.hostname()) return true;
-  return processIsLive(lease.pid);
+  if (lease.schema_version === RUN_LEASE_SCHEMA) {
+    if (!leaseShapeIsCurrent(lease)) {
+      try {
+        const stat = await fs.stat(leaseDirectory);
+        const withinGrace = now - stat.mtimeMs < LEASE_INITIALISATION_GRACE_MS;
+        return {
+          live: withinGrace,
+          takeover_reason: withinGrace ? null : "malformed_lease_after_initialisation_grace",
+        };
+      } catch {
+        return { live: false, takeover_reason: "lease_directory_absent" };
+      }
+    }
+    const expiry = leaseExpiryEpoch(lease);
+    if (now < expiry) return { live: true, takeover_reason: null };
+    return { live: false, takeover_reason: "heartbeat_expired" };
+  }
+  if (lease.hostname === os.hostname()) {
+    return {
+      live: processIsLive(lease.pid),
+      takeover_reason: processIsLive(lease.pid) ? null : "legacy_same_host_process_dead",
+    };
+  }
+  try {
+    const stat = await fs.stat(path.join(leaseDirectory, LEASE_FILE));
+    const expired = now - stat.mtimeMs >= LEGACY_CROSS_HOST_EXPIRY_MS;
+    return {
+      live: !expired,
+      takeover_reason: expired ? "legacy_cross_host_lease_expired" : null,
+    };
+  } catch {
+    return { live: true, takeover_reason: null };
+  }
 }
 
-export async function acquireRunLease(runRoot, { owner = "debt-model-runtime" } = {}) {
+async function writeLeaseWithoutRecreatingDirectory(leaseDirectory, lease) {
+  const target = path.join(leaseDirectory, LEASE_FILE);
+  const temporary = path.join(
+    leaseDirectory,
+    `.heartbeat.${process.pid}.${randomUUID()}.tmp`,
+  );
+  let handle;
+  try {
+    handle = await fs.open(temporary, "wx", 0o600);
+    await handle.writeFile(`${canonicalJson(lease)}\n`, "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    const current = await readLease(leaseDirectory);
+    if (!current || current.token !== lease.token) {
+      throw new Error("Run lease changed owner before its heartbeat could be written.");
+    }
+    await fs.rename(temporary, target);
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+    await fs.rm(temporary, { force: true }).catch(() => {});
+  }
+}
+
+export async function heartbeatRunLease(runRoot, token, { leaseDurationMs } = {}) {
+  const canonicalRunRoot = await canonicalPathThroughExistingAncestor(runRoot);
+  const leaseDirectory = path.join(canonicalRunRoot, LEASE_DIRECTORY);
+  const existing = await readLease(leaseDirectory);
+  if (!leaseShapeIsCurrent(existing)) throw new Error("Run lease is absent, legacy or malformed.");
+  if (existing.token !== token) throw new Error("Run lease token does not match the current owner.");
+  const now = Date.now();
+  if (now >= leaseExpiryEpoch(existing)) {
+    throw new Error("An expired run lease cannot be revived by a late heartbeat.");
+  }
+  const duration = positiveDuration(
+    "Lease duration",
+    leaseDurationMs ?? existing.lease_duration_ms,
+    DEFAULT_LEASE_DURATION_MS,
+  );
+  const renewed = {
+    ...existing,
+    heartbeat_at: leaseTimestamp(now),
+    expires_at: leaseTimestamp(now + duration),
+    heartbeat_sequence: Number(existing.heartbeat_sequence ?? 0) + 1,
+  };
+  await writeLeaseWithoutRecreatingDirectory(leaseDirectory, renewed);
+  return Object.freeze(renewed);
+}
+
+function startLeaseHeartbeat(runRoot, token, leaseDurationMs, heartbeatIntervalMs) {
+  const entry = { timer: null, last_error: null };
+  entry.timer = setInterval(() => {
+    heartbeatRunLease(runRoot, token, { leaseDurationMs }).catch((error) => {
+      entry.last_error = error;
+      clearInterval(entry.timer);
+    });
+  }, heartbeatIntervalMs);
+  entry.timer.unref?.();
+  ACTIVE_LEASE_HEARTBEATS.set(token, entry);
+}
+
+async function recordLeaseTakeover({ runRoot, staleDirectory, observed, reason, owner, sessionIdentity }) {
+  const captured = await readLease(staleDirectory);
+  if (sha256Value(captured) !== sha256Value(observed)) {
+    throw new Error("Run lease changed while an expired takeover was being isolated.");
+  }
+  const takeoverId = randomUUID();
+  const receiptBody = {
+    schema_version: "debt-runtime-lease-takeover/1.0",
+    takeover_id: takeoverId,
+    occurred_at: new Date().toISOString(),
+    reason,
+    prior_lease_sha256: sha256Value(captured),
+    prior_owner: captured?.owner ?? null,
+    prior_pid: captured?.pid ?? null,
+    prior_host_identity: captured?.host_identity ?? (
+      captured?.hostname ? { hostname: captured.hostname, host_id: null } : null
+    ),
+    prior_session_identity_hash: captured?.session_identity_hash ?? null,
+    prior_heartbeat_at: captured?.heartbeat_at ?? null,
+    prior_expires_at: captured?.expires_at ?? null,
+    acquiring_owner: owner,
+    acquiring_host_identity: leaseHostIdentity(),
+    acquiring_session_identity_hash: sessionIdentity,
+  };
+  const receipt = { ...receiptBody, receipt_sha256: sha256Value(receiptBody) };
+  const receiptDirectory = path.join(runRoot, LEASE_TAKEOVER_DIRECTORY);
+  await fs.mkdir(receiptDirectory, { recursive: true });
+  const receiptPath = path.join(receiptDirectory, `${receipt.occurred_at.replace(/[:.]/g, "-")}-${takeoverId}.json`);
+  await atomicWriteJson(receiptPath, receipt);
+  return receiptPath;
+}
+
+export async function acquireRunLease(runRoot, {
+  owner = "debt-model-runtime",
+  sessionId = null,
+  leaseDurationMs = DEFAULT_LEASE_DURATION_MS,
+  heartbeatIntervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS,
+} = {}) {
   const canonicalRunRoot = await canonicalPathThroughExistingAncestor(runRoot);
   await fs.mkdir(canonicalRunRoot, { recursive: true });
   const leaseDirectory = path.join(canonicalRunRoot, LEASE_DIRECTORY);
   let recoveredStale = false;
+  const takeoverReceipts = [];
+  const normalisedOwner = requireNonEmptyString("Lease owner", owner);
+  const sessionIdentity = leaseSessionIdentity(sessionId);
+  const duration = positiveDuration("Lease duration", leaseDurationMs, DEFAULT_LEASE_DURATION_MS);
+  const heartbeatInterval = positiveDuration(
+    "Lease heartbeat interval",
+    heartbeatIntervalMs,
+    DEFAULT_HEARTBEAT_INTERVAL_MS,
+  );
+  if (heartbeatInterval >= duration) {
+    throw new Error("Lease heartbeat interval must be shorter than lease duration.");
+  }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
       await fs.mkdir(leaseDirectory);
       const token = randomUUID();
+      const now = Date.now();
       const lease = {
         schema_version: RUN_LEASE_SCHEMA,
-        owner: requireNonEmptyString("Lease owner", owner),
+        owner: normalisedOwner,
         pid: process.pid,
-        hostname: os.hostname(),
         token,
+        host_identity: leaseHostIdentity(),
+        session_identity_hash: sessionIdentity,
+        acquired_at: leaseTimestamp(now),
+        heartbeat_at: leaseTimestamp(now),
+        expires_at: leaseTimestamp(now + duration),
+        lease_duration_ms: duration,
+        heartbeat_interval_ms: heartbeatInterval,
+        heartbeat_sequence: 0,
       };
       await atomicWriteJson(path.join(leaseDirectory, LEASE_FILE), lease);
+      startLeaseHeartbeat(canonicalRunRoot, token, duration, heartbeatInterval);
       return Object.freeze({
         path: leaseDirectory,
         token,
         recovered_stale: recoveredStale,
+        takeover_receipts: Object.freeze([...takeoverReceipts]),
         lease,
       });
     } catch (error) {
@@ -350,31 +579,56 @@ export async function acquireRunLease(runRoot, { owner = "debt-model-runtime" } 
     }
 
     const existing = await readLease(leaseDirectory);
-    if (await leaseIsLive(existing, leaseDirectory)) {
+    const inspection = await inspectLease(existing, leaseDirectory);
+    if (inspection.live) {
       throw new Error(
-        `Run already has a live lease${existing ? ` (pid ${existing.pid} on ${existing.hostname})` : ""}.`,
+        `Run already has a live lease${existing ? ` (pid ${existing.pid} on ${existing.host_identity?.hostname ?? existing.hostname ?? "unknown host"})` : ""}.`,
       );
     }
 
     const stale = `${leaseDirectory}.stale.${process.pid}.${randomUUID()}`;
     try {
       await fs.rename(leaseDirectory, stale);
+      const takeoverReceipt = await recordLeaseTakeover({
+        runRoot: canonicalRunRoot,
+        staleDirectory: stale,
+        observed: existing,
+        reason: inspection.takeover_reason,
+        owner: normalisedOwner,
+        sessionIdentity,
+      });
+      takeoverReceipts.push(takeoverReceipt);
       recoveredStale = true;
       await fs.rm(stale, { recursive: true, force: true });
     } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
+      if (error?.code !== "ENOENT") {
+        const staleExists = await pathExists(stale);
+        const activeExists = await pathExists(leaseDirectory);
+        if (staleExists && !activeExists) {
+          await fs.rename(stale, leaseDirectory).catch(() => {});
+        }
+        throw error;
+      }
     }
   }
   throw new Error("Could not acquire the run lease after repeated concurrent attempts.");
 }
 
 export async function releaseRunLease(runRoot, token) {
+  const heartbeat = ACTIVE_LEASE_HEARTBEATS.get(token);
+  if (heartbeat) {
+    clearInterval(heartbeat.timer);
+    ACTIVE_LEASE_HEARTBEATS.delete(token);
+  }
   const canonicalRunRoot = await canonicalPathThroughExistingAncestor(runRoot);
   const leaseDirectory = path.join(canonicalRunRoot, LEASE_DIRECTORY);
   const existing = await readLease(leaseDirectory);
   if (!existing) throw new Error("Run lease is absent or unreadable.");
   if (existing.token !== token) throw new Error("Run lease token does not match the current owner.");
   await fs.rm(leaseDirectory, { recursive: true, force: true });
+  if (heartbeat?.last_error) {
+    throw new Error(`Run lease heartbeat failed before release: ${heartbeat.last_error.message}`);
+  }
 }
 
 async function walkFiles(root) {
@@ -549,6 +803,12 @@ export async function assertRuntimeIntegrityUnchanged(before, skillRoot) {
 export const RUNTIME_ISOLATION_CONSTANTS = Object.freeze({
   identity_file: IDENTITY_FILE,
   lease_directory: LEASE_DIRECTORY,
+  lease_file: LEASE_FILE,
+  lease_takeover_directory: LEASE_TAKEOVER_DIRECTORY,
   identity_schema: RUN_IDENTITY_SCHEMA,
   lease_schema: RUN_LEASE_SCHEMA,
+  legacy_lease_schema: LEGACY_RUN_LEASE_SCHEMA,
+  default_lease_duration_ms: DEFAULT_LEASE_DURATION_MS,
+  default_heartbeat_interval_ms: DEFAULT_HEARTBEAT_INTERVAL_MS,
+  maximum_lease_duration_ms: MAX_LEASE_DURATION_MS,
 });

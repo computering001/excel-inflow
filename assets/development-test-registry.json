@@ -883,6 +883,15 @@
       "test_class": "unit"
     },
     {
+      "id": "immutable-release-package-attestation",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_package_attestation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "workbook-build-identity-quality-panel",
       "phase": "proof",
       "runtime": "node",
@@ -997,6 +1006,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "broker-pdf-timeout-policy",
+      "phase": "performance",
+      "runtime": "python",
+      "script": "run_broker_pdf_timeout_policy_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "experience-trace-policy",
       "phase": "performance",
       "runtime": "python",
@@ -1004,6 +1022,24 @@
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "unit"
+    },
+    {
+      "id": "experience-trace-leaf-coverage",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_experience_trace_leaf_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-process-interpreter-lease-custody",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_custody_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "host-experience-trace",

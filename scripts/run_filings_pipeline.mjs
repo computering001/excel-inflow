@@ -13,6 +13,7 @@ import { promisify } from "node:util";
 import { filingManifestCustodyErrors } from "./lib/face_statement_manifest.mjs";
 import { acquireFilingsSources } from "./lib/filings_acquisition.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { resolvePythonExecutable } from "./lib/process_tree.mjs";
 import { canonicalise } from "./lib/run_store.mjs";
 import {
   assertWorkflowState,
@@ -436,8 +437,15 @@ async function main() {
   const nativeArtifacts = {};
   if (!responsePath) {
     const nativeRoot = path.join(outputRoot, `native-${cacheKey.slice(0, 16)}`);
+    const pythonCandidate = process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3";
+    if (process.env.EXCEL_INFLOW_PYTHON && !path.isAbsolute(pythonCandidate)) {
+      throw new Error("EXCEL_INFLOW_PYTHON must be the top-level resolved absolute executable.");
+    }
+    const pythonExecutable = process.env.EXCEL_INFLOW_PYTHON
+      ? pythonCandidate
+      : await resolvePythonExecutable(pythonCandidate, { cwd: HERE, env: process.env });
     const completed = await execFileAsync(
-      "python3",
+      pythonExecutable,
       [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
       { cwd: HERE, maxBuffer: 32 * 1024 * 1024 },
     ).then((value) => ({ ...value, code: 0 })).catch((error) => ({

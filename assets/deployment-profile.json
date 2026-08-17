@@ -105,6 +105,7 @@
     "product-identity-v2.schema.json",
     "production-contract-v2.json",
     "public-test-run-v1.schema.json",
+    "release-package-attestation-v1.schema.json",
     "deployment-profile.json",
     "runtime-manifest.json",
     "row-taxonomy-v2.json",
@@ -217,6 +218,7 @@
     "host-experience-envelope-v1.schema.json": "Host boundary envelope contract for joining Rogo/platform waits with Excel Inflow component traces. It is consumed by the external trace compiler and installed-host evidence path.",
     "performance-policy-v1.json": "Canonical v3.6 timing classification and promotion policy, including external-wait classification and 30/120/300 second unknown-gap thresholds; loaded through runtime tracing helpers.",
     "product-identity-v2.schema.json": "Closed source/runtime/package/deployment identity vocabulary. Package mode is development or certified; mutable deployment status is a separate identity dimension.",
+    "release-package-attestation-v1.schema.json": "Strict external receipt for a sealed complete-package inventory and deterministic archive. The compiler emits the receipt beside, never inside, certified package bytes.",
     "product-delivery-constitution-v2.json": "Canonical v3.6 product/delivery owner retained as an inspectable policy artifact while compatibility runtime views remain generated for the current controller."
   },
   "script_entry_points": [
@@ -226,6 +228,7 @@
     "compile_evidence_resolution_v2.mjs",
     "compile_public_test_run.mjs",
     "flow_cli.mjs",
+    "migrate_run_carrier.mjs",
     "orchestrate_release.mjs",
     "run_user_flow.mjs",
     "run_excel_inflow_vnext.mjs",
@@ -256,7 +259,7 @@
     "compile_case.mjs",
     "propose_case_source.mjs"
   ],
-  "_entry_point_note": "Thirty-five JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; v64's user-flow controller remains its workbook-stage delegate and rollback route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
+  "_entry_point_note": "Thirty-six JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; v64's user-flow controller remains its workbook-stage delegate and rollback route. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
   "script_allowlist": [
     "build_dynamic_model.mjs",
     "compile_case.mjs",
@@ -266,6 +269,7 @@
     "compile_public_test_run.mjs",
     "debt-model-economics.mjs",
     "flow_cli.mjs",
+    "migrate_run_carrier.mjs",
     "lib/acquisition_policy.mjs",
     "lib/attachment_ingress.mjs",
     "lib/broker_anchor.mjs",
@@ -329,6 +333,7 @@
     "lib/release_checkpoint_store.mjs",
     "lib/release_module_registry.mjs",
     "lib/release_nodes.mjs",
+    "lib/release_package_attestation.mjs",
     "lib/row_plan.mjs",
     "lib/run_carrier.mjs",
     "lib/run_constitution_graph.mjs",
