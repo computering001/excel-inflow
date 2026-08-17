@@ -158,6 +158,22 @@
           "maxItems": 3,
           "items": { "type": ["number", "null"] }
         },
+        "value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          }
+        },
+        "structural_role": { "enum": ["body", "header"] },
         "page_or_note": { "type": "string", "minLength": 1 },
         "material": { "type": "boolean" },
         "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },

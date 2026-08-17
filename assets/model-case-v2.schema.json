@@ -1962,6 +1962,38 @@
           "$ref": "#/$defs/series3",
           "description": "Filed historical total retained only for a reported_total_reconciled row. The workbook emits the declared formula, and validation proves that formula against these three source totals."
         },
+        "historical_value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          },
+          "description": "Source-visible state of each historical cell. Only reported_zero licenses numeric zero; null-valued states remain distinct."
+        },
+        "reported_historical_value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          },
+          "description": "Typed filed states retained as reconciliation evidence when a historical total is formula-owned."
+        },
         "semantic_role": {
           "type": "string"
         },

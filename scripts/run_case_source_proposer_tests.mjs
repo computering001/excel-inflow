@@ -80,6 +80,71 @@ assert.equal(new Set([
   ...result.statement_map.cash_flow,
 ].map((row) => row.row_id)).size, 15);
 
+const typedIncome = manifest("income_statement", [
+  {
+    source_line_id: "is.unresolved_body",
+    ordinal: 1,
+    raw_label: "Unresolved operating movement",
+    values: [null, null, null],
+    value_states: ["unresolved", "unresolved", "unresolved"],
+    structural_role: "body",
+    material: true,
+  },
+  {
+    source_line_id: "is.positive_heading",
+    ordinal: 2,
+    raw_label: "Operating components",
+    values: [null, null, null],
+    value_states: ["reported_blank", "reported_blank", "reported_blank"],
+    structural_role: "header",
+    material: false,
+  },
+  {
+    source_line_id: "is.explicit_zero",
+    ordinal: 3,
+    raw_label: "Explicit nil movement",
+    values: [0, 0, 0],
+    value_states: ["reported_zero", "reported_zero", "reported_zero"],
+    structural_role: "body",
+    material: false,
+  },
+]);
+const typedEvidence = structuredClone(evidence);
+typedEvidence.face_statement_manifests.income_statement = [typedIncome];
+const typedSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Typed Value Test plc", reporting_currency: "GBP" },
+  },
+  caseEvidence: typedEvidence,
+});
+assert.equal(
+  typedSource.statement_map.income_statement[0].header,
+  undefined,
+  "An unresolved body row was promoted to a presentation header.",
+);
+assert.equal(
+  typedSource.statement_map.income_statement[1].header,
+  true,
+  "Positive structural header evidence was not preserved.",
+);
+assert.notEqual(
+  faceStatementManifestDigest({
+    ...typedIncome,
+    rows: typedIncome.rows.map((row, index) =>
+      index === 0
+        ? { ...row, value_states: ["reported_zero", "unresolved", "unresolved"] }
+        : row,
+    ),
+  }),
+  typedIncome.rows_sha256,
+  "The manifest seal did not bind typed value states.",
+);
+assert.deepEqual(
+  typedIncome.rows[2].values,
+  [0, 0, 0],
+  "Explicit reported zero was not preserved as numeric zero.",
+);
+
 const attributionIncome = manifest("income_statement", [
   { source_line_id: "is.net", ordinal: 1, raw_label: "Profit for the period", values: [100, 110, 120], material: true },
   { source_line_id: "is.owners", ordinal: 2, raw_label: "Owners of the parent", values: [94, 103, 112], material: true },
@@ -181,4 +246,4 @@ assert.deepEqual(
   "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 36 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 40 }, null, 2));

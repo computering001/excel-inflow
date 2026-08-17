@@ -25,6 +25,12 @@ export function faceStatementManifestDigest(manifest) {
       ordinal: row?.ordinal ?? null,
       raw_label: row?.raw_label ?? null,
       values: row?.values ?? null,
+      ...(Array.isArray(row?.value_states)
+        ? { value_states: row.value_states }
+        : {}),
+      ...(row?.structural_role
+        ? { structural_role: row.structural_role }
+        : {}),
       page_or_note: row?.page_or_note ?? null,
       material: row?.material ?? null,
       parent_source_line_id: row?.parent_source_line_id ?? null,

@@ -949,6 +949,38 @@ for (const name of files) {
         Number.isFinite(nci) && Math.abs(ownerValue - (netIncome - nci)) <= 1e-9;
     });
   };
+  // Typed filing states are additive custody over the same sealed source row,
+  // not new economics. A legacy fixture may omit them, but the migration is
+  // justified only when the compiled states equal the manifest states (or the
+  // exact lossless migration of an older manifest). This deliberately checks
+  // source evidence rather than a later derived formula value.
+  const isTypedHistoricalStateStrengthening = (diff) => {
+    const match = diff.path.match(
+      /^statement_structure\.(income_statement|cash_flow)\[([^\]]+)\]\.(historical_value_states|reported_historical_value_states)$/,
+    );
+    if (!match || diff.certifiedAbsent !== true) return false;
+    const row = statementRowsById.get(match[2]);
+    const states = row?.[match[3]];
+    if (!Array.isArray(states) || states.length !== 3) return false;
+    const sourceIds = new Set(row?.source_line_ids ?? []);
+    const sourceLine = [
+      ...(evidence.face_statement_manifests?.income_statement ?? []),
+      ...(evidence.face_statement_manifests?.cash_flow ?? []),
+    ].flatMap((manifest) => manifest.rows ?? [])
+      .find((line) => sourceIds.has(line.source_line_id));
+    if (!sourceLine || !Array.isArray(sourceLine.values)) return false;
+    const expectedStates =
+      Array.isArray(sourceLine.value_states) && sourceLine.value_states.length === 3
+        ? sourceLine.value_states
+        : sourceLine.values.slice(0, 3).map((value) => {
+            if (value === "") return "reported_blank";
+            if (value === null || value === undefined) return "unresolved";
+            const number = Number(value);
+            if (!Number.isFinite(number)) return "unresolved";
+            return number === 0 ? "reported_zero" : "reported_number";
+          });
+    return JSON.stringify(states) === JSON.stringify(expectedStates);
+  };
   const isJustifiedAll = (diff) =>
     isJustified(diff) ||
     isFixtureReceipt(diff) ||
@@ -959,7 +991,8 @@ for (const name of files) {
     isLinkDirectionSwap(diff) ||
     isFilingProvenanceStrengthening(diff) ||
     isInverseBridgeResidualQuarantine(diff) ||
-    isAttributionIdentityAddition(diff);
+    isAttributionIdentityAddition(diff) ||
+    isTypedHistoricalStateStrengthening(diff);
   const justified = allDiffs.filter(isJustifiedAll);
   // Presentation is compiler-owned convention, verified post-canonicalisation
   // by the plan clause; sealed-level presentation drift in the hand-authored
@@ -1257,6 +1290,9 @@ for (const name of files) {
           "projection_origin", "projection_required_by",
           // Classifier/fixture receipts — never plan economics.
           "operation_scope", "scope_reconciliation_note",
+          // Source-state custody is proved by the case clause above; it does
+          // not alter row placement, formulas or solved workbook values.
+          "historical_value_states", "reported_historical_value_states",
         ]) delete copy[key];
         // Broker-linked forecast cells resolve from the pack at build; a
         // vintage that cached the numbers into its plan differs inertly.

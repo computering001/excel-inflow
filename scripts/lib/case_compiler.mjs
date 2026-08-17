@@ -164,6 +164,18 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
   // Row minting — first pass: kept lines become rows carrying manifest values
   // (historicals only; forecasts belong to the forecast plan) and manifest
   // materiality.  Absorbed lines fold their identity into their absorber.
+  const typedHistoricalStates = (line) => {
+    if (Array.isArray(line?.value_states) && line.value_states.length === 3) {
+      return [...line.value_states];
+    }
+    return (line?.values ?? []).slice(0, 3).map((value) => {
+      if (value === "") return "reported_blank";
+      if (value === null || value === undefined) return "unresolved";
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "unresolved";
+      return number === 0 ? "reported_zero" : "reported_number";
+    });
+  };
   const rows = [];
   const rowsBySourceLine = new Map();
   for (const { manifest, row: line } of lines) {
@@ -205,6 +217,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
           row_type: entry.uncalculated ? "uncalculated" : "input",
           ...(entry.uncalculated ? { forecast_treatment: "uncalculated" } : {}),
           values: [...(line.values ?? []).slice(0, 3), null, null, null],
+          historical_value_states: typedHistoricalStates(line),
           ...(declaredRole ? { semantic_role: declaredRole } : {}),
           ...(entry.movement_type ? { movement_type: entry.movement_type } : {}),
           ...(entry.acquisition_driver_role
@@ -430,8 +443,12 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     parentRow.row_type = "calculation";
     parentRow.calculation = { operator: "sum", refs };
     parentRow.reported_historical_values = [...filed];
+    parentRow.reported_historical_value_states = [
+      ...(parentRow.historical_value_states ?? typedHistoricalStates(parentLine)),
+    ];
     parentRow.historical_authority = "reported_total_reconciled";
     delete parentRow.values;
+    delete parentRow.historical_value_states;
     parentRow.style_role = totalStyle(parentRow) ? "total" : "subsection";
     // The DERIVED variant: a total summed live from its filed members
     // declares them as contributing children.  (The reconciled-subtotal
@@ -508,6 +525,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
       row.values = [...(row.values ?? []).slice(0, 3), null, null, null];
     } else {
       delete row.values;
+      delete row.historical_value_states;
     }
   }
   // Authored forecast wiring declarations.

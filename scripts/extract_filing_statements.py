@@ -37,6 +37,10 @@ NUMBER_RE = re.compile(
     r"^\s*(?P<open>\()?\s*(?:[$€£¥])?\s*(?P<sign>[-+])?\s*"
     r"(?P<number>(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?)\s*%?\s*(?P<close>\))?\s*$"
 )
+NOT_APPLICABLE_RE = re.compile(
+    r"^(?:n/?a|n\.?m\.?|not applicable|not meaningful)$",
+    re.I,
+)
 DECORATION_RE = re.compile(
     r"^(?:for (?:the )?(?:year|period) ended\b|financial statements?\b.*(?:annual report|form 10-k|form 20-f)\b|"
     r"annual report\b.*(?:financial statements?|form 10-k|form 20-f)\b)",
@@ -173,6 +177,20 @@ def parse_number(text: str) -> float | None:
     return int(number) if number.is_integer() else number
 
 
+def classify_value_token(text: str) -> tuple[float | None, str] | None:
+    """Preserve the source-visible state independently from its value."""
+
+    token = text.strip()
+    if token in {"-", "—", "–"}:
+        return None, "reported_dash"
+    if NOT_APPLICABLE_RE.fullmatch(token):
+        return None, "not_applicable"
+    value = parse_number(token)
+    if value is None:
+        return None
+    return value, "reported_zero" if value == 0 else "reported_number"
+
+
 def pdf_lines(target: Path) -> list[dict[str, Any]]:
     try:
         import fitz  # type: ignore
@@ -216,13 +234,15 @@ def numeric_runs(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     for word in words:
         token = word["text"]
-        value = parse_number(token)
-        if value is not None or token in {"-", "—", "–"}:
+        observation = classify_value_token(token)
+        if observation is not None:
+            value, value_state = observation
             runs.append({
                 "x0": word["x0"],
                 "x1": word["x1"],
                 "text": token,
                 "value": value,
+                "value_state": value_state,
             })
     return runs
 
@@ -303,9 +323,19 @@ def year_columns(window: list[dict[str, Any]], periods: list[str]) -> list[float
 
 
 def nearest_values(runs: list[dict[str, Any]], columns: list[float]) -> list[float | None]:
+    return nearest_observations(runs, columns)[0]
+
+
+def nearest_observations(
+    runs: list[dict[str, Any]],
+    columns: list[float],
+    *,
+    missing_state: str = "reported_blank",
+) -> tuple[list[float | None], list[str]]:
     if len(columns) != 3:
-        return []
+        return [], []
     assigned: list[float | None] = [None, None, None]
+    states = [missing_state, missing_state, missing_state]
     distances: list[float] = [float("inf")] * 3
     for run in runs:
         centre = (run["x0"] + run["x1"]) / 2
@@ -313,8 +343,45 @@ def nearest_values(runs: list[dict[str, Any]], columns: list[float]) -> list[flo
         distance = abs(columns[index] - centre)
         if distance < distances[index]:
             assigned[index] = run["value"]
+            states[index] = run["value_state"]
             distances[index] = distance
-    return assigned
+    return assigned, states
+
+
+def infer_structural_roles(rows: list[dict[str, Any]]) -> None:
+    """Stamp a heading only from positive hierarchy evidence.
+
+    A row without resolved numerics is not thereby a heading.  It becomes one
+    only when the source geometry places at least one subsequent row beneath
+    it before the next same-or-higher-level boundary.  Everything else remains
+    a body row, including unresolved, dash-only and N/A-only observations.
+    """
+
+    explicit_body_states = {
+        "reported_number",
+        "reported_zero",
+        "reported_dash",
+        "not_applicable",
+    }
+    for index, row in enumerate(rows):
+        states = row.get("value_states") or []
+        if any(state in explicit_body_states for state in states):
+            row["structural_role"] = "body"
+            continue
+        level = int(row.get("hierarchy_level") or 0)
+        owns_indented_child = False
+        for candidate in rows[index + 1 :]:
+            candidate_level = int(candidate.get("hierarchy_level") or 0)
+            if candidate_level <= level:
+                break
+            owns_indented_child = True
+            break
+        row["structural_role"] = "header" if owns_indented_child else "body"
+        if owns_indented_child:
+            row["value_states"] = [
+                "reported_blank" if state == "unresolved" else state
+                for state in states
+            ]
 
 
 def _finite_series(row: dict[str, Any]) -> list[float] | None:
@@ -543,7 +610,11 @@ def extract_statement(
             continue
         if DECORATION_RE.search(label):
             continue
-        values = nearest_values(runs, columns) if runs else [None, None, None]
+        values, value_states = nearest_observations(
+            runs,
+            columns,
+            missing_state="reported_blank" if runs else "unresolved",
+        )
         if len(values) != 3:
             findings.append({"code": "ROW_VALUES_UNRESOLVED", "section": section, "page": line["page"], "label": label})
             continue
@@ -571,11 +642,13 @@ def extract_statement(
             "ordinal": len(rows) + 1,
             "raw_label": label,
             "values": values,
+            "value_states": value_states,
             "page_or_note": f"page {line['page']}",
             "material": any(value not in {None, 0} for value in values),
             "hierarchy_level": hierarchy,
             "is_subtotal": is_subtotal_label(label),
         })
+    infer_structural_roles(rows)
     rows = model_statement_scope(rows, section)
     if not rows:
         return None, findings + [{"code": "NO_STATEMENT_ROWS", "section": section}]
@@ -608,6 +681,8 @@ def extract_statement(
             "ordinal": row["ordinal"],
             "raw_label": row["raw_label"],
             "values": row["values"],
+            "value_states": row["value_states"],
+            "structural_role": row["structural_role"],
             "page_or_note": row["page_or_note"],
             "material": row["material"],
             "parent_source_line_id": row.get("parent_source_line_id"),

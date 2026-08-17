@@ -206,6 +206,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "typed-filing-values-and-row-identity",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_typed_filing_value_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "historical-normalisation",
       "phase": "evidence",
       "runtime": "node",

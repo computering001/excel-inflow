@@ -261,8 +261,8 @@ function manifestReferences(caseEvidence, section) {
   }));
 }
 
-function valueLess(row) {
-  return !Array.isArray(row?.values) || row.values.every((value) => value === null || value === "");
+function hasPositiveHeaderEvidence(row) {
+  return row?.structural_role === "header" || row?.row_type === "header";
 }
 
 function proposeSection(caseEvidence, section, used) {
@@ -341,7 +341,7 @@ function proposeSection(caseEvidence, section, used) {
       ...(row.parent_source_line_id
         ? { parent_source_line_id: row.parent_source_line_id }
         : {}),
-      ...(valueLess(row) ? { header: true } : {}),
+      ...(hasPositiveHeaderEvidence(row) ? { header: true } : {}),
     };
     return entry;
   });
