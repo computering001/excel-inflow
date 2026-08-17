@@ -23,6 +23,16 @@ jobs:
           set -euo pipefail
           find publish/v360 -type f -name 'patch.part*.b64' -print | sort -V > /tmp/parts.txt
           cat $(cat /tmp/parts.txt) | tr -d '\n\r' > /tmp/v360.patch.b64
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('/tmp/v360.patch.b64')
+          value = path.read_text('ascii')
+          missing = (-len(value)) % 4
+          if missing:
+              value += '=' * missing
+          path.write_text(value, 'ascii')
+          print(f'base64_padding_added={missing}')
+          PY
           base64 -d /tmp/v360.patch.b64 > /tmp/v360.patch.gz
           gzip -t /tmp/v360.patch.gz
           gzip -dc /tmp/v360.patch.gz > /tmp/v360.patch
