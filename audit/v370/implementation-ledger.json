@@ -984,16 +984,16 @@
       "earliest_responsible_layer": "Release identity.",
       "candidate_files": "scripts/lib/source_identity.mjs; scripts/lib/release_certification.mjs; scripts/compile_skill_release.mjs",
       "acceptance_criterion": "One package-mode enum and separate deployment-status enum are used consistently.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "One package-mode enum and separate deployment-status enum are used consistently.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced independently: the release compiler emitted packageMode development or certified while assertProductionSourceIdentity required the impossible literal production; the old test fabricated that value and therefore passed vacuously.",
+        "focused_test": "PASS: typed product identity vocabulary 20/20, source identity 12/12, carrier compatibility identity 13/13 and release certification 25/25.",
+        "source_fix": "One canonical identity module now owns package mode development|certified and a separate deployment status enum; source identity, compiler, runtime integrity, orchestrator and certification all consume that vocabulary.",
+        "integration_evidence": "PASS: a clean development compiler run emitted package_mode=development, deployment_status=not_installed and product-identity/2.0; packaged runtime-code closure recomputation matched the manifest over 283 files.",
+        "semantic_oracle_evidence": "PASS: invalid production package mode and deployment-status aliases are rejected; certified production identity requires both certified package mode and production_promoted deployment state.",
+        "native_excel_evidence": "NOT_APPLICABLE_RELEASE_IDENTITY_VOCABULARY",
+        "commit": "e64f121"
       }
     },
     {
@@ -1026,16 +1026,16 @@
       "earliest_responsible_layer": "Package identity vocabulary.",
       "candidate_files": "scripts/compile_skill_release.mjs; scripts/lib/runtime_isolation.mjs; scripts/lib/source_identity.mjs",
       "acceptance_criterion": "Distinct named identities exist for source tree, runtime code closure, complete package inventory, archive and installed package.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Distinct named identities exist for source tree, runtime code closure, complete package inventory, archive and installed package.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced independently: the compiler conceptual closure, declared runtime closure and complete package inventory used different file sets and hashes while all were named closure; installed source identity resolved neither source nor installation identity.",
+        "focused_test": "PASS: product identity mutation suite 20/20 distinguishes instruction-inclusive runtime integrity from executable runtime code and rejects unnamed or malformed digest substitutions.",
+        "source_fix": "product-identity/2.0 now names source_tree, runtime_code_closure, complete_package_inventory, archive and installed_package separately. Declared runtime integrity nests but does not masquerade as the executable closure, and vendored runtime bytes are included.",
+        "integration_evidence": "PASS: development release manifest emits the typed identity; packaged runtime code recomputation matched db68f130df5cc6c659a1bde91cd00ec0b7862f7305dcc7c27f32de75301953d1 while the separately named full declared runtime integrity remained distinct.",
+        "semantic_oracle_evidence": "PASS: schema and mutation tests reject digest-format errors, identity-kind aliasing and the removed production package mode. Complete-package, archive and installed identities remain null until the external immutable sealing and installation phases prove them.",
+        "native_excel_evidence": "NOT_APPLICABLE_PACKAGE_IDENTITY_VOCABULARY",
+        "commit": "e64f121"
       }
     },
     {
@@ -1131,16 +1131,16 @@
       "earliest_responsible_layer": "Source ingress.",
       "candidate_files": "scripts/lib/filings_acquisition.mjs; scripts/lib/attachment_ingress.mjs",
       "acceptance_criterion": "Canonical paths must remain under declared roots; symlink escapes, devices and non-regular files are rejected.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Canonical paths must remain under declared roots; symlink escapes, devices and non-regular files are rejected.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced: local filing and attachment paths were resolved and read directly, permitting parent traversal outside the request directory and providing no regular-file or symlink gate.",
+        "focused_test": "PASS: source-ingress security 26/26 covers valid canonical files plus traversal, symlink escape, directory and device rejection through the production helpers.",
+        "source_fix": "A shared ingress authority canonicalises declared roots and candidates, checks lexical and realpath containment, rejects symbolic links, opens with O_NOFOLLOW where available and accepts only regular files. Both attachment and filing acquisition use the same byte-reading path.",
+        "integration_evidence": "PASS: filing source modes 9/9, architecture ownership 6/6, registry 3/3 and the packaged development runtime include the shared ingress module and authority.",
+        "semantic_oracle_evidence": "PASS: traversal through both production attachment ingress and production filing acquisition is rejected before bytes enter evidence custody.",
+        "native_excel_evidence": "NOT_APPLICABLE_SOURCE_INGRESS_SECURITY",
+        "commit": "e64f121"
       }
     },
     {
@@ -1152,16 +1152,16 @@
       "earliest_responsible_layer": "Remote source acquisition.",
       "candidate_files": "scripts/lib/filings_acquisition.mjs; scripts/lib/attachment_ingress.mjs",
       "acceptance_criterion": "Independent allowlist authority, private-IP and rebinding protection, redirect revalidation, byte/time limits and content checks.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Independent allowlist authority, private-IP and rebinding protection, redirect revalidation, byte/time limits and content checks.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced: callers supplied their own allowed_domains and the prior fetch path had no independent authority, DNS-address classification, peer binding, byte limit, end-to-end timeout or media magic check.",
+        "focused_test": "PASS: source-ingress security 26/26 covers the independent domain authority, per-hop DNS, metadata/private addresses, peer rebinding, off-authority redirects, DNS timeout, response bounds, content type and PDF magic.",
+        "source_fix": "The shipped excel-inflow-official-filings-v1 authority now controls domains and bounds. HTTPS requests pin validated public DNS answers to the actual TLS peer, revalidate every redirect, reject non-default ports and credentials, and enforce total time/byte and content checks.",
+        "integration_evidence": "PASS: filing acquisition schema receipts bind the official-domain and controller-root authority IDs; filing source modes 9/9 and packaged runtime membership checks pass.",
+        "semantic_oracle_evidence": "PASS: caller-selected evil.test authority, metadata-service resolution, loopback peer rebinding, off-authority redirect, oversized response, HTML-as-PDF and invalid magic are all rejected.",
+        "native_excel_evidence": "NOT_APPLICABLE_REMOTE_SOURCE_SECURITY",
+        "commit": "e64f121"
       }
     },
     {
