@@ -63,7 +63,11 @@ import {
 } from "./lib/solver.mjs";
 import { assertWriteTargetOutsideSkill } from "./lib/runtime_isolation.mjs";
 import { applyHistoricalNormalisation } from "./lib/historical_normalisation.mjs";
-import { ensureIllustrativeAcquisitionCase } from "./lib/acquisition_policy.mjs";
+import {
+  acquisitionAmountLabel,
+  acquisitionTargetEbitdaFormula,
+  ensureIllustrativeAcquisitionCase,
+} from "./lib/acquisition_policy.mjs";
 import {
   balancingRcfInstrument,
   hasBalancingRcf,
@@ -3108,7 +3112,7 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
     // standalone tax-rate cell. This is acyclic and lets every transaction
     // change above PBT flow through exactly once.
     return (
-      `=-MAX(0,${column}${preTaxIncomeRow})*` +
+      `=-${column}${preTaxIncomeRow}*` +
       `${standaloneColumn}${effectiveTaxRateRow}`
     );
   }
@@ -3351,7 +3355,7 @@ function configureOperatingModel(
     ],
     [
       c.transaction_enterprise_value,
-      "Enterprise value",
+      acquisitionAmountLabel(modelCase, "Enterprise value"),
       acquisition.transaction_enterprise_value ?? illustrativeEnterpriseValue,
       AMOUNT,
       "entry",
@@ -3363,12 +3367,18 @@ function configureOperatingModel(
       MULTIPLE,
       "entry",
     ],
-    [c.target_ebitda, "Target EBITDA", null, AMOUNT, "formula"],
+    [
+      c.target_ebitda,
+      acquisitionAmountLabel(modelCase, "Target EBITDA"),
+      null,
+      AMOUNT,
+      "formula",
+    ],
     [
       // Absolute acquisition debt is supplied independently from EV. EV
       // controls inferred EBITDA; this amount alone controls debt economics.
       c.acquisition_debt_amount,
-      "Acquisition debt",
+      acquisitionAmountLabel(modelCase, "Acquisition debt"),
       acquisition.acquisition_debt_amount ?? illustrativeDebt,
       AMOUNT,
       "entry",
@@ -3403,7 +3413,10 @@ function configureOperatingModel(
       applyFormula(
         sheet,
         `P${row}`,
-        `=IFERROR(P${c.transaction_enterprise_value}/P${c.entry_ev_to_ebitda},0)`,
+        acquisitionTargetEbitdaFormula(
+          `P${c.transaction_enterprise_value}`,
+          `P${c.entry_ev_to_ebitda}`,
+        ),
       );
       sheet.getRange(`P${row}`).format.numberFormat = format;
     } else if (treatment === "toggle") {

@@ -26,6 +26,10 @@ import {
 import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
 import { selectedEbitdaRow } from "./semantic_roles.mjs";
 import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
+import {
+  acquisitionValuation,
+  acquisitionValuationErrors,
+} from "./acquisition_policy.mjs";
 
 const SOLVER_ITERATION_POLICY = solverIterationOptions();
 
@@ -1487,6 +1491,7 @@ export function validateCaseShape(modelCase) {
   }
   errors.push(...validateLeasePolicy(modelCase));
   errors.push(...validateResidualInterestAuthority(modelCase));
+  errors.push(...acquisitionValuationErrors(modelCase));
   if (modelCase.modules?.acquisition && !modelCase.acquisition) {
     errors.push("Acquisition module is enabled but acquisition inputs are absent.");
   }
@@ -1499,17 +1504,6 @@ export function validateCaseShape(modelCase) {
     if (!(acquisitionDebt(modelCase.acquisition) > 0)) {
       errors.push(
         "Enabled acquisition needs acquisition_debt_amount greater than zero.",
-      );
-    }
-    if (!(Number(modelCase.acquisition.entry_ev_to_ebitda) > 0)) {
-      errors.push("Enabled acquisition needs entry_ev_to_ebitda greater than zero.");
-    }
-    if (
-      Number(modelCase.contract_version) === 2 &&
-      !(Number(modelCase.acquisition.transaction_enterprise_value) > 0)
-    ) {
-      errors.push(
-        "Enabled v2 acquisition needs transaction_enterprise_value greater than zero.",
       );
     }
     if (
@@ -2270,12 +2264,15 @@ export function solveCase(
       : acquisitionActive
         ? 1
         : 0;
+    const valuation = acquisitionValuation(modelCase);
     const transactionEnterpriseValue = isV2
-      ? Number(modelCase.acquisition?.transaction_enterprise_value ?? 0)
+      ? valuation.transaction_enterprise_value
       : acquisitionDebtAmount;
     const baseTargetEbitda = acquisitionActive
-      ? transactionEnterpriseValue /
-        Number(modelCase.acquisition.entry_ev_to_ebitda)
+      ? isV2
+        ? valuation.target_ebitda
+        : transactionEnterpriseValue /
+          Number(modelCase.acquisition.entry_ev_to_ebitda)
       : 0;
     // EVERY TARGET OPERATING DRIVER RESOLVES THE SAME WAY THE CELLS DO.
     //
@@ -2523,10 +2520,11 @@ export function solveCase(
           ? baseEbit - (standaloneGrossInterest - interestIncome) +
             otherNonOperating
           : declaredStandalonePreTax;
-      const targetPreTaxIncome = Math.max(
-        0,
-        targetEbit * acquisitionTiming - acquisitionInterest,
-      );
+      // Losses are economic outputs too.  Do not silently rewrite a negative
+      // target PBT to zero: the inherited visible tax-rate assumption then
+      // determines the corresponding tax benefit in both solver and workbook.
+      const targetPreTaxIncome =
+        targetEbit * acquisitionTiming - acquisitionInterest;
       const preTaxIncome = standalonePreTaxIncome + targetPreTaxIncome;
       // Tax and net income belong to the issuer's declared statement graph too.
       // Most cases derive them from PBT and an effective rate, but a legitimate

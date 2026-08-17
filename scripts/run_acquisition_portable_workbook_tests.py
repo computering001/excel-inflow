@@ -136,8 +136,11 @@ def main() -> int:
     off_cells = operating_cells(states[0][3])
     on_cells = operating_cells(states[1][3])
     row_map = states[1][4]
+    controls = row_map["controls"]
     consideration_row = statement_row(row_map, "acquisitions_net_of_cash")
     change_in_debt_row = statement_row(row_map, "change_in_debt")
+    pre_tax_income_row = statement_row(row_map, "pre_tax_income")
+    tax_expense_row = statement_row(row_map, "tax_expense")
     debt_total_row = int(row_map["debt_summary_rows"]["total_change_in_debt"])
     waterfall_proceeds_row = int(row_map["waterfall_rows"]["non_rcf_debt_proceeds"])
     cash_before_rcf_row = int(row_map["waterfall_rows"]["cash_before_rcf"])
@@ -173,11 +176,41 @@ def main() -> int:
         source["acquisition"]["acquisition_debt_amount"]
     )
 
+    amount_basis = (
+        f"({source['issuer']['reporting_currency']}, {source['issuer']['units']})"
+    )
+    for control_id in (
+        "transaction_enterprise_value",
+        "target_ebitda",
+        "acquisition_debt_amount",
+    ):
+        label = str(on_cells[f"N{controls[control_id]}"].get("v", ""))
+        assert label.endswith(amount_basis), (
+            f"Acquisition amount control {control_id} does not state currency and units: {label}"
+        )
+
+    target_formula = str(on_cells[f"P{controls['target_ebitda']}"].get("f", ""))
+    expected_target_formula = (
+        f"IFERROR(P{controls['transaction_enterprise_value']}/"
+        f"P{controls['entry_ev_to_ebitda']},0)"
+    )
+    assert target_formula == expected_target_formula
+    assert "MAX(" not in target_formula
+
+    for column in ("N", "O", "P"):
+        tax_formula = str(on_cells[f"{column}{tax_expense_row}"].get("f", ""))
+        assert "MAX(" not in tax_formula, (
+            f"Acquisition tax formula still floors negative PBT: {tax_formula}"
+        )
+        assert f"-{column}{pre_tax_income_row}*" in tax_formula, (
+            f"Acquisition tax does not consume signed target PBT: {tax_formula}"
+        )
+
     report = {
         "schema_version": "acquisition-portable-workbook-test/1.0",
         "status": "PASS",
         "states": [state[0] for state in states],
-        "checks": 14,
+        "checks": 25,
         "close_year": close_year,
         "change_in_debt_row_id": "change_in_debt",
         "portable_formula_cache_parity": "PASS",
