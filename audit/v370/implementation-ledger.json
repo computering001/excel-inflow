@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T18:20:00Z",
+  "recorded_at": "2026-08-17T17:38:03Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -205,12 +205,12 @@
       "status": "OPEN",
       "implementation": {
         "invariant": "When complete reported children reconcile in all historical periods, the visible parent is a formula, the filed total is retained as reconciliation evidence, and a mutation to hardcode the parent fails.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
+        "baseline_reproduction": "FAIL reproduced in the handed-over workbook: the reported parent remains a blue historical input despite exact child reconciliation.",
+        "focused_test": "PASS_AT_SOURCE: source arithmetic 9/9, topology 5/5 and independent arithmetic oracle 2/2 infer unfamiliar aggregate parentage and reject a one-period mismatch.",
+        "source_fix": "The clean baseline already carries generic three-period source arithmetic inference and reported_total_reconciled formula ownership; f3f53e7 adds the complementary single-owner forecast guard.",
+        "integration_evidence": "PASS_AT_COMPILER: statement topology/classifier suite and two frozen compiler cases prove reconciled historical totals retain formula ownership with zero economic diffs.",
+        "semantic_oracle_evidence": "PASS_AT_CONTRACT: protected formula mutations reject replacement hardcodes; repaired production workbook proof remains pending.",
+        "native_excel_evidence": "PENDING_REPAIRED_PACKAGE_AND_NATIVE_RECALCULATION",
         "commit": null
       }
     },
@@ -223,16 +223,16 @@
       "earliest_responsible_layer": "Forecast ownership / aggregate capture topology.",
       "candidate_files": "scripts/lib/case_compiler.mjs; scripts/lib/forecast_candidate_compiler.mjs; scripts/lib/row_plan.mjs",
       "acceptance_criterion": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in run_forecast_behavior_tests.mjs: a source-visible reported parent and both complete children retained independent user-assumption authorities.",
+        "focused_test": "PASS: 31 forecast-behavior checks; mixed ownership blocks in every forecast period while valid children-own and parent-own modes remain accepted.",
+        "source_fix": "Forecast-authority validation now derives section-local source-visible aggregate membership and enforces exactly one owner per period without treating ordinary EBIT/EBITDA bridge levels as one aggregate.",
+        "integration_evidence": "PASS: forecast development phase 6/6; forecast topology 27/27; both frozen compiler cases solve cleanly with zero economic, plan or compile diffs.",
+        "semantic_oracle_evidence": "PASS: unfamiliar issuer labels and source-line identities drive the check; no cell addresses or company exceptions are used.",
+        "native_excel_evidence": "NOT_APPLICABLE_SEMANTIC_AUTHORITY_GATE",
+        "commit": "f3f53e7"
       }
     },
     {
@@ -895,16 +895,16 @@
       "earliest_responsible_layer": "Ledger integrity.",
       "candidate_files": "scripts/lib/forecast_authority_ledger.mjs",
       "acceptance_criterion": "Verifier hashes actual stored body, hashes rebuilt expected body, and compares bodies and hashes independently.",
-      "status": "OPEN",
+      "status": "CLOSED",
       "implementation": {
         "invariant": "Verifier hashes actual stored body, hashes rebuilt expected body, and compares bodies and hashes independently.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced in run_forecast_authority_ledger_tests.mjs: mutating a stored ledger row while retaining the copied digest passed verification.",
+        "focused_test": "PASS: forecast authority ledger 6/6, including stored-body and rebuilt-model mutations.",
+        "source_fix": "The verifier independently hashes the stored body and rebuilt body, compares both supplied digests to those hashes, and compares canonical bodies.",
+        "integration_evidence": "PASS: forecast development phase 6/6 and two-case compiler equivalence with zero compile blocks.",
+        "semantic_oracle_evidence": "PASS: a body-only mutation and a source-authority mutation both fail with ledger drift.",
+        "native_excel_evidence": "NOT_APPLICABLE_CONTENT_ADDRESS_INTEGRITY",
+        "commit": "6fb41cd"
       }
     },
     {
