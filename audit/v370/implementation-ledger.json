@@ -1,6 +1,6 @@
 {
   "schema_version": "excel-inflow-v370-implementation-ledger/1.0",
-  "recorded_at": "2026-08-17T17:56:22Z",
+  "recorded_at": "2026-08-17T18:03:07Z",
   "source_request": "Excel Inflow v3.7 repair handover dated 2026-08-17",
   "repository": {
     "remote": "https://github.com/computering001/excel-inflow.git",
@@ -227,12 +227,12 @@
       "implementation": {
         "invariant": "Exactly one forecast mode is selected: children-own and parent sums, or parent-owns and children are blank/captured.",
         "baseline_reproduction": "FAIL reproduced in run_forecast_behavior_tests.mjs: a source-visible reported parent and both complete children retained independent user-assumption authorities.",
-        "focused_test": "PASS: 31 forecast-behavior checks; mixed ownership blocks in every forecast period while valid children-own and parent-own modes remain accepted.",
+        "focused_test": "PASS: 31 forecast-behavior checks plus the statement-classifier projection-alias regression; mixed ownership blocks in every forecast period while valid children-own and parent-own modes remain accepted.",
         "source_fix": "Forecast-authority validation now derives section-local source-visible aggregate membership and enforces exactly one owner per period without treating ordinary EBIT/EBITDA bridge levels as one aggregate.",
-        "integration_evidence": "PASS: forecast development phase 6/6; forecast topology 27/27; both frozen compiler cases solve cleanly with zero economic, plan or compile diffs.",
+        "integration_evidence": "PASS: forecast development phase 6/6; forecast topology 31/31; both frozen compiler cases solve cleanly with zero economic, plan or compile diffs; the projected EBIT/operating-profit authority passes the production decisions gate.",
         "semantic_oracle_evidence": "PASS: unfamiliar issuer labels and source-line identities drive the check; no cell addresses or company exceptions are used.",
         "native_excel_evidence": "NOT_APPLICABLE_SEMANTIC_AUTHORITY_GATE",
-        "commit": "f3f53e7"
+        "commit": "f3f53e7 (single-owner authority); b11acad (projected-role coverage compatibility)"
       }
     },
     {
@@ -374,12 +374,12 @@
       "implementation": {
         "invariant": "CFI is a same-period formula over top-level investing members in every historical, forecast, adjustment and pro forma period.",
         "baseline_reproduction": "FAIL reproduced: the baseline independent OOXML oracle accepted a prior-period protected subtotal carry.",
-        "focused_test": "PASS: forecast topology 30/30 with a semantic prior-period mutation; protected-identity OOXML checks 4/4 and real-workbook adversarial mutations 8/8.",
-        "source_fix": "Protected investing cash flow must resolve as accounting_identity; its source formula must be non-temporal and sum exactly the top-level rows in the investing statement band.",
-        "integration_evidence": "PASS: forecast phase gate 6/6 and both frozen compiler cases solve with zero compile, economic or plan diffs.",
+        "focused_test": "PASS: forecast topology 31/31 covers semantic prior-period mutation and nested investing detail; protected-identity OOXML checks 4/4 and real-workbook adversarial mutations 8/8.",
+        "source_fix": "Protected investing cash flow must resolve as accounting_identity; its source formula must be non-temporal and sum exactly the top-level rows in the investing statement band, excluding nested formula members from that top-level set.",
+        "integration_evidence": "PASS: forecast phase gate 6/6, both frozen compiler cases solve with zero compile/economic/plan diffs, and the production no-question user flow reaches the decisions checkpoint.",
         "semantic_oracle_evidence": "PASS: 9d24f24 enforces workbook formula ownership/current-period membership; 14dceb9 enforces the matching semantic authority before emission.",
         "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
-        "commit": "14dceb9 (source repair); 9d24f24 (independent workbook guardrail)"
+        "commit": "14dceb9 (source repair); 9d24f24 (independent workbook guardrail); d7d659c (nested-member compatibility)"
       }
     },
     {
@@ -416,12 +416,12 @@
       "implementation": {
         "invariant": "The row is zero when acquisition is off and links exactly once to transaction consideration when on; no FX-row dependency exists.",
         "baseline_reproduction": "FAIL reproduced in both funded-acquisition output adapters: the portable workbook accepted an investing total bound to FX instead of consideration, and the captured plan accepted a second physical consideration row.",
-        "focused_test": "PASS: funded-acquisition transaction suite 14/14 covers disabled zero, close-year consideration, semantic investing ownership, no FX dependency and one N:P physical target.",
-        "source_fix": "The portable row-plan route requires exactly one consideration and debt-proceeds row, exactly one investing total, one consideration membership and no FX member; the captured-plan route requires one complete N:P row per transaction role.",
-        "integration_evidence": "PASS: economics phase gate 3/3 and two frozen compiler cases with zero compile, economic or plan diffs.",
+        "focused_test": "PASS: funded-acquisition transaction suite 14/14 covers disabled zero, close-year consideration, semantic investing ownership, no FX dependency and one N:P physical target; source proposer 42/42 binds the filed FX cash line independently.",
+        "source_fix": "The portable row-plan route requires exactly one consideration and debt-proceeds row, exactly one investing total, one consideration membership and no FX member; the captured-plan route requires one complete N:P row per transaction role; filed FX-effect aliases bind only to fx_effect_on_cash.",
+        "integration_evidence": "PASS: economics phase gate 3/3, two frozen compiler cases with zero compile/economic/plan diffs, and the production no-question user flow reaches the decisions checkpoint.",
         "semantic_oracle_evidence": "PASS: binding is derived from semantic role/row identity, never workbook row number; duplicate and FX-bound mutations both fail closed.",
         "native_excel_evidence": "PENDING_OVERALL_REPAIRED_PACKAGE_CERTIFICATION",
-        "commit": "f6d9ca3"
+        "commit": "f6d9ca3 (transaction binding); e8e3d1a (filed FX-role binding)"
       }
     },
     {
