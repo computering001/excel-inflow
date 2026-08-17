@@ -92,6 +92,49 @@ def mutate_formula(
             outgoing.writestr(info, data)
 
 
+def remove_formula(
+    source: Path,
+    destination: Path,
+    *,
+    part: str,
+    address: str,
+) -> None:
+    """Turn one formula cell into its existing cached literal value."""
+
+    cell_pattern = re.compile(
+        r'(<(?:[A-Za-z_][\w.-]*:)?c\b(?=[^>]*\br="%s")[^>]*>[\s\S]*?'
+        r'</(?:[A-Za-z_][\w.-]*:)?c>)' % re.escape(address)
+    )
+    formula_pattern = re.compile(
+        r'<(?:[A-Za-z_][\w.-]*:)?f\b[^>]*>[\s\S]*?'
+        r'</(?:[A-Za-z_][\w.-]*:)?f>'
+    )
+    with zipfile.ZipFile(source, "r") as incoming, zipfile.ZipFile(
+        destination, "w", compression=zipfile.ZIP_DEFLATED
+    ) as outgoing:
+        for info in incoming.infolist():
+            data = incoming.read(info.filename)
+            if info.filename == part:
+                text = data.decode("utf-8")
+                matches = list(cell_pattern.finditer(text))
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        "expected one cell %s, found %d"
+                        % (address, len(matches))
+                    )
+                cell_text = matches[0].group(1)
+                changed_cell, count = formula_pattern.subn("", cell_text, count=1)
+                if count != 1:
+                    raise RuntimeError("expected %s to contain one formula" % address)
+                text = (
+                    text[: matches[0].start(1)]
+                    + changed_cell
+                    + text[matches[0].end(1) :]
+                )
+                data = text.encode("utf-8")
+            outgoing.writestr(info, data)
+
+
 def run_oracle(workbook: Path, contract: dict, model_ir: dict) -> dict:
     return verify(read_workbook(workbook), contract, model_ir)
 
@@ -166,13 +209,12 @@ def main() -> int:
     )
 
     requirements = physical.get("required_formula_paths") or []
-    self_path = next(
+    prior_path = next(
         item
         for item in requirements
-        if item.get("consumer_display_id") == item.get("dependency_display_id")
-        and item.get("period_relation") == "prior_period"
+        if item.get("period_relation") == "prior_period"
     )
-    dependency_cell = self_path["dependency_cell"]
+    dependency_cell = prior_path["dependency_cell"]
     dependency_column, dependency_row = re.fullmatch(
         r"([A-Z]+)([0-9]+)", dependency_cell
     ).groups()
@@ -181,12 +223,76 @@ def main() -> int:
         % (re.escape(dependency_column), dependency_row)
     )
     with tempfile.TemporaryDirectory(prefix="semantic-oracle-mutations-") as temp:
+        protected = next(
+            item
+            for item in contract.get("protected_formula_identities") or []
+            if item.get("concept_id") == "cash_from_investing"
+        )
+        protected_owner = int(protected["owner_row"])
+        protected_cell = "J%s" % protected_owner
+        statement_part = sheet_part(
+            args.xlsx, physical.get("statement_sheet", "Operating Model")
+        )
+
+        hardcoded_identity_workbook = Path(temp) / "hardcoded-identity.xlsx"
+        remove_formula(
+            args.xlsx,
+            hardcoded_identity_workbook,
+            part=statement_part,
+            address=protected_cell,
+        )
+        hardcoded_identity_report = run_oracle(
+            hardcoded_identity_workbook, contract, model_ir
+        )
+        hardcoded_identity_code = "OOXML_PROTECTED_IDENTITY_FORMULA_REQUIRED"
+        mutation_results.append(
+            {
+                "id": "hardcoded-protected-identity",
+                "expected_code": hardcoded_identity_code,
+                "caught": hardcoded_identity_code
+                in finding_codes(hardcoded_identity_report),
+            }
+        )
+        (args.out / "hardcoded-protected-identity.json").write_text(
+            json.dumps(hardcoded_identity_report, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        prior_identity_workbook = Path(temp) / "prior-period-identity.xlsx"
+        mutate_formula(
+            args.xlsx,
+            prior_identity_workbook,
+            part=statement_part,
+            address=protected_cell,
+            transform=lambda _formula: "I%s" % protected_owner,
+        )
+        prior_identity_report = run_oracle(
+            prior_identity_workbook, contract, model_ir
+        )
+        prior_identity_codes = {
+            "OOXML_PROTECTED_IDENTITY_PRIOR_PERIOD",
+            "OOXML_PROTECTED_IDENTITY_MEMBER_MISSING",
+        }
+        mutation_results.append(
+            {
+                "id": "prior-period-protected-identity",
+                "expected_codes": sorted(prior_identity_codes),
+                "caught": prior_identity_codes.issubset(
+                    finding_codes(prior_identity_report)
+                ),
+            }
+        )
+        (args.out / "prior-period-protected-identity.json").write_text(
+            json.dumps(prior_identity_report, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
         missing_path_workbook = Path(temp) / "missing-path.xlsx"
         mutate_formula(
             args.xlsx,
             missing_path_workbook,
             part=sheet_part(args.xlsx, physical.get("statement_sheet", "Operating Model")),
-            address=self_path["consumer_cell"],
+            address=prior_path["consumer_cell"],
             transform=lambda formula: reference_pattern.sub(
                 "%s%s" % (dependency_column, int(dependency_row) + 1),
                 formula,
@@ -214,7 +320,7 @@ def main() -> int:
             adjacency[edge["consumer_display_id"]].add(
                 edge["dependency_display_id"]
             )
-        consumer_id = self_path["consumer_display_id"]
+        consumer_id = prior_path["consumer_display_id"]
         reached = set()
         pending = list(adjacency[consumer_id])
         while pending:
@@ -229,7 +335,7 @@ def main() -> int:
             if identifier != consumer_id and identifier not in reached
         )
         consumer_column = re.fullmatch(
-            r"([A-Z]+)([0-9]+)", self_path["consumer_cell"]
+            r"([A-Z]+)([0-9]+)", prior_path["consumer_cell"]
         ).group(1)
         wrong_cell = "%s%s" % (consumer_column, nodes[wrong_id]["row"])
         unauthorised_workbook = Path(temp) / "unauthorised-edge.xlsx"
@@ -237,7 +343,7 @@ def main() -> int:
             args.xlsx,
             unauthorised_workbook,
             part=sheet_part(args.xlsx, physical.get("statement_sheet", "Operating Model")),
-            address=self_path["consumer_cell"],
+            address=prior_path["consumer_cell"],
             transform=lambda formula: "%s+0*%s" % (formula, wrong_cell),
         )
         unauthorised_report = run_oracle(unauthorised_workbook, contract, model_ir)

@@ -721,6 +721,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "protected-identity-semantic-oracle",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "verify/run_protected_identity_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "delivery-inventory",
       "phase": "proof",
       "runtime": "node",

@@ -648,6 +648,75 @@ def verify(facts: WorkbookFacts, contract: dict, model_ir: dict | None = None) -
                     column=column,
                 )
 
+    # Protected accounting identities are an independent product doctrine,
+    # not merely another projection of whatever forecast authority happened
+    # to enter the model IR.  A subtotal or cash bridge declared here must be
+    # a formula, must consume every declared member in the same period, and
+    # must not silently become a prior-period carry.  The proof contract uses
+    # physical rows sealed before emission; this verifier reads only OOXML.
+    for rule in contract.get("protected_formula_identities", []):
+        owners = _rule_rows(sheet, rule, "owner", label_column)
+        member_rows = sorted(
+            {
+                int(row)
+                for row in rule.get("member_rows", [])
+                if isinstance(row, int) and row > 0
+            }
+        )
+        if len(owners) != 1 or not member_rows:
+            block(
+                "OOXML_PROTECTED_IDENTITY_CONTRACT_UNRESOLVED",
+                f"Protected identity {rule.get('concept_id')} has no unique owner or members.",
+                owner_rows=owners,
+                member_rows=member_rows,
+            )
+            continue
+        owner_row = owners[0]
+        for column in rule.get("columns", forecast_columns):
+            owner_cell = _cell(sheet, column, owner_row)
+            if owner_cell is None or not owner_cell.formula:
+                block(
+                    "OOXML_PROTECTED_IDENTITY_FORMULA_REQUIRED",
+                    f"Protected identity {rule.get('concept_id')} is not a formula in {column}.",
+                    cell=f"{column}{owner_row}",
+                )
+                continue
+            references = expand_formula_references(owner_cell.formula, sheet_name)
+            expected_members = {
+                (sheet_name, f"{column}{row}") for row in member_rows
+            }
+            missing_members = sorted(
+                address
+                for expected_sheet, address in expected_members - references
+                if expected_sheet == sheet_name
+            )
+            if missing_members:
+                block(
+                    "OOXML_PROTECTED_IDENTITY_MEMBER_MISSING",
+                    f"Protected identity {rule.get('concept_id')} omits same-period members in {column}.",
+                    cell=f"{column}{owner_row}",
+                    missing=missing_members,
+                )
+            if rule.get("period_relation", "same_period") == "same_period":
+                prior_number = column_number(column) - 1
+                prior_column = column_name(prior_number) if prior_number > 0 else None
+                protected_rows = {owner_row, *member_rows}
+                prior_references = sorted(
+                    address
+                    for reference_sheet, address in references
+                    if reference_sheet == sheet_name
+                    and prior_column is not None
+                    and split_cell(address)[0] == prior_column
+                    and split_cell(address)[1] in protected_rows
+                )
+                if prior_references:
+                    block(
+                        "OOXML_PROTECTED_IDENTITY_PRIOR_PERIOD",
+                        f"Protected identity {rule.get('concept_id')} carries a prior-period dependency in {column}.",
+                        cell=f"{column}{owner_row}",
+                        references=prior_references,
+                    )
+
     formula_cells = []
     for candidate_sheet in facts.sheets.values():
         for cell in candidate_sheet.cells.values():
