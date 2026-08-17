@@ -1,0 +1,63 @@
+name: v360 find recovery base
+
+on:
+  push:
+    branches:
+      - agent/v360-publication-bridge
+    paths:
+      - .github/workflows/v360-find-recovery-base.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reconstruct verified recovery patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/v360-recovery.b64
+          for i in $(seq -w 0 15); do
+            tr -d '\n\r\t ' < "publish/v360-recovery-complete/part${i}.b64" >> /tmp/v360-recovery.b64
+          done
+          echo 'fa24f76ac907af6d0db50ee0827d9c268d55753800aa5e2248e4d0e3bc99060b  /tmp/v360-recovery.b64' | sha256sum -c -
+          base64 -d /tmp/v360-recovery.b64 | gzip -dc > /tmp/v360-recovery.patch
+          echo '5b89177b3bbd408493493be3b8fc32b90a375fccbceaacab9b285d49e62b5e0f  /tmp/v360-recovery.patch' | sha256sum -c -
+      - name: Test known candidate bases without modifying branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            ee5ae55cb8a0ce2f2d1d1b71810fc405c11416dd
+            9edbbfe1596071c03813badee21b99d714affc23
+            dcf459fdb0db4c54da644c6927a3e268188ffd6b
+            1bfaf1ae6fadc04494f80118784f23401824bf12
+            79fa7e9db1d8dcde65e8176a7f488e7adb680ce3
+            a20ccc028af726d918214ea97942781e978ba478
+          )
+          found=0
+          for base in "${candidates[@]}"; do
+            rm -rf /tmp/base-test
+            git worktree add --detach /tmp/base-test "$base" >/dev/null
+            if git -C /tmp/base-test apply --check /tmp/v360-recovery.patch >/tmp/apply.out 2>/tmp/apply.err; then
+              echo "APPLIES $base"
+              git -C /tmp/base-test apply /tmp/v360-recovery.patch
+              git -C /tmp/base-test diff --check
+              printf 'CHANGED_PATHS '
+              git -C /tmp/base-test diff --name-only | wc -l
+              printf 'TREE '
+              git -C /tmp/base-test add -A
+              git -C /tmp/base-test write-tree
+              found=$((found+1))
+            else
+              echo "NOAPPLY $base"
+              head -n 8 /tmp/apply.err || true
+            fi
+            git worktree remove --force /tmp/base-test
+          done
+          test "$found" -ge 1 || { echo 'No candidate base accepts the exact recovery patch.' >&2; exit 1; }
