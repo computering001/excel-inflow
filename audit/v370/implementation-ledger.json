@@ -963,16 +963,16 @@
       "earliest_responsible_layer": "Resume identity binding.",
       "candidate_files": "scripts/lib/run_carrier.mjs; scripts/lib/source_identity.mjs",
       "acceptance_criterion": "Resume requires active source commit, tree, closure, package mode and installation identity match, or an explicit migration receipt.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Resume requires active source commit, tree, closure, package mode and installation identity match, or an explicit migration receipt.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced exactly: a hash-valid v3 carrier containing forged source commit, tree, runtime closure, package mode, repository and installation identity was accepted because verification checked only field presence and the carrier's own hash.",
+        "focused_test": "PASS: carrier v4 and migration suite 38/38 covers active comparison across all six resume dimensions, typed v3 compatibility, opaque-v3/v2 fail-closed behavior and eight receipt/hash/custody mutations.",
+        "source_fix": "Carrier v4 binds the typed product identity and a resume projection hash. Verification recomputes current runtime bytes and compares source commit, tree, runtime-code closure, package mode, deployment status and installation identity. The explicit workspace-token-authorized migration route derives mismatches and invalidation; callers cannot supply either.",
+        "integration_evidence": "PASS: run_user_flow salts every invalidated stage input with the migration receipt, so source/runtime movement invalidates from inputs while deployment/install movement invalidates build_checks and delivery. Packaged route/module presence, source identity 12/12, broker preview 14/14 and release attestation 24/24 pass.",
+        "semantic_oracle_evidence": "PASS: forged v4/v3 identities, wrong token, stale receipt, external receipt, opaque v3, retired v2 and rehashed mismatch/invalidation/stage-input mutations are rejected against recomputed active identity.",
+        "native_excel_evidence": "NOT_APPLICABLE_RESUME_IDENTITY_CUSTODY",
+        "commit": "f334267"
       }
     },
     {
@@ -1005,16 +1005,16 @@
       "earliest_responsible_layer": "Immutable attestation.",
       "candidate_files": "scripts/lib/release_certification.mjs; scripts/compile_skill_release.mjs",
       "acceptance_criterion": "Build immutable package, hash it, then emit a separate external attestation; certified bytes never change.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Build immutable package, hash it, then emit a separate external attestation; certified bytes never change.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced independently: the compiler hashed runtime-manifest as a closure member, then mutated its certification fields and persisted source bytes after package emission; source, package and manifest therefore described different certified bytes.",
+        "focused_test": "PASS: immutable release-package attestation 24/24 rejects post-seal package mutation, package/attestation swaps, self-mutation, rehashed source-identity forgery, archive damage, in-package attestation paths, source runtime-manifest writes and inventory-before-manifest ordering.",
+        "source_fix": "Certified compilation now builds and smokes a fresh package, writes its final release manifest, seals the complete inventory, creates a deterministic external ustar archive and emits a sibling external attestation. It recomputes inventory afterward and never writes source or package bytes after the seal.",
+        "integration_evidence": "PASS: two clean compiler builds produced the same 301-file inventory 1aa79d70be0809c28222b89d0b190c67d7aa1a66be0cd60e37b20a96f5844c78 and byte-identical 6,452,736-byte ustar c23f25b2aa1e54d860236a43335ad54af2f5e6224295ca7fe2c5e0a4ba899bf8; certification 25/25 and identity 20/20 pass.",
+        "semantic_oracle_evidence": "PASS: verification independently recomputes the full package inventory, release-manifest identity and typed product identity; external attestation and archive paths are forced outside the package and created without overwrite.",
+        "native_excel_evidence": "PENDING_FRESH_CERTIFICATION_EVIDENCE_AND_PRODUCTION_PROMOTION",
+        "commit": "f334267"
       }
     },
     {
@@ -1047,16 +1047,16 @@
       "earliest_responsible_layer": "Process supervision.",
       "candidate_files": "scripts/run_excel_inflow_vnext.mjs; scripts/lib/process_tree.mjs",
       "acceptance_criterion": "Timeout terminates descendants, verifies none survive, preserves logs and does not release state early.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Timeout terminates descendants, verifies none survive, preserves logs and does not release state early.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced: vNext used a direct child SIGTERM timeout and rejected immediately, without process-group/descendant termination, survivor verification or durable stdout/stderr termination evidence.",
+        "focused_test": "PASS: runtime custody 21/21 with six mutations launches a detached SIGTERM-ignoring descendant, proves its PID is captured and dead before return, and preserves descendant stdout plus parent stderr and termination evidence.",
+        "source_fix": "vNext now uses the shared process-tree supervisor. It snapshots descendants and nested process groups, applies TERM then forced termination, waits and verifies no PID survives; a survivor is a hard custody error carrying both bounded output streams.",
+        "integration_evidence": "PASS: both vNext delegate failure paths retain stdout, stderr, timeout flag, termination verification and survivor list; the controller cannot release normal state before process-tree custody closes.",
+        "semantic_oracle_evidence": "PASS: the adversarial detached-grandchild mutation would survive the retired direct-child path and is killed by the production helper; source inspection proves the weak child.kill path is absent.",
+        "native_excel_evidence": "NOT_APPLICABLE_PROCESS_SUPERVISION",
+        "commit": "f334267"
       }
     },
     {
@@ -1068,16 +1068,16 @@
       "earliest_responsible_layer": "Interpreter custody.",
       "candidate_files": "scripts/run_excel_inflow_vnext.mjs; subordinate Python launch sites",
       "acceptance_criterion": "One resolved Python executable is passed through every subprocess.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "One resolved Python executable is passed through every subprocess.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: vNext accepted a selected Python but subordinate filing and attachment verification paths invoked bare python3, allowing PATH or host drift to select a different interpreter.",
+        "focused_test": "PASS: runtime custody proves an absolute executable is resolved once and a poisoned PATH cannot replace EXCEL_INFLOW_PYTHON in subordinate attachment, filing or user-flow paths.",
+        "source_fix": "The top-level controller probes sys.executable to a real absolute executable, forwards it through both user-flow launches and the environment, and subordinate attachment/filing paths either use that exact authority or resolve their standalone compatibility candidate before launch.",
+        "integration_evidence": "PASS: runtime custody 21/21, source-ingress security 26/26 and source identity 12/12 pass with direct attachment, both user-flow and release-orchestration forwarding assertions.",
+        "semantic_oracle_evidence": "PASS: a relative EXCEL_INFLOW_PYTHON and a poisoned fallback python3 are rejected; source scans prove the shipping subordinate launch sites no longer call bare python3.",
+        "native_excel_evidence": "NOT_APPLICABLE_INTERPRETER_CUSTODY",
+        "commit": "f334267"
       }
     },
     {
@@ -1089,16 +1089,16 @@
       "earliest_responsible_layer": "Lease expiry and takeover.",
       "candidate_files": "scripts/lib/runtime_isolation.mjs; scripts/lib/run_store.mjs",
       "acceptance_criterion": "Lease has heartbeat, expiry, host/session identity and auditable takeover.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Lease has heartbeat, expiry, host/session identity and auditable takeover.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: every foreign-host lease was treated as live forever because liveness depended only on same-host PID checks and carried no heartbeat, expiry or session identity.",
+        "focused_test": "PASS: runtime custody 21/21 proves renewal, live contention, expired foreign takeover, future foreign rejection and malformed-current fail-closed behavior; six adversarial mutations are closed.",
+        "source_fix": "Lease v1.1 carries hashed host and session identities, acquired/heartbeat/expiry timestamps, sequence and bounded durations. A background heartbeat renews ownership; expired takeover atomically isolates the stale directory and writes a hash-bound permanent receipt before new custody begins.",
+        "integration_evidence": "PASS: user-flow and release orchestration bind the workspace token as lease session authority. Release rejects a heartbeat failure and never removes a lease owned by another token.",
+        "semantic_oracle_evidence": "PASS: the takeover receipt independently binds the complete prior lease hash, owner, PID, host/session, heartbeat/expiry, reason and acquiring host/session; unexpired or malformed-during-grace foreign leases cannot be stolen.",
+        "native_excel_evidence": "NOT_APPLICABLE_RUNTIME_LEASE_CUSTODY",
+        "commit": "f334267"
       }
     },
     {
@@ -1110,16 +1110,16 @@
       "earliest_responsible_layer": "Experience trace accounting.",
       "candidate_files": "scripts/lib/experience_trace.mjs; scripts/experience_trace.py",
       "acceptance_criterion": "Coverage is computed from leaf work and explicit waits; gaps remain visible.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Coverage is computed from leaf work and explicit waits; gaps remain visible.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced: a root excel_inflow_active span covered the whole controller lifetime, so interval union classified all elapsed time and concealed every unowned gap.",
+        "focused_test": "PASS: JavaScript leaf-coverage 7/7 with one root-mask mutation, Python trace 8/8 with one mutation and host external-wait trace 3/3.",
+        "source_fix": "Both trace runtimes now exclude declared roots and containing stage spans from coverage, union only leaf work and explicit named waits, and emit the exact classified leaf IDs. vNext marks its root and instruments supervised subprocesses as leaves; attachment root-only time remains visibly unknown.",
+        "integration_evidence": "PASS: registered JS/Python tests prove a 100ms root containing two 20ms leaves reports 40ms classified and 60ms unknown while a real external host wait remains classified.",
+        "semantic_oracle_evidence": "PASS: a root-only hostile trace reports zero classified and the full duration unknown; parent containment cannot inflate the leaf union.",
+        "native_excel_evidence": "NOT_APPLICABLE_EXPERIENCE_TRACE_ACCOUNTING",
+        "commit": "dd90815"
       }
     },
     {
@@ -1194,16 +1194,16 @@
       "earliest_responsible_layer": "Broker runtime policy.",
       "candidate_files": "scripts/run_broker_pipeline.py; scripts/broker_terminal_recovery.py",
       "acceptance_criterion": "Timeouts are evidence-size aware, supervised and observable; valid recovery is not prematurely abandoned.",
-      "status": "OPEN",
+      "status": "CLOSED_SOURCE_AND_SEMANTIC_GATES",
       "implementation": {
         "invariant": "Timeouts are evidence-size aware, supervised and observable; valid recovery is not prematurely abandoned.",
-        "baseline_reproduction": "PENDING",
-        "focused_test": "PENDING",
-        "source_fix": "PENDING",
-        "integration_evidence": "PENDING",
-        "semantic_oracle_evidence": "PENDING",
-        "native_excel_evidence": "PENDING",
-        "commit": null
+        "baseline_reproduction": "FAIL reproduced at source: every native PDF table lane received a fixed 0.5-second alarm regardless of page count, page density, demanded concepts or discovery strategy, prematurely degrading valid dense evidence.",
+        "focused_test": "PASS: broker PDF timeout policy 6/6 with one mutation proves budgets grow with evidence size and lane cost, a valid 0.55-second native read completes, and an injected pathological lane is still interrupted.",
+        "source_fix": "Per-lane budgets are now finite 2-15 second evidence-sized functions of document pages, page words, bounded target concepts and discovery strategy; the total document budget scales to a capped 30-300 seconds.",
+        "integration_evidence": "PASS: every page's evidence bundle records lane status, budget, duration, candidate count and timeout/error detail; native preflight reuse 4/4 and broker demand selection 18/18 pass.",
+        "semantic_oracle_evidence": "PASS: the policy mutation proves the retired 0.5-second threshold would abandon a valid read, while the production signal supervisor still stops the explicitly over-budget lane.",
+        "native_excel_evidence": "PENDING_REAL_DENSE_NATIVE_BROKER_PDF_RUN",
+        "commit": "dd90815"
       }
     },
     {
