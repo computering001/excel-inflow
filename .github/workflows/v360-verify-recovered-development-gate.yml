@@ -1,4 +1,4 @@
-# diagnose the last Stage-4 checkpoint failure on the completed recovered v3.6 target
+# verify the last Stage-4 checkpoint seam using a HOME-independent Python runtime
 name: v360 verify recovered development gate
 
 on:
@@ -12,47 +12,36 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fdfdea50dce4b228e35e5263ece366e60203a8cc
           fetch-depth: 0
-      - name: Install Stage-4 runtime
+      - name: Install isolated Stage-4 runtime
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y libreoffice
-          python3 -m pip install --upgrade pip
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
-      - name: Reproduce Stage-4 interruption and dump internal state
+          sudo apt-get install -y libreoffice python3-venv
+          python3 -m venv /tmp/v360-python
+          /tmp/v360-python/bin/python -m pip install --upgrade pip
+          /tmp/v360-python/bin/python -m pip install pymupdf openpyxl pillow jsonschema lxml numpy
+          HOME=/tmp/v360-isolated-home /tmp/v360-python/bin/python -c 'import openpyxl, pymupdf, PIL, numpy; print(openpyxl.__version__)'
+      - name: Run Stage-4 checkpoint interruption and recovery
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           export DEBT_OVERLAY_CASES_DIR="$GITHUB_WORKSPACE/test-fixtures/cases"
-          export DEBT_OVERLAY_PYTHON="$(command -v python3)"
-          export EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)"
+          export DEBT_OVERLAY_PYTHON="/tmp/v360-python/bin/python"
+          export EXCEL_INFLOW_TEST_PYTHON="/tmp/v360-python/bin/python"
           export SOFFICE_BIN="$(command -v soffice)"
-          out=/tmp/v360-stage4-diagnostic
-          rm -rf "$out"
+          rm -rf /tmp/v360-stage4-proof
           node scripts/run_stage4_checkpoint_tests.mjs \
             --cases test-fixtures/cases \
-            --python "$(command -v python3)" \
+            --python /tmp/v360-python/bin/python \
             --soffice "$(command -v soffice)" \
-            --out "$out"
-          test_exit=$?
-          echo "STAGE4_TEST_EXIT=$test_exit"
-          echo '--- user-flow result ---'
-          find "$out" -name user-flow-result.json -print -exec cat {} \;
-          echo '--- build-result ---'
-          find "$out" -name build-result.json -print -exec cat {} \;
-          echo '--- stage4 filesystem ---'
-          find "$out" -path '*/.stage4/*' -maxdepth 12 -type f -printf '%p\n' | sort
-          echo '--- receipt contents ---'
-          find "$out" -path '*/.stage4/receipts/*.json' -type f -print -exec sh -c 'cat "$1"; echo' _ {} \;
-          echo '--- orchestrator logs/receipts outside .stage4 ---'
-          find "$out" -type f \( -name '*gate*.json' -o -name '*receipt*.json' -o -name '*result*.json' \) -print | sort
-          exit $test_exit
+            --out /tmp/v360-stage4-proof
+          cat /tmp/v360-stage4-proof/stage4-checkpoint-test-report.json
