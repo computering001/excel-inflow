@@ -1388,6 +1388,62 @@ function brokerMetricRowMap(modelCase) {
   };
 }
 
+const QUALITY_FALLBACK_METHODS = new Set([
+  "driver_formula",
+  "roll_forward",
+  "seasonal_run_rate",
+  "historical_average",
+  "historical_trend",
+  "carry_forward",
+  "explicit_zero",
+]);
+
+function workbookQualityDisclosure(modelCase, brokerEvidence) {
+  const houses = brokerNames(modelCase);
+  const selection = String(modelCase.controls?.broker_case ?? "Not selected");
+  const selectedMetricIds = consumedBrokerMetricIds(modelCase);
+  const ledgerRows = modelCase.forecast_authority_ledger?.rows ?? [];
+  const fallbackCount = ledgerRows.filter(
+    (entry) =>
+      QUALITY_FALLBACK_METHODS.has(entry.method) ||
+      (entry.broker_rejection_reasons ?? []).length > 0,
+  ).length;
+  const rejectedAuthorityCount = ledgerRows.filter(
+    (entry) => (entry.broker_rejection_reasons ?? []).length > 0,
+  ).length;
+  const quarantinedCellCount = Number(brokerEvidence?.quarantinedCellCount ?? 0);
+  const unresolvedCount = ledgerRows.filter(
+    (entry) => entry.status === "BLOCK" || entry.method === "unresolved",
+  ).length;
+  const selectedHouses = ["Consensus", "High", "Low"].includes(selection)
+    ? houses
+    : houses.includes(selection)
+      ? [selection]
+      : [];
+  const degraded =
+    selection === "Forecast Waterfall" ||
+    fallbackCount > 0 ||
+    rejectedAuthorityCount > 0 ||
+    quarantinedCellCount > 0 ||
+    unresolvedCount > 0;
+  return {
+    source_identity: `${modelCase.case_id} · contract v${modelCase.contract_version}`,
+    source_label: modelCase.broker_pack?.source_label ?? "No broker source label declared",
+    broker_status:
+      selection === "Forecast Waterfall"
+        ? "DEGRADED — company evidence / forecast waterfall"
+        : `${selection} selected`,
+    selected_house_count: selectedHouses.length,
+    selected_metric_ids: selectedMetricIds,
+    fallback_count: fallbackCount,
+    rejected_evidence_count: rejectedAuthorityCount + quarantinedCellCount,
+    quarantined_cell_count: quarantinedCellCount,
+    unresolved_count: unresolvedCount,
+    quality_mode: degraded ? "DEGRADED / REVIEW" : "STANDARD",
+    certification_status: "PENDING — native Excel restoration and visual review",
+  };
+}
+
 // WHICH OPERATING-MODEL ROW STATES THIS BROKER METRIC.
 //
 // Resolved by SEMANTIC ROLE first, `row_id` second, and only then by
@@ -2335,59 +2391,50 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     row += 1;
   }
 
-  // A compact, visible evidence disposition. This is deliberately on the
-  // central Brokers sheet: a quarantined source cell must not silently vanish
-  // merely because the forecast waterfall found a safe non-broker authority.
-  // The raw value remains on its house tab in amber; this block tells the
-  // analyst whether broker cells were linked, retained only as evidence, or
-  // excluded from formulas.
-  if (brokerEvidence) {
-    setValue(sheet, `B${row}`, "BROKER EVIDENCE STATUS");
-    sheet.getRange(`B${row}:${LAST_COLUMN}${row}`).format.fill = COLORS.navy;
-    styleFont(sheet, `B${row}:${LAST_COLUMN}${row}`, COLORS.white, { bold: true });
-    row += 1;
-    const brokerCase = String(modelCase.controls?.broker_case ?? "");
-    setValue(sheet, `B${row}`, "Forecast authority");
-    setValue(
-      sheet,
-      `C${row}`,
-      brokerCase === "Forecast Waterfall"
-        ? "Company evidence / forecast waterfall — no broker case selected"
-        : brokerCase || "Not selected",
-    );
-    styleFont(sheet, `C${row}`, brokerCase === "Forecast Waterfall" ? COLORS.stateAmber : COLORS.black, {
-      bold: true,
-    });
-    row += 1;
-    setValue(sheet, `B${row}`, "Model-linked broker mappings");
-    setValue(sheet, `C${row}`, brokerEvidence.mappingByKey.size);
-    styleFont(sheet, `C${row}`, COLORS.black);
-    row += 1;
-    setValue(sheet, `B${row}`, "Quarantined source cells");
-    setValue(sheet, `C${row}`, brokerEvidence.quarantinedCellCount);
-    setValue(
-      sheet,
-      `D${row}`,
-      brokerEvidence.quarantinedCellCount > 0
-        ? "Retained on source tabs; prohibited from model formulas"
-        : "None",
-    );
-    styleFont(
-      sheet,
-      `C${row}:D${row}`,
-      brokerEvidence.quarantinedCellCount > 0 ? COLORS.stateAmber : COLORS.grey,
-    );
-    row += 1;
-    setValue(sheet, `B${row}`, "Raw broker tables rendered");
-    setValue(sheet, `C${row}`, brokerEvidence.tableCount);
-    setValue(
-      sheet,
-      `D${row}`,
-      `${brokerEvidence.evidenceOnlyTableCount} evidence-only`,
-    );
-    styleFont(sheet, `C${row}:D${row}`, COLORS.grey);
-    row += 2;
-  }
+  // A compact disclosure on the central Brokers sheet. It is always emitted,
+  // including cases with no raw broker-page layout, so degraded authority,
+  // rejected evidence and outstanding certification cannot disappear simply
+  // because a safe forecast fallback exists.
+  const quality = workbookQualityDisclosure(modelCase, brokerEvidence);
+  setValue(sheet, `B${row}`, "BUILD IDENTITY / QUALITY");
+  sheet.getRange(`B${row}:${LAST_COLUMN}${row}`).format.fill = COLORS.navy;
+  styleFont(sheet, `B${row}:${LAST_COLUMN}${row}`, COLORS.white, { bold: true });
+  row += 1;
+  setValue(sheet, `B${row}`, "Case source identity");
+  setValue(sheet, `C${row}`, quality.source_identity);
+  setValue(sheet, `E${row}`, quality.source_label);
+  styleFont(sheet, `C${row}:E${row}`, COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Broker status");
+  setValue(sheet, `C${row}`, quality.broker_status);
+  setValue(sheet, `E${row}`, `${quality.selected_house_count} selected house(s)`);
+  styleFont(sheet, `C${row}:E${row}`, quality.quality_mode === "STANDARD" ? COLORS.black : COLORS.stateAmber, {
+    bold: true,
+  });
+  row += 1;
+  setValue(sheet, `B${row}`, "Selected broker metrics");
+  setValue(sheet, `C${row}`, quality.selected_metric_ids.length);
+  setValue(sheet, `E${row}`, quality.selected_metric_ids.join(", ") || "None");
+  styleFont(sheet, `C${row}:E${row}`, COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Forecast fallbacks");
+  setValue(sheet, `C${row}`, quality.fallback_count);
+  setValue(sheet, `E${row}`, `${quality.unresolved_count} unresolved`);
+  styleFont(sheet, `C${row}:E${row}`, quality.fallback_count > 0 ? COLORS.stateAmber : COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Rejected / quarantined evidence");
+  setValue(sheet, `C${row}`, quality.rejected_evidence_count);
+  setValue(sheet, `E${row}`, `${quality.quarantined_cell_count} quarantined source cell(s)`);
+  styleFont(sheet, `C${row}:E${row}`, quality.rejected_evidence_count > 0 ? COLORS.stateAmber : COLORS.grey);
+  row += 1;
+  setValue(sheet, `B${row}`, "Quality mode");
+  setValue(sheet, `C${row}`, quality.quality_mode);
+  styleFont(sheet, `C${row}`, quality.quality_mode === "STANDARD" ? COLORS.black : COLORS.stateAmber, { bold: true });
+  row += 1;
+  setValue(sheet, `B${row}`, "Delivery certification");
+  setValue(sheet, `C${row}`, quality.certification_status);
+  styleFont(sheet, `C${row}`, COLORS.stateAmber, { bold: true });
+  row += 2;
 
   // INDEPENDENT FORECAST ASSUMPTIONS LIVE HERE, NOT ON THE MODEL FACE.
   //
@@ -12376,4 +12423,9 @@ if (invokedDirectly) {
 // `main` is exported for scripts/build_package.mjs, the local-only `--out`
 // driver. It is the same `main()` this file runs when it is invoked directly;
 // there is no second copy of the build for the certification path to drift from.
-export { assertShippedPlan, declareShippedFacts, main };
+export {
+  assertShippedPlan,
+  declareShippedFacts,
+  main,
+  workbookQualityDisclosure,
+};

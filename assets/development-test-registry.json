@@ -883,6 +883,15 @@
       "test_class": "unit"
     },
     {
+      "id": "workbook-build-identity-quality-panel",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_workbook_quality_panel_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "test-registry-contract",
       "phase": "proof",
       "runtime": "node",
