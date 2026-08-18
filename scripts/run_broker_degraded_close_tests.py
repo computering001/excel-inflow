@@ -1416,12 +1416,49 @@ def main() -> int:
             all(item.get("model_use") == "reference_only" for item in reference_shell.get("metrics", {}).values()),
             "reference-only shell promoted a metric",
         )
+        # Reproduce the real-pack failure: a review authored before bounded
+        # physical quarantine can still name a canonical table that is no
+        # longer in the active verified bundle. Zero authority owns no mapped
+        # decision to preserve, so it must rebuild this derived inventory.
+        stale_table_id = "ct-quarantined-before-zero-authority"
+        stale_shell = json.loads(json.dumps(reference_shell))
+        stale_shell["table_reviews"].insert(0, {
+            "table_id": stale_table_id,
+            "house_id": zero_bundle["documents"][0]["house_id"],
+            "review_status": "reviewed",
+            "rationale": "Stale pre-quarantine review mutation.",
+            "classification": "non_forecast",
+            "header_rows": [],
+            "period_columns": [],
+        })
+        bundle_before_zero = broker.sha256_file(zero_bundle_path)
         zero_crosswalk, zero_receipt, _ = degrade_all_broker_authority(
             bundle=zero_bundle,
-            crosswalk=reference_shell,
+            crosswalk=stale_shell,
             bundle_sha256=broker.sha256_file(zero_bundle_path),
-            source_crosswalk_sha256=broker.sha256_bytes(canonical_bytes(reference_shell)),
+            source_crosswalk_sha256=broker.sha256_bytes(canonical_bytes(stale_shell)),
             reason="Regression-forced global semantic failure.",
+        )
+        current_table_ids = {
+            str(table["table_id"])
+            for document in zero_bundle.get("documents", [])
+            for table in document.get("tables", [])
+        }
+        zero_review_ids = {
+            str(review["table_id"])
+            for review in zero_crosswalk.get("table_reviews", [])
+        }
+        check(
+            zero_review_ids == current_table_ids,
+            "zero-authority reviews do not exactly match the active canonical table universe",
+        )
+        check(
+            stale_table_id not in zero_review_ids,
+            "a quarantined stale table review survived zero-authority compilation",
+        )
+        check(
+            broker.sha256_file(zero_bundle_path) == bundle_before_zero,
+            "zero-authority review repair mutated the preserved broker evidence bundle",
         )
         zero_crosswalk_path = root / "zero-authority-crosswalk.json"
         write_json(zero_crosswalk_path, zero_crosswalk)
@@ -1467,7 +1504,7 @@ def main() -> int:
         )
         check(zero_compile.returncode == 0, zero_compile.stderr or zero_compile.stdout)
         check((zero_pack_root / "broker-pack.json").is_file(), "zero-authority pack was not emitted")
-        checks += 8
+        checks += 11
 
         if args.out:
             write_json(root / "degraded-close-test-output.json", {

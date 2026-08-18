@@ -932,6 +932,21 @@ def degrade_all_broker_authority(
     pruned.pop("provider_consensus", None)
     pruned.pop("derived_mappings", None)
     pruned.pop("flex_elections", None)
+    # Table reviews are an inventory of the ACTIVE verified/canonical table
+    # universe, not immutable source evidence and not a decision worth carrying
+    # through a zero-authority close. A bounded physical quarantine may remove
+    # or replace tables after an earlier/model-host crosswalk was authored. Once
+    # all mappings are removed, regenerate this derived ledger from the current
+    # bundle so a stale quarantined table cannot survive as an impossible pack
+    # repair task. Raw tables and candidates remain untouched in the bundle and
+    # terminal quarantine receipt.
+    current_shell = compile_reference_only_crosswalk(bundle, {
+        "as_of": pruned.get("as_of"),
+        "reporting_currency": pruned.get("reporting_currency"),
+        "units": pruned.get("units"),
+        "forecast_periods": pruned.get("forecast_periods"),
+    })
+    pruned["table_reviews"] = current_shell["table_reviews"]
     for declaration in (pruned.get("metrics") or {}).values():
         if isinstance(declaration, dict):
             declaration["model_use"] = "reference_only"
