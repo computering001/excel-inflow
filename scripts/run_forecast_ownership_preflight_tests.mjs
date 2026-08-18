@@ -184,6 +184,10 @@ mixed.statement_structure.cash_flow[0].forecast_period_authorities[1]
   .selection_rank = structuredClone(sealedIdentityRank);
 mixed.statement_structure.cash_flow[0].forecast_period_authorities[2]
   .selection_rank = structuredClone(sealedIdentityRank);
+mixed.statement_structure.cash_flow[0].forecast_period_authorities[1]
+  .material = false;
+mixed.statement_structure.cash_flow[0].forecast_period_authorities[2]
+  .material = false;
 const mixedReceipt = resolveSelectedForecastOwnership(mixed);
 assert.deepEqual(
   mixedReceipt.resolutions.map((item) => item.selected_mode),
@@ -199,8 +203,88 @@ assert.deepEqual(
   sealedIdentityRank,
   "children-owned resolution discarded the sealed formula rank proof",
 );
+assert.equal(
+  mixed.statement_structure.cash_flow[0].forecast_period_authorities[1]
+    .material,
+  false,
+  "children-owned resolution promoted a source-declared immaterial identity",
+);
 sealOwnershipCensus(mixed);
 assert.equal(assertPhysicalOwnershipPreflight(mixed, physicalPlan(mixed)).status, "PASS");
+
+// Formula dependencies are reusable calculation inputs, not owned detail.
+// A direct parent cannot globally capture them away from a second identity.
+const sharedFormulaDependency = workingCapitalFixture();
+const sharedRows = sharedFormulaDependency.statement_structure.cash_flow;
+for (const child of sharedRows.slice(1)) delete child.parent_row_id;
+sharedRows.push({
+  row_id: "working_capital_cross_check",
+  label: "Movement cross-check",
+  semantic_role: "working_capital_cross_check",
+  row_type: "subtotal",
+  material: true,
+  calculation: {
+    operator: "sum",
+    refs: ["receivable_movement", "inventory_movement", "payable_movement"],
+  },
+  values: [-10, -12, -14, null, null, null],
+});
+const sharedReceipt = resolveSelectedForecastOwnership(sharedFormulaDependency);
+assert.deepEqual(
+  sharedReceipt.resolutions.map((item) => item.selected_mode),
+  ["parent_owned", "parent_owned", "parent_owned", "children_owned", "children_owned", "children_owned"],
+);
+for (const child of sharedRows.slice(1, 4)) {
+  assert.ok(
+    child.forecast_period_authorities.every(
+      (item) => item.method !== "not_separately_forecast",
+    ),
+    "formula dependency was globally captured away from a second identity",
+  );
+}
+const structurallyOwnedDependency = workingCapitalFixture();
+structurallyOwnedDependency.statement_structure.cash_flow.push(
+  structuredClone(sharedRows.at(-1)),
+);
+assert.throws(
+  () => resolveSelectedForecastOwnership(structurallyOwnedDependency),
+  /preflight B blocked.*unresolved material ownership/,
+  "structurally owned detail was incorrectly treated as a reusable formula dependency",
+);
+
+// Final sealing may rebuild a redundant identity authority after case
+// normalisation removes it. The rebuilt authority must still take its
+// materiality from mapped source evidence, not the presentation row default.
+const evidenceImmaterialIdentity = workingCapitalFixture();
+const evidenceParent = evidenceImmaterialIdentity.statement_structure.cash_flow[0];
+delete evidenceParent.forecast_period_authorities;
+evidenceImmaterialIdentity.source_coverage = {
+  cash_flow: [
+    {
+      source_line_id: "filing.cf.20",
+      mapped_row_ids: ["working_capital_total"],
+      material: false,
+    },
+  ],
+};
+const evidenceReceipt = resolveSelectedForecastOwnership(evidenceImmaterialIdentity);
+assert.ok(
+  evidenceReceipt.resolutions.every((item) => item.selected_mode === "children_owned"),
+);
+assert.ok(
+  evidenceParent.forecast_period_authorities.every(
+    (item) => item.method === "accounting_identity" && item.material === false,
+  ),
+  "identity reconstruction promoted mapped immaterial evidence",
+);
+const staleEvidenceMateriality = structuredClone(evidenceImmaterialIdentity);
+staleEvidenceMateriality.statement_structure.cash_flow[0]
+  .forecast_period_authorities[1].material = true;
+assert.throws(
+  () => verifySelectedForecastOwnership(staleEvidenceMateriality),
+  /topology is stale/,
+  "a changed reconstructed evidence materiality flag survived the ownership receipt",
+);
 
 // A schedule child is captured by default; explicit co-ownership is the only exception.
 const scheduleCase = workingCapitalFixture();
@@ -242,6 +326,43 @@ assert.match(
   /unresolved material ownership/,
 );
 
+// An absent child is not an ownership gap when mapped evidence declares that
+// child immaterial. Changing that source declaration must reverse the result.
+const immaterialMissingChild = workingCapitalFixture();
+immaterialMissingChild.statement_structure.cash_flow[0]
+  .forecast_period_authorities = authorities(
+    "accounting_identity",
+    "formula.wc",
+    [null, null, null],
+  );
+immaterialMissingChild.statement_structure.cash_flow[3]
+  .forecast_period_authorities = authorities(
+    "not_separately_forecast",
+    "missing.pay",
+    [null, null, null],
+  );
+immaterialMissingChild.source_coverage = {
+  cash_flow: [
+    {
+      source_line_id: "filing.cf.23",
+      mapped_row_ids: ["payable_movement"],
+      material: false,
+    },
+  ],
+};
+assert.equal(
+  resolveSelectedForecastOwnership(immaterialMissingChild).status,
+  "PASS",
+);
+const materialMissingChild = structuredClone(immaterialMissingChild);
+delete materialMissingChild.forecast_ownership_preflights;
+materialMissingChild.source_coverage.cash_flow[0].material = true;
+assert.throws(
+  () => resolveSelectedForecastOwnership(materialMissingChild),
+  /preflight B blocked.*unresolved material ownership/,
+  "material source evidence did not restore the missing-child blocker",
+);
+
 // Row order and issuer wording do not change the selected modes.
 const reordered = workingCapitalFixture();
 const parent = reordered.statement_structure.cash_flow.shift();
@@ -276,6 +397,14 @@ assert.throws(
   /topology is stale/,
   "a changed sealed formula rank proof survived the ownership receipt",
 );
+const staleMateriality = structuredClone(mixed);
+staleMateriality.statement_structure.cash_flow[0]
+  .forecast_period_authorities[1].material = true;
+assert.throws(
+  () => verifySelectedForecastOwnership(staleMateriality),
+  /topology is stale/,
+  "a changed source-owned materiality flag survived the ownership receipt",
+);
 const staleCensus = structuredClone(blocker);
 staleCensus.ownership_census.records.pop();
 assert.equal(compilePhysicalOwnershipPreflight(staleCensus, physicalPlan(staleCensus)).status, "BLOCK");
@@ -286,7 +415,7 @@ assert.equal(compilePhysicalOwnershipPreflight(blocker, missingDestination).stat
 
 console.log(JSON.stringify({
   status: "PASS",
-  checks: 28,
+  checks: 40,
   blocker_fixture: "working_capital_parent_broker_children_fallback",
   user_intervention_required: false,
   topology_elapsed_ms: Number(elapsedMs.toFixed(3)),

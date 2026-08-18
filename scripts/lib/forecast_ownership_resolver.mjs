@@ -1,6 +1,7 @@
 import { canonicalJson, hashValue } from "./run_store.mjs";
 import { verifyOwnershipCensus } from "./ownership_census.mjs";
 import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
+import { forecastRowMateriality } from "./forecast_authority.mjs";
 
 export const FORECAST_OWNERSHIP_PREFLIGHT_VERSION =
   "forecast-ownership-preflight/1.0";
@@ -27,6 +28,11 @@ function rowsBySection(modelCase) {
 function material(row) {
   return row?.row_type !== "header" && row?.material !== false &&
     row?.is_material !== false;
+}
+
+function sourceOwnedMateriality(modelCase, row) {
+  const mapped = forecastRowMateriality(modelCase, row);
+  return typeof mapped === "boolean" ? mapped : material(row);
 }
 
 function methodAt(row, forecastIndex) {
@@ -71,6 +77,12 @@ function familyRows(rows) {
     children.add(row.row_id);
     childrenByParent.set(row.parent_row_id, children);
   }
+  const structuralChildrenByParent = new Map(
+    [...childrenByParent].map(([parentId, childIds]) => [
+      parentId,
+      new Set(childIds),
+    ]),
+  );
   for (const row of rows) {
     if (row?.calculation?.operator !== "sum") continue;
     const children = childrenByParent.get(row.row_id) ?? new Set();
@@ -80,11 +92,15 @@ function familyRows(rows) {
     childrenByParent.set(row.row_id, children);
   }
   return rows.flatMap((parent) => {
+    const structuralChildIds = new Set(
+      structuralChildrenByParent.get(parent?.row_id) ?? [],
+    );
     const childIds = [...(childrenByParent.get(parent?.row_id) ?? [])].sort();
     if (childIds.length < 2) return [];
     return [{
       parent,
       children: childIds.map((rowId) => byId.get(rowId)).filter(Boolean),
+      structural_child_ids: structuralChildIds,
       formula_child_ids: new Set(
         parent?.calculation?.operator === "sum"
           ? (parent.calculation.refs ?? []).filter((rowId) => byId.has(rowId))
@@ -110,7 +126,7 @@ function topologyProjection(modelCase) {
       source_line_id: row?.source_line_id ?? null,
       source_line_ids: row?.source_line_ids ?? null,
       source_precision: row?.source_precision ?? null,
-      material: material(row),
+      material: sourceOwnedMateriality(modelCase, row),
     })),
   );
 }
@@ -145,7 +161,7 @@ export function compileStructuralOwnershipPreflight(modelCase) {
   const families = [];
   const violations = [];
   for (const { section, rows } of rowsBySection(modelCase)) {
-    for (const { parent, children, formula_child_ids } of familyRows(rows)) {
+    for (const { parent, children } of familyRows(rows)) {
       const family = familyShape(section, parent, children);
       const parentDemand = family.candidate_broker_demand_row_ids.includes(parent.row_id);
       const childDemand = family.candidate_broker_demand_row_ids.some(
@@ -181,7 +197,7 @@ export function compileStructuralOwnershipPreflight(modelCase) {
   return receipt;
 }
 
-function captureAuthority(parent, child, forecastIndex, rejectedAuthorities) {
+function captureAuthority(modelCase, parent, child, forecastIndex, rejectedAuthorities) {
   const rejected = child?.forecast_period_authorities?.[forecastIndex] ?? null;
   const priorCertificate = (child?.forecast_capture_certificates ?? []).find(
     (certificate) => certificate?.forecast_index === forecastIndex,
@@ -205,7 +221,7 @@ function captureAuthority(parent, child, forecastIndex, rejectedAuthorities) {
       ? rejected.material
       : typeof priorCertificate?.material === "boolean"
         ? priorCertificate.material
-      : material(child),
+      : sourceOwnedMateriality(modelCase, child),
     note: `Forecast detail is represented once by ${parent.row_id}.`,
   };
   if (Array.isArray(child.values)) child.values[forecastIndex + 3] = null;
@@ -218,13 +234,13 @@ function captureAuthority(parent, child, forecastIndex, rejectedAuthorities) {
     `Forecast detail is captured by deterministic ownership resolver in ${parent.row_id}.`;
 }
 
-function sealCaptureCertificates(parent, child) {
+function sealCaptureCertificates(modelCase, parent, child) {
   if (!child.forecast_capture_parent_id) return;
   child.forecast_capture_certificates = [0, 1, 2].map((forecastIndex) => ({
     forecast_index: forecastIndex,
     parent_row_id: parent.row_id,
     mode: "semantic_scope",
-    material: material(child),
+    material: sourceOwnedMateriality(modelCase, child),
     membership_path: [child.row_id, parent.row_id],
     proof: ownershipClass(methodAt(child, forecastIndex)) === "absent"
       ? "The child is intentionally blank in this period and its economic scope is represented once by the selected parent authority."
@@ -232,7 +248,7 @@ function sealCaptureCertificates(parent, child) {
   }));
 }
 
-function setParentIdentity(parent, forecastIndex) {
+function setParentIdentity(modelCase, parent, forecastIndex) {
   parent.forecast_period_authorities ??= [null, null, null];
   const selectedAuthority = parent.forecast_period_authorities[forecastIndex];
   const selectedIdentity =
@@ -243,7 +259,10 @@ function setParentIdentity(parent, forecastIndex) {
     ...selectedIdentity,
     method: "accounting_identity",
     source_kind: "formula",
-    material: material(parent),
+    material:
+      typeof selectedIdentity.material === "boolean"
+        ? selectedIdentity.material
+        : sourceOwnedMateriality(modelCase, parent),
     note:
       selectedIdentity.note ??
       "The aggregate is calculated from its complete live child set.",
@@ -284,7 +303,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
   const rejectedAuthorities = [];
   const violations = [];
   for (const { section, rows } of rowsBySection(modelCase)) {
-    for (const { parent, children, formula_child_ids } of familyRows(rows)) {
+    for (const { parent, children, structural_child_ids } of familyRows(rows)) {
       for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
         const parentMethod = methodAt(parent, forecastIndex);
         const parentClass = ownershipClass(parentMethod);
@@ -297,14 +316,14 @@ export function resolveSelectedForecastOwnership(modelCase) {
         else if (parentClass === "direct") selectedMode = "parent_owned";
         else if (
           ["not_separately_forecast", "not_applicable"].includes(parentMethod) &&
-          childStates.filter(({ row }) => material(row)).every(({ owner_class }) => owner_class === "absent")
+          childStates.filter(({ row }) => sourceOwnedMateriality(modelCase, row)).every(({ owner_class }) => owner_class === "absent")
         ) selectedMode = "captured_by_ancestor";
         else if (
           parentClass === "identity" &&
-          childStates.filter(({ row }) => material(row)).every(({ owner_class }) => owner_class !== "absent")
+          childStates.filter(({ row }) => sourceOwnedMateriality(modelCase, row)).every(({ owner_class }) => owner_class !== "absent")
         ) selectedMode = "children_owned";
         else if (
-          childStates.filter(({ row }) => material(row)).every(({ owner_class }) => owner_class !== "absent")
+          childStates.filter(({ row }) => sourceOwnedMateriality(modelCase, row)).every(({ owner_class }) => owner_class !== "absent")
         ) selectedMode = "children_owned";
 
         if (!selectedMode) {
@@ -326,8 +345,15 @@ export function resolveSelectedForecastOwnership(modelCase) {
           for (const { row: child, owner_class: childClass } of childStates) {
             const permittedSchedule = childClass === "schedule" &&
               child.forecast_schedule_coownership_permitted === true;
-            if (!permittedSchedule) {
-              captureAuthority(parent, child, forecastIndex, rejectedAuthorities);
+            // A calculation dependency is not automatically owned detail.
+            // Shared statement building blocks (for example operating profit
+            // and D&A) must remain live for their other accounting identities.
+            // Only the declared structural children belong to this parent's
+            // capture scope.
+            const formulaDependencyOnly =
+              !structural_child_ids.has(child.row_id);
+            if (!permittedSchedule && !formulaDependencyOnly) {
+              captureAuthority(modelCase, parent, child, forecastIndex, rejectedAuthorities);
             }
           }
         } else if (selectedMode === "children_owned") {
@@ -339,7 +365,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
               rejection_reason: "Complete compatible children own the aggregate identity.",
             });
           }
-          setParentIdentity(parent, forecastIndex);
+          setParentIdentity(modelCase, parent, forecastIndex);
         }
         resolutions.push({
           section,
@@ -350,7 +376,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
         });
       }
       for (const child of children) {
-        sealCaptureCertificates(parent, child);
+        sealCaptureCertificates(modelCase, parent, child);
         clearFullyCapturedDirectMarkers(child);
       }
     }
@@ -438,7 +464,7 @@ export function compilePhysicalOwnershipPreflight(
     },
   };
   for (const { section, rows } of rowsBySection(plannedCase)) {
-    for (const { parent, children, formula_child_ids } of familyRows(rows)) {
+    for (const { parent, children, structural_child_ids } of familyRows(rows)) {
       const parentDestination = Number(parent?.row ?? rowPlan?.rows_by_id?.[parent.row_id]);
       if (!Number.isInteger(parentDestination)) {
         violations.push(`${section}:${parent.row_id} has no physical workbook destination`);
@@ -459,6 +485,7 @@ export function compilePhysicalOwnershipPreflight(
         );
         const directParent = ["direct", "schedule"].includes(parentClass);
         if (directParent && liveChildren.some((child) =>
+          structural_child_ids.has(child.row_id) &&
           !(ownershipClass(methodAt(child, forecastIndex)) === "schedule" &&
             child.forecast_schedule_coownership_permitted === true))) {
           violations.push(
