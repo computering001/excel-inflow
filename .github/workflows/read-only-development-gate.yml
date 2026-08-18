@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
 
       - name: Run the complete portable registry partition
         id: portable-gate
