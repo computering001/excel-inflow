@@ -1,0 +1,79 @@
+{
+  "schema_version": "excel-inflow-phase15-full-run-evidence/2.0",
+  "recorded_at": "2026-08-18T10:13:08Z",
+  "scope": "AUTOMATED_NON_ROGO_FULL_RUN_EVIDENCE",
+  "status": "PASS_PENDING_MANUAL",
+  "source_identity": {
+    "commit": "13cf667dbfbf66cb7c87fd1965a1eb3768a1138e",
+    "tree": "3345b36bf4b2bd78769fc4dd3525d506148127d4",
+    "runtime_closure_sha256": "f093796646680527bc5a15c39fd6f2404076ab1510a384e0345766cf492c0508"
+  },
+  "durable_receipt": {
+    "url": "https://github.com/computering001/excel-inflow/releases/download/excel-inflow-v3.7.3-development/performance-receipt.json",
+    "file_sha256": "648806a1738f78e1631e023070d6b21760b66b669a194141cf4a54554105a304",
+    "internal_receipt_sha256": "1cd67edb9bf96c67b7bf23eaf861dd79ff1308f3385dc9152b4bc935c5f49a99"
+  },
+  "route": {
+    "public_entrypoint": "scripts/run_excel_inflow_vnext.mjs",
+    "raw_input_harness": "scripts/run_raw_input_black_box_canary.mjs",
+    "broker_state": "usable",
+    "dcs_balance_basis": "native_principal",
+    "preauthored_statement_map": false,
+    "preauthored_compiler_lanes": false,
+    "preauthored_broker_pack": false,
+    "preauthored_dcs_projection": false
+  },
+  "performance": {
+    "status": "PASS",
+    "validator_errors": [],
+    "total_duration_ms": 26439,
+    "required_leaf_span_count": 10,
+    "observed_leaf_span_count": 10,
+    "root_span_substitution_allowed": false,
+    "spans_ms": {
+      "source_acquisition": 7.189542,
+      "filing_extraction": 182.5855,
+      "broker_native_extraction": 872,
+      "semantic_recovery": 672.932,
+      "case_compilation": 625.257791,
+      "solver": 645.878834,
+      "workbook_build": 1111.929042,
+      "recalculation": 2241.152917,
+      "validation": 668.075376,
+      "delivery": 121.096834
+    }
+  },
+  "progress": {
+    "status": "PASS",
+    "validator_errors": [],
+    "maximum_allowed_interval_ms": 30000,
+    "maximum_observed_interval_ms": 22426,
+    "activity_count": 3,
+    "event_count": 6
+  },
+  "delivery": {
+    "controller_status": "PASS_PENDING_MANUAL",
+    "build_status": "PASS_PENDING_MANUAL",
+    "attachment_status": "PASS",
+    "live_delivery_attestation_status": "PASS",
+    "total_violations": 0,
+    "workbook_sha256": "f654e29f99e0e52a4edc239807e08d2af2c9644ed87ab43bbfaa68a24c8830bb",
+    "sheet_names": [
+      "Operating Model",
+      "Brokers",
+      "B01 House A",
+      "Forward Curves"
+    ]
+  },
+  "runtime_custody": {
+    "active_lease_count_after_exit": 0,
+    "lease_takeover_count_after_exit": 0,
+    "survivor_process_count_after_exit": 0,
+    "orphan_process_count_after_exit": 0
+  },
+  "limitations": [
+    "Native Microsoft Excel review was not run.",
+    "Rogo and Citrix were not opened or changed.",
+    "The hash-bound raw-input route uses generated source-owned evidence and is product evidence, not production-company evidence."
+  ]
+}

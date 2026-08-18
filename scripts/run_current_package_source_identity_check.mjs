@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { classifyCiIdentityRoles } from "./lib/release_identity_governance.mjs";
 
 const exec = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,7 +15,7 @@ function option(name, fallback = null) {
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
 const out = option("out");
-if (!out) throw new Error("Usage: run_current_package_source_identity_check.mjs --out <report.json> [--python <python>] [--soffice <soffice>]");
+if (!out) throw new Error("Usage: run_current_package_source_identity_check.mjs --out <report.json> [--expected-source-commit <sha>] [--expected-source-tree <tree>] [--merge-test-commit <sha>] [--merge-test-tree <tree>] [--python <python>] [--soffice <soffice>]");
 const [{ stdout: commit }, { stdout: tree }, { stdout: status }] = await Promise.all([
   exec("git", ["rev-parse", "HEAD"], { cwd: root }),
   exec("git", ["rev-parse", "HEAD^{tree}"], { cwd: root }),
@@ -52,15 +53,38 @@ try {
     },
   });
   const manifest = JSON.parse(await fs.readFile(path.join(packageRoot, "release-manifest.json"), "utf8"));
-  const errors = [];
-  if (manifest.identity?.source?.commit_sha !== commit.trim()) errors.push("Package source commit does not equal checkout HEAD.");
-  if (manifest.identity?.source?.tree_sha !== tree.trim()) errors.push("Package source tree does not equal checkout HEAD tree.");
+  const candidateSourceCommit = option("expected-source-commit", commit.trim());
+  const candidateSourceTree = option("expected-source-tree", tree.trim());
+  const mergeTestCommit = option("merge-test-commit");
+  const mergeTestTree = option("merge-test-tree");
+  const roleCheck = classifyCiIdentityRoles({
+    checkedOutCommit: commit.trim(),
+    checkedOutTree: tree.trim(),
+    candidateSourceCommit,
+    candidateSourceTree,
+    mergeTestCommit,
+    mergeTestTree,
+    packageSourceCommit: manifest.identity?.source?.commit_sha,
+    packageSourceTree: manifest.identity?.source?.tree_sha,
+  });
+  const errors = [...roleCheck.errors];
   if (manifest.packageMode !== "development" || manifest.deploymentStatus !== "not_installed") errors.push("Package is not an uninstalled development package.");
   if (!manifest.identity?.package?.runtime_code_closure?.sha256) errors.push("Package has no runtime closure identity.");
   const report = {
-    schema_version: "current-package-source-identity/1.0",
+    schema_version: "current-package-source-identity/2.0",
+    identity_roles: roleCheck.roles,
+    candidate_source_commit: candidateSourceCommit,
+    candidate_source_tree: candidateSourceTree,
+    checkout_commit: commit.trim(),
+    checkout_tree: tree.trim(),
     source_commit: commit.trim(),
     source_tree: tree.trim(),
+    package_source_commit: manifest.identity?.source?.commit_sha ?? null,
+    package_source_tree: manifest.identity?.source?.tree_sha ?? null,
+    merge_test_commit: mergeTestCommit,
+    merge_test_tree: mergeTestTree,
+    package_only_commit: null,
+    installed_package_identity: null,
     package_mode: manifest.packageMode,
     deployment_status: manifest.deploymentStatus,
     skill_version: manifest.skillVersion,

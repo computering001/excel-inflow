@@ -42,7 +42,7 @@ if (summaryOut) {
     schema_version: "development-test-classification-census-summary/1.0",
     registry: report.registry,
     generator: "scripts/compile_test_registry_census.mjs",
-    generator_command: "node scripts/compile_test_registry_census.mjs --summary-out audit/v372-governance/test-registry-classification-census.json",
+    generator_command: `node scripts/compile_test_registry_census.mjs --summary-out ${path.relative(root, summaryOut).split(path.sep).join("/")}`,
     full_record_policy: "The generator emits one owner, declared test class, canonical audit class, expected-exit contract, profile and self-confirmation classification for every registry id.",
     completeness: report.completeness,
     counts: { by_audit_class: report.counts.by_audit_class, by_profile: report.counts.by_profile, self_confirmation_risk: report.counts.self_confirmation_risk },

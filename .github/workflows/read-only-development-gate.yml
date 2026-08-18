@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   phase-gates:
-    name: Phase gate (${{ matrix.lane }})
+    name: Merge compatibility phase gate (${{ matrix.lane }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
@@ -55,12 +55,12 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: portable-${{ matrix.lane }}
-          path: ${{ runner.temp }}/phase-${{ matrix.lane }}/*.json
+          path: ${{ runner.temp }}/phase-${{ matrix.lane }}/**/*.json
           if-no-files-found: error
           retention-days: 30
 
   portable-serial:
-    name: Complete portable registry (serial)
+    name: Merge compatibility complete portable registry (serial)
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -89,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: portable-serial
-          path: ${{ runner.temp }}/portable-serial/*.json
+          path: ${{ runner.temp }}/portable-serial/**/*.json
           if-no-files-found: error
           retention-days: 30
 
@@ -111,7 +111,33 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: custody-inventory
-          path: ${{ runner.temp }}/custody-inventory/*.json
+          path: ${{ runner.temp }}/custody-inventory/**/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+  merge-compatibility-identity:
+    name: Distinguish merge compatibility from package source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: "22" }
+      - name: Record the compatibility checkout role
+        env:
+          CANDIDATE_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_ROLE: ${{ github.event_name == 'pull_request' && 'merge_test' || 'candidate_source' }}
+        run: |
+          node scripts/run_merge_compatibility_identity_check.mjs \
+            --candidate-source-commit "$CANDIDATE_SOURCE_SHA" \
+            --expected-role "$EXPECTED_ROLE" \
+            --out "${{ runner.temp }}/merge-compatibility-identity.json"
+      - name: Retain merge-compatibility identity
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: merge-compatibility-identity
+          path: ${{ runner.temp }}/merge-compatibility-identity.json
           if-no-files-found: error
           retention-days: 30
 
@@ -121,6 +147,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: "22" }
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -131,8 +159,14 @@ jobs:
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
           python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
       - name: Compile package and verify exact source binding
+        env:
+          CANDIDATE_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          MERGE_TEST_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || '' }}
         run: |
+          IDENTITY_ARGS=(--expected-source-commit "$CANDIDATE_SOURCE_SHA")
+          if [[ -n "$MERGE_TEST_SHA" ]]; then IDENTITY_ARGS+=(--merge-test-commit "$MERGE_TEST_SHA"); fi
           node scripts/run_current_package_source_identity_check.mjs \
+            "${IDENTITY_ARGS[@]}" \
             --python "$(command -v python3)" --soffice "$(command -v soffice)" \
             --out "${{ runner.temp }}/current-package-source-identity.json"
       - name: Retain package/source custody
@@ -146,7 +180,7 @@ jobs:
 
   aggregate-and-compare:
     name: Exact-once matrix and current-SHA serial/parallel comparison
-    needs: [phase-gates, portable-serial, custody-inventory, package-source-identity]
+    needs: [phase-gates, portable-serial, custody-inventory, merge-compatibility-identity, package-source-identity]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -165,6 +199,10 @@ jobs:
         with:
           name: package-source-identity
           path: ${{ runner.temp }}/package
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: merge-compatibility-identity
+          path: ${{ runner.temp }}/merge
       - name: Aggregate, compare and compile complete matrix
         env:
           REPORT_ROOT: ${{ runner.temp }}/portable
@@ -182,6 +220,7 @@ jobs:
             --portable-aggregate "$MATRIX_OUT/portable-aggregate.json" \
             --comparison "$MATRIX_OUT/serial-parallel-comparison.json" \
             --custody-report "${{ runner.temp }}/custody/development-gate-report.json" \
+            --merge-report "${{ runner.temp }}/merge/merge-compatibility-identity.json" \
             --package-report "${{ runner.temp }}/package/current-package-source-identity.json" \
             --out "$MATRIX_OUT/complete-ci-gate-matrix.json"
       - name: Retain complete gate matrix
