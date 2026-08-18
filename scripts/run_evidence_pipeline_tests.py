@@ -82,6 +82,27 @@ def main() -> int:
     assert_true(attachment.classify(passed) == ("PASS", None, False), "two passed lanes did not close")
     checks += 3
 
+    current_pack = {
+        "houses": [{
+            "estimates": {
+                "revenue": [100.0, None, 120.0],
+                "tax_rate": [True, "0.2", None],
+            },
+        }],
+        "metrics": {"revenue": {"brokers": {"stale": [999, 999, 999]}}},
+    }
+    assert_true(
+        attachment.broker_pack_selected_value_count(current_pack) == 2,
+        "current houses[].estimates broker values were not counted exactly",
+    )
+    assert_true(
+        attachment.broker_pack_selected_value_count({
+            "metrics": {"revenue": {"brokers": {"legacy": [1, 2, 3]}}},
+        }) == 0,
+        "obsolete metrics[].brokers content was treated as current pack authority",
+    )
+    checks += 2
+
     with tempfile.TemporaryDirectory(prefix="excel-inflow-attachment-controller-") as temporary:
         root = Path(temporary)
         missing_request = attachment.run_lane(

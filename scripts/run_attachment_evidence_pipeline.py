@@ -14,6 +14,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -48,6 +49,20 @@ def sha256_file(target: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def broker_pack_selected_value_count(pack: dict[str, Any]) -> int:
+    """Count usable values on the normalized broker-pack contract surface."""
+    return sum(
+        1
+        for house in pack.get("houses") or []
+        for series in (house.get("estimates") or {}).values()
+        if isinstance(series, list)
+        for value in series
+        if isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 def sha256_value(value: Any) -> str:
@@ -902,12 +917,7 @@ def apply_closed_broker_lane(
         raise FileNotFoundError("Closed broker lane has no evidence template")
     evidence = read_json(evidence_path, "closed-broker evidence template")
     evidence["broker_pack"] = pack
-    selected_value_count = sum(
-        len(values)
-        for metric in (pack.get("metrics") or {}).values()
-        for values in (metric.get("brokers") or {}).values()
-        if isinstance(values, list)
-    )
+    selected_value_count = broker_pack_selected_value_count(pack)
     archive_only = selected_value_count == 0
 
     broker_source_ids = {

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -10,6 +9,11 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
+import {
+  bindRawCanaryEvidence,
+  prepareSyntheticRawFilingRows,
+  sha256Bytes,
+} from "./lib/raw_canary_fixture.mjs";
 import { stageHashBoundTestSource } from "./lib/hash_bound_source_staging.mjs";
 import { solveCase } from "./lib/solver.mjs";
 
@@ -51,9 +55,10 @@ if (!process.argv[2]) {
     "--real-filings-expectations <run-scoped-expectations.json>]",
   );
 }
-const clean = JSON.parse(await fs.readFile(cleanPath, "utf8"));
-const runId = `raw_black_box_${brokerState}_${dcsBalanceBasis}`.replaceAll("_reporting_currency_carrying_value", "_carrying");
 const out = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-raw-black-box-"));
+const { evidence: clean, sha256: sourceOwnedCleanEvidenceSha256 } =
+  bindRawCanaryEvidence(await fs.readFile(cleanPath));
+const runId = `raw_black_box_${brokerState}_${dcsBalanceBasis}`.replaceAll("_reporting_currency_carrying_value", "_carrying");
 const runRoot = path.join(out, "public-controller-run");
 // The attachment controller emits its resolved ingress beneath runRoot/evidence.
 // Keep every hash-bound raw input below that same controller-owned root so both
@@ -62,7 +67,7 @@ const runRoot = path.join(out, "public-controller-run");
 const input = path.join(runRoot, "evidence", "raw-inputs");
 await fs.mkdir(input, { recursive: true });
 const writeJson = (target, value) => fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`);
-const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const sha256 = sha256Bytes;
 const canonicalise = (value) => {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) return value.map(canonicalise);
@@ -88,11 +93,6 @@ let companyName = clean.company_name;
 let rawFilingKind = "generated_complete_face_statements";
 let realFilingExpectations = null;
 let realFilingExpectationsSha256 = null;
-const restate = (section, sourceLineId, values) => {
-  const row = rawFilingRows[section].find((item) => item.source_line_id === sourceLineId);
-  if (!row) throw new Error(`Raw canary fixture lacks ${section}.${sourceLineId}`);
-  row.values = values;
-};
 if (options["real-filings-request"]) {
   const realRequestPath = path.resolve(String(options["real-filings-request"]));
   const realRequest = JSON.parse(await fs.readFile(realRequestPath, "utf8"));
@@ -152,30 +152,7 @@ if (options["real-filings-request"]) {
     throw new Error("Real filings canary expectations require positive source statement row counts.");
   }
 } else {
-  rawFilingRows = {
-    income_statement: structuredClone(
-      clean.filings.face_statement_manifests.income_statement.flatMap((item) => item.rows),
-    ),
-    cash_flow: structuredClone(
-      clean.filings.face_statement_manifests.cash_flow.flatMap((item) => item.rows),
-    ),
-  };
-  for (const [sourceLineId, values] of Object.entries({
-    "is.interest_expense": [-5, -5, -5],
-    "is.pre_tax_income": [145, 145, 145],
-    "is.net_income": [114, 114, 114],
-  })) restate("income_statement", sourceLineId, values);
-  for (const [sourceLineId, values] of Object.entries({
-    "cf.cash_flow_net_income": [114, 114, 114],
-    "cf.cash_flow_profit_before_tax": [145, 145, 145],
-    "cf.net_finance_result": [-5, -5, -5],
-    "cf.cash_generated_from_operations": [190, 190, 190],
-    "cf.cash_from_operations": [164, 164, 164],
-    "cf.fx_effect_on_cash": [0, 0, 0],
-    "cf.net_change_in_cash": [0, 0, 0],
-    "cf.ending_cash": [370, 380, 390],
-    "cf.free_cash_flow": [64, 64, 64],
-  })) restate("cash_flow", sourceLineId, values);
+  rawFilingRows = prepareSyntheticRawFilingRows(clean);
   rawStatementCounts = {
     income_statement: rawFilingRows.income_statement.length,
     cash_flow: rawFilingRows.cash_flow.length,
@@ -303,6 +280,11 @@ let brokerRaw = null;
 let brokerHash = null;
 let brokerExtractionRequest = null;
 let brokerCrosswalkPath = null;
+// The forecast authority contract names its normalized broker source
+// `broker-pack`. Bind that identifier directly to the one raw House A document
+// in this single-house synthetic canary, so the cited authority remains a real
+// used attachment rather than an unattached generated alias.
+const brokerSourceId = "broker-pack";
 if (brokerState !== "explicit_skip") {
   brokerRaw = path.join(input, "house-a-report.pdf");
   await exec(python, ["-c", [
@@ -322,7 +304,12 @@ if (brokerState !== "explicit_skip") {
   brokerHash = sha256(await fs.readFile(brokerRaw));
   brokerExtractionRequest = path.join(input, "broker-extraction-request.json");
   let brokerModelContext = null;
-  if (brokerState === "usable") {
+  {
+    // Every attached broker document, including a deliberately failed optional
+    // lane, is bound to the same filings-derived demand surface. Omitting this
+    // context used to make the failed branch silently switch demand-contract
+    // generations and test controller compatibility rather than broker fault
+    // containment.
     const filingsStaging = path.join(out, "broker-model-host-filings-staging");
     await exec(process.execPath, [
       path.join(here, "run_filings_pipeline.mjs"),
@@ -396,7 +383,7 @@ if (brokerState !== "explicit_skip") {
       ...(brokerState === "usable" ? {
         house_id: "house_a",
         house_name: "House A",
-        source_id: "broker_house_a",
+        source_id: brokerSourceId,
         published_date: "2026-08-15",
       } : {}),
       path: brokerRaw,
@@ -570,7 +557,7 @@ const evidenceTemplate = {
       content_sha256: dcsHash, text_extractable: true, status: "used",
     },
     ...(brokerRaw ? [{
-      source_id: "broker_house_a", kind: "user_broker_research", name: "House A",
+      source_id: brokerSourceId, kind: "user_broker_research", name: "House A",
       origin: "uploaded", media_type: "application/pdf", publication_date: "2026-08-15",
       as_of_date: filingFacts.historical_periods[2], entity_name: companyName,
       content_sha256: brokerHash, text_extractable: true, status: "used",
@@ -699,7 +686,7 @@ await writeJson(ingressPath, {
       adapter: { domain: "factset_dcs", format: "csv" },
     },
     ...(brokerRaw ? [{
-      attachment_id: "house-a", source_ids: ["broker_house_a"], path: brokerRaw,
+      attachment_id: "house-a", source_ids: [brokerSourceId], path: brokerRaw,
       expected_sha256: brokerHash, media_type: "application/pdf",
       adapter: { domain: "broker_pack", format: "pdf" },
     }] : []),
@@ -976,6 +963,7 @@ console.log(JSON.stringify({
   schema_version: "raw-input-black-box-canary/1.0",
   status: "PASS",
   raw_filing_kind: rawFilingKind,
+  source_owned_clean_evidence_sha256: sourceOwnedCleanEvidenceSha256,
   real_filing_expectations: realFilingExpectations
     ? {
         schema_version: realFilingExpectations.schema_version,

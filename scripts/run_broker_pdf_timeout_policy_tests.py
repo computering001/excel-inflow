@@ -9,6 +9,7 @@ from extract_broker_evidence import (
     bounded_table_find,
     pdf_document_table_budget,
     pdf_lane_timeout_budget,
+    table_discovery_lane_summary,
 )
 
 
@@ -49,5 +50,15 @@ try:
 except TimeoutError as error:
     assert "evidence-sized budget" in str(error)
 checks += 1
+
+clean_summary = table_discovery_lane_summary("lines", candidate_count=1)
+timeout_summary = table_discovery_lane_summary(
+    "text", error=TimeoutError("bounded lane expired")
+)
+assert clean_summary == {"lane_id": "lines", "status": "pass", "candidate_count": 1}
+assert timeout_summary["status"] == "error" and timeout_summary["message"].startswith("timeout: ")
+assert "duration_ms" not in clean_summary and "timeout_budget_seconds" not in clean_summary
+assert "duration_ms" not in timeout_summary and "timeout_budget_seconds" not in timeout_summary
+checks += 4
 
 print(json.dumps({"status": "PASS", "checks": checks, "mutations_rejected": 1}))

@@ -135,6 +135,30 @@ def pdf_document_table_budget(*, page_count: int, target_count: int) -> float:
     return min(300.0, max(30.0, page_count * 2.5 + min(max(0, target_count), 20) * 3.0))
 
 
+def table_discovery_lane_summary(
+    lane_id: str, *, candidate_count: int = 0, error: Exception | None = None
+) -> dict[str, Any]:
+    """Return only the evidence-contract surface for one discovery lane.
+
+    Timeout budgets and elapsed time are controller telemetry. They do not
+    belong in the immutable extraction bundle, whose closed schema deliberately
+    admits only discovery outcome and an optional diagnostic message.
+    """
+    if error is None:
+        return {
+            "lane_id": lane_id,
+            "status": "pass" if candidate_count else "empty",
+            "candidate_count": candidate_count,
+        }
+    prefix = "timeout: " if isinstance(error, TimeoutError) else ""
+    return {
+        "lane_id": lane_id,
+        "status": "error",
+        "candidate_count": 0,
+        "message": f"{prefix}{error}",
+    }
+
+
 def bounded_table_find(page: Any, kwargs: dict[str, Any], timeout_seconds: float) -> Any:
     """Bound pathological PDF table discovery and fall through to rendering."""
     if not hasattr(signal, "setitimer") or timeout_seconds <= 0:
@@ -680,7 +704,6 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                 target_count=len(selected_targets),
                 lane_id=lane_id,
             )
-            lane_started = time.monotonic()
             try:
                 if time.monotonic() - table_budget_started > table_budget_seconds:
                     raise TimeoutError(
@@ -688,10 +711,14 @@ def extract_pdf(path: Path, descriptor: dict[str, Any], writer: ArtifactWriter,
                     )
                 finder = bounded_table_find(page, kwargs, lane_timeout_seconds)
                 found = list(getattr(finder, "tables", []) or [])
-                lane_summaries.append({"lane_id": lane_id, "status": "pass" if found else "empty", "candidate_count": len(found), "timeout_budget_seconds": lane_timeout_seconds, "duration_ms": round((time.monotonic() - lane_started) * 1000, 3)})
+                lane_summaries.append(table_discovery_lane_summary(
+                    lane_id, candidate_count=len(found)
+                ))
                 page_tables.extend((lane_id, item) for item in found)
             except Exception as error:
-                lane_summaries.append({"lane_id": lane_id, "status": "timeout" if isinstance(error, TimeoutError) else "error", "candidate_count": 0, "timeout_budget_seconds": lane_timeout_seconds, "duration_ms": round((time.monotonic() - lane_started) * 1000, 3), "message": str(error)})
+                lane_summaries.append(table_discovery_lane_summary(
+                    lane_id, error=error
+                ))
 
         table_bboxes: list[list[float]] = []
         text_discovery_bboxes: list[list[float]] = []
