@@ -1161,6 +1161,12 @@ export function applyBrokerPreviewSelection(modelCase, preview, confirmation) {
             (authority, forecastIndex) =>
               brokerPeriods.includes(forecastIndex) ? null : authority,
           );
+          // The strip is a DECLARED transition, not a finished state: the
+          // row-owned fallback is reactivated by the next compile. The marker
+          // lets the authority ledger reseal the intermediate case honestly
+          // (disposition waterfall_pending) instead of blocking on rows whose
+          // recompile is the very next deterministic step.
+          row.forecast_waterfall_pending = true;
           if (row.forecast_period_authorities.every((authority) => !authority)) {
             delete row.forecast_period_authorities;
           }

@@ -27,6 +27,10 @@ function historicalOwner(row) {
 
 function forecastOwner(row, authority, forecastIndex) {
   if (row?.row_type === "header" || authority?.method === "not_applicable") return "not_applicable";
+  // A broker-waterfall strip is a receipted intermediate state: the very next
+  // compile mints the row-owned fallback and clears the marker. The census
+  // records the transition instead of blocking a deterministic next step.
+  if (row?.forecast_waterfall_pending === true && !authority) return "waterfall_pending";
   const capturedThisPeriod = authority?.method === "not_separately_forecast";
   if (capturedThisPeriod) return "captured";
   if (!authority && (row?.calculation || row?.forecast_calculation || row?.forecast_treatment === "formula")) return "parent_owned";
@@ -53,6 +57,7 @@ function mechanism(owner, authority) {
   if (owner === "historical_fallback") return "formula_driven_fallback";
   if (owner === "captured") return "captured_by_parent";
   if (owner === "blocked" || owner === "unresolved") return "blocked";
+  if (owner === "waterfall_pending") return "pending_recompile";
   return "not_applicable";
 }
 

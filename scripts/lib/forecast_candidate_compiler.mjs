@@ -11,6 +11,7 @@ import {
   selectForecastAuthority,
 } from "./forecast_authority.mjs";
 import { observationsForConcept } from "./forecast_observation.mjs";
+import { taxRatePolicyCandidate } from "./tax_rate_policy.mjs";
 import {
   sealForecastAuthorityLedger,
   verifyForecastAuthorityLedger,
@@ -312,6 +313,10 @@ function normaliseEvaluatedHistoricalValues(
 }
 
 function historicalCandidate(row, behavior, forecastIndex) {
+  // Effective tax rate has a dedicated role policy (tax_rate_policy.mjs):
+  // its history must be normalized from filed tax/PBT with loss and
+  // distortion handling, never averaged or trend-extended as a raw series.
+  if (row?.semantic_role === "effective_tax_rate") return null;
   const history = historicalValues(row);
   const observed = history.filter((value) => value !== null);
   if (observed.length === 0) return null;
@@ -1245,6 +1250,8 @@ export function compileForecastPlan(
           }
         }
         if (inferred) candidates.push(inferred);
+        const taxPolicy = taxRatePolicyCandidate(modelCase, row, forecastIndex);
+        if (taxPolicy) candidates.push(taxPolicy);
         const eventZero = eventZeroCandidate(modelCase, row, behavior);
         if (eventZero) candidates.push(eventZero);
         if (behavior === "not_applicable") candidates.push({ method: "not_applicable", origin: "behavior", source_kind: "none", material: false, note: "The row is outside the applicable economic scope." });
@@ -1560,7 +1567,18 @@ function authorityFromState(state, candidate) {
       state.broker_rejection_reasons,
     );
   }
-  if (finite(state.value) && ["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "broker_consensus", "user_assumption", "explicit_zero"].includes(state.method)) authority.value = Number(state.value);
+  if (
+    finite(state.value) &&
+    (["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "broker_consensus", "user_assumption", "explicit_zero"].includes(state.method) ||
+      // The tax-rate policy computes its rate from NORMALIZED tax/PBT
+      // components (with loss and distortion exclusions); the row's own
+      // display history cannot reproduce it, so the authority carries the
+      // policy value with its normalization ledger as provenance.
+      state.origin === "tax_rate_policy" || candidate?.origin === "tax_rate_policy")
+  ) authority.value = Number(state.value);
+  if (candidate?.tax_rate_normalization) {
+    authority.tax_rate_normalization = structuredClone(candidate.tax_rate_normalization);
+  }
   if (candidate?.partial_period) authority.partial_period = structuredClone(candidate.partial_period);
   if (candidate?.guidance_range) authority.guidance_range = structuredClone(candidate.guidance_range);
   if (candidate?.zero_basis) authority.zero_basis = candidate.zero_basis;
@@ -1571,6 +1589,10 @@ function calculationFromState(state) {
   if (["accounting_identity", "driver_formula", "roll_forward"].includes(state.method)) {
     return state.formula_spec ? structuredClone(state.formula_spec) : null;
   }
+  // The tax-rate policy's value is component-derived; a self-referential
+  // historical-average formula over the display row would recompute a
+  // DIFFERENT (or empty) number. The authority carries the value instead.
+  if (state.origin === "tax_rate_policy") return null;
   if (!["historical_average", "historical_trend", "seasonal_run_rate", "carry_forward"].includes(state.method)) return null;
   if (state.method === "historical_average") return { operator: "historical_average", refs: [state.row_id] };
   if (state.method === "historical_trend") return { operator: "historical_trend", refs: [state.row_id], forecast_index: state.forecast_index };
@@ -1631,6 +1653,7 @@ export function materializeForecastPlan(modelCase, plan) {
   const candidatesById = new Map((plan?.candidate_ledger ?? []).map((candidate) => [candidate.candidate_id, candidate]));
   for (const state of plan?.states ?? []) {
     const row = rowsByKey.get(`${state.section}\u0000${state.row_id}`);
+    if (row) delete row.forecast_waterfall_pending;
     if (!row) throw new Error(`Forecast plan state ${state.state_id} refers to missing row ${state.row_id}.`);
     const candidate = candidatesById.get(state.selected_candidate_id);
     row.forecast_period_authorities ??= [null, null, null];

@@ -114,6 +114,35 @@ function ledgerBody(modelCase) {
   const rows=[]; const violations=[]; const selected_metric_traces=[];
   for (const {section,row} of sourceRows(modelCase)) {
     const rowId=String(row?.row_id ?? '(missing-row-id)');
+    if (row?.forecast_waterfall_pending===true && !Array.isArray(row?.forecast_period_authorities)) {
+      // A broker-waterfall strip is a receipted intermediate state: the next
+      // compile mints the row-owned fallback and clears the marker. Sealing
+      // the transition as pending keeps the mutator honest without turning a
+      // deterministic next step into a block.
+      for (let i=0;i<3;i+=1) {
+        rows.push({
+          row_id:rowId,
+          model_node_id:row?.model_node_id ?? rowId,
+          section,
+          semantic_role:canonicalSemanticRole(row?.semantic_role ?? row?.row_id),
+          period_end:forecastPeriods(modelCase)[i],
+          recurrence:'unknown',
+          variability:'unknown',
+          disposition:'waterfall_pending',
+          method:'pending_recompile',
+          producer:null,
+          source_kind:null,
+          source_id:null,
+          value:null,
+          confidence:null,
+          selection_rank:null,
+          material:true,
+          broker_rejection_reasons:[],
+          status:'PASS',
+        });
+      }
+      continue;
+    }
     const authorities=row?.forecast_period_authorities;
     let classification=null;
     try {

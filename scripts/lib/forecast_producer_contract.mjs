@@ -55,6 +55,12 @@ function formulaWitness(state, candidate) {
     "historical_trend",
     "funded_acquisition_consideration",
     "funded_acquisition_debt_proceeds",
+    // Tax-rate role policy: the rate is computed from normalized tax/PBT
+    // components and carried on the authority as a value; the spec names the
+    // policy basis and source row rather than a self-referential average.
+    "tax_rate_policy_median",
+    "tax_rate_policy_latest",
+    "tax_rate_policy_loss_case",
   ].includes(spec?.operator) && Boolean(spec?.row_id ?? state?.row_id);
   const executable = Boolean(
     spec &&

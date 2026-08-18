@@ -7,6 +7,12 @@ import { fileURLToPath } from "node:url";
 
 import { validateEvidenceRun } from "./lib/evidence_run.mjs";
 import {
+  boundedOuterTimeoutMs,
+  openRunDeadline,
+  recordComputeSegment,
+} from "./lib/run_deadline.mjs";
+import { DEFAULT_RUNTIME_BUDGETS_MS } from "./lib/runtime_budget_policy.mjs";
+import {
   applyAnswers,
   deliver,
   parseAnswers,
@@ -105,6 +111,9 @@ import {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 let ACTIVE_RUN_GUARD = null;
+let ACTIVE_RUN_DEADLINE = null;
+let ACTIVE_INVOCATION_STARTED_MS = null;
+let ACTIVE_INVOCATION_ATTRIBUTED_MS = 0;
 
 const PRESENTATION_SCREENS = Object.freeze({
   evidence_review: Object.freeze({
@@ -321,7 +330,14 @@ function stage4OuterTimeout(modelCase, explicit) {
   // plus enough headroom for plan/emit/publish, without imposing a shorter
   // fixed ceiling on a larger evidence-backed workbook.
   const complexityUnits = Math.max(1, Math.ceil(statementRows / 50)) + brokerHouses + Math.ceil(instruments / 10);
-  return Math.min(3_600_000, 1_200_000 + complexityUnits * 90_000);
+  // The complexity formula sizes the allowance BETWEEN its floor and the
+  // product's own end-to-end hard ceiling. There is deliberately no longer an
+  // independent one-hour class: no single stage may be granted more compute
+  // than the whole run is promised to take.
+  return Math.min(
+    DEFAULT_RUNTIME_BUDGETS_MS.end_to_end_hard_ceiling,
+    600_000 + complexityUnits * 90_000,
+  );
 }
 
 async function loadAnswers(target, questions) {
@@ -401,6 +417,18 @@ function blockerForStoppedOutcome(outcome) {
 }
 
 async function finish({ runDir, result, screen = null, machine = false }) {
+  // Attribute this invocation's remaining compute (everything outside the
+  // separately measured stage-4 spawn) so no interval stays unattributed.
+  if (ACTIVE_RUN_DEADLINE && Number.isFinite(ACTIVE_INVOCATION_STARTED_MS)) {
+    await recordComputeSegment(ACTIVE_RUN_DEADLINE, {
+      label: "controller_invocation_overhead",
+      durationMs: Math.max(
+        0,
+        Date.now() - ACTIVE_INVOCATION_STARTED_MS - ACTIVE_INVOCATION_ATTRIBUTED_MS,
+      ),
+    });
+    ACTIVE_INVOCATION_STARTED_MS = null;
+  }
   if (ACTIVE_RUN_GUARD) {
     const closing = await assertRuntimeIntegrityUnchanged(ACTIVE_RUN_GUARD.integrity, ROOT);
     await writeIsolationJson(path.join(runDir, "skill-integrity.json"), {
@@ -450,6 +478,12 @@ async function main() {
   }
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });
   const runDir = isolated.run_root;
+  // One persisted compute clock for the WHOLE user run: it survives chat
+  // turns, resume and host transition, so no stage ever restarts the budget.
+  const runDeadline = await openRunDeadline({ runDir });
+  ACTIVE_RUN_DEADLINE = runDeadline;
+  ACTIVE_INVOCATION_STARTED_MS = Date.now();
+  ACTIVE_INVOCATION_ATTRIBUTED_MS = 0;
   if (options.carrier && positional[0]) {
     throw new Error("Provide either a positional evidence run or --carrier, not both.");
   }
@@ -1839,9 +1873,14 @@ async function main() {
     const runtimeTmp = path.join(runDir, ".runtime-tmp");
     await fs.mkdir(runtimeHome, { recursive: true });
     await fs.mkdir(runtimeTmp, { recursive: true });
+    const stage4AllowanceMs = await boundedOuterTimeoutMs(runDeadline, {
+      stage: "workbook_build_outer",
+      requestedMs: stage4OuterTimeout(answeredCase, options.timeout),
+    });
+    const stage4StartedMs = Date.now();
     const executed = await runCommand(process.execPath, args, {
       cwd: buildDir,
-      timeout: stage4OuterTimeout(answeredCase, options.timeout),
+      timeout: stage4AllowanceMs,
       env: {
         ...process.env,
         HOME: runtimeHome,
@@ -1849,6 +1888,11 @@ async function main() {
         PYTHONDONTWRITEBYTECODE: "1",
         EXCEL_INFLOW_WORKSPACE_TOKEN: workspaceToken,
       },
+    });
+    ACTIVE_INVOCATION_ATTRIBUTED_MS += Date.now() - stage4StartedMs;
+    await recordComputeSegment(runDeadline, {
+      label: "stage4_build_execution",
+      durationMs: Date.now() - stage4StartedMs,
     });
     try {
       buildResult = JSON.parse(executed.stdout);
