@@ -3830,6 +3830,35 @@ export function compileCase(caseSource, evidence = {}) {
     report.add("coverage.crash", "BLOCK", `assessCoverage failed: ${error.message}`, "Report this as a compiler defect; validators must not throw.");
   }
 
+  const finalCase = applyFundedAcquisitionRows(modelCase);
+  const forecastPeriods = (finalCase.periods ?? []).filter((period) => period?.status === "forecast");
+  if (forecastPeriods.length === 3) {
+    try {
+      sealForecastAuthorityLedger(finalCase);
+    } catch (error) {
+      const ownershipReceipt =
+        finalCase?.forecast_ownership_preflights?.selected ??
+        finalCase?.forecast_ownership_preflights?.structural;
+      if (
+        /^forecast ownership preflight [AB] blocked:/.test(String(error.message)) &&
+        ownershipReceipt?.controller_signal?.action ===
+          "cancel_descendants_preserve_checkpoint"
+      ) {
+        report.add(
+          "forecast_ownership.preflight",
+          "BLOCK",
+          error.message,
+          "Persist the attached ownership receipt, cancel unnecessary descendants, resolve from its declared resume point and reuse all unchanged evidence checkpoints.",
+          {
+            receipt: ownershipReceipt,
+            controller_signal: ownershipReceipt.controller_signal,
+          },
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
   const blocks = report.findings.filter((finding) => finding.severity === "BLOCK");
   const compileReport = {
     schema_version: CASE_COMPILE_REPORT_VERSION,
@@ -3841,11 +3870,6 @@ export function compileCase(caseSource, evidence = {}) {
     },
     findings: report.findings,
   };
-  const finalCase = applyFundedAcquisitionRows(modelCase);
-  const forecastPeriods = (finalCase.periods ?? []).filter((period) => period?.status === "forecast");
-  if (forecastPeriods.length === 3) {
-    sealForecastAuthorityLedger(finalCase);
-  }
   return { model_case: finalCase, report: compileReport };
 }
 

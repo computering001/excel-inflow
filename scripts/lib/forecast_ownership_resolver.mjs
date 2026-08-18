@@ -183,6 +183,9 @@ export function compileStructuralOwnershipPreflight(modelCase) {
 
 function captureAuthority(parent, child, forecastIndex, rejectedAuthorities) {
   const rejected = child?.forecast_period_authorities?.[forecastIndex] ?? null;
+  const priorCertificate = (child?.forecast_capture_certificates ?? []).find(
+    (certificate) => certificate?.forecast_index === forecastIndex,
+  );
   if (rejected && ownershipClass(rejected.method) !== "absent") {
     rejectedAuthorities.push({
       row_id: child.row_id,
@@ -195,7 +198,14 @@ function captureAuthority(parent, child, forecastIndex, rejectedAuthorities) {
   child.forecast_period_authorities[forecastIndex] = {
     method: "not_separately_forecast",
     source_kind: "none",
-    material: material(child),
+    // Capturing changes ownership, not source materiality. Preserve the
+    // selected authority's sealed material flag where it exists so the
+    // resolver cannot silently promote a source-declared immaterial detail.
+    material: typeof rejected?.material === "boolean"
+      ? rejected.material
+      : typeof priorCertificate?.material === "boolean"
+        ? priorCertificate.material
+      : material(child),
     note: `Forecast detail is represented once by ${parent.row_id}.`,
   };
   if (Array.isArray(child.values)) child.values[forecastIndex + 3] = null;
