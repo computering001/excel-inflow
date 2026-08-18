@@ -1321,6 +1321,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "forecast-ownership-physical-oracle",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "verify/run_forecast_ownership_physical_mutations.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "forecast-authority-ranking",
       "phase": "forecast",
       "runtime": "node",

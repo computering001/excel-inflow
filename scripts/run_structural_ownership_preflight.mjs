@@ -43,9 +43,17 @@ function projectedCase(filingsBundle, demandGraph) {
   const demandByMetric = new Map();
   for (const node of demandGraph?.nodes ?? []) {
     if (node?.source_line_id && node?.metric_id) {
-      demandBySource.set(String(node.source_line_id), String(node.metric_id));
+      const key = String(node.source_line_id);
+      const current = demandBySource.get(key) ?? [];
+      current.push(node);
+      demandBySource.set(key, current);
     }
-    if (node?.metric_id) demandByMetric.set(String(node.metric_id), String(node.metric_id));
+    if (node?.metric_id) {
+      const key = String(node.metric_id);
+      const current = demandByMetric.get(key) ?? [];
+      current.push(node);
+      demandByMetric.set(key, current);
+    }
   }
   const projectRows = (section) => {
     const sources = filings?.[section] ?? [];
@@ -77,10 +85,15 @@ function projectedCase(filingsBundle, demandGraph) {
       if (parentFromSource || parentFromLabel) {
         row.parent_row_id = parentFromSource ?? parentFromLabel;
       }
-      const demandedMetric =
+      const demandedNodes =
         demandBySource.get(String(row.source_line_id ?? "")) ??
         demandByMetric.get(String(row.broker_metric_id ?? row.semantic_role ?? row.row_id));
-      if (demandedMetric) row.broker_metric_id = demandedMetric;
+      if (demandedNodes?.length) {
+        row.broker_metric_id = String(demandedNodes[0].metric_id);
+        row.broker_demand_node_ids = demandedNodes
+          .map((node) => String(node.node_id))
+          .sort();
+      }
       return row;
     });
   };

@@ -61,6 +61,7 @@ const CHECKPOINT_ORDER = Object.freeze([
   "emit",
   "recalculate",
   "terminal_patch",
+  "verify_ownership_physical",
   "verify_dynamic",
   "verify_style",
   "verify_cache",
@@ -873,6 +874,59 @@ async function main() {
   });
   if (!step.ok) return step.result;
 
+  const ownershipPhysicalDir = store.workDir("verify_ownership_physical");
+  const ownershipPhysicalReport = path.join(
+    ownershipPhysicalDir,
+    "forecast-ownership-physical-proof.json",
+  );
+  step = await checkpoint({
+    id: "verify_ownership_physical",
+    recipe: "release-verify-forecast-ownership-physical/1.0",
+    inputs: {
+      workbook: await hashFile(patchedWorkbook),
+      row_map: await hashFile(`${patchedWorkbook}.row-map.json`),
+      solution: await hashFile(`${patchedWorkbook}.solution.json`),
+      model_case: caseHash,
+      terminal_patch_receipt: checkpointReceipts.terminal_patch,
+      code: source.verify,
+      python: python.identity,
+    },
+    outputs: { forecast_ownership_physical_proof: ownershipPhysicalReport },
+    action: async () => {
+      const result = await command(python.path, [
+        path.join(HERE, "verify", "forecast_ownership_physical_oracle.py"),
+        "--xlsx", patchedWorkbook,
+        "--row-map", `${patchedWorkbook}.row-map.json`,
+        "--solution", `${patchedWorkbook}.solution.json`,
+        "--model-case", casePath,
+        "--out", ownershipPhysicalReport,
+      ]);
+      if (!result.ok) {
+        return fail("Preflight C did not bind solver ownership to emitted workbook writers.", {
+          stdout: result.stdout.slice(-4000),
+          stderr: result.stderr.slice(-4000),
+        });
+      }
+      const report = await json(ownershipPhysicalReport);
+      if (report.status !== "PASS" || Number(report.checked_writer_bindings ?? 0) <= 0) {
+        return fail("Preflight C emitted-workbook proof did not pass.", {
+          report_status: report.status,
+          checked_writer_bindings: report.checked_writer_bindings ?? 0,
+          violations: report.violations ?? [],
+        });
+      }
+      return {
+        status: "PASS",
+        detail: {
+          report_status: report.status,
+          checked_writer_bindings: report.checked_writer_bindings,
+          receipt_sha256: report.receipt_sha256,
+        },
+      };
+    },
+  });
+  if (!step.ok) return step.result;
+
   const executionPolicy = await workbookExecutionPolicy(patchedWorkbook);
   const validationDir = store.workDir("verify_dynamic");
   const validationReport = path.join(validationDir, "validation-report.json");
@@ -1009,6 +1063,7 @@ async function main() {
       cache: checkpointReceipts.verify_cache,
       finance: checkpointReceipts.verify_finance,
       semantic: checkpointReceipts.verify_semantic,
+      ownership_physical: checkpointReceipts.verify_ownership_physical,
     },
     outputs: { verification_summary: verificationSummary },
     action: async () => {
@@ -1025,6 +1080,10 @@ async function main() {
           cache: { path: cacheReport, sha256: await hashFile(cacheReport) },
           finance: { path: financeReport, sha256: await hashFile(financeReport) },
           semantic: { path: semanticOracleReport, sha256: await hashFile(semanticOracleReport) },
+          forecast_ownership_physical: {
+            path: ownershipPhysicalReport,
+            sha256: await hashFile(ownershipPhysicalReport),
+          },
         },
       };
       await writeIsolationJson(verificationSummary, report);
@@ -1209,6 +1268,7 @@ async function main() {
         [cacheReport, "cache-parity.json"],
         [financeReport, "finance-proof.json"],
         [semanticOracleReport, "workbook-semantic-oracle.json"],
+        [ownershipPhysicalReport, "forecast-ownership-physical-proof.json"],
         [verificationSummary, "verification-summary.json"],
         [recalcSecondOpinion, "libreoffice-recalc-receipt.json"],
         [beforeCacheMap, "formula-caches.before.json"],

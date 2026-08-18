@@ -177,6 +177,16 @@ function familyShape(section, parent, children) {
   const brokerDemandOwnerRowIds = parentDemand
     ? [parent.row_id]
     : candidateDemandRows.filter((rowId) => rowId !== parent.row_id);
+  const candidateBrokerDemandNodeIds = [parent, ...children]
+    .filter((row) => candidateDemandRows.includes(row.row_id))
+    .flatMap((row) => row?.broker_demand_node_ids ?? [])
+    .map(String)
+    .sort();
+  const brokerDemandOwnerNodeIds = [parent, ...children]
+    .filter((row) => brokerDemandOwnerRowIds.includes(row.row_id))
+    .flatMap((row) => row?.broker_demand_node_ids ?? [])
+    .map(String)
+    .sort();
   return {
     section,
     parent_row_id: parent.row_id,
@@ -187,6 +197,8 @@ function familyShape(section, parent, children) {
     ],
     candidate_broker_demand_row_ids: candidateDemandRows,
     broker_demand_owner_row_ids: brokerDemandOwnerRowIds,
+    candidate_broker_demand_node_ids: candidateBrokerDemandNodeIds,
+    broker_demand_owner_node_ids: brokerDemandOwnerNodeIds,
   };
 }
 
@@ -629,6 +641,8 @@ export function compilePhysicalOwnershipPreflight(
     pro_forma_forecast_periods: Array.isArray(proFormaSolution?.forecast)
       ? proFormaSolution.forecast.length
       : null,
+    standalone_solution_sha256: standaloneSolution ? hashValue(standaloneSolution) : null,
+    pro_forma_solution_sha256: proFormaSolution ? hashValue(proFormaSolution) : null,
   };
   if (
     modelCase?.execution_profile === "production_model" &&
@@ -649,6 +663,7 @@ export function compilePhysicalOwnershipPreflight(
     census_sha256: census?.census_sha256 ?? null,
     solver_binding: solverBinding,
     destinations,
+    ownership_writer_contract_sha256: hashValue(destinations),
     violations,
     controller_signal: {
       action: violations.length ? "cancel_descendants_preserve_checkpoint" : "continue",

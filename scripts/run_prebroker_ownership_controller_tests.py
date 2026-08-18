@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,37 @@ def run_checked(command: list[str], *, timeout: int = 120) -> subprocess.Complet
         f"{completed.stdout}\n{completed.stderr}",
     )
     return completed
+
+
+def portable_runtime() -> tuple[str, str]:
+    dependency_root = Path.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies"
+    python_candidates = [
+        str(dependency_root / "python" / "bin" / "python3"),
+        sys.executable,
+        shutil.which("python3") or "",
+    ]
+    def imports_openpyxl(candidate: str) -> bool:
+        if not candidate:
+            return False
+        try:
+            return subprocess.run(
+                [candidate, "-c", "import openpyxl"],
+                capture_output=True,
+                check=False,
+            ).returncode == 0
+        except OSError:
+            return False
+
+    python = next((candidate for candidate in python_candidates if imports_openpyxl(candidate)), None)
+    soffice_candidates = [
+        shutil.which("soffice") or "",
+        str(dependency_root / "bin" / "override" / "soffice"),
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ]
+    soffice = next((candidate for candidate in soffice_candidates if candidate and Path(candidate).exists()), None)
+    require(bool(python), "Portable openpyxl runtime is unavailable")
+    require(bool(soffice), "Portable LibreOffice runtime is unavailable")
+    return str(python), str(soffice)
 
 
 def filings_bundle(run_id: str) -> dict[str, Any]:
@@ -108,7 +140,57 @@ def attachment_scenario(mode: str) -> None:
         output = root / "out"
         spec_path = root / "spec.json"
         choice_path = root / "choice.json"
+        broker_request_path = root / "broker-request.json"
         write_json(choice_path, {"scenario": mode})
+        periods = ["2026-12-31", "2027-12-31", "2028-12-31"]
+        demand_rows = [
+            ("cf.change_in_working_capital", "change_in_working_capital", "Change in working capital"),
+            ("cf.receivables_movement", "receivables_movement", "Receivables movement"),
+            ("cf.inventory_movement", "inventory_movement", "Inventory movement"),
+            ("cf.payables_movement", "payables_movement", "Payables movement"),
+        ]
+        demand_nodes = []
+        for source_line_id, metric_id, label in demand_rows:
+            for index, period in enumerate(periods):
+                demand_nodes.append({
+                    "node_id": f"model_demand.{metric_id}.fy{index + 1}",
+                    "node_kind": "model_demand",
+                    "section": "cash_flow",
+                    "source_line_id": source_line_id,
+                    "metric_id": metric_id,
+                    "label": label,
+                    "parent_label": None if metric_id == "change_in_working_capital" else "Change in working capital",
+                    "period_end": period,
+                    "material": True,
+                    "source_backed": True,
+                    "broker_demand_eligible": True,
+                    "house_requirement": "required",
+                    "allowed_authorities": ["selected_broker", "historical_inference"],
+                    "definition_signature_sha256": "d" * 64,
+                    "consumer_ids": [f"forecast_authority.{metric_id}.{period}"],
+                })
+        demand_body = {
+            "schema_version": "pre-broker-model-demand/2.0",
+            "run_id": f"prebroker_{mode}",
+            "as_of": "2025-12-31",
+            "reporting_currency": "USD",
+            "units": "millions",
+            "forecast_periods": periods,
+            "ontology_sha256": "e" * 64,
+            "nodes": demand_nodes,
+            "counts": {
+                "source_rows": 4,
+                "filed_forecast_nodes": 0,
+                "model_demand_concepts": 4,
+                "model_demand_nodes": 12,
+                "material_model_demand_nodes": 12,
+            },
+        }
+        demand_graph = {**demand_body, "graph_sha256": pipeline.sha256_value(demand_body)}
+        write_json(broker_request_path, {
+            "run_id": f"prebroker_{mode}",
+            "model_context": {"model_demand_graph": demand_graph},
+        })
         spec = {
             "schema_version": "attachment-evidence-controller/1.0",
             "run_id": f"prebroker_{mode}",
@@ -116,7 +198,7 @@ def attachment_scenario(mode: str) -> None:
             "case_source_declarations_path": "unused-declarations.json",
             "broker_intake_choice_path": str(choice_path),
             "filings": {"request_path": "unused-filings.json"},
-            "broker": {"request_path": "unused-broker.json"},
+            "broker": {"request_path": str(broker_request_path)},
             "dcs": {"request_path": "unused-dcs.json"},
         }
         write_json(spec_path, spec)
@@ -134,7 +216,7 @@ def attachment_scenario(mode: str) -> None:
 
         def fake_run_lane(
             kind: str,
-            _declaration: dict[str, Any],
+            declaration: dict[str, Any],
             _base: Path,
             output_root: Path,
         ) -> dict[str, Any]:
@@ -178,6 +260,29 @@ def attachment_scenario(mode: str) -> None:
                 and len(family.get("child_row_ids") or []) == 3,
                 f"{kind} launched after a non-structural or demand-blind A receipt",
             )
+            projection_path = output_root / "ownership" / "broker-demand-ownership-projection.json"
+            require(projection_path.is_file(), f"{kind} launched before demand projection was sealed")
+            if kind == "broker":
+                broker_request = json.loads(
+                    Path(str(declaration.get("request_path"))).read_text("utf-8")
+                )
+                launched_graph = (broker_request.get("model_context") or {}).get("model_demand_graph") or {}
+                launched_ids = {node.get("node_id") for node in launched_graph.get("nodes") or []}
+                expected_parent_ids = {
+                    f"model_demand.change_in_working_capital.fy{index}"
+                    for index in (1, 2, 3)
+                }
+                require(
+                    launched_ids == expected_parent_ids,
+                    f"Broker launched child work after parent ownership won: {sorted(launched_ids)}",
+                )
+                projection = json.loads(projection_path.read_text("utf-8"))
+                require(
+                    projection.get("status") == "PASS"
+                    and projection.get("counts", {}).get("rejected_nodes") == 9
+                    and set(projection.get("owner_node_ids") or []) == expected_parent_ids,
+                    "Broker launch was not bound to the sealed 3/12 ownership projection",
+                )
             return {
                 "schema_version": f"{kind}-run-state/1.0",
                 "pipeline_status": "BLOCKED_INPUT",
@@ -212,6 +317,19 @@ def attachment_scenario(mode: str) -> None:
                 return original_run(command, timeout_seconds=timeout_seconds)
 
             pipeline.run = tampering_run
+        if mode == "projection_tamper":
+            original_projection = pipeline.project_broker_demand_to_structural_owners
+
+            def tampering_projection(**kwargs: Any) -> tuple[Path, Path]:
+                result = original_projection(**kwargs)
+                declaration = kwargs.get("broker_declaration") or {}
+                request_path = Path(str(declaration.get("request_path") or ""))
+                request = json.loads(request_path.read_text("utf-8"))
+                request["model_context"]["model_demand_graph"]["graph_sha256"] = "0" * 64
+                write_json(request_path, request)
+                return result
+
+            pipeline.project_broker_demand_to_structural_owners = tampering_projection
 
         prior_argv = sys.argv
         try:
@@ -230,7 +348,7 @@ def attachment_scenario(mode: str) -> None:
                 all(order.index(kind) > a_index for kind in ("broker", "dcs")),
                 f"A descendant launched before Preflight A: {order}",
             )
-        else:
+        elif mode == "tamper":
             require(result == 2, "Tampered Preflight A did not stop the controller")
             require(order == ["filings"], f"Tampered A launched descendants: {order}")
             require(
@@ -243,6 +361,17 @@ def attachment_scenario(mode: str) -> None:
                 and ((state.get("summary") or {}).get("controller_signal") or {}).get("action")
                 == "cancel_descendants_preserve_checkpoint",
                 "Tampered A did not preserve the early-cancellation contract",
+            )
+        else:
+            require(result == 2, "Tampered ownership projection did not stop the controller")
+            require(
+                order == ["filings", "A_STRUCTURAL"],
+                f"Tampered ownership projection launched descendants: {order}",
+            )
+            require(
+                state.get("pipeline_status") == "BLOCKED_INTERNAL"
+                and (state.get("summary") or {}).get("descendant_lanes_started") == [],
+                "Tampered ownership projection was not contained before launch",
             )
 
 
@@ -260,14 +389,17 @@ def neutral_working_capital_controller() -> dict[str, Any]:
             str(evidence),
         ])
         relevant_evidence_at = time.monotonic()
+        python, soffice = portable_runtime()
         run_checked([
             "node",
             str(HERE / "run_user_flow.mjs"),
             str(evidence),
             "--out",
             str(run_root),
-            "--stop-after",
-            "decisions",
+            "--python",
+            python,
+            "--soffice",
+            soffice,
             "--json",
         ])
         elapsed_ms = round((time.monotonic() - relevant_evidence_at) * 1000)
@@ -278,10 +410,11 @@ def neutral_working_capital_controller() -> dict[str, Any]:
         model = ((validation.get("handoff") or {}).get("model_case") or {})
         require(elapsed_ms < 120_000, f"Ownership resolution took {elapsed_ms}ms")
         require(
-            result.get("status") == "PAUSED"
-            and result.get("stage") == "decisions"
-            and result.get("user_blocking") is False,
-            "Neutral working-capital evidence did not auto-progress without user action",
+            result.get("status") == "PASS_PENDING_MANUAL"
+            and result.get("stage") == "delivery"
+            and result.get("user_blocking") is not True
+            and Path(str(result.get("delivery_file") or "")).is_file(),
+            "Neutral working-capital evidence did not auto-progress through build and delivery",
         )
         selected = (model.get("forecast_ownership_preflights") or {}).get("selected") or {}
         wc_resolutions = [
@@ -328,11 +461,21 @@ def neutral_working_capital_controller() -> dict[str, Any]:
             and len(rejected) == 9,
             "Checkpoint B did not retain all rejected fallback/user evidence",
         )
+        physical_proofs = list(run_root.rglob("forecast-ownership-physical-proof.json"))
+        require(len(physical_proofs) >= 1, "Full build omitted the emitted Preflight C proof")
+        physical = json.loads(physical_proofs[-1].read_text("utf-8"))
+        require(
+            physical.get("status") == "PASS"
+            and int(physical.get("checked_writer_bindings") or 0) > 0,
+            "Delivered workbook did not clear emitted physical ownership proof",
+        )
         return {
             "elapsed_ms_from_relevant_evidence": elapsed_ms,
             "resolution_count": len(wc_resolutions),
             "rejected_evidence_count": len(rejected),
             "user_action_required": False,
+            "delivery_status": result.get("status"),
+            "physical_writer_bindings": physical.get("checked_writer_bindings"),
         }
 
 
@@ -341,7 +484,7 @@ def main() -> int:
         attachment_scenario(sys.argv[2])
         print(json.dumps({"scenario": sys.argv[2], "status": "PASS"}, sort_keys=True))
         return 0
-    for scenario in ("valid", "tamper"):
+    for scenario in ("valid", "tamper", "projection_tamper"):
         run_checked([sys.executable, str(Path(__file__).resolve()), "--attachment-scenario", scenario])
     neutral = neutral_working_capital_controller()
     print(json.dumps({
@@ -349,6 +492,7 @@ def main() -> int:
         "checks": {
             "preflight_a_call_order": "PASS",
             "tampered_preflight_a_early_cancel": "PASS",
+            "tampered_demand_projection_early_cancel": "PASS",
             "neutral_working_capital_controller": neutral,
         },
     }, indent=2, sort_keys=True))

@@ -47,12 +47,18 @@
     "solver_binding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["standalone_forecast_periods", "pro_forma_forecast_periods"],
+      "required": [
+        "standalone_forecast_periods", "pro_forma_forecast_periods",
+        "standalone_solution_sha256", "pro_forma_solution_sha256"
+      ],
       "properties": {
         "standalone_forecast_periods": { "type": ["integer", "null"], "minimum": 0 },
-        "pro_forma_forecast_periods": { "type": ["integer", "null"], "minimum": 0 }
+        "pro_forma_forecast_periods": { "type": ["integer", "null"], "minimum": 0 },
+        "standalone_solution_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "pro_forma_solution_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
       }
     },
+    "ownership_writer_contract_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "families": {
       "type": "array",
       "items": { "$ref": "#/$defs/family" }
@@ -88,7 +94,7 @@
     },
     {
       "if": { "properties": { "checkpoint": { "const": "C_PHYSICAL" } } },
-      "then": { "required": ["selected_receipt_sha256", "census_sha256", "solver_binding", "destinations"] }
+      "then": { "required": ["selected_receipt_sha256", "census_sha256", "solver_binding", "destinations", "ownership_writer_contract_sha256"] }
     }
   ],
   "$defs": {
@@ -102,7 +108,8 @@
       "additionalProperties": false,
       "required": [
         "section", "parent_row_id", "child_row_ids", "schedule_child_row_ids",
-        "permitted_modes", "candidate_broker_demand_row_ids", "broker_demand_owner_row_ids"
+        "permitted_modes", "candidate_broker_demand_row_ids", "broker_demand_owner_row_ids",
+        "candidate_broker_demand_node_ids", "broker_demand_owner_node_ids"
       ],
       "properties": {
         "section": { "enum": ["income_statement", "cash_flow"] },
@@ -115,7 +122,9 @@
           "uniqueItems": true
         },
         "candidate_broker_demand_row_ids": { "$ref": "#/$defs/rowIds" },
-        "broker_demand_owner_row_ids": { "$ref": "#/$defs/rowIds" }
+        "broker_demand_owner_row_ids": { "$ref": "#/$defs/rowIds" },
+        "candidate_broker_demand_node_ids": { "$ref": "#/$defs/rowIds" },
+        "broker_demand_owner_node_ids": { "$ref": "#/$defs/rowIds" }
       }
     },
     "resolution": {

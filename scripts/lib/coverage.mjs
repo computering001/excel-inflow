@@ -388,6 +388,8 @@ function dependencyChecks(modelCase) {
   const approvedCompilerRoles = new Set(
     PRODUCTION_CONTRACT.formula_dependency.approved_compiler_calculated_roles,
   );
+  const selectedOwnership =
+    modelCase?.forecast_ownership_preflights?.selected?.resolutions ?? [];
   for (const row of rows) {
     if (ids.has(row.row_id)) {
       checks.push(
@@ -407,10 +409,27 @@ function dependencyChecks(modelCase) {
     const forecastPeriodCalculations =
       row.forecast_period_calculations ?? [];
     const compilerCalculated = approvedCompilerRoles.has(row.semantic_role);
+    const parentOwnedPeriods = selectedOwnership.filter(
+      (resolution) => resolution?.parent_row_id === row.row_id &&
+        resolution?.selected_mode === "parent_owned",
+    );
+    const capturedChildren = rows.filter(
+      (candidate) => candidate?.forecast_capture_parent_id === row.row_id,
+    );
+    const sealedDirectAggregate =
+      modelCase?.forecast_ownership_preflights?.selected?.status === "PASS" &&
+      new Set(parentOwnedPeriods.map((resolution) => resolution.forecast_index)).size === 3 &&
+      capturedChildren.length >= 2 &&
+      (row.forecast_period_authorities ?? []).length === 3 &&
+      (row.forecast_period_authorities ?? []).every(
+        (authority) => !["accounting_identity", "not_separately_forecast", "unresolved"]
+          .includes(authority?.method),
+      );
     if (
       ["calculation", "subtotal"].includes(row.row_type) &&
       !calculation &&
-      !compilerCalculated
+      !compilerCalculated &&
+      !sealedDirectAggregate
     ) {
       checks.push(
         result(
@@ -420,12 +439,21 @@ function dependencyChecks(modelCase) {
         ),
       );
     }
-    if (row.row_type === "subtotal" && !calculation) {
+    if (row.row_type === "subtotal" && !calculation && !sealedDirectAggregate) {
       checks.push(
         result(
           `dependency.${row.row_id}.hardcoded_subtotal`,
           "BLOCK",
           `${row.label} is a subtotal without a formula.`,
+        ),
+      );
+    }
+    if (sealedDirectAggregate && !calculation) {
+      checks.push(
+        result(
+          `dependency.${row.row_id}.sealed_direct_aggregate`,
+          "PASS",
+          `${row.label} is a sealed direct aggregate owner for all three forecast periods; its captured children cannot also write the subtotal.`,
         ),
       );
     }

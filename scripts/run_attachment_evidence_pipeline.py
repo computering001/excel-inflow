@@ -70,6 +70,18 @@ def sha256_value(value: Any) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
+def sha256_node_value(value: Any) -> str:
+    """Match scripts/lib/run_store.mjs hashValue (pretty canonical JSON, no LF)."""
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        indent=2,
+        ensure_ascii=False,
+        separators=(",", ": "),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def read_json(target: Path, label: str) -> dict[str, Any]:
     try:
         value = json.loads(target.read_text("utf-8"))
@@ -634,6 +646,159 @@ def run_structural_ownership_preflight(
     if receipt_path.read_bytes() != verify_path.read_bytes():
         raise ValueError("Structural ownership preflight changed during reopen verification")
     return receipt, receipt_path, round((time.monotonic() - started) * 1000)
+
+
+def project_broker_demand_to_structural_owners(
+    *,
+    structural_receipt: dict[str, Any],
+    demand_path: Path,
+    broker_declaration: dict[str, Any] | None,
+    output_root: Path,
+) -> tuple[Path, Path]:
+    """Rewrite the graph consumed by the broker lane to its sole structural owners.
+
+    The structural receipt carries exact demand-node identities, not a label or
+    metric heuristic.  The projection receipt binds the original graph, the A
+    receipt and the projected graph.  Any ambiguity fails before a descendant
+    lane can start.
+    """
+    if structural_receipt.get("status") != "PASS":
+        raise ValueError("Cannot project broker demand from a non-PASS structural receipt")
+    structural_hash = str(structural_receipt.get("receipt_sha256") or "")
+    receipt_body = {key: value for key, value in structural_receipt.items() if key != "receipt_sha256"}
+    if len(structural_hash) != 64 or structural_hash != sha256_node_value(receipt_body):
+        raise ValueError("Structural ownership receipt is stale before broker-demand projection")
+    graph = read_json(demand_path, "unprojected pre-broker demand graph")
+    graph_hash = str(graph.get("graph_sha256") or "")
+    graph_body = {key: value for key, value in graph.items() if key != "graph_sha256"}
+    if len(graph_hash) != 64 or graph_hash != sha256_value(graph_body):
+        raise ValueError("Pre-broker demand graph is stale before ownership projection")
+    nodes = list(graph.get("nodes") or [])
+    node_ids = [str(node.get("node_id") or "") for node in nodes]
+    if any(not node_id for node_id in node_ids) or len(set(node_ids)) != len(node_ids):
+        raise ValueError("Pre-broker demand graph node identities are absent or duplicated")
+    available = set(node_ids)
+    candidate: set[str] = set()
+    owners: set[str] = set()
+    for family in structural_receipt.get("families") or []:
+        family_candidates = set(map(str, family.get("candidate_broker_demand_node_ids") or []))
+        family_owners = set(map(str, family.get("broker_demand_owner_node_ids") or []))
+        if family.get("candidate_broker_demand_row_ids") and not family_candidates:
+            raise ValueError("Structural ownership projection cannot bind demand rows to graph nodes")
+        if not family_owners.issubset(family_candidates):
+            raise ValueError("Structural ownership projection contains an owner outside its candidate set")
+        if not family_candidates.issubset(available):
+            raise ValueError("Structural ownership projection references a missing demand node")
+        conflicting = candidate.intersection(family_candidates)
+        if conflicting and any(
+            (node_id in owners) != (node_id in family_owners)
+            for node_id in conflicting
+        ):
+            raise ValueError("A demand node has conflicting structural owners")
+        candidate.update(family_candidates)
+        owners.update(family_owners)
+    rejected = candidate - owners
+    projected_nodes = [node for node in nodes if str(node.get("node_id")) not in rejected]
+    projected = dict(graph_body)
+    projected["nodes"] = projected_nodes
+    counts = dict(projected.get("counts") or {})
+    demand_nodes = [node for node in projected_nodes if node.get("node_kind") == "model_demand"]
+    counts["source_rows"] = len({
+        str(node.get("source_line_id")) for node in demand_nodes if node.get("source_line_id")
+    })
+    counts["model_demand_concepts"] = len({
+        str(node.get("metric_id")) for node in demand_nodes if node.get("metric_id")
+    })
+    counts["model_demand_nodes"] = len(demand_nodes)
+    counts["material_model_demand_nodes"] = sum(
+        1 for node in demand_nodes if node.get("material") is True
+    )
+    projected["counts"] = counts
+    projected_graph = {**projected, "graph_sha256": sha256_value(projected)}
+    projection_body = {
+        "schema_version": "pre-broker-demand-ownership-projection/1.0",
+        "status": "PASS",
+        "structural_receipt_sha256": structural_hash,
+        "input_graph_sha256": graph_hash,
+        "output_graph_sha256": projected_graph["graph_sha256"],
+        "candidate_node_ids": sorted(candidate),
+        "owner_node_ids": sorted(owners),
+        "rejected_node_ids": sorted(rejected),
+        "counts": {
+            "input_nodes": len(nodes),
+            "output_nodes": len(projected_nodes),
+            "rejected_nodes": len(rejected),
+        },
+    }
+    projection_receipt = {
+        **projection_body,
+        "receipt_sha256": sha256_value(projection_body),
+    }
+    atomic_json(demand_path, projected_graph)
+    projection_path = output_root / "ownership" / "broker-demand-ownership-projection.json"
+    atomic_json(projection_path, projection_receipt)
+    if broker_declaration is not None:
+        request_path = Path(str(broker_declaration.get("request_path") or "")).resolve()
+        if not request_path.is_file():
+            raise ValueError("Broker descendant lacks a controller-owned request to project")
+        request = read_json(request_path, "broker request for ownership projection")
+        context = request.get("model_context")
+        if not isinstance(context, dict) or not isinstance(context.get("model_demand_graph"), dict):
+            raise ValueError("Broker descendant request lacks its demand graph")
+        context["model_demand_graph"] = projected_graph
+        atomic_json(request_path, request)
+    verify_broker_demand_projection(
+        demand_path=demand_path,
+        projection_path=projection_path,
+        structural_receipt=structural_receipt,
+        broker_declaration=broker_declaration,
+    )
+    return demand_path, projection_path
+
+
+def verify_broker_demand_projection(
+    *,
+    demand_path: Path,
+    projection_path: Path,
+    structural_receipt: dict[str, Any],
+    broker_declaration: dict[str, Any] | None,
+) -> None:
+    graph = read_json(demand_path, "projected pre-broker demand graph")
+    receipt = read_json(projection_path, "broker-demand ownership projection")
+    receipt_hash = receipt.pop("receipt_sha256", None)
+    if receipt_hash != sha256_value(receipt):
+        raise ValueError("Broker-demand ownership projection receipt is stale")
+    graph_hash = graph.get("graph_sha256")
+    graph_body = {key: value for key, value in graph.items() if key != "graph_sha256"}
+    if graph_hash != sha256_value(graph_body):
+        raise ValueError("Projected broker-demand graph is stale")
+    if (
+        receipt.get("status") != "PASS"
+        or receipt.get("structural_receipt_sha256") != structural_receipt.get("receipt_sha256")
+        or receipt.get("output_graph_sha256") != graph_hash
+    ):
+        raise ValueError("Projected broker demand is not bound to the active structural receipt")
+    actual_ids = {str(node.get("node_id")) for node in graph.get("nodes") or []}
+    if actual_ids.intersection(set(receipt.get("rejected_node_ids") or [])):
+        raise ValueError("Rejected child demand remains in the broker graph")
+    if not set(receipt.get("owner_node_ids") or []).issubset(actual_ids):
+        raise ValueError("Owned demand is missing from the broker graph")
+    if broker_declaration is not None:
+        request = read_json(
+            Path(str(broker_declaration.get("request_path") or "")).resolve(),
+            "projected broker request",
+        )
+        request_graph = (request.get("model_context") or {}).get("model_demand_graph")
+        request_graph_body = {
+            key: value for key, value in (request_graph or {}).items()
+            if key != "graph_sha256"
+        }
+        if (
+            not isinstance(request_graph, dict)
+            or request_graph.get("graph_sha256") != sha256_value(request_graph_body)
+            or request_graph != graph
+        ):
+            raise ValueError("Broker request does not carry the sealed projected demand graph")
 
 def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dict[str, Path]) -> dict[str, Any]:
     declarations: dict[str, Any] = {}
@@ -1569,6 +1734,52 @@ def main() -> int:
                 "message": "; ".join(structural_receipt.get("violations") or []),
                 "descendant_lanes_started": [],
                 "controller_signal": structural_receipt.get("controller_signal"),
+                "performance": {"lane_duration_ms": lane_duration_ms},
+            },
+        )
+        return 2
+    try:
+        demand_path, projection_path = project_broker_demand_to_structural_owners(
+            structural_receipt=structural_receipt,
+            demand_path=demand_path,
+            broker_declaration=concurrent_declarations.get("broker"),
+            output_root=output_root,
+        )
+        # Reopen the exact artifacts returned by the projection boundary.  The
+        # helper verifies before returning as well; this second read closes the
+        # handoff so a stale request can never reach executor submission.
+        verify_broker_demand_projection(
+            demand_path=demand_path,
+            projection_path=projection_path,
+            structural_receipt=structural_receipt,
+            broker_declaration=concurrent_declarations.get("broker"),
+        )
+        derived_artifacts["pre_broker_model_demand"] = str(demand_path)
+        derived_artifacts["broker_demand_ownership_projection"] = str(projection_path)
+        checkpoints.append({
+            "stage": "broker_demand_ownership_projection",
+            "status": "PASS",
+            "state_sha256": sha256_file(projection_path),
+        })
+    except Exception as error:
+        checkpoints.append({
+            "stage": "broker_demand_ownership_projection",
+            "status": "BLOCKED",
+            "state_sha256": None,
+        })
+        write_state(
+            state_path, spec=spec, spec_hash=spec_hash, runtime_hash=runtime_hash,
+            status="BLOCKED_INTERNAL", blocker="INTERNAL_WORK",
+            user_blocking=False, lanes=lanes, checkpoints=checkpoints,
+            artifacts=derived_artifacts, tasks=[],
+            summary={
+                "terminal_reason": "broker_demand_ownership_projection_blocked",
+                "message": str(error),
+                "descendant_lanes_started": [],
+                "controller_signal": {
+                    "action": "cancel_descendants_preserve_checkpoint",
+                    "resume_from": "structural_ownership",
+                },
                 "performance": {"lane_duration_ms": lane_duration_ms},
             },
         )
