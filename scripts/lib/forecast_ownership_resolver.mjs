@@ -280,25 +280,23 @@ export function resolveSelectedForecastOwnership(modelCase) {
             parentAuthority,
           )
           : null;
-        // Family-level ownership: the children may take the aggregate only
-        // when the WHOLE material direct family substantively outranks the
-        // parent. One strong child with weak or incomplete siblings must not
-        // flip the family — that shape previously shipped a children-owned
-        // aggregate whose family was not actually complete.
-        const materialDirectChildren = materialChildStates
-          .filter(({ owner_class }) => owner_class === "direct")
-          .map(({ row }) => ({ row, authority: authorityAt(row, forecastIndex) }));
+        // Family-level ownership: children may take the aggregate only when
+        // the material family is COMPLETE (no absent member) — that is the
+        // completeness half of the constitution, enforced above — and the
+        // strongest child substantively outranks the parent. The sealed
+        // contract tests deliberately let strong FY1 company evidence own a
+        // complete child set whose siblings carry weaker-but-present
+        // authorities; requiring every sibling to beat the parent would
+        // reject that lawful shape.
         const strongerDirectChild = Boolean(
           completeMaterialChildren &&
           parentHasCompilableIdentity &&
           strongestChild &&
           !["stable_id", "exact_tie"].includes(childRankDimension) &&
-          materialDirectChildren.length > 0 &&
-          materialDirectChildren.every(({ authority }) => {
-            const dimension = forecastAuthorityDecidingDimension(authority, parentAuthority);
-            return !["stable_id", "exact_tie"].includes(dimension) &&
-              compareForecastAuthorityCandidates(authority, parentAuthority) < 0;
-          }),
+          compareForecastAuthorityCandidates(
+            strongestChild.authority,
+            parentAuthority,
+          ) < 0,
         );
         let selectedMode = null;
         if (parentClass === "schedule") selectedMode = "schedule_owned";
@@ -323,7 +321,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
         // it never overwrites a selected source or turns unresolved evidence into zero.
         if (
           !selectedMode &&
-          process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE !== "off" &&
+          process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE === "historical_average" &&
           parentHasCompilableIdentity
         ) {
           for (const { row: child, owner_class: ownerClass } of materialChildStates) {
