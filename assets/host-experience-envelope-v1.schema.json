@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/host-experience-envelope-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "trace_id", "run_id", "submitted_at", "delivered_at", "external_waits"],
+  "properties": {
+    "schema_version": {"const": "host-experience-envelope/1.0"},
+    "trace_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "submitted_at": {"type": "string"},
+    "delivered_at": {"type": "string"},
+    "external_waits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation", "reason", "started_at", "ended_at"],
+        "properties": {
+          "operation": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "started_at": {"type": "string"},
+          "ended_at": {"type": "string"}
+        }
+      }
+    }
+  }
+}

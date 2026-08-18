@@ -1,0 +1,891 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/evidence-run-v1.schema.json",
+  "title": "Debt Overlay evidence-to-case run envelope",
+  "description": "The machine-checkable boundary between deployment-host source reading and the deterministic debt-model runtime. It proves which sources were read and carries declarations plus sealed evidence; the normalized model case is compiled inside the runtime and is never accepted as first-run authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "created_at",
+    "mode",
+    "company_name",
+    "source_inventory",
+    "retrieval_log",
+    "filings",
+    "dcs_export",
+    "broker_pack",
+    "forecast_context",
+    "case_source",
+    "case_evidence",
+    "decisions"
+  ],
+  "properties": {
+    "schema_version": { "const": "evidence-run/1.0" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "created_at": { "type": "string", "minLength": 10 },
+    "mode": { "enum": ["first_run", "rebuild"] },
+    "company_name": { "type": "string", "minLength": 1 },
+    "source_inventory": {
+      "type": "array",
+      "minItems": 2,
+      "description": "At minimum the controlled run carries company filing evidence and one debt export. Broker research is optional and therefore cannot determine this lower bound.",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "retrieval_log": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/retrievalDecision" }
+    },
+    "filings": { "$ref": "#/$defs/filings" },
+    "dcs_export": { "type": "object" },
+    "dcs_source_tables": { "type": "object" },
+    "dcs_candidate_manifest": { "type": "object" },
+    "dcs_crosswalk": { "type": "object" },
+    "dcs_projection": { "type": "object" },
+    "dcs_evidence_receipt": { "type": "object" },
+    "dcs_independent_verification": { "type": "object" },
+    "broker_pack": { "type": "object" },
+    "broker_source_tables": { "$ref": "#/$defs/brokerSourceTables" },
+    "broker_crosswalk_receipt": { "type": "object" },
+    "broker_semantic_verification": { "type": "object" },
+    "forecast_context": { "$ref": "#/$defs/forecastContext" },
+    "forecast_observation_ledger": { "type": "object" },
+    "forecast_observation_ledger_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "ledger_sha256",
+        "observation_count",
+        "violation_count"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "forecast-observation-ledger-receipt/1.0"
+        },
+        "status": { "const": "PASS" },
+        "ledger_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observation_count": { "type": "integer", "minimum": 1 },
+        "violation_count": { "const": 0 }
+      }
+    },
+    "case_source": {
+      "description": "Declarations-only case authorship surface. The runtime compiles this object through compileCase; it never trusts a supplied model case.",
+      "type": "object"
+    },
+    "case_evidence": {
+      "description": "Sealed compiler evidence: face-statement manifests plus typed evidence lanes. Economic values live here, not in case_source.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["face_statement_manifests", "lanes"],
+      "properties": {
+        "face_statement_manifests": { "type": "object" },
+        "filing_provenance": {
+          "description": "Compiler-owned document/period authority copied from the sealed filings bundle for deterministic selected-row provenance.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "documents": {
+              "type": "array",
+              "items": { "type": "object" }
+            },
+            "period_authority": { "type": "object" }
+          }
+        },
+        "lanes": { "type": "object" }
+      }
+    },
+    "model_case": {
+      "description": "Deprecated comparison artifact. It is never authoritative and is rejected on first-run production flows.",
+      "type": "object"
+    },
+    "attachment_manifest": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/attachment" }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "compiler_version", "manifest_sha256"],
+      "properties": {
+        "schema_version": { "const": "attachment-ingress/1.0" },
+        "compiler_version": { "type": "string", "minLength": 1 },
+        "manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "broker_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["broker_run_state_sha256", "broker_runtime_closure_sha256", "broker_cache_key", "extraction_bundle_sha256", "source_tables_sha256", "crosswalk_sha256", "crosswalk_receipt_sha256"],
+          "properties": {
+            "broker_run_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "broker_runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "broker_cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "extraction_bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "crosswalk_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "semantic_verification_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "degraded_close_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "dcs_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dcs_run_state_sha256",
+            "dcs_runtime_closure_sha256",
+            "dcs_cache_key",
+            "source_tables_sha256",
+            "candidate_manifest_sha256",
+            "crosswalk_sha256",
+            "projection_sha256",
+            "evidence_receipt_sha256",
+            "independent_verification_sha256"
+          ],
+          "properties": {
+            "dcs_run_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "dcs_runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "dcs_cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "candidate_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "crosswalk_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "projection_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "evidence_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "independent_verification_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
+      }
+    },
+    "prior_case_receipt": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["case_id", "case_sha256", "issuer_name", "answers_preserved"],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "case_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "issuer_name": { "type": "string", "minLength": 1 },
+        "answers_preserved": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["restatements", "groupings", "manual_debt_supplements", "stated_assumptions"],
+      "properties": {
+        "restatements": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/restatementDecision" }
+        },
+        "groupings": { "type": "array", "items": { "$ref": "#/$defs/decision" } },
+        "manual_debt_supplements": { "type": "array", "items": { "$ref": "#/$defs/debtSupplement" } },
+        "stated_assumptions": { "type": "array", "items": { "$ref": "#/$defs/decision" } }
+      }
+    }
+  },
+  "$defs": {
+    "brokerSourceTables": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "run_id", "houses"],
+      "properties": {
+        "schema_version": { "const": "broker-source-tables/1.0" },
+        "run_id": { "type": "string", "minLength": 1 },
+        "houses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["house_id", "house_name", "source_id", "content_sha256", "tables"],
+            "properties": {
+              "house_id": { "type": "string", "minLength": 1 },
+              "house_name": { "type": "string", "minLength": 1 },
+              "source_id": { "type": "string", "minLength": 1 },
+              "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "published_date": { "type": "string", "format": "date" },
+              "file_name": { "type": "string", "minLength": 1 },
+              "pages": {
+                "type": "array",
+                "description": "Hash-bound full-page images for screenshot-only Bxx evidence tabs; never calculation authority.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["page_number", "surface_id", "width_points", "height_points", "artifact_path", "artifact_sha256"],
+                  "properties": {
+                    "page_number": { "type": "integer", "minimum": 1 },
+                    "surface_id": { "type": "string", "minLength": 1 },
+                    "width_points": { "type": "number", "exclusiveMinimum": 0 },
+                    "height_points": { "type": "number", "exclusiveMinimum": 0 },
+                    "artifact_path": { "type": "string", "minLength": 1 },
+                    "artifact_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+                  }
+                },
+                "default": []
+              },
+              "tables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["table_id", "title", "source_location", "units", "extraction_method", "workbook_presentation", "workbook_presentation_reason", "rows"],
+                  "properties": {
+                    "table_id": { "type": "string", "minLength": 1 },
+                    "title": { "type": ["string", "null"] },
+                    "source_location": { "type": "string", "minLength": 1 },
+                    "units": { "type": ["string", "null"] },
+                    "extraction_method": { "type": "string", "minLength": 1 },
+                    "workbook_presentation": { "enum": ["analytical_table", "evidence_only"] },
+                    "workbook_presentation_reason": { "type": "string", "minLength": 1 },
+                    "rows": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": { "type": ["string", "number", "boolean", "null"] }
+                      }
+                    },
+                    "cell_authorities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["row", "column", "status"],
+                        "properties": {
+                          "row": { "type": "integer", "minimum": 1 },
+                          "column": { "type": "integer", "minimum": 1 },
+                          "status": {
+                            "enum": ["verified_native", "verified_dual_read", "verified_adjudicated", "quarantined_conflict"]
+                          },
+                          "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
+                          "basis": { "type": "string", "minLength": 1 }
+                        }
+                      }
+                    },
+                    "transcription_structure": {
+                      "type": "object",
+                      "properties": {
+                        "row_labels": { "type": "integer" },
+                        "period_headers": { "type": "integer" },
+                        "row_count": { "type": "integer" },
+                        "max_columns": { "type": "integer" },
+                        "is_grid": { "type": "boolean" }
+                      },
+                      "additionalProperties": true
+                    },
+                    "workbook_presentation_hint": {
+                      "enum": ["analytical_table", "evidence_only"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "forecastContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "reviewed_at",
+        "public_results_source_ids",
+        "latest_public_results_source_id",
+        "guidance_status",
+        "guidance_source_ids",
+        "guidance_review_note"
+      ],
+      "properties": {
+        "contract_version": { "const": "forecast-evidence/1.0" },
+        "reviewed_at": { "type": "string", "format": "date" },
+        "public_results_source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "latest_public_results_source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "guidance_status": {
+          "enum": ["used", "reviewed_none", "not_applicable"]
+        },
+        "guidance_source_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "guidance_review_note": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "guidance_status": { "const": "used" } } },
+          "then": { "properties": { "guidance_source_ids": { "minItems": 1 } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "guidance_status": { "enum": ["reviewed_none", "not_applicable"] }
+            }
+          },
+          "then": { "properties": { "guidance_source_ids": { "maxItems": 0 } } }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "kind", "name", "origin", "media_type", "entity_name", "content_sha256", "text_extractable", "status"],
+      "properties": {
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "kind": {
+          "enum": [
+            "user_factset_export",
+            "user_broker_research",
+            "company_annual_report",
+            "company_interim_update",
+            "company_debt_document",
+            "company_transaction_announcement",
+            "prior_case",
+            "user_answer"
+          ]
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "origin": { "enum": ["uploaded", "retrieved", "generated"] },
+        "media_type": { "type": "string", "minLength": 1 },
+        "publication_date": { "type": ["string", "null"] },
+        "as_of_date": { "type": ["string", "null"] },
+        "entity_name": { "type": "string", "minLength": 1 },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
+        "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
+        "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "attachment_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "text_extractable": { "type": "boolean" },
+        "status": {
+          "enum": [
+            "used",
+            "evidence_only",
+            "quarantined",
+            "rejected_for_model_use",
+            "superseded",
+            "rejected"
+          ]
+        },
+        "status_reason": { "type": "string" }
+      }
+    },
+    "retrievalDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "selected_source_id", "precedence_rank", "reason"],
+      "properties": {
+        "fact_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "selected_source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "precedence_rank": { "type": "integer", "minimum": 1, "maximum": 7 },
+        "reason": { "type": "string", "minLength": 1 },
+        "supersedes_source_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attachment_id", "source_ids", "file_name", "media_type", "byte_length", "raw_sha256", "adapter", "normalized_artifact"],
+      "properties": {
+        "attachment_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "source_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" } },
+        "file_name": { "type": "string", "minLength": 1 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "byte_length": { "type": "integer", "minimum": 1 },
+        "raw_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["domain", "format"],
+          "properties": {
+            "domain": { "enum": ["factset_dcs", "broker_pack", "document_extraction"] },
+            "format": { "enum": ["json", "csv", "xlsx", "pdf", "docx", "text", "image"] },
+            "table_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "normalized_artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "kind"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "kind": { "enum": ["normalized_json", "explicit_extraction", "raw_archive", "controller_owned_raw"] }
+          }
+        },
+        "auxiliary_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256", "kind"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "kind": {
+                "enum": [
+                  "broker_source_tables",
+                  "broker_crosswalk_receipt",
+                  "broker_extraction_bundle",
+                  "dcs_source_tables",
+                  "dcs_candidate_manifest",
+                  "dcs_crosswalk",
+                  "dcs_projection",
+                  "dcs_evidence_receipt",
+                  "dcs_independent_verification"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_line_id", "label", "values", "source_id", "page_or_note", "face_statement", "material"],
+      "properties": {
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "values": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["number", "null"] }
+        },
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "face_statement": { "type": "boolean" },
+        "material": { "type": "boolean" },
+        "parent_label": { "type": "string" },
+        "neighbouring_labels": { "type": "array", "items": { "type": "string" } },
+        "table_context": { "type": "string" }
+      }
+    },
+    "faceStatementCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_text",
+        "source_page",
+        "source_coordinates",
+        "confidence",
+        "typed_state",
+        "currency",
+        "units",
+        "period",
+        "normalized_value"
+      ],
+      "properties": {
+        "raw_text": { "type": "string" },
+        "source_page": { "type": "integer", "minimum": 1 },
+        "source_coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coordinate_system", "x0", "y0", "x1", "y1", "inferred_blank_position"],
+          "properties": {
+            "coordinate_system": { "const": "pdf_points_top_left" },
+            "x0": { "type": "number" },
+            "y0": { "type": "number" },
+            "x1": { "type": "number" },
+            "y1": { "type": "number" },
+            "inferred_blank_position": { "type": "boolean" }
+          }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "typed_state": {
+          "enum": ["reported_number", "reported_zero", "reported_dash", "reported_blank", "not_applicable", "unresolved"]
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions"] },
+        "period": { "type": "string", "format": "date" },
+        "normalized_value": { "type": ["number", "null"] }
+      }
+    },
+    "faceStatementRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_line_id",
+        "ordinal",
+        "raw_label",
+        "values",
+        "page_or_note",
+        "material"
+      ],
+      "properties": {
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "values": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["number", "null"] }
+        },
+        "value_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "reported_number",
+              "reported_zero",
+              "reported_dash",
+              "reported_blank",
+              "not_applicable",
+              "unresolved"
+            ]
+          }
+        },
+        "value_precisions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 }
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/faceStatementCell" }
+        },
+        "structural_role": { "enum": ["body", "header"] },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "material": { "type": "boolean" },
+        "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "hierarchy_level": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "is_subtotal": { "type": "boolean" }
+      }
+    },
+    "faceStatementManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "statement",
+        "statement_order",
+        "source_id",
+        "document_sha256",
+        "page_or_note",
+        "periods",
+        "complete_face_statement",
+        "row_count",
+        "rows_sha256",
+        "rows"
+      ],
+      "properties": {
+        "schema_version": { "enum": ["face-statement-manifest/1.0", "face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"] },
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "statement_order": { "type": "integer", "minimum": 1 },
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "periods": { "$ref": "#/$defs/periods3" },
+        "complete_face_statement": { "const": true },
+        "source_pages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "integer", "minimum": 1 },
+          "uniqueItems": true
+        },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "type": "string", "minLength": 1 },
+        "source_unit_labels": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "row_count": { "type": "integer", "minimum": 1 },
+        "rows_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/faceStatementRow" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "schema_version": { "enum": ["face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"] } } },
+          "then": {
+            "required": ["source_pages", "reporting_currency", "units", "source_unit_labels"],
+            "properties": { "rows": { "items": { "required": ["value_states", "structural_role", "hierarchy_level", "is_subtotal"] } } }
+          }
+        },
+        {
+          "if": { "properties": { "schema_version": { "enum": ["face-statement-manifest/1.2", "face-statement-manifest/1.3"] } } },
+          "then": {
+            "properties": { "rows": { "items": { "required": ["value_precisions"] } } }
+          }
+        },
+        {
+          "if": { "properties": { "schema_version": { "const": "face-statement-manifest/1.3" } } },
+          "then": {
+            "properties": {
+              "rows": { "items": { "required": ["cells"] } }
+            }
+          }
+        }
+      ]
+    },
+    "faceStatementManifests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["income_statement", "cash_flow"],
+      "properties": {
+        "income_statement": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/faceStatementManifest" }
+        },
+        "cash_flow": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/faceStatementManifest" }
+        }
+      }
+    },
+    "entityIdentifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lei": { "type": ["string", "null"] },
+        "isin": { "type": ["string", "null"] },
+        "cusip": { "type": ["string", "null"] },
+        "ticker": { "type": ["string", "null"] },
+        "factset_entity_id": { "type": ["string", "null"] },
+        "company_number": { "type": ["string", "null"] }
+      }
+    },
+    "filings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_name",
+        "reporting_currency",
+        "units",
+        "fiscal_calendar_kind",
+        "historical_periods",
+        "forecast_periods",
+        "reported_gross_debt",
+        "reported_cash",
+        "face_statement_manifests",
+        "income_statement",
+        "cash_flow"
+      ],
+      "properties": {
+        "entity_name": { "type": "string", "minLength": 1 },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
+        "entity_identifiers": { "$ref": "#/$defs/entityIdentifiers" },
+        "entity_aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "type": "string", "minLength": 1 },
+        "fiscal_calendar_kind": { "enum": ["fixed_date", "52_53_week"] },
+        "historical_periods": { "$ref": "#/$defs/periods3" },
+        "forecast_periods": { "$ref": "#/$defs/periods3" },
+        "reported_gross_debt": { "type": "number", "minimum": 0 },
+        "historical_gross_debt": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "number", "minimum": 0 }
+        },
+        "reported_cash": { "type": "number", "minimum": 0 },
+        "reported_gross_interest": { "type": ["number", "null"] },
+        "reported_lease_liability": { "type": ["number", "null"], "minimum": 0 },
+        "fiscal_label": { "type": ["string", "null"] },
+        "maximum_residual_percentage": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "restricted_cash": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["amount", "jurisdiction", "available_to_repay_debt"],
+              "properties": {
+                "amount": { "type": "number", "minimum": 0 },
+                "jurisdiction": { "type": ["string", "null"] },
+                "available_to_repay_debt": { "type": ["boolean", "null"] }
+              }
+            }
+          ]
+        },
+        "leverage_basis": { "type": ["string", "null"], "enum": ["includes_leases", "excludes_leases", null] },
+        "minimum_operating_cash": { "type": ["number", "null"], "minimum": 0 },
+        "announced_acquisition": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["target", "consideration", "funding"],
+              "properties": {
+                "target": { "type": "string", "minLength": 1 },
+                "consideration": { "type": "number", "exclusiveMinimum": 0 },
+                "funding": { "type": ["string", "null"], "enum": ["debt", "equity", null] }
+              }
+            }
+          ]
+        },
+        "period_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["income_statement", "cash_flow"],
+          "properties": {
+            "income_statement": { "$ref": "#/$defs/filingPeriodAuthorityList" },
+            "cash_flow": { "$ref": "#/$defs/filingPeriodAuthorityList" }
+          }
+        },
+        "source_registry_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "face_statement_manifests": { "$ref": "#/$defs/faceStatementManifests" },
+        "income_statement": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } },
+        "cash_flow": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/line" } }
+      }
+    },
+    "filingPeriodAuthorityList": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["period", "source_id", "document_id", "document_sha256", "origin", "basis", "filing_date", "topology_source_id", "reason"],
+        "properties": {
+          "period": { "type": "string", "format": "date" },
+          "source_id": { "type": "string", "minLength": 1 },
+          "document_id": { "type": "string", "minLength": 1 },
+          "document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "origin": { "enum": ["user_supplied", "official_declarative_url", "runtime_library", "legacy_direct"] },
+          "basis": { "enum": ["as_reported", "restated_comparative"] },
+          "filing_date": { "type": ["string", "null"], "format": "date" },
+          "topology_source_id": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "periods3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "reason", "source_ids"],
+      "properties": {
+        "decision_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "reason": { "type": "string", "minLength": 1 },
+        "source_ids": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "restatementDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period", "basis", "source_ids", "bridge_status", "reason"],
+      "properties": {
+        "period": { "type": "string", "format": "date" },
+        "basis": { "enum": ["as_reported", "restated_comparative", "predecessor_combined", "calendarised"] },
+        "source_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "bridge_status": { "enum": ["not_required", "complete"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "numeric_bridge": { "$ref": "#/$defs/numericHistoricalBridge" }
+      }
+    },
+    "numericHistoricalBridge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "bridge_sha256", "metrics"],
+      "properties": {
+        "schema_version": { "const": "historical-numeric-bridge/1.0" },
+        "bridge_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/numericHistoricalBridgeMetric" }
+        }
+      }
+    },
+    "numericHistoricalBridgeMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "canonical_path",
+        "reported_value",
+        "reported_source_ids",
+        "adjustments",
+        "selected_value",
+        "tolerance"
+      ],
+      "properties": {
+        "metric_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "canonical_path": {
+          "type": "string",
+          "pattern": "^(operating_metrics|statement_structure\\.(income_statement|cash_flow))\\.[a-z0-9][a-z0-9_.-]*$"
+        },
+        "reported_value": { "type": "number" },
+        "reported_source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        },
+        "adjustments": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/numericHistoricalAdjustment" }
+        },
+        "selected_value": { "type": "number" },
+        "tolerance": { "type": "number", "minimum": 0, "maximum": 0.000001 }
+      }
+    },
+    "numericHistoricalAdjustment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adjustment_id", "label", "value", "source_ids"],
+      "properties": {
+        "adjustment_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" }
+        }
+      }
+    },
+    "debtSupplement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instrument_id", "field", "value", "basis", "source_id", "reason"],
+      "properties": {
+        "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "field": { "enum": ["maturity_date", "maturity_treatment", "coupon_rate", "reference_rate", "margin_bps", "all_in_rate", "facility_limit", "drawn_amount", "committed", "amortisation_schedule"] },
+        "value": {},
+        "basis": { "enum": ["company_document", "user_answer"] },
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
