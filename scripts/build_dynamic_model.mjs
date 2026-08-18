@@ -10382,7 +10382,15 @@ function statementSolverValues(
     // specialised formulas retain their explicit semantic cache authority.
     const visibleAggregateOwnsCache =
       activeCalculation?.operator === "sum" &&
-      ["cash_from_financing", "cash_flow_da"].includes(solverRole);
+      [
+        "cash_from_financing",
+        "cash_flow_da",
+        // The source-declared cash identity decides whether FX is inside or
+        // outside Net Change in Cash. Resolve the visible SUM graph itself;
+        // seeding an always-exclusive solver summary makes inclusive formulas
+        // carry stale standalone, adjustment and pro-forma caches.
+        "net_change_in_cash",
+      ].includes(solverRole);
     let value = solverRole && !visibleAggregateOwnsCache
       ? semantic.get(solverRole)
       : undefined;

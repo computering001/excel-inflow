@@ -1554,6 +1554,77 @@ function transferDebtForecastAuthorityToParent(modelCase, rows, consolidated) {
   }
 }
 
+function attachConsolidatedDebtToFinancingTotal(rows, consolidated) {
+  const financingRows = rows.filter(
+    (row) =>
+      row.semantic_role === "cash_from_financing" ||
+      row.row_id === "cash_from_financing",
+  );
+  if (financingRows.length !== 1) {
+    throw new Error(
+      `Change in Debt requires exactly one cash_from_financing authority; found ${financingRows.length}.`,
+    );
+  }
+  const [financing] = financingRows;
+  const rules = [
+    financing.calculation,
+    financing.forecast_calculation,
+    ...(financing.forecast_period_calculations ?? []),
+  ].filter((rule) => rule?.operator === "sum" && Array.isArray(rule.refs));
+  for (const rule of rules) {
+    if (!rule.refs.includes(consolidated.row_id)) {
+      rule.refs = [...rule.refs, consolidated.row_id];
+    }
+  }
+}
+
+function attachScheduleInterestToPreTaxIdentity(rows) {
+  const preTax = rows.find((row) => row.semantic_role === "pre_tax_income");
+  if (!preTax) return;
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const rules = [
+    { rule: preTax.calculation, forecastIndex: null },
+    { rule: preTax.forecast_calculation, forecastIndex: "default" },
+    ...(preTax.forecast_period_calculations ?? []).map((rule, forecastIndex) => ({
+      rule,
+      forecastIndex,
+    })),
+  ].filter(({ rule }) => rule?.operator === "sum" && Array.isArray(rule.refs));
+  const reaches = (refs, targetId, forecastIndex, visited = new Set()) =>
+    refs.some((ref) => {
+      if (ref === targetId) return true;
+      if (visited.has(ref)) return false;
+      visited.add(ref);
+      const child = byId.get(ref);
+      const childRule = Number.isInteger(forecastIndex)
+        ? child?.forecast_period_calculations?.[forecastIndex] ??
+          child?.forecast_calculation ??
+          child?.calculation
+        : forecastIndex === "default"
+          ? child?.forecast_calculation ?? child?.calculation
+          : child?.calculation;
+      return reaches(
+        childRule?.refs ?? [],
+        targetId,
+        forecastIndex,
+        visited,
+      );
+    });
+  for (const interestRole of ["interest_income", "interest_expense"]) {
+    const interest = rows.find((row) => row.semantic_role === interestRole);
+    if (!interest) continue;
+    for (const { rule, forecastIndex } of rules) {
+      // A zero historical interest line can be omitted by exact source
+      // arithmetic even though the forecast row is schedule-owned and live.
+      // Retain that economic dependency in every PBT identity, without adding
+      // a duplicate when an intervening net-finance subtotal already owns it.
+      if (!reaches(rule.refs, interest.row_id, forecastIndex)) {
+        rule.refs = [...rule.refs, interest.row_id];
+      }
+    }
+  }
+}
+
 export function assertUniqueStatementDependencies(rows, section = "statement") {
   for (const row of rows) {
     const rules = [
@@ -3362,6 +3433,7 @@ export function normaliseStatementRows(
   if (section === "income_statement") {
     collapseRedundantStatementAliases(modelCase, section, rows);
     projectIncomeStatementToDebtOverlay(modelCase, rows);
+    attachScheduleInterestToPreTaxIdentity(rows);
     const anchorSelection = applyBrokerAnchorRule(modelCase, rows);
     applyAnchoredSlimForecast(modelCase, rows, anchorSelection);
   }
@@ -3465,6 +3537,12 @@ export function normaliseStatementRows(
       // prevents the financing statement from consuming both parent and legs.
       foldRevolverIntoChangeInDebt(rows, changeInDebt);
       transferDebtForecastAuthorityToParent(modelCase, rows, changeInDebt);
+      // Schedule-owned issuance, repayment and revolver legs are captured in
+      // one visible Change in Debt line. The financing subtotal must consume
+      // that parent exactly once: otherwise its emitted formula omits the debt
+      // schedule while the solver cache still includes it, and the blank
+      // captured children have no unique subtotal in the physical workbook.
+      attachConsolidatedDebtToFinancingTotal(rows, changeInDebt);
     }
   }
   // The acquisition case is a debt-overlay balance-sheet module. It never
