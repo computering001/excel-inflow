@@ -1393,6 +1393,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "local-workbook-review-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_local_workbook_review_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "large-broker-pack-stress",
       "phase": "performance",
       "runtime": "node",

@@ -72,7 +72,9 @@ function relationships(xml, base) {
       target,
       resolved_target: attr(item, "TargetMode") === "External"
         ? target
-        : path.posix.normalize(path.posix.join(base, target)),
+        : target.startsWith("/")
+          ? path.posix.normalize(target.replace(/^\/+/, ""))
+          : path.posix.normalize(path.posix.join(base, target)),
     });
   }
   return values;

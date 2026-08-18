@@ -475,6 +475,27 @@ def _run_sheet(
                 "producer_row_model": baseline_mod.row_model_for_application(
                     workbook.generator_application),
             }
+            # Structural company renders are first-class Phase-13 review
+            # evidence.  Persist one hash-bound image per page even though no
+            # reusable pixel baseline is consulted.  Previously only exact
+            # baseline runs retained page PNGs, so a local review could bind a
+            # PDF as a whole but could not prove which individual pages had
+            # actually been reviewed.
+            page_folder = os.path.join(
+                case_out,
+                "structural-pages" if scope.primary
+                else os.path.join("structural-pages", _slug(sheet_name)),
+            )
+            os.makedirs(page_folder, exist_ok=True)
+            current_pages = []
+            for page_index in range(rendered.page_count):
+                current_page = os.path.join(
+                    page_folder, "page-%02d.png" % (page_index + 1))
+                rendered.save_png(page_index, current_page, dpi=dpi)
+                current_pages.append(current_page)
+            evidence["rendered_pages"] = [
+                _file_evidence(page) for page in current_pages
+            ]
         elif baselines_dir:
             # The producer's row model is recorded either way, so a mismatch is
             # visible in the evidence rather than folklore -- and a producer whose

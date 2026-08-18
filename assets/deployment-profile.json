@@ -108,6 +108,7 @@
     "public-test-run-v1.schema.json",
     "release-package-attestation-v1.schema.json",
     "release-package-attestation-v2.schema.json",
+    "local-workbook-review-evidence-v1.schema.json",
     "deployment-profile.json",
     "runtime-manifest.json",
     "row-taxonomy-v2.json",
@@ -223,6 +224,7 @@
     "product-identity-v2.schema.json": "Closed source/runtime/package/deployment identity vocabulary. Package mode is development or certified; mutable deployment status is a separate identity dimension.",
     "release-package-attestation-v1.schema.json": "Legacy certified-only external package receipt retained for verification compatibility.",
     "release-package-attestation-v2.schema.json": "Strict external receipt for a sealed complete-package inventory and deterministic archive. It distinguishes development identity attestation from certification and is emitted beside, never inside, package bytes.",
+    "local-workbook-review-evidence-v1.schema.json": "Fail-closed portable Phase-13 evidence contract binding one exact workbook, its independently recomputed semantic inventory, a review-only Show Formulas derivative, every visible rendered sheet/page and all twelve checklist sections in both review modes. It explicitly cannot claim human or native Excel review.",
     "product-delivery-constitution-v2.json": "Canonical v3.6 product/delivery owner retained as an inspectable policy artifact while compatibility runtime views remain generated for the current controller."
   },
   "script_entry_points": [
@@ -233,6 +235,7 @@
     "compile_public_test_run.mjs",
     "flow_cli.mjs",
     "inspect_workbook_semantics.mjs",
+    "validate_local_workbook_review.mjs",
     "migrate_run_carrier.mjs",
     "orchestrate_release.mjs",
     "run_user_flow.mjs",
@@ -264,7 +267,7 @@
     "compile_case.mjs",
     "propose_case_source.mjs"
   ],
-  "_entry_point_note": "Thirty-six JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; v64's user-flow controller remains its workbook-stage delegate and rollback route. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
+  "_entry_point_note": "Thirty-eight JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; v64's user-flow controller remains its workbook-stage delegate and rollback route. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. inspect_workbook_semantics.mjs and validate_local_workbook_review.mjs independently bind the portable Phase-13 workbook evidence; verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
   "script_allowlist": [
     "build_dynamic_model.mjs",
     "compile_case.mjs",
@@ -359,8 +362,10 @@
     "lib/user_flow_controller.mjs",
     "lib/validation_invariants.mjs",
     "lib/workflow_state.mjs",
+    "lib/local_workbook_review.mjs",
     "lib/workbook_semantic_inventory.mjs",
     "inspect_workbook_semantics.mjs",
+    "validate_local_workbook_review.mjs",
     "orchestrate_release.mjs",
     "propose_case_source.mjs",
     "run_broker_dynamic_concept_tests.mjs",
@@ -430,6 +435,7 @@
     "compile_dcs_evidence.py",
     "verify/dcs_evidence_oracle.py",
     "emit/__main__.py",
+    "prepare_local_workbook_review.py",
     "render/check_render.py",
     "render/selftest.py",
     "verify/finance_proof.py",
@@ -439,7 +445,7 @@
     "verify/workbook_semantic_oracle.py",
     "verify/verify_delivery.py"
   ],
-  "_python_entry_point_note": "Twenty-six Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers, recovery tools and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; render and verify entry points provide independent structural, visual and financial proof.",
+  "_python_entry_point_note": "Twenty-seven Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers, recovery tools and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; prepare_local_workbook_review.py creates portable exact-workbook Phase-13 evidence without claiming native or human review; render and verify entry points provide independent structural, visual and financial proof.",
   "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
   "python_entry_point_notes": {
     "migrate_broker_run_state.py": "Fail-closed, receipted migration of a sealed broker run across an intentional runtime-closure change; re-homes receipt-verified checkpoints and preserves exhaustion history so a live run resumes without losing progress or re-uploading sources. Invoked only on controller upgrades, never in ordinary runs.",
@@ -454,7 +460,8 @@
     "compile_broker_pack.py": "Invoked by run_broker_pipeline.py only after prior broker checkpoints pass; retained independently runnable for diagnostics.",
     "broker_period_recovery.py": "Invoked by run_broker_pipeline.py after physical capture to resolve rendered period headers or quarantine only unresolved columns; retained independently runnable for diagnostics.",
     "broker_table_engine.py": "Optional provider-neutral adapter for host-installed table engines; Rogo remains the required model-host path and every result still enters dual-read reconciliation.",
-    "rebind_broker_native_preflight.py": "Invoked by run_broker_pipeline.py only when an early demand-independent native preflight can be reused against the final filings-derived model-demand graph; independently runnable for diagnostics and fails closed to the ordinary full extraction path when rebinding is incompatible."
+    "rebind_broker_native_preflight.py": "Invoked by run_broker_pipeline.py only when an early demand-independent native preflight can be reused against the final filings-derived model-demand graph; independently runnable for diagnostics and fails closed to the ordinary full extraction path when rebinding is incompatible.",
+    "prepare_local_workbook_review.py": "Local release-evidence utility. It leaves the attested workbook unchanged, creates a deterministic non-deliverable Show Formulas derivative, renders every visible sheet in both modes, and explicitly records human and native Excel review as not performed."
   },
   "python_entry_point_smoke": {
     "migrate_broker_run_state.py": {
@@ -620,6 +627,15 @@
       ],
       "expect_output_contains": "usage: check_render.py"
     },
+    "prepare_local_workbook_review.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: prepare_local_workbook_review.py"
+    },
     "render/selftest.py": {
       "argv": [
         "--help"
@@ -719,6 +735,7 @@
     "compile_dcs_evidence.py",
     "emit/__init__.py",
     "emit/__main__.py",
+    "prepare_local_workbook_review.py",
     "emit/patch.py",
     "emit/plan.py",
     "emit/render.py",
@@ -843,6 +860,24 @@
   },
   "_python_vendoring_policy": "Every entry above is provision=native and vendoring=forbidden, and the compiler enforces both: it refuses any provision other than native, and refuses to ship a vendored_dependencies entry whose name collides with a Python third-party root. None of these packages is vendored. Vendoring a package the host already provides is how you ship a version conflict.",
   "python_package_dependency_policy": {
+    "prepare_local_workbook_review.py": {
+      "may_import_third_party": [
+        "fitz",
+        "PIL",
+        "numpy",
+        "pdfplumber",
+        "pypdf",
+        "reportlab"
+      ],
+      "must_not_import_third_party": [
+        "openpyxl"
+      ],
+      "must_not_import_packages": [
+        "emit",
+        "verify"
+      ],
+      "reason": "The portable Phase-13 evidence producer delegates only to the existing render package, never to the emitter or finance verifier. Its own OOXML derivative logic is standard-library only, while the renderer retains its declared PDF geometry and raster dependencies."
+    },
     "migrate_broker_run_state.py": {
       "may_import_third_party": [],
       "reason": "The fail-closed broker run migration tool is stdlib-only; it reuses run_broker_pipeline's digest primitives so a migrated checkpoint is sealed by byte-identical rules, and it authors no evidence of its own."

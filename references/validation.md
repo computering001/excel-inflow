@@ -896,6 +896,32 @@ When enabled, confirm:
 Render every user-facing sheet. Inspect representative inputs, formulas,
 same-workbook links, totals and key outputs.
 
+For the portable Phase-13 pass, never mark a workbook reviewed from an
+unbound PDF or from a similarly named prior build. Create and validate one
+exact-workbook local bundle:
+
+```text
+python3 scripts/prepare_local_workbook_review.py <workbook.xlsx> --out <review-folder> [--soffice <path>]
+node scripts/validate_local_workbook_review.mjs <review-folder>/local-workbook-review-evidence.json
+```
+
+The producer leaves the attested workbook byte-for-byte unchanged, creates a
+deterministic non-deliverable copy with Show Formulas enabled on every visible
+sheet, and renders every visible page once in Values and once in Show Formulas.
+The validator independently re-hashes the source, recomputes its exhaustive
+semantic inventory, proves that the derivative changed only the visible
+worksheet `showFormulas` view attribute, rejects stale render reports and
+requires all twelve checklist sections separately in both modes. The resulting
+PASS is labelled `AUTOMATED_LOCAL_REVIEW_ONLY`. It is not human visual review,
+not native Microsoft Excel review and cannot close either later gate.
+
+The twelve sections are: control panel; income statement; EBITDA bridge; cash
+flow; debt schedule; leverage/liquidity; RCF sweep; interest schedule;
+adjustment columns; pro forma columns; broker sheets; and quality panel. No
+section or mode may be omitted. External links, a hardcode in a hidden row or
+column, and any formula outside the declared used range fail before presentation
+evidence can pass.
+
 Check:
 
 - labels and values are not clipped and nothing overlaps;

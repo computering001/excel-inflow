@@ -753,6 +753,8 @@ node scripts/run_instrument_period_state_tests.mjs
 node scripts/validate_source_parity.mjs <workbook.xlsx> <row-map.json> <ledger.json> [--json out.json]
 node scripts/validate_cache_parity.mjs <workbook.xlsx> [--json out.json] [--tol 1e-6] [--rel 1e-9]
 node scripts/validate_style_tokens.mjs <workbook.xlsx> [--json out.json]
+python3 scripts/prepare_local_workbook_review.py <workbook.xlsx> --out <review-folder> [--soffice <path>]
+node scripts/validate_local_workbook_review.mjs <review-folder>/local-workbook-review-evidence.json
 node scripts/validate_structure.mjs <source.xlsx> <built.xlsx>
 python3 scripts/verify/validate_dynamic_model.py <workbook.xlsx> --out <folder> [--tolerance-mode contract|legacy] [--visual-reviewed <file>] [--finance-reviewed <json>]
 python3 scripts/verify/finance_proof.py <case.json> <workbook.xlsx> --out <report.json>
