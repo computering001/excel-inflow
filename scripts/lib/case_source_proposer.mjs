@@ -304,8 +304,7 @@ function proposeSection(caseEvidence, section, used) {
   );
 
   for (const { row } of lines) {
-    const aliasCandidate = coreRole(section, row.raw_label);
-    const numericType = /(?:margin|rate|percent|percentage)/i.test(row.raw_label ?? "")
+    const numericType = /(?:margin|rate|percent|percentage)\s*%?$/i.test(row.raw_label ?? "")
       ? "percentage"
       : (row.values ?? []).some(
           (value) => value !== null && value !== "" && Number.isFinite(Number(value)),
@@ -329,25 +328,16 @@ function proposeSection(caseEvidence, section, used) {
       numeric_type: numericType,
       is_subtotal: row.is_subtotal === true,
     });
-    const contextualRoles = new Set([
-      "ebit",
-      "operating_profit",
-      "adjusted_ebit",
-      "reported_ebitda",
-      "adjusted_ebitda",
-      "depreciation_and_amortisation",
-      "depreciation_amortisation_and_impairment",
-      "cash_flow_da",
-      "cash_flow_da_and_impairment",
-      "impairment_loss",
-    ]);
     const classifiedRole = classification.status === "accepted"
       ? classification.classified_role
       : null;
+    // Exact aliases are discovery vocabulary only. The independent classifier
+    // must accept the source label in its statement, numeric and structural
+    // context before the proposer may write an economic role.
     const role = contextualRole(
       section,
       row,
-      contextualRoles.has(aliasCandidate) ? classifiedRole : aliasCandidate ?? classifiedRole,
+      classifiedRole,
     );
     roleBySource.set(row.source_line_id, role);
     rowIdBySource.set(

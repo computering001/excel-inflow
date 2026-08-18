@@ -38,6 +38,9 @@ export function faceStatementManifestDigest(manifest) {
       ...(Array.isArray(row?.value_states)
         ? { value_states: row.value_states }
         : {}),
+      ...(Array.isArray(row?.value_precisions)
+        ? { value_precisions: row.value_precisions }
+        : {}),
       ...(row?.structural_role
         ? { structural_role: row.structural_role }
         : {}),
@@ -53,6 +56,7 @@ export function faceStatementManifestDigest(manifest) {
 export const FACE_STATEMENT_MANIFEST_VERSIONS = Object.freeze([
   "face-statement-manifest/1.0",
   "face-statement-manifest/1.1",
+  "face-statement-manifest/1.2",
 ]);
 
 const TYPED_VALUE_STATES = new Set([
@@ -86,7 +90,8 @@ export function filingManifestCustodyErrors({
   const errors = [];
   const rows = manifest?.rows ?? [];
   const version = manifest?.schema_version;
-  const strictCustody = version === "face-statement-manifest/1.1";
+  const strictCustody = ["face-statement-manifest/1.1", "face-statement-manifest/1.2"].includes(version);
+  const precisionCustody = version === "face-statement-manifest/1.2";
 
   if (!FACE_STATEMENT_MANIFEST_VERSIONS.includes(version)) errors.push(`${section} manifest has the wrong schema version`);
   if (manifest?.statement !== section) errors.push(`${section} manifest declares ${manifest?.statement}`);
@@ -128,6 +133,18 @@ export function filingManifestCustodyErrors({
         errors.push(`${section}.${row?.source_line_id ?? index} does not carry three typed value states`);
       } else if (Array.isArray(row?.values) && row.values.length === 3 && row.values.some((value, valueIndex) => !valueStateMatches(value, row.value_states[valueIndex]))) {
         errors.push(`${section}.${row?.source_line_id ?? index} value and value-state custody disagree`);
+      }
+      if (precisionCustody) {
+        if (
+          !Array.isArray(row?.value_precisions) ||
+          row.value_precisions.length !== 3 ||
+          row.value_precisions.some((precision, period) => {
+            const numericState = ["reported_number", "reported_zero"].includes(row.value_states?.[period]);
+            return numericState
+              ? !Number.isInteger(precision) || precision < 0 || precision > 12
+              : precision !== null;
+          })
+        ) errors.push(`${section}.${row?.source_line_id ?? index} does not carry source-visible period precision`);
       }
     }
     if (typeof row?.page_or_note !== "string" || row.page_or_note.trim() === "") errors.push(`${section}.${row?.source_line_id ?? index} has no source location`);

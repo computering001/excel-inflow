@@ -231,6 +231,18 @@ def classify_value_token(text: str) -> tuple[float | None, str] | None:
     return value, "reported_zero" if value == 0 else "reported_number"
 
 
+def displayed_decimal_places(text: str) -> int | None:
+    """Return the source-visible decimal precision of a numeric token."""
+
+    if classify_value_token(text) is None:
+        return None
+    match = NUMBER_RE.match(text)
+    if not match:
+        return None
+    number = match.group("number").replace(",", "").replace(" ", "")
+    return len(number.rsplit(".", 1)[1]) if "." in number else 0
+
+
 def pdf_lines(target: Path) -> list[dict[str, Any]]:
     try:
         import fitz  # type: ignore
@@ -283,6 +295,7 @@ def numeric_runs(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "text": token,
                 "value": value,
                 "value_state": value_state,
+                "value_precision": displayed_decimal_places(token),
             })
     return runs
 
@@ -486,10 +499,25 @@ def nearest_observations(
     *,
     missing_state: str = "reported_blank",
 ) -> tuple[list[float | None], list[str]]:
+    values, states, _ = nearest_typed_observations(
+        runs,
+        columns,
+        missing_state=missing_state,
+    )
+    return values, states
+
+
+def nearest_typed_observations(
+    runs: list[dict[str, Any]],
+    columns: list[float],
+    *,
+    missing_state: str = "reported_blank",
+) -> tuple[list[float | None], list[str], list[int | None]]:
     if len(columns) != 3:
-        return [], []
+        return [], [], []
     assigned: list[float | None] = [None, None, None]
     states = [missing_state, missing_state, missing_state]
+    precisions: list[int | None] = [None, None, None]
     distances: list[float] = [float("inf")] * 3
     for run in runs:
         centre = (run["x0"] + run["x1"]) / 2
@@ -498,8 +526,9 @@ def nearest_observations(
         if distance < distances[index]:
             assigned[index] = run["value"]
             states[index] = run["value_state"]
+            precisions[index] = run.get("value_precision")
             distances[index] = distance
-    return assigned, states
+    return assigned, states, precisions
 
 
 def infer_structural_roles(rows: list[dict[str, Any]]) -> None:
@@ -543,7 +572,12 @@ def _finite_series(row: dict[str, Any]) -> list[float] | None:
     if not isinstance(values, list) or len(values) != 3:
         return None
     result: list[float] = []
-    for value in values:
+    states = row.get("value_states")
+    for index, value in enumerate(values):
+        if isinstance(states, list) and len(states) == 3:
+            state = states[index]
+            if state not in {"reported_number", "reported_zero"}:
+                return None
         if value is None or isinstance(value, bool):
             return None
         try:
@@ -556,16 +590,52 @@ def _finite_series(row: dict[str, Any]) -> list[float] | None:
     return result
 
 
-def _series_sum_matches(parent: list[float], children: list[list[float]]) -> bool:
-    if len(children) < 2:
+def _explicit_zero_series(row: dict[str, Any]) -> bool:
+    series = _finite_series(row)
+    if series is None or any(value != 0 for value in series):
         return False
-    calculated = [sum(series[index] for series in children) for index in range(3)]
-    # Filing faces are commonly rounded to whole millions or one decimal place.
-    # Source-visible arithmetic is therefore proved within display precision,
-    # not machine epsilon.  A 0.5-unit envelope is conservative for whole-unit
-    # presentation while still rejecting economically different relationships.
+    states = row.get("value_states")
+    return not isinstance(states, list) or states == ["reported_zero"] * 3
+
+
+def _display_precision(row: dict[str, Any], index: int) -> int:
+    precisions = row.get("value_precisions")
+    if (
+        isinstance(precisions, list)
+        and len(precisions) == 3
+        and isinstance(precisions[index], int)
+        and not isinstance(precisions[index], bool)
+        and precisions[index] >= 0
+    ):
+        return precisions[index]
+    value = row.get("values", [None, None, None])[index]
+    text = str(value)
+    return len(text.rsplit(".", 1)[1]) if "." in text else 0
+
+
+def _source_tolerance(row: dict[str, Any], index: int) -> float:
+    return 0.5 * (10 ** -_display_precision(row, index)) + 1e-12
+
+
+def _series_sum_matches(parent_row: dict[str, Any], child_rows: list[dict[str, Any]]) -> bool:
+    parent = _finite_series(parent_row)
+    children = [_finite_series(row) for row in child_rows]
+    if parent is None or len(children) < 2 or any(series is None for series in children):
+        return False
+    calculated = [
+        sum(series[index] for series in children if series is not None)
+        for index in range(3)
+    ]
+    # The printed parent owns the equality claim. Its per-period last displayed
+    # digit therefore owns the rounding band, in the manifest's declared units.
+    # Missing/dash/N/A cells never enter this lane as numeric zero.
     return all(
-        math.isclose(calculated[index], parent[index], rel_tol=1e-9, abs_tol=0.5000001)
+        math.isclose(
+            calculated[index],
+            parent[index],
+            rel_tol=0.0,
+            abs_tol=_source_tolerance(parent_row, index),
+        )
         for index in range(3)
     )
 
@@ -600,12 +670,10 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
                     # conservative. This covers filing surfaces that print a
                     # zero net-finance/result line between operating cash-flow
                     # components while preserving the issuer's proved subtotal.
-                    series = _finite_series(candidate)
                     neutral_separator = (
                         level <= parent_level
                         and not candidate.get("is_subtotal")
-                        and series is not None
-                        and all(abs(value) <= 0.5000001 for value in series)
+                        and _explicit_zero_series(candidate)
                     )
                     if neutral_separator:
                         cursor += direction
@@ -619,10 +687,8 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
             for start in range(len(indexes)):
                 for end in range(start + 2, len(indexes) + 1):
                     family = indexes[start:end]
-                    child_values = [_finite_series(rows[index]) for index in family]
-                    if all(series is not None for series in child_values) and _series_sum_matches(
-                        parent_values, child_values,  # type: ignore[arg-type]
-                    ):
+                    child_rows = [rows[index] for index in family]
+                    if _series_sum_matches(parent_row, child_rows):
                         families.append(family)
         # Zero-valued child rows cannot distinguish two otherwise identical
         # arithmetic families. Canonicalise matches over informative children
@@ -634,8 +700,7 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
         for family in families:
             informative = []
             for index in family:
-                series = _finite_series(rows[index])
-                if series is not None and all(abs(value) <= 0.5000001 for value in series):
+                if _explicit_zero_series(rows[index]):
                     continue
                 informative.append(index)
             key = tuple(informative)
@@ -827,7 +892,7 @@ def extract_statement(
             continue
         if DECORATION_RE.search(label):
             continue
-        values, value_states = nearest_observations(
+        values, value_states, value_precisions = nearest_typed_observations(
             runs,
             line_columns,
             missing_state="reported_blank" if runs else "unresolved",
@@ -869,6 +934,7 @@ def extract_statement(
             "raw_label": label,
             "values": values,
             "value_states": value_states,
+            "value_precisions": value_precisions,
             "page_or_note": source_provenance_note(
                 int(line["page"]), provenance_tokens
             ),
@@ -882,7 +948,7 @@ def extract_statement(
         return None, findings + [{"code": "NO_STATEMENT_ROWS", "section": section}]
     infer_parent_links(rows)
     manifest = {
-        "schema_version": "face-statement-manifest/1.1",
+        "schema_version": "face-statement-manifest/1.2",
         "statement": section,
         "statement_order": 1,
         "source_id": source_id,
@@ -921,6 +987,7 @@ def extract_statement(
             "raw_label": row["raw_label"],
             "values": row["values"],
             "value_states": row["value_states"],
+            "value_precisions": row["value_precisions"],
             "structural_role": row["structural_role"],
             "page_or_note": row["page_or_note"],
             "material": row["material"],

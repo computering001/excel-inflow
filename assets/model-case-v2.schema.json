@@ -2095,6 +2095,13 @@
           },
           "description": "Source-visible state of each historical cell. Only reported_zero licenses numeric zero; null-valued states remain distinct."
         },
+        "historical_value_precisions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 },
+          "description": "Printed decimal places for each historical source cell, in the issuer's declared reporting units. Null-valued states carry null precision."
+        },
         "reported_historical_value_states": {
           "type": "array",
           "minItems": 3,
@@ -2110,6 +2117,13 @@
             ]
           },
           "description": "Typed filed states retained as reconciliation evidence when a historical total is formula-owned."
+        },
+        "reported_historical_value_precisions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 },
+          "description": "Printed decimal places retained with a reconciled filed subtotal."
         },
         "semantic_role": {
           "type": "string"

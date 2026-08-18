@@ -129,6 +129,51 @@ function flattenManifests(manifests) {
   return lines;
 }
 
+function typedHistoricalStates(line) {
+  const declared = line?.value_states ??
+    line?.historical_value_states ??
+    line?.reported_historical_value_states;
+  if (Array.isArray(declared) && declared.length === 3) return [...declared];
+  return (line?.values ?? line?.reported_historical_values ?? []).slice(0, 3).map((value) => {
+    if (value === "") return "reported_blank";
+    if (value === null || value === undefined) return "unresolved";
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "unresolved";
+    return number === 0 ? "reported_zero" : "reported_number";
+  });
+}
+
+function typedHistoricalPrecisions(line) {
+  const declared = line?.value_precisions ??
+    line?.historical_value_precisions ??
+    line?.reported_historical_value_precisions;
+  if (Array.isArray(declared) && declared.length === 3) return [...declared];
+  return (line?.values ?? line?.reported_historical_values ?? []).slice(0, 3).map((value) => {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
+    const text = String(value);
+    return text.includes(".") ? text.split(".").at(-1).length : 0;
+  });
+}
+
+function sourceTolerance(line, period) {
+  const precision = typedHistoricalPrecisions(line)[period];
+  if (!Number.isInteger(precision) || precision < 0) return 0;
+  return 0.5 * (10 ** -precision) + 1e-12;
+}
+
+function typedNumericSeries(line) {
+  const values = line?.values ?? line?.reported_historical_values;
+  if (!Array.isArray(values) || values.length !== 3) return null;
+  const states = typedHistoricalStates(line);
+  const numbers = values.map((value, period) => {
+    if (!["reported_number", "reported_zero"].includes(states[period])) return null;
+    if (value === null || value === undefined || typeof value === "boolean") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  });
+  return numbers.every((value) => value !== null) ? numbers : null;
+}
+
 /**
  * Derive the statement skeleton for one section: filed lines from the sealed
  * manifests, dispositions/roles/parentage from the statement map.  The map may
@@ -177,18 +222,6 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
   // Row minting — first pass: kept lines become rows carrying manifest values
   // (historicals only; forecasts belong to the forecast plan) and manifest
   // materiality.  Absorbed lines fold their identity into their absorber.
-  const typedHistoricalStates = (line) => {
-    if (Array.isArray(line?.value_states) && line.value_states.length === 3) {
-      return [...line.value_states];
-    }
-    return (line?.values ?? []).slice(0, 3).map((value) => {
-      if (value === "") return "reported_blank";
-      if (value === null || value === undefined) return "unresolved";
-      const number = Number(value);
-      if (!Number.isFinite(number)) return "unresolved";
-      return number === 0 ? "reported_zero" : "reported_number";
-    });
-  };
   const rows = [];
   const rowsBySourceLine = new Map();
   for (const { manifest, row: line } of lines) {
@@ -231,6 +264,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
           ...(entry.uncalculated ? { forecast_treatment: "uncalculated" } : {}),
           values: [...(line.values ?? []).slice(0, 3), null, null, null],
           historical_value_states: typedHistoricalStates(line),
+          historical_value_precisions: typedHistoricalPrecisions(line),
           ...(declaredRole ? { semantic_role: declaredRole } : {}),
           ...(entry.movement_type ? { movement_type: entry.movement_type } : {}),
           ...(entry.acquisition_driver_role
@@ -314,18 +348,10 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
   // gross profit, operating profit and cash-flow activity totals without a
   // caption dictionary or issuer exception. Three-period equality makes a
   // coincidental grouping fail closed.
-  const numericSeries = (line, { allowPrintedBlank = false } = {}) => {
-    const values = line?.values;
-    if (!Array.isArray(values) || values.length !== 3) return null;
-    if (!allowPrintedBlank && values.some((value) => value === null || value === undefined)) {
-      return null;
-    }
-    if (!values.some((value) => value !== null && value !== undefined)) return null;
-    const numbers = values.map((value) => Number(value ?? 0));
-    return numbers.every(Number.isFinite) ? numbers : null;
-  };
+  const numericSeries = (line) => typedNumericSeries(line);
   for (let parentIndex = 2; parentIndex < lines.length; parentIndex += 1) {
-    const parentLine = lines[parentIndex].row;
+    const parentManifestEntry = lines[parentIndex];
+    const parentLine = parentManifestEntry.row;
     if (childrenByParent.has(parentLine.source_line_id)) continue;
     const candidateParentRow = rowsBySourceLine.get(parentLine.source_line_id);
     // Numeric coincidence is proof of additivity, not proof that a line is a
@@ -336,20 +362,22 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     if (!parentLine.is_subtotal && !totalStyle(candidateParentRow ?? {})) continue;
     const target = numericSeries(parentLine);
     if (!target) continue;
-    if (target.every((value) => Math.abs(value) <= 0.51)) continue;
+    if (target.every((value, period) => Math.abs(value) <= sourceTolerance(parentLine, period))) continue;
     const maximumChildren = Math.min(parentIndex, 64);
     for (let count = 2; count <= maximumChildren; count += 1) {
-      const candidates = lines
-        .slice(parentIndex - count, parentIndex)
-        .map((entry) => entry.row);
-      const series = candidates.map((candidate) =>
-        numericSeries(candidate, { allowPrintedBlank: true }),
-      );
+      const candidateEntries = lines.slice(parentIndex - count, parentIndex);
+      if (candidateEntries.some(({ manifest }) =>
+        manifest.source_id !== parentManifestEntry.manifest.source_id ||
+        manifest.document_sha256 !== parentManifestEntry.manifest.document_sha256 ||
+        manifest.units !== parentManifestEntry.manifest.units
+      )) break;
+      const candidates = candidateEntries.map((entry) => entry.row);
+      const series = candidates.map((candidate) => numericSeries(candidate));
       if (series.some((values) => values === null)) break;
       const matches = target.every((value, period) =>
         Math.abs(
           series.reduce((sum, values) => sum + values[period], 0) - value,
-        ) <= 0.51,
+        ) <= sourceTolerance(parentLine, period),
       );
       if (!matches) continue;
       const parentRowId = candidateParentRow?.row_id;
@@ -440,16 +468,25 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
         )
       ) continue;
       const total = childLines.reduce(
-        (sum, child) => sum + Number(child?.values?.[period] ?? 0),
+        (sum, child) => sum + Number(child.values[period]),
         0,
       );
-      if (Math.abs(total - target) > 0.51) {
+      const tolerance = sourceTolerance(parentLine, period);
+      if (Math.abs(total - target) > tolerance) {
         report.add(
           "statement_map.face_additivity",
           "BLOCK",
           `${section}.${parentLineId}: the filed subtotal prints ${target} in historical period ${period + 1}, but its filed children sum to ${Number(total.toFixed(2))}.`,
           "Fix the manifest transcription or the parentage; a reported parent must reconcile to its filed children.",
-          { section, source_line_id: parentLineId, period: period + 1, filed: target, children_sum: total },
+          {
+            section,
+            source_line_id: parentLineId,
+            period: period + 1,
+            filed: target,
+            children_sum: total,
+            source_tolerance: tolerance,
+            source_units: linesById.get(parentLineId)?.manifest?.units ?? null,
+          },
         );
       }
     }
@@ -459,9 +496,13 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     parentRow.reported_historical_value_states = [
       ...(parentRow.historical_value_states ?? typedHistoricalStates(parentLine)),
     ];
+    parentRow.reported_historical_value_precisions = [
+      ...(parentRow.historical_value_precisions ?? typedHistoricalPrecisions(parentLine)),
+    ];
     parentRow.historical_authority = "reported_total_reconciled";
     delete parentRow.values;
     delete parentRow.historical_value_states;
+    delete parentRow.historical_value_precisions;
     parentRow.style_role = totalStyle(parentRow) ? "total" : "subsection";
     // The DERIVED variant: a total summed live from its filed members
     // declares them as contributing children.  (The reconciled-subtotal
@@ -1005,7 +1046,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       [0, 1, 2].every((period) =>
         Math.abs(
           ownersHistory[period] - (profitHistory[period] - nciHistory[period]),
-        ) <= 0.51,
+        ) <= sourceTolerance(owners, period),
       );
   });
   if (owners && nonControllingInterests && profitBasis) {
@@ -1202,12 +1243,10 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       ).filter(({ row: line }) =>
         (expansion?.source_line_ids ?? []).includes(line.source_line_id),
       );
-      if (involvedLines.length > 0) {
+      const involvedSeries = involvedLines.map(({ row: line }) => numericSeries(line));
+      if (involvedLines.length > 0 && involvedSeries.every((series) => series !== null)) {
         const summed = [0, 1, 2].map((period) =>
-          involvedLines.reduce(
-            (total, { row: line }) => total + Number(line.values?.[period] ?? 0),
-            0,
-          ),
+          involvedSeries.reduce((total, values) => total + values[period], 0),
         );
         daRow = {
           row_id: "depreciation_and_amortisation",

@@ -122,7 +122,10 @@ export function classifyStatementLine(line) {
     ),
   );
   const separated = !next || best.score - next.score >= 0.15;
-  const sufficientlySupported = !best.high_impact || substantiveChannels.size >= 1;
+  // An alias plus the expected statement is discovery, not authority. Every
+  // accepted role needs at least one independent substantive channel (numeric
+  // type, hierarchy or source structure), regardless of impact tier.
+  const sufficientlySupported = substantiveChannels.size >= 1;
   const accepted = best.score >= 0.85 && separated && sufficientlySupported;
   return {
     taxonomy_version: TAXONOMY.contract_version,

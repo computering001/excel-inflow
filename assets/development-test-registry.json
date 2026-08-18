@@ -278,6 +278,24 @@
       "test_class": "unit"
     },
     {
+      "id": "source-arithmetic-precision",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_source_arithmetic_precision_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "source-arithmetic-authority",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_source_arithmetic_authority_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "historical-normalisation",
       "phase": "evidence",
       "runtime": "node",
