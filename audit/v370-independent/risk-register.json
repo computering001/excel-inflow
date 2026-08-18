@@ -1,0 +1,151 @@
+{
+  "schema_version": "excel-inflow-independent-risk-register/1.0",
+  "programme": "Excel Inflow v3.7.0 independent verification",
+  "baseline": {
+    "repository": "computering001/excel-inflow",
+    "commit": "200c3a4ab073ef614b529978a31092a882d56261",
+    "tree": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+    "package_mode": "development",
+    "deployment_status": "not_installed"
+  },
+  "doctrine": {
+    "baseline_only": true,
+    "repair_status_not_backfilled": true,
+    "unresolved_is_not_zero": true,
+    "component_pass_is_not_production_proof": true
+  },
+  "risks": [
+    {
+      "id": "V370-P0-001",
+      "priority": "P0",
+      "title": "Source gate not fully green",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "The independently retained serial and parallel reports each contain source-owned failures.",
+      "evidence": ["full-source-gate-serial.json", "full-source-gate-parallel.json"],
+      "repair_phases": [2, 4, 6, 7, 8]
+    },
+    {
+      "id": "V370-P0-002",
+      "priority": "P0",
+      "title": "External custody tests blocked",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "Seven registered lanes require external broker, raw-filing, fixed-point or installed-host evidence.",
+      "evidence": ["full-source-gate-serial.json", "external-evidence-register.json"],
+      "repair_phases": [5, 9, 14, 16]
+    },
+    {
+      "id": "V370-P0-003",
+      "priority": "P0",
+      "title": "GitHub workflow omits most registered tests",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "The baseline workflow does not execute the source-owned development-gate registry as an exact-once partition.",
+      "evidence": ["baseline-source-identity.json"],
+      "repair_phases": [3]
+    },
+    {
+      "id": "V370-P0-004",
+      "priority": "P0",
+      "title": "No durable installed-host certification evidence",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "The source identity is not_installed and no schema-valid installed-host receipt exists in durable custody.",
+      "evidence": ["external-evidence-register.json"],
+      "repair_phases": [14, 16]
+    },
+    {
+      "id": "V370-P1-005",
+      "priority": "P1",
+      "title": "Source release identity drift",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "The root release manifest identifies an older product and can be preferred by source identity resolution.",
+      "evidence": ["baseline-source-identity.json"],
+      "repair_phases": [1]
+    },
+    {
+      "id": "V370-P1-006",
+      "priority": "P1",
+      "title": "Generated instruction surfaces drift from canonical source",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "Checked-in instruction snapshots omit the canonical carrier-migration block.",
+      "evidence": ["baseline-source-identity.json", "baseline-package-build-a.json"],
+      "repair_phases": [1]
+    },
+    {
+      "id": "V370-P1-007",
+      "priority": "P1",
+      "title": "Alias dictionaries can remain sole material authority",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "A direct alias may be accepted for a material semantic role without an independent contextual evidence channel.",
+      "evidence": ["full-source-gate-serial.json"],
+      "repair_phases": [4, 6]
+    },
+    {
+      "id": "V370-P1-008",
+      "priority": "P1",
+      "title": "Source arithmetic lacks typed precision custody",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "Baseline subtotal inference uses a fixed absolute tolerance and can admit missing-state or cross-dimensional coincidences.",
+      "evidence": ["full-source-gate-serial.json"],
+      "repair_phases": [4, 5, 7]
+    },
+    {
+      "id": "V370-P1-009",
+      "priority": "P1",
+      "title": "Authority ledger is not a complete material-row census",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "Formula-owned, schedule-owned, not-applicable or unresolved material rows can be absent from the sealed ledger.",
+      "evidence": ["full-source-gate-serial.json"],
+      "repair_phases": [8]
+    },
+    {
+      "id": "V370-P1-010",
+      "priority": "P1",
+      "title": "Critical tests are vulnerable to self-confirmation",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "Some workbooks and expected outputs are checked through producer-owned graphs, tolerances or mappings.",
+      "evidence": ["full-source-gate-serial.json"],
+      "repair_phases": [4, 10, 11, 12, 13]
+    },
+    {
+      "id": "V370-P1-011",
+      "priority": "P1",
+      "title": "Full source report lacks exact durable reproduction bindings",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "The tracked summary does not bind the complete exact-once registry, source SHA and protected input hashes.",
+      "evidence": ["full-source-gate-serial.json", "full-source-gate-parallel.json"],
+      "repair_phases": [2, 3]
+    },
+    {
+      "id": "V370-P1-012",
+      "priority": "P1",
+      "title": "No permanent development tag and durable package asset",
+      "baseline_status": "REPRODUCED_AT_BASELINE",
+      "reproduction": "The frozen baseline predates the later v3.7.0 development release publication.",
+      "evidence": ["external-evidence-register.json"],
+      "repair_phases": [1, 16]
+    },
+    {
+      "id": "V370-P1-013",
+      "priority": "P1",
+      "title": "Real-world corpus coverage is narrow",
+      "baseline_status": "REPRODUCED",
+      "reproduction": "The strongest gates depend on synthetic fixtures or absent external corpora rather than a broad real-source cohort.",
+      "evidence": ["external-evidence-register.json", "full-source-gate-serial.json"],
+      "repair_phases": [5, 9, 14]
+    },
+    {
+      "id": "V370-P2-014",
+      "priority": "P2",
+      "title": "Critical modules remain oversized",
+      "baseline_status": "OBSERVED",
+      "reproduction": "Several compiler, emitter and controller files retain multiple economic responsibilities and raise change-coupling risk.",
+      "evidence": ["baseline-source-identity.json"],
+      "repair_phases": [15]
+    }
+  ],
+  "counts": {
+    "total": 14,
+    "P0": 4,
+    "P1": 9,
+    "P2": 1
+  }
+}
