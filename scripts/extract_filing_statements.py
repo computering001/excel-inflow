@@ -33,6 +33,25 @@ STRICT_HEADINGS = {
     ),
 }
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
+FISCAL_RANGE_RE = re.compile(r"^((?:19|20)\d{2})[\u2013\u2014/-](\d{2})$")
+
+
+def years_in_token(text: str) -> set[str]:
+    """Years one printed token observes, including UK fiscal ranges.
+
+    "2025" observes {2025}; "2024-25"/"2024/25"/"2024\u201325" observe
+    {2024, 2025} — statutory accounts label columns by fiscal RANGE, and a
+    March-2025 period is printed as 2024-25, never as a bare 2025.
+    """
+    token = text.strip("(),")
+    if YEAR_RE.fullmatch(token):
+        return {token}
+    match = FISCAL_RANGE_RE.fullmatch(token)
+    if match:
+        start = match.group(1)
+        end = start[:2] + match.group(2)
+        return {start, end}
+    return set()
 NUMBER_RE = re.compile(
     r"^\s*(?P<open>\()?\s*(?:[$€£¥])?\s*(?P<sign>[-+])?\s*"
     r"(?P<number>(?:\d{1,3}(?:[, ]\d{3})+|\d+)(?:\.\d+)?)\s*%?\s*(?P<close>\))?\s*$"
@@ -494,10 +513,10 @@ def statement_window(
         page_start, page_end = page_ranges[page]
         local = lines[heading_index:page_end]
         observed_years = {
-            word["text"].strip("(),")
+            year
             for candidate in local[:20]
             for word in candidate["words"]
-            if YEAR_RE.fullmatch(word["text"].strip("(),"))
+            for year in years_in_token(word["text"])
         }
         if not requested_years.issubset(observed_years):
             continue
@@ -540,8 +559,9 @@ def year_columns(window: list[dict[str, Any]], periods: list[str]) -> list[float
     observed: dict[str, list[float]] = {year: [] for year in years}
     for line in window[:20]:
         for word in line["words"]:
+            token_years = years_in_token(word["text"])
             for year in years:
-                if word["text"].strip("(),") == year:
+                if year in token_years:
                     observed[year].append((word["x0"] + word["x1"]) / 2)
     columns = [sum(observed[year]) / len(observed[year]) if observed[year] else math.nan for year in years]
     if all(math.isfinite(value) for value in columns):
