@@ -518,11 +518,22 @@ def statement_window(
             for word in candidate["words"]
             for year in years_in_token(word["text"])
         }
-        if not requested_years.issubset(observed_years):
+        observed_requested = requested_years & observed_years
+        latest_year = max(requested_years)
+        if latest_year not in observed_requested or len(observed_requested) < 2:
             continue
-        columns = year_columns(local, periods)
-        if len(columns) != 3:
+        supported_periods = [
+            period for period in periods if str(period)[:4] in observed_requested
+        ]
+        columns = year_columns(local, supported_periods)
+        if len(columns) != len(supported_periods):
             continue
+        if len(supported_periods) < 3:
+            # Statement Authority v2: this filing owns the statement topology
+            # and the periods it actually prints (two-column IFRS/UK
+            # presentation). The absent older period is a DECLARED support
+            # requirement for the prior filing, not a defect in this one.
+            columns = columns + [math.nan] * (3 - len(columns))
         resolved_rows = _resolved_row_count(local[1:], columns, periods, section)
         end = page_end
         previous_page_lines = lines[page_start:page_end]
