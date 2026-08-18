@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-work-graph-v1.schema.json",
+  "title": "Append-only broker evidence work graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "cache_key", "status", "revision", "nodes",
+    "open_task_ids", "completed_node_ids", "frontier_history_sha256",
+    "current_frontier_sha256", "monotonic_from_prior", "violations",
+    "graph_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-work-graph/1.0" },
+    "cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "status": { "enum": ["OPEN", "CLOSED"] },
+    "revision": { "type": "integer", "minimum": 0 },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node_id", "node_kind"],
+        "properties": {
+          "node_id": { "type": "string", "minLength": 1 },
+          "node_kind": { "enum": ["checkpoint", "task", "execution_receipt"] }
+        }
+      }
+    },
+    "open_task_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "completed_node_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "frontier_history_sha256": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+      "uniqueItems": true
+    },
+    "current_frontier_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "monotonic_from_prior": { "const": true },
+    "violations": { "type": "array", "maxItems": 0 },
+    "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

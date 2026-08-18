@@ -1,0 +1,205 @@
+{
+  "schema_version": 4,
+  "presentation_profile": "crh_dynamic",
+  "fixed_columns": {
+    "labels": "B",
+    "terms": "C:E",
+    "historical": "G:I",
+    "standalone_forecast": "J:L",
+    "adjustment_forecast": "N:P",
+    "latest_historical_reference": "R",
+    "pro_forma_forecast": "S:U",
+    "gutters": ["A", "F", "M", "Q"]
+  },
+  "section_order": [
+    "controls",
+    "income_statement",
+    "cash_flow",
+    "debt_schedule",
+    "rcf_waterfall",
+    "interest_schedule"
+  ],
+  "statement_row_types": {
+    "input": {
+      "requires_values_or_broker_metric": true,
+      "historical_hardcodes_are_blue": true
+    },
+    "calculation": {
+      "requires_formula_rule_or_semantic_role": true,
+      "font_role": "formula"
+    },
+    "subtotal": {
+      "requires_formula_rule": true,
+      "style_role": "total"
+    },
+    "header": {
+      "style_role": "subsection"
+    },
+    "uncalculated": {
+      "forecast_fill_role": "na_grey",
+      "forecast_values_forbidden": true
+    }
+  },
+  "formula_operators": [
+    "sum",
+    "link",
+    "subtract",
+    "ratio",
+    "growth",
+    "tax",
+    "negate",
+    "prior_period",
+    "average"
+  ],
+  "formula_operator_notes": {
+    "prior_period": "Reference to the prior period. refs[0] may be this row (flat carry-forward) or another row (roll-forward, e.g. opening cash = prior ending cash). Never emit a repeated constant in place of this.",
+    "average": "Mean of the referenced rows. Used where the source averaged a prior actual against an annualised interim run-rate."
+  },
+  "free_text_formula_operator_forbidden": true,
+  "required_semantic_roles": [
+    "revenue",
+    "ebit",
+    "interest_income",
+    "interest_expense",
+    "pre_tax_income",
+    "tax_expense",
+    "net_income",
+    "depreciation_and_amortisation",
+    "adjusted_ebitda",
+    "cash_from_operations",
+    "capex",
+    "cash_from_investing",
+    "cash_from_financing",
+    "opening_cash",
+    "ending_cash"
+  ],
+  "dynamic_rules": {
+    "absolute_rows_forbidden_in_taxonomy": true,
+    "row_ids_unique": true,
+    "component_refs_must_resolve": true,
+    "debt_and_interest_one_to_one": true,
+    "instrument_count_unbounded": true,
+    "support_rows_follow_visible_model": true,
+    "unsupported_forecast_detail_blank_and_grey": true,
+    "raw_or_historical_support_sheets_forbidden": true
+  },
+  "statement_hierarchy": {
+    "accounting_bases": ["IFRS", "US_GAAP", "other_disclosed"],
+    "aggregation_authorities": ["reported_parent", "derived_from_children", "standalone"],
+    "aggregation_roles": ["contributing_child", "working_child", "standalone"],
+    "economic_classes": ["working_capital", "provision", "pension", "tax", "restructuring", "deferred_revenue", "other_operating", "investing", "financing", "non_cash_debt"],
+    "operation_scopes": ["continuing", "discontinued", "combined", "not_applicable"],
+    "rules": {
+      "reported_parent_used_once": true,
+      "working_children_are_historical_workings": true,
+      "derived_parent_sums_exact_children": true,
+      "parent_references_same_statement_only": true,
+      "economic_class_overrides_wording": true,
+      "mixed_scope_requires_combined_reconciliation": true,
+      "issuer_labels_preserved": true
+    }
+  },
+  "semantic_graph": {
+    "schema_version": 1,
+    "semantic_id_authority": "row_id",
+    "required_build_artifacts": [
+      "row-map.json",
+      "semantic-manifest.json",
+      "source-crosswalk.csv"
+    ],
+    "mapping_methods": [
+      "exact",
+      "renamed",
+      "aggregate",
+      "split",
+      "derived",
+      "not_applicable"
+    ],
+    "movement_types": {
+      "operating_cash_flow": {
+        "cash_flow_classification": "operating",
+        "waterfall_stage": "pre_debt"
+      },
+      "investing_cash_flow": {
+        "cash_flow_classification": "investing",
+        "waterfall_stage": "pre_debt"
+      },
+      "non_debt_financing": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "pre_debt"
+      },
+      "debt_issuance": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "non_rcf_debt"
+      },
+      "scheduled_amortisation": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "non_rcf_debt"
+      },
+      "maturity_repayment": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "non_rcf_debt"
+      },
+      "debt_issuance_cost": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "non_rcf_debt"
+      },
+      "other_cash_debt_movement": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "non_rcf_debt"
+      },
+      "working_capital_movement": {
+        "cash_flow_classification": "operating",
+        "waterfall_stage": "within_operating_subtotal"
+      },
+      "non_cash_debt_movement": {
+        "cash_flow_classification": "none",
+        "waterfall_stage": "excluded"
+      },
+      "pik_accretion": {
+        "cash_flow_classification": "none",
+        "waterfall_stage": "excluded"
+      },
+      "fair_value_debt_movement": {
+        "cash_flow_classification": "none",
+        "waterfall_stage": "excluded"
+      },
+      "other_non_cash_debt_movement": {
+        "cash_flow_classification": "none",
+        "waterfall_stage": "excluded"
+      },
+      "lease_principal": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "non_rcf_debt"
+      },
+      "rcf_draw": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "rcf_balance"
+      },
+      "rcf_repayment": {
+        "cash_flow_classification": "financing",
+        "waterfall_stage": "rcf_balance"
+      },
+      "fx_on_cash": {
+        "cash_flow_classification": "cash_reconciliation",
+        "waterfall_stage": "pre_debt"
+      },
+      "cash_balance": {
+        "cash_flow_classification": "cash_reconciliation",
+        "waterfall_stage": "cash_balance"
+      }
+    }
+  },
+  "style_archetypes": [
+    "title",
+    "metadata",
+    "period_header",
+    "section_header",
+    "subsection",
+    "body",
+    "total",
+    "input",
+    "same_workbook_link",
+    "intentionally_uncalculated"
+  ]
+}

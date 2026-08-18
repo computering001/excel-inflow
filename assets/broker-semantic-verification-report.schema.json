@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-semantic-verification-report.schema.json",
+  "title": "Independent broker semantic verification report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "total_violation_count",
+    "candidate_manifest_sha256",
+    "crosswalk_sha256",
+    "candidate_count",
+    "coverage_entry_count",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-semantic-verification-report/1.0" },
+    "status": { "enum": ["PASS", "BLOCKED"] },
+    "total_violation_count": { "type": "integer", "minimum": 0 },
+    "candidate_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "crosswalk_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "candidate_count": { "type": "integer", "minimum": 0 },
+    "coverage_entry_count": { "type": "integer", "minimum": 0 },
+    "terminal_quarantined_candidate_count": { "type": "integer", "minimum": 0 },
+    "unresolved_selected_candidate_count": { "type": "integer", "minimum": 0 },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^SEM-[A-Z0-9-]+$" },
+          "message": { "type": "string", "minLength": 1 },
+          "candidate_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "PASS" } } },
+      "then": {
+        "properties": {
+          "total_violation_count": { "const": 0 },
+          "findings": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "BLOCKED" } } },
+      "then": {
+        "properties": {
+          "total_violation_count": { "minimum": 1 },
+          "findings": { "minItems": 1 }
+        }
+      }
+    }
+  ]
+}

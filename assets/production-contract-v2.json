@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "contract_id": "excel-inflow-production-v2",
+  "tolerances": {
+    "description": "ONE ABSOLUTE TOLERANCE CANNOT SERVE MONEY AND MULTIPLES. validate_dynamic_model.mjs used a single 0.05 for every numeric comparison it made, and applied it to net leverage by plain absolute difference — 0.05 is 1.7% of a 3.0x headline metric, and that was recorded as agreement. It was equally wrong at the other end: 0.05 on a 26,971m gross-debt figure is 1.9e-6 relative, so a currency comparison that should have been exact was allowed two parts per million of drift. Tolerances are keyed by METRIC CLASS, and the currency floor is stated in reporting-currency units and scaled by issuer.units, so a model in millions and a model in units are held to the same economic precision rather than the same printed digits.",
+    "unit_scale": {
+      "units": 1,
+      "thousands": 0.001,
+      "millions": 0.000001
+    },
+    "metric_classes": {
+      "currency": {
+        "relative": 0.000001,
+        "absolute_floor_currency_units": 1,
+        "note": "A money figure is tested relatively, because the precision that matters scales with the figure. The floor is one currency unit — one euro, one dollar — expressed in the issuer's units through unit_scale, so it is what governs comparisons at or near zero."
+      },
+      "ratio": {
+        "absolute": 0.0001,
+        "note": "Leverage and coverage multiples. A multiple has no natural scale to be relative to and is read to two decimals, so it is tested absolutely, two orders of magnitude tighter than the printed precision."
+      },
+      "rate": {
+        "absolute": 0.000001,
+        "note": "Rates, margins, growth and conversion percentages: fractions of one, printed to a tenth of a point."
+      }
+    },
+    "checks": {
+      "statement-arithmetic": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate"
+      },
+      "standalone-adjustment-pro-forma-tie": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate",
+        "note": "The pro-forma tie is A + B = C across three independently emitted columns. It gets its own entry because it is the one comparison whose two sides are computed by different formulas rather than being two readings of the same arithmetic."
+      },
+      "cross-row-equality": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate",
+        "note": "Two cells that must state the same number — the income statement's interest expense against the interest schedule's gross interest, the cash flow's ending cash against the sweep, the pro-forma actual column against the latest standalone actual. Same number, so the only tolerance is arithmetic noise."
+      },
+      "independent-solver-parity": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate",
+        "note": "net_leverage is a RATIO here and is why this block exists."
+      },
+      "input-authority": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate"
+      },
+      "liquidity-certification": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate"
+      },
+      "cfs-waterfall-component-parity": {
+        "currency": "currency",
+        "ratio": "ratio",
+        "rate": "rate",
+        "note": "The consolidated Change-in-Debt line against the waterfall rows that carry its constituents into ending cash: pre-RCF debt movement + RCF draw - RCF repayment. Both sides are money and both are computed by different formulas off the same debt schedule, so the only tolerance is arithmetic noise. Declared explicitly rather than left to the resolver's fall-through, so the band this comparison runs under is stated rather than inferred."
+      }
+    },
+    "cli_override": {
+      "allowed": true,
+      "must_be_recorded_in_evidence": true,
+      "note": "--tolerance still exists for diagnosis, but supplying it is recorded on the face of the validation report as tolerance_override so a report produced under a loosened tolerance can never be mistaken for one produced under the contract's."
+    }
+  },
+  "statement_coverage": {
+    "required_status": "complete",
+    "required_face_statement_coverage": 1,
+    "allow_unmapped_material_lines": false,
+    "allow_undocumented_aggregation": false,
+    "required_income_statement_roles": [
+      "revenue",
+      "ebit",
+      "interest_income",
+      "interest_expense",
+      "pre_tax_income",
+      "tax_expense",
+      "net_income",
+      "depreciation_and_amortisation"
+    ],
+    "required_income_statement_role_groups": [
+      ["adjusted_ebitda", "reported_ebitda"]
+    ],
+    "required_cash_flow_roles": [
+      "cash_flow_net_income",
+      "change_in_working_capital",
+      "cash_from_operations",
+      "capex",
+      "cash_from_investing",
+      "debt_issuance",
+      "debt_repayment",
+      "dividends",
+      "cash_from_financing",
+      "fx_effect_on_cash",
+      "net_change_in_cash",
+      "opening_cash",
+      "ending_cash"
+    ]
+  },
+  "formula_dependency": {
+    "calculation_rows_require_declared_dependencies": true,
+    "subtotals_require_formulas": true,
+    "references_must_resolve": true,
+    "duplicate_row_ids_allowed": false,
+    "approved_compiler_calculated_roles": [
+      "interest_income",
+      "interest_expense",
+      "debt_issuance",
+      "debt_repayment",
+      "rcf_draw",
+      "rcf_repayment",
+      "opening_cash",
+      "ending_cash",
+      "non_cash_interest_addback"
+    ]
+  },
+  "statement_hierarchy": {
+    "accounting_basis_required_when_hierarchy_declared": true,
+    "reported_parent_may_not_have_formula": true,
+    "reported_parent_child_role": "working_child",
+    "derived_parent_child_role": "contributing_child",
+    "derived_parent_operator": "sum",
+    "derived_parent_historical_input_forbidden": true,
+    "working_child_double_count_forbidden": true,
+    "mixed_operation_scope_requires_reconciliation": true,
+    "economic_class_is_classification_authority": true
+  },
+  "semantic_graph": {
+    "schema_version": 1,
+    "required_build_artifacts": [
+      "row-map.json",
+      "semantic-manifest.json",
+      "source-crosswalk.csv"
+    ],
+    "source_crosswalk_requires_resolved_destinations": true,
+    "statement_nodes_require_stable_semantic_ids": true,
+    "calculation_nodes_require_dependency_edges": true,
+    "mechanical_calculation_nodes_require_dependency_edges": true,
+    "downstream_graph_augmentation_forbidden": true,
+    "cash_and_debt_movements_are_typed": true,
+    "required_instrument_non_cash_movement_types": [
+      "pik_accretion",
+      "fair_value_debt_movement",
+      "other_non_cash_debt_movement"
+    ],
+    "pik_interest_and_principal_accretion_are_distinct_nodes": true,
+    "pik_interest_enters_financing_cash_flow": false,
+    "fair_value_and_other_non_cash_movement_enter_financing_cash_flow": false,
+    "non_cash_debt_movements_enter_cash_waterfall": false,
+    "rcf_is_separate_balancing_stage": true,
+    "rcf_amount_authority": "facility_native_currency",
+    "foreign_rcf_capacity_tested_in_facility_currency": true,
+    "foreign_rcf_cash_flows_translate_at_average_fx": true,
+    "foreign_rcf_balances_and_headroom_translate_at_period_end_fx": true,
+    "foreign_rcf_interest_and_commitment_fee_translate_at_average_fx": true,
+    "foreign_rcf_fx_non_cash_movement_enters_financing_cash_flow": false,
+    "cfs_waterfall_component_path_count": 1,
+    "fx_on_cash_required_in_cash_reconciliation": true,
+    "acquisition_debt_repayment_required_when_applicable": false,
+    "acquisition_debt_repayment_and_maturity_forbidden": true,
+    "approved_mapping_methods": [
+      "exact",
+      "renamed",
+      "aggregate",
+      "split",
+      "derived",
+      "not_applicable"
+    ]
+  },
+  "acquisition": {
+    "illustrative_inputs_required_when_module_present": true,
+    "positive_input_fields": [
+      "transaction_enterprise_value",
+      "entry_ev_to_ebitda",
+      "incremental_rate"
+    ],
+    "non_negative_input_fields": [
+      "acquisition_debt_amount"
+    ],
+    "close_year_must_be_forecast": true,
+    "enterprise_value_purpose": "infer_target_operating_economics_only",
+    "debt_sizing": "absolute_acquisition_debt_amount",
+    "consideration_or_equity_cash_flow": false,
+    "ev_minus_debt_rcf_funding": false,
+    "adjustment_definition": "pro_forma_minus_standalone",
+    "control_row_id": "adjustments_enabled",
+    "control_label": "Adjustment columns",
+    "separate_acquisition_toggle_allowed": false,
+    "off_state_requires_zero_adjustment_cells": true,
+    "off_state_requires_pro_forma_equals_standalone": true,
+    "formula_text_required_in_both_states": true
+  },
+  "leverage_block": {
+    "ratio_denominators_must_be_visible_rows": true,
+    "ratios_must_reference_the_visible_denominator_row": true,
+    "split_by_basis": true,
+    "required_bridge_sequence": [
+      "model_basis_header",
+      "gross_debt_excluding_leases",
+      "gross_debt_including_leases",
+      "cash_for_net_debt",
+      "net_debt_excluding_leases",
+      "net_debt_including_leases",
+      "leverage_adjusted_ebitda",
+      "net_debt_excluding_leases_to_adjusted_ebitda",
+      "net_debt_to_adjusted_ebitda",
+      "leverage_net_interest",
+      "adjusted_ebitda_to_net_interest",
+      "total_change_in_debt"
+    ],
+    "model_basis_ratios_use_model_basis_numerators": true,
+    "conditional_bridge_rows": {
+      "net_debt_including_leases": "lease_policy.mode is not 'exclude'",
+      "net_debt_excluding_leases_to_adjusted_ebitda": "lease_policy.mode is not 'exclude'",
+      "company_reported_header": "historical_supplement.reported_net_debt_adjustment supplies at least one named component that is non-zero in some period; opens the company-reported sub-block after the model-basis block",
+      "net_debt_model_basis_restated": "as company_reported_header",
+      "reported_net_debt_adjustment_<n>": "one row per surviving named component, in case order",
+      "net_debt_company_reported": "as company_reported_header",
+      "company_reported_adjusted_ebitda": "as company_reported_header",
+      "net_debt_company_reported_to_adjusted_ebitda": "as company_reported_header"
+    },
+    "company_basis_must_be_named_in_a_row_label": true,
+    "no_identically_zero_bridge_rows": true,
+    "no_anonymous_reported_adjustment_row": true,
+    "model_basis_header_states_agreement_when_no_bridge": true
+  },
+  "typography": {
+    "font_family": "Calibri",
+    "body_font_size": 8,
+    "section_title_font_color": "FFFFFF",
+    "hardcode_font_color": "0000FF",
+    "same_sheet_formula_font_color": "000000",
+    "other_sheet_formula_font_color": "008000",
+    "external_link_font_color": "FF0000",
+    "external_links_allowed": false
+  },
+  "certification": {
+    "aggregate_score_can_override_critical_failure": false,
+    "required_clean_rebuilds": 2,
+    "required_control_states": 8,
+    "mutation_detection_required": true,
+    "native_excel_restoration_required": true,
+    "native_excel_evidence_schema": "native-excel-restoration-evidence/3.2",
+    "native_excel_required_control_sequence": [1, 0, 1, 0, 1],
+    "native_excel_evidence_bindings": [
+      "case_id",
+      "case_sha256",
+      "workbook_sha256",
+      "semantic_manifest_sha256",
+      "row_map_sha256",
+      "economic_solve_policy_sha256",
+      "certified_closure_sha256"
+    ],
+    "native_excel_required_release_profiles": [
+      "acquisition",
+      "stressed_liquidity"
+    ],
+    "native_excel_required_test_ids": [
+      "native-excel-circularity-restoration-acquisition-case",
+      "native-excel-acquisition-restoration",
+      "native-excel-circularity-restoration-stressed-case",
+      "native-excel-maturity-restoration"
+    ],
+    "native_excel_required_tests_by_profile": {
+      "acquisition": [
+        "native-excel-circularity-restoration-acquisition-case",
+        "native-excel-acquisition-restoration"
+      ],
+      "stressed_liquidity": [
+        "native-excel-circularity-restoration-stressed-case",
+        "native-excel-maturity-restoration"
+      ]
+    },
+    "native_excel_non_vacuity": {
+      "formula_cells_compared_minimum": 1,
+      "numeric_cells_compared_minimum": 1,
+      "declared_effect_cells_present_minimum": 1,
+      "declared_effect_cells_changed_minimum": 1,
+      "circularity_and_acquisition_kill_switch_cells_minimum": 1,
+      "repeated_on_and_off_restoration_difference_maximum": 0,
+      "candidate_binding_required": true,
+      "failed_test_or_nonempty_failures_rejected": true,
+      "metric_class_tolerance_policy_required": true,
+      "maximum_observed_drift_required": true,
+      "certified_closure_binding_required": true,
+      "all_worksheets_scanned_required": true,
+      "used_cells_scanned_minimum": 1,
+      "excel_error_cells_maximum": 0
+    },
+    "positive_liquidity_shortfall_allowed": true,
+    "positive_liquidity_shortfall_condition": "ending_rcf_equals_committed_capacity",
+    "rcf_draw_repayment_simultaneous_allowed": false,
+    "non_rcf_auto_sweep_allowed": false,
+    "visible_interest_assumption_references_required": true,
+    "embedded_rate_literals_allowed": false,
+    "visual_review_required": true
+  }
+}

@@ -1,0 +1,1138 @@
+{
+  "schema_version": 2,
+  "release_name": "Excel Inflow",
+  "central_instruction_source": "compiled",
+  "default_reference_policy": "central-only-first",
+  "instruction_strip_rules_runtime": [],
+  "_note": "This file is the single source of truth for what ships to deployment host. scripts/compile_skill_release.mjs reads every list below; it holds no duplicate hardcoded set. script_allowlist is the transitive import closure of script_entry_points and is verified against a freshly computed closure on every compile \u2014 a disagreement fails the build rather than shipping a package that cannot resolve. python_module_allowlist is the same statement for every Python runtime module, computed by the same both-directions rule from an `ast` walk rather than a regex.",
+  "reference_allowlist": [
+    "runtime-core.md",
+    "model-contract.md",
+    "calculation-rules.md",
+    "forecast-and-input-policy.md",
+    "acquisition.md",
+    "advanced-history-and-fx.md",
+    "template-and-formatting.md",
+    "broker-extraction.md",
+    "model-intent.md",
+    "development-and-release-loop.md",
+    "validation.md"
+  ],
+  "asset_allowlist": [
+    "broker-metric-dictionary.json",
+    "broker-metric-dictionary.schema.json",
+    "broker-pack.schema.json",
+    "broker-preview-v1.schema.json",
+    "broker-preview-confirmation-v1.schema.json",
+    "broker-consensus-membership-v1.schema.json",
+    "broker-intake-choice-v1.schema.json",
+    "broker-intake-run-v1.schema.json",
+    "broker-extraction-request.schema.json",
+    "broker-extraction-bundle.schema.json",
+    "broker-vision-result.schema.json",
+    "broker-bounded-capture-decision.schema.json",
+    "broker-crosswalk.schema.json",
+    "broker-crosswalk-receipt.schema.json",
+    "broker-source-tables.schema.json",
+    "broker-candidate-manifest.schema.json",
+    "broker-canonical-tables.schema.json",
+    "broker-semantic-verification-report.schema.json",
+    "broker-surface-census.schema.json",
+    "broker-run-state.schema.json",
+    "broker-degraded-close-receipt-v1.schema.json",
+    "broker-work-graph-v1.schema.json",
+    "broker-runtime-members.json",
+    "broker-model-host-response-boundary-v1.json",
+    "broker-terminal-materiality-review.schema.json",
+    "broker-period-header-review.schema.json",
+    "broker-table-engine-registry-v1.json",
+    "broker-table-engine-result.schema.json",
+    "broker-supervisor-state-machine-v1.json",
+    "run-scoped-broker-concept-v1.schema.json",
+    "real-filing-canary-expectations-v1.schema.json",
+    "delivery-constitution-v1.json",
+    "delivery-constitution-v1.schema.json",
+    "controller-terminal-exit-inventory-v1.json",
+    "attachment-evidence-controller.schema.json",
+    "attachment-evidence-run-state.schema.json",
+    "attachment-evidence-runtime-members.json",
+    "content-addressed-artifact-ref-v1.schema.json",
+    "filings-acquisition-request-v1.schema.json",
+    "filings-source-registry-v1.schema.json",
+    "filings-extraction-request-v1.schema.json",
+    "filings-extraction-response-v1.schema.json",
+    "filings-run-state.schema.json",
+    "filings-runtime-members.json",
+    "workflow-state-contract-v1.json",
+    "authority-projection-overrides.v3.json",
+    "authority-projection-overrides.v4.json",
+    "dcs-export.schema.json",
+    "dcs-candidate-manifest-v1.schema.json",
+    "dcs-crosswalk-v1.schema.json",
+    "dcs-evidence-receipt-v1.schema.json",
+    "dcs-extraction-receipt-v1.schema.json",
+    "dcs-extraction-request-v1.schema.json",
+    "dcs-independent-verification-v1.schema.json",
+    "dcs-projection-v1.schema.json",
+    "dcs-source-tables-v1.schema.json",
+    "dcs-run-state.schema.json",
+    "dcs-runtime-members.json",
+    "debt-class-ontology-v1.json",
+    "economic-solve-policy.v1.json",
+    "economic-solve-policy.v1.schema.json",
+    "equation-graph.v1.json",
+    "equation-graph.v1.schema.json",
+    "convergence-contract.v1.json",
+    "convergence-contract.v1.schema.json",
+    "evidence-run-v1.schema.json",
+    "evidence-resolution-v2.schema.json",
+    "excel-inflow-vnext-run.schema.json",
+    "forecast-observation-ledger-v1.schema.json",
+    "forecast-behavior-map-v1.schema.json",
+    "forecast-plan-v2.schema.json",
+    "instrument-period-state-v1.schema.json",
+    "lineage-exceptions.json",
+    "model-case-v2.schema.json",
+    "model-demand-graph-v1.schema.json",
+    "pre-broker-model-demand-v1.schema.json",
+    "pre-broker-model-demand-v2.schema.json",
+    "selected-authority-contract-v1.schema.json",
+    "run-constitution-graph-v1.schema.json",
+    "product-constitution-v1.json",
+    "product-constitution-v1.schema.json",
+    "model-case.schema.json",
+    "model-ir-v3.schema.json",
+    "native-excel-evidence-v3.schema.json",
+    "plan.schema.json",
+    "product-identity-v2.schema.json",
+    "production-contract-v2.json",
+    "public-test-run-v1.schema.json",
+    "release-package-attestation-v1.schema.json",
+    "release-package-attestation-v2.schema.json",
+    "local-workbook-review-evidence-v1.schema.json",
+    "deployment-profile.json",
+    "runtime-manifest.json",
+    "row-taxonomy-v2.json",
+    "source-ingress-authority-v1.json",
+    "statement-semantic-taxonomy.v1.json",
+    "standardised-design-runtime.v2.json",
+    "standardised-design-runtime.v3.json",
+    "standardised-design-runtime.v4.json",
+    "style-tokens.json",
+    "case-source.schema.json",
+    "filings-acquisition-request-v2.schema.json",
+    "filings-source-registry-v2.schema.json",
+    "architecture-ownership-v2.json",
+    "broker-state-machine-v2.json",
+    "canonical-model-graph-v2.json",
+    "economic-ontology-v2.json",
+    "experience-trace-v1.schema.json",
+    "forecast-authority-ledger-v2.schema.json",
+    "forecast-ownership-preflight-v1.schema.json",
+    "host-experience-envelope-v1.schema.json",
+    "performance-policy-v1.json",
+    "product-delivery-constitution-v2.json"
+  ],
+  "declared_only_assets": {
+    "authority-projection-overrides.v3.json": "Empty correction registry retained with presentation epoch 3 as an explicit rollback route; it never inherits epoch-2 corrections.",
+    "authority-projection-overrides.v4.json": "Empty correction registry for the source-founded presentation epoch 4 candidate. Epoch 4 must validate with zero approved differences; epochs 2 and 3 remain explicit rollback routes.",
+    "broker-pack.schema.json": "Stage-1 normalised broker-pack contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
+    "broker-preview-v1.schema.json": "Hash-bound Stage-2 preview of the coherent primary-house series, exact source-cell provenance, alternates and preserved evidence-only inventory.",
+    "broker-preview-confirmation-v1.schema.json": "Minimal user confirmation bound to one broker preview hash and one primary-eligible coherent house.",
+    "broker-consensus-membership-v1.schema.json": "Hash-bound per-metric contributor eligibility, definition compatibility and period-status contract for the calculated Model Consensus; Provider Consensus remains a separate sourced series.",
+    "broker-intake-choice-v1.schema.json": "Sealed proof that the visible Brokers milestone ended through 1-10 supplied reports or the exact explicit skip choice; zero attachments can never imply consent.",
+    "broker-intake-run-v1.schema.json": "Typed ACTION_REQUIRED or COMPLETE state for the visible Brokers upload-or-skip controller.",
+    "broker-extraction-request.schema.json": "External broker-document extraction request contract; consumed before the extraction entry point runs.",
+    "broker-extraction-bundle.schema.json": "Lossless broker evidence bundle contract; loaded through the attachment-ingress schema helper and retained for independent validation.",
+    "broker-vision-result.schema.json": "Hash-bound independent image-table transcription contract; responses are inputs to the vision consensus compiler.",
+    "broker-bounded-capture-decision.schema.json": "Task-, image-, round- and replacement-read-bound decision contract for finite physical-overlap recovery; it can only request one more independent read round or prohibit unresolved regions from model use.",
+    "broker-crosswalk.schema.json": "Declarative cell-addressed broker crosswalk contract; consumed by the stdlib broker-pack compiler.",
+    "broker-crosswalk-receipt.schema.json": "Hash-bound broker mapping and semantic-gate receipt contract loaded through the attachment-ingress schema helper.",
+    "broker-source-tables.schema.json": "Structured full-table evidence contract loaded through the attachment-ingress schema helper.",
+    "broker-candidate-manifest.schema.json": "Immutable broker candidate-universe contract retained for independent validation.",
+    "broker-canonical-tables.schema.json": "Canonical broker-table contract retained for independent validation.",
+    "broker-semantic-verification-report.schema.json": "Independent broker semantic-verification report contract loaded through the attachment-ingress schema helper.",
+    "broker-surface-census.schema.json": "Whole-surface broker census contract retained for independent validation.",
+    "broker-run-state.schema.json": "Hash-bound resumable broker-controller state. It distinguishes internal extraction work from the narrow source conditions that may legitimately block the user.",
+    "broker-degraded-close-receipt-v1.schema.json": "Atomic closure contract binding every degraded broker lane to its quarantined bundle, pack, source tables, semantic report and zero unresolved selected candidates before Build may continue.",
+    "broker-work-graph-v1.schema.json": "Append-only broker task, checkpoint and execution-receipt graph. It permits legitimate late task discovery without stage regression while proving that completed work never disappears.",
+    "broker-runtime-members.json": "Single source of truth for the broker controller's hash-bound runtime closure; read independently by the controller and attachment ingress.",
+    "broker-model-host-response-boundary-v1.json": "Closed model-host response seam for broker vision, targeted adjudication and semantic crosswalk tasks, including deterministic remedies and finite attempt budgets.",
+    "broker-terminal-materiality-review.schema.json": "Hash-bound model-host response contract for preserving independently proven non-consumed broker evidence after bounded semantic review; it cannot authorize model consumption or values.",
+    "broker-period-header-review.schema.json": "Hash-bound rendered-grid period-header review contract. It can resolve a truncated native-text fragment only from the preserved page image and otherwise leaves that column quarantined.",
+    "broker-table-engine-registry-v1.json": "Closed broker table-engine capability registry. Rogo remains the required model-host reader; optional Surya and Docling adapters are discovered only when the deployment host actually provides them.",
+    "broker-table-engine-result.schema.json": "Provider-neutral table-engine result contract used before the existing dual-read reconciliation and semantic gates.",
+    "broker-supervisor-state-machine-v1.json": "Finite monotone broker supervisor machine; every failed optional path closes with zero broker authority.",
+    "run-scoped-broker-concept-v1.schema.json": "Strict one-run insertion contract for broker concepts that cannot mutate the global metric dictionary.",
+    "real-filing-canary-expectations-v1.schema.json": "Generic schema for external, run-scoped real-corpus expectations. Issuer-specific counts, labels and values never ship in the runtime or source-owned test registry.",
+    "delivery-constitution-v1.json": "Single BLOCK / ASK / DEGRADE / LOG ownership authority for runtime delivery decisions.",
+    "delivery-constitution-v1.schema.json": "Strict contract for the executable delivery constitution.",
+    "controller-terminal-exit-inventory-v1.json": "Frozen and current inventory of all public-controller and internal-delegate terminal exits.",
+    "model-demand-graph-v1.schema.json": "Run-scoped graph of every material model row-period and contractual debt term that evidence authority may satisfy.",
+    "pre-broker-model-demand-v1.schema.json": "Filings-derived row-period demand compiled before broker extraction and rebound exactly to final model demand before Build.",
+    "selected-authority-contract-v1.schema.json": "Single-writer authority decision for every model-demand node, including explicit fallback and quarantine traces.",
+    "run-constitution-graph-v1.schema.json": "Joined source-to-observation-to-authority-to-model graph used to prove causal blocker reachability and delivery safety.",
+    "product-constitution-v1.json": "Single product authority for optional evidence, authority fallback, causal blocker reachability, runtime gates and release-only certification.",
+    "product-constitution-v1.schema.json": "Strict contract for the Excel Inflow product constitution.",
+    "attachment-evidence-controller.schema.json": "Strict input contract for the single raw-attachment evidence owner.",
+    "attachment-evidence-run-state.schema.json": "Typed resumable state contract separating internal work from genuine user evidence blockers.",
+    "attachment-evidence-runtime-members.json": "Hash-bound runtime closure for the broker/DCS/case-source evidence transaction.",
+    "content-addressed-artifact-ref-v1.schema.json": "Portable hash-and-size reference used so large broker and DCS artifacts appear once in the run carrier rather than being embedded repeatedly.",
+    "filings-acquisition-request-v1.schema.json": "Declarative, no-search filing-source registry contract for user-supplied, runtime-library and explicit official HTTPS sources.",
+    "filings-source-registry-v1.schema.json": "Content-addressed output ledger binding every acquired filing to source identity, precedence, periods and raw bytes.",
+    "filings-extraction-request-v1.schema.json": "Strict raw-filing extraction request contract consumed by the resumable filings controller.",
+    "filings-extraction-response-v1.schema.json": "Strict source-owned statement extraction response contract emitted from raw filing bytes.",
+    "filings-run-state.schema.json": "Typed, resumable filings-controller state that separates internal extraction work from genuine source defects.",
+    "filings-runtime-members.json": "Hash-bound runtime closure for the filings extraction and evidence-sealing lane.",
+    "workflow-state-contract-v1.json": "Canonical cross-language workflow-state and blocker-ownership contract shared by all resumable controllers.",
+    "dcs-export.schema.json": "Stage-1 normalised debt-export contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
+    "dcs-candidate-manifest-v1.schema.json": "Lossless DCS candidate-universe contract loaded through the attachment-ingress schema helper.",
+    "dcs-crosswalk-v1.schema.json": "Cell-addressed DCS crosswalk contract loaded through the attachment-ingress schema helper.",
+    "dcs-evidence-receipt-v1.schema.json": "DCS compiler receipt contract loaded through the attachment-ingress schema helper.",
+    "dcs-extraction-receipt-v1.schema.json": "Lossless DCS extraction receipt contract retained for independent validation.",
+    "dcs-extraction-request-v1.schema.json": "Lossless DCS extraction request contract consumed before the extractor runs.",
+    "dcs-independent-verification-v1.schema.json": "Independent DCS verification report contract loaded through the attachment-ingress schema helper.",
+    "dcs-projection-v1.schema.json": "DCS model-projection and term-authority contract loaded through the attachment-ingress schema helper.",
+    "dcs-source-tables-v1.schema.json": "Lossless DCS source-cell ledger contract loaded through the attachment-ingress schema helper.",
+    "dcs-run-state.schema.json": "Resumable DCS controller state contract, including typed blocker ownership.",
+    "dcs-runtime-members.json": "Hash-bound DCS controller runtime closure.",
+    "debt-class-ontology-v1.json": "Canonical debt-class enum and reviewed legacy adapter vocabulary used by the compiler, solver and workbook presentation.",
+    "economic-solve-policy.v1.json": "Canonical solver, workbook-calculation, native-tolerance and circularity-role authority loaded by the economic runtime.",
+    "economic-solve-policy.v1.schema.json": "Strict schema for the canonical economic solve policy, loaded beside that policy by the runtime.",
+    "equation-graph.v1.json": "Canonical machine-readable forecast economic equation graph loaded by the economic graph runtime.",
+    "equation-graph.v1.schema.json": "Strict equation-graph/1.0 schema loaded beside the canonical economic graph.",
+    "convergence-contract.v1.json": "Hash-bound structural and active SCC, iteration-state and tolerance-class contract loaded by the economic graph runtime.",
+    "convergence-contract.v1.schema.json": "Strict convergence-contract/1.0 schema loaded beside the canonical convergence contract.",
+    "forecast-plan-v2.schema.json": "Sealed per-row and per-period forecast-state and candidate-ledger contract retained for independent validation.",
+    "lineage-exceptions.json": "L0 immutable exception registry. Named as immutable-at-runtime; must be present so a runtime exception claim can be checked against it.",
+    "native-excel-evidence-v3.schema.json": "Certification evidence contract. Loaded by the native evidence producer and independent contract checks, not by the portable workbook runtime's static import graph.",
+    "model-ir-v3.schema.json": "Proof-carrying five-plane IR contract. The runtime emits a conforming model-ir-v3 sidecar; the schema ships so installed-byte and downstream validation can prove its shape independently.",
+    "deployment-profile.json": "Package provenance and exact allowlists. It is compiler input rather than runtime-loaded content, but ships so release-manifest.json never points to an absent profile.",
+    "runtime-manifest.json": "Version and certification-state identity consumed by the release compiler and read back by the installed host. It must ship so runtime and release manifests cannot disagree after a versioned update.",
+    "row-taxonomy-v2.json": "Row taxonomy the agent reads while mapping company rows. Referenced from the instructions, not imported by a shipped script.",
+    "broker-metric-dictionary.schema.json": "Contract for assets/broker-metric-dictionary.json. The dictionary itself is read at runtime by compile_broker_pack.py and scripts/lib/broker_metric_dictionary.mjs, which pin its digest; the schema is the review-time check on the asset's own shape.",
+    "case-source.schema.json": "Loaded by scripts/lib/case_compiler.mjs via path.resolve(HERE, '..', '..', 'assets', ...) \u2014 the resolve form the static scanner does not parse. The schema is the case-source doctrine: compile_case refuses any authoring surface it cannot validate against it.",
+    "evidence-resolution-v2.schema.json": "Strict model-first observation-ledger, authority-graph, blocker-ownership and quality-receipt contract loaded by the vNext resolution compiler.",
+    "excel-inflow-vnext-run.schema.json": "Strict terminal state contract for the one raw-evidence-to-delivery vNext controller.",
+    "pre-broker-model-demand-v2.schema.json": "Model-owned broker demand projected from the canonical economic graph while retaining source-backed filing nodes for exact binding.",
+    "architecture-ownership-v2.json": "Canonical seven-owner architecture registry. It is validated by release proof tooling and ships so installed deployments can inspect policy ownership without executing development tests.",
+    "broker-state-machine-v2.json": "Canonical broker supervisor state-machine policy. Runtime transitions are implemented in code, while this closed machine ships as independent review and installed-byte evidence.",
+    "canonical-model-graph-v2.json": "Canonical composable model-graph module contract and ownership registry. Runtime graph instances are compiled from issuer evidence; this asset ships as the independent architecture contract.",
+    "experience-trace-v1.schema.json": "Schema for controller-produced experience-trace receipts. The Python tracing helper writes it dynamically through the runtime evidence closure, which the static JS asset scanner cannot resolve.",
+    "filings-acquisition-request-v2.schema.json": "Versioned filing acquisition request contract included in the filings runtime closure and loaded through the filings registry rather than a statically resolvable JS asset literal.",
+    "filings-source-registry-v2.schema.json": "Versioned internal-source/user-override filing registry contract loaded by run_filings_pipeline through the shared ASSETS path variable, which the static asset scanner does not resolve.",
+    "forecast-authority-ledger-v2.schema.json": "Schema for the sealed row-period forecast authority ledger. The ledger module resolves the asset dynamically and runtime evidence members bind it independently.",
+    "forecast-ownership-preflight-v1.schema.json": "Hash-bound structural, selected-authority and physical ownership receipts. Checkpoint B retains every displaced authority and checkpoint C binds the sealed census to workbook destinations before emission.",
+    "host-experience-envelope-v1.schema.json": "Host boundary envelope contract for joining Rogo/platform waits with Excel Inflow component traces. It is consumed by the external trace compiler and installed-host evidence path.",
+    "performance-policy-v1.json": "Canonical v3.6 timing classification and promotion policy, including external-wait classification and 30/120/300 second unknown-gap thresholds; loaded through runtime tracing helpers.",
+    "product-identity-v2.schema.json": "Closed source/runtime/package/deployment identity vocabulary. Package mode is development or certified; mutable deployment status is a separate identity dimension.",
+    "release-package-attestation-v1.schema.json": "Legacy certified-only external package receipt retained for verification compatibility.",
+    "release-package-attestation-v2.schema.json": "Strict external receipt for a sealed complete-package inventory and deterministic archive. It distinguishes development identity attestation from certification and is emitted beside, never inside, package bytes.",
+    "local-workbook-review-evidence-v1.schema.json": "Fail-closed portable Phase-13 evidence contract binding one exact workbook, its independently recomputed semantic inventory, a review-only Show Formulas derivative, every visible rendered sheet/page and all twelve checklist sections in both review modes. It explicitly cannot claim human or native Excel review.",
+    "product-delivery-constitution-v2.json": "Canonical v3.6 product/delivery owner retained as an inspectable policy artifact while compatibility runtime views remain generated for the current controller."
+  },
+  "script_entry_points": [
+    "build_dynamic_model.mjs",
+    "compile_evidence_run.mjs",
+    "compile_declared_evidence_run.mjs",
+    "compile_evidence_resolution_v2.mjs",
+    "compile_public_test_run.mjs",
+    "flow_cli.mjs",
+    "inspect_workbook_semantics.mjs",
+    "validate_local_workbook_review.mjs",
+    "migrate_run_carrier.mjs",
+    "orchestrate_release.mjs",
+    "run_user_flow.mjs",
+    "run_excel_inflow_vnext.mjs",
+    "run_structural_ownership_preflight.mjs",
+    "run_evidence_resolution_v2_tests.mjs",
+    "run_filings_pipeline.mjs",
+    "run_broker_intake.mjs",
+    "run_statement_classifier_tests.mjs",
+    "run_forecast_observation_tests.mjs",
+    "run_forecast_behavior_tests.mjs",
+    "run_instrument_period_state_tests.mjs",
+    "run_equation_graph_tests.mjs",
+    "run_run_constitution_graph_tests.mjs",
+    "run_product_constitution_tests.mjs",
+    "run_delivery_constitution_tests.mjs",
+    "run_controller_exit_inventory_tests.mjs",
+    "run_broker_dynamic_concept_tests.mjs",
+    "run_broker_exit_fault_injection_tests.mjs",
+    "run_universal_broker_delivery_matrix.mjs",
+    "run_raw_input_black_box_canary.mjs",
+    "run_fixed_point_constitution_tests.mjs",
+    "debt-model-economics.mjs",
+    "test_release_convergence_seam.mjs",
+    "validate_cache_parity.mjs",
+    "validate_source_parity.mjs",
+    "validate_structure.mjs",
+    "validate_style_tokens.mjs",
+    "verify/recalc_second_opinion.mjs",
+    "compile_case.mjs",
+    "propose_case_source.mjs"
+  ],
+  "_entry_point_note": "Thirty-nine JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; run_structural_ownership_preflight.mjs is the installed pre-descendant topology gate invoked by the attachment controller before broker or debt work; v64's user-flow controller remains its workbook-stage delegate and rollback route. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. inspect_workbook_semantics.mjs and validate_local_workbook_review.mjs independently bind the portable Phase-13 workbook evidence; verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
+  "script_allowlist": [
+    "build_dynamic_model.mjs",
+    "compile_case.mjs",
+    "compile_declared_evidence_run.mjs",
+    "compile_evidence_resolution_v2.mjs",
+    "compile_evidence_run.mjs",
+    "compile_public_test_run.mjs",
+    "debt-model-economics.mjs",
+    "flow_cli.mjs",
+    "migrate_run_carrier.mjs",
+    "lib/acquisition_policy.mjs",
+    "lib/attachment_ingress.mjs",
+    "lib/broker_anchor.mjs",
+    "lib/broker_consensus.mjs",
+    "lib/broker_headline_policy.mjs",
+    "lib/broker_intake_choice.mjs",
+    "lib/broker_metric_dictionary.mjs",
+    "lib/broker_preview.mjs",
+    "lib/broker_supervisor.mjs",
+    "lib/case_compiler.mjs",
+    "lib/case_source_proposer.mjs",
+    "lib/coverage.mjs",
+    "lib/delivery_constitution.mjs",
+    "lib/debt_class.mjs",
+    "lib/design_contract.mjs",
+    "lib/economic_solve_policy.mjs",
+    "lib/equation_graph.mjs",
+    "lib/evidence_resolution_v2.mjs",
+    "lib/evidence_run.mjs",
+    "lib/excel_value_semantics.mjs",
+    "lib/experience_trace.mjs",
+    "lib/face_statement_manifest.mjs",
+    "lib/filings_acquisition.mjs",
+    "lib/fixed_point_constitution.mjs",
+    "lib/flow.mjs",
+    "lib/flow_entity.mjs",
+    "lib/flow_impact.mjs",
+    "lib/flow_questions.mjs",
+    "lib/flow_read.mjs",
+    "lib/flow_reconcile.mjs",
+    "lib/flow_runtime.mjs",
+    "lib/flow_screens.mjs",
+    "lib/forecast_authority.mjs",
+    "lib/forecast_authority_ledger.mjs",
+    "lib/forecast_ownership_resolver.mjs",
+    "lib/forecast_behavior.mjs",
+    "lib/forecast_candidate_compiler.mjs",
+    "lib/forecast_observation.mjs",
+    "lib/forecast_producer_contract.mjs",
+    "lib/ownership_census.mjs",
+    "lib/formula_dsl.mjs",
+    "lib/funded_acquisition_plan.mjs",
+    "lib/funded_acquisition_runtime.mjs",
+    "lib/hash_bound_source_staging.mjs",
+    "lib/historical_interest_authority.mjs",
+    "lib/historical_normalisation.mjs",
+    "lib/identity_vocabulary.mjs",
+    "lib/instrument_display.mjs",
+    "lib/instrument_period_state.mjs",
+    "lib/intake.mjs",
+    "lib/json_schema.mjs",
+    "lib/layered_graph_constitution.mjs",
+    "lib/lease_policy.mjs",
+    "lib/live_delivery_attestation.mjs",
+    "lib/model_ir_v3.mjs",
+    "lib/optional_broker_circuit_breaker.mjs",
+    "lib/performance_receipt.mjs",
+    "lib/plan_builder.mjs",
+    "lib/plan_values.mjs",
+    "lib/plausibility_acknowledgements.mjs",
+    "lib/pre_broker_demand.mjs",
+    "lib/process_tree.mjs",
+    "lib/progress_heartbeat.mjs",
+    "lib/runtime_budget_policy.mjs",
+    "lib/public_test_run.mjs",
+    "lib/raw_canary_fixture.mjs",
+    "lib/rcf_policy.mjs",
+    "lib/residual_interest_authority.mjs",
+    "lib/release_checkpoint_store.mjs",
+    "lib/release_module_registry.mjs",
+    "lib/release_nodes.mjs",
+    "lib/release_package_attestation.mjs",
+    "lib/row_plan.mjs",
+    "lib/run_carrier.mjs",
+    "lib/run_constitution_graph.mjs",
+    "lib/run_scoped_broker_concepts.mjs",
+    "lib/run_store.mjs",
+    "lib/runtime_isolation.mjs",
+    "lib/semantic_graph.mjs",
+    "lib/semantic_roles.mjs",
+    "lib/solver.mjs",
+    "lib/source_ingress_security.mjs",
+    "lib/source_identity.mjs",
+    "lib/statement_classifier.mjs",
+    "lib/statement_topology.mjs",
+    "lib/user_flow_controller.mjs",
+    "lib/validation_invariants.mjs",
+    "lib/workflow_state.mjs",
+    "lib/local_workbook_review.mjs",
+    "lib/workbook_semantic_inventory.mjs",
+    "inspect_workbook_semantics.mjs",
+    "validate_local_workbook_review.mjs",
+    "orchestrate_release.mjs",
+    "propose_case_source.mjs",
+    "run_broker_dynamic_concept_tests.mjs",
+    "run_broker_exit_fault_injection_tests.mjs",
+    "run_broker_intake.mjs",
+    "run_controller_exit_inventory_tests.mjs",
+    "run_delivery_constitution_tests.mjs",
+    "run_equation_graph_tests.mjs",
+    "run_evidence_resolution_v2_tests.mjs",
+    "run_excel_inflow_vnext.mjs",
+    "run_structural_ownership_preflight.mjs",
+    "run_filings_pipeline.mjs",
+    "run_fixed_point_constitution_tests.mjs",
+    "run_forecast_behavior_tests.mjs",
+    "run_forecast_observation_tests.mjs",
+    "run_instrument_period_state_tests.mjs",
+    "run_product_constitution_tests.mjs",
+    "run_raw_input_black_box_canary.mjs",
+    "run_run_constitution_graph_tests.mjs",
+    "run_statement_classifier_tests.mjs",
+    "run_universal_broker_delivery_matrix.mjs",
+    "run_user_flow.mjs",
+    "test_release_convergence_seam.mjs",
+    "validate_cache_parity.mjs",
+    "validate_source_parity.mjs",
+    "validate_structure.mjs",
+    "validate_style_tokens.mjs",
+    "verify/recalc_second_opinion.mjs"
+  ],
+  "resource_directory_allowlist": [],
+  "allowed_bare_imports": [
+    "jszip"
+  ],
+  "vendored_dependencies": [
+    {
+      "name": "jszip",
+      "version": "3.10.1",
+      "license": "(MIT OR GPL-3.0-or-later)",
+      "used_under": "MIT",
+      "reason": "The only third-party runtime dependency. The four portable validators read raw OOXML through it.",
+      "source": "node_modules/jszip/jszip.min.js",
+      "install_path": "node_modules/jszip/jszip.min.js",
+      "sha256": "acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e",
+      "package_sha256": "62201617263e6e57862b8b1810c593fab32561e5137d50b2041e0d833e4d64c8",
+      "license_source": "node_modules/jszip/LICENSE.markdown",
+      "license_install_path": "node_modules/jszip/LICENSE.markdown",
+      "license_sha256": "566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4",
+      "note": "Shipped as the pre-built UMD bundle so the vendored copy has no transitive dependencies of its own. It sits at node_modules/jszip because that is where Node resolves a bare specifier; the shipped validators are byte-identical to their local sources and must stay that way for source parity."
+    }
+  ],
+  "_python_note": "The Python runtime modules ship alongside the JavaScript closure. They are held to the same standard: the closure is COMPUTED from python_entry_points by an ast walk (never a regex \u2014 this tree has docstring lines beginning `from ...` that a regex reads as imports) and compared with python_module_allowlist in both directions; a disagreement fails the build. Third-party imports are checked against allowed_python_third_party_imports exactly as a bare JS specifier is checked against allowed_bare_imports.",
+  "python_entry_points": [
+    "run_broker_pipeline.py",
+    "migrate_broker_run_state.py",
+    "run_attachment_evidence_pipeline.py",
+    "rebind_broker_native_preflight.py",
+    "run_dcs_pipeline.py",
+    "extract_filing_statements.py",
+    "propose_dcs_crosswalk.py",
+    "extract_broker_evidence.py",
+    "compile_broker_vision.py",
+    "compile_broker_pack.py",
+    "compile_broker_surface_census.py",
+    "verify_broker_semantics.py",
+    "broker_period_recovery.py",
+    "broker_table_engine.py",
+    "extract_dcs_evidence.py",
+    "compile_dcs_evidence.py",
+    "verify/dcs_evidence_oracle.py",
+    "verify/broker_consensus_membership_oracle.py",
+    "emit/__main__.py",
+    "prepare_local_workbook_review.py",
+    "render/check_render.py",
+    "render/selftest.py",
+    "verify/finance_proof.py",
+    "verify/run_finance_proof_mutations.py",
+    "verify/run_deterministic_tests.py",
+    "verify/validate_dynamic_model.py",
+    "verify/workbook_semantic_oracle.py",
+    "verify/verify_delivery.py"
+  ],
+  "_python_entry_point_note": "Twenty-eight Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers, recovery tools and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; prepare_local_workbook_review.py creates portable exact-workbook Phase-13 evidence without claiming native or human review; render and verify entry points provide independent structural, visual and financial proof.",
+  "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
+  "python_entry_point_notes": {
+    "migrate_broker_run_state.py": "Fail-closed, receipted migration of a sealed broker run across an intentional runtime-closure change; re-homes receipt-verified checkpoints and preserves exhaustion history so a live run resumes without losing progress or re-uploading sources. Invoked only on controller upgrades, never in ordinary runs.",
+    "run_attachment_evidence_pipeline.py": "The sole raw-attachment evidence transaction owner; it sequences the broker and DCS controllers, case-source proposal and sealed ingress compilation.",
+    "run_dcs_pipeline.py": "Invoked by run_attachment_evidence_pipeline.py as the resumable DCS checkpoint; independently runnable for diagnostics.",
+    "extract_filing_statements.py": "Invoked by run_filings_pipeline.mjs as the native raw-filing extraction checkpoint; independently runnable for diagnostics.",
+    "propose_dcs_crosswalk.py": "Invoked by run_dcs_pipeline.py to author a deterministic source-cell crosswalk after export basis is known; independently runnable for diagnostics.",
+    "extract_broker_evidence.py": "Invoked by run_broker_pipeline.py as the raw evidence checkpoint; retained independently runnable for diagnostics, never as an alternate user route.",
+    "compile_broker_surface_census.py": "Invoked by run_broker_pipeline.py as the independent coverage checkpoint; retained independently runnable for diagnostics.",
+    "compile_broker_vision.py": "Invoked by run_broker_pipeline.py for two-read reconciliation and bounded cell adjudication; retained independently runnable for diagnostics.",
+    "verify_broker_semantics.py": "Invoked by run_broker_pipeline.py as an independent semantic gate; retained independently runnable for diagnostics.",
+    "compile_broker_pack.py": "Invoked by run_broker_pipeline.py only after prior broker checkpoints pass; retained independently runnable for diagnostics.",
+    "broker_period_recovery.py": "Invoked by run_broker_pipeline.py after physical capture to resolve rendered period headers or quarantine only unresolved columns; retained independently runnable for diagnostics.",
+    "broker_table_engine.py": "Optional provider-neutral adapter for host-installed table engines; Rogo remains the required model-host path and every result still enters dual-read reconciliation.",
+    "rebind_broker_native_preflight.py": "Invoked by run_broker_pipeline.py only when an early demand-independent native preflight can be reused against the final filings-derived model-demand graph; independently runnable for diagnostics and fails closed to the ordinary full extraction path when rebinding is incompatible.",
+    "prepare_local_workbook_review.py": "Local release-evidence utility. It leaves the attested workbook unchanged, creates a deterministic non-deliverable Show Formulas derivative, renders every visible sheet in both modes, and explicitly records human and native Excel review as not performed.",
+    "verify/broker_consensus_membership_oracle.py": "Independent stdlib-only library/diagnostic invoked by the registered broker-consensus mutation harness. It ships as a separately smoke-tested verifier, not as an ordinary company-run command."
+  },
+  "python_entry_point_smoke": {
+    "migrate_broker_run_state.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: migrate_broker_run_state.py"
+    },
+    "run_attachment_evidence_pipeline.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: run_attachment_evidence_pipeline.py"
+    },
+    "run_dcs_pipeline.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: run_dcs_pipeline.py"
+    },
+    "extract_filing_statements.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: extract_filing_statements.py"
+    },
+    "propose_dcs_crosswalk.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: propose_dcs_crosswalk.py"
+    },
+    "run_broker_pipeline.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: run_broker_pipeline.py"
+    },
+    "extract_broker_evidence.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: extract_broker_evidence.py"
+    },
+    "compile_broker_vision.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: compile_broker_vision.py"
+    },
+    "compile_broker_pack.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: compile_broker_pack.py"
+    },
+    "compile_broker_surface_census.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: compile_broker_surface_census.py"
+    },
+    "verify_broker_semantics.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: verify_broker_semantics.py"
+    },
+    "broker_period_recovery.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: broker_period_recovery.py"
+    },
+    "broker_table_engine.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: broker_table_engine.py"
+    },
+    "extract_dcs_evidence.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: extract_dcs_evidence.py"
+    },
+    "compile_dcs_evidence.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: compile_dcs_evidence.py"
+    },
+    "verify/dcs_evidence_oracle.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: dcs_evidence_oracle.py"
+    },
+    "verify/broker_consensus_membership_oracle.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: broker_consensus_membership_oracle.py"
+    },
+    "_note": "What running each entry point from the clean release root must produce. Exit status alone is not the contract: two of these treat --help as an unrecognised argument and exit 1 with a usage line, and an entry point that had lost its imports would also exit non-zero. The required substring is what separates the two.",
+    "emit/__main__.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: emit"
+    },
+    "render/check_render.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: check_render.py"
+    },
+    "prepare_local_workbook_review.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: prepare_local_workbook_review.py"
+    },
+    "render/selftest.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: selftest.py"
+    },
+    "verify/finance_proof.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: finance_proof.py"
+    },
+    "verify/run_finance_proof_mutations.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: run_finance_proof_mutations.py"
+    },
+    "verify/run_deterministic_tests.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        1
+      ],
+      "expect_output_contains": "Usage: run_deterministic_tests.py"
+    },
+    "verify/validate_dynamic_model.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        1
+      ],
+      "expect_output_contains": "Usage: validate_dynamic_model.py"
+    },
+    "verify/workbook_semantic_oracle.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: workbook_semantic_oracle.py"
+    },
+    "verify/verify_delivery.py": {
+      "argv": [],
+      "expect_exit": [
+        2
+      ],
+      "expect_output_contains": "Usage: verify_delivery.py"
+    },
+    "rebind_broker_native_preflight.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: rebind_broker_native_preflight.py"
+    }
+  },
+  "python_module_allowlist": [
+    "run_broker_pipeline.py",
+    "migrate_broker_run_state.py",
+    "broker_terminal_recovery.py",
+    "broker_work_graph.py",
+    "archive_broker_pages.py",
+    "zero_broker_authority.py",
+    "run_attachment_evidence_pipeline.py",
+    "run_dcs_pipeline.py",
+    "extract_filing_statements.py",
+    "propose_dcs_crosswalk.py",
+    "workflow_state.py",
+    "extract_broker_evidence.py",
+    "compile_broker_vision.py",
+    "compile_broker_pack.py",
+    "broker_dynamic_concepts.py",
+    "broker_numeric.py",
+    "delivery_constitution.py",
+    "compile_broker_candidate_manifest.py",
+    "compile_broker_canonical_tables.py",
+    "compile_broker_surface_census.py",
+    "verify_broker_semantics.py",
+    "broker_period_recovery.py",
+    "broker_table_engine.py",
+    "extract_dcs_evidence.py",
+    "compile_dcs_evidence.py",
+    "emit/__init__.py",
+    "emit/__main__.py",
+    "prepare_local_workbook_review.py",
+    "emit/patch.py",
+    "emit/plan.py",
+    "emit/render.py",
+    "emit/styles.py",
+    "emit/verify.py",
+    "render/__init__.py",
+    "render/baseline.py",
+    "render/calibrate.py",
+    "render/cfeval.py",
+    "render/check_render.py",
+    "render/checks.py",
+    "render/pdfdoc.py",
+    "render/rowmap.py",
+    "render/selftest.py",
+    "render/soffice.py",
+    "render/synth.py",
+    "render/textfit.py",
+    "render/xlsx_model.py",
+    "verify/__init__.py",
+    "verify/finance_proof.py",
+    "verify/invariants.py",
+    "verify/interest_lineage.py",
+    "verify/run_finance_proof_mutations.py",
+    "verify/run_deterministic_tests.py",
+    "verify/dcs_evidence_oracle.py",
+    "verify/broker_consensus_membership_oracle.py",
+    "verify/tolerances.py",
+    "verify/validate_dynamic_model.py",
+    "verify/workbook_semantic_oracle.py",
+    "verify/xlsx.py",
+    "verify/verify_delivery.py",
+    "pre_broker_demand.py",
+    "experience_trace.py",
+    "rebind_broker_native_preflight.py"
+  ],
+  "_python_module_allowlist_omissions": {},
+  "allowed_python_third_party_imports": {
+    "openpyxl": {
+      "distribution": "openpyxl",
+      "provision": "native",
+      "host_version": "3.1.5",
+      "required_at": "import",
+      "used_by_packages": [
+        "emit",
+        "extract_broker_evidence.py"
+      ],
+      "vendoring": "forbidden",
+      "reason": "The renderer writes the workbook through openpyxl. deployment host ships 3.1.5 natively. Vendoring it would put a second copy on sys.path ahead of or behind the native one depending on resolution order, which is how a version conflict gets shipped rather than avoided; a vendored 3.1.x that disagreed with the native one about style deduplication would move bytes the determinism gate compares."
+    },
+    "fitz": {
+      "distribution": "PyMuPDF",
+      "provision": "native",
+      "required_at": "runtime",
+      "used_by_packages": [
+        "archive_broker_pages.py",
+        "extract_broker_evidence.py",
+        "extract_filing_statements.py",
+        "render"
+      ],
+      "vendoring": "forbidden",
+      "reason": "PyMuPDF reads the rendered PDF back. Native in deployment host. It is a compiled extension \u2014 vendoring it would mean shipping a platform-specific binary wheel, which the release format has no way to pin honestly across architectures."
+    },
+    "PIL": {
+      "distribution": "Pillow",
+      "provision": "native",
+      "required_at": "runtime",
+      "used_by_packages": [
+        "render"
+      ],
+      "vendoring": "forbidden",
+      "reason": "Pillow rasterises for the baseline image comparison. Native in deployment host; compiled extension, same vendoring objection as PyMuPDF."
+    },
+    "numpy": {
+      "distribution": "numpy",
+      "provision": "native",
+      "required_at": "runtime",
+      "used_by_packages": [
+        "render"
+      ],
+      "vendoring": "forbidden",
+      "reason": "Pixel-array arithmetic for the baseline diff. Native in deployment host; compiled extension."
+    },
+    "jsonschema": {
+      "distribution": "jsonschema",
+      "provision": "native",
+      "required_at": "runtime_optional",
+      "used_by_packages": [
+        "emit"
+      ],
+      "vendoring": "forbidden",
+      "reason": "emit/plan.py prefers jsonschema when importable and falls back to a deliberately small draft-07 subset when it is not, so the renderer still fails closed without it. required_at is runtime_optional and the compiler asserts the import really is guarded \u2014 an unguarded jsonschema import would turn a documented fallback into a hard dependency."
+    },
+    "pdfplumber": {
+      "distribution": "pdfplumber",
+      "provision": "native",
+      "required_at": "runtime_optional",
+      "used_by_packages": [
+        "render"
+      ],
+      "vendoring": "forbidden",
+      "reason": "Optional local diagnostic PDF reader used only when PyMuPDF is unavailable. The deployment host production route remains PyMuPDF; absence of this fallback does not weaken or redirect that route."
+    },
+    "pypdf": {
+      "distribution": "pypdf",
+      "provision": "native",
+      "required_at": "runtime_optional",
+      "used_by_packages": [
+        "render"
+      ],
+      "vendoring": "forbidden",
+      "reason": "Optional companion to pdfplumber for the local Poppler diagnostic path. It is not used by the deployment host PyMuPDF production route."
+    },
+    "reportlab": {
+      "distribution": "reportlab",
+      "provision": "native",
+      "required_at": "runtime_optional",
+      "used_by_packages": [
+        "render"
+      ],
+      "vendoring": "forbidden",
+      "reason": "Synthetic-PDF dependency of the render-check self-test only. It is not on the end-user workbook build or PyMuPDF comparison path."
+    }
+  },
+  "_python_vendoring_policy": "Every entry above is provision=native and vendoring=forbidden, and the compiler enforces both: it refuses any provision other than native, and refuses to ship a vendored_dependencies entry whose name collides with a Python third-party root. None of these packages is vendored. Vendoring a package the host already provides is how you ship a version conflict.",
+  "python_package_dependency_policy": {
+    "prepare_local_workbook_review.py": {
+      "may_import_third_party": [
+        "fitz",
+        "PIL",
+        "numpy",
+        "pdfplumber",
+        "pypdf",
+        "reportlab"
+      ],
+      "must_not_import_third_party": [
+        "openpyxl"
+      ],
+      "must_not_import_packages": [
+        "emit",
+        "verify"
+      ],
+      "reason": "The portable Phase-13 evidence producer delegates only to the existing render package, never to the emitter or finance verifier. Its own OOXML derivative logic is standard-library only, while the renderer retains its declared PDF geometry and raster dependencies."
+    },
+    "migrate_broker_run_state.py": {
+      "may_import_third_party": [],
+      "reason": "The fail-closed broker run migration tool is stdlib-only; it reuses run_broker_pipeline's digest primitives so a migrated checkpoint is sealed by byte-identical rules, and it authors no evidence of its own."
+    },
+    "extract_filing_statements.py": {
+      "may_import_third_party": [
+        "fitz"
+      ],
+      "reason": "The raw-filings extractor is a subordinate runtime module that uses native PyMuPDF only for readable PDF text geometry and emits deterministic source-owned statement facts for the sealed filings lane."
+    },
+    "propose_dcs_crosswalk.py": {
+      "may_import_third_party": [],
+      "reason": "The deterministic DCS crosswalk proposer is stdlib-only and maps sealed source cells under an explicit export-basis declaration before independent compilation and verification."
+    },
+    "workflow_state.py": {
+      "may_import_third_party": [],
+      "reason": "The Python workflow-state helper is stdlib-only and enforces the same typed transition and blocker-ownership contract as the JavaScript controller layer."
+    },
+    "archive_broker_pages.py": {
+      "may_import_third_party": [
+        "fitz"
+      ],
+      "reason": "The archive-only broker page renderer uses deferred native PyMuPDF to create screenshot evidence. It has no semantic or selected-cell authority, and callers degrade safely when rendering is unavailable."
+    },
+    "zero_broker_authority.py": {
+      "may_import_third_party": [],
+      "reason": "The terminal optional-broker fallback is stdlib-only. It rewrites only the broker authority projection to a schema-valid zero-authority state while preserving immutable archive custody."
+    },
+    "run_attachment_evidence_pipeline.py": {
+      "may_import_third_party": [],
+      "reason": "The top-level evidence controller is stdlib-only and sequences sealed subordinate lanes; optional archive rendering is delegated to archive_broker_pages rather than sharing extraction implementation."
+    },
+    "run_dcs_pipeline.py": {
+      "may_import_third_party": [],
+      "reason": "The resumable DCS controller is stdlib-only and owns orchestration rather than source parsing or semantic verification."
+    },
+    "run_broker_pipeline.py": {
+      "may_import_third_party": [],
+      "reason": "The broker controller is stdlib-only and sequences hash-bound evidence compilers without sharing their extraction or semantic implementation."
+    },
+    "broker_terminal_recovery.py": {
+      "may_import_third_party": [],
+      "reason": "The broker terminal-recovery helper is stdlib-only and proves negative model consumption from immutable candidate cells and the canonical metric dictionary; it neither reads PDFs nor authors visual or semantic judgments."
+    },
+    "pre_broker_demand.py": {
+      "may_import_third_party": [],
+      "reason": "The shared pre-broker demand normalizer is stdlib-only and reduces a sealed demand graph to the canonical broker-independent material states without reading source documents or authoring evidence."
+    },
+    "broker_work_graph.py": {
+      "may_import_third_party": [],
+      "reason": "The broker work-graph helper is stdlib-only and records append-only task, checkpoint and execution-receipt lineage without reading source documents or authoring evidence."
+    },
+    "broker_period_recovery.py": {
+      "may_import_third_party": [],
+      "reason": "The period-header recovery helper is stdlib-only. It binds model-host transcription to preserved rendered artifacts and otherwise quarantines only the unresolved columns."
+    },
+    "broker_table_engine.py": {
+      "may_import_third_party": [],
+      "reason": "The provider-neutral adapter is stdlib-only and discovers optional host engines without importing or bundling them; normalized output still passes through the independent broker reconciliation gates."
+    },
+    "extract_broker_evidence.py": {
+      "may_import_third_party": [
+        "fitz",
+        "openpyxl"
+      ],
+      "reason": "Broker evidence extraction prefers native PDF and workbook structure, preserves images, and defers every host-provided compiled dependency until the matching source type is encountered."
+    },
+    "compile_broker_vision.py": {
+      "may_import_third_party": [],
+      "reason": "The image-consensus compiler is stdlib-only so verification cannot depend on the extractor's PDF or image implementation."
+    },
+    "compile_broker_pack.py": {
+      "may_import_third_party": [],
+      "reason": "The broker crosswalk compiler is stdlib-only and operates only on already verified evidence artifacts."
+    },
+    "broker_dynamic_concepts.py": {
+      "may_import_third_party": [],
+      "reason": "The run-scoped broker concept validator is stdlib-only and independently enforces the one-run insertion contract shared by compiler and semantic verifier."
+    },
+    "broker_numeric.py": {
+      "may_import_third_party": [],
+      "reason": "Shared broker numeric parsing is stdlib-only and provides one deterministic locale-aware value grammar to extraction, period recovery and terminal reconciliation."
+    },
+    "delivery_constitution.py": {
+      "may_import_third_party": [],
+      "reason": "The Python delivery-ownership helper is stdlib-only and loads the same immutable BLOCK / ASK / DEGRADE / LOG constitution as the public JavaScript controller."
+    },
+    "compile_broker_candidate_manifest.py": {
+      "may_import_third_party": [],
+      "reason": "The immutable broker candidate-universe compiler is stdlib-only and cannot inherit reviewer-authored semantic classifications."
+    },
+    "compile_broker_canonical_tables.py": {
+      "may_import_third_party": [],
+      "reason": "The canonical broker-table compiler is stdlib-only and reconciles already captured native and vision contributors."
+    },
+    "compile_broker_surface_census.py": {
+      "may_import_third_party": [],
+      "reason": "The independent broker whole-surface census compiler is stdlib-only and recomputes coverage from hash-bound capture artifacts."
+    },
+    "verify_broker_semantics.py": {
+      "may_import_third_party": [],
+      "reason": "The broker semantic oracle is stdlib-only and deliberately shares no compiler implementation with the broker-pack compiler."
+    },
+    "extract_dcs_evidence.py": {
+      "may_import_third_party": [],
+      "reason": "The lossless DCS extractor is stdlib-only and reads CSV, JSON and OOXML directly into a source-owned cell ledger."
+    },
+    "compile_dcs_evidence.py": {
+      "may_import_third_party": [],
+      "reason": "The DCS term-authority compiler is stdlib-only and operates only on sealed source tables, the immutable manifest and a reviewed cell crosswalk."
+    },
+    "emit": {
+      "may_import_third_party": [
+        "openpyxl",
+        "jsonschema"
+      ],
+      "reason": "The renderer's job is to write a workbook. openpyxl expresses most of it; the terminal patch in emit/patch.py handles what openpyxl cannot."
+    },
+    "verify": {
+      "may_import_third_party": [],
+      "must_not_import_third_party": [
+        "openpyxl",
+        "lxml",
+        "numpy",
+        "fitz",
+        "PIL"
+      ],
+      "must_not_import_packages": [
+        "emit",
+        "render"
+      ],
+      "reason": "STDLIB ONLY, and the compiler enforces it rather than trusting the docstring. Two separate claims: (a) a validator with no third-party surface has no version to disagree about, which is the point of the port off private workbook library; (b) the validator is the independent checker of what emit writes, so it must not reach into emit for anything. Both are checked on every compile \u2014 an import of openpyxl, or of emit, anywhere under verify/ fails the build."
+    },
+    "render": {
+      "may_import_third_party": [
+        "fitz",
+        "PIL",
+        "numpy",
+        "pdfplumber",
+        "pypdf",
+        "reportlab"
+      ],
+      "must_not_import_third_party": [
+        "openpyxl"
+      ],
+      "must_not_import_packages": [
+        "emit",
+        "verify"
+      ],
+      "reason": "The image-check stage reads the rendered PDF, not the workbook object model, so it has no use for openpyxl and render/xlsx_model.py says so explicitly. Kept out of emit and verify so a render change cannot move either of them."
+    },
+    "experience_trace.py": {
+      "may_import_third_party": [],
+      "reason": "The controller experience-trace helper is stdlib-only and records wall-clock ownership spans without reading or interpreting financial evidence."
+    },
+    "rebind_broker_native_preflight.py": {
+      "may_import_third_party": [],
+      "reason": "The native-preflight rebinder is stdlib-only at its own boundary; it reuses already-declared broker extraction helpers and either proves exact source/demand compatibility or falls back to the ordinary full extraction path."
+    }
+  },
+  "xlsx_reader_consolidation_decision": {
+    "decision": "keep-separate",
+    "decided_at": "2026-07-26",
+    "readers": {
+      "verify/xlsx.py": "327 lines. Read-only. Extracts cached values, formulas, sheet names and value matches with semantics matched to private workbook library by probe. stdlib zipfile + ElementTree.",
+      "render/xlsx_model.py": "697 lines. Read plus a page-setup patcher that always writes a separate copy. Carries an Excel LAYOUT model \u2014 column-width-to-pixel conversion against the default font's max digit width, row heights, print setup, conditional-format geometry. stdlib zipfile + ElementTree.",
+      "emit/patch.py": "456 lines. Not a reader in the same sense: a byte-level rewriter of the .xlsx zip. Uses a hand-written tag scanner rather than ElementTree ON PURPOSE, because ElementTree does not round-trip bytes and this stage must not re-escape a quotation mark that needs no escaping between tags."
+    },
+    "note_on_the_brief": "The brief describes two independent readers. There are three. emit/patch.py is the third and is the one whose consolidation would cost the most.",
+    "reasons_to_keep_separate": [
+      "The validator must not depend on openpyxl OR on emit, so that a bug in a shared reader cannot make the emitter and its own checker agree. verify/ reads back exactly what emit/patch.py writes: a shared misunderstanding of, say, t=\"str\" versus t=\"s\" would be invisible to a comparison performed through the same code. This is now enforced, not merely asserted \u2014 python_package_dependency_policy.verify forbids the import and the compiler fails the build on it.",
+      "They read different things. verify/xlsx.py wants values and formulas; render/xlsx_model.py wants geometry. Merging would make the validator carry ~700 lines of layout model it never calls, enlarging the audit surface of the one component whose small surface is the point.",
+      "Certification coupling. The closure hash covers every shipped file. A shared module would put a render-geometry tweak inside the validator's certified closure, so every change to column-width handling would invalidate the validator's certification and force a re-run of solver parity that nothing about the change could have affected.",
+      "emit/patch.py is byte-exact by requirement and the other two are not. Its escaping behaviour is load-bearing for the determinism and golden-file gates, which compare bytes."
+    ],
+    "cost_if_consolidated": "One shared ooxml module of roughly 800-1000 lines plus three adapters, serving three incompatible policies (stdlib-only for verify, openpyxl-permitted for emit, byte-exact round-trip for patch). It would need re-certification of all three packages, and it would permanently couple the validator's certified closure to the renderer's. The saving is real but small: the genuine overlap is address parsing, shared-string resolution and namespace constants, on the order of 120 lines, none of it the part that is hard to get right.",
+    "revisit_if": "verify/ ever needs layout geometry, or a defect is found in the address/shared-string handling of more than one of the three. Either would mean the duplication has started costing correctness rather than lines."
+  },
+  "python_runtime": {
+    "minimum_version": [
+      3,
+      9
+    ],
+    "minimum_version_reason": "verify/ declares 3.9+. The packages use `from __future__ import annotations` throughout, so PEP 585/604 spellings in annotations are strings and do not raise on 3.9.",
+    "smoke_interpreter_candidates": [
+      "python3.12",
+      "python3"
+    ],
+    "smoke_interpreter_requirement": "The chosen interpreter must satisfy every third-party package declared required_at=import, otherwise the smoke test cannot prove the package imports and the build fails rather than reporting a pass it did not earn. Candidates are tried in order and the rejection reason for each is recorded in the release manifest.",
+    "external_binaries": [
+      {
+        "name": "soffice",
+        "used_by_packages": [
+          "render"
+        ],
+        "required_at": "runtime",
+        "provision": "host",
+        "reason": "render/soffice.py resolves soffice/libreoffice from SOFFICE_BIN or a fixed candidate list and returns BLOCKED \u2014 never a warning \u2014 when it is absent. Not required for import, so its absence does not affect the smoke test; render/selftest.py exists precisely so the checks remain provable without it."
+      }
+    ]
+  },
+  "_removed_strip_rules": {
+    "local-plan-extractor-name": "Removed on 2026-07-27, not weakened. It rewrote the single sentence naming `extract_plan.mjs`; that sentence now sits inside the block two-build-paths-subsection removes wholesale, so the rule would match zero times and fail its own exactly_one declaration. The invariant it protected \u2014 no bare `extract_plan.mjs` surviving into the compiled instructions \u2014 is asserted independently, and more strongly, by the dangling-script-reference check, which resolves bare filenames against the shipped basenames and fails the build on any that do not resolve. Restore this rule if the extractor is ever named outside that block."
+  },
+  "instruction_required_phrases": [
+    "run excel inflow",
+    "Non-bypassable end-user route",
+    "live-delivery-attestation/1.0",
+    "BUILD IDENTITY",
+    "three historical and three forecast years",
+    "RCF is the only balancing liquidity source",
+    "interest income",
+    "Flat replacement",
+    "acquisition",
+    "central source register",
+    "node scripts/run_excel_inflow_vnext.mjs --screen company",
+    "+=[ EXCEL INFLOW ]",
+    "asks for the COMPANY ONLY"
+  ],
+  "instruction_prohibited_pattern": "\\btransfer\\b",
+  "exclude_patterns": [
+    "ratings",
+    "blind",
+    "holdout",
+    "certification",
+    "issuer-specific",
+    "archive",
+    "developer"
+  ],
+  "model_routing": {
+    "routine_build": "Sol",
+    "mechanical_check": "Luna",
+    "material_ambiguity_or_persistent_failure": "Sol"
+  },
+  "diagnostic_prompt_policy": "natural_end_user_only"
+}
