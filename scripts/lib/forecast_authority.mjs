@@ -217,6 +217,7 @@ const STRUCTURAL_EVENT_ROLES = new Set([
   "acquisition_cost",
   "business_combination",
   "disposal",
+  "contingent_consideration",
   "litigation",
   "legal_settlement",
   "restructuring",

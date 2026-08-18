@@ -478,10 +478,10 @@ hidden.
 Under `simple_roll_forward`:
 
 ```text
-ending lease liability = MAX(0, opening liability + non-cash additions - cash principal repayment)
+ending lease liability = MAX(0, opening liability + non-cash additions + lease interest + signed other movements - cash principal repayment)
 ```
 
-Under `flat_replacement`, show non-cash replacement additions equal to principal repayment so the liability does not decline without explanation. In both modes, map principal repayment into financing cash flow exactly once and do not treat non-cash additions as cash outflows.
+Under `flat_replacement`, show non-cash replacement additions equal to principal repayment less capitalised lease interest and signed other movements so the liability does not decline without explanation. In both modes, map principal repayment into financing cash flow exactly once and do not treat non-cash additions, other non-cash movements or capitalised interest as cash outflows.
 
 Model finance-lease interest in the Interest Schedule. Do not add operating-lease interest separately when operating lease cost is already included in operating expenses unless the source explicitly separates and reclassifies it.
 

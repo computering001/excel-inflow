@@ -51,6 +51,9 @@ def main() -> int:
         ("overdraft", "Bank overdraft", "floating", "overdraft"),
         ("other debt", "Other borrowings", "fixed", "other_explicit"),
         ("", "Bespoke funding arrangement", "", "unclassified"),
+        ("", "Note 7", "fixed", "unclassified"),
+        ("", "Bank borrowings note 12", "floating", "unclassified"),
+        ("", "USD 5% Senior Notes due 2030", "fixed", "bond_fixed"),
     ]
     for source_type, description, rate_hint, expected in classifier_cases:
         assert classify_type(source_type, description, rate_hint) == expected

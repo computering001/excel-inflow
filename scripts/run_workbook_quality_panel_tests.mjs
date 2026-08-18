@@ -43,6 +43,37 @@ assert.equal(disclosure.quality_mode, "DEGRADED / REVIEW");
 assert.match(disclosure.certification_status, /native Excel restoration and visual review/);
 checks += 8;
 
+const reconciled = workbookQualityDisclosure({
+  case_id: "quality-reconciled",
+  contract_version: 2,
+  controls: { broker_case: "Consensus" },
+  broker_pack: { metrics: { revenue: { brokers: { HouseA: [1, 2, 3] } } } },
+  forecast_authority_ledger: {
+    ledger_sha256: "a".repeat(64),
+    rows: [],
+    selected_metric_traces: [
+      { demand_concept: "revenue", method: "selected_broker" },
+    ],
+  },
+});
+assert.equal(reconciled.authority_ledger_reconciliation, "PASS");
+const unreconciled = workbookQualityDisclosure({
+  case_id: "quality-unreconciled",
+  contract_version: 2,
+  controls: { broker_case: "Consensus" },
+  broker_pack: { metrics: { revenue: { brokers: { HouseA: [1, 2, 3] } } } },
+  forecast_authority_ledger: {
+    ledger_sha256: "b".repeat(64),
+    rows: [],
+    selected_metric_traces: [
+      { demand_concept: "adjusted_ebitda", method: "selected_broker" },
+    ],
+  },
+});
+assert.equal(unreconciled.authority_ledger_reconciliation, "BLOCK");
+assert.equal(unreconciled.quality_mode, "DEGRADED / REVIEW");
+checks += 3;
+
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-quality-panel-"));
 try {
   const modelCase = JSON.parse(
@@ -76,6 +107,7 @@ try {
   const fallbackRow = rowFor("Forecast fallbacks");
   const rejectedRow = rowFor("Rejected / quarantined evidence");
   const qualityRow = rowFor("Quality mode");
+  const authorityLedgerRow = rowFor("Authority ledger reconciliation");
   const certificationRow = rowFor("Delivery certification");
   assert(sourceRow === headerRow + 1, "Quality panel is not compact and contiguous.");
   assert.match(String(cells[`C${sourceRow}`]?.v), new RegExp(modelCase.case_id));
@@ -84,8 +116,10 @@ try {
   assert.equal(cells[`C${fallbackRow}`]?.v, 0);
   assert.equal(cells[`C${rejectedRow}`]?.v, 0);
   assert.equal(cells[`C${qualityRow}`]?.v, "DEGRADED / REVIEW");
+  assert.equal(cells[`C${authorityLedgerRow}`]?.v, "NOT SEALED");
+  assert.equal(authorityLedgerRow, qualityRow + 1);
   assert.match(String(cells[`C${certificationRow}`]?.v), /PENDING/);
-  checks += 15;
+  checks += 17;
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

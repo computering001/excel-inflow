@@ -8,6 +8,24 @@ const SUPPORTED_SOURCE_VERSIONS = new Set([
   "pre-broker-model-demand/2.0",
 ]);
 
+const LEGACY_METRIC_ALIASES = new Map(Object.entries({
+  revenue: "revenue", revenues: "revenue", turnover: "revenue", ebit: "ebit",
+  "adjusted ebitda": "adjusted_ebitda", ebitda: "adjusted_ebitda",
+  "depreciation and amortisation": "depreciation_and_amortisation",
+  "depreciation and amortization": "depreciation_and_amortisation",
+  "effective tax rate": "effective_tax_rate", capex: "capex",
+  "capital expenditure": "capex", "change in working capital": "change_in_working_capital",
+  dividends: "dividends", "dividends paid": "dividends",
+  "share buybacks": "share_buybacks", "share repurchases": "share_buybacks",
+}));
+
+function legacyMetricId(node) {
+  const label = String(node?.label ?? "").toLowerCase().replaceAll("_", " ").trim().replaceAll(/\s+/g, " ");
+  if (LEGACY_METRIC_ALIASES.has(label)) return LEGACY_METRIC_ALIASES.get(label);
+  const prefix = String(node?.node_id ?? "").split(".", 1)[0].replaceAll("_", " ");
+  return LEGACY_METRIC_ALIASES.get(prefix) ?? null;
+}
+
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -48,10 +66,10 @@ export function normalizePreBrokerDemand(graph) {
     const allowedAuthorities = [...(node.allowed_authorities ?? [])];
     return {
       node_id: String(node.node_id ?? ""),
-      node_kind: v2 ? String(node.node_kind ?? "model_demand") : "filed_observation",
+      node_kind: v2 ? String(node.node_kind ?? "model_demand") : "model_demand",
       section: String(node.section ?? ""),
       source_line_ids: sourceLineId ? [String(sourceLineId)] : [],
-      metric_id: v2 && node.metric_id ? String(node.metric_id) : null,
+      metric_id: v2 && node.metric_id ? String(node.metric_id) : legacyMetricId(node),
       label: String(node.label ?? ""),
       period_end: String(node.period_end ?? ""),
       material: node.material !== false,
@@ -63,12 +81,14 @@ export function normalizePreBrokerDemand(graph) {
         String(node.definition_signature_sha256 ?? ""),
       consumer_ids: v2
         ? [...(node.consumer_ids ?? [])].map(String).sort()
-        : [],
+        : [String(node.node_id ?? "")],
     };
   }).sort((left, right) => left.node_id.localeCompare(right.node_id));
   return Object.freeze({
     schema_version: CANONICAL_PRE_BROKER_DEMAND_VERSION,
     source_schema_version: graph.schema_version,
+    effective_schema_version: "pre-broker-model-demand/2.0",
+    migration_status: v2 ? "native_v2" : "migrated_v1_to_v2",
     source_graph_sha256: graph.graph_sha256,
     run_id: String(graph.run_id ?? ""),
     forecast_periods: forecastPeriods,

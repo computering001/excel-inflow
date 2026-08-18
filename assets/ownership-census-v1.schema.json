@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/ownership-census-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "status", "records", "violations", "census_sha256"],
+  "properties": {
+    "schema_version": {"const": "ownership-census/1.0"},
+    "case_id": {"type": ["string", "null"]},
+    "status": {"enum": ["PASS", "BLOCK"]},
+    "records": {"type": "array", "items": {"$ref": "#/$defs/record"}},
+    "violations": {"type": "array", "items": {"type": "string"}},
+    "census_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "model_node_id", "section", "period_end", "period_index", "period_status", "historical_owner", "forecast_owner", "source_evidence", "formula_schedule_owner", "capture_parent", "selected_evidence", "fallback_method", "visible_mechanism", "material", "status"],
+      "properties": {
+        "row_id": {"type": "string"}, "model_node_id": {"type": "string"},
+        "section": {"enum": ["income_statement", "cash_flow"]}, "period_end": {"type": "string"},
+        "period_index": {"type": "integer", "minimum": 0, "maximum": 5},
+        "period_status": {"enum": ["historical", "forecast"]},
+        "historical_owner": {"enum": ["source_input", "reported_total_reconciled", "derived_formula", "schedule_link", "not_applicable", "unresolved", null]},
+        "forecast_owner": {"enum": ["parent_owned", "child_owned", "schedule_owned", "guidance_owned", "broker_owned", "user_override", "user_assumption", "historical_fallback", "captured", "blocked", "not_applicable", null]},
+        "source_evidence": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "formula_schedule_owner": {"type": ["string", "null"]}, "capture_parent": {"type": ["string", "null"]},
+        "selected_evidence": {"anyOf": [{"$ref": "#/$defs/selectedEvidence"}, {"type": "null"}]}, "fallback_method": {"type": ["string", "null"]},
+        "visible_mechanism": {"enum": ["source_input", "same_sheet_formula", "schedule_link", "broker_link", "visible_hardcode", "formula_driven_fallback", "captured_by_parent", "blocked", "not_applicable"]},
+        "material": {"type": "boolean"}, "status": {"enum": ["PASS", "BLOCK"]}
+      }
+    },
+    "selectedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_kind", "source_id", "value", "method"],
+      "properties": {
+        "source_kind": {"type": ["string", "null"]},
+        "source_id": {"type": ["string", "null"]},
+        "value": {"type": ["number", "string", "null"]},
+        "method": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

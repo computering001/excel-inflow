@@ -2875,6 +2875,7 @@ export function solveCase(
         liquidity_shortfall: liquidityShortfall,
         lease_principal: leasePrincipal,
         lease_additions: leaseAdditions,
+        lease_other_movements: leasePeriod.other_movements,
         ending_lease: endingLease,
         lease_interest_basis: leasePeriod.interest_basis,
         opening_interest_bearing_lease:

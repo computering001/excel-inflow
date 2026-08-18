@@ -5,6 +5,9 @@ import {
   sealForecastAuthorityLedger,
   verifyForecastAuthorityLedger,
 } from "./lib/forecast_authority_ledger.mjs";
+import fs from "node:fs";
+import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { buildOwnershipCensus } from "./lib/ownership_census.mjs";
 
 const periods = [
   "2023-12-31",
@@ -52,12 +55,26 @@ const modelCase = {
 const ledger = sealForecastAuthorityLedger(modelCase);
 assert.equal(ledger.status, "PASS");
 assert.equal(ledger.rows.length, 6);
+const ledgerSchema = JSON.parse(fs.readFileSync(new URL("../assets/forecast-authority-ledger-v2.schema.json", import.meta.url), "utf8"));
+assert.deepEqual(validateJsonSchema(ledger, ledgerSchema), []);
+assert.equal(ledger.selected_metric_traces.length, 6);
 assert.deepEqual(
   [...new Set(ledger.rows.map((row) => row.disposition))],
   ["authority_selected"],
   "The ledger omitted the explicit economic disposition for selected authority rows.",
 );
 verifyForecastAuthorityLedger(modelCase);
+const censusSchema = JSON.parse(fs.readFileSync(new URL("../assets/ownership-census-v1.schema.json", import.meta.url), "utf8"));
+assert.deepEqual(validateJsonSchema(modelCase.ownership_census, censusSchema), []);
+assert.equal(modelCase.ownership_census.records.length, 12);
+assert.deepEqual(
+  [...new Set(modelCase.ownership_census.records.filter((row) => row.period_status === "historical").map((row) => row.historical_owner))],
+  ["source_input"],
+);
+assert.deepEqual(
+  [...new Set(modelCase.ownership_census.records.filter((row) => row.row_id === "revenue" && row.period_status === "forecast").map((row) => row.forecast_owner))],
+  ["guidance_owned"],
+);
 const before = ledger.ledger_sha256;
 
 const storedBodyTamper = structuredClone(modelCase);
@@ -115,4 +132,18 @@ assert.ok(
   "A behavior-classification exception was silently swallowed by the authority ledger.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 12, sha: before }));
+const doubleOwned = structuredClone(modelCase);
+delete doubleOwned.ownership_census;
+delete doubleOwned.ownership_census_version;
+doubleOwned.statement_structure.income_statement.push({
+  row_id: "revenue_child",
+  parent_row_id: "revenue",
+  row_type: "input",
+  values: [1, 2, 3],
+  forecast_period_authorities: [auth(1), auth(2), auth(3)],
+});
+const doubleOwnedCensus = buildOwnershipCensus(doubleOwned);
+assert.equal(doubleOwnedCensus.status, "BLOCK");
+assert.ok(doubleOwnedCensus.violations.every((finding) => finding.includes("both own forecasts")));
+
+console.log(JSON.stringify({ status: "PASS", checks: 16, sha: before }));

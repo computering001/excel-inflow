@@ -1854,6 +1854,9 @@ function applyDerivedStratum(modelCase, evidence = {}) {
         target.semantic_role = spec.semantic_role;
         roleIndex.set(spec.semantic_role, target);
       }
+      if (Array.isArray(spec.role_aliases)) {
+        target.role_aliases = [...new Set([...(target.role_aliases ?? []), ...spec.role_aliases])].sort();
+      }
       if (target.calculation) return;
       if ((spec.refs ?? []).some((ref) => !rowIdIndex.has(ref) && !roleIndex.has(ref))) return;
       target.row_type = "calculation";
@@ -1875,7 +1878,7 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       if (adjRow) {
         const basis = ebitdaBasis(adjRow);
         const marginId = `${adjRow.row_id}_margin`;
-        ensure(marginId, { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], number_format: "percentage", style_role: "subsection" });
+        ensure(marginId, { operator: "ratio", refs: [adjRow.row_id, revenueRow.row_id], role_aliases: ["margin"], number_format: "percentage", style_role: "subsection" });
         const marginRow = rowIdIndex.get(marginId);
         if (marginRow) marginRow.label = basis.margin_label;
       }
@@ -3323,7 +3326,7 @@ function compilePolicies(caseSource, lanes, report) {
     "lease.forecast_basis",
   );
   if (leaseBasis !== undefined && typeof leaseBasis === "object") {
-    for (const key of ["additions", "principal_repayment", "effective_rate"]) {
+    for (const key of ["additions", "other_movements", "principal_repayment", "effective_rate"]) {
       if (leaseBasis[key] !== undefined) lease[key] = clone(leaseBasis[key]);
     }
   }

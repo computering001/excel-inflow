@@ -88,6 +88,86 @@ assert(
   percentageProfit.classified_role !== "adjusted_ebit",
   "A percentage margin was admitted as a currency adjusted-EBIT row.",
 );
+const marginConcept = classifyStatementLine({
+  label: "Adjusted EBITDA margin",
+  section: "income_statement",
+  numeric_type: "percentage",
+});
+assert(
+  marginConcept.status === "accepted" && marginConcept.classified_role === "margin",
+  `A legitimate percentage margin did not receive its own economic role: ${JSON.stringify(marginConcept)}`,
+);
+const reorderedWords = classifyStatementLine({
+  label: "Profit operating core",
+  section: "income_statement",
+  numeric_type: "currency",
+  is_subtotal: true,
+  parent_label: "Reconciliation of statutory to underlying result",
+});
+assert(
+  reorderedWords.status === "accepted" && reorderedWords.classified_role === "adjusted_ebit",
+  `A word-order perturbation changed the economic role: ${JSON.stringify(reorderedWords)}`,
+);
+const auditProbe = classifyStatementLine({
+  label: "Underlying operating result",
+  section: "income_statement",
+  numeric_type: "currency",
+  is_subtotal: true,
+  neighbouring_labels: ["Statutory operating profit bridge"],
+  arithmetic_evidence: [{ role: "adjusted_ebit", detail: "subtotal equals visible bridge members" }],
+});
+for (const field of [
+  "candidate_roles", "alias_evidence", "context_evidence", "structural_evidence",
+  "arithmetic_evidence", "negative_evidence", "confidence", "margin", "final_disposition",
+]) {
+  assert(Object.hasOwn(auditProbe, field), `Classifier audit omitted ${field}.`);
+}
+assert(auditProbe.arithmetic_evidence.length === 1, "Classifier lost arithmetic evidence.");
+assert(auditProbe.final_disposition.status === auditProbe.status, "Classifier final disposition drifted from its result.");
+
+const perturbationConcepts = [
+  ["statutory operating profit", "Operating profit", "income_statement", "operating_profit", "currency"],
+  ["reported EBIT", "Reported EBIT", "income_statement", "ebit", "currency"],
+  ["adjusted EBIT", "Underlying operating profit", "income_statement", "adjusted_ebit", "currency"],
+  ["reported EBITDA", "Reported EBITDA", "income_statement", "reported_ebitda", "currency"],
+  ["adjusted EBITDA", "Core EBITDA", "income_statement", "adjusted_ebitda", "currency"],
+  ["D&A", "Depreciation and amortisation", "income_statement", "depreciation_and_amortisation", "currency"],
+  ["impairment", "Impairment loss", "income_statement", "impairment_loss", "currency"],
+  ["non-cash adjustment", "Non cash impairment", "cash_flow", "other_non_cash", "currency"],
+  ["margin", "EBITDA margin", "income_statement", "margin", "percentage"],
+  ["cash-flow add-back", "Net finance expense add back", "cash_flow", "net_finance_addback", "currency"],
+  ["cash payment", "Cash interest paid", "cash_flow", "cash_interest_paid", "currency"],
+];
+for (const [concept, label, section, expectedRole, numericType] of perturbationConcepts) {
+  const baseLine = {
+    label,
+    section,
+    numeric_type: numericType,
+    is_subtotal: /profit|ebit/i.test(label),
+  };
+  const baseline = classifyStatementLine(baseLine);
+  assert(
+    baseline.status === "accepted" && baseline.classified_role === expectedRole,
+    `${concept} baseline did not classify: ${JSON.stringify(baseline)}`,
+  );
+  const variants = [
+    { ...baseLine, label: label.split(/\s+/).reverse().join(" "), neighbouring_labels: [label] },
+    { ...baseLine, label: `Issuer-specific ${label.replace(/EBITDA|EBIT/gi, "operating result")}`, parent_label: label },
+    { ...baseLine, label: label.replace(/EBITDA|EBIT/gi, "operating result"), neighbouring_labels: [label] },
+    { ...baseLine, label: `${label} misleading cash payment`, numeric_type: numericType },
+    { ...baseLine, section: section === "income_statement" ? "cash_flow" : "income_statement" },
+    { ...baseLine, numeric_type: numericType === "percentage" ? "currency" : "percentage" },
+    { ...baseLine, parent_label: "Unrelated issuer appendix", neighbouring_labels: ["Unrelated disclosure"] },
+  ];
+  for (const variant of variants) {
+    const result = classifyStatementLine(variant);
+    assert(
+      result.classified_role === expectedRole || result.classified_role === null,
+      `${concept} perturbation changed to a different economic role: ${JSON.stringify({ variant, result })}`,
+    );
+    assert(Object.hasOwn(result, "final_disposition") && Object.hasOwn(result, "margin"));
+  }
+}
 for (const [label, section, forbiddenRole] of [
   ["Deferred tax", "cash_flow"],
   ["Impairment charge", "cash_flow", "capex"],

@@ -93,6 +93,7 @@ export function validateLeasePolicy(modelCase) {
 export function leaseForecast(modelCase) {
   const policy = modelCase.lease_policy;
   const basis = resolvedLeaseInterestBasis(modelCase);
+  const interestEnabled = modelCase?.controls?.circularity !== 0;
   const historicalTotal = policy.historical_liabilities
     ? series3(
         policy.historical_liabilities,
@@ -107,6 +108,11 @@ export function leaseForecast(modelCase) {
   const additions = series3(
     policy.additions,
     "lease_policy.additions",
+    [0, 0, 0],
+  );
+  const otherMovements = series3(
+    policy.other_movements,
+    "lease_policy.other_movements",
     [0, 0, 0],
   );
   const rates = series3(
@@ -142,40 +148,40 @@ export function leaseForecast(modelCase) {
   for (let index = 0; index < 3; index += 1) {
     const periodPrincipal =
       policy.mode === "exclude" ? 0 : principal[index];
-    const endingTotal =
-      policy.mode === "exclude"
-        ? 0
-        : policy.mode === "sourced_balance"
-          ? sourcedTotal[index]
-          : Math.max(
-              0,
-              openingTotal +
-                (policy.mode === "flat_replacement"
-                  ? periodPrincipal
-                  : additions[index]) -
-                periodPrincipal,
-            );
-    const endingInterestBearing =
-      basis === "none"
-        ? 0
-        : basis === "separately_supplied"
-          ? separateForecast[index]
-          : endingTotal;
-    const interest =
-      basis === "none"
-        ? 0
-        : ((openingInterestBearing + endingInterestBearing) / 2) *
-          rates[index];
+    let endingTotal;
+    let endingInterestBearing;
+    let interest;
+    let periodAdditions;
+    if (policy.mode === "exclude") {
+      endingTotal = 0; endingInterestBearing = 0; interest = 0; periodAdditions = 0;
+    } else if (policy.mode === "sourced_balance") {
+      endingTotal = sourcedTotal[index];
+      endingInterestBearing = basis === "none" ? 0 : basis === "separately_supplied" ? separateForecast[index] : endingTotal;
+      interest = basis === "none" || !interestEnabled ? 0 : ((openingInterestBearing + endingInterestBearing) / 2) * rates[index];
+      periodAdditions = endingTotal - openingTotal - interest - otherMovements[index] + periodPrincipal;
+    } else if (policy.mode === "flat_replacement") {
+      endingTotal = openingTotal;
+      endingInterestBearing = basis === "none" ? 0 : basis === "separately_supplied" ? separateForecast[index] : endingTotal;
+      interest = basis === "none" || !interestEnabled ? 0 : ((openingInterestBearing + endingInterestBearing) / 2) * rates[index];
+      periodAdditions = periodPrincipal - interest - otherMovements[index];
+    } else if (basis === "total_liability" && interestEnabled) {
+      const preInterestClosing = openingTotal + additions[index] + otherMovements[index] - periodPrincipal;
+      const denominator = 1 - rates[index] / 2;
+      if (!(denominator > 0)) throw new Error("lease effective rate must remain below 200%");
+      endingTotal = Math.max(0, (preInterestClosing + openingInterestBearing * rates[index] / 2) / denominator);
+      endingInterestBearing = endingTotal;
+      interest = ((openingInterestBearing + endingInterestBearing) / 2) * rates[index];
+      periodAdditions = additions[index];
+    } else {
+      endingInterestBearing = basis === "none" ? 0 : separateForecast[index];
+      interest = basis === "none" || !interestEnabled ? 0 : ((openingInterestBearing + endingInterestBearing) / 2) * rates[index];
+      periodAdditions = additions[index];
+      endingTotal = Math.max(0, openingTotal + periodAdditions + interest + otherMovements[index] - periodPrincipal);
+    }
     periods.push({
       opening_total: openingTotal,
-      additions:
-        policy.mode === "flat_replacement"
-          ? periodPrincipal
-          : policy.mode === "sourced_balance"
-            ? endingTotal - openingTotal + periodPrincipal
-            : policy.mode === "exclude"
-              ? 0
-              : additions[index],
+      additions: periodAdditions,
+      other_movements: policy.mode === "exclude" ? 0 : otherMovements[index],
       principal_repayment: periodPrincipal,
       ending_total: endingTotal,
       opening_interest_bearing: openingInterestBearing,
@@ -200,6 +206,7 @@ export function leaseProjectionErrors(
 ) {
   const policy = modelCase?.lease_policy ?? {};
   const basis = resolvedLeaseInterestBasis(modelCase);
+  const interestEnabled = modelCase?.controls?.circularity !== 0;
   const rates = series3(
     policy.effective_rate,
     "lease_policy.effective_rate",
@@ -235,6 +242,7 @@ export function leaseProjectionErrors(
     for (const field of [
       "opening_total",
       "additions",
+      "other_movements",
       "principal_repayment",
       "ending_total",
       "opening_interest_bearing",
@@ -257,6 +265,7 @@ export function leaseProjectionErrors(
     if (policy.mode === "exclude") {
       for (const field of [
         "additions",
+        "other_movements",
         "principal_repayment",
         "ending_total",
         "ending_interest_bearing",
@@ -269,11 +278,13 @@ export function leaseProjectionErrors(
     } else {
       const expectedEnding =
         Number(period.opening_total) +
-        Number(period.additions) -
+        Number(period.additions) +
+        Number(period.interest) +
+        Number(period.other_movements) -
         Number(period.principal_repayment);
       if (!near(period.ending_total, expectedEnding)) {
         errors.push(
-          `${prefix} closing liability does not equal opening + additions - principal.`,
+          `${prefix} closing liability does not equal opening + additions + interest + other movements - principal.`,
         );
       }
       const expectedEndingInterestBearing =
@@ -286,7 +297,7 @@ export function leaseProjectionErrors(
         errors.push(`${prefix} closing interest-bearing basis is inconsistent with ${basis}.`);
       }
       const expectedInterest =
-        basis === "none"
+        basis === "none" || !interestEnabled
           ? 0
           : ((Number(period.opening_interest_bearing) +
               Number(period.ending_interest_bearing)) /

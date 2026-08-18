@@ -82,7 +82,11 @@ def classify_type(value: Any, description: str, rate_hint: str = "") -> str | No
         return "overdraft"
     if "lease liabil" in text or "finance lease" in text:
         return "lease_liability"
-    is_bond = any(token in text for token in ("bond", "note", "debenture"))
+    security_note = bool(re.search(
+        r"\b(?:senior|secured|unsecured|subordinated|convertible|floating rate|fixed rate|medium term) notes?\b|\bnotes? due\b",
+        text,
+    ))
+    is_bond = any(token in text for token in ("bond", "debenture")) or security_note
     is_term_loan = any(token in text for token in ("term loan", "term facility", "bank loan"))
     floating = "floating" in text or rate_hint == "floating"
     fixed = "fixed" in text or rate_hint == "fixed"

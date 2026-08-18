@@ -1,6 +1,7 @@
 import { canonicalJson, hashValue } from './run_store.mjs';
 import { canonicalSemanticRole, isStructuredEventRole } from './semantic_roles.mjs';
 import { classifyForecastBehavior } from './forecast_behavior.mjs';
+import { sealOwnershipCensus, verifyOwnershipCensus } from './ownership_census.mjs';
 
 export const FORECAST_AUTHORITY_LEDGER_VERSION = 'forecast-authority-ledger/2.0';
 
@@ -55,9 +56,58 @@ function sourceRows(modelCase) {
   }
   return out;
 }
+function numericSelectionScore(authority) {
+  const explicit=Number(authority?.selection_score);
+  if (Number.isFinite(explicit)) return explicit;
+  const rank=authority?.selection_rank;
+  const scalar=Number(rank);
+  if (rank !== null && typeof rank !== 'object' && Number.isFinite(scalar)) return scalar;
+  if (rank && typeof rank === 'object') {
+    const components=Object.entries(rank)
+      .sort(([left],[right])=>left.localeCompare(right))
+      .map(([,value])=>Number(value))
+      .filter(Number.isFinite);
+    if (components.length>0) return components.reduce((total,value,index)=>total+(value/(10**index)),0);
+  }
+  return 0;
+}
+function numericCompatibilityScore(authority,rejectionReasons) {
+  const explicit=Number(authority?.compatibility_score);
+  if (Number.isFinite(explicit)) return explicit;
+  const compatibility=authority?.compatibility;
+  if (compatibility && typeof compatibility === 'object') {
+    const flags=Object.values(compatibility).filter((value)=>typeof value==='boolean');
+    if (flags.length>0) return flags.filter(Boolean).length/flags.length;
+  }
+  return rejectionReasons.length===0 ? 1 : 0;
+}
+function scalarText(value) {
+  if (value===null || value===undefined || value==='') return null;
+  if (typeof value==='string') return value;
+  if (['number','boolean'].includes(typeof value)) return String(value);
+  return canonicalJson(value);
+}
+function selectedMetricTrace(modelCase,row,authority,periodEnd,periodIndex) {
+  const rejectionReasons=(authority?.broker_rejection_reasons ?? []).map(String);
+  return {
+    demand_concept:canonicalSemanticRole(row?.semantic_role ?? row?.broker_metric_id ?? row?.row_id),
+    source_page_cell:scalarText(authority?.source_page_cell ?? authority?.source_ref ?? authority?.source_id),
+    house:scalarText(authority?.house_id ?? authority?.house_name ?? authority?.source_house),
+    period:periodEnd,
+    units:scalarText(authority?.units ?? modelCase?.issuer?.units ?? modelCase?.units),
+    definition:scalarText(authority?.definition_id ?? authority?.definition_signature_sha256),
+    compatibility_score:numericCompatibilityScore(authority,rejectionReasons),
+    selection_score:numericSelectionScore(authority),
+    rejection_reasons:rejectionReasons,
+    selected_value:authority?.value ?? null,
+    workbook_destination:`Operating Model:${row?.row_id ?? '(missing-row-id)'}:${periodEnd}`,
+    final_formula:row?.forecast_period_calculations?.[periodIndex] ?? row?.forecast_calculation ?? row?.calculation ?? authority?.formula ?? null,
+    method:authority?.method ?? null,
+  };
+}
 function ledgerBody(modelCase) {
   const periods=forecastPeriods(modelCase);
-  const rows=[]; const violations=[];
+  const rows=[]; const violations=[]; const selected_metric_traces=[];
   for (const {section,row} of sourceRows(modelCase)) {
     const rowId=String(row?.row_id ?? '(missing-row-id)');
     const authorities=row?.forecast_period_authorities;
@@ -149,10 +199,12 @@ function ledgerBody(modelCase) {
         broker_rejection_reasons: authority.broker_rejection_reasons ?? [],
         status: authority.status ?? (authority.method==='unresolved' ? 'BLOCK' : 'PASS'),
       });
+      selected_metric_traces.push(selectedMetricTrace(modelCase,row,authority,periods[i],i));
     }
   }
   rows.sort((a,b)=>`${a.section}\0${a.row_id}\0${a.period_end}`.localeCompare(`${b.section}\0${b.row_id}\0${b.period_end}`));
-  return {schema_version:FORECAST_AUTHORITY_LEDGER_VERSION,case_id:modelCase?.case_id ?? null,forecast_periods:periods,status:violations.length?'BLOCK':'PASS',rows,violations};
+  selected_metric_traces.sort((a,b)=>`${a.demand_concept}\0${a.period}`.localeCompare(`${b.demand_concept}\0${b.period}`));
+  return {schema_version:FORECAST_AUTHORITY_LEDGER_VERSION,case_id:modelCase?.case_id ?? null,forecast_periods:periods,status:violations.length?'BLOCK':'PASS',rows,selected_metric_traces,violations};
 }
 export function buildForecastAuthorityLedger(modelCase) {
   const body=ledgerBody(modelCase);
@@ -163,6 +215,7 @@ export function sealForecastAuthorityLedger(modelCase) {
   modelCase.forecast_authority_ledger_version=FORECAST_AUTHORITY_LEDGER_VERSION;
   modelCase.forecast_authority_ledger=ledger;
   if (ledger.status!=='PASS') throw new Error(`forecast authority ledger blocked: ${ledger.violations.join('; ')}`);
+  sealOwnershipCensus(modelCase);
   return ledger;
 }
 export function verifyForecastAuthorityLedger(modelCase) {
@@ -184,5 +237,6 @@ export function verifyForecastAuthorityLedger(modelCase) {
   ) {
     throw new Error(`forecast authority ledger drift: expected ${expected.ledger_sha256}, received ${actual.ledger_sha256}`);
   }
+  verifyOwnershipCensus(modelCase);
   return actual;
 }

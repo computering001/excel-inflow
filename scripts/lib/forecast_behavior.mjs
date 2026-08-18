@@ -82,6 +82,7 @@ const IDENTITY_ROLES = new Set([
 
 const NON_RECURRING_ROLES = new Set([
   "acquisitions_net_of_cash", "acquisition", "acquisition_cost", "business_combination", "disposal",
+  "contingent_consideration",
   "litigation", "legal_settlement", "restructuring", "impairment_loss",
   "exceptional_item", "discontinued_operation",
 ]);

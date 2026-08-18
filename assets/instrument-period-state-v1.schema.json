@@ -84,6 +84,9 @@
       "required": [
         "state_id",
         "instrument_id",
+        "source_name",
+        "face_label",
+        "maturity",
         "period_id",
         "period_index",
         "class",
@@ -100,6 +103,11 @@
         "ending_pre_repayment",
         "ending_post_repayment",
         "average_interest_balance",
+        "rate_type",
+        "benchmark",
+        "margin_bps",
+        "floor",
+        "interest",
         "active_fraction",
         "repayment_state",
         "pricing_state",
@@ -109,6 +117,9 @@
       "properties": {
         "state_id": { "type": "string", "minLength": 3 },
         "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "source_name": { "type": "string", "minLength": 1 },
+        "face_label": { "type": "string", "minLength": 1 },
+        "maturity": { "type": ["string", "null"], "format": "date" },
         "period_id": { "type": "string", "format": "date" },
         "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
         "class": {
@@ -153,6 +164,11 @@
         "ending_pre_repayment": { "$ref": "#/$defs/amount" },
         "ending_post_repayment": { "$ref": "#/$defs/amount" },
         "average_interest_balance": { "$ref": "#/$defs/amount" },
+        "rate_type": { "type": "string", "minLength": 1 },
+        "benchmark": { "type": ["string", "null"] },
+        "margin_bps": { "type": ["number", "null"], "minimum": 0 },
+        "floor": { "type": ["number", "null"] },
+        "interest": { "$ref": "#/$defs/amount" },
         "active_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
         "repayment_state": {
           "enum": [

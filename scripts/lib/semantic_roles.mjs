@@ -5,11 +5,14 @@ export const SEMANTIC_ROLE_ALIASES = Object.freeze({
   acquisition: "acquisitions_net_of_cash",
   acquisition_cost: "acquisitions_net_of_cash",
   business_combination: "acquisitions_net_of_cash",
+  disposal_gain: "disposal",
+  contingent_consideration: "contingent_consideration",
 });
 
 export const STRUCTURED_EVENT_ROLES = Object.freeze(new Set([
   "acquisitions_net_of_cash",
   "disposal",
+  "contingent_consideration",
   "litigation",
   "legal_settlement",
   "restructuring",

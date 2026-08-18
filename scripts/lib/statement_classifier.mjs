@@ -95,7 +95,46 @@ function candidateFor(role, line) {
     score += 0.08;
     evidence.push({ channel: "structure", detail: "source subtotal", score: 0.08 });
   }
+  const arithmeticEvidence = Array.isArray(line.arithmetic_evidence)
+    ? line.arithmetic_evidence.filter((item) => item?.role === role.id || item?.role === undefined)
+    : [];
+  if (line.arithmetic_reconciled === true || arithmeticEvidence.length > 0) {
+    const arithmeticScore = line.arithmetic_reconciled === true ? 0.12 : 0.08;
+    score += arithmeticScore;
+    evidence.push({
+      channel: "arithmetic",
+      detail: arithmeticEvidence.map((item) => item.detail).filter(Boolean).join("; ") ||
+        "source arithmetic reconciles the candidate role",
+      score: arithmeticScore,
+    });
+  }
   return { role: role.id, score: Math.max(0, Math.min(1, score)), evidence, high_impact: role.high_impact };
+}
+
+function auditFields({ status, classifiedRole, best, next, candidates }) {
+  const evidence = best?.evidence ?? [];
+  const byChannels = (...channels) => evidence.filter((item) => channels.includes(item.channel));
+  return {
+    candidate_roles: candidates.map(({ role, score }) => ({
+      role,
+      score: Number(score.toFixed(2)),
+    })),
+    alias_evidence: byChannels("label").filter((item) => item.detail === "declared alias"),
+    context_evidence: byChannels("statement", "context", "hierarchy", "definition_basis"),
+    structural_evidence: byChannels("structure"),
+    arithmetic_evidence: byChannels("arithmetic"),
+    negative_evidence: evidence.filter((item) => item.score < 0 || item.channel === "negative"),
+    margin: best ? Number((best.score - (next?.score ?? 0)).toFixed(2)) : 0,
+    final_disposition: {
+      status,
+      role: classifiedRole,
+      reason: status === "accepted"
+        ? "accepted_with_independent_evidence"
+        : status === "ambiguous"
+          ? "insufficient_or_unseparated_evidence"
+          : "no_supported_candidate",
+    },
+  };
 }
 
 /**
@@ -113,7 +152,17 @@ export function classifyStatementLine(line) {
   const best = candidates[0] ?? null;
   const next = candidates[1] ?? null;
   if (!best || best.score < 0.6) {
-    return { taxonomy_version: TAXONOMY.contract_version, status: "unmapped", classified_role: null, confidence: 0, evidence: [], candidates: candidates.map(({ role, score }) => ({ role, score: Number(score.toFixed(2)) })) };
+    const status = "unmapped";
+    const compactCandidates = candidates.map(({ role, score }) => ({ role, score: Number(score.toFixed(2)) }));
+    return {
+      taxonomy_version: TAXONOMY.contract_version,
+      status,
+      classified_role: null,
+      confidence: 0,
+      evidence: [],
+      candidates: compactCandidates,
+      ...auditFields({ status, classifiedRole: null, best, next, candidates }),
+    };
   }
   const channels = new Set(best.evidence.filter((item) => item.score > 0).map((item) => item.channel));
   const substantiveChannels = new Set(
@@ -127,13 +176,16 @@ export function classifyStatementLine(line) {
   // type, hierarchy or source structure), regardless of impact tier.
   const sufficientlySupported = substantiveChannels.size >= 1;
   const accepted = best.score >= 0.85 && separated && sufficientlySupported;
+  const status = accepted ? "accepted" : "ambiguous";
+  const classifiedRole = accepted ? best.role : null;
   return {
     taxonomy_version: TAXONOMY.contract_version,
-    status: accepted ? "accepted" : "ambiguous",
-    classified_role: accepted ? best.role : null,
+    status,
+    classified_role: classifiedRole,
     confidence: Number(best.score.toFixed(2)),
     evidence: best.evidence,
     candidates: candidates.map(({ role, score }) => ({ role, score: Number(score.toFixed(2)) })),
+    ...auditFields({ status, classifiedRole, best, next, candidates }),
   };
 }
 

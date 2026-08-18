@@ -61,12 +61,14 @@ SHEET = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <row r="22"><c r="B22" t="inlineStr"><is><t>Product component two</t></is></c><c r="G22"><v>40</v></c><c r="H22"><v>44</v></c><c r="I22"><v>48</v></c></row>
     <row r="30"><c r="B30" t="inlineStr"><is><t>Cash from operations</t></is></c><c r="J30"><v>50</v></c></row>
     <row r="31"><c r="B31" t="inlineStr"><is><t>Capital expenditure</t></is></c><c r="J31"><v>-10</v></c></row>
-    <row r="32"><c r="B32" t="inlineStr"><is><t>Other investing</t></is></c><c r="J32"><v>3</v></c></row>
+    <row r="32"><c r="B32" t="inlineStr"><is><t>Acquisition cash consideration</t></is></c><c r="J32"><v>3</v></c></row>
     <row r="33"><c r="B33" t="inlineStr"><is><t>Net cash from investing</t></is></c><c r="I33"><v>-8</v></c><c r="J33"><f>SUM(J31:J32)</f><v>-7</v></c></row>
     <row r="34"><c r="B34" t="inlineStr"><is><t>Change in Debt</t></is></c><c r="J34"><f>J15</f><v>3</v></c></row>
     <row r="35"><c r="B35" t="inlineStr"><is><t>Other financing</t></is></c><c r="J35"><v>-4</v></c></row>
     <row r="36"><c r="B36" t="inlineStr"><is><t>Net cash from financing</t></is></c><c r="J36"><f>J34+J35</f><v>-1</v></c></row>
     <row r="37"><c r="B37" t="inlineStr"><is><t>Net change in cash</t></is></c><c r="J37"><f>J30+J33+J36</f><v>42</v></c></row>
+    <row r="38"><c r="B38" t="inlineStr"><is><t>Cash before Financing</t></is></c><c r="I38"><v>40</v></c><c r="J38"><f>J30+J33</f><v>43</v></c></row>
+    <row r="40"><c r="B40" t="inlineStr"><is><t>FX effect on cash</t></is></c><c r="J40"><v>1</v></c></row>
     <row r="50"><c r="B50" t="inlineStr"><is><t>Alpha Notes interest</t></is></c><c r="J50"><f>-AVERAGE(I10,J10)*J55</f><v>-5</v></c></row>
     <row r="51"><c r="B51" t="inlineStr"><is><t>Beta Loan interest</t></is></c><c r="J51"><f>-AVERAGE(I11,J11)*J56</f><v>-4.4</v></c></row>
     <row r="52"><c r="B52" t="inlineStr"><is><t>RCF interest</t></is></c><c r="J52"><f>-AVERAGE(I12,J12)*J57</f><v>-1.075</v></c></row>
@@ -112,15 +114,19 @@ MANUAL_ORACLE = {
         {"owner_row": 20, "member_rows": [21, 22], "columns": ["G", "H", "I"]}
     ],
     "protected_cash_identities": [
-        {"owner_row": 33, "member_rows": [31, 32], "columns": ["J"]}
+        {"owner_row": 33, "member_rows": [31, 32], "columns": ["J"]},
+        {"owner_row": 38, "member_rows": [30, 33], "columns": ["J"]}
     ],
     "required_formula_paths": [
         {"path_id": "rcf_draw_to_financing_cash", "from_cell": "J36", "to_cell": "J13"},
         {"path_id": "rcf_repayment_to_financing_cash", "from_cell": "J36", "to_cell": "J14"},
     ],
+    "forbidden_formula_paths": [
+        {"path_id": "acquisition_cash_must_not_link_to_fx", "from_cell": "J32", "to_cell": "J40"},
+    ],
 }
-FROZEN_MANUAL_OOXML_SHA256 = "3d08d021694b14067080001c5c048b0afde1866888bec09eb812525e069af24f"
-FROZEN_MANUAL_ORACLE_SHA256 = "2c639250bd250ff97ae3315e79f23a558f1a69c1f3a760f24bc3146c13d566cf"
+FROZEN_MANUAL_OOXML_SHA256 = "750347600ec54bb3190edd6fb515046f275b20ff8ee259a7b816c132bee28ae1"
+FROZEN_MANUAL_ORACLE_SHA256 = "faeefd8e55e77b83b9c9b2bedcc68826a508775a56cd408a5a6af9732f01c555"
 
 
 def write_manual_workbook(target: Path) -> None:
@@ -167,6 +173,14 @@ def remove_formula(root: ET.Element, address: str) -> None:
     target.remove(formula_node)
 
 
+def add_formula(root: ET.Element, address: str, formula: str) -> None:
+    target = cell(root, address)
+    formula_node = target.find("m:f", MAIN_NS)
+    if formula_node is None:
+        formula_node = ET.SubElement(target, "{%s}f" % NS)
+    formula_node.text = formula
+
+
 def swap_rows(root: ET.Element, first_number: int, second_number: int) -> None:
     first = root.find(".//m:row[@r='%s']" % first_number, MAIN_NS)
     second = root.find(".//m:row[@r='%s']" % second_number, MAIN_NS)
@@ -211,6 +225,21 @@ def main() -> int:
             "INDEPENDENT_PROTECTED_CASH_IDENTITY",
         ),
         (
+            "prior-period-cash-before-financing",
+            lambda root: set_formula(root, "J38", "I38"),
+            "INDEPENDENT_PROTECTED_CASH_IDENTITY",
+        ),
+        (
+            "removed-investing-child",
+            lambda root: set_formula(root, "J33", "J31"),
+            "INDEPENDENT_PROTECTED_CASH_IDENTITY",
+        ),
+        (
+            "acquisition-cash-linked-to-fx",
+            lambda root: add_formula(root, "J32", "J40"),
+            "INDEPENDENT_FORBIDDEN_FORMULA_PATH",
+        ),
+        (
             "wrong-interest-edge",
             lambda root: set_formula(root, "J50", "-AVERAGE(I11,J11)*J55"),
             "INDEPENDENT_INTEREST_EDGE_MISMATCH",
@@ -219,6 +248,16 @@ def main() -> int:
             "reported-parent-hardcode",
             lambda root: remove_formula(root, "H20"),
             "INDEPENDENT_RECONCILED_PARENT_HARDCODE",
+        ),
+        (
+            "dropped-rcf-draw-link",
+            lambda root: set_formula(root, "J15", "-J14"),
+            "INDEPENDENT_REQUIRED_FORMULA_PATH_MISSING",
+        ),
+        (
+            "dropped-rcf-repayment-link",
+            lambda root: set_formula(root, "J15", "J13"),
+            "INDEPENDENT_REQUIRED_FORMULA_PATH_MISSING",
         ),
         (
             "dropped-rcf-financing-link",

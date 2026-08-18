@@ -140,6 +140,7 @@ assert.deepEqual(statesFor("bullet").map((state) => state.ending_post_repayment.
 assert.deepEqual(statesFor("amortising").map((state) => state.ending_post_repayment.basis_amount), [85, 75, 70]);
 
 const maturity = statesFor("maturing");
+assert.equal(maturity[0].maturity, "2026-06-30");
 assert.equal(maturity[0].repayment_state, "maturity");
 assert.equal(maturity[0].maturity_repayment.basis_amount, 100);
 assert.equal(maturity[0].ending_post_repayment.basis_amount, 0);
@@ -158,6 +159,10 @@ assert.deepEqual(
     maturity_repayment: 0,
   })),
   "A dated zero-balance instrument invented a mandatory maturity state.",
+);
+assert.ok(
+  zeroBalanceMaturity.every((state) => state.interest.basis_amount === 0),
+  "A zero-opening instrument with no issuance invented interest.",
 );
 
 const issuedBeforeMaturity = statesFor("issued_before_maturity");
@@ -225,7 +230,12 @@ assert.equal(carrying.ending_post_repayment.reporting_amount, 80);
 const leases = statesFor("lease_liability");
 assert.equal(leases.length, 3);
 assert.ok(leases.every((state) => state.class === "lease_liability" && state.family === "lease"));
-assert.deepEqual(leases.map((state) => state.ending_post_repayment.basis_amount), [44, 45, 46]);
+assert.deepEqual(leases.map((state) => state.other_non_cash_movement.basis_amount), [0, 0, 0]);
+assert.deepEqual(leases.map((state) => state.ending_post_repayment.basis_amount), [
+  46.15384615384615,
+  49.54635108481262,
+  53.112830627623524,
+]);
 assert.ok(leases.every((state) => state.inclusion.leverage && !state.inclusion.liquidity));
 
 const periodZeroStates = artifact.states.filter((state) => state.period_index === 0);

@@ -833,7 +833,55 @@ def _source_tolerance(row: dict[str, Any], index: int) -> float:
     return 0.5 * (10 ** -_display_precision(row, index)) + 1e-12
 
 
+def _declared_dimension(row: dict[str, Any], *names: str) -> str | None:
+    for name in names:
+        value = row.get(name)
+        if value is not None and str(value).strip():
+            return str(value).strip().lower()
+    return None
+
+
+def _arithmetic_dimensions_compatible(
+    parent_row: dict[str, Any], child_rows: list[dict[str, Any]],
+) -> bool:
+    """Require one additive economic dimension before numeric coincidence counts.
+
+    Older face manifests do not carry row dimensions, so absent dimensions stay
+    backwards compatible. Once any row declares a dimension, every declaration
+    in the family must agree. Percentages, rates and presentation counts are not
+    additive statement amounts unless the source explicitly marks them additive.
+    """
+
+    family = [parent_row, *child_rows]
+    dimension_specs = (
+        ("currency", ("reporting_currency", "currency")),
+        ("scale", ("scale", "units", "unit_scale")),
+        ("sign", ("sign_convention", "source_sign_convention")),
+    )
+    for _label, names in dimension_specs:
+        declared = {
+            value for row in family
+            if (value := _declared_dimension(row, *names)) is not None
+        }
+        if len(declared) > 1:
+            return False
+
+    unit_classes = {
+        value for row in family
+        if (value := _declared_dimension(
+            row, "unit_class", "numeric_type", "number_format",
+        )) is not None
+    }
+    if len(unit_classes) > 1:
+        return False
+    if unit_classes & {"percentage", "percent", "rate", "ratio", "count"}:
+        return all(row.get("arithmetic_additive") is True for row in family)
+    return True
+
+
 def _series_sum_matches(parent_row: dict[str, Any], child_rows: list[dict[str, Any]]) -> bool:
+    if not _arithmetic_dimensions_compatible(parent_row, child_rows):
+        return False
     parent = _finite_series(parent_row)
     children = [_finite_series(row) for row in child_rows]
     if parent is None or len(children) < 2 or any(series is None for series in children):
@@ -868,6 +916,8 @@ def _partial_series_sum_matches(
     period while preserving its typed source state.
     """
 
+    if not _arithmetic_dimensions_compatible(parent_row, child_rows):
+        return False
     parent = _finite_series(parent_row)
     children = [_typed_partial_series(row) for row in child_rows]
     if parent is None or len(children) < 2 or any(series is None for series in children):
@@ -906,7 +956,7 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
         for direction in (-1, 1):
             indexes: list[int] = []
             cursor = parent_index + direction
-            while 0 <= cursor < len(rows) and len(indexes) < 10:
+            while 0 <= cursor < len(rows):
                 candidate = rows[cursor]
                 level = int(candidate.get("hierarchy_level") or 0)
                 if level <= parent_level:

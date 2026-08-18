@@ -262,6 +262,17 @@ def verify_manual_binding(workbook_path: Path, oracle: dict) -> dict:
                 to_cell=rule["to_cell"],
             )
 
+    for rule in oracle.get("forbidden_formula_paths", []):
+        checks += 1
+        if _path_exists(cells, sheet_name, rule["from_cell"], rule["to_cell"]):
+            block(
+                "INDEPENDENT_FORBIDDEN_FORMULA_PATH",
+                "A manually forbidden physical formula path is present.",
+                path_id=rule["path_id"],
+                from_cell=rule["from_cell"],
+                to_cell=rule["to_cell"],
+            )
+
     return {
         "status": "PASS" if not findings else "BLOCK",
         "total_violations": len(findings),

@@ -10,6 +10,7 @@
     "forecast_periods",
     "status",
     "rows",
+    "selected_metric_traces",
     "violations",
     "ledger_sha256"
   ],
@@ -39,6 +40,29 @@
     },
     "rows": {
       "type": "array"
+    },
+    "selected_metric_traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["demand_concept", "source_page_cell", "house", "period", "units", "definition", "compatibility_score", "selection_score", "rejection_reasons", "selected_value", "workbook_destination", "final_formula", "method"],
+        "properties": {
+          "demand_concept": {"type": "string", "minLength": 1},
+          "source_page_cell": {"type": ["string", "null"]},
+          "house": {"type": ["string", "null"]},
+          "period": {"type": "string", "format": "date"},
+          "units": {"type": ["string", "null"]},
+          "definition": {"type": ["string", "null"]},
+          "compatibility_score": {"type": "number"},
+          "selection_score": {"type": "number"},
+          "rejection_reasons": {"type": "array", "items": {"type": "string"}},
+          "selected_value": {"type": ["number", "string", "null"]},
+          "workbook_destination": {"type": "string", "minLength": 1},
+          "final_formula": {"type": ["object", "string", "null"]},
+          "method": {"type": ["string", "null"]}
+        }
+      }
     },
     "violations": {
       "type": "array"

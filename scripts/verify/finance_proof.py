@@ -539,18 +539,39 @@ class Proof:
 
             mode = lease_policy.get("mode")
             principal = 0.0 if mode == "exclude" else series3(lease_policy.get("principal_repayment"))[index]
-            additions = (
-                principal if mode == "flat_replacement"
-                else series3(lease_policy.get("additions"))[index] if mode == "simple_roll_forward"
-                else 0.0
+            supplied_additions = series3(lease_policy.get("additions"))[index]
+            lease_other_movements = series3(lease_policy.get("other_movements"))[index]
+            rate = (
+                series3(lease_policy.get("effective_rate"))[index]
+                if circularity == 1 else 0.0
             )
-            ending_lease = (
-                0.0
-                if mode == "exclude"
-                else number(lease_policy.get("forecast_liabilities")[index])
-                if mode == "sourced_balance"
-                else max(0.0, lease_balance + additions - principal)
-            )
+            if mode == "exclude":
+                ending_lease = 0.0
+            elif mode == "sourced_balance":
+                ending_lease = number(lease_policy.get("forecast_liabilities")[index])
+            elif mode == "flat_replacement":
+                ending_lease = lease_balance
+            elif lease_interest_basis == "total_liability":
+                denominator = 1.0 - rate / 2.0
+                if denominator <= 0.0:
+                    raise AssertionError("lease effective rate must remain below 200%")
+                ending_lease = max(
+                    0.0,
+                    (lease_balance + supplied_additions + lease_other_movements - principal + lease_interest_balance * rate / 2.0)
+                    / denominator,
+                )
+            else:
+                provisional_interest = (
+                    0.0
+                    if lease_interest_basis == "none"
+                    else (
+                        lease_interest_balance
+                        + number(lease_policy.get("forecast_interest_bearing_liabilities")[index])
+                    )
+                    / 2.0
+                    * rate
+                )
+                ending_lease = max(0.0, lease_balance + supplied_additions + provisional_interest + lease_other_movements - principal)
             ending_interest_bearing_lease = (
                 0.0
                 if lease_interest_basis == "none"
@@ -567,10 +588,17 @@ class Proof:
                     (lease_interest_balance + ending_interest_bearing_lease)
                     / 2.0
                 )
-                * series3(lease_policy.get("effective_rate"))[index]
+                * rate
             )
             if circularity != 1:
                 lease_interest = 0.0
+            additions = (
+                0.0
+                if mode == "exclude"
+                else ending_lease - lease_balance - lease_interest - lease_other_movements + principal
+                if mode in {"flat_replacement", "sourced_balance"}
+                else supplied_additions
+            )
             period_instruments.append(
                 {
                     "instrument_interest": instrument_interest,

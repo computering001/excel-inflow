@@ -298,6 +298,21 @@ function contextualRole(section, row, role) {
   return role;
 }
 
+function contextualRowId(section, row, role) {
+  if (section !== "income_statement" || role !== "margin") return role;
+  const label = normalise(row?.raw_label);
+  const adjusted = /\b(?:adjusted|core|underlying)\b/.test(label);
+  if (/\bebitda\b/.test(label)) {
+    return adjusted ? "adjusted_ebitda_margin" : "reported_ebitda_margin";
+  }
+  if (/\bebit\b/.test(label)) {
+    return adjusted ? "adjusted_ebit_margin" : "ebit_margin";
+  }
+  if (/\boperating\b/.test(label)) return "operating_margin";
+  if (/\bgross\b/.test(label)) return "gross_margin";
+  return role;
+}
+
 function manifestRows(caseEvidence, section) {
   return (caseEvidence?.face_statement_manifests?.[section] ?? [])
     .flatMap((manifest) => (manifest.rows ?? []).map((row) => ({ manifest, row })));
@@ -362,7 +377,10 @@ function proposeSection(caseEvidence, section, used) {
     rowIdBySource.set(
       row.source_line_id,
       sanitizeRowId(
-        canonicalRowId(section, row.raw_label) ?? role ?? row.raw_label ?? row.source_line_id,
+        canonicalRowId(section, row.raw_label) ??
+          contextualRowId(section, row, role) ??
+          row.raw_label ??
+          row.source_line_id,
         used,
       ),
     );

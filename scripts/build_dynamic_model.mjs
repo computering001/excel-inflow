@@ -1414,6 +1414,16 @@ function workbookQualityDisclosure(modelCase, brokerEvidence) {
   const unresolvedCount = ledgerRows.filter(
     (entry) => entry.status === "BLOCK" || entry.method === "unresolved",
   ).length;
+  const ledger = modelCase.forecast_authority_ledger;
+  const ledgerSelectedMetricIds = [...new Set((ledger?.selected_metric_traces ?? [])
+    .filter((entry) => ["selected_broker", "broker_consensus"].includes(entry.method))
+    .map((entry) => entry.demand_concept))].sort();
+  const selectedIds = [...selectedMetricIds].sort();
+  const authorityLedgerReconciliation = !ledger?.ledger_sha256
+    ? "NOT SEALED"
+    : JSON.stringify(ledgerSelectedMetricIds) === JSON.stringify(selectedIds)
+      ? "PASS"
+      : "BLOCK";
   const selectedHouses = ["Consensus", "High", "Low"].includes(selection)
     ? houses
     : houses.includes(selection)
@@ -1421,6 +1431,7 @@ function workbookQualityDisclosure(modelCase, brokerEvidence) {
       : [];
   const degraded =
     selection === "Forecast Waterfall" ||
+    authorityLedgerReconciliation === "BLOCK" ||
     fallbackCount > 0 ||
     rejectedAuthorityCount > 0 ||
     quarantinedCellCount > 0 ||
@@ -1438,6 +1449,8 @@ function workbookQualityDisclosure(modelCase, brokerEvidence) {
     rejected_evidence_count: rejectedAuthorityCount + quarantinedCellCount,
     quarantined_cell_count: quarantinedCellCount,
     unresolved_count: unresolvedCount,
+    authority_ledger_sha256: ledger?.ledger_sha256 ?? null,
+    authority_ledger_reconciliation: authorityLedgerReconciliation,
     quality_mode: degraded ? "DEGRADED / REVIEW" : "STANDARD",
     certification_status: "PENDING — native Excel restoration and visual review",
   };
@@ -2429,6 +2442,11 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   setValue(sheet, `B${row}`, "Quality mode");
   setValue(sheet, `C${row}`, quality.quality_mode);
   styleFont(sheet, `C${row}`, quality.quality_mode === "STANDARD" ? COLORS.black : COLORS.stateAmber, { bold: true });
+  row += 1;
+  setValue(sheet, `B${row}`, "Authority ledger reconciliation");
+  setValue(sheet, `C${row}`, quality.authority_ledger_reconciliation);
+  setValue(sheet, `E${row}`, quality.authority_ledger_sha256 ?? "Not sealed");
+  styleFont(sheet, `C${row}:E${row}`, quality.authority_ledger_reconciliation === "PASS" ? COLORS.green : COLORS.stateAmber);
   row += 1;
   setValue(sheet, `B${row}`, "Delivery certification");
   setValue(sheet, `C${row}`, quality.certification_status);
@@ -5314,6 +5332,7 @@ function configureOperatingModel(
     lease_liability: leaseLiabilityLabel,
     lease_principal_assumption: "Lease principal repayment assumption",
     lease_additions_assumption: "New lease additions assumption",
+    lease_other_movements_assumption: "Other lease liability movements assumption",
     lease_interest_bearing_liability:
       "Interest-bearing lease liabilities",
     total_lease_liabilities: "Total lease liabilities",
@@ -5409,6 +5428,7 @@ function configureOperatingModel(
     "lease_liability",
     "lease_principal_assumption",
     "lease_additions_assumption",
+    "lease_other_movements_assumption",
     // The translation line is a memo beneath the cash movement it explains,
     // not a second subtotal competing with it.
     "debt_fx_translation",
@@ -5886,11 +5906,13 @@ function configureOperatingModel(
   });
   const leasePrincipalAssumptionRow = debtRows.lease_principal_assumption;
   const leaseAdditionsAssumptionRow = debtRows.lease_additions_assumption;
+  const leaseOtherMovementsAssumptionRow = debtRows.lease_other_movements_assumption;
   if (
     Number.isInteger(leasePrincipalAssumptionRow) &&
-    Number.isInteger(leaseAdditionsAssumptionRow)
+    Number.isInteger(leaseAdditionsAssumptionRow) &&
+    Number.isInteger(leaseOtherMovementsAssumptionRow)
   ) {
-    for (const row of [leasePrincipalAssumptionRow, leaseAdditionsAssumptionRow]) {
+    for (const row of [leasePrincipalAssumptionRow, leaseAdditionsAssumptionRow, leaseOtherMovementsAssumptionRow]) {
       setPeriodNumberFormat(sheet, row, AMOUNT);
       for (const column of HISTORICAL_COLUMNS) {
         setValue(sheet, `${column}${row}`, null);
@@ -5907,6 +5929,15 @@ function configureOperatingModel(
       sheet,
       `J${leasePrincipalAssumptionRow}:L${leasePrincipalAssumptionRow}`,
     );
+    setRow(
+      sheet,
+      `J${leaseOtherMovementsAssumptionRow}:L${leaseOtherMovementsAssumptionRow}`,
+      asSeries3(modelCase.lease_policy.other_movements, 0),
+    );
+    styleInput(
+      sheet,
+      `J${leaseOtherMovementsAssumptionRow}:L${leaseOtherMovementsAssumptionRow}`,
+    );
     for (let index = 0; index < 3; index += 1) {
       const standaloneColumn = FORECAST_COLUMNS[index];
       const adjustmentColumn = ADJUSTMENT_COLUMNS[index];
@@ -5915,7 +5946,7 @@ function configureOperatingModel(
         applyFormula(
           sheet,
           `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
-          `=${standaloneColumn}${leasePrincipalAssumptionRow}`,
+          `=${standaloneColumn}${leasePrincipalAssumptionRow}+${standaloneColumn}${interestRows.lease_interest}-${standaloneColumn}${leaseOtherMovementsAssumptionRow}`,
         );
       } else if (modelCase.lease_policy.mode === "simple_roll_forward") {
         setValue(
@@ -5927,6 +5958,15 @@ function configureOperatingModel(
           sheet,
           `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
         );
+      } else if (modelCase.lease_policy.mode === "sourced_balance") {
+        const priorLease = index === 0
+          ? `I${debtRows.lease_liability}`
+          : `${FORECAST_COLUMNS[index - 1]}${debtRows.lease_liability}`;
+        applyFormula(
+          sheet,
+          `${standaloneColumn}${leaseAdditionsAssumptionRow}`,
+          `=${standaloneColumn}${debtRows.lease_liability}-${priorLease}+${standaloneColumn}${leasePrincipalAssumptionRow}+${standaloneColumn}${interestRows.lease_interest}-${standaloneColumn}${leaseOtherMovementsAssumptionRow}`,
+        );
       } else {
         setValue(sheet, `${standaloneColumn}${leaseAdditionsAssumptionRow}`, null);
         sheet.getRange(
@@ -5936,6 +5976,7 @@ function configureOperatingModel(
       for (const row of [
         leasePrincipalAssumptionRow,
         leaseAdditionsAssumptionRow,
+        leaseOtherMovementsAssumptionRow,
       ]) {
         applyFormula(sheet, `${adjustmentColumn}${row}`, "=0");
         applyFormula(
@@ -5964,10 +6005,13 @@ function configureOperatingModel(
     const additionsCell = Number.isInteger(leaseAdditionsAssumptionRow)
       ? `${column}${leaseAdditionsAssumptionRow}`
       : "0";
+    const otherMovementsCell = Number.isInteger(leaseOtherMovementsAssumptionRow)
+      ? `${column}${leaseOtherMovementsAssumptionRow}`
+      : "0";
     const formula =
       modelCase.lease_policy.mode === "exclude"
         ? "=0"
-        : `=MAX(0,${prior}+${additionsCell}-${principalCell})`;
+        : `=MAX(0,${prior}+${additionsCell}+${otherMovementsCell}-${principalCell}-${column}${interestRows.lease_interest})`;
     if (modelCase.lease_policy.mode === "sourced_balance") {
       setValue(
         sheet,

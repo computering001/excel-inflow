@@ -33,18 +33,18 @@ const common = {
 
 const simpleCase = baseCase({ ...common, mode: "simple_roll_forward" });
 const simple = leaseForecast(simpleCase);
-assert.deepEqual(simple.map((period) => period.opening_total), [100, 105, 111]);
-assert.deepEqual(simple.map((period) => period.ending_total), [105, 111, 118]);
+assert.deepEqual(rounded(simple.map((period) => period.opening_total)), [100, 110.25641, 122.064431]);
+assert.deepEqual(rounded(simple.map((period) => period.ending_total)), [110.25641, 122.064431, 135.503633]);
 assert.deepEqual(simple.map((period) => period.additions), [15, 18, 21]);
 assert.deepEqual(simple.map((period) => period.principal_repayment), [10, 12, 14]);
-assert.deepEqual(rounded(simple.map((period) => period.interest)), [5.125, 5.4, 5.725]);
+assert.deepEqual(rounded(simple.map((period) => period.interest)), [5.25641, 5.808021, 6.439202]);
 assert.deepEqual(leaseProjectionErrors(simpleCase, simple), []);
 assert.deepEqual(validateLeasePolicy(simpleCase), []);
 
 const flatCase = baseCase({ ...common, mode: "flat_replacement" });
 const flat = leaseForecast(flatCase);
 assert.deepEqual(flat.map((period) => period.ending_total), [100, 100, 100]);
-assert.deepEqual(flat.map((period) => period.additions), [10, 12, 14]);
+assert.deepEqual(flat.map((period) => period.additions), [5, 7, 9]);
 assert.deepEqual(leaseProjectionErrors(flatCase, flat), []);
 
 const sourcedCase = baseCase({
@@ -54,8 +54,17 @@ const sourcedCase = baseCase({
 });
 const sourced = leaseForecast(sourcedCase);
 assert.deepEqual(sourced.map((period) => period.ending_total), [95, 85, 70]);
-assert.deepEqual(sourced.map((period) => period.additions), [5, 2, -1]);
+assert.deepEqual(sourced.map((period) => period.additions), [0.125, -2.5, -4.875]);
 assert.deepEqual(leaseProjectionErrors(sourcedCase, sourced), []);
+
+const otherMovementCase = baseCase({
+  ...common,
+  mode: "simple_roll_forward",
+  other_movements: [2, -1, 3],
+});
+const otherMovement = leaseForecast(otherMovementCase);
+assert.deepEqual(otherMovement.map((period) => period.other_movements), [2, -1, 3]);
+assert.deepEqual(leaseProjectionErrors(otherMovementCase, otherMovement), []);
 
 const separateCase = baseCase({
   ...common,
@@ -89,6 +98,7 @@ const mutations = [
   ["interest-bearing basis", (projection) => { projection[2].ending_interest_bearing += 1; }],
   ["interest calculation", (projection) => { projection[0].interest += 1; }],
   ["principal leg", (projection) => { projection[2].principal_repayment += 1; }],
+  ["other movement leg", (projection) => { projection[1].other_movements += 1; }],
 ];
 for (const [label, mutate] of mutations) {
   const projection = structuredClone(simple);
@@ -119,11 +129,11 @@ assert.deepEqual(
 );
 assert.deepEqual(
   solved.forecast.map((period) => period.lease_principal),
-  [4, 4, 4],
+    [4, 4, 4],
 );
 assert.deepEqual(
   solved.forecast.map((period) => period.lease_additions),
-  [4, 4, 4],
+  [3, 3, 3],
 );
 assert.deepEqual(
   solved.forecast.map((period) => period.lease_interest),
@@ -136,7 +146,7 @@ console.log(
   JSON.stringify(
     {
       status: "PASS",
-      checks: 31,
+      checks: 34,
       mutations: mutations.map(([label]) => label),
       production_case_exercised: true,
     },

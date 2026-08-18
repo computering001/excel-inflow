@@ -14,6 +14,25 @@ SUPPORTED_SOURCE_VERSIONS = {
     "pre-broker-model-demand/2.0",
 }
 
+LEGACY_METRIC_ALIASES = {
+    "revenue": "revenue", "revenues": "revenue", "turnover": "revenue",
+    "ebit": "ebit", "adjusted ebitda": "adjusted_ebitda", "ebitda": "adjusted_ebitda",
+    "depreciation and amortisation": "depreciation_and_amortisation",
+    "depreciation and amortization": "depreciation_and_amortisation",
+    "effective tax rate": "effective_tax_rate", "capex": "capex",
+    "capital expenditure": "capex", "change in working capital": "change_in_working_capital",
+    "dividends": "dividends", "dividends paid": "dividends",
+    "share buybacks": "share_buybacks", "share repurchases": "share_buybacks",
+}
+
+
+def _legacy_metric_id(node: dict[str, Any]) -> str | None:
+    label = " ".join(str(node.get("label") or "").lower().replace("_", " ").split())
+    if label in LEGACY_METRIC_ALIASES:
+        return LEGACY_METRIC_ALIASES[label]
+    prefix = str(node.get("node_id") or "").split(".", 1)[0]
+    return LEGACY_METRIC_ALIASES.get(prefix.replace("_", " "))
+
 
 def canonical_hash(value: Any) -> str:
     encoded = (
@@ -42,10 +61,10 @@ def normalize_pre_broker_demand(graph: dict[str, Any]) -> dict[str, Any]:
         allowed_authorities = list(node.get("allowed_authorities") or [])
         nodes.append({
             "node_id": str(node.get("node_id") or ""),
-            "node_kind": str(node.get("node_kind") or "model_demand") if v2 else "filed_observation",
+            "node_kind": str(node.get("node_kind") or "model_demand") if v2 else "model_demand",
             "section": str(node.get("section") or ""),
             "source_line_ids": [str(source_line_id)] if source_line_id else [],
-            "metric_id": str(node.get("metric_id")) if v2 and node.get("metric_id") else None,
+            "metric_id": str(node.get("metric_id")) if v2 and node.get("metric_id") else _legacy_metric_id(node),
             "label": str(node.get("label") or ""),
             "period_end": str(node.get("period_end") or ""),
             "material": node.get("material") is not False,
@@ -56,12 +75,14 @@ def normalize_pre_broker_demand(graph: dict[str, Any]) -> dict[str, Any]:
             ),
             "allowed_authorities": allowed_authorities,
             "definition_signature_sha256": str(node.get("definition_signature_sha256") or ""),
-            "consumer_ids": sorted(str(value) for value in (node.get("consumer_ids") or [])) if v2 else [],
+            "consumer_ids": sorted(str(value) for value in (node.get("consumer_ids") or [])) if v2 else [str(node.get("node_id") or "")],
         })
     nodes.sort(key=lambda item: item["node_id"])
     return {
         "schema_version": CANONICAL_PRE_BROKER_DEMAND_VERSION,
         "source_schema_version": source_version,
+        "effective_schema_version": "pre-broker-model-demand/2.0",
+        "migration_status": "native_v2" if v2 else "migrated_v1_to_v2",
         "source_graph_sha256": graph["graph_sha256"],
         "run_id": str(graph.get("run_id") or ""),
         "forecast_periods": forecast_periods,

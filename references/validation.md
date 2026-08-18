@@ -845,8 +845,8 @@ Flat forecast interest income without a cash-based formula is critical.
 Confirm one mode is selected and applied consistently:
 
 - exclude: remove debt, principal and interest;
-- flat replacement: hold liability flat and show additions equal principal;
-- simple roll-forward: opening plus additions less principal.
+- flat replacement: hold liability flat and show additions equal principal less lease interest and signed other movements;
+- simple roll-forward: opening plus additions plus lease interest plus signed other movements less principal.
 
 State whether leverage includes leases.
 

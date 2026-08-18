@@ -233,8 +233,8 @@ Default when only a liability and annual lease metrics are available:
 
 ```text
 ending lease liability = opening lease liability
-new lease additions = lease principal repayment
 lease interest = average lease liability × effective rate
+new lease additions = lease principal repayment - lease interest - other movements
 ```
 
 Show repayment as a financing outflow and replacement additions as a non-cash liability movement.
@@ -247,6 +247,8 @@ Use when additions and principal are available:
 ending lease liability
 = opening lease liability
 + new lease additions
++ lease interest
++ other movements
 - principal repayment
 ```
 
@@ -259,7 +261,7 @@ sourced closing balances visible as inputs and derive the implied non-cash
 additions bridge:
 
 ```text
-implied additions = sourced ending liability - opening liability + principal repayment
+implied additions = sourced ending liability - opening liability - lease interest - other movements + principal repayment
 ```
 
 Lease-interest basis is a separate decision from total lease debt. Use

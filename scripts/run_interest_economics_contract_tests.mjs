@@ -13,6 +13,18 @@ import {
   validateResidualInterestAuthority,
 } from "./lib/residual_interest_authority.mjs";
 
+function duplicateRcfFeeFindings(formula, column, rows) {
+  const compact = String(formula ?? "").replace(/\s+/g, "").replace(/\$/g, "");
+  const subtotal = `${column}${rows.rcf_total_fees}`;
+  const direct = [
+    `${column}${rows.rcf_interest}`,
+    `${column}${rows.rcf_commitment_fee}`,
+  ].filter((reference) => compact.includes(reference));
+  return compact.includes(subtotal) && direct.length > 0
+    ? [{ issue: "rcf_fee_component_double_count", references: direct }]
+    : [];
+}
+
 const zeroCase = { other_interest: [0, 0, 0] };
 assert.deepEqual(validateResidualInterestAuthority(zeroCase), []);
 assert.equal(resolvedResidualInterestAuthority(zeroCase).method, "zero");
@@ -66,6 +78,7 @@ execFileSync(
 );
 let productionCaseExercised = true;
 let feeValues = [];
+const duplicatedRcfFeeMutations = [];
 try {
   productionCaseExercised = true;
   const modelCase = JSON.parse(fs.readFileSync(productionPath, "utf8"));
@@ -104,6 +117,21 @@ try {
     assert(grossFormula.includes(`${column}${interest.rcf_total_fees}`));
     assert.equal(grossFormula.includes(`${column}${interest.rcf_interest}`), false);
     assert.equal(grossFormula.includes(`${column}${interest.rcf_commitment_fee}`), false);
+    assert.deepEqual(duplicateRcfFeeFindings(grossFormula, column, interest), []);
+    const mutatedGrossFormula =
+      `${grossFormula}+${column}${interest.rcf_interest}+${column}${interest.rcf_commitment_fee}`;
+    assert.deepEqual(
+      duplicateRcfFeeFindings(mutatedGrossFormula, column, interest),
+      [{
+        issue: "rcf_fee_component_double_count",
+        references: [
+          `${column}${interest.rcf_interest}`,
+          `${column}${interest.rcf_commitment_fee}`,
+        ],
+      }],
+      "The isolated duplicate-RCF-fee mutation escaped the structural oracle.",
+    );
+    duplicatedRcfFeeMutations.push(`${column}${interest.gross_interest_expense}`);
   }
   for (const period of solution.standalone.forecast) {
     assert(period.rcf_commitment_fee > 0, "non-zero RCF fee mutation did not price");
@@ -138,6 +166,9 @@ console.log(
       checks: productionCaseExercised ? 35 : 5,
       production_case_exercised: productionCaseExercised,
       non_zero_rcf_commitment_fees: feeValues,
+      mutations: {
+        duplicate_rcf_fee_components: duplicatedRcfFeeMutations,
+      },
     },
     null,
     2,

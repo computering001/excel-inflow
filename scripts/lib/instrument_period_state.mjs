@@ -1,4 +1,5 @@
 import { assertCanonicalDebtClass } from "./debt_class.mjs";
+import { leaseForecast } from "./lease_policy.mjs";
 
 const DAY_MS = 86_400_000;
 const EPSILON = 1e-9;
@@ -359,6 +360,33 @@ function pricingState(instrument, pik) {
   return "not_interest_bearing";
 }
 
+function interestDetails(instrument, index, averageBalance, pik, translation) {
+  const rateType = instrument.rate_type ?? "unpriced";
+  const coupon = series3(instrument.coupon_or_all_in_rate, `${instrument.instrument_id}.coupon_or_all_in_rate`)[index];
+  const benchmark = series3(instrument.benchmark_rate, `${instrument.instrument_id}.benchmark_rate`)[index];
+  const floor = series3(instrument.benchmark_floor, `${instrument.instrument_id}.benchmark_floor`)[index];
+  const marginBps = instrument.spread_bps ?? null;
+  const cashRate = instrument.cash_interest === false || rateType === "unpriced"
+    ? 0
+    : rateType === "floating"
+      ? Math.max(benchmark, floor) + Number(marginBps ?? 0) / 10_000
+      : coupon;
+  const cashInterest = Math.max(0, averageBalance * cashRate);
+  const basisAmount = cashInterest + pik;
+  const reportingAmount = cashInterest * translation.flow_rate + pik * translation.closing_rate;
+  return {
+    rate_type: rateType,
+    benchmark: instrument.benchmark ?? null,
+    margin_bps: marginBps,
+    floor: rateType === "floating" ? floor : null,
+    interest: {
+      basis_amount: basisAmount,
+      reporting_amount: reportingAmount,
+      translation_rate: basisAmount > EPSILON ? reportingAmount / basisAmount : translation.flow_rate,
+    },
+  };
+}
+
 function repaymentState(instrument, scheduled, maturity, balancingRcf = false) {
   if (balancingRcf) return "discretionary_rcf";
   // A contractual date is evidence of *when* a balance repays, not evidence
@@ -461,6 +489,7 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       throw new Error(`${instrument.instrument_id} sourced ending balance does not reconcile in ${forecastPeriods[index].date}.`);
     }
     const translation = translationFor(modelCase, resolvedInstrument, bounds);
+    const interestCensus = interestDetails(instrument,index,averageBalance,pik,translation);
     const inclusion = {
       gross_debt: instrument.include_in_gross_debt !== false,
       net_debt: instrument.include_in_net_debt !== false,
@@ -472,6 +501,9 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
     states.push({
       state_id: `${instrument.instrument_id}:${forecastPeriods[index].date}`,
       instrument_id: instrument.instrument_id,
+      source_name: instrument.source_name ?? instrument.name ?? instrument.instrument_id,
+      face_label: instrument.face_label ?? instrument.name ?? instrument.instrument_id,
+      maturity: instrument.maturity_date ?? null,
       period_id: forecastPeriods[index].date,
       period_index: index,
       class: debtClass,
@@ -488,6 +520,7 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
       ending_pre_repayment: amount(endingPre, translation.closing_rate),
       ending_post_repayment: amount(endingPost, translation.closing_rate),
       average_interest_balance: amount(averageBalance, translation.flow_rate),
+      ...interestCensus,
       active_fraction: activeFraction,
       repayment_state: repaymentState(
         instrument,
@@ -510,41 +543,15 @@ function leaseStates(modelCase, forecastPeriods) {
   if ((modelCase.instruments ?? []).some((instrument) => instrument.instrument_id === "lease_liability")) {
     throw new Error("lease_liability is reserved for the separately identified lease state family.");
   }
-  const principal = series3(policy.principal_repayment, "lease_policy.principal_repayment");
-  const suppliedAdditions = series3(policy.additions, "lease_policy.additions");
-  const sourcedEnding = policy.mode === "sourced_balance"
-    ? series3(policy.forecast_liabilities, "lease_policy.forecast_liabilities")
-    : null;
-  const separatelySupplied = policy.interest_basis === "separately_supplied";
-  const historicalInterest = separatelySupplied
-    ? series3(policy.historical_interest_bearing_liabilities, "lease_policy.historical_interest_bearing_liabilities")
-    : null;
-  const forecastInterest = separatelySupplied
-    ? series3(policy.forecast_interest_bearing_liabilities, "lease_policy.forecast_interest_bearing_liabilities")
-    : null;
-  let opening = Array.isArray(policy.historical_liabilities)
-    ? number(policy.historical_liabilities[2], "lease_policy.historical_liabilities[2]")
-    : number(policy.opening_liability, "lease_policy.opening_liability");
-  let openingInterest = separatelySupplied ? historicalInterest[2] : opening;
+  const projection = leaseForecast(modelCase);
   const states = [];
   for (let index = 0; index < 3; index += 1) {
-    const periodPrincipal = Math.min(opening + Math.max(0, suppliedAdditions[index]), Math.max(0, principal[index]));
-    const ending = policy.mode === "sourced_balance"
-      ? sourcedEnding[index]
-      : policy.mode === "flat_replacement"
-        ? opening
-        : Math.max(0, opening + suppliedAdditions[index] - periodPrincipal);
-    const additions = policy.mode === "sourced_balance"
-      ? ending - opening + periodPrincipal
-      : policy.mode === "flat_replacement"
-        ? periodPrincipal
-        : suppliedAdditions[index];
-    const endingInterest = policy.interest_basis === "none"
-      ? 0
-      : separatelySupplied
-        ? forecastInterest[index]
-        : ending;
-    const averageInterest = policy.interest_basis === "none" ? 0 : (openingInterest + endingInterest) / 2;
+    const period = projection[index];
+    const opening = period.opening_total;
+    const periodPrincipal = period.principal_repayment;
+    const ending = period.ending_total;
+    const additions = period.additions;
+    const averageInterest = (period.opening_interest_bearing + period.ending_interest_bearing) / 2;
     const translation = {
       method: "reporting_currency_carrying_value_no_translation",
       basis_currency: modelCase.issuer.reporting_currency,
@@ -555,6 +562,9 @@ function leaseStates(modelCase, forecastPeriods) {
     states.push({
       state_id: `lease_liability:${forecastPeriods[index].date}`,
       instrument_id: "lease_liability",
+      source_name: "Lease liabilities",
+      face_label: "Lease liabilities",
+      maturity: null,
       period_id: forecastPeriods[index].date,
       period_index: index,
       class: "lease_liability",
@@ -562,15 +572,20 @@ function leaseStates(modelCase, forecastPeriods) {
       currency: modelCase.issuer.reporting_currency,
       balance_basis: "reporting_currency_carrying_value",
       opening: amount(opening, 1),
-      issuance: amount(0, 1),
+      issuance: amount(additions, 1),
       fair_value_movement: amount(0, 1),
-      other_non_cash_movement: amount(additions, 1),
-      pik_accretion: amount(0, 1),
+      other_non_cash_movement: amount(period.other_movements, 1),
+      pik_accretion: amount(period.interest, 1),
       scheduled_amortisation: amount(periodPrincipal, 1),
       maturity_repayment: amount(0, 1),
       ending_pre_repayment: amount(ending, 1),
       ending_post_repayment: amount(ending, 1),
       average_interest_balance: amount(averageInterest, 1),
+      rate_type: "lease_effective",
+      benchmark: null,
+      margin_bps: null,
+      floor: null,
+      interest: amount(period.interest, 1),
       active_fraction: 1,
       repayment_state: periodPrincipal > EPSILON ? "lease_principal" : "none",
       pricing_state: policy.interest_basis === "none" ? "not_interest_bearing" : "priced_cash",
@@ -584,8 +599,6 @@ function leaseStates(modelCase, forecastPeriods) {
       },
       translation,
     });
-    opening = ending;
-    openingInterest = endingInterest;
   }
   return states;
 }

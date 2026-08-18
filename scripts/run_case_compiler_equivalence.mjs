@@ -647,7 +647,7 @@ export function deriveCaseSourceAndEvidence(modelCase) {
   for (const key of Object.keys(lease)) {
     if (["mode", "include_in_gross_debt", "include_in_net_debt", "include_in_leverage"].includes(key)) {
       policies.lease[key] = lease[key];
-    } else if (["additions", "principal_repayment", "effective_rate"].includes(key)) {
+    } else if (["additions", "other_movements", "principal_repayment", "effective_rate"].includes(key)) {
       leaseBasis[key] = clone(lease[key]);
     } else {
       policyEvidence.lease[key] = clone(lease[key]);
@@ -818,11 +818,13 @@ const JUSTIFIED = [
   // the compiled case carries the full production contract the legacy cohort
   // predates.  Only absent-in-certified paths qualify; a VALUE disagreement
   // on any of these is a real divergence.
-  /^statement_structure\.(income_statement|cash_flow)\[[^\]]+\]\.(historical_authority|forecast_period_authorities|forecast_period_calculations|forecast_capture_parent_id|forecast_capture_mode|forecast_capture_note|forecast_capture_certificates|formula_authority|aggregation_authority|source_line_ids)\b/,
+  /^statement_structure\.(income_statement|cash_flow)\[[^\]]+\]\.(historical_authority|forecast_period_authorities|forecast_period_calculations|forecast_capture_parent_id|forecast_capture_mode|forecast_capture_note|forecast_capture_certificates|formula_authority|aggregation_authority|source_line_ids|role_aliases)\b/,
   /^statement_structure_compiled_version$/,
   // v3.6 seals the row-period forecast authority as an additive, content-addressed ledger.
   /^forecast_authority_ledger_version$/,
   /^forecast_authority_ledger(?:\.|$)/,
+  /^ownership_census_version$/,
+  /^ownership_census(?:\.|$)/,
   // Named default for legacy DCS lanes without a balance-basis declaration.
   /^instruments\[\d+\]\.balance_basis$/,
   // Newly compiled cases state the balancing-facility mode explicitly. Legacy
@@ -1550,6 +1552,7 @@ for (const name of files) {
           // Source-state custody is proved by the case clause above; it does
           // not alter row placement, formulas or solved workbook values.
           "historical_value_states", "reported_historical_value_states",
+          "role_aliases",
         ]) delete copy[key];
         // Broker-linked forecast cells resolve from the pack at build; a
         // vintage that cached the numbers into its plan differs inertly.

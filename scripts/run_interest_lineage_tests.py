@@ -88,6 +88,7 @@ mutations = {
     "wrong-instrument-rate": fixed.replace("$D$123", "$D$124"),
     "positive-interest-sign": fixed.replace(",0,-MAX", ",0,MAX"),
     "missing-maturity": fixed.replace("MIN($E71,J$15)", "J$15").replace("$C$6=0,1,", ""),
+    "wrong-period-opening": fixed.replace("$D71", "$K71"),
 }
 results = {}
 for mutation_id, formula in mutations.items():
@@ -112,6 +113,8 @@ floating_mutations = {
     "wrong-benchmark": floating_foreign.replace("$J$120", "$J$122"),
     "missing-floor": floating_foreign.replace("MAX($J$120,$J$121)", "$J$120"),
     "missing-average-fx": floating_foreign.replace("*'Forward Curves'!F7", ""),
+    "missing-pik-accretion": floating_foreign.replace("+$J86/2", ""),
+    "wrong-period-movement": floating_foreign.replace("$J82", "$K82"),
 }
 for mutation_id, formula in floating_mutations.items():
     observed = findings(

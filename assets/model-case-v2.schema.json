@@ -1390,12 +1390,16 @@
         "additions": {
           "$ref": "#/$defs/series3"
         },
+        "other_movements": {
+          "$ref": "#/$defs/series3",
+          "description": "Signed non-cash lease-liability movements other than additions and capitalised interest. Positive values increase the liability."
+        },
         "effective_rate": {
           "$ref": "#/$defs/series3"
         },
         "forecast_liabilities": {
           "$ref": "#/$defs/series3",
-          "description": "Explicit total lease-liability forecast used only under sourced_balance. The model retains the sourced closing balances and derives the implied additions bridge from opening + additions - principal = closing."
+          "description": "Explicit total lease-liability forecast used only under sourced_balance. The model retains the sourced closing balances and derives the implied additions bridge from opening + additions + interest + other movements - principal = closing."
         },
         "interest_basis": {
           "enum": [
@@ -1459,6 +1463,12 @@
       "const": "forecast-authority-ledger/2.0"
     },
     "forecast_authority_ledger": {
+      "type": "object"
+    },
+    "ownership_census_version": {
+      "const": "ownership-census/1.0"
+    },
+    "ownership_census": {
       "type": "object"
     }
   },

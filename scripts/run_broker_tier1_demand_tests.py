@@ -3,6 +3,7 @@
 from __future__ import annotations
 import hashlib, importlib.util, json
 from pathlib import Path
+from pre_broker_demand import normalize_pre_broker_demand
 HERE=Path(__file__).resolve().parent
 SPEC=importlib.util.spec_from_file_location("broker_extractor", HERE/"extract_broker_evidence.py")
 assert SPEC and SPEC.loader
@@ -16,6 +17,10 @@ v1_nodes=[{"node_id":f"revenue.fy{i+1}","section":"income_statement","source_lin
 v1=seal({"schema_version":"pre-broker-model-demand/1.0","run_id":"v1","as_of":"2025-12-31","reporting_currency":"USD","units":"millions","forecast_periods":periods,"nodes":v1_nodes,"counts":{"source_rows":1,"forecast_nodes":3,"material_nodes":3}})
 v1_contract=broker.ensure_core_broker_demand_contract(broker.compile_broker_demand_contract({"forecast_periods":periods,"model_demand_graph":v1}))
 assert {t["metric_id"] for t in v1_contract["targets"]}=={"revenue"}
+migrated=normalize_pre_broker_demand(v1)
+assert migrated["migration_status"]=="migrated_v1_to_v2"
+assert migrated["effective_schema_version"]=="pre-broker-model-demand/2.0"
+assert all(node["node_kind"]=="model_demand" and node["metric_id"]=="revenue" and node["consumer_ids"] for node in migrated["nodes"])
 # v2 graph explicitly owns the full controlled economic vocabulary.
 v2_nodes=[]
 for metric in sorted(required):

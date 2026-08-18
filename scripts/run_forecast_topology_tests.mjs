@@ -539,6 +539,30 @@ for (const protectedRole of ["cash_from_investing", "cash_before_financing"]) {
   );
 }
 
+for (const eventRole of ["disposal_gain", "contingent_consideration"]) {
+  const mutation = clone(protectedCashFlowCase);
+  mutation.statement_structure.cash_flow.unshift(row(
+    `event_${eventRole}`,
+    eventRole.replaceAll("_", " "),
+    [4, 0, 2, null, null, null],
+    {
+      semantic_role: eventRole,
+      forecast_period_authorities: [0, 1, 2].map(() => ({
+        method: "historical_average",
+        source_kind: "historical_inference",
+        source_id: `fixture.repeat.${eventRole}`,
+        as_of_date: "2025-12-31",
+        material: true,
+      })),
+    },
+  ));
+  assert(
+    validateForecastAuthorities(mutation, mutation.statement_structure.cash_flow)
+      .some((error) => /event|non.?recurr|historical_average/i.test(error)),
+    `${eventRole} was allowed to repeat through a historical average.`,
+  );
+}
+
 const crossSection = fixture();
 crossSection.statement_structure.income_statement[0].forecast_capture_parent_id = "cash_from_financing";
 crossSection.statement_structure.income_statement[0].forecast_capture_mode = "semantic_scope";
