@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
-          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+          python3 -m pip install numpy pymupdf openpyxl pillow jsonschema lxml
 
       - name: Stage 4 checkpoint diagnostic
         id: stage4
