@@ -1,0 +1,28 @@
+{
+  "schema_version": "broker-supervisor-state-machine/1.0",
+  "states": [
+    { "id": "INIT", "rank": 0 },
+    { "id": "ARCHIVED", "rank": 1 },
+    { "id": "SELECTING", "rank": 2 },
+    { "id": "AUTHORITY_READY", "rank": 3 },
+    { "id": "ZERO_AUTHORITY", "rank": 3 },
+    { "id": "CLOSED", "rank": 4 }
+  ],
+  "transitions": [
+    ["INIT", "ARCHIVED"],
+    ["ARCHIVED", "SELECTING"],
+    ["ARCHIVED", "ZERO_AUTHORITY"],
+    ["SELECTING", "AUTHORITY_READY"],
+    ["SELECTING", "ZERO_AUTHORITY"],
+    ["AUTHORITY_READY", "CLOSED"],
+    ["ZERO_AUTHORITY", "CLOSED"]
+  ],
+  "terminal_states": ["CLOSED"],
+  "failure_sink": "ZERO_AUTHORITY",
+  "invariants": [
+    "rank_never_decreases",
+    "optional_failure_has_path_to_closed",
+    "zero_authority_has_no_selected_broker_cells",
+    "closed_is_terminal"
+  ]
+}

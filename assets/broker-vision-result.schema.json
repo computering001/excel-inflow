@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-vision-result.schema.json",
+  "title": "Independent broker-page vision transcription",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "document_id",
+    "surface_id",
+    "image_sha256",
+    "pass_index",
+    "producer_id",
+    "method"
+  ],
+  "properties": {
+    "schema_version": { "enum": ["broker-vision-result/1.0", "broker-vision-result/1.1"] },
+    "document_id": { "type": "string", "minLength": 1 },
+    "surface_id": { "type": "string", "minLength": 1 },
+    "image_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "pass_index": { "enum": [1, 2, "resolution"] },
+    "producer_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the independent run or reviewer. Pass 1 and pass 2 must differ."
+    },
+    "producer_fingerprint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Execution-specific fingerprint. Independent pass 1 and pass 2 must carry different fingerprints even when the producer labels differ."
+    },
+    "method": {
+      "enum": ["ocr_geometry", "vision_model", "manual_transcription", "reviewed_resolution"],
+      "description": "The evidence-producing lane. Raw whole-page OCR is diagnostic and must not be represented as a completed table transcription."
+    },
+    "surface_disposition": {
+      "enum": ["analytical_tables", "verified_non_tabular"],
+      "description": "Independent physical classification of the surface. verified_non_tabular closes capture without making narrative numbers model-eligible."
+    },
+    "non_tabular_reason": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "units", "rows"],
+        "properties": {
+          "title": { "type": ["string", "null"] },
+          "units": { "type": ["string", "null"] },
+          "bbox": {
+            "type": ["array", "null"],
+            "minItems": 4,
+            "maxItems": 4,
+            "items": { "type": "number" }
+          },
+          "cell_bboxes": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "array",
+              "items": {
+                "type": ["array", "null"],
+                "minItems": 4,
+                "maxItems": 4,
+                "items": { "type": "number" }
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": ["string", "number", "boolean", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "footnotes": { "type": "array", "items": { "type": "string" } },
+    "review_note": { "type": ["string", "null"] },
+    "conflict_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "conflict_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["conflict_id", "status", "rationale"],
+        "properties": {
+          "conflict_id": { "type": "string", "pattern": "^bvc-[a-f0-9]{24}$" },
+          "status": { "enum": ["resolved", "quarantined"] },
+          "chosen_source": { "enum": ["pass1", "pass2", "native", "targeted_adjudication"] },
+          "resolved_values": {
+            "type": "array",
+            "items": { "type": ["string", "number", "boolean", "null"] }
+          },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "pass_index": { "enum": [1, 2] } } },
+      "then": { "required": ["tables", "producer_fingerprint", "surface_disposition"] }
+    },
+    {
+      "if": { "properties": { "pass_index": { "const": "resolution" } } },
+      "then": { "required": ["conflict_manifest_sha256", "conflict_decisions", "review_note"] }
+    }
+  ],
+  "anyOf": [
+    {
+      "properties": {
+        "pass_index": { "const": "resolution" }
+      }
+    },
+    {
+      "properties": {
+        "surface_disposition": { "const": "analytical_tables" },
+        "tables": { "minItems": 1 }
+      }
+    },
+    {
+      "properties": {
+        "surface_disposition": { "const": "verified_non_tabular" },
+        "tables": { "maxItems": 0 }
+      },
+      "required": ["non_tabular_reason"]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "excel-inflow-performance-policy/1.0",
+  "trace": {
+    "initial_classification_target": 0.95,
+    "engineering_classification_target": 0.98,
+    "unknown_gap_warning_ms": 30000,
+    "unknown_gap_investigation_ms": 120000,
+    "unknown_internal_gap_certification_block_ms": 300000,
+    "known_external_wait_is_not_unowned_time": true
+  },
+  "service_objectives_minutes": {
+    "standard_p50": 35,
+    "standard_p95": 45,
+    "no_broker_p95": 25,
+    "broker_native_processing_p95": 5,
+    "broker_native_plus_semantic_recovery_p95": 12,
+    "build_recalc_validation_p95": 8
+  },
+  "release_policy": {
+    "single_external_wait_breach_is_not_automatic_failure": true,
+    "block_on_reproducible_excel_inflow_owned_regression": true,
+    "block_on_trace_classification_below_initial_target": true,
+    "block_on_unexplained_internal_gap_over_ms": 300000,
+    "block_if_native_clean_broker_unnecessarily_invokes_semantic_recovery": true
+  }
+}

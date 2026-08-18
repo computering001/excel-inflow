@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-bounded-capture-decision.schema.json",
+  "title": "Bounded broker physical-capture decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "task_input_sha256",
+    "round_index",
+    "document_id",
+    "surface_id",
+    "source_image_sha256",
+    "producer_id",
+    "producer_fingerprint",
+    "decision",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-bounded-capture-decision/1.0" },
+    "task_id": { "type": "string", "pattern": "^broker-task-[a-f0-9]{24}$" },
+    "task_input_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "round_index": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "document_id": { "type": "string", "minLength": 1 },
+    "surface_id": { "type": "string", "minLength": 1 },
+    "source_image_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "producer_id": { "type": "string", "minLength": 1 },
+    "producer_fingerprint": { "type": "string", "minLength": 1 },
+    "decision": {
+      "enum": [
+        "retry_with_replacement_reads",
+        "quarantine_remaining_regions"
+      ]
+    },
+    "replacement_pass_sha256s": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass1", "pass2"],
+      "properties": {
+        "pass1": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "pass2": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "rationale": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "decision": { "const": "retry_with_replacement_reads" } },
+        "required": ["decision"]
+      },
+      "then": { "required": ["replacement_pass_sha256s"] }
+    },
+    {
+      "if": {
+        "properties": { "decision": { "const": "quarantine_remaining_regions" } },
+        "required": ["decision"]
+      },
+      "then": { "not": { "required": ["replacement_pass_sha256s"] } }
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "delivery-constitution-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "objective",
+    "ownership_order",
+    "block_predicate",
+    "ask_predicate",
+    "lanes",
+    "hard_block_reasons",
+    "degrade_reasons",
+    "log_reasons",
+    "broker_failure_contract",
+    "runtime_delivery_gates",
+    "release_certification_gates"
+  ],
+  "properties": {
+    "schema_version": { "const": "delivery-constitution/1.0" },
+    "objective": { "type": "string", "minLength": 1 },
+    "ownership_order": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": { "enum": ["LOG", "DEGRADE", "ASK", "BLOCK"] }
+    },
+    "block_predicate": { "$ref": "#/$defs/predicate" },
+    "ask_predicate": {
+      "allOf": [
+        { "$ref": "#/$defs/predicate" },
+        {
+          "type": "object",
+          "required": ["maximum_visible_rounds_per_frontier", "aggregate_questions"],
+          "properties": {
+            "maximum_visible_rounds_per_frontier": { "const": 1 },
+            "aggregate_questions": { "const": true }
+          }
+        }
+      ]
+    },
+    "lanes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filings",
+        "debt",
+        "dcs_live_terms",
+        "economic_graph",
+        "workbook",
+        "broker",
+        "broker_capture",
+        "broker_semantics",
+        "broker_preview",
+        "dcs_metadata",
+        "release_enrichment"
+      ],
+      "properties": {
+        "filings": { "const": "mandatory" },
+        "debt": { "const": "mandatory" },
+        "dcs_live_terms": { "const": "mandatory" },
+        "economic_graph": { "const": "mandatory" },
+        "workbook": { "const": "mandatory" },
+        "broker": { "const": "optional" },
+        "broker_capture": { "const": "optional" },
+        "broker_semantics": { "const": "optional" },
+        "broker_preview": { "const": "optional" },
+        "dcs_metadata": { "const": "optional" },
+        "release_enrichment": { "const": "optional" }
+      }
+    },
+    "hard_block_reasons": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "degrade_reasons": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "log_reasons": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "broker_failure_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terminal_authority_state",
+        "raw_archive_required",
+        "remove_unverified_selected_edges",
+        "remove_stale_forecast_observations",
+        "rerun_authority_resolver",
+        "continue_to_build",
+        "public_internal_states"
+      ],
+      "properties": {
+        "terminal_authority_state": { "const": "zero_or_verified_subset" },
+        "raw_archive_required": { "const": true },
+        "remove_unverified_selected_edges": { "const": true },
+        "remove_stale_forecast_observations": { "const": true },
+        "rerun_authority_resolver": { "const": true },
+        "continue_to_build": { "const": true },
+        "public_internal_states": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "runtime_delivery_gates": { "$ref": "#/$defs/nonEmptyUniqueStrings" },
+    "release_certification_gates": { "$ref": "#/$defs/nonEmptyUniqueStrings" }
+  },
+  "$defs": {
+    "predicate": {
+      "type": "object",
+      "required": ["all"],
+      "properties": {
+        "all": { "$ref": "#/$defs/nonEmptyUniqueStrings" }
+      }
+    },
+    "nonEmptyUniqueStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

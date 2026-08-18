@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excel-inflow.local/schema/real-filing-canary-expectations-v1.schema.json",
+  "title": "Run-scoped real filing canary expectations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "source_statement_rows",
+    "historical_gross_debt"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "real-filing-canary-expectations/1.0"
+    },
+    "fixture_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_statement_rows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["income_statement", "cash_flow"],
+      "properties": {
+        "income_statement": { "type": "integer", "minimum": 1 },
+        "cash_flow": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "historical_gross_debt": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "number" }
+    },
+    "minimum_visible_rows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["income_statement", "cash_flow"],
+      "properties": {
+        "income_statement": { "type": "integer", "minimum": 1 },
+        "cash_flow": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "minimum_visible_income_data_rows": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "required_income_labels": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "required_cash_flow_row_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}
