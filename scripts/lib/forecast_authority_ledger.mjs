@@ -25,6 +25,29 @@ function variabilityFor(behavior, recurrence) {
   if (['not_applicable','accounting_identity','schedule_owned','captured_detail'].includes(recurrence)) return 'not_applicable';
   return 'stable';
 }
+function dispositionFor(behavior, authority) {
+  if (authority?.method==='unresolved' || authority?.status==='BLOCK') return 'unresolved_block';
+  if (behavior==='accounting_identity') return 'formula_owned';
+  if (behavior==='schedule_owned') return 'schedule_owned';
+  if (behavior==='captured_detail') return 'captured_detail';
+  if (behavior==='not_applicable') return 'not_applicable';
+  return 'authority_selected';
+}
+function intrinsicAuthorityFor(behavior) {
+  if (behavior==='accounting_identity') {
+    return {disposition:'formula_owned',method:'accounting_identity',producer:'formula',source_kind:'calculation_graph'};
+  }
+  if (behavior==='schedule_owned') {
+    return {disposition:'schedule_owned',method:'schedule_link',producer:'schedule',source_kind:'schedule'};
+  }
+  if (behavior==='captured_detail') {
+    return {disposition:'captured_detail',method:'not_separately_forecast',producer:'parent_capture',source_kind:'calculation_graph'};
+  }
+  if (behavior==='not_applicable') {
+    return {disposition:'not_applicable',method:'not_applicable',producer:null,source_kind:null};
+  }
+  return null;
+}
 function sourceRows(modelCase) {
   const out=[];
   for (const section of ['income_statement','cash_flow']) {
@@ -36,26 +59,85 @@ function ledgerBody(modelCase) {
   const periods=forecastPeriods(modelCase);
   const rows=[]; const violations=[];
   for (const {section,row} of sourceRows(modelCase)) {
+    const rowId=String(row?.row_id ?? '(missing-row-id)');
     const authorities=row?.forecast_period_authorities;
-    if (!Array.isArray(authorities)) continue;
-    let behavior='recurring_flow';
-    try { behavior=classifyForecastBehavior(modelCase,row,{section,rows:modelCase?.statement_structure?.[section]??[]})?.behavior ?? behavior; } catch {}
+    let classification=null;
+    try {
+      classification=classifyForecastBehavior(modelCase,row,{section,rows:modelCase?.statement_structure?.[section]??[]});
+    } catch (error) {
+      violations.push(`${rowId} forecast behavior classification failed: ${error?.message ?? String(error)}`);
+    }
+    const behavior=classification?.behavior ?? 'unresolved';
     const recurrence=recurrenceFor(row,behavior);
     const variability=variabilityFor(behavior,recurrence);
+    if (!Array.isArray(authorities)) {
+      if (row?.row_type==='header' || row?.material===false || row?.is_material===false) continue;
+      const intrinsic=intrinsicAuthorityFor(behavior);
+      if (intrinsic) {
+        for (let i=0;i<3;i+=1) {
+          rows.push({
+            row_id:rowId,
+            model_node_id:row?.model_node_id ?? rowId,
+            section,
+            semantic_role:canonicalSemanticRole(row?.semantic_role ?? row?.row_id),
+            period_end:periods[i],
+            recurrence,
+            variability,
+            disposition:intrinsic.disposition,
+            method:intrinsic.method,
+            producer:intrinsic.producer,
+            source_kind:intrinsic.source_kind,
+            source_id:null,
+            value:null,
+            confidence:classification?.confidence ?? null,
+            selection_rank:null,
+            material:classification?.material ?? true,
+            broker_rejection_reasons:[],
+            status:'PASS',
+          });
+        }
+        continue;
+      }
+      violations.push(`${rowId} has no explicit forecast disposition`);
+      for (let i=0;i<3;i+=1) {
+        rows.push({
+          row_id:rowId,
+          model_node_id:row?.model_node_id ?? rowId,
+          section,
+          semantic_role:canonicalSemanticRole(row?.semantic_role ?? row?.row_id),
+          period_end:periods[i],
+          recurrence,
+          variability,
+          disposition:'unresolved_block',
+          method:'unresolved',
+          producer:null,
+          source_kind:null,
+          source_id:null,
+          value:null,
+          confidence:classification?.confidence ?? null,
+          selection_rank:null,
+          material:classification?.material ?? true,
+          broker_rejection_reasons:[],
+          status:'BLOCK',
+        });
+      }
+      continue;
+    }
     for (let i=0;i<3;i+=1) {
       const authority=authorities[i] ?? null;
-      if (!authority) { violations.push(`${row.row_id}:${periods[i]} missing forecast authority`); continue; }
+      if (!authority) { violations.push(`${rowId}:${periods[i]} missing forecast authority`); continue; }
       if (recurrence==='discrete_event' && ['historical_average','historical_trend','carry_forward'].includes(authority.method)) {
-        violations.push(`${row.row_id}:${periods[i]} discrete event uses forbidden ${authority.method}`);
+        violations.push(`${rowId}:${periods[i]} discrete event uses forbidden ${authority.method}`);
       }
       rows.push({
-        row_id: row.row_id,
-        model_node_id: row.model_node_id ?? row.row_id,
+        row_id: rowId,
+        model_node_id: row.model_node_id ?? rowId,
         section,
         semantic_role: canonicalSemanticRole(row.semantic_role ?? row.row_id),
         period_end: periods[i],
         recurrence,
         variability,
+        disposition: dispositionFor(behavior,authority),
         method: authority.method ?? null,
         producer: authority.producer ?? authority.ownership ?? null,
         source_kind: authority.source_kind ?? authority.origin ?? null,

@@ -52,6 +52,11 @@ const modelCase = {
 const ledger = sealForecastAuthorityLedger(modelCase);
 assert.equal(ledger.status, "PASS");
 assert.equal(ledger.rows.length, 6);
+assert.deepEqual(
+  [...new Set(ledger.rows.map((row) => row.disposition))],
+  ["authority_selected"],
+  "The ledger omitted the explicit economic disposition for selected authority rows.",
+);
 verifyForecastAuthorityLedger(modelCase);
 const before = ledger.ledger_sha256;
 
@@ -74,4 +79,40 @@ bad.statement_structure.cash_flow[0]
   .forecast_period_authorities[0].method = "historical_average";
 assert.equal(buildForecastAuthorityLedger(bad).status, "BLOCK");
 
-console.log(JSON.stringify({ status: "PASS", checks: 6, sha: before }));
+const missingDisposition = structuredClone(modelCase);
+delete missingDisposition.forecast_authority_ledger;
+delete missingDisposition.forecast_authority_ledger_version;
+missingDisposition.statement_structure.cash_flow.push({
+  row_id: "unowned_material_row",
+  semantic_role: "other_operating_cash_flow",
+  row_type: "input",
+  material: true,
+  values: [1, 2, 3],
+});
+const missingDispositionLedger = buildForecastAuthorityLedger(missingDisposition);
+assert.equal(missingDispositionLedger.status, "BLOCK");
+assert.equal(
+  missingDispositionLedger.rows.filter((row) => row.row_id === "unowned_material_row").length,
+  3,
+  "A material row without an authority array disappeared from the economic census.",
+);
+assert.ok(
+  missingDispositionLedger.rows
+    .filter((row) => row.row_id === "unowned_material_row")
+    .every((row) => row.disposition === "unresolved_block" && row.status === "BLOCK"),
+  "A missing material disposition was not represented as a typed unresolved block.",
+);
+
+const classifierFailure = structuredClone(modelCase);
+delete classifierFailure.forecast_authority_ledger;
+delete classifierFailure.forecast_authority_ledger_version;
+delete classifierFailure.statement_structure.income_statement[0].row_id;
+const classifierFailureLedger = buildForecastAuthorityLedger(classifierFailure);
+assert.equal(classifierFailureLedger.status, "BLOCK");
+assert.ok(
+  classifierFailureLedger.violations.some((finding) =>
+    finding.includes("forecast behavior classification failed")),
+  "A behavior-classification exception was silently swallowed by the authority ledger.",
+);
+
+console.log(JSON.stringify({ status: "PASS", checks: 12, sha: before }));
