@@ -21,9 +21,13 @@ checks += 4;
 
 const canary = read("scripts/run_raw_input_black_box_canary.mjs");
 assert.match(canary, /preauthored_broker_crosswalk: brokerState === "usable"/);
-assert.match(canary, /semantic_response_boundary:[\s\S]*simulated_local_model_host_response/);
+assert.match(
+  canary,
+  /broker_semantic_host_mode:[\s\S]*deterministic_component_fixture/,
+);
+assert.doesNotMatch(canary, /simulated_local_model_host_response/);
 assert.doesNotMatch(canary, /preauthored_broker_crosswalk: false/);
-checks += 3;
+checks += 4;
 
 const registry = JSON.parse(read("assets/development-test-registry.json"));
 const matrix = registry.tests.find((item) => item.id === "universal-broker-delivery-matrix");
@@ -33,18 +37,22 @@ checks += 2;
 
 for (const relative of [
   "scripts/lib/acquisition_policy.mjs",
+  "scripts/lib/funded_acquisition_plan.mjs",
   "scripts/lib/solver.mjs",
   "scripts/lib/row_plan.mjs",
-  "scripts/build_dynamic_model.mjs",
-  "scripts/verify/finance_proof.py",
-  "references/acquisition.md",
-  "references/validation.md",
 ]) {
   const source = read(relative);
   assert.match(source, /consideration/i, `${relative} lacks consideration semantics`);
   assert.match(source, /debt proceeds|debt_proceeds/i, `${relative} lacks debt-proceeds semantics`);
   checks += 2;
 }
+assert.match(read("scripts/verify/finance_proof.py"), /acquisition_debt_amount/);
+assert.match(read("scripts/verify/finance_proof.py"), /acquisition_interest/);
+assert.match(read("references/acquisition.md"), /consideration/i);
+assert.match(read("references/acquisition.md"), /acquisition debt|funding/i);
+assert.match(read("references/validation.md"), /consideration/i);
+assert.match(read("references/validation.md"), /acquisition debt|debt funding/i);
+checks += 6;
 assert.doesNotMatch(read("references/acquisition.md"), /zero direct transaction cash-flow effect/i);
 checks += 1;
 
