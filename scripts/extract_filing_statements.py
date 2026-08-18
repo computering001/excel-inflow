@@ -23,12 +23,12 @@ STRICT_HEADINGS = {
     "income_statement": re.compile(
         r"^\s*(?:consolidated\s+)?(?:income statements?|statements? of\s+"
         r"(?:comprehensive income|income|operations|profit or loss(?: and other comprehensive income)?))\s*"
-        r"(?:\(continued\)|continued)?\s*$",
+        r"(?:\(unaudited\))?\s*(?:\(continued\)|continued)?\s*$",
         re.I,
     ),
     "cash_flow": re.compile(
         r"^\s*(?:consolidated\s+)?(?:cash flow statements?|statements? of cash flows?)\s*"
-        r"(?:\(continued\)|continued)?\s*$",
+        r"(?:\(unaudited\))?\s*(?:\(continued\)|continued)?\s*$",
         re.I,
     ),
 }
