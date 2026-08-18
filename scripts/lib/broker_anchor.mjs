@@ -1,3 +1,12 @@
+import {
+  brokerMetricDefinitionSignature,
+  compareDefinitionSignatures,
+  compileBrokerConsensusMetric,
+  resolveBrokerConsensusSelection,
+} from "./broker_consensus.mjs";
+
+export { brokerMetricDefinitionSignature, compareDefinitionSignatures };
+
 /**
  * BROKER ANCHOR SELECTION — which ONE of EBIT / Adj. EBITDA is the headline
  * forecast authority. D&A is the bridge driver; the other headline is derived.
@@ -40,16 +49,6 @@ export const HEADLINE_ANCHOR_METRIC_IDS = Object.freeze([
   "adjusted_ebitda",
 ]);
 
-const DEFINITION_DIMENSIONS = Object.freeze([
-  "metric_id",
-  "accounting_basis",
-  "operation_scope",
-  "adjustment_basis",
-  "currency",
-  "units",
-  "fiscal_calendar",
-]);
-
 const METRIC_SHORT_LABEL = Object.freeze({
   ebit: "EBIT",
   adjusted_ebitda: "Adj. EBITDA",
@@ -61,44 +60,6 @@ function rowOwnsSemanticRole(row, role) {
     row?.semantic_role === role ||
     (Array.isArray(row?.role_aliases) && row.role_aliases.includes(role))
   );
-}
-
-/**
- * A broker CONTRIBUTES a metric when it has a usable series, not when it has
- * a key. Packs carry a placeholder entry for every house on every line, so
- * counting keys would score a metric no one actually publishes as fully
- * supplied — on the Smurfit pack that is the difference between D&A scoring
- * seven and scoring its true five.
- */
-function contributes(series) {
-  return (
-    Array.isArray(series) &&
-    series.some(
-      (value) =>
-        value !== null && value !== undefined && Number.isFinite(Number(value)),
-    )
-  );
-}
-
-export function brokerMetricDefinitionSignature(modelCase, metricId) {
-  const declared =
-    modelCase?.broker_pack?.metrics?.[metricId]?.definition_signature ?? {};
-  return {
-    metric_id: declared.metric_id ?? metricId,
-    accounting_basis:
-      declared.accounting_basis ?? modelCase?.issuer?.accounting_basis ?? null,
-    operation_scope: declared.operation_scope ?? "continuing",
-    adjustment_basis:
-      declared.adjustment_basis ??
-      (metricId.startsWith("adjusted_") ? "adjusted" : "statutory"),
-    currency:
-      declared.currency ?? modelCase?.issuer?.reporting_currency ?? null,
-    units: declared.units ?? modelCase?.issuer?.units ?? null,
-    fiscal_calendar:
-      declared.fiscal_calendar ?? modelCase?.issuer?.fiscal_calendar ?? "fixed_date",
-    declaration_status:
-      Object.keys(declared).length > 0 ? "declared" : "inferred_from_case_contract",
-  };
 }
 
 export function statementMetricDefinitionSignature(modelCase, rows, metricId) {
@@ -115,62 +76,21 @@ export function statementMetricDefinitionSignature(modelCase, rows, metricId) {
   };
 }
 
-export function compareDefinitionSignatures(left, right) {
-  const mismatches = [];
-  for (const dimension of DEFINITION_DIMENSIONS) {
-    const a = left?.[dimension];
-    const b = right?.[dimension];
-    if (a !== null && a !== undefined && b !== null && b !== undefined && a !== b) {
-      mismatches.push({ dimension, left: a, right: b });
-    }
-  }
-  return { compatible: mismatches.length === 0, mismatches };
-}
-
 export function brokerContributorCount(modelCase, metricId) {
-  const metric = modelCase?.broker_pack?.metrics?.[metricId];
-  if (!metric) return 0;
-  return Object.values(metric.brokers ?? {}).filter(contributes).length;
+  const compiled = compileBrokerConsensusMetric(modelCase, metricId);
+  if (!compiled) return 0;
+  return new Set(
+    compiled.periods.flatMap((period) =>
+      period.included.map((entry) => entry.house_name),
+    ),
+  ).size;
 }
 
 /** Contributor coverage by forecast period. A house with FY1 only must not be
  * counted as if it supplied FY2 and FY3 as well. */
 export function brokerContributorCounts(modelCase, metricId) {
-  const metric = modelCase?.broker_pack?.metrics?.[metricId];
-  if (!metric) return [0, 0, 0];
-  return [0, 1, 2].map(
-    (periodIndex) =>
-      Object.values(metric.brokers ?? {}).filter((series) => {
-        const value = series?.[periodIndex];
-        return value !== null && value !== undefined && Number.isFinite(Number(value));
-      }).length,
-  );
-}
-
-function consensusSelection(metric, forecastIndex) {
-  const provider = metric.provider_consensus?.[forecastIndex];
-  if (provider !== null && provider !== undefined) {
-    return {
-      value: Number(provider),
-      source_kind: "provider_consensus",
-      source_name: "Provider consensus",
-      substituted: false,
-    };
-  }
-  const values = Object.entries(metric.brokers ?? {})
-    .map(([name, series]) => [name, series?.[forecastIndex]])
-    .filter(([, value]) => value !== null && value !== undefined)
-    .map(([name, value]) => [name, Number(value)]);
-  return {
-    value:
-      values.length === 0
-        ? null
-        : values.reduce((total, [, value]) => total + value, 0) / values.length,
-    source_kind: "named_house_mean",
-    source_name: `${values.length} named-house mean`,
-    contributors: values.map(([name]) => name),
-    substituted: false,
-  };
+  const compiled = compileBrokerConsensusMetric(modelCase, metricId);
+  return compiled?.periods.map((period) => period.contributor_count) ?? [0, 0, 0];
 }
 
 /** Resolve one visible broker selection.
@@ -186,70 +106,24 @@ export function resolveBrokerForecastSelection(
   metricId,
   forecastIndex,
 ) {
-  const metric = modelCase?.broker_pack?.metrics?.[metricId];
-  if (!metric) {
+  const resolved = resolveBrokerConsensusSelection(
+    modelCase,
+    metricId,
+    forecastIndex,
+  );
+  if (
+    resolved.source_kind === "named_house_unavailable" ||
+    resolved.source_kind === "provider_consensus_unavailable"
+  ) {
     return {
-      value: null,
-      source_kind: "absent",
-      source_name: null,
-      substituted: false,
+      ...resolved,
+      substituted_from: resolved.selected_mode,
+      substitution_reason:
+        `${resolved.selected_mode} does not supply a compatible forecast for period ` +
+        `${forecastIndex + 1}; the ordinary forecast waterfall must resolve it.`,
     };
   }
-  const consensus = () => consensusSelection(metric, forecastIndex);
-  const selected = modelCase.controls?.broker_case ?? "Consensus";
-  if (selected === "Forecast Waterfall") {
-    // "Forecast Waterfall" selects the cross-source decision process; it is
-    // not a rejection of broker evidence. A compatible broker observation is
-    // still the broker rung of that process. Where no usable value exists,
-    // consensusSelection returns a disclosed null and the ordinary waterfall
-    // proceeds to the next authority without inventing a house or a value.
-    return consensus();
-  }
-  if (selected === "Consensus") return consensus();
-  const values = Object.entries(metric.brokers ?? {})
-    .map(([name, series]) => [name, series?.[forecastIndex]])
-    .filter(([, value]) => value !== null && value !== undefined)
-    .map(([name, value]) => [name, Number(value)]);
-  if (selected === "High" || selected === "Low") {
-    if (values.length === 0) {
-      const fallback = consensus();
-      return {
-        ...fallback,
-        substituted: true,
-        substituted_from: selected,
-        substitution_reason: `No named broker supplies forecast period ${forecastIndex + 1}.`,
-      };
-    }
-    const compare = selected === "High"
-      ? (left, right) => right[1] - left[1]
-      : (left, right) => left[1] - right[1];
-    const [sourceName, value] = [...values].sort(compare)[0];
-    return {
-      value,
-      source_kind: selected.toLowerCase(),
-      source_name: sourceName,
-      substituted: false,
-    };
-  }
-  const named = metric.brokers?.[selected]?.[forecastIndex];
-  if (named !== null && named !== undefined) {
-    return {
-      value: Number(named),
-      source_kind: "named_house",
-      source_name: selected,
-      substituted: false,
-    };
-  }
-  return {
-    value: null,
-    source_kind: "named_house_unavailable",
-    source_name: selected,
-    substituted: false,
-    substituted_from: selected,
-    substitution_reason:
-      `${selected} does not supply forecast period ${forecastIndex + 1}; ` +
-      "the ordinary forecast waterfall must resolve the period without another broker house.",
-  };
+  return resolved;
 }
 
 /**

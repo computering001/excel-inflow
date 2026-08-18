@@ -76,7 +76,9 @@ function columnNameOf(number) {
 // Tokeniser
 // ---------------------------------------------------------------------------
 
-const FUNCTIONS = new Set(["IF", "IFERROR", "SUM", "MIN", "MAX", "ROUND", "ABS", "DATE"]);
+const FUNCTIONS = new Set([
+  "IF", "IFERROR", "AND", "OR", "SUM", "AVERAGE", "COUNT", "MIN", "MAX", "ROUND", "ABS", "DATE",
+]);
 
 // A reference, with an optional quoted sheet name and an optional second
 // corner. `$` is anchoring and carries no meaning once the formula is written.
@@ -470,6 +472,12 @@ class Evaluator {
       const value = this.evaluate(args[0], sheetName);
       return isError(value) ? this.evaluate(args[1], sheetName) : value;
     }
+    if (name === "AND" || name === "OR") {
+      const values = args.map((argument) => truthy(this.evaluate(argument, sheetName)));
+      const error = values.find((value) => isError(value));
+      if (error) return error;
+      return name === "AND" ? values.every(Boolean) : values.some(Boolean);
+    }
     if (name === "DATE") {
       const evaluated = args.map((argument) => toNumber(this.evaluate(argument, sheetName)));
       const error = evaluated.find((value) => isError(value));
@@ -509,6 +517,12 @@ class Evaluator {
       for (const value of numbers) total += value;
       return total;
     }
+    if (name === "AVERAGE") {
+      return numbers.length === 0
+        ? DIV0
+        : numbers.reduce((total, value) => total + value, 0) / numbers.length;
+    }
+    if (name === "COUNT") return numbers.length;
     if (name === "MIN") return numbers.length === 0 ? 0 : Math.min(...numbers);
     if (name === "MAX") return numbers.length === 0 ? 0 : Math.max(...numbers);
     if (name === "ROUND") {

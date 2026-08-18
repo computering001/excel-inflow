@@ -24,6 +24,7 @@
     "broker-pack.schema.json",
     "broker-preview-v1.schema.json",
     "broker-preview-confirmation-v1.schema.json",
+    "broker-consensus-membership-v1.schema.json",
     "broker-intake-choice-v1.schema.json",
     "broker-intake-run-v1.schema.json",
     "broker-extraction-request.schema.json",
@@ -138,6 +139,7 @@
     "broker-pack.schema.json": "Stage-1 normalised broker-pack contract. The intake module loads it through an imported path helper that the static asset scanner cannot resolve.",
     "broker-preview-v1.schema.json": "Hash-bound Stage-2 preview of the coherent primary-house series, exact source-cell provenance, alternates and preserved evidence-only inventory.",
     "broker-preview-confirmation-v1.schema.json": "Minimal user confirmation bound to one broker preview hash and one primary-eligible coherent house.",
+    "broker-consensus-membership-v1.schema.json": "Hash-bound per-metric contributor eligibility, definition compatibility and period-status contract for the calculated Model Consensus; Provider Consensus remains a separate sourced series.",
     "broker-intake-choice-v1.schema.json": "Sealed proof that the visible Brokers milestone ended through 1-10 supplied reports or the exact explicit skip choice; zero attachments can never imply consent.",
     "broker-intake-run-v1.schema.json": "Typed ACTION_REQUIRED or COMPLETE state for the visible Brokers upload-or-skip controller.",
     "broker-extraction-request.schema.json": "External broker-document extraction request contract; consumed before the extraction entry point runs.",
@@ -283,6 +285,7 @@
     "lib/acquisition_policy.mjs",
     "lib/attachment_ingress.mjs",
     "lib/broker_anchor.mjs",
+    "lib/broker_consensus.mjs",
     "lib/broker_headline_policy.mjs",
     "lib/broker_intake_choice.mjs",
     "lib/broker_metric_dictionary.mjs",
@@ -439,6 +442,7 @@
     "extract_dcs_evidence.py",
     "compile_dcs_evidence.py",
     "verify/dcs_evidence_oracle.py",
+    "verify/broker_consensus_membership_oracle.py",
     "emit/__main__.py",
     "prepare_local_workbook_review.py",
     "render/check_render.py",
@@ -613,6 +617,15 @@
       ],
       "expect_output_contains": "usage: dcs_evidence_oracle.py"
     },
+    "verify/broker_consensus_membership_oracle.py": {
+      "argv": [
+        "--help"
+      ],
+      "expect_exit": [
+        0
+      ],
+      "expect_output_contains": "usage: broker_consensus_membership_oracle.py"
+    },
     "_note": "What running each entry point from the clean release root must produce. Exit status alone is not the contract: two of these treat --help as an unrecognised argument and exit 1 with a usage line, and an entry point that had lost its imports would also exit non-zero. The required substring is what separates the two.",
     "emit/__main__.py": {
       "argv": [
@@ -766,6 +779,7 @@
     "verify/run_finance_proof_mutations.py",
     "verify/run_deterministic_tests.py",
     "verify/dcs_evidence_oracle.py",
+    "verify/broker_consensus_membership_oracle.py",
     "verify/tolerances.py",
     "verify/validate_dynamic_model.py",
     "verify/workbook_semantic_oracle.py",

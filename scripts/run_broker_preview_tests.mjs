@@ -610,7 +610,7 @@ await test("forecast-waterfall mode consumes compatible broker evidence when it 
   const selection = resolveBrokerForecastSelection(modelCase, "revenue", 0);
   assert(selection.value === 101, `forecast waterfall rejected compatible broker evidence: ${selection.value}`);
   assert(
-    selection.source_kind === "named_house_mean",
+    selection.source_kind === "model_consensus",
     `forecast waterfall did not disclose its broker authority: ${selection.source_kind}`,
   );
   const anchor = selectBrokerAnchor(modelCase);

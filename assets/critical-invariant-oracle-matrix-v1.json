@@ -2,9 +2,9 @@
   "schema_version": "critical-invariant-oracle-matrix/1.0",
   "bindings": {
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-    "oracle_sha256": "62e281da941a246f5310d4f66b18b6978126aabd05220da9a50e1cd2b42503f1",
+    "oracle_sha256": "a3a0271eef56aa6fe49cf4b7627f048beaaeee469956a066fde589bd8672948d",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "4eafe88e0ff058f656aca3068efede64d12d04e29092f72eef2d7008d0fd25e9"
+    "registry_sha256": "5b890beffb7ed6b5a581bfb1a87d70f456922d5980891af43281af5ddff9c847"
   },
   "domains": [
     {"domain": "cash_flow_identity", "invariant_id": "cash-flow-current-period-additivity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "cash_flow_subtotal_prior_period"}]},
@@ -14,6 +14,7 @@
     {"domain": "forecast_ownership", "invariant_id": "single-parent-or-child-writer", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "parent_and_child_forecast"}]},
     {"domain": "rcf_financing_cash", "invariant_id": "rcf-enters-financing-once", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "drop_rcf_from_financing_cash"}]},
     {"domain": "broker_period", "invariant_id": "broker-demand-period-parity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "change_broker_period"}]},
+    {"domain": "broker_consensus_membership", "invariant_id": "model-consensus-sealed-compatible-membership", "independent_oracle_test_ids": ["broker-consensus-membership-oracle"], "mutations": [{"mutation_id": "rejected_house_enters_model_consensus"}]},
     {"domain": "typed_unresolved_state", "invariant_id": "unresolved-is-not-zero", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "unresolved_to_zero"}]},
     {"domain": "debt_classification", "invariant_id": "fixed-coupon-bond-class", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "bond_as_other_debt"}]},
     {"domain": "workbook_error_scan", "invariant_id": "all-cell-formula-error-scan", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "remote_value_error"}]}

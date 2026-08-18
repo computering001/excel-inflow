@@ -16,6 +16,10 @@ import {
   FACE_STATEMENT_SECTIONS,
   faceStatementManifestDigest,
 } from "./face_statement_manifest.mjs";
+import {
+  BROKER_CONSENSUS_MEMBERSHIP_VERSION,
+  sealBrokerConsensusMembership,
+} from "./broker_consensus.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const execFileAsync = promisify(execFile);
@@ -1693,16 +1697,7 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       (value) => typeof value === "number" && Number.isFinite(value),
     );
     if (!hasSelectedValue) continue;
-    const providerConsensus = sourcePack.provider_consensus?.[metricId] ?? [0, 1, 2].map(
-      (periodIndex) => {
-        const values = Object.values(brokers)
-          .map((series) => series[periodIndex])
-          .filter((value) => typeof value === "number" && Number.isFinite(value));
-        return values.length > 0
-          ? values.reduce((total, value) => total + value, 0) / values.length
-          : null;
-      },
-    );
+    const providerConsensus = sourcePack.provider_consensus?.[metricId];
     const fingerprint = declaration.definition_fingerprint ?? {};
     const definitionSignature = Object.fromEntries(
       Object.entries({
@@ -1717,12 +1712,48 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
         lease_basis: fingerprint.lease_basis ?? null,
       }).filter(([, value]) => value !== undefined),
     );
+    const membership = sealBrokerConsensusMembership({
+      schema_version: BROKER_CONSENSUS_MEMBERSHIP_VERSION,
+      metric_id: metricId,
+      contributors: (sourcePack.houses ?? [])
+        .filter((house) => Object.hasOwn(brokers, house.house_name))
+        .map((house) => {
+          const included =
+            house.eligibility === undefined ||
+            ["primary_eligible", "supplemental_eligible"].includes(
+              house.eligibility,
+            );
+          const reason = included
+            ? []
+            : [`source house eligibility is ${house.eligibility ?? "not declared"}`];
+          return {
+            house_name: house.house_name,
+            status: included ? "included" : "excluded",
+            reasons: reason,
+            definition_signature: definitionSignature,
+            period_status: [0, 1, 2].map(() =>
+              included ? "included" : "rejected",
+            ),
+            period_reasons: [0, 1, 2].map(() => reason),
+          };
+        })
+        .sort((left, right) =>
+          left.house_name < right.house_name
+            ? -1
+            : left.house_name > right.house_name
+              ? 1
+              : 0,
+        ),
+    });
     modelMetrics[metricId] = {
       label: declaration.label ?? metricId,
       ...(declaration.definition_id ? { definition_id: declaration.definition_id } : {}),
       ...(declaration.semantic_role ? { semantic_role: declaration.semantic_role } : {}),
       definition_signature: definitionSignature,
-      provider_consensus: providerConsensus,
+      ...(Array.isArray(providerConsensus)
+        ? { provider_consensus: structuredClone(providerConsensus) }
+        : {}),
+      consensus_membership: membership,
       brokers,
     };
   }

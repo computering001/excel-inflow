@@ -23,8 +23,6 @@ const casesDirectory = path.resolve(
 );
 
 const clone = (value) => structuredClone(value);
-const mean = (values) =>
-  values.reduce((total, value) => total + Number(value), 0) / values.length;
 const hash = (character) => character.repeat(64);
 const normalizeLabel = (value) =>
   String(value ?? "").normalize("NFKC").replace(/[\u2010-\u2015]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
@@ -63,11 +61,9 @@ function brokerCasePack(pack) {
     );
     metrics[metricId] = {
       label: descriptor.label,
-      provider_consensus:
-        pack.provider_consensus?.[metricId] ??
-        [0, 1, 2].map((index) =>
-          mean(Object.values(brokers).map((series) => series[index])),
-        ),
+      ...(Array.isArray(pack.provider_consensus?.[metricId])
+        ? { provider_consensus: pack.provider_consensus[metricId] }
+        : {}),
       brokers,
     };
   }

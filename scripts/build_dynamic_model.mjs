@@ -28,7 +28,16 @@ import { presentationEpoch, sharedHorizontalGrammar } from "./lib/design_contrac
 // supply each metric, and the broker-anchor rule DECIDES on that same number. A
 // second count written beside the first is a second definition of "contributes",
 // and the two would part company the first time either moved.
-import { applyTier1AnchorOwnership, brokerContributorCount } from "./lib/broker_anchor.mjs";
+import {
+  applyTier1AnchorOwnership,
+  resolveBrokerForecastSelection,
+} from "./lib/broker_anchor.mjs";
+import {
+  brokerConsensusExtremumFormula,
+  brokerConsensusFormula,
+  compileBrokerConsensusMetric,
+  providerConsensusIsSupplied,
+} from "./lib/broker_consensus.mjs";
 import {
   benchmarkCurvePlan,
   compileRowPlan,
@@ -1377,8 +1386,16 @@ function brokerMetricRowMap(modelCase) {
   const rows = {};
   let row = 5;
   for (const metricId of consumedBrokerMetricIds(modelCase)) {
-    rows[metricId] = row;
-    row += 1 + names.length + 3 + 1;
+    const metric = modelCase.broker_pack?.metrics?.[metricId];
+    const providerRows = providerConsensusIsSupplied(metric) ? 3 : 0;
+    // Houses, Model Consensus, optional Provider/Difference/Difference %, two
+    // census rows, High, Low and finally the selected forecast consumed by the
+    // Operating Model. One blank row separates metric blocks.
+    rows[metricId] = row + names.length + 5 + providerRows;
+    // Advance from this block's first contributor to the blank row immediately
+    // after its Selected Forecast row. The selected-row offset above is
+    // `names + 5 + providerRows`, so the next block begins one row later.
+    row += names.length + 6 + providerRows;
   }
   return {
     sheet: "Brokers",
@@ -1514,9 +1531,9 @@ const BROKER_MAGNITUDE_ROLES = new Set(["capex", "dividends", "share_buybacks"])
  * across the three forecasts. The reference's own Date column is absent, and
  * absent deliberately — see the column-geometry note below.
  *
- * The block reads TOP DOWN, which is the whole point of the rebuild. The metric
- * row carries the answer the Operating Model actually consumes; the named houses
- * that feed it sit underneath; the derived summaries close the block. Three
+ * The block reads TOP DOWN from named evidence through the calculated and
+ * supplied summaries to the Selected Forecast the Operating Model consumes.
+ * Three
  * grounds say which is which without a word of legend — answer fill on the
  * metric row, no fill on a sourced contributor, subsection fill on the derived
  * rows — and all three are colours this model already uses for exactly those
@@ -2101,15 +2118,18 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   // `toggleOn` is the same fill the Operating Model selector takes when a case is
   // engaged, and it is used here for the same reason — this is the option that
   // is ON.
-  const markLiveCase = (labelRow, span = `B${labelRow}`) => {
+  const markLiveCase = (labelRow, span = `B${labelRow}`, aliases = []) => {
+    const labels = [`$B${labelRow}`, ...aliases.map((label) => `"${label}"`)]
+      .map((label) => `${liveCaseCell}=${label}`)
+      .join(",");
     sheet.getRange(span).conditionalFormats.add("expression", {
-      formula: `=AND(${liveCaseCell}<>"",${liveCaseCell}=$B${labelRow})`,
+      formula: `=AND(${liveCaseCell}<>"",OR(${labels}))`,
       format: { fill: COLORS.toggleOn, font: { bold: true } },
     });
   };
   // A derived row's mark spans the whole row; a contributor's stops at its name.
-  const markLiveCaseAcross = (labelRow) =>
-    markLiveCase(labelRow, `B${labelRow}:${LAST_COLUMN}${labelRow}`);
+  const markLiveCaseAcross = (labelRow, aliases = []) =>
+    markLiveCase(labelRow, `B${labelRow}:${LAST_COLUMN}${labelRow}`, aliases);
 
   const names = brokerNames(modelCase);
   const selectedRows = {};
@@ -2149,30 +2169,9 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         : `='Operating Model'!${HISTORICAL_COLUMNS.at(-1)}${definition.row}`
       : null;
 
-    const metricRow = row;
-    if (
-      declaredMetricRows[metricId] != null &&
-      declaredMetricRows[metricId] !== metricRow
-    ) {
-      throw new Error(
-        `Broker metric row drift for ${metricId}: row plan ` +
-          `${declaredMetricRows[metricId]}, emitted ${metricRow}.`,
-      );
-    }
-    selectedRows[metricId] = metricRow;
-    // THE LABEL IS THE METRIC'S NAME AND NOTHING ELSE.
-    //
-    // It used to carry a `(6 of 7)` coverage annotation wherever fewer than the
-    // full panel supplied the basis. The reviewer struck it: the thin blocks
-    // announce themselves — the gaps are visible in the contributor rows
-    // directly beneath — and a parenthetical on a row label is a second, weaker
-    // statement of what the block already shows. `brokerContributorCount`
-    // remains the broker-anchor rule's own count; the sheet simply no longer
-    // restates it.
-    // One exception to the bare label: an ATTRIBUTED line wears its house's
-    // name on the face. A single-source inclusion is legitimate exactly because
-    // it never claims to be consensus - the label is where that claim would
-    // otherwise be implied, so the label is where the attribution lives.
+    const compiledConsensus = compileBrokerConsensusMetric(modelCase, metricId);
+    // An attributed flex election still names its selected house on the final
+    // Selected Forecast row. It never borrows the Model Consensus label.
     const election = (modelCase.broker_pack?.flex_elections ?? []).find(
       (item) => item.metric_id === metricId,
     );
@@ -2185,17 +2184,12 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
               ),
           ) ?? election.source_house_id
         : null;
-    setValue(
-      sheet,
-      `B${metricRow}`,
-      attributedHouse ? `${metric.label} — ${attributedHouse} (attributed)` : metric.label,
-    );
-    row += 1;
-
     const brokerRows = [];
+    const rowByHouse = new Map();
     for (const name of names) {
       const values = metric.brokers?.[name] ?? [null, null, null];
       brokerRows.push(row);
+      rowByHouse.set(name, row);
       contributorRows.push(row);
       setValue(sheet, `B${row}`, name);
       for (let index = 0; index < 3; index += 1) {
@@ -2238,12 +2232,47 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
       }
       // NAME CELL ONLY on a contributor: C:F here are the house's own inputs.
       markLiveCase(row);
+      const exclusions = compiledConsensus.periods.flatMap((period) =>
+        period.excluded
+          .filter((entry) => entry.house_name === name)
+          .flatMap((entry) => entry.reasons),
+      );
+      if (exclusions.length > 0) {
+        styleFont(sheet, `B${row}`, COLORS.grey);
+        addCommentOnce(
+          workbook,
+          sheet,
+          `B${row}`,
+          `Excluded from Model Consensus: ${[...new Set(exclusions)].join("; ")}`,
+        );
+      }
       row += 1;
     }
 
-    const consensusRow = row;
-    setValue(sheet, `B${row}`, "Consensus");
-    if (Array.isArray(metric.provider_consensus)) {
+    const modelConsensusRow = row;
+    setValue(sheet, `B${row}`, `${metric.label} — Model Consensus`);
+    for (let index = 0; index < 3; index += 1) {
+      const column = FORECAST_COLUMNS_BROKERS[index];
+      applyFormula(
+        sheet,
+        `${column}${row}`,
+        brokerConsensusFormula(
+          column,
+          rowByHouse,
+          compiledConsensus.periods[index],
+        ),
+      );
+    }
+    styleFont(sheet, `B${row}`, COLORS.black, { bold: true });
+    markLiveCaseAcross(row, ["Consensus", "Model Consensus", "Forecast Waterfall"]);
+    row += 1;
+
+    let providerConsensusRow = null;
+    let differenceRow = null;
+    let differencePctRow = null;
+    if (compiledConsensus.provider_consensus_supplied) {
+      providerConsensusRow = row;
+      setValue(sheet, `B${row}`, "Provider Consensus");
       setRow(
         sheet,
         `${FORECAST_COLUMNS_BROKERS[0]}${row}:${LAST_COLUMN}${row}`,
@@ -2253,26 +2282,76 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         sheet,
         `${FORECAST_COLUMNS_BROKERS[0]}${row}:${LAST_COLUMN}${row}`,
       );
-    } else {
+      markLiveCaseAcross(row);
+      row += 1;
+      differenceRow = row;
+      setValue(sheet, `B${row}`, "Difference — Provider less Model");
       for (let index = 0; index < 3; index += 1) {
         const column = FORECAST_COLUMNS_BROKERS[index];
-        const range = brokerRows.length
-          ? `${column}${brokerRows[0]}:${column}${brokerRows.at(-1)}`
-          : null;
-        const consensusFormula = brokerRows.length === 1
-          ? `=${column}${brokerRows[0]}`
-          : range
-            ? `=IFERROR(AVERAGE(${range}),0)`
-            : "=0";
         applyFormula(
           sheet,
           `${column}${row}`,
-          consensusFormula,
+          `=IFERROR(${column}${providerConsensusRow}-${column}${modelConsensusRow},"")`,
         );
       }
+      row += 1;
+      differencePctRow = row;
+      setValue(
+        sheet,
+        `B${row}`,
+        `Difference % — review above ${(compiledConsensus.review_threshold * 100).toFixed(1)}%`,
+      );
+      for (let index = 0; index < 3; index += 1) {
+        const column = FORECAST_COLUMNS_BROKERS[index];
+        applyFormula(
+          sheet,
+          `${column}${row}`,
+          `=IFERROR(${column}${differenceRow}/ABS(${column}${modelConsensusRow}),"")`,
+        );
+        sheet.getRange(`${column}${row}`).conditionalFormats.add("expression", {
+          formula: `=ABS(${column}${row})>${compiledConsensus.review_threshold}`,
+          format: { fill: COLORS.toggleOff, font: { bold: true } },
+        });
+      }
+      row += 1;
     }
-    styleFont(sheet, `B${row}`, COLORS.black, { bold: true });
-    markLiveCaseAcross(row);
+
+    setValue(sheet, `B${row}`, "Contributor Count");
+    for (let index = 0; index < 3; index += 1) {
+      const column = FORECAST_COLUMNS_BROKERS[index];
+      const refs = compiledConsensus.periods[index].included
+        .map((entry) => rowByHouse.get(entry.house_name))
+        .filter((value) => Number.isInteger(value))
+        .map((value) => `${column}${value}`);
+      applyFormula(
+        sheet,
+        `${column}${row}`,
+        refs.length > 0 ? `=COUNT(${refs.join(",")})` : "=0",
+      );
+    }
+    row += 1;
+    setValue(sheet, `B${row}`, "Excluded Count");
+    for (let index = 0; index < 3; index += 1) {
+      setValue(
+        sheet,
+        `${FORECAST_COLUMNS_BROKERS[index]}${row}`,
+        compiledConsensus.periods[index].excluded_count,
+      );
+      styleFont(sheet, `${FORECAST_COLUMNS_BROKERS[index]}${row}`, COLORS.grey);
+    }
+    const exclusionReasons = [...new Set(
+      compiledConsensus.periods.flatMap((period) =>
+        period.excluded.flatMap((entry) => entry.reasons),
+      ),
+    )];
+    if (exclusionReasons.length > 0) {
+      addCommentOnce(
+        workbook,
+        sheet,
+        `B${row}`,
+        `Excluded evidence retained: ${exclusionReasons.join("; ")}`,
+      );
+    }
     row += 1;
     const highRow = row;
     setValue(sheet, `B${row}`, "High");
@@ -2282,49 +2361,69 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     markLiveCaseAcross(lowRow);
     for (let index = 0; index < 3; index += 1) {
       const column = FORECAST_COLUMNS_BROKERS[index];
-      const range = brokerRows.length
-        ? `${column}${brokerRows[0]}:${column}${brokerRows.at(-1)}`
-        : `${column}${consensusRow}`;
-      applyFormula(sheet, `${column}${highRow}`, `=MAX(${range})`);
-      applyFormula(sheet, `${column}${lowRow}`, `=MIN(${range})`);
+      applyFormula(
+        sheet,
+        `${column}${highRow}`,
+        brokerConsensusExtremumFormula(
+          "High",
+          column,
+          rowByHouse,
+          compiledConsensus.periods[index],
+        ),
+      );
+      applyFormula(
+        sheet,
+        `${column}${lowRow}`,
+        brokerConsensusExtremumFormula(
+          "Low",
+          column,
+          rowByHouse,
+          compiledConsensus.periods[index],
+        ),
+      );
     }
-    // HOW MANY HOUSES STAND BEHIND EACH CONSENSUS CELL, per period, as live
-    // COUNT formulas over the contributor rows - so a thin panel announces its
-    // thinness on the row the model actually consumes. Grey and outside the
-    // block fill: this is an annotation about the consensus, not a member of
-    // the panel. (The reviewer struck a "(6 of 7)" from the metric LABEL as a
-    // second, weaker statement of what the block shows; a count beside the
-    // derived row is the first and only statement of how derived it is.)
-    if (brokerRows.length > 0) {
-      setValue(sheet, `G${consensusRow}`, "houses");
-      styleFont(sheet, `G${consensusRow}`, COLORS.grey);
-      ["H", "I", "J"].forEach((column, index) => {
-        const supplying = names.filter((name) => {
-          const value = (metric.brokers?.[name] ?? [])[index];
-          return typeof value === "number" && Number.isFinite(value);
-        }).length;
-        setValue(sheet, `${column}${consensusRow}`, supplying);
-        styleFont(sheet, `${column}${consensusRow}`, COLORS.grey);
-      });
-    }
+    // High and Low use exactly the same sealed compatible contributor set as
+    // Model Consensus; excluded rows can never re-enter through an extremum.
     row += 2;
 
-    // THE ANSWER, WRITTEN AT THE HEAD OF THE BLOCK.
-    //
-    // This is the row the Operating Model links to, and it used to sit at the
-    // FOOT of the block under the label "Selected case" — so the reader met ten
-    // candidates before meeting the number the model was actually using. It is
-    // the same selector, resolving the same way; it has simply moved to where
-    // the reader looks first, and it now carries the metric's name because the
-    // metric row it replaces was an empty label.
+    const metricRow = row;
+    if (
+      declaredMetricRows[metricId] != null &&
+      declaredMetricRows[metricId] !== metricRow
+    ) {
+      throw new Error(
+        `Broker metric row drift for ${metricId}: row plan ` +
+          `${declaredMetricRows[metricId]}, emitted ${metricRow}.`,
+      );
+    }
+    selectedRows[metricId] = metricRow;
+    setValue(
+      sheet,
+      `B${metricRow}`,
+      attributedHouse
+        ? `${metric.label} — Selected Forecast (${attributedHouse}, attributed)`
+        : `${metric.label} — Selected Forecast`,
+    );
+
+    // The answer closes the block after every candidate and reconciliation row.
+    // The Operating Model links only to this row.
     for (let index = 0; index < 3; index += 1) {
       const column = FORECAST_COLUMNS_BROKERS[index];
       let expression =
-        `IF(${liveCaseCell}="Consensus",${column}${consensusRow},` +
+        `IF(OR(${liveCaseCell}="Consensus",${liveCaseCell}="Model Consensus",` +
+        `${liveCaseCell}="Forecast Waterfall"),${column}${modelConsensusRow},`;
+      if (providerConsensusRow) {
+        expression +=
+          `IF(${liveCaseCell}="Provider Consensus",${column}${providerConsensusRow},`;
+      }
+      expression +=
         `IF(${liveCaseCell}="High",${column}${highRow},` +
         `IF(${liveCaseCell}="Low",${column}${lowRow}`;
-      names.forEach((name, nameIndex) => {
-        const brokerRow = brokerRows[nameIndex];
+      const selectableNames = compiledConsensus.periods[index].included.map(
+        (entry) => entry.house_name,
+      );
+      selectableNames.forEach((name) => {
+        const brokerRow = rowByHouse.get(name);
         expression +=
           `,IF(${liveCaseCell}="${name.replace(/"/g, '""')}",` +
           `${column}${brokerRow}`;
@@ -2334,7 +2433,9 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
       // evidence, formulas or history; this display selector may never invent
       // a consensus fallback for a missing named-house cell.
       expression += `,""`;
-      expression += ")".repeat(3 + names.length);
+      expression += ")".repeat(
+        3 + selectableNames.length + (providerConsensusRow ? 1 : 0),
+      );
       applyFormula(sheet, `${column}${metricRow}`, `=${expression}`);
     }
     if (actualFormula) {
@@ -2343,7 +2444,7 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
 
     // THREE GROUNDS, THREE KINDS OF ROW, NO LEGEND.
     //
-    // `Consensus`, `High` and `Low` are DERIVED rows standing in a list of
+    // `Model Consensus`, `High` and `Low` are DERIVED rows standing in a list of
     // SOURCED ones, and they were formatted identically to a named house. They
     // now carry `subsection_fill`, which is this model's declared ground for a
     // block subtotal — which is exactly what they are, the subtotals of the
@@ -2362,12 +2463,17 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     sheet.getRange(
       `${ACTUAL_COLUMN}${metricRow}:${LAST_COLUMN}${metricRow}`,
     ).format.font = { bold: true };
-    sheet.getRange(`B${consensusRow}:${LAST_COLUMN}${lowRow}`).format.fill =
+    sheet.getRange(`B${modelConsensusRow}:${LAST_COLUMN}${lowRow}`).format.fill =
       COLORS.subsection;
 
     sheet.getRange(
-      `${ACTUAL_COLUMN}${metricRow}:${LAST_COLUMN}${lowRow}`,
+      `${ACTUAL_COLUMN}${brokerRows[0] ?? modelConsensusRow}:${LAST_COLUMN}${metricRow}`,
     ).format.numberFormat = numberFormat;
+    if (differencePctRow) {
+      sheet.getRange(
+        `${FORECAST_COLUMNS_BROKERS[0]}${differencePctRow}:${LAST_COLUMN}${differencePctRow}`,
+      ).format.numberFormat = PERCENT;
+    }
 
     // A BLANK ROW BETWEEN BLOCKS, at the reviewer's instruction ("there should
     // be a space in between each broker"). The blocks ran straight into one
@@ -10161,20 +10267,13 @@ function forecastInput(modelCase, definition, forecastIndex) {
   if (authority.mechanism === "hardcode" && authority.value !== null) {
     return Number(authority.value);
   }
-  const metric = definition.broker_metric_id
-    ? modelCase.broker_pack.metrics?.[definition.broker_metric_id]
+  let value = definition.broker_metric_id
+    ? resolveBrokerForecastSelection(
+        modelCase,
+        definition.broker_metric_id,
+        forecastIndex,
+      ).value
     : null;
-  const selectedBroker = modelCase.controls.broker_case;
-  let value = null;
-  if (
-    selectedBroker &&
-    !["Consensus", "High", "Low"].includes(selectedBroker)
-  ) {
-    value = metric?.brokers?.[selectedBroker]?.[forecastIndex];
-  }
-  if (value === null || value === undefined) {
-    value = metric?.provider_consensus?.[forecastIndex];
-  }
   if (value === null || value === undefined) {
     value = rowValues(modelCase, definition)[forecastIndex + 3];
   }
@@ -12618,6 +12717,9 @@ if (invokedDirectly) {
 // there is no second copy of the build for the certification path to drift from.
 export {
   assertShippedPlan,
+  brokerMetricRowMap,
+  brokerLink,
+  buildBrokersSheet,
   declareShippedFacts,
   main,
   workbookQualityDisclosure,

@@ -372,6 +372,20 @@ When broker data is supplied or available:
 - exclude synthetic values unless explicitly instructed;
 - derive compatible model metrics visibly when definitions differ.
 
+For every consumed metric, keep calculated and supplied consensus distinct.
+`Model Consensus` is always a black workbook formula over the hash-sealed set
+of compatible, period-eligible, non-rejected and non-quarantined named-house
+cells. Blanks never become zero and do not count as contributors. A vendor's
+published line appears separately as blue `Provider Consensus` only when it was
+actually supplied; it is never manufactured from the named houses. Show the
+model/provider difference, difference percentage, live contributor count,
+excluded count and the configured material-review threshold. Preserve excluded
+evidence and reasons in the membership receipt. `Selected Forecast` may choose
+Model Consensus, Provider Consensus, High, Low or one eligible named house, and
+the Operating Model consumes that answer only through a green cross-sheet link.
+The legacy control label `Consensus` resolves to Model Consensus during carrier
+migration; it never means Provider Consensus.
+
 The production workflow requires the 3–10-house broker set and retains the
 approved `Brokers` sheet. A synthetic stress test may use an explicitly
 indicative broker fixture, but it must be labelled as test data and must never

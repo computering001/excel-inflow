@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url";
 
 import { validatePublicTestRun } from "./lib/public_test_run.mjs";
 import { assertWriteTargetOutsideSkill } from "./lib/runtime_isolation.mjs";
+import {
+  compileBrokerConsensusMetric,
+  sealBrokerConsensusMembership,
+} from "./lib/broker_consensus.mjs";
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = path.resolve(SCRIPT_DIRECTORY, "..");
@@ -88,9 +92,41 @@ function applySyntheticBrokers(modelCase, sourceId, sourceName, publicationDate)
   }));
   for (const [metricId, metric] of Object.entries(modelCase.broker_pack.metrics ?? {})) {
     const old = metric.brokers ?? {};
-    metric.brokers = Object.fromEntries(
-      newNames.map((newName, index) => [newName, structuredClone(old[oldNames[index]] ?? metric.provider_consensus)]),
+    const modelConsensus = compileBrokerConsensusMetric(
+      modelCase,
+      metricId,
+    ).periods.map((period) => period.model_consensus);
+    const oldMembership = new Map(
+      (metric.consensus_membership?.contributors ?? []).map((entry) => [
+        entry.house_name,
+        entry,
+      ]),
     );
+    metric.brokers = Object.fromEntries(
+      newNames.map((newName, index) => [
+        newName,
+        structuredClone(old[oldNames[index]] ?? modelConsensus),
+      ]),
+    );
+    metric.consensus_membership = sealBrokerConsensusMembership({
+      schema_version: "broker-consensus-membership/1.0",
+      metric_id: metricId,
+      contributors: newNames.map((newName, index) => {
+        const prior = oldMembership.get(oldNames[index]);
+        return {
+          house_name: newName,
+          status: prior?.status ?? "included",
+          reasons: structuredClone(prior?.reasons ?? []),
+          definition_signature: structuredClone(
+            prior?.definition_signature ?? metric.definition_signature ?? {},
+          ),
+          period_status: structuredClone(
+            prior?.period_status ?? ["included", "included", "included"],
+          ),
+          period_reasons: structuredClone(prior?.period_reasons ?? [[], [], []]),
+        };
+      }),
+    });
     houses.forEach((house, index) => {
       house.estimates[metricId] = structuredClone(metric.brokers[newNames[index]]);
     });

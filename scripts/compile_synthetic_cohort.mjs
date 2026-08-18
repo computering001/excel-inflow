@@ -8,6 +8,10 @@ import { fileURLToPath } from "node:url";
 import { assessCoverage } from "./lib/coverage.mjs";
 import { acknowledgeSyntheticLiquidityStress } from "./lib/plausibility_acknowledgements.mjs";
 import { solveCase, validateCaseShape } from "./lib/solver.mjs";
+import {
+  compileBrokerConsensusMetric,
+  sealBrokerConsensusMembership,
+} from "./lib/broker_consensus.mjs";
 
 export const COMPILER_VERSION = "dmu-synthetic-cohort/1.0.0";
 const EXPECTED_IDS = Array.from({ length: 32 }, (_, index) => `C${index + 1}`);
@@ -1016,12 +1020,33 @@ function applyAcquisitionOverlay(caseData, value) {
 function makeThreeHouseBrokerPack(caseData, seed) {
   const rng = mulberry32(seed ^ 0xa5a5a5a5);
   const names = ["Northstar Securities", "Harbour Lane Research", "Moorland Capital"];
-  for (const metric of Object.values(caseData.broker_pack.metrics)) {
-    const consensus = metric.provider_consensus.map(Number);
+  for (const [metricId, metric] of Object.entries(caseData.broker_pack.metrics)) {
+    const compiled = compileBrokerConsensusMetric(caseData, metricId);
+    const consensus = compiled.periods.map((period, index) => {
+      if (!Number.isFinite(period.model_consensus)) {
+        throw new Error(
+          `Cannot synthesise ${metricId} period ${index + 1}: ` +
+            "no compatible named-house Model Consensus is available.",
+        );
+      }
+      return Number(period.model_consensus);
+    });
     metric.brokers = Object.fromEntries(names.map((name, houseIndex) => {
       const offset = (houseIndex - 1) * (0.0125 + rng() * 0.0075);
       return [name, consensus.map((value) => round(value * (1 + offset), Math.abs(value) < 1 ? 4 : 3))];
     }));
+    metric.consensus_membership = sealBrokerConsensusMembership({
+      schema_version: "broker-consensus-membership/1.0",
+      metric_id: metricId,
+      contributors: names.map((houseName) => ({
+        house_name: houseName,
+        status: "included",
+        reasons: [],
+        definition_signature: structuredClone(metric.definition_signature ?? {}),
+        period_status: ["included", "included", "included"],
+        period_reasons: [[], [], []],
+      })),
+    });
   }
   caseData.broker_pack.source_label = "SYNTHETIC TEST DATA — three fictional broker houses generated solely for deterministic Debt Model Unified stress testing. No licensed research or real broker forecast is reproduced or implied.";
 }

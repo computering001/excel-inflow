@@ -219,6 +219,33 @@
       "test_class": "mutation"
     },
     {
+      "id": "broker-consensus-membership-oracle",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_broker_consensus_membership_oracle_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "broker-consensus-compiler",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_broker_consensus_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "broker-consensus-workbook-semantics",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_broker_consensus_workbook_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
+    },
+    {
       "id": "forecast-behavior",
       "phase": "forecast",
       "runtime": "node",

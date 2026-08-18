@@ -52,6 +52,11 @@ def detected(mutation_id: str) -> bool:
     if mutation_id == "change_broker_period":
         demand_period, selected_period = "2027-12-31", "2028-12-31"
         return demand_period != selected_period
+    if mutation_id == "rejected_house_enters_model_consensus":
+        members = {"House A": "included", "House B": "rejected"}
+        averaged = {"House A", "House B"}
+        eligible = {house for house, status in members.items() if status == "included"}
+        return averaged != eligible
     if mutation_id == "unresolved_to_zero":
         typed_state, value = "unresolved", 0
         return typed_state == "unresolved" and value is not None
@@ -70,7 +75,7 @@ tests = {test["id"]: test for test in registry["tests"]}
 required_domains = {
     "cash_flow_identity", "instrument_identity", "interest_lineage",
     "ebitda_basis", "forecast_ownership", "rcf_financing_cash",
-    "broker_period", "typed_unresolved_state", "debt_classification",
+    "broker_period", "broker_consensus_membership", "typed_unresolved_state", "debt_classification",
     "workbook_error_scan",
 }
 

@@ -1573,29 +1573,6 @@ function validateDebtMapping(run, findings) {
   }
 }
 
-function expectedConsensus(pack, metricId, forecastIndex) {
-  const provider = pack.provider_consensus?.[metricId]?.[forecastIndex];
-  if (
-    provider !== null &&
-    provider !== undefined &&
-    Number.isFinite(Number(provider))
-  ) {
-    return Number(provider);
-  }
-  const values = (pack.houses ?? [])
-    .map((house) => house.estimates?.[metricId]?.[forecastIndex])
-    .filter(
-      (value) =>
-        value !== null &&
-        value !== undefined &&
-        Number.isFinite(Number(value)),
-    )
-    .map(Number);
-  return values.length > 0
-    ? values.reduce((total, value) => total + value, 0) / values.length
-    : null;
-}
-
 function validateBrokerMapping(run, findings) {
   const source = run.broker_pack ?? {};
   const target = run.model_case?.broker_pack ?? {};
@@ -1643,23 +1620,26 @@ function validateBrokerMapping(run, findings) {
         );
       }
     }
-    for (let index = 0; index < 3; index += 1) {
-      const expected = expectedConsensus(source, metricId, index);
-      const actual = metric.provider_consensus?.[index];
-      if (
-        expected !== null &&
-        (actual === null ||
-          actual === undefined ||
-          !approximate(actual, expected))
-      ) {
+    const sourceProvider = source.provider_consensus?.[metricId];
+    const targetProvider = metric.provider_consensus;
+    if (Array.isArray(sourceProvider)) {
+      if (!sameArray(sourceProvider, targetProvider)) {
         findings.push(
           finding(
-            "evidence.broker.consensus_mismatch",
+            "evidence.broker.provider_consensus_mismatch",
             "BLOCK",
-            `${metricId} consensus for forecast period ${index + 1} does not match the provider line or the named-house mean.`,
+            `${metricId} Provider Consensus does not match the supplied provider line.`,
           ),
         );
       }
+    } else if (targetProvider !== undefined) {
+      findings.push(
+        finding(
+          "evidence.broker.provider_consensus_invented",
+          "BLOCK",
+          `${metricId} has no supplied Provider Consensus, but the model case created one.`,
+        ),
+      );
     }
   }
   const sourceTableByHouse = new Map(

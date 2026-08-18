@@ -1,3 +1,5 @@
+import { compileBrokerConsensusMetric } from "./broker_consensus.mjs";
+
 /**
  * Populate the optional acquisition module with a coherent illustrative case.
  *
@@ -35,17 +37,21 @@ function twoSignificantFigures(value) {
 }
 
 function forecastEbitda(modelCase) {
+  const modelConsensus = (metricId) =>
+    compileBrokerConsensusMetric(modelCase, metricId)?.periods.map(
+      (period) => period.model_consensus,
+    );
   return (
     firstPositive(
       modelCase.operating_metrics?.adjusted_ebitda?.values?.slice(3),
     ) ??
     firstPositive(
-      modelCase.broker_pack?.metrics?.adjusted_ebitda?.provider_consensus,
+      modelConsensus("adjusted_ebitda"),
     ) ??
     firstPositive(
       modelCase.operating_metrics?.ebitda?.values?.slice(3),
     ) ??
-    firstPositive(modelCase.broker_pack?.metrics?.ebitda?.provider_consensus) ??
+    firstPositive(modelConsensus("ebitda")) ??
     null
   );
 }
