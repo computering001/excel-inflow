@@ -359,6 +359,43 @@ def bounded_capture_responses(
     return accepted, errors
 
 
+def portable_vision_task_identity(task: dict[str, Any]) -> dict[str, Any]:
+    """Remove transport locations only when immutable artifact hashes replace them.
+
+    Model-host task packets need absolute paths so the host can open the rendered
+    evidence in the current run.  Those paths are transport, not evidence: a
+    fresh output root must not mint a new obligation for identical source bytes.
+    The omission is deliberately conditional.  A legacy or malformed task with
+    no hash companion retains its path in the identity and therefore cannot gain
+    portable replay merely by asserting that its bytes are unchanged.
+    """
+    value = copy.deepcopy(task)
+
+    def is_sha256(candidate: Any) -> bool:
+        return (
+            isinstance(candidate, str)
+            and len(candidate) == 64
+            and all(character in "0123456789abcdef" for character in candidate)
+        )
+
+    if is_sha256(value.get("image_artifact_sha256")):
+        value.pop("image_path", None)
+    if is_sha256(value.get("task_artifact_sha256")):
+        value.pop("task_path", None)
+    crops = value.get("region_crops")
+    if isinstance(crops, list):
+        portable_crops = []
+        for crop in crops:
+            portable_crop = copy.deepcopy(crop)
+            if isinstance(portable_crop, dict) and is_sha256(
+                portable_crop.get("sha256")
+            ):
+                portable_crop.pop("path", None)
+            portable_crops.append(portable_crop)
+        value["region_crops"] = portable_crops
+    return value
+
+
 def task_identity(task: dict[str, Any], cache_key: str) -> tuple[str, str]:
     raw = {
         key: value
@@ -369,6 +406,12 @@ def task_identity(task: dict[str, Any], cache_key: str) -> tuple[str, str]:
             "prior_response_sha256s", "bounded_capture_round",
         }
     }
+    if raw.get("task_kind") == "independent_table_transcription":
+        raw = portable_vision_task_identity(raw)
+    elif raw.get("task_kind") == "bounded_capture_adjudication":
+        prior_task = raw.get("prior_task")
+        if isinstance(prior_task, dict):
+            raw["prior_task"] = portable_vision_task_identity(prior_task)
     input_sha = sha256_bytes(canonical_bytes({"cache_key": cache_key, "task": raw}))
     return f"broker-task-{input_sha[:24]}", input_sha
 
@@ -853,6 +896,11 @@ def canonical_recovery_artifacts_valid(bundle_path: Path) -> bool:
 def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
     for document in bundle.get("documents", []):
+        artifacts = {
+            str(item.get("artifact_id")): item
+            for item in document.get("artifacts", [])
+            if isinstance(item, dict) and item.get("artifact_id")
+        }
         for surface in document.get("surfaces", []):
             if surface.get("lane_status", {}).get("vision") != "required":
                 continue
@@ -884,6 +932,8 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
             )
             task_path = artifact_path(bundle, document, task_id) if task_id else None
             task_payload = read_json(task_path, "broker vision task") if task_path else {}
+            image_artifact = artifacts.get(str(image_id or "")) or {}
+            task_artifact = artifacts.get(str(task_id or "")) or {}
             source_surface_digest = sha256_bytes(canonical_bytes({
                 "schema_version": "broker-source-surface/1.0",
                 "document_id": document.get("document_id"),
@@ -892,10 +942,14 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
             }))
             crop_paths = []
             for crop in task_payload.get("region_crops", []):
-                crop_target = artifact_path(bundle, document, str(crop.get("image_artifact_id") or ""))
+                crop_id = str(crop.get("image_artifact_id") or "")
+                crop_artifact = artifacts.get(crop_id) or {}
+                crop_target = artifact_path(bundle, document, crop_id)
                 if crop_target:
                     crop_paths.append({
                         "region_id": crop.get("region_id"),
+                        "image_artifact_id": crop_id,
+                        "sha256": crop_artifact.get("sha256"),
                         "bbox": crop.get("bbox"),
                         "dpi": crop.get("dpi"),
                         "path": str(crop_target),
@@ -908,8 +962,12 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
                 "missing_passes": missing_passes,
                 "image_path": str(artifact_path(bundle, document, image_id)) if image_id else None,
                 "image_sha256": source_surface_digest,
+                "image_artifact_id": image_id,
+                "image_artifact_sha256": image_artifact.get("sha256"),
                 "region_crops": crop_paths,
                 "task_path": str(task_path) if task_path else None,
+                "task_artifact_id": task_id,
+                "task_artifact_sha256": task_artifact.get("sha256"),
                 "selected_cell_contract": task_payload.get("selected_cell_contract"),
                 "instruction": task_payload.get("instruction") or (
                     "Complete two independent grid-preserving table reads. Use native text, coordinates, "

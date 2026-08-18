@@ -51,6 +51,79 @@ def prior_state(
     }
 
 
+def relocated_vision_task(root: Path) -> dict:
+    """Build one real path-bearing task from stable artifact bytes."""
+    artifact_root = root / "extract-artifacts"
+    document_root = artifact_root / "artifacts" / "broker-a"
+    page_path = document_root / "pages" / "page-0001.png"
+    crop_path = document_root / "crops" / "page-0001-region-001.png"
+    task_path = document_root / "vision" / "page-0001.task.json"
+    for target in (page_path, crop_path, task_path):
+        target.parent.mkdir(parents=True, exist_ok=True)
+    page_path.write_bytes(b"stable rendered broker page")
+    crop_path.write_bytes(b"stable bounded broker crop")
+    task_payload = {
+        "schema_version": "broker-vision-task/1.0",
+        "document_id": "broker-a",
+        "surface_id": "page-1",
+        "image_artifact_id": "broker-a.page",
+        "reason": "synthetic relocation regression",
+        "required_passes": 2,
+        "source_census_artifact_id": "broker-a.census",
+        "uncovered_region_ids": ["page-1.crop1"],
+        "region_crops": [{
+            "region_id": "page-1.crop1",
+            "image_artifact_id": "broker-a.crop",
+            "bbox": [1.0, 2.0, 30.0, 40.0],
+            "dpi": 300,
+        }],
+        "selected_cell_contract": {
+            "schema_version": "broker-selected-cell-task/1.0",
+            "model_demand_graph_sha256": "1" * 64,
+            "demand_contract_sha256": "2" * 64,
+            "targets": [],
+        },
+        "instruction": "Read the complete grid twice.",
+    }
+    task_path.write_bytes(broker.canonical_bytes(task_payload))
+    artifacts = [
+        {
+            "artifact_id": "broker-a.page", "kind": "page_image",
+            "path": page_path.relative_to(artifact_root).as_posix(),
+            "sha256": broker.sha256_file(page_path),
+        },
+        {
+            "artifact_id": "broker-a.crop", "kind": "table_crop",
+            "path": crop_path.relative_to(artifact_root).as_posix(),
+            "sha256": broker.sha256_file(crop_path),
+        },
+        {
+            "artifact_id": "broker-a.task", "kind": "vision_task",
+            "path": task_path.relative_to(artifact_root).as_posix(),
+            "sha256": broker.sha256_file(task_path),
+        },
+    ]
+    bundle = {
+        "artifact_root": str(artifact_root),
+        "documents": [{
+            "document_id": "broker-a",
+            "house_id": "house-a",
+            "raw_sha256": "3" * 64,
+            "artifacts": artifacts,
+            "surfaces": [{
+                "surface_id": "page-1",
+                "lane_status": {"vision": "required"},
+                "artifact_refs": [
+                    "broker-a.page", "broker-a.crop", "broker-a.task",
+                ],
+            }],
+        }],
+    }
+    tasks = broker.vision_tasks(bundle, None)
+    check(len(tasks) == 1, "relocation fixture did not produce one vision task")
+    return tasks[0]
+
+
 def main() -> int:
     checks = 0
     cache_key = "a" * 64
@@ -87,13 +160,70 @@ def main() -> int:
         response_root = Path(temp)
         (response_root / "page-1.pass1.json").write_text('{"round":0,"pass":1}\n')
         (response_root / "page-1.pass2.json").write_text('{"round":0,"pass":2}\n')
-        bounded_source_task = {
-            **vision_task,
-            "image_sha256": "d" * 64,
-            "missing_passes": [1, 2],
-        }
+        bounded_source_task = relocated_vision_task(response_root / "output-a")
+        relocated_source_task = relocated_vision_task(response_root / "output-b")
+        check(
+            bounded_source_task["image_path"] != relocated_source_task["image_path"]
+            and bounded_source_task["task_path"] != relocated_source_task["task_path"]
+            and bounded_source_task["region_crops"][0]["path"]
+            != relocated_source_task["region_crops"][0]["path"],
+            "relocation fixture did not exercise distinct absolute transport paths",
+        )
         bounded_raw = broker.bounded_capture_tasks(
             [bounded_source_task], response_root
+        )
+        relocated_raw = broker.bounded_capture_tasks(
+            [relocated_source_task], response_root
+        )
+        original_identity = broker.task_identity(bounded_raw[0], cache_key)
+        relocated_identity = broker.task_identity(relocated_raw[0], cache_key)
+        check(
+            relocated_identity == original_identity,
+            "identical bounded evidence minted a new identity after output-root relocation",
+        )
+        changed_image = copy.deepcopy(relocated_raw[0])
+        changed_image["prior_task"]["image_artifact_sha256"] = "4" * 64
+        check(
+            broker.task_identity(changed_image, cache_key) != original_identity,
+            "changed rendered image bytes did not invalidate bounded task identity",
+        )
+        changed_task = copy.deepcopy(relocated_raw[0])
+        changed_task["prior_task"]["task_artifact_sha256"] = "5" * 64
+        check(
+            broker.task_identity(changed_task, cache_key) != original_identity,
+            "changed vision-task bytes did not invalidate bounded task identity",
+        )
+        changed_crop = copy.deepcopy(relocated_raw[0])
+        changed_crop["prior_task"]["region_crops"][0]["sha256"] = "6" * 64
+        check(
+            broker.task_identity(changed_crop, cache_key) != original_identity,
+            "changed crop bytes did not invalidate bounded task identity",
+        )
+        check(
+            broker.task_identity(relocated_raw[0], "7" * 64) != original_identity,
+            "changed source/runtime cache key did not invalidate bounded task identity",
+        )
+        unbound_paths_a = copy.deepcopy(bounded_raw[0])
+        unbound_paths_b = copy.deepcopy(relocated_raw[0])
+        for candidate in (unbound_paths_a, unbound_paths_b):
+            candidate["prior_task"].pop("image_artifact_sha256")
+            candidate["prior_task"].pop("task_artifact_sha256")
+            candidate["prior_task"]["region_crops"][0].pop("sha256")
+        check(
+            broker.task_identity(unbound_paths_a, cache_key)
+            != broker.task_identity(unbound_paths_b, cache_key),
+            "unhashed transport paths were incorrectly granted portable replay",
+        )
+        invalid_hash_paths_a = copy.deepcopy(unbound_paths_a)
+        invalid_hash_paths_b = copy.deepcopy(unbound_paths_b)
+        for candidate in (invalid_hash_paths_a, invalid_hash_paths_b):
+            candidate["prior_task"]["image_artifact_sha256"] = "not-a-sha256"
+            candidate["prior_task"]["task_artifact_sha256"] = "not-a-sha256"
+            candidate["prior_task"]["region_crops"][0]["sha256"] = "not-a-sha256"
+        check(
+            broker.task_identity(invalid_hash_paths_a, cache_key)
+            != broker.task_identity(invalid_hash_paths_b, cache_key),
+            "invalid self-asserted hashes made transport paths replayable",
         )
         attempts = {
             "execution_response_sha256": [],
@@ -142,7 +272,7 @@ def main() -> int:
             "round_index": 1,
             "document_id": "broker-a",
             "surface_id": "page-1",
-            "source_image_sha256": "d" * 64,
+            "source_image_sha256": bounded_source_task["image_sha256"],
             "producer_id": "model-host-bounded-capture-test",
             "producer_fingerprint": "bounded-capture-round-1",
             "decision": "retry_with_replacement_reads",
@@ -156,6 +286,29 @@ def main() -> int:
                 bounded_packet, response, response_root
             ) == [],
             "valid round-one bounded-capture response was rejected",
+        )
+        _, relocated_packets, _, _ = broker.seal_internal_work(
+            prior={}, cache_key=cache_key, status="NEEDS_RESOLUTION",
+            tasks=relocated_raw, checkpoints=checkpoints, summary={},
+            attempts=attempts,
+        )
+        check(
+            relocated_packets[0]["task_id"] == bounded_packet["task_id"]
+            and broker.validate_bounded_capture_response(
+                relocated_packets[0], response, response_root
+            ) == [],
+            "a valid bounded response could not be replayed after output relocation",
+        )
+        _, changed_image_packets, _, _ = broker.seal_internal_work(
+            prior={}, cache_key=cache_key, status="NEEDS_RESOLUTION",
+            tasks=[changed_image], checkpoints=checkpoints, summary={},
+            attempts=attempts,
+        )
+        check(
+            broker.validate_bounded_capture_response(
+                changed_image_packets[0], response, response_root
+            ),
+            "a stale bounded response was accepted after rendered evidence changed",
         )
 
         mutation = copy.deepcopy(response)
@@ -201,7 +354,7 @@ def main() -> int:
             "one accepted bounded round exhausted a two-round task",
         )
         second_raw = broker.bounded_capture_tasks(
-            [bounded_source_task], response_root
+            [relocated_source_task], response_root
         )
         _, second_packets, second_fixed, _ = broker.seal_internal_work(
             prior=bounded_state, cache_key=cache_key, status="NEEDS_RESOLUTION",
@@ -214,6 +367,8 @@ def main() -> int:
         }
         check(
             second_packet["task_id"] == bounded_packet["task_id"]
+            and second_packet["progress_measure"]["task_input_sha256"]
+            == bounded_packet["progress_measure"]["task_input_sha256"]
             and second_packet["bounded_capture_round"]["round_index"] == 2
             and second_packet["attempt_budget"]["attempts_remaining"] == 1,
             "bounded capture did not preserve its stable id into round two",
@@ -265,7 +420,7 @@ def main() -> int:
             ) == [],
             "lawful task-bound quarantine decision was rejected",
         )
-        checks += 14
+        checks += 24
 
     overlap_tables = [
         {
@@ -792,8 +947,8 @@ def main() -> int:
     print(json.dumps({
         "status": "PASS",
         "checks": checks,
-        "positive_checks": checks - 16,
-        "mutation_checks": 16,
+        "positive_checks": checks - 23,
+        "mutation_checks": 23,
         "total_violation_count": 0,
     }, sort_keys=True))
     return 0
