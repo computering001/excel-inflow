@@ -27,8 +27,32 @@ async function gitValue(skillRoot, args) {
 }
 export async function resolveSourceIdentity({ skillRoot, overrides = {} } = {}) {
   const root = path.resolve(skillRoot ?? new URL("../../", import.meta.url).pathname);
-  const release = await readJson(path.join(root, "release-manifest.json")) ?? {};
+  const releaseCandidate = await readJson(path.join(root, "release-manifest.json")) ?? {};
   const runtime = await readJson(path.join(root, "assets", "runtime-manifest.json")) ?? {};
+  const deploymentProfile =
+    await readJson(path.join(root, "assets", "deployment-profile.json")) ?? {};
+  const gitTree = await gitValue(root, ["rev-parse", "HEAD^{tree}"]);
+  const gitBranch = await gitValue(root, ["branch", "--show-current"]);
+  const releaseCandidateIdentity = releaseCandidate.identity ?? {};
+  const releaseCandidateIsTyped =
+    releaseCandidateIdentity.schema_version === PRODUCT_IDENTITY_SCHEMA;
+  const releaseCandidateMatchesRuntime =
+    releaseCandidate.skillVersion === runtime.skill_version;
+  const releaseCandidateMatchesSource =
+    !gitTree ||
+    gitBranch?.startsWith("packages/") ||
+    releaseCandidateIdentity.source?.tree_sha === gitTree;
+  // A package manifest is package-owned evidence, not mutable-source authority.
+  // Source checkouts historically retained old package manifests at the root;
+  // accepting one can silently replace the live version, commit and tree with
+  // an older release. Trust only a typed, version-compatible manifest whose
+  // source tree matches the checkout (or an explicit package-only branch).
+  const release =
+    releaseCandidateIsTyped &&
+    releaseCandidateMatchesRuntime &&
+    releaseCandidateMatchesSource
+      ? releaseCandidate
+      : {};
   const attestationPath = path.resolve(
     overrides.release_package_attestation_path ??
       process.env.EXCEL_INFLOW_RELEASE_PACKAGE_ATTESTATION ??
@@ -70,7 +94,7 @@ export async function resolveSourceIdentity({ skillRoot, overrides = {} } = {}) 
     attestedIdentity.source?.tree_sha ??
     releaseIdentity.source?.tree_sha ??
     runtime.source_tree ??
-    await gitValue(root, ["rev-parse", "HEAD^{tree}"]);
+    gitTree;
   const packageMode = assertPackageMode(
     overrides.package_mode ??
       attestedIdentity.package?.mode ??
@@ -91,7 +115,7 @@ export async function resolveSourceIdentity({ skillRoot, overrides = {} } = {}) 
       release.deploymentStatus ??
       "not_installed",
   );
-  const runtimeCodeClosureSha256 =
+  let runtimeCodeClosureSha256 =
     overrides.runtime_code_closure_sha256 ??
     attestedIdentity.package?.runtime_code_closure?.sha256 ??
     releaseIdentity.package?.runtime_code_closure?.sha256 ??
@@ -100,6 +124,10 @@ export async function resolveSourceIdentity({ skillRoot, overrides = {} } = {}) 
     runtime.runtime_code_closure_sha256 ??
     runtime.current_closure_sha256 ??
     null;
+  if (!runtimeCodeClosureSha256) {
+    runtimeCodeClosureSha256 =
+      (await captureRuntimeIntegrity(root)).runtime_code_closure.sha256;
+  }
   const certifiedRuntimeCodeClosureSha256 =
     overrides.certified_runtime_code_closure_sha256 ??
     attestedIdentity.package?.runtime_code_closure?.certified_sha256 ??
@@ -141,6 +169,12 @@ export async function resolveSourceIdentity({ skillRoot, overrides = {} } = {}) 
       null,
     installationIdentity,
   });
+  const skillVersion = release.skillVersion ?? runtime.skill_version ?? null;
+  const releaseName =
+    release.releaseName ??
+    (deploymentProfile.release_name && skillVersion
+      ? `${deploymentProfile.release_name} v${skillVersion}`
+      : null);
   return {
     schema_version: "source-identity/2.0",
     product_identity_schema: PRODUCT_IDENTITY_SCHEMA,
@@ -150,8 +184,8 @@ export async function resolveSourceIdentity({ skillRoot, overrides = {} } = {}) 
     source_tree: tree,
     package_mode: packageMode,
     deployment_status: deploymentStatus,
-    release_name: release.releaseName ?? null,
-    skill_version: release.skillVersion ?? runtime.skill_version ?? null,
+    release_name: releaseName,
+    skill_version: skillVersion,
     runtime_code_closure_sha256: runtimeCodeClosureSha256,
     certified_runtime_code_closure_sha256: certifiedRuntimeCodeClosureSha256,
     // Carrier v3 compatibility aliases. Carrier v4 will remove the ambiguous

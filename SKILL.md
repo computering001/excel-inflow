@@ -598,6 +598,15 @@ node scripts/run_user_flow.mjs --carrier <run-folder>/run-carrier.json \
   [--json]
 ```
 
+When an older carrier must cross a controller or installation identity
+boundary, migrate it explicitly; never weaken ordinary carrier verification:
+
+```text
+node scripts/migrate_run_carrier.mjs <run-folder>/run-carrier.json \
+  --run-root <run-folder> --out <run-folder>/identity-migration-receipt.json \
+  --workspace-token <same-token>
+```
+
 The carrier contains only run-relative paths and exact hashes. It is bound to
 the immutable run identity, issuer, controller and workspace/session token;
 absolute paths, traversal, symlink escapes, changed bytes or a different token
