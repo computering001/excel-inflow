@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Installed-host usable-broker canary receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "source_identity", "artifacts", "raw_pdf_sha256", "host_response_sha256", "selected_cells", "workbook_sha256", "workbook_consumption"],
+  "properties": {
+    "schema_version": { "const": "installed-host-broker-canary/2.0" },
+    "status": { "const": "PASS" },
+    "source_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "source_commit", "source_tree", "runtime_code_closure_sha256", "package_mode", "deployment_status", "installation_identity", "broker_document_id", "broker_source_id", "broker_house_id", "raw_pdf_sha256"],
+      "properties": {
+        "schema_version": { "const": "installed-host-source-identity/2.0" },
+        "source_commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "source_tree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "runtime_code_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "package_mode": { "enum": ["development", "certified"] },
+        "deployment_status": { "enum": ["not_installed", "installed_candidate", "active_candidate", "production_promoted", "rollback"] },
+        "installation_identity": { "type": "string", "minLength": 1 },
+        "broker_document_id": { "type": "string", "minLength": 1 },
+        "broker_source_id": { "type": "string", "minLength": 1 },
+        "broker_house_id": { "type": "string", "minLength": 1 },
+        "raw_pdf_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_pdf", "host_response", "workbook"],
+      "properties": {
+        "raw_pdf": { "type": "string", "minLength": 1 },
+        "host_response": { "type": "string", "minLength": 1 },
+        "workbook": { "type": "string", "minLength": 1 }
+      }
+    },
+    "raw_pdf_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "host_response_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "selected_cells": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric_id", "source_cell", "value_sha256", "host_response_sha256"],
+        "properties": {
+          "metric_id": { "type": "string", "minLength": 1 },
+          "source_cell": { "type": "string", "minLength": 1 },
+          "value_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "host_response_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "workbook_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "workbook_consumption": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metric_id", "source_cell", "workbook_cell", "value_sha256", "workbook_sha256", "consumed"],
+        "properties": {
+          "metric_id": { "type": "string", "minLength": 1 },
+          "source_cell": { "type": "string", "minLength": 1 },
+          "workbook_cell": { "type": "string", "minLength": 1 },
+          "value_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "workbook_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "consumed": { "const": true }
+        }
+      }
+    }
+  }
+}

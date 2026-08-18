@@ -934,6 +934,15 @@
       "script": "run_portability_contract_tests.mjs"
     },
     {
+      "id": "installed-host-broker-receipt-contract",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_installed_host_broker_receipt_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "installed-host-usable-broker",
       "phase": "real_corpus",
       "runtime": "node",
@@ -998,6 +1007,15 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "synthetic_integration"
+    },
+    {
+      "id": "acquisition-valuation-contract",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_acquisition_valuation_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "carrier-product-identity",

@@ -1,0 +1,131 @@
+import { createHash } from "node:crypto";
+
+export const CUSTODY_INPUTS = Object.freeze([
+  "BROKER_CORPUS",
+  "BROKER_REAL_PACK_MANIFEST",
+  "FIXED_POINT_CASES_MANIFEST",
+  "INSTALLED_HOST_BROKER_RECEIPT",
+  "RAW_CANARY_EVIDENCE",
+  "REAL_FILINGS_EXPECTATIONS",
+  "REAL_FILINGS_REQUEST",
+]);
+
+const CUSTODY_INPUT_SET = new Set(CUSTODY_INPUTS);
+export const DEVELOPMENT_GATE_PROFILES = Object.freeze(["all", "portable", "custody"]);
+
+export function sha256Text(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
+export function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => Buffer.compare(Buffer.from(left), Buffer.from(right)))
+        .map(([key, entry]) => [key, canonical(entry)]),
+    );
+  }
+  return value;
+}
+
+export function testProfile(test) {
+  return (test.requires ?? []).some((name) => CUSTODY_INPUT_SET.has(name))
+    ? "custody"
+    : "portable";
+}
+
+export function selectRegistryTests(registry, { profile = "all", phases = null } = {}) {
+  if (!DEVELOPMENT_GATE_PROFILES.includes(profile)) {
+    throw new Error(`Unknown development-gate profile ${profile}.`);
+  }
+  const phaseSet = phases ? new Set(phases) : null;
+  return registry.tests.filter((test) =>
+    (!phaseSet || phaseSet.has(test.phase)) &&
+    (profile === "all" || testProfile(test) === profile));
+}
+
+export function testIdSetSha256(tests) {
+  return sha256Text(`${tests.map((test) => test.id).sort().join("\n")}\n`);
+}
+
+export function aggregateGateReports({ registry, registrySha256, profile, reports }) {
+  const errors = [];
+  if (!DEVELOPMENT_GATE_PROFILES.includes(profile)) {
+    errors.push(`Unknown aggregate profile ${profile}.`);
+  }
+  if (!Array.isArray(reports) || reports.length === 0) {
+    errors.push("At least one development-gate report is required.");
+  }
+
+  const expectedTests = errors.length === 0
+    ? selectRegistryTests(registry, { profile })
+    : [];
+  const expectedIds = expectedTests.map((test) => test.id).sort();
+  const expectedSet = new Set(expectedIds);
+  const seen = new Map();
+  let sourceCommit = null;
+  const failed = [];
+
+  for (const [reportIndex, report] of (reports ?? []).entries()) {
+    if (report?.schema_version !== "development-gate-report/2.0") {
+      errors.push(`Report ${reportIndex} has the wrong schema version.`);
+      continue;
+    }
+    if (report.registry?.sha256 !== registrySha256) {
+      errors.push(`Report ${reportIndex} is bound to a different registry hash.`);
+    }
+    if (!report.source?.commit) {
+      errors.push(`Report ${reportIndex} has no source commit.`);
+    } else if (sourceCommit === null) {
+      sourceCommit = report.source.commit;
+    } else if (report.source.commit !== sourceCommit) {
+      errors.push(`Report ${reportIndex} is bound to a different source commit.`);
+    }
+    if (report.source?.worktree_dirty === true) {
+      errors.push(`Report ${reportIndex} was produced from a dirty worktree.`);
+    }
+    if (profile !== "all" && report.selection?.profile !== profile) {
+      errors.push(`Report ${reportIndex} has profile ${report.selection?.profile ?? "<missing>"}, expected ${profile}.`);
+    }
+    if (profile === "all" && !["all", "portable", "custody"].includes(report.selection?.profile)) {
+      errors.push(`Report ${reportIndex} has an invalid selection profile.`);
+    }
+
+    const reportResults = report.results ?? [];
+    const reportSelectionSha256 = testIdSetSha256(reportResults);
+    if (report.selection?.selected_test_ids_sha256 !== reportSelectionSha256) {
+      errors.push(`Report ${reportIndex} selected-test hash does not match its results.`);
+    }
+
+    for (const result of reportResults) {
+      if (!expectedSet.has(result.id)) {
+        errors.push(`Unexpected test id ${result.id}.`);
+        continue;
+      }
+      if (seen.has(result.id)) {
+        errors.push(`Duplicate test id ${result.id}.`);
+        continue;
+      }
+      seen.set(result.id, reportIndex);
+      if (result.status !== "PASS") failed.push(result.id);
+    }
+  }
+
+  const missing = expectedIds.filter((id) => !seen.has(id));
+  if (missing.length > 0) errors.push(`Missing test ids: ${missing.join(", ")}.`);
+
+  const result = canonical({
+    schema_version: "development-gate-aggregate/1.0",
+    profile,
+    source_commit: sourceCommit,
+    registry_sha256: registrySha256,
+    expected_test_count: expectedIds.length,
+    observed_test_count: seen.size,
+    expected_test_ids_sha256: testIdSetSha256(expectedTests),
+    failed_test_ids: [...new Set(failed)].sort(),
+    errors,
+    status: errors.length === 0 && failed.length === 0 ? "PASS" : "FAIL",
+  });
+  return result;
+}

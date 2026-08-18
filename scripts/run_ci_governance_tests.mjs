@@ -16,6 +16,7 @@ const FORBIDDEN = Object.freeze([
   ["shell append redirection", /(?:^|\s)>>\s*[^&]/m],
   ["heredoc source authoring", /<<[-]?['\"]?[A-Za-z_][A-Za-z0-9_]*['\"]?/],
 ]);
+const ACTION_USE = /^\s*-?\s*uses:\s*([^\s#]+)(?:\s*#.*)?$/gm;
 
 function findings(text) {
   return FORBIDDEN
@@ -36,7 +37,15 @@ for (const name of workflowFiles) {
   assert.match(text, /^\s*push:\s*$/m, `${name} does not run on main pushes.`);
   assert.match(text, /^\s*contents:\s*read\s*$/m, `${name} lacks read-only contents permission.`);
   assert.deepEqual(findings(text), [], `${name} can mutate repository or remote state.`);
-  checks += 4;
+  const actionUses = [...text.matchAll(ACTION_USE)].map((match) => match[1]);
+  assert(actionUses.length > 0, `${name} uses no pinned actions.`);
+  assert(
+    actionUses.every((value) => /@[a-f0-9]{40}$/.test(value)),
+    `${name} contains a mutable action reference.`,
+  );
+  assert.match(text, /run_development_gate\.mjs[\s\S]*--profile portable/, `${name} does not execute the portable registry partition.`);
+  assert.match(text, /aggregate_development_gate_reports\.mjs[\s\S]*--profile portable/, `${name} does not aggregate exact-once portable coverage.`);
+  checks += 8;
 }
 
 const clean = fs.readFileSync(
@@ -52,10 +61,15 @@ const mutations = [
 for (const mutation of mutations) {
   assert(findings(mutation).length > 0, "A CI authoring mutation escaped governance lint.");
 }
+const mutableAction = clean.replace(/@[a-f0-9]{40}/, "@v4");
+assert(
+  [...mutableAction.matchAll(ACTION_USE)].some((match) => !/@[a-f0-9]{40}$/.test(match[1])),
+  "A mutable action reference escaped governance lint.",
+);
 
 console.log(JSON.stringify({
   status: "PASS",
   workflow_count: workflowFiles.length,
   checks,
-  mutations_caught: mutations.length,
+  mutations_caught: mutations.length + 1,
 }, null, 2));

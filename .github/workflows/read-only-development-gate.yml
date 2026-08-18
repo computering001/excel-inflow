@@ -14,30 +14,51 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
-      - name: Install portable test dependencies
-        run: python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+      - name: Install portable runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
 
-      - name: Prove CI is read-only
-        run: node scripts/run_ci_governance_tests.mjs
+      - name: Run the complete portable registry partition
+        id: portable-gate
+        continue-on-error: true
+        env:
+          GATE_OUT: ${{ runner.temp }}/excel-inflow-portable-gate
+        run: |
+          node scripts/run_development_gate.mjs \
+            --profile portable \
+            --cases test-fixtures/cases \
+            --representative test-fixtures/cases/standard-maximal-v2.json \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)" \
+            --out "$GATE_OUT" \
+            --concurrency 3
 
-      - name: Validate the source-owned test registry
-        run: node scripts/run_test_registry_contract_tests.mjs
+      - name: Aggregate exact-once portable coverage
+        env:
+          GATE_OUT: ${{ runner.temp }}/excel-inflow-portable-gate
+        run: |
+          node scripts/aggregate_development_gate_reports.mjs \
+            --profile portable \
+            --report "$GATE_OUT/development-gate-report.json" \
+            --out "$GATE_OUT/development-gate-aggregate.json"
 
-      - name: Run authority ranking mutations
-        run: node scripts/run_forecast_authority_ranking_tests.mjs
-
-      - name: Run acquisition valuation mutations
-        run: node scripts/run_acquisition_valuation_contract_tests.mjs
-
-      - name: Run typed filing extraction mutations
-        run: python3 scripts/run_typed_filing_value_tests.py
+      - name: Retain redacted gate custody
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: portable-development-gate
+          path: ${{ runner.temp }}/excel-inflow-portable-gate/*.json
+          if-no-files-found: error
+          retention-days: 14

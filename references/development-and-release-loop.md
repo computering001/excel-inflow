@@ -45,12 +45,36 @@ invokes release governance.
 
 ```text
 node scripts/run_development_gate.mjs \
+  --profile portable \
   --phase workflow,evidence,forecast \
   --cases <v2-case-directory> \
   --representative <representative-compiled-case.json> \
   --fixed-point-cases-manifest <external-case-manifest.json> \
   --out <development-evidence-directory>
 ```
+
+`--profile portable` selects every registry test that does not require an
+external custody input. `--profile custody` selects every test that requires a
+broker corpus, real pack, fixed-point manifest, raw canary, real-filings pair or
+installed-host receipt. Omitting the profile selects both partitions. The
+partition is derived from each test's declared `requires` list; it is never a
+second hand-maintained test inventory.
+
+Every report binds the source commit, dirty-worktree state, registry SHA-256,
+selected-test-set SHA-256 and the SHA-256 of each supplied input. Commands,
+paths, stdout and stderr are replaced by byte counts and hashes so protected
+corpus details cannot enter CI artifacts. Use
+`scripts/aggregate_development_gate_reports.mjs` to prove exact-once coverage
+for one partition or for the joined portable and custody reports. The aggregate
+fails on missing or duplicate IDs, source or registry drift, a dirty source
+tree, or any non-PASS test.
+
+The installed-host broker seam requires
+`installed-host-broker-canary/2.0`. Its verifier resolves active source,
+package, deployment and installation identity, recomputes the raw-PDF,
+model-host-response and workbook hashes from contained regular artifacts, and
+joins every selected source cell exactly once to workbook consumption. A v1,
+self-asserted or path-escaping receipt is not certification evidence.
 
 Phases come from `assets/development-test-registry.json` and are the only
 selector the gate accepts:
