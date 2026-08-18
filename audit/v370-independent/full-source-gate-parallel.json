@@ -1,0 +1,1270 @@
+{
+  "completed_at": "2026-08-18T05:27:01.709Z",
+  "counts": {
+    "BLOCKED": 6,
+    "FAIL": 2,
+    "PASS": 85
+  },
+  "golden_actions_performed": false,
+  "inputs": {
+    "BROKER_CORPUS": null,
+    "BROKER_REAL_PACK_MANIFEST": null,
+    "CASES": "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases",
+    "DEGRADED_DELIVERY_REPORT": null,
+    "FIXED_POINT_CASES_MANIFEST": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/fixed-point-cases.json",
+    "INSTALLED_HOST_BROKER_RECEIPT": null,
+    "PYTHON": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "RAW_CANARY_EVIDENCE": null,
+    "REAL_FILINGS_EXPECTATIONS": null,
+    "REAL_FILINGS_REQUEST": null,
+    "REPRESENTATIVE": "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases/standard-maximal-v2.json",
+    "SOFFICE": "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "USABLE_BROKER_WORKBOOK": null
+  },
+  "kind": "source_owned_lean_development_gate",
+  "native_excel_actions_performed": false,
+  "phases": [
+    "cohort",
+    "economic",
+    "economics",
+    "evidence",
+    "forecast",
+    "graph",
+    "performance",
+    "proof",
+    "real_corpus",
+    "workflow"
+  ],
+  "registry_path": "assets/development-test-registry.json",
+  "release_actions_performed": false,
+  "results": [
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_workflow_state_tests.mjs"
+      ],
+      "duration_ms": 80.284208,
+      "exit_code": 0,
+      "id": "workflow-state-contract",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "  PASS  canonical contract loads\n  PASS  broker intake requires an explicit choice before completion\n  PASS  one visible progress scale maps internal checkpoints without leaking stage numbers\n  PASS  screen response semantics reject contradictory or ambiguous actions\n  PASS  broker-only delivery block\n  PASS  broker defects degrade and cannot claim a delivery block\n  PASS  undeclared fatal reason\n  PASS  only the four declared fatal reasons can block delivery\n  PASS  valid internal and user-owned states are accepted\n  PASS  every internal evidence state has a declared route to a closed lane\n  PASS  internal work can never become an action-required user message\n  PASS  internal work cannot masquerade as a user upload blocker\n  PASS  user-blocking boolean cannot disagree with ownership\n  PASS  legal resumable transitions are accepted\n  PASS  same-evidence fatal input block cannot silently become pass\n  PASS  filing extraction work cannot become a user blocker\n  PASS  a delivered run cannot silently regress into an earlier flow state\n  PASS  user-flow normalisation persists typed ownership\n  PASS  optional broker control-plane defects cannot terminate the company run\n  PASS  an untyped user-flow block is forbidden\n  PASS  action-required is only legal at the decisions stage\n  PASS  stage receipts enforce the same stage-state contract\n  PASS  stage receipt mutation cannot request a decision at inputs\n  PASS  Python controllers consume the same canonical contract\n\n24/24 workflow-state checks passed.\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_ci_governance_tests.mjs"
+      ],
+      "duration_ms": 31.329708,
+      "exit_code": 0,
+      "id": "ci-governance-read-only",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"workflow_count\": 1,\n  \"checks\": 5,\n  \"mutations_caught\": 4\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_decision_round_tests.mjs"
+      ],
+      "duration_ms": 265.372167,
+      "exit_code": 0,
+      "id": "decision-round-batching",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"maturity_question_count\":0,\"pending_maturity_question_count\":0,\"total_violation_count\":0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_entity_identity_tests.mjs"
+      ],
+      "duration_ms": 32.770084,
+      "exit_code": 0,
+      "id": "entity-identity",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_source_ingress_security_tests.mjs"
+      ],
+      "duration_ms": 65.841958,
+      "exit_code": 0,
+      "id": "source-ingress-security",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":29}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_multipage_filing_extraction_tests.py"
+      ],
+      "duration_ms": 320.249458,
+      "exit_code": 0,
+      "id": "multipage-filing-extraction",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"kind\": \"multipage-filing-extraction-tests/1.0\",\n  \"status\": \"PASS\",\n  \"checks\": 14,\n  \"mutations_rejected\": 8,\n  \"mutations_total\": 8,\n  \"violations\": 0,\n  \"failures\": []\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_layered_graph_constitution_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases/standard-maximal-v2.json"
+      ],
+      "duration_ms": 125.868208,
+      "exit_code": 0,
+      "id": "layered-graph-constitution",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"baseline_closure_sha256\": \"f91be02f960c2d4d1e39aa13af6bd30e0ca0520d2100c61f3c304c1c31ee8955\",\n  \"layers\": {\n    \"evidence\": \"5c6d4358710d9fa4e40fad9473b3d8a87e9ca6751474b5b038b0a15c00137bbd\",\n    \"statement\": \"447e862e69bd0400dd9d26ba090a204cbd92f88c7a3de08ee0ca8f1f7a9a7546\",\n    \"forecast\": \"134bf753b8a6bfa41f204ff5db4f113e1f58a80a0c325f0f53a6bc8e5bec6c0b\",\n    \"economic\": \"1de752e6b2afa32ad50c8bbc6de1494d7ac1c856ee16999a3f49004db29b0c53\",\n    \"row_plan\": \"67ab76b085e73aeb165d99e2d9cbfbded492efbde0e8341c654ff16e01dba0b1\"\n  },\n  \"positive_checks\": 11,\n  \"adversarial_mutations_caught\": 8,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_equation_graph_tests.mjs"
+      ],
+      "duration_ms": 83.563417,
+      "exit_code": 0,
+      "id": "equation-graph-and-scc",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"total_violations\": 0,\n  \"graph_schema_version\": \"equation-graph/1.0\",\n  \"convergence_contract_version\": \"convergence-contract/1.0\",\n  \"policy_schema_version\": \"economic-solve-policy/1.0\",\n  \"structural_scc_count\": 1,\n  \"active_scc_count\": {\n    \"circularity_off\": 0,\n    \"circularity_on\": 1\n  },\n  \"off_state_live_edge_count\": 42,\n  \"iteration_state_size\": 13,\n  \"mutations\": [\n    {\n      \"name\": \"missing cash to interest income\",\n      \"status\": \"PASS\",\n      \"total_violations\": 5\n    },\n    {\n      \"name\": \"missing ending RCF to RCF interest\",\n      \"status\": \"PASS\",\n      \"total_violations\": 5\n    },\n    {\n      \"name\": \"missing statement start to CFO\",\n      \"status\": \"PASS\",\n      \"total_violations\": 5\n    },\n    {\n      \"name\": \"missing CFO to cash\",\n      \"status\": \"PASS\",\n      \"total_violations\": 3\n    },\n    {\n      \"name\": \"unrelated cycle\",\n      \"status\": \"PASS\",\n      \"total_violations\": 6\n    },\n    {\n      \"name\": \"reverse statement schedule direction\",\n      \"status\": \"PASS\",\n      \"total_violations\": 6\n    },\n    {\n      \"name\": \"missing circularity gate\",\n      \"status\": \"PASS\",\n      \"total_violations\": 2\n    },\n    {\n      \"name\": \"gate RCF sweep off\",\n      \"status\": \"PASS\",\n      \"total_violations\": 2\n    },\n    {\n      \"name\": \"policy role drift\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    },\n    {\n      \"name\": \"state tolerance class drift\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    },\n    {\n      \"name\": \"workbook tolerance drift\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    },\n    {\n      \"name\": \"strict schema rejects extension\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    }\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_fixed_point_constitution_tests.mjs",
+        "--manifest",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/fixed-point-cases.json"
+      ],
+      "duration_ms": 66.671917,
+      "exit_code": 1,
+      "id": "fixed-point-multi-archetype",
+      "phase": "graph",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "file:///Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/lib/solver.mjs:1597\n    const error = new Error(`Invalid model case:\\n- ${shapeErrors.join(\"\\n- \")}`);\n                  ^\n\nError: Invalid model case:\n- $.instruments[0].class must be one of \"bond_fixed\", \"bond_floating\", \"term_loan_fixed\", \"term_loan_floating\", \"commercial_paper\", \"securitisation\", \"rcf\", \"lease_liability\", \"overdraft\", \"other_explicit\", \"unclassified\".\n    at solveCase (file:///Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/lib/solver.mjs:1597:19)\n    at file:///Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_fixed_point_constitution_tests.mjs:65:14\n    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)\n    at async node:internal/modules/esm/loader:643:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  validationErrors: [\n    '$.instruments[0].class must be one of \"bond_fixed\", \"bond_floating\", \"term_loan_fixed\", \"term_loan_floating\", \"commercial_paper\", \"securitisation\", \"rcf\", \"lease_liability\", \"overdraft\", \"other_explicit\", \"unclassified\".'\n  ]\n}\n\nNode.js v24.19.0\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_instrument_period_state_tests.mjs"
+      ],
+      "duration_ms": 55.929042,
+      "exit_code": 0,
+      "id": "instrument-period-state",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"schema_version\": \"instrument-period-state/1.0\",\n  \"state_count\": 39,\n  \"definition_node_count\": 14,\n  \"violations\": 0,\n  \"mutations\": [\n    \"double_fx\",\n    \"rcf_mandatory_repayment\",\n    \"definition_membership\",\n    \"mandatory_membership\",\n    \"semantic_membership_binding\",\n    \"legacy_native_basis_migration\",\n    \"non_maturing_with_in_horizon_date\",\n    \"multi_rcf_role_separation\",\n    \"no_rcf_state_graph\",\n    \"no_rcf_ordinary_revolver_maturity\",\n    \"residual_pricing_authority\",\n    \"zero_balance_maturity_exclusion\",\n    \"issuance_before_maturity_inclusion\"\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_debt_class_contract_tests.mjs"
+      ],
+      "duration_ms": 81.757083,
+      "exit_code": 0,
+      "id": "debt-class-contract",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 44\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_lease_roll_forward_tests.mjs"
+      ],
+      "duration_ms": 290.0965,
+      "exit_code": 0,
+      "id": "lease-roll-forward",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 31,\n  \"mutations\": [\n    \"opening continuity\",\n    \"closing equation\",\n    \"interest-bearing basis\",\n    \"interest calculation\",\n    \"principal leg\"\n  ],\n  \"production_case_exercised\": true\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_interest_lineage_tests.py"
+      ],
+      "duration_ms": 30.772625,
+      "exit_code": 0,
+      "id": "instrument-interest-lineage",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"mutations\": {\n    \"manual-all-in-own-rate-missing\": [\n      \"own_rate_or_spread_missing\"\n    ],\n    \"missing-amortisation\": [\n      \"same_instrument_movement_missing\"\n    ],\n    \"missing-average-fx\": [\n      \"average_fx_reference_missing\"\n    ],\n    \"missing-floor\": [\n      \"own_benchmark_floor_missing\"\n    ],\n    \"missing-issuance\": [\n      \"same_instrument_movement_missing\"\n    ],\n    \"missing-maturity\": [\n      \"contractual_maturity_missing\",\n      \"maturity_roll_control_missing\"\n    ],\n    \"positive-interest-sign\": [\n      \"interest_expense_sign_missing\"\n    ],\n    \"reporting-carrying-double-fx\": [\n      \"reporting_carrying_value_double_fx\"\n    ],\n    \"wrong-benchmark\": [\n      \"own_benchmark_missing\"\n    ],\n    \"wrong-instrument-opening\": [\n      \"cross_instrument_reference\",\n      \"same_instrument_opening_balance_missing\"\n    ],\n    \"wrong-instrument-rate\": [\n      \"cross_instrument_reference\",\n      \"own_rate_or_spread_missing\"\n    ]\n  },\n  \"mutations_caught\": 11,\n  \"positive_checks\": 3,\n  \"status\": \"PASS\"\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_interest_economics_contract_tests.mjs"
+      ],
+      "duration_ms": 538.538625,
+      "exit_code": 0,
+      "id": "interest-economics-contract",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 35,\n  \"production_case_exercised\": true,\n  \"non_zero_rcf_commitment_fees\": [\n    1.25,\n    1.25,\n    1.25\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_forecast_behavior_tests.mjs"
+      ],
+      "duration_ms": 50.207291,
+      "exit_code": 0,
+      "id": "forecast-behavior",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"tests\": 33,\n  \"adversarial_mutations_caught\": 7,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_forecast_observation_tests.mjs"
+      ],
+      "duration_ms": 91.195334,
+      "exit_code": 0,
+      "id": "forecast-observation-ledger",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "PASS annual, H1, Q3, quarterly, guidance, broker and user observations pass\nPASS normalization and digest are independent of source record order\nPASS observationsForConcept supports period end and forecast index selectors\nPASS unknown source id blocks\nPASS incompatible definition and units block\nPASS strict schema rejects unknown ledger and record fields\nPASS YTD evidence without reported_through blocks\nPASS duplicate writer blocks\nPASS observation outside the fiscal forecast horizon blocks\nPASS partial period misclassified as annual blocks\nPASS evidence-run validator invokes the optional ledger contract\nPASS evidence-run validator rejects a receipt not bound to its ledger\nPASS deployment profile includes the ledger schema and runtime library\n\n13/13 forecast-observation tests pass\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_evidence_resolution_v2_tests.mjs"
+      ],
+      "duration_ms": 53.513709,
+      "exit_code": 0,
+      "id": "evidence-resolution-v2",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 29,\n  \"verified_observations\": 18,\n  \"degraded_quarantines\": 2,\n  \"authority_nodes\": 8\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_run_constitution_graph_tests.mjs"
+      ],
+      "duration_ms": 46.230625,
+      "exit_code": 0,
+      "id": "run-constitution-graph",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"positive_checks\": 16,\n  \"adversarial_mutations\": 5,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_product_constitution_tests.mjs"
+      ],
+      "duration_ms": 38.547375,
+      "exit_code": 0,
+      "id": "product-constitution",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"product_constitution_sha256\": \"07b39324841888a82fc7fe23b3a670244b9f6b96057f007e6d76ff7d0d98bc21\",\n  \"causal_matrix_checks\": 5,\n  \"broker_delivery_block_mutations\": 4,\n  \"zero_broker_fallback\": \"PASS\",\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_delivery_constitution_tests.mjs"
+      ],
+      "duration_ms": 30.689583,
+      "exit_code": 0,
+      "id": "delivery-constitution",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"schema_errors\": 0,\n  \"broker_degradation_mutations\": 13,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_controller_exit_inventory_tests.mjs"
+      ],
+      "duration_ms": 27.449417,
+      "exit_code": 0,
+      "id": "controller-terminal-exits",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 62,\n  \"public_exit_count\": 8,\n  \"delegate_exit_count\": 18,\n  \"public_controller_count\": 1\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_dynamic_concept_tests.mjs"
+      ],
+      "duration_ms": 68.2565,
+      "exit_code": 0,
+      "id": "broker-dynamic-concepts",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 11,\n  \"mutation_count\": 4\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_forecast_topology_tests.mjs"
+      ],
+      "duration_ms": 68.344334,
+      "exit_code": 0,
+      "id": "forecast-topology",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"tests\": 37,\n  \"mutations_caught\": 7,\n  \"captured_paths\": 6,\n  \"cash_flow_event_method\": \"explicit_zero\"\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_statement_classifier_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases/standard-maximal-v2.json"
+      ],
+      "duration_ms": 462.157041,
+      "exit_code": 0,
+      "id": "statement-classifier",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "Statement classifier tests: PASS (13 positive, 5 adversarial, 3 classification mutations, 1 targeted-question case, 19 topology regressions, 2 hierarchy authorities, 6 hierarchy mutations).\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_case_source_proposer_tests.mjs"
+      ],
+      "duration_ms": 129.861417,
+      "exit_code": 0,
+      "id": "case-source-proposer",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 51\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_typed_filing_value_tests.py"
+      ],
+      "duration_ms": 32.289334,
+      "exit_code": 0,
+      "id": "typed-filing-values-and-row-identity",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"kind\": \"typed-filing-value-tests/1.0\",\n  \"status\": \"PASS\",\n  \"checks\": 21,\n  \"violations\": 0,\n  \"failures\": []\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_historical_normalisation_tests.mjs"
+      ],
+      "duration_ms": 27.50125,
+      "exit_code": 0,
+      "id": "historical-normalisation",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 5,\n  \"inverse_identity_cycle_rejected\": true,\n  \"valid_one_way_identity_preserved\": true\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_case_authorship_boundary_tests.mjs"
+      ],
+      "duration_ms": 101.835584,
+      "exit_code": 0,
+      "id": "case-authorship-boundary",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "PASS case-authorship boundary: declarations compile; caller case and split manifests block\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_evidence_pipeline_tests.py"
+      ],
+      "duration_ms": 292.877166,
+      "exit_code": 0,
+      "id": "attachment-evidence-controller",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 24, \"status\": \"PASS\", \"total_violation_count\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_intake_tests.mjs"
+      ],
+      "duration_ms": 115.102459,
+      "exit_code": 0,
+      "id": "broker-intake-choice",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 19,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_degraded_close_tests.py"
+      ],
+      "duration_ms": 1788.757917,
+      "exit_code": 0,
+      "id": "broker-degraded-close",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 75, \"status\": \"PASS\", \"statuses\": [\"NEEDS_VISION\", \"NEEDS_RESOLUTION\", \"NEEDS_CROSSWALK\", \"NEEDS_RESOLUTION\", \"PASS_DEGRADED\"]}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_demand_selection_tests.py"
+      ],
+      "duration_ms": 222.902708,
+      "exit_code": 0,
+      "id": "broker-demand-selection",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 18, \"status\": \"PASS\", \"violations\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_migration_tests.py"
+      ],
+      "duration_ms": 769.647167,
+      "exit_code": 0,
+      "id": "broker-carrier-migration",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 25, \"status\": \"PASS\", \"statuses\": [\"NEEDS_CROSSWALK\", \"PASS_DEGRADED\"]}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_preview_tests.mjs"
+      ],
+      "duration_ms": 276.448541,
+      "exit_code": 0,
+      "id": "broker-preview-gate",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "PASS sealed preview is deterministic, schema-valid and screen-safe\nPASS evidence-only tables remain visible inventory but cannot be selected\nPASS file API binds exact artifact bytes for proof-gate use\nPASS confirmation is hash-bound and selects only an eligible coherent house\nPASS ordinary Stage 2 auto-selects a clean house without a user stop\nPASS automatic broker selection receipt and run carrier preserve the seal\nPASS stale preview hash is rejected\nPASS mixed-house primary period mutation is rejected\nPASS selected quarantined source cell falls through without poisoning its house\nPASS unselected quarantined cell remains evidence-only without poisoning clean selections\nPASS no coherent house succeeds through a zero-consumption forecast-waterfall preview\nPASS forecast-waterfall mode consumes compatible broker evidence when it exists\nPASS named-house gaps never mix to consensus while explicit consensus remains available\nPASS named primary house owns a complete local headline anchor\n14/14 broker preview tests pass\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_page_evidence_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases/standard-maximal-v2.json"
+      ],
+      "duration_ms": 1908.482166,
+      "exit_code": 0,
+      "id": "broker-page-evidence",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"houses\":5,\"pages\":6,\"horizontal_pages\":2,\"screenshot_only_tabs\":5,\"calculation_dependencies\":0,\"formula_lineage_checks\":10,\"formula_lineage_mutations_caught\":2,\"oracle\":\"PASS\",\"validator_violations\":0,\"tamper_blocked\":true,\"root\":\"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/broker-page-evidence-a5p1Ng\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_internal_fixed_point_tests.py"
+      ],
+      "duration_ms": 98.330125,
+      "exit_code": 0,
+      "id": "internal-evidence-fixed-point",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"blocker_class\": \"INTERNAL_WORK\", \"state\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-fixed-point-6_87ptik/broker-run-state.json\", \"status\": \"NEEDS_VISION\", \"task_count\": 1, \"user_blocking\": false}\n{\"blocker_class\": \"INTERNAL_WORK\", \"state\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-fixed-point-6_87ptik/broker-run-state.json\", \"status\": \"NEEDS_VISION\", \"task_count\": 1, \"user_blocking\": false}\n{\"blocker_class\": \"INTERNAL_WORK\", \"state\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-fixed-point-6_87ptik/broker-run-state.json\", \"status\": \"NEEDS_VISION\", \"task_count\": 1, \"user_blocking\": false}\n{\"checks\": 51, \"mutation_checks\": 10, \"positive_checks\": 41, \"status\": \"PASS\", \"total_violation_count\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_work_graph_tests.py"
+      ],
+      "duration_ms": 23.144792,
+      "exit_code": 0,
+      "id": "broker-work-graph",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"closure_sha256\": \"c08af21423538965a0107ffc8fe974e6f30ce72731d23f4a1042000767296a9e\", \"mutation_checks\": 6, \"positive_checks\": 10, \"status\": \"PASS\", \"total_violation_count\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_dcs_evidence_tests.py",
+        "--out",
+        "/tmp/excel-inflow-v370-gate-concurrency4.VV0Lji/dcs-lossless-evidence"
+      ],
+      "duration_ms": 366.515458,
+      "exit_code": 0,
+      "id": "dcs-lossless-evidence",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"schema_version\": \"dcs-evidence-tests/1.0\",\n  \"status\": \"PASS\",\n  \"positive_checks\": 11,\n  \"adversarial_mutations_caught\": 5,\n  \"mutations\": {\n    \"schema-extra\": [\n      \"DCS-SCHEMA-CONTRACT\"\n    ],\n    \"drop-zero-cp\": [\n      \"DCS-MODEL-EVIDENCE-ROW-OWNER\",\n      \"DCS-ORPHAN-MODEL-EVIDENCE\"\n    ],\n    \"drop-zero-rcf\": [\n      \"DCS-MODEL-EVIDENCE-ROW-OWNER\",\n      \"DCS-ORPHAN-MODEL-EVIDENCE\"\n    ],\n    \"wrong-cell\": [\n      \"DCS-AUTHORITY-CELL-DISPOSITION\",\n      \"DCS-AUTHORITY-VALUE\"\n    ],\n    \"economic-tamper\": [\n      \"DCS-ORACLE-MATURITY-CONVENTION\",\n      \"DCS-ORACLE-PROJECTION-VALUE\"\n    ]\n  }\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_dcs_pipeline_tests.py",
+        "--out",
+        "/tmp/excel-inflow-v370-gate-concurrency4.VV0Lji/dcs-controller-fixed-point"
+      ],
+      "duration_ms": 385.676208,
+      "exit_code": 0,
+      "id": "dcs-controller-fixed-point",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"mutation_checks\": 6, \"positive_checks\": 21, \"resume_reused_all\": true, \"schema_version\": \"dcs-pipeline-tests/1.0\", \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_physical_reconciliation_tests.py"
+      ],
+      "duration_ms": 36.200167,
+      "exit_code": 0,
+      "id": "broker-physical-reconciliation",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"adversarial_mutations_caught\": 5, \"native_recovery_status\": \"NEEDS_VISION\", \"positive_archetypes\": 5, \"rendered_disagreement_status\": \"NEEDS_RESOLUTION\", \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_period_header_tests.py"
+      ],
+      "duration_ms": 487.854958,
+      "exit_code": 0,
+      "id": "broker-period-header-recovery",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"controller_statuses\": [\"NEEDS_RESOLUTION\", \"NEEDS_CROSSWALK\", \"PASS\"], \"locally_quarantined_columns\": 1, \"mutations_caught\": 2, \"positive_checks\": 14, \"resolved_headers\": 2, \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_house_exclusion_tests.py"
+      ],
+      "duration_ms": 603.269083,
+      "exit_code": 0,
+      "id": "broker-house-exclusion",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"controller_status\": \"PASS_DEGRADED\", \"excluded_house\": \"kepler\", \"mutations_caught\": 3, \"positive_checks\": 14, \"remaining_mapping_count\": 0, \"status\": \"PASS\", \"terminal_candidate_count\": 2}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_table_engine_tests.py"
+      ],
+      "duration_ms": 24.791833,
+      "exit_code": 0,
+      "id": "broker-table-engine-adapter",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"mutations_caught\": 1, \"positive_checks\": 7, \"status\": \"PASS\"}\n"
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "broker-public-layout-corpus",
+      "missing": [
+        "BROKER_CORPUS"
+      ],
+      "phase": "real_corpus",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): BROKER_CORPUS",
+      "stdout": ""
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "broker-real-pack-completion",
+      "missing": [
+        "BROKER_REAL_PACK_MANIFEST"
+      ],
+      "phase": "real_corpus",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): BROKER_REAL_PACK_MANIFEST",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_filings_pipeline_tests.mjs"
+      ],
+      "duration_ms": 1353.925209,
+      "exit_code": 0,
+      "id": "filings-controller",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":41,\"total_violation_count\":0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_evidence_orchestration_tests.mjs"
+      ],
+      "duration_ms": 59.006417,
+      "exit_code": 0,
+      "id": "evidence-orchestration",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":8,\"total_violation_count\":0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_evidence_run_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases"
+      ],
+      "duration_ms": 76.834875,
+      "exit_code": 0,
+      "id": "evidence-run-compiler",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_user_flow_tests.mjs"
+      ],
+      "duration_ms": 9543.921875,
+      "exit_code": 0,
+      "id": "production-user-flow",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "  PASS  bare chat invocation is routed to the canonical Company screen\n  PASS  vNext is the single public Company-screen controller\n  PASS  production controller owns one canonical six-milestone visible journey\n  PASS  successful ordinary transitions emit ASCII while JSON remains pure\n  PASS  no-question production path pauses after decisions\n  PASS  run carrier references the canonical evidence snapshot without copying it\n  PASS  run carrier preserves a sealed broker choice and never infers zero files as skip\n  PASS  identical restart reuses all completed stages\n  PASS  tampered stage output invalidates only that stage\n  PASS  question path stops once and never treats action-required as success\n  PASS  delivery blocker constitution covers every terminal user-flow outcome\n  PASS  supplied answer persists and resumes deterministically\n  PASS  invalid evidence blocks before reconciliation\n  PASS  a case edited while the run waited blocks the resume by name\n\n14/14 production user-flow tests pass\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_stage4_checkpoint_tests.mjs",
+        "--cases",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases",
+        "--python",
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "--soffice",
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice"
+      ],
+      "duration_ms": 37837.18675,
+      "exit_code": 0,
+      "id": "stage4-content-addressed-resume",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"schema_version\": \"stage4-checkpoint-test-report/1.0\",\n  \"status\": \"PASS\",\n  \"total_violations\": 0,\n  \"tests\": [\n    {\n      \"id\": \"stage3-reconciled-historical-cash-cache\",\n      \"status\": \"PASS\",\n      \"mutation\": \"BLOCKED\"\n    },\n    {\n      \"id\": \"real-mid-build-timeout\",\n      \"status\": \"PASS\"\n    },\n    {\n      \"id\": \"resume-from-last-internal-success\",\n      \"status\": \"PASS\",\n      \"reused\": [\n        \"semantic_gates\",\n        \"plan\",\n        \"emit\"\n      ]\n    },\n    {\n      \"id\": \"internal-scratch-loss-does-not-invalidate-published-closure\",\n      \"status\": \"PASS\",\n      \"reused\": [\n        \"inputs\",\n        \"evidence_review\",\n        \"decisions\",\n        \"build_checks\",\n        \"delivery\"\n      ]\n    },\n    {\n      \"id\": \"missing-published-output-targeted-invalidation\",\n      \"status\": \"PASS\",\n      \"executed\": [\n        \"emit\",\n        \"publish\"\n      ]\n    },\n    {\n      \"id\": \"single-render-leaf-targeted-invalidation\",\n      \"status\": \"PASS\",\n      \"executed\": [\n        \"render_sheet_02\",\n        \"render\",\n        \"publish\"\n      ]\n    },\n    {\n      \"id\": \"delivered-workbook-identity-after-repair\",\n      \"status\": \"PASS\",\n      \"sha256\": \"db72e16973e6767cdb8d0935f903764e6513efb8078513c23749a6b86e4d26f9\"\n    },\n    {\n      \"id\": \"five-user-stage-final-reuse\",\n      \"status\": \"PASS\",\n      \"reused\": [\n        \"inputs\",\n        \"evidence_review\",\n        \"decisions\",\n        \"build_checks\",\n        \"delivery\"\n      ]\n    }\n  ],\n  \"evidence\": {\n    \"run_directory\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/dmu-stage4-checkpoints-nAXBHC/interrupted-run\",\n    \"build_directory\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/dmu-stage4-checkpoints-nAXBHC/interrupted-run/build-ddcf2c469180\",\n    \"workbook\": \"/private/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/dmu-stage4-checkpoints-nAXBHC/interrupted-run/build-ddcf2c469180/model.xlsx\"\n  }\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_degraded_broker_delivery_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases"
+      ],
+      "duration_ms": 21866.372791,
+      "exit_code": 0,
+      "id": "degraded-broker-delivery",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"schema_version\": \"degraded-broker-delivery-test/1.0\",\n  \"status\": \"PASS\",\n  \"broker_controller_status\": \"PASS_DEGRADED\",\n  \"broker_house_count\": 5,\n  \"raw_table_count\": 4,\n  \"broker_mapping_count\": 0,\n  \"broker_preview_mode\": \"forecast_waterfall\",\n  \"broker_preview_selected_value_count\": 0,\n  \"case_compile_status\": \"clean\",\n  \"historical_cash_cache_sync\": \"PASS\",\n  \"historical_cash_cache_mutation\": \"BLOCKED\",\n  \"stage4_status\": \"PASS_PENDING_MANUAL\",\n  \"zero_broker_stage4_status\": \"PASS_PENDING_MANUAL\",\n  \"zero_broker_workbook\": \"/private/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-degraded-delivery.OZby1U/zero-broker-delivered-build/model.xlsx\",\n  \"optional_broker_intake_house_counts\": [\n    0,\n    1,\n    2\n  ],\n  \"workbook\": \"/private/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-degraded-delivery.OZby1U/delivered-build/model.xlsx\",\n  \"workbook_bytes\": 67582,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_exit_fault_injection_tests.mjs"
+      ],
+      "duration_ms": 34.566459,
+      "exit_code": 0,
+      "id": "broker-exit-fault-injection",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"schema_version\": \"broker-exit-fault-injection-report/1.0\",\n  \"status\": \"PASS\",\n  \"injected_exit_classes\": 4,\n  \"constitution_broker_reasons\": 13,\n  \"checks\": 57,\n  \"broker_caused_hard_blocks\": 0\n}\n"
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "universal-broker-delivery-matrix",
+      "missing": [
+        "RAW_CANARY_EVIDENCE"
+      ],
+      "phase": "workflow",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): RAW_CANARY_EVIDENCE",
+      "stdout": ""
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "raw-input-black-box-canary",
+      "missing": [
+        "RAW_CANARY_EVIDENCE"
+      ],
+      "phase": "proof",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): RAW_CANARY_EVIDENCE",
+      "stdout": ""
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "real-raw-filing-black-box-canary",
+      "missing": [
+        "RAW_CANARY_EVIDENCE",
+        "REAL_FILINGS_REQUEST",
+        "REAL_FILINGS_EXPECTATIONS"
+      ],
+      "phase": "real_corpus",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): RAW_CANARY_EVIDENCE, REAL_FILINGS_REQUEST, REAL_FILINGS_EXPECTATIONS",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_case_compiler_equivalence.mjs",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/test-fixtures/cases"
+      ],
+      "duration_ms": 169.6405,
+      "exit_code": 1,
+      "id": "case-compiler-equivalence",
+      "phase": "cohort",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "",
+      "stdout": "\n=== standard-maximal-v2.json: 4 economic diffs (+12 presentation, +35 inert-ft, +602 justified), 10 compile blocks (findings)\n      1  statement_structure\n      1  other_interest_authority\n      1  debt_class_contract_version\n      1  selected_ebitda_basis\n    · statement_structure.income_statement[adjusted_ebitda].ebitda_basis\n        certified: (absent)\n        compiled:  {\"semantic_role\":\"adjusted_ebitda\",\"label\":\"Adjusted EBITDA\",\"margin_label\":\"…\n    · other_interest_authority\n        certified: {\"contract_version\":\"residual-interest-authority/1.0\",\"method\":\"explicit_fore…\n        compiled:  (absent)\n    · debt_class_contract_version\n        certified: (absent)\n        compiled:  \"debt-class-ontology/1.0\"\n    · selected_ebitda_basis\n        certified: (absent)\n        compiled:  {\"row_id\":\"adjusted_ebitda\",\"semantic_role\":\"adjusted_ebitda\",\"label\":\"Adjust…\n  BLOCK 1× case.shape\n  BLOCK 1× coverage.classification.is.is_da_expense.destination\n  BLOCK 1× coverage.classification.is.operating_profit.destination\n  BLOCK 1× coverage.classification.is.bridge_operating_profit.destination\n  BLOCK 1× coverage.classification.is.adjusted_ebitda_bridge_total.destination\n  BLOCK 1× coverage.classification.cf.cash_flow_tax_addback.destination\n  BLOCK 1× coverage.classification.cf.income_taxes_paid.destination\n  BLOCK 1× coverage.classification.cf.finance_income_received.destination\n  BLOCK 1× coverage.classification.cf.finance_costs_paid.destination\n  BLOCK 1× coverage.interest.residual_forecast_authority.1\n\n=== standard-net-cash-v2.json: 3 economic diffs (+12 presentation, +32 inert-ft, +592 justified), 8 compile blocks (findings)\n      1  statement_structure\n      1  debt_class_contract_version\n      1  selected_ebitda_basis\n    · statement_structure.income_statement[adjusted_ebitda].ebitda_basis\n        certified: (absent)\n        compiled:  {\"semantic_role\":\"adjusted_ebitda\",\"label\":\"Adjusted EBITDA\",\"margin_label\":\"…\n    · debt_class_contract_version\n        certified: (absent)\n        compiled:  \"debt-class-ontology/1.0\"\n    · selected_ebitda_basis\n        certified: (absent)\n        compiled:  {\"row_id\":\"adjusted_ebitda\",\"semantic_role\":\"adjusted_ebitda\",\"label\":\"Adjust…\n  BLOCK 1× coverage.classification.is.is_da_expense.destination\n  BLOCK 1× coverage.classification.is.operating_profit.destination\n  BLOCK 1× coverage.classification.is.bridge_operating_profit.destination\n  BLOCK 1× coverage.classification.is.adjusted_ebitda_bridge_total.destination\n  BLOCK 1× coverage.classification.cf.cash_flow_tax_addback.destination\n  BLOCK 1× coverage.classification.cf.income_taxes_paid.destination\n  BLOCK 1× coverage.classification.cf.finance_income_received.destination\n  BLOCK 1× coverage.classification.cf.finance_costs_paid.destination\n\nTOTAL path diffs across cohort: 7\nTOTAL compile blocks across cohort: 18\nTOTAL failed compiled solves: 0\nTOTAL hard plan diffs: 0\nTOTAL failed plan compiles: 0\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_opening_debt_reconciliation_tests.mjs"
+      ],
+      "duration_ms": 76.913417,
+      "exit_code": 0,
+      "id": "opening-debt-reconciliation",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"positive\": [\n    \"native_principal_translated_at_last_historical_period_end\",\n    \"reporting_currency_carrying_value_not_double_translated\",\n    \"case_only_release_uses_canonical_opening_state\",\n    \"coverage_uses_canonical_opening_state\",\n    \"raw_dcs_reporting_currency_contract_preserved\"\n  ],\n  \"mutations\": [\n    \"missing_fx_blocks\",\n    \"incorrect_native_basis_creates_reconciliation_failure\"\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_excel_value_semantics_tests.mjs"
+      ],
+      "duration_ms": 23.385083,
+      "exit_code": 0,
+      "id": "excel-value-semantics",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"kind\": \"excel-value-semantics-tests/1.0\",\n  \"status\": \"PASS\",\n  \"total\": 15,\n  \"violations\": 0,\n  \"failures\": []\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/verify/run_protected_identity_oracle_tests.py"
+      ],
+      "duration_ms": 34.4455,
+      "exit_code": 0,
+      "id": "protected-identity-semantic-oracle",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"kind\": \"protected-identity-oracle-tests/1.0\",\n  \"status\": \"PASS\",\n  \"checks\": 4,\n  \"violations\": 0,\n  \"failures\": []\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_reconciled_parent_portable_workbook_tests.mjs"
+      ],
+      "duration_ms": 993.279,
+      "exit_code": 0,
+      "id": "reconciled-parent-portable-workbook",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 15,\n  \"historical_formula_cells\": 3,\n  \"hardcode_mutation\": \"BLOCKED\",\n  \"cache_parity\": \"PASS\",\n  \"semantic_oracle\": \"PASS\"\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_native_excel_error_scan_tests.py"
+      ],
+      "duration_ms": 44.333584,
+      "exit_code": 0,
+      "id": "native-excel-all-cell-error-scan",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6,\"scope\":\"all_serialized_cells_all_worksheets\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_release_certification_tests.mjs"
+      ],
+      "duration_ms": 604.1505,
+      "exit_code": 0,
+      "id": "release-certification-contract",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"tests\": 25\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_delivery_inventory_tests.mjs"
+      ],
+      "duration_ms": 44.742458,
+      "exit_code": 0,
+      "id": "delivery-inventory",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 13,\n  \"mutations\": 11,\n  \"violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_source_arithmetic_topology_tests.py"
+      ],
+      "duration_ms": 34.03925,
+      "exit_code": 0,
+      "id": "source-arithmetic-topology",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":5}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_semantic_role_closure_tests.mjs"
+      ],
+      "duration_ms": 33.933917,
+      "exit_code": 0,
+      "id": "semantic-role-closure",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":11}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_public_state_ownership_tests.mjs"
+      ],
+      "duration_ms": 27.871292,
+      "exit_code": 0,
+      "id": "public-state-ownership",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_core_demand_tests.py"
+      ],
+      "duration_ms": 41.865875,
+      "exit_code": 0,
+      "id": "broker-core-demand-quality",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":3}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_nonrecurring_forecast_policy_tests.mjs"
+      ],
+      "duration_ms": 30.606375,
+      "exit_code": 0,
+      "id": "nonrecurring-forecast-policy",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":4}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_source_identity_tests.mjs"
+      ],
+      "duration_ms": 63.218208,
+      "exit_code": 0,
+      "id": "source-release-identity",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":12}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_identity_vocabulary_tests.mjs"
+      ],
+      "duration_ms": 73.085791,
+      "exit_code": 0,
+      "id": "typed-product-identity-vocabulary",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 20\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_release_package_attestation_tests.mjs"
+      ],
+      "duration_ms": 60.551375,
+      "exit_code": 0,
+      "id": "immutable-release-package-attestation",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 24\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_workbook_quality_panel_tests.mjs"
+      ],
+      "duration_ms": 515.3405,
+      "exit_code": 0,
+      "id": "workbook-build-identity-quality-panel",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":23}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_test_registry_contract_tests.mjs"
+      ],
+      "duration_ms": 32.979084,
+      "exit_code": 0,
+      "id": "test-registry-contract",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":3}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_portability_contract_tests.mjs"
+      ],
+      "duration_ms": 63.95775,
+      "exit_code": 0,
+      "id": "portability-contract",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":1}\n"
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "installed-host-usable-broker",
+      "missing": [
+        "INSTALLED_HOST_BROKER_RECEIPT"
+      ],
+      "phase": "real_corpus",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): INSTALLED_HOST_BROKER_RECEIPT",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_source_arithmetic_oracle_tests.py"
+      ],
+      "duration_ms": 31.345292,
+      "exit_code": 0,
+      "id": "source-arithmetic-oracle",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":2}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_filings_source_mode_tests.mjs"
+      ],
+      "duration_ms": 53.750208,
+      "exit_code": 0,
+      "id": "filings-source-mode",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":9}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_model_owned_broker_demand_tests.py"
+      ],
+      "duration_ms": 48.525958,
+      "exit_code": 0,
+      "id": "model-owned-broker-demand",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":3}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_forecast_authority_ledger_tests.mjs"
+      ],
+      "duration_ms": 39.265791,
+      "exit_code": 0,
+      "id": "forecast-authority-ledger",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6,\"sha\":\"4404592eaf23934f12a42f4c04792c5422fa0bf0b7cca619188d3588118a45ea\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_forecast_authority_ranking_tests.mjs"
+      ],
+      "duration_ms": 51.5305,
+      "exit_code": 0,
+      "id": "forecast-authority-ranking",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"direct_rank_dimensions\": 6,\n  \"stable_tie_checks\": 4,\n  \"compiler_orderings\": 2,\n  \"declared_shell_periods\": 3,\n  \"actual_plus_remainder_pairings\": 2,\n  \"rank_mutations_caught\": 2,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_funded_acquisition_transaction_tests.mjs"
+      ],
+      "duration_ms": 28.382917,
+      "exit_code": 0,
+      "id": "funded-acquisition-transaction",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":16}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_carrier_product_identity_tests.mjs"
+      ],
+      "duration_ms": 1469.402875,
+      "exit_code": 0,
+      "id": "carrier-product-identity",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":38}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_architecture_ownership_tests.mjs"
+      ],
+      "duration_ms": 28.314166,
+      "exit_code": 0,
+      "id": "architecture-ownership",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_native_preflight_reuse_tests.py"
+      ],
+      "duration_ms": 61.11225,
+      "exit_code": 0,
+      "id": "broker-native-preflight-reuse",
+      "phase": "performance",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":4}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_broker_pdf_timeout_policy_tests.py"
+      ],
+      "duration_ms": 612.830166,
+      "exit_code": 0,
+      "id": "broker-pdf-timeout-policy",
+      "phase": "performance",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\": \"PASS\", \"checks\": 6, \"mutations_rejected\": 1}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_experience_trace_tests.py"
+      ],
+      "duration_ms": 34.409541,
+      "exit_code": 0,
+      "id": "experience-trace-policy",
+      "phase": "performance",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":8,\"mutations_rejected\":1}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_experience_trace_leaf_tests.mjs"
+      ],
+      "duration_ms": 29.5825,
+      "exit_code": 0,
+      "id": "experience-trace-leaf-coverage",
+      "phase": "performance",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":7,\"mutations_rejected\":1}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_runtime_custody_tests.mjs"
+      ],
+      "duration_ms": 823.651375,
+      "exit_code": 0,
+      "id": "runtime-process-interpreter-lease-custody",
+      "phase": "performance",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"kind\": \"runtime-custody-tests/1.0\",\n  \"status\": \"PASS\",\n  \"checks\": 23,\n  \"mutations_rejected\": 8,\n  \"mutations\": [\n    \"direct_child_only_timeout_rejected\",\n    \"bare_python_path_override_rejected\",\n    \"live_lease_takeover_rejected\",\n    \"dead_same_host_pid_not_misclassified_live\",\n    \"reused_same_host_pid_not_misclassified_live\",\n    \"dead_cross_host_lease_recovered_with_receipt\",\n    \"unexpired_cross_host_takeover_rejected\",\n    \"malformed_current_lease_fails_closed_during_grace\"\n  ],\n  \"total_violation_count\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_excel_number_format_compatibility_tests.py"
+      ],
+      "duration_ms": 112.637667,
+      "exit_code": 0,
+      "id": "native-excel-number-format-compatibility",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6,\"mutations_rejected\":3}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_runtime_version_contract_tests.mjs"
+      ],
+      "duration_ms": 26.529375,
+      "exit_code": 0,
+      "id": "runtime-version-contract",
+      "phase": "proof",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":10,\"skill_version\":\"3.7.0\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_host_experience_trace_tests.py"
+      ],
+      "duration_ms": 30.216917,
+      "exit_code": 0,
+      "id": "host-experience-trace",
+      "phase": "performance",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":3}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_ebitda_basis_contract_tests.mjs"
+      ],
+      "duration_ms": 90.286375,
+      "exit_code": 0,
+      "id": "ebitda-basis-contract",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 24\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-v370-independent-verification/scripts/run_solver_hardening_tests.mjs"
+      ],
+      "duration_ms": 46.07425,
+      "exit_code": 0,
+      "id": "solver-hardening",
+      "phase": "economic",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":3}\n"
+    }
+  ],
+  "schema_version": "development-gate-report/1.0",
+  "started_at": "2026-08-18T05:26:21.108Z",
+  "status": "FAIL"
+}
