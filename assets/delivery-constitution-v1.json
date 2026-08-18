@@ -1,0 +1,105 @@
+{
+  "schema_version": "delivery-constitution/1.0",
+  "objective": "With valid mandatory filings and debt evidence, every broker state delivers a workbook; optional evidence may change authority but never delivery liveness.",
+  "ownership_order": ["LOG", "DEGRADE", "ASK", "BLOCK"],
+  "block_predicate": {
+    "all": [
+      "unresolved",
+      "material",
+      "reachable_to_material_output",
+      "no_alternative_authority_path",
+      "mandatory_evidence_lane"
+    ]
+  },
+  "ask_predicate": {
+    "all": [
+      "unresolved",
+      "material",
+      "reachable_to_material_output",
+      "no_alternative_authority_path",
+      "finite_user_resolution_available"
+    ],
+    "maximum_visible_rounds_per_frontier": 1,
+    "aggregate_questions": true
+  },
+  "lanes": {
+    "filings": "mandatory",
+    "debt": "mandatory",
+    "dcs_live_terms": "mandatory",
+    "economic_graph": "mandatory",
+    "workbook": "mandatory",
+    "broker": "optional",
+    "broker_capture": "optional",
+    "broker_semantics": "optional",
+    "broker_preview": "optional",
+    "dcs_metadata": "optional",
+    "release_enrichment": "optional"
+  },
+  "hard_block_reasons": [
+    "issuer_identity_unresolved",
+    "required_periods_unresolved",
+    "mandatory_statements_unconstructable",
+    "opening_debt_unresolved",
+    "essential_live_debt_term_unresolved",
+    "economic_graph_underdetermined",
+    "undeclared_circularity",
+    "solver_non_convergence",
+    "core_accounting_identity_failure",
+    "workbook_emission_failure",
+    "workbook_integrity_failure",
+    "mandatory_evidence_seal_invalid"
+  ],
+  "degrade_reasons": [
+    "broker_ocr_failure",
+    "broker_table_reconciliation_failure",
+    "broker_crosswalk_failure",
+    "broker_semantic_failure",
+    "broker_incomplete_house",
+    "broker_selected_cell_conflict",
+    "broker_multi_page_header_ambiguity",
+    "broker_controller_exception",
+    "broker_timeout",
+    "broker_preview_failure",
+    "broker_optional_close_failure",
+    "broker_invalid_state",
+    "broker_zero_usable_houses",
+    "optional_dcs_metadata_failure"
+  ],
+  "log_reasons": [
+    "unused_broker_table",
+    "unselected_house_conflict",
+    "unused_broker_page",
+    "unused_ocr_difference",
+    "broker_evidence_only_row",
+    "unused_broker_render_metadata",
+    "release_only_enrichment_failure"
+  ],
+  "broker_failure_contract": {
+    "terminal_authority_state": "zero_or_verified_subset",
+    "raw_archive_required": true,
+    "remove_unverified_selected_edges": true,
+    "remove_stale_forecast_observations": true,
+    "rerun_authority_resolver": true,
+    "continue_to_build": true,
+    "public_internal_states": []
+  },
+  "runtime_delivery_gates": [
+    "identity_period_units",
+    "mandatory_filings",
+    "selected_cell_provenance",
+    "opening_debt",
+    "material_forecast_coverage",
+    "equation_determinacy_and_convergence",
+    "debt_cash_rcf_interest_identities",
+    "formula_cache_external_link_integrity",
+    "basic_structural_render"
+  ],
+  "release_certification_gates": [
+    "unused_broker_semantic_enrichment",
+    "public_layout_corpus",
+    "unused_cell_dual_reads",
+    "full_mutation_cohorts",
+    "exact_pixel_baselines",
+    "package_install_native_certification"
+  ]
+}

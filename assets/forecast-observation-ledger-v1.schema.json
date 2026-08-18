@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/forecast-observation-ledger-v1.schema.json",
+  "title": "Forecast observation ledger v1",
+  "description": "A closed, source-bound ledger of forecast-period observations. It records evidence only; it does not select a model writer or forecast method.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "ledger_id", "observations"],
+  "properties": {
+    "schema_version": { "const": "forecast-observation-ledger/1.0" },
+    "ledger_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observation" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.:/-]*$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "economic_concept_id",
+        "definition_id",
+        "units",
+        "sign_convention",
+        "period_basis",
+        "period_start",
+        "period_end",
+        "reported_through",
+        "value",
+        "observation_kind",
+        "source_id"
+      ],
+      "properties": {
+        "observation_id": { "$ref": "#/$defs/identifier" },
+        "economic_concept_id": { "$ref": "#/$defs/identifier" },
+        "definition_id": { "$ref": "#/$defs/identifier" },
+        "units": { "type": "string", "minLength": 1 },
+        "sign_convention": { "$ref": "#/$defs/identifier" },
+        "period_basis": {
+          "enum": ["annual", "h1_ytd", "q3_ytd", "quarterly"]
+        },
+        "period_start": { "type": "string", "format": "date" },
+        "period_end": { "type": "string", "format": "date" },
+        "reported_through": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "value": { "type": "number" },
+        "observation_kind": {
+          "enum": [
+            "company_actual",
+            "company_guidance",
+            "broker_estimate",
+            "user_input"
+          ]
+        },
+        "source_id": { "$ref": "#/$defs/identifier" }
+      }
+    }
+  }
+}

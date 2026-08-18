@@ -1,0 +1,41 @@
+{
+  "schema_version": "debt-class-ontology/1.0",
+  "canonical_classes": [
+    "bond_fixed",
+    "bond_floating",
+    "term_loan_fixed",
+    "term_loan_floating",
+    "rcf",
+    "commercial_paper",
+    "securitisation",
+    "lease_liability",
+    "overdraft",
+    "other_explicit",
+    "unclassified"
+  ],
+  "legacy_aliases": {
+    "fixed_bond": "bond_fixed",
+    "floating_bond": "bond_floating",
+    "floating_loan": "term_loan_floating",
+    "term_loan": "term_loan_floating",
+    "bond": "bond_fixed",
+    "senior_notes": "bond_fixed",
+    "bank_debt": "term_loan_floating",
+    "lease": "lease_liability",
+    "other_debt": "other_explicit",
+    "revolver": "rcf"
+  },
+  "presentation": {
+    "bond_fixed": { "group": "bonds", "group_label": "Bonds", "type_label": "Senior Notes" },
+    "bond_floating": { "group": "bonds", "group_label": "Bonds", "type_label": "Floating Notes" },
+    "term_loan_fixed": { "group": "bank_debt", "group_label": "Bank Debt", "type_label": "Fixed Term Loan" },
+    "term_loan_floating": { "group": "bank_debt", "group_label": "Bank Debt", "type_label": "Floating Term Loan" },
+    "rcf": { "group": "bank_debt", "group_label": "Bank Debt", "type_label": "RCF" },
+    "commercial_paper": { "group": "other_debt", "group_label": "Other Debt", "type_label": "Commercial Paper" },
+    "securitisation": { "group": "bank_debt", "group_label": "Bank Debt", "type_label": "Securitisation" },
+    "lease_liability": { "group": "other_debt", "group_label": "Other Debt", "type_label": "Lease Liability" },
+    "overdraft": { "group": "bank_debt", "group_label": "Bank Debt", "type_label": "Overdraft" },
+    "other_explicit": { "group": "other_debt", "group_label": "Other Debt", "type_label": "Other Debt" },
+    "unclassified": { "group": "unclassified_review", "group_label": "Unclassified — review required", "type_label": "Unclassified Debt" }
+  }
+}

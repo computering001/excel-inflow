@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "skill_name": "excel-inflow",
+  "skill_version": "3.7.2",
+  "template_version": "4.0.0-dynamic",
+  "model_case_schema_version": 2,
+  "row_taxonomy_version": 3,
+  "validation_policy_version": 3,
+  "status": "v2_development",
+  "deployment_status": "not_installed",
+  "certification_invalidated_reason": "Excel Inflow v3.7.2 preserves the v3.7.1 audit closure and completes the remote portable CI runtime with its declared renderer dependency. Fresh installed-Rogo, native Excel and human visual evidence are required before production certification.",
+  "deployment_requires_explicit_user_approval": true,
+  "certification_requires": [
+    "lossless_attachment_evidence",
+    "compiler_owned_model_case",
+    "forecast_authority_cohort",
+    "independent_solver_and_formula_parity",
+    "native_spreadsheet_control_restoration",
+    "visual_review",
+    "installed_fresh_session_test"
+  ]
+}

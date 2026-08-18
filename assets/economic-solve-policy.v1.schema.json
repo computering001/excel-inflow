@@ -1,0 +1,92 @@
+{
+  "$id": "economic-solve-policy/1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "controls", "solver", "workbook_calculation", "native_tolerances", "circularity_roles"],
+  "properties": {
+    "schema_version": { "const": "economic-solve-policy/1.0" },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["circularity", "debt_maturities_roll", "acquisition"],
+      "properties": {
+        "circularity": { "$ref": "#/$defs/control" },
+        "debt_maturities_roll": { "$ref": "#/$defs/control" },
+        "acquisition": { "$ref": "#/$defs/control" }
+      }
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_iterations", "absolute_tolerance", "relative_tolerance", "non_convergence", "two_cycle_detection", "damping_factors", "monotone_boundary_fallback"],
+      "properties": {
+        "max_iterations": { "type": "integer", "minimum": 1 },
+        "absolute_tolerance": { "type": "number", "exclusiveMinimum": 0 },
+        "relative_tolerance": { "type": "number", "minimum": 0 },
+        "non_convergence": { "const": "BLOCK" },
+        "two_cycle_detection": { "const": true },
+        "damping_factors": { "type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{ "const": 0.5 }, { "const": 0.25 }], "items": false },
+        "monotone_boundary_fallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "method", "declared_boundaries_only", "current_cash_rcf_boundary"],
+          "properties": {
+            "enabled": { "const": true },
+            "method": { "const": "deterministic_bisection" },
+            "declared_boundaries_only": { "const": true },
+            "current_cash_rcf_boundary": { "const": "analytic_min_max_projection" }
+          }
+        }
+      }
+    },
+    "workbook_calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["calc_id", "calc_mode", "full_calc_on_load", "force_full_calc", "iterate", "iterate_count", "iterate_delta"],
+      "properties": {
+        "calc_id": { "type": "string", "minLength": 1 },
+        "calc_mode": { "const": "auto" },
+        "full_calc_on_load": { "const": true },
+        "force_full_calc": { "const": true },
+        "iterate": { "const": true },
+        "iterate_count": { "type": "integer", "minimum": 1 },
+        "iterate_delta": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "native_tolerances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "ratio", "percentage", "control", "default", "relative"],
+      "properties": {
+        "currency": { "type": "number", "exclusiveMinimum": 0 },
+        "ratio": { "type": "number", "exclusiveMinimum": 0 },
+        "percentage": { "type": "number", "exclusiveMinimum": 0 },
+        "control": { "const": 0 },
+        "default": { "type": "number", "exclusiveMinimum": 0 },
+        "relative": { "type": "number", "minimum": 0 }
+      }
+    },
+    "circularity_roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zero_when_off", "live_when_off"],
+      "properties": {
+        "zero_when_off": { "$ref": "#/$defs/roleList" },
+        "live_when_off": { "$ref": "#/$defs/roleList" }
+      }
+    }
+  },
+  "$defs": {
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowed_values", "display", "native_sequence"],
+      "properties": {
+        "allowed_values": { "type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{ "const": 0 }, { "const": 1 }], "items": false },
+        "display": { "type": "object", "additionalProperties": false, "required": ["0", "1"], "properties": { "0": { "const": "Off" }, "1": { "const": "On" } } },
+        "native_sequence": { "type": "array", "minItems": 5, "maxItems": 5, "prefixItems": [{ "const": 1 }, { "const": 0 }, { "const": 1 }, { "const": 0 }, { "const": 1 }], "items": false }
+      }
+    },
+    "roleList": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+  }
+}
