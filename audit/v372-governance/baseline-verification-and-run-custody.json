@@ -1,6 +1,6 @@
 {
   "schema_version": "baseline-verification-and-run-custody/1.0",
-  "recorded_at": "2026-08-18T00:00:00Z",
+  "recorded_at": "2026-08-18T08:34:42Z",
   "recording_policy": "contemporaneous_observation_only_no_retroactive_chronology_claim",
   "baseline": {
     "commit": "200c3a4ab073ef614b529978a31092a882d56261",
