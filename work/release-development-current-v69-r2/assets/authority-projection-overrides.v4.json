@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "kind": "authority_projection_overrides",
+  "status": "active_epoch_4_candidate",
+  "supersedes": "authority-projection-overrides.v3.json",
+  "source_contract_sha256": "334fc8f1dbd365fb0e1c70d7fc091cc949f2b75456f32b801d7a3a259e81aa62",
+  "source_runtime_sha256": "ccaced0fe772f279fee4e87ad80b15d101d7ac0e0a52c953c72258ac77719e2d",
+  "rules": {
+    "allowed_missing_semantic_rows": [],
+    "allowed_added_semantic_rows": [],
+    "semantic_reorder_blocks": [],
+    "control_replacements": [],
+    "control_additions": [],
+    "dynamic_label_variants": [],
+    "formula_provenance_corrections": [],
+    "semantic_style_corrections": [],
+    "physical_style_corrections": []
+  }
+}

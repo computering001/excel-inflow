@@ -1,0 +1,12 @@
+{
+  "schema_version": "broker-semantic-verification-report/1.0",
+  "status": "PASS",
+  "total_violation_count": 0,
+  "candidate_manifest_sha256": "1dfc4a34106dfe473a15d52280296f88c21ae076d5c9b4f7e7168d9f0b60e52b",
+  "crosswalk_sha256": "ec5f4b685b5428a53009edc80dd1209fe02179b133beb879dbb51269dd3fab55",
+  "candidate_count": 14,
+  "coverage_entry_count": 14,
+  "terminal_quarantined_candidate_count": 0,
+  "unresolved_selected_candidate_count": 0,
+  "findings": []
+}

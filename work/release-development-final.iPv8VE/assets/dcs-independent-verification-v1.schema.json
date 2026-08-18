@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-independent-verification-v1.schema.json",
+  "title": "Independent lossless DCS verification report",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "status", "source_sha256", "artifact_hashes", "counts", "violations"],
+  "properties": {
+    "schema_version": {"const": "dcs-independent-verification/1.0"},
+    "status": {"enum": ["PASS", "BLOCKED"]},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact_hashes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "manifest", "crosswalk", "projection", "receipt"],
+      "properties": {
+        "source": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "manifest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "crosswalk": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "projection": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "receipt": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_rows", "source_cells", "term_authorities", "violations"],
+      "properties": {
+        "source_rows": {"type": "integer", "minimum": 0},
+        "source_cells": {"type": "integer", "minimum": 0},
+        "term_authorities": {"type": "integer", "minimum": 0},
+        "violations": {"type": "integer", "minimum": 0}
+      }
+    },
+    "violations": {"type": "array", "items": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}}}}
+  }
+}

@@ -1,0 +1,46 @@
+20 November 2025                                                                                SFC Energy AG
+
+
+CASH FLOW STATEMENT
+
+ All figures in EUR '000                      2022A     2023A     2024A     2025E     2026E     2027E
+
+ EBIT                                            3,599       9,157     13,737       2,474       7,664     16,187
+ Depreciation and amortisation                      4,993       5,462       6,452       7,955       8,090       8,185
+EBITDA                                         8,593     14,619     20,190     10,429     15,754     24,373
+Changes in w orking capital                       -13,135     -11,887      -8,199     -14,376       9,276      -7,312
+ Other adjustments                                -219       843       2,469       -493      -2,235      -4,903
+ Operating cash flow                             -4,761       3,575     14,459      -4,439     22,795     12,159
+
+ Investments in PP&E                               -2,146      -2,243      -5,915      -3,518      -3,396      -2,991
+ Investments in intangibles                          -3,056      -4,204      -3,255      -3,225      -2,778      -2,991
+ Free cash flow                                  -9,963      -2,872       5,289     -11,182     16,621       6,176
+
+ Acquisitions & disposals, net                        0         34         0         0         0         0
+ Other investments                                0       932      -1,911         0         0         0
+ Investing cash flow                             -5,202      -5,482     -11,082      -6,743      -6,174      -5,982
+
+ Debt financing, net                                -239      -1,893      -2,275       -136         0         0
+ Equity financing, net                             56,432         0        18         0         0         0
+ Dividend paid                                    0         0         0         0         0         0
+ Other financing                                    -6,017       -786       -839       -830       -455       -372
+ Financing cash flow                           50,176      -2,679      -3,096       -966       -455       -372
+
+ Forex & other effects                                -32       -107        20         0         0         0
+ Net cash flows                                40,181      -4,693       302     -12,148     16,166       5,804
+ Cash, start of the year                           24,623     64,803     56,056     60,494     48,346     64,512
+Cash, end of the year                         64,803     60,110     56,358     48,346     64,512     70,316
+
+ EBITDA/share (in €)                               0.55        0.82        1.16        0.60        0.91        1.37
+
+
+Y-Y Growth
+ Operating cash flow                                  n.m.         n.m.    304.5%         n.m.         n.m.     -46.7%
+ Free cash flow                                       n.m.         n.m.         n.m.         n.m.         n.m.     -62.8%
+ EBITDA/share                                        n.m.     49.5%     41.8%     -48.3%     51.1%     50.7%
+
+
+
+
+
+                                                       Page 8/12

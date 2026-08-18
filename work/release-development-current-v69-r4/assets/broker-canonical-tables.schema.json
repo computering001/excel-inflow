@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-canonical-tables.schema.json",
+  "title": "Canonical reconciled broker tables",
+  "type": "object",
+  "required": ["schema_version", "source_bundle_sha256", "canonical_tables_sha256", "physical_capture_receipt", "documents", "canonical_findings", "gate_status"],
+  "properties": {
+    "schema_version": {"const": "broker-canonical-tables/1.0"},
+    "source_bundle_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "canonical_tables_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["document_id", "canonical_tables"],
+        "properties": {
+          "document_id": {"type": "string", "minLength": 1},
+          "physical_capture_receipts": {"type": "array", "items": {"type": "object"}},
+          "canonical_tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["canonical_table_id", "physical_table_id", "surface_id", "source_table_ids", "extraction_methods", "authority_role", "verification_basis", "rows"],
+              "properties": {
+                "canonical_table_id": {"type": "string", "minLength": 1},
+                "physical_table_id": {"type": "string", "minLength": 1},
+                "surface_id": {"type": "string", "minLength": 1},
+                "source_table_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                "extraction_methods": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                "authority_role": {"enum": ["rendered_authority", "native_structured_authority"]},
+                "verification_basis": {"enum": ["two_pass_visual", "bounded_native_geometry", "native_structured_cells"]},
+                "bbox": {"type": ["array", "null"]},
+                "units": {"type": ["string", "null"]},
+                "footnotes": {"type": "array", "items": {"type": "string"}},
+                "continuation_of": {"type": ["string", "null"]},
+                "continuation_certificate": {
+                  "type": ["object", "null"],
+                  "additionalProperties": false,
+                  "required": ["schema_version", "predecessor_table_id", "predecessor_surface_id", "current_surface_id", "basis", "same_title", "title_continuation", "continuation_title", "compatible_units", "same_column_count", "inherited_period_headers", "certificate_sha256"],
+                  "properties": {
+                    "schema_version": {"const": "broker-table-continuation-certificate/1.0"},
+                    "predecessor_table_id": {"type": "string", "minLength": 1},
+                    "predecessor_surface_id": {"type": "string", "minLength": 1},
+                    "current_surface_id": {"type": "string", "minLength": 1},
+                    "basis": {"enum": ["repeated_header", "omitted_header", "truncated_header"]},
+                    "same_title": {"type": "boolean"},
+                    "title_continuation": {"type": "boolean"},
+                    "continuation_title": {"type": ["string", "null"]},
+                    "compatible_units": {"type": "boolean"},
+                    "same_column_count": {"type": "boolean"},
+                    "inherited_period_headers": {"type": "array", "items": {"type": "object"}},
+                    "certificate_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+                  }
+                },
+                "effective_period_headers": {"type": "array", "items": {"type": "object"}},
+                "rows": {"type": "array", "minItems": 1}
+              }
+            }
+          }
+        }
+      }
+    },
+    "physical_capture_receipt": {
+      "type": "object",
+      "required": ["schema_version", "status", "surface_count", "complete_surface_count", "analytical_surface_count", "evidence_only_surface_count", "pending_surface_ids", "model_linked_accuracy_status"],
+      "properties": {
+        "schema_version": {"const": "broker-physical-capture-receipt/1.0"},
+        "status": {"enum": ["PASS", "NEEDS_VISION", "NEEDS_RESOLUTION"]},
+        "surface_count": {"type": "integer", "minimum": 0},
+        "complete_surface_count": {"type": "integer", "minimum": 0},
+        "analytical_surface_count": {"type": "integer", "minimum": 0},
+        "evidence_only_surface_count": {"type": "integer", "minimum": 0},
+        "pending_surface_ids": {"type": "array", "items": {"type": "string"}},
+        "model_linked_accuracy_status": {"const": "PENDING_SEMANTIC_CROSSWALK"}
+      }
+    },
+    "canonical_findings": {"type": "array"},
+    "gate_status": {"enum": ["PASS", "NEEDS_VISION", "NEEDS_RESOLUTION", "BLOCKED"]}
+  }
+}

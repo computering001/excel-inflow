@@ -1,0 +1,61 @@
+SMARTBROKER HOLDING AG
+
+
+ Kapitalflussrechnung (in Mio. EUR) Smartbroker Holding                                                        2022      2023      2024     2025e     2026e     2027e AG
+ Jahresüberschuss/ -fehlbetrag                                           -10,1        -5,9        -2,0        -10,4        -8,4        -0,9
+ Abschreibung Anlagevermögen                                       0,7         0,6         0,6         0,6         0,6         0,6
+ Amortisation immaterielle Vermögensgegenstände                 16,5         6,0            10,1          9,7         6,4          4,7
+ Veränderung langfristige Rückstellungen                           0,0         0,0         0,0         0,0         0,0         0,0
+ Sonstige zahlungsunwirksame Erträge/Aufwendungen              2,9        -0,2          0,7         0,0         0,0         0,0
+ Cash Flow                                                        10,0        0,4        9,4        -0,1        -1,4        4,4
+ Veränderung Working Capital                                    -4,9        -0,2         0,6          -1,0        -0,5        -0,8
+ Cash Flow aus operativer Tätigkeit                             5,0         0,2        10,0          -1,1         -1,9         3,6
+ CAPEX                                                         -20,6          -11,7        -3,9          -1,9          -1,9        -2,0
+ Sonstiges                                                                   -1,4          0,7         0,4         0,0         0,0         0,0
+ Cash Flow aus Investitionstätigkeit                           -22,0        -11,0       -3,4         -1,9         -1,9       -2,0
+ Dividendenzahlung                                                 0,0         0,0         0,0         0,0         0,0         0,0
+ Veränderung Finanzverbindlichkeiten                               9,0        -4,3        -4,3         0,0         0,0         0,0
+ Sonstiges                                                               9,7        -0,2          7,5         0,0         0,0         0,0
+ Cash Flow aus Finanzierungstätigkeit                              18,7       -4,5         3,2        0,0        0,0        0,0
+ Effekte aus Wechselkursänderungen                                         0,1         0,0         0,0         0,0         0,0         0,0
+ Veränderung liquide Mittel                                                  1,7       -15,3        9,8       -3,0       -3,8            1,7
+ Endbestand liquide Mittel                                      27,4        12,0         22,1        19,0        15,2        16,9
+ Quelle: Unternehmen (berichtete Daten), Montega (Prognosen)
+
+
+
+
+ Kennzahlen Smartbroker Holding AG                       2022      2023      2024     2025e     2026e     2027e
+ Ertragsmargen
+ Rohertragsmarge (%)                                       64,6%      59,9%      60,2%      46,0%       51,0%      50,6%
+ EBITDA-Marge (%)                                                16,6%       2,9%         17,1%       -0,1%       0,2%       5,7%
+ EBIT-Marge (%)                                                 -15,9%       -11,2%      -3,2%      -15,0%      -9,8%      -0,7%
+ EBT-Marge (%)                                                  -18,8%       -11,3%      -3,2%      -14,9%      -10,5%        -1,2%
+ Netto-Umsatzrendite (%)                                             -19,1%      -12,7%      -3,8%       -15,1%      -12,0%         -1,1%
+ Kapitalverzinsung
+ ROCE (%)                                                   -25,3%      -13,4%      -4,6%     -34,9%     -29,2%      -2,8%
+ ROE (%)                                                    -20,4%       -11,9%      -4,6%       -21,1%      -21,7%      -2,9%
+ ROA (%)                                                           -13,7%      -9,2%        -3,1%       -19,1%      -18,2%       -1,9%
+ Solvenz
+ Net Debt zum Jahresende (Mio. Euro)                                 -12,5          -1,9        -15,8        -12,8        -9,0        -10,7
+ Net Debt / EBITDA                                                          -1,4          -1,4          -1,8       n.m.      -66,3        -2,2
+ Net Gearing (Net Debt/EK)                                           -0,3         0,0        -0,3        -0,3        -0,3        -0,4
+ Kapitalfluss
+ Free Cash Flow (Mio. EUR)                                             -15,5          -11,5            6,1        -3,0        -3,8              1,7
+ Capex / Umsatz (%)                                          39,9%      23,7%       6,6%       2,8%        2,7%        2,3%
+ Working Capital / Umsatz (%)                                         1,0%       6,7%       5,6%       4,5%       5,5%       5,4%
+ Bewertung
+ EV/Umsatz                                                            3,8         4,3         3,8          2,9          2,9          2,4
+ EV/EBITDA                                                         22,9       149,0        22,4          -      1478,2        42,2
+ EV/EBIT                                                        -          -          -          -          -          -
+ EV/FCF                                                        -          -        32,7          -          -        120,4
+ KGV                                                           -          -          -          -          -          -
+ KBV                                                                 4,4         5,0         4,4         5,6              7,1          7,3
+ Dividendenrendite                                             0,0%       0,0%       0,0%       0,0%       0,0%       0,0%
+ Quelle: Unternehmen (berichtete Daten), Montega (Prognosen)
+
+
+
+
+
+ Wir verbinden Emittenten und Investoren                                                                              Financials | 11

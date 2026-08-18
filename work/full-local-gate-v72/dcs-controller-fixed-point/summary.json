@@ -1,0 +1,7 @@
+{
+  "mutation_checks": 6,
+  "positive_checks": 9,
+  "resume_reused_all": true,
+  "schema_version": "dcs-pipeline-tests/1.0",
+  "status": "PASS"
+}

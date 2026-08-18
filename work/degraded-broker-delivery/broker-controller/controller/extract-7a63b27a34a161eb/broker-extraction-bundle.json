@@ -1,0 +1,710 @@
+{
+  "artifact_root": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/artifacts",
+  "created_at": "2026-08-13T00:00:00Z",
+  "documents": [
+    {
+      "artifacts": [
+        {
+          "artifact_id": "jpm-census",
+          "kind": "surface_census",
+          "path": "jpm/p1.census.json",
+          "sha256": "2bccd7510c2d3aa014c7cc0c28a060d9ff74fd64bdb8dfffb4b76f261e4e9028"
+        }
+      ],
+      "byte_length": 16,
+      "document_id": "jpm",
+      "extraction_status": "complete",
+      "file_name": "jpm.pdf",
+      "house_id": "jpm",
+      "house_name": "J.P. Morgan",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [
+          "101",
+          "111",
+          "19",
+          "21"
+        ],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": [
+          "101",
+          "111",
+          "19",
+          "21"
+        ]
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "3d6060f23a84988c87934443d6195cb9fb176cef648891b6d0be281720ac0be3",
+      "source_id": "fixture.jpm",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "jpm-census"
+          ],
+          "height": 792,
+          "image_count": 0,
+          "kind": "pdf_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "none",
+            "native_text": "pass",
+            "tables": "pass",
+            "vision": "not_required"
+          },
+          "native_text_chars": 420,
+          "native_word_count": 80,
+          "numeric_token_count": 4,
+          "ordinal": 1,
+          "source_table_numeric_tokens": [
+            "101",
+            "111",
+            "19",
+            "21"
+          ],
+          "surface_census_artifact_id": "jpm-census",
+          "surface_id": "jpm.p1",
+          "table_count": 1,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 1,
+              "lane_id": "native_pdf_lines",
+              "status": "pass"
+            }
+          ],
+          "uncovered_numeric_regions": [],
+          "whole_surface_numeric_token_count": 4,
+          "width": 612
+        }
+      ],
+      "tables": [
+        {
+          "bbox": [
+            10,
+            10,
+            300,
+            180
+          ],
+          "confidence": 1.0,
+          "extraction_method": "native_pdf_lines",
+          "rows": [
+            [
+              {
+                "column": 1,
+                "raw_text": "Metric",
+                "row": 1,
+                "source_ref": "fixture:r1c1",
+                "value": "Metric",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "2027E",
+                "row": 1,
+                "source_ref": "fixture:r1c2",
+                "value": "2027E",
+                "value_kind": "text"
+              },
+              {
+                "column": 3,
+                "raw_text": "2028E",
+                "row": 1,
+                "source_ref": "fixture:r1c3",
+                "value": "2028E",
+                "value_kind": "text"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Alpha series",
+                "row": 2,
+                "source_ref": "fixture:r2c1",
+                "value": "Alpha series",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "101",
+                "row": 2,
+                "source_ref": "fixture:r2c2",
+                "value": "101",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "111",
+                "row": 2,
+                "source_ref": "fixture:r2c3",
+                "value": "111",
+                "value_kind": "number"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Beta series",
+                "row": 3,
+                "source_ref": "fixture:r3c1",
+                "value": "Beta series",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "19",
+                "row": 3,
+                "source_ref": "fixture:r3c2",
+                "value": "19",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "21",
+                "row": 3,
+                "source_ref": "fixture:r3c3",
+                "value": "21",
+                "value_kind": "number"
+              }
+            ]
+          ],
+          "source_location": "page 1",
+          "surface_id": "jpm.p1",
+          "table_id": "jpm-t1",
+          "title": "Forecasts",
+          "units": "USDm"
+        }
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "artifact_id": "kepler-census",
+          "kind": "surface_census",
+          "path": "kepler/p4.census.json",
+          "sha256": "46345f115ca9fbbbc0068502d2a4c39024b5ee24cf754073b709f086096b956f"
+        },
+        {
+          "artifact_id": "kepler-image",
+          "kind": "page_image",
+          "path": "kepler/page4.png",
+          "sha256": "77c4e890fe4fab80fc945e87aab1b387fdab9131b0e39cc58bc2ed8f27120ad9"
+        },
+        {
+          "artifact_id": "kepler-task",
+          "kind": "vision_task",
+          "path": "kepler/page4.task.json",
+          "sha256": "af0738d561465c8474ebe69b0927c5028f60fc6d4ed60ffd0c44e5579ff8e8b3"
+        }
+      ],
+      "byte_length": 19,
+      "document_id": "kepler",
+      "extraction_status": "needs_vision",
+      "file_name": "kepler.pdf",
+      "house_id": "kepler",
+      "house_name": "Kepler Cheuvreux",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": []
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "2bf37b795e8c2bd520f8c361650d2b2e9ec8a0af273c0d8bee91c163dee4fe58",
+      "source_id": "fixture.kepler",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "kepler-image",
+            "kepler-task"
+          ],
+          "height": 792,
+          "image_count": 1,
+          "kind": "image_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "pass",
+            "native_text": "empty",
+            "tables": "none",
+            "vision": "required"
+          },
+          "native_text_chars": 0,
+          "native_word_count": 0,
+          "numeric_token_count": 0,
+          "ordinal": 4,
+          "source_table_numeric_tokens": [],
+          "surface_census_artifact_id": "kepler-census",
+          "surface_id": "kepler.p4",
+          "table_count": 0,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 0,
+              "lane_id": "image_render",
+              "status": "empty"
+            }
+          ],
+          "uncovered_numeric_regions": [
+            {
+              "bbox": [
+                10,
+                10,
+                300,
+                180
+              ],
+              "disposition": "requires_vision",
+              "material": true,
+              "region_id": "kepler.p4.r1"
+            }
+          ],
+          "whole_surface_numeric_token_count": 0,
+          "width": 612
+        }
+      ],
+      "tables": []
+    },
+    {
+      "artifacts": [
+        {
+          "artifact_id": "berenberg-census",
+          "kind": "surface_census",
+          "path": "berenberg/p4.census.json",
+          "sha256": "a6881efe49c54a9139928d68d0b230fc9695d58a19d72019824697f1d48b09be"
+        },
+        {
+          "artifact_id": "berenberg-image",
+          "kind": "page_image",
+          "path": "berenberg/page4.png",
+          "sha256": "964eaae116bcbe11f7d69d080706d559b5383fa0488f8a61298e5916744179df"
+        },
+        {
+          "artifact_id": "berenberg-task",
+          "kind": "vision_task",
+          "path": "berenberg/page4.task.json",
+          "sha256": "7c5915f64a12e11495879b5f9ad3c284fcd88928195c5143c956507d8fae6b1a"
+        }
+      ],
+      "byte_length": 22,
+      "document_id": "berenberg",
+      "extraction_status": "needs_vision",
+      "file_name": "berenberg.pdf",
+      "house_id": "berenberg",
+      "house_name": "Berenberg",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": []
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "803fb60b5a24c1af9595b2a83e681d0761c0be56d5e59f70ec5d808b8193741c",
+      "source_id": "fixture.berenberg",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "berenberg-image",
+            "berenberg-task"
+          ],
+          "height": 792,
+          "image_count": 1,
+          "kind": "image_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "pass",
+            "native_text": "empty",
+            "tables": "none",
+            "vision": "required"
+          },
+          "native_text_chars": 0,
+          "native_word_count": 0,
+          "numeric_token_count": 0,
+          "ordinal": 4,
+          "source_table_numeric_tokens": [],
+          "surface_census_artifact_id": "berenberg-census",
+          "surface_id": "berenberg.p4",
+          "table_count": 0,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 0,
+              "lane_id": "image_render",
+              "status": "empty"
+            }
+          ],
+          "uncovered_numeric_regions": [
+            {
+              "bbox": [
+                10,
+                10,
+                300,
+                180
+              ],
+              "disposition": "requires_vision",
+              "material": true,
+              "region_id": "berenberg.p4.r1"
+            }
+          ],
+          "whole_surface_numeric_token_count": 0,
+          "width": 612
+        }
+      ],
+      "tables": []
+    },
+    {
+      "artifacts": [
+        {
+          "artifact_id": "bnp-census",
+          "kind": "surface_census",
+          "path": "bnp/p1.census.json",
+          "sha256": "84101166362ff0a4646d87b2297127e1ca995896ff81b7432e1a4b4c2426e2e7"
+        }
+      ],
+      "byte_length": 16,
+      "document_id": "bnp",
+      "extraction_status": "complete",
+      "file_name": "bnp.pdf",
+      "house_id": "bnp",
+      "house_name": "BNP Paribas",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [
+          "99",
+          "108",
+          "18",
+          "20"
+        ],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": [
+          "99",
+          "108",
+          "18",
+          "20"
+        ]
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "4ff34dcab929e69440f414562b457d899deaff28c2b666de23d14a026e5e513b",
+      "source_id": "fixture.bnp",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "bnp-census"
+          ],
+          "height": 792,
+          "image_count": 0,
+          "kind": "pdf_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "none",
+            "native_text": "pass",
+            "tables": "pass",
+            "vision": "not_required"
+          },
+          "native_text_chars": 420,
+          "native_word_count": 80,
+          "numeric_token_count": 4,
+          "ordinal": 1,
+          "source_table_numeric_tokens": [
+            "99",
+            "108",
+            "18",
+            "20"
+          ],
+          "surface_census_artifact_id": "bnp-census",
+          "surface_id": "bnp.p1",
+          "table_count": 1,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 1,
+              "lane_id": "native_pdf_lines",
+              "status": "pass"
+            }
+          ],
+          "uncovered_numeric_regions": [],
+          "whole_surface_numeric_token_count": 4,
+          "width": 612
+        }
+      ],
+      "tables": [
+        {
+          "bbox": [
+            10,
+            10,
+            300,
+            180
+          ],
+          "confidence": 1.0,
+          "extraction_method": "native_pdf_lines",
+          "rows": [
+            [
+              {
+                "column": 1,
+                "raw_text": "Metric",
+                "row": 1,
+                "source_ref": "fixture:r1c1",
+                "value": "Metric",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "2027E",
+                "row": 1,
+                "source_ref": "fixture:r1c2",
+                "value": "2027E",
+                "value_kind": "text"
+              },
+              {
+                "column": 3,
+                "raw_text": "2028E",
+                "row": 1,
+                "source_ref": "fixture:r1c3",
+                "value": "2028E",
+                "value_kind": "text"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Alpha series",
+                "row": 2,
+                "source_ref": "fixture:r2c1",
+                "value": "Alpha series",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "99",
+                "row": 2,
+                "source_ref": "fixture:r2c2",
+                "value": "99",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "108",
+                "row": 2,
+                "source_ref": "fixture:r2c3",
+                "value": "108",
+                "value_kind": "number"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Beta series",
+                "row": 3,
+                "source_ref": "fixture:r3c1",
+                "value": "Beta series",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "18",
+                "row": 3,
+                "source_ref": "fixture:r3c2",
+                "value": "18",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "20",
+                "row": 3,
+                "source_ref": "fixture:r3c3",
+                "value": "20",
+                "value_kind": "number"
+              }
+            ]
+          ],
+          "source_location": "page 1",
+          "surface_id": "bnp.p1",
+          "table_id": "bnp-t1",
+          "title": "Forecasts",
+          "units": "USDm"
+        }
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "artifact_id": "jefferies-census",
+          "kind": "surface_census",
+          "path": "jefferies/p1.census.json",
+          "sha256": "26cdbfef433c27450006d1909370edfbf05871c0aee69b6260ae61ac0a812a99"
+        }
+      ],
+      "byte_length": 22,
+      "document_id": "jefferies",
+      "extraction_status": "complete",
+      "file_name": "jefferies.pdf",
+      "house_id": "jefferies",
+      "house_name": "Jefferies",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [
+          "102",
+          "112",
+          "20",
+          "23"
+        ],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": [
+          "102",
+          "112",
+          "20",
+          "23"
+        ]
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "5c3092b7b0a5b84b52d9703b6e6d5632b2ba062230905b12b87fb66d2b06e8a8",
+      "source_id": "fixture.jefferies",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "jefferies-census"
+          ],
+          "height": 792,
+          "image_count": 0,
+          "kind": "pdf_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "none",
+            "native_text": "pass",
+            "tables": "pass",
+            "vision": "not_required"
+          },
+          "native_text_chars": 420,
+          "native_word_count": 80,
+          "numeric_token_count": 4,
+          "ordinal": 1,
+          "source_table_numeric_tokens": [
+            "102",
+            "112",
+            "20",
+            "23"
+          ],
+          "surface_census_artifact_id": "jefferies-census",
+          "surface_id": "jefferies.p1",
+          "table_count": 1,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 1,
+              "lane_id": "native_pdf_lines",
+              "status": "pass"
+            }
+          ],
+          "uncovered_numeric_regions": [],
+          "whole_surface_numeric_token_count": 4,
+          "width": 612
+        }
+      ],
+      "tables": [
+        {
+          "bbox": [
+            10,
+            10,
+            300,
+            180
+          ],
+          "confidence": 1.0,
+          "extraction_method": "native_pdf_lines",
+          "rows": [
+            [
+              {
+                "column": 1,
+                "raw_text": "Metric",
+                "row": 1,
+                "source_ref": "fixture:r1c1",
+                "value": "Metric",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "2027E",
+                "row": 1,
+                "source_ref": "fixture:r1c2",
+                "value": "2027E",
+                "value_kind": "text"
+              },
+              {
+                "column": 3,
+                "raw_text": "2028E",
+                "row": 1,
+                "source_ref": "fixture:r1c3",
+                "value": "2028E",
+                "value_kind": "text"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Alpha series",
+                "row": 2,
+                "source_ref": "fixture:r2c1",
+                "value": "Alpha series",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "102",
+                "row": 2,
+                "source_ref": "fixture:r2c2",
+                "value": "102",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "112",
+                "row": 2,
+                "source_ref": "fixture:r2c3",
+                "value": "112",
+                "value_kind": "number"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Beta series",
+                "row": 3,
+                "source_ref": "fixture:r3c1",
+                "value": "Beta series",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "20",
+                "row": 3,
+                "source_ref": "fixture:r3c2",
+                "value": "20",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "23",
+                "row": 3,
+                "source_ref": "fixture:r3c3",
+                "value": "23",
+                "value_kind": "number"
+              }
+            ]
+          ],
+          "source_location": "page 1",
+          "surface_id": "jefferies.p1",
+          "table_id": "jefferies-t1",
+          "title": "Forecasts",
+          "units": "USDm"
+        }
+      ]
+    }
+  ],
+  "extractor_version": "fixture/1.0",
+  "findings": [],
+  "gate_status": "NEEDS_VISION",
+  "run_id": "degraded_close_regression",
+  "schema_version": "broker-extraction-bundle/1.0",
+  "summary": {}
+}

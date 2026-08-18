@@ -4,8 +4,9 @@
 This is deliberately stricter than ``run_broker_public_layout_tests.py``.  The
 layout cohort proves that difficult pages enter the internal work queue.  This
 gate proves that a separately reviewed, external five-to-ten-house fixture
-actually exits that queue, compiles a sealed pack, and supplies a forecast
-authority which the model may consume.
+actually exits that queue, compiles a sealed pack, and supplies at least one
+coherent-house forecast authority which the model may consume while absent
+concept-periods retain the ordinary waterfall.
 
 The fixture, PDFs, model-host responses and reviewed crosswalk remain external
 test custody.  No source values or reports enter the skill package.
@@ -316,32 +317,36 @@ def validate_pack(
     check(metric_ids & HEADLINE_ALTERNATIVES, "Pack has neither EBIT nor adjusted EBITDA authority.")
     eligibility = pack.get("eligibility_summary") or {}
     check(
-        int(eligibility.get("primary_eligible_house_count", 0)) >= 1,
-        "No house is primary eligible across the three forecast periods.",
+        int(eligibility.get("primary_eligible_house_count", 0))
+        + int(eligibility.get("supplemental_eligible_house_count", 0)) >= 1,
+        "No house has any coherent model-usable forecast authority.",
     )
     check(
         eligibility.get("run_can_continue_without_broker_question") is True,
-        "Compiled pack does not provide a complete forecast authority.",
+        "Compiled pack cannot continue without an unnecessary broker question.",
     )
-    recommended = pack.get("recommended_primary_house_id")
-    check(recommended in house_ids, "Recommended primary house is absent from the pack.")
-    selected_house = next(item for item in houses if item.get("house_id") == recommended)
-    estimates = selected_house.get("estimates") or {}
-    for metric_id in sorted(REQUIRED_CORE):
-        values = estimates.get(metric_id)
-        check(
-            isinstance(values, list) and len(values) == 3 and all(value is not None for value in values),
-            f"Recommended house lacks complete {metric_id} estimates.",
-        )
+    authority_houses = []
+    for house in houses:
+        estimates = house.get("estimates") or {}
+        complete_metrics = {
+            metric_id for metric_id, values in estimates.items()
+            if isinstance(values, list) and len(values) == 3
+            and all(value is not None for value in values)
+        }
+        if complete_metrics:
+            authority_houses.append((house, complete_metrics))
+    check(len(authority_houses) == 1, "Model authority is not confined to one coherent house.")
+    selected_house, complete_metrics = authority_houses[0]
     check(
-        any(
-            isinstance(estimates.get(metric_id), list)
-            and len(estimates[metric_id]) == 3
-            and all(value is not None for value in estimates[metric_id])
-            for metric_id in HEADLINE_ALTERNATIVES
-        ),
-        "Recommended house lacks a complete headline forecast anchor.",
+        bool(complete_metrics & HEADLINE_ALTERNATIVES),
+        "Selected coherent house lacks a complete headline forecast anchor.",
     )
+    check(
+        len(complete_metrics & metric_ids) >= 2,
+        "Selected coherent house does not supply a non-vacuous forecast surface.",
+    )
+    recommended = pack.get("recommended_primary_house_id") or selected_house.get("house_id")
+    check(recommended in house_ids, "Selected coherent house is absent from the pack.")
     check(
         source_tables.get("schema_version") == "broker-source-tables/1.0",
         "Broker source-table artifact has wrong version.",
@@ -628,9 +633,18 @@ def main() -> int:
     check(responses.is_dir(), "responses must be a directory.")
     crosswalk = resolve(base, manifest.get("crosswalk"), "crosswalk")
     check(crosswalk.is_file(), "crosswalk must be a JSON file.")
+    model_context_path = resolve(base, manifest.get("model_context"), "model_context")
+    check(model_context_path.is_file(), "model_context must be a JSON file.")
+    model_context = read_json(model_context_path, "model context")
+    demand_graph = model_context.get("model_demand_graph") or {}
+    check(
+        demand_graph.get("schema_version") == "pre-broker-model-demand/1.0",
+        "Real-pack model context must carry pre-broker-model-demand/1.0.",
+    )
     request = {
         "schema_version": "broker-extraction-request/1.0",
         "run_id": str(manifest.get("run_id") or "real_same_issuer_multi_house_completion"),
+        "model_context": model_context,
         "documents": request_documents,
     }
     request_path = output_root / "broker-extraction-request.json"

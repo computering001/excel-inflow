@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/attachment-evidence-controller.schema.json",
+  "title": "Single production owner for raw attachment evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "attachment_ingress_path", "case_source_declarations_path", "broker_intake_choice_path"],
+  "properties": {
+    "schema_version": { "const": "attachment-evidence-controller/1.0" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "attachment_ingress_path": { "type": "string", "minLength": 1 },
+    "case_source_declarations_path": { "type": "string", "minLength": 1 },
+    "broker_intake_choice_path": { "type": "string", "minLength": 1 },
+    "filings": { "$ref": "#/$defs/filingsLane" },
+    "broker": { "$ref": "#/$defs/brokerLane" },
+    "dcs": { "$ref": "#/$defs/dcsLane" }
+  },
+  "anyOf": [
+    { "required": ["filings"] },
+    { "required": ["broker"] },
+    { "required": ["dcs"] }
+  ],
+  "$defs": {
+    "filingsLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_path"],
+      "properties": {
+        "request_path": { "type": "string", "minLength": 1 },
+        "responses_path": { "type": ["string", "null"] }
+      }
+    },
+    "brokerLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_path"],
+      "properties": {
+        "request_path": { "type": "string", "minLength": 1 },
+        "responses_path": { "type": ["string", "null"] },
+        "crosswalk_path": { "type": ["string", "null"] }
+      }
+    },
+    "dcsLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_path"],
+      "properties": {
+        "request_path": { "type": "string", "minLength": 1 },
+        "crosswalk_path": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

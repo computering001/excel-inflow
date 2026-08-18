@@ -1,0 +1,13 @@
+{
+  "document_id": "late",
+  "image_sha256": "cd706c185a0589c760074a298d5702a36e5fba5e8ed59c9baff3a322a7616d72",
+  "method": "ocr_geometry",
+  "non_tabular_reason": "narrative page",
+  "pass_index": 2,
+  "producer_fingerprint": "late-beta-fingerprint-2",
+  "producer_id": "late-beta-pass2",
+  "schema_version": "broker-vision-result/1.0",
+  "surface_disposition": "verified_non_tabular",
+  "surface_id": "late.p4",
+  "tables": []
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/filings-source-registry-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "company", "acquisition_policy", "documents", "extraction_request_sha256", "registry_sha256"],
+  "properties": {
+    "schema_version": { "const": "filings-source-registry/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "company": { "type": "object" },
+    "acquisition_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["search_performed", "user_supplied_precedence", "official_urls_must_be_declarative", "content_addressed", "ordering"],
+      "properties": {
+        "search_performed": { "const": false },
+        "user_supplied_precedence": { "const": true },
+        "official_urls_must_be_declarative": { "const": true },
+        "content_addressed": { "const": true },
+        "ordering": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "enum": ["user_supplied", "official_declarative_url", "runtime_library"] },
+          "uniqueItems": true
+        }
+      }
+    },
+    "documents": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["document_id", "source_id", "origin", "authority_rank", "path", "raw_sha256", "filing_kind", "filing_date", "period_end", "covered_periods", "section_coverage", "restatement_basis"],
+        "properties": {
+          "document_id": { "type": "string", "minLength": 1 },
+          "source_id": { "type": "string", "minLength": 1 },
+          "origin": { "enum": ["user_supplied", "official_declarative_url", "runtime_library"] },
+          "authority_rank": { "type": "integer", "minimum": 0, "maximum": 2 },
+          "path": { "type": "string", "minLength": 1 },
+          "raw_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "filing_kind": { "enum": ["annual_report", "annual_results", "restatement", "interim_report", "debt_note", "supplemental"] },
+          "filing_date": { "type": "string", "format": "date" },
+          "period_end": { "type": ["string", "null"], "format": "date" },
+          "covered_periods": { "type": "array", "minItems": 1, "items": { "type": "string", "format": "date" }, "uniqueItems": true },
+          "section_coverage": { "type": "array", "minItems": 1, "items": { "enum": ["income_statement", "cash_flow", "debt_notes", "issuer_facts"] }, "uniqueItems": true },
+          "restatement_basis": { "enum": ["as_reported", "restated_comparative"] },
+          "final_url": { "type": "string", "pattern": "^https://" }
+        }
+      }
+    },
+    "extraction_request_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "registry_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

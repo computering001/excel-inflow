@@ -55,6 +55,12 @@
       "script": "run_instrument_period_state_tests.mjs"
     },
     {
+      "id": "flow-read-balance-basis",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_flow_read_balance_basis_tests.mjs"
+    },
+    {
       "id": "forecast-behavior",
       "phase": "forecast",
       "runtime": "node",
@@ -84,6 +90,24 @@
     "runtime": "node",
     "script": "run_product_constitution_tests.mjs"
   },
+  {
+    "id": "delivery-constitution",
+    "phase": "workflow",
+    "runtime": "node",
+    "script": "run_delivery_constitution_tests.mjs"
+  },
+  {
+    "id": "controller-terminal-exits",
+    "phase": "workflow",
+    "runtime": "node",
+    "script": "run_controller_exit_inventory_tests.mjs"
+  },
+  {
+    "id": "broker-dynamic-concepts",
+    "phase": "evidence",
+    "runtime": "node",
+    "script": "run_broker_dynamic_concept_tests.mjs"
+  },
     {
       "id": "forecast-topology",
       "phase": "forecast",
@@ -105,6 +129,12 @@
       "script": "run_case_source_proposer_tests.mjs"
     },
     {
+      "id": "historical-normalisation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_historical_normalisation_tests.mjs"
+    },
+    {
       "id": "case-authorship-boundary",
       "phase": "evidence",
       "runtime": "node",
@@ -115,6 +145,18 @@
       "phase": "evidence",
       "runtime": "python",
       "script": "run_evidence_pipeline_tests.py"
+    },
+    {
+      "id": "dcs-ingress-projection",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_dcs_ingress_projection_tests.mjs"
+    },
+    {
+      "id": "zero-broker-authority",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_zero_broker_authority_tests.py"
     },
     {
       "id": "broker-intake-choice",
@@ -247,12 +289,92 @@
       "script": "run_user_flow_tests.mjs"
     },
     {
+      "id": "stage4-content-addressed-resume",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_stage4_checkpoint_tests.mjs",
+      "arguments": [
+        "--cases", "$CASES",
+        "--python", "$PYTHON",
+        "--soffice", "$SOFFICE"
+      ],
+      "requires": ["CASES", "PYTHON", "SOFFICE"]
+    },
+    {
       "id": "degraded-broker-delivery",
       "phase": "workflow",
       "runtime": "node",
       "script": "run_degraded_broker_delivery_tests.mjs",
       "arguments": ["$CASES"],
       "requires": ["CASES"]
+    },
+    {
+      "id": "broker-exit-fault-injection",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_broker_exit_fault_injection_tests.mjs"
+    },
+    {
+      "id": "universal-broker-delivery-matrix",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_universal_broker_delivery_matrix.mjs",
+      "arguments": ["$RAW_CANARY_EVIDENCE", "$PYTHON", "$SOFFICE"],
+      "requires": ["RAW_CANARY_EVIDENCE", "PYTHON", "SOFFICE"]
+    },
+    {
+      "id": "raw-input-black-box-canary",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_raw_input_black_box_canary.mjs",
+      "arguments": ["$RAW_CANARY_EVIDENCE", "$PYTHON", "$SOFFICE"],
+      "requires": ["RAW_CANARY_EVIDENCE", "PYTHON", "SOFFICE"]
+    },
+    {
+      "id": "terminal-broker-image-rewrite",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_terminal_broker_image_rewrite_tests.py"
+    },
+    {
+      "id": "broker-numeric-token-boundaries",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_broker_numeric_token_tests.py"
+    },
+    {
+      "id": "broker-model-projection",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_broker_model_projection_tests.mjs"
+    },
+    {
+      "id": "broker-anchor-projection",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_broker_anchor_projection_tests.mjs"
+    },
+    {
+      "id": "real-raw-filing-black-box-canary",
+      "phase": "real_corpus",
+      "runtime": "node",
+      "script": "run_raw_input_black_box_canary.mjs",
+      "arguments": [
+        "$RAW_CANARY_EVIDENCE",
+        "$PYTHON",
+        "$SOFFICE",
+        "--real-filings-request",
+        "$REAL_FILINGS_REQUEST",
+        "--real-filings-expectations",
+        "$REAL_FILINGS_EXPECTATIONS"
+      ],
+      "requires": [
+        "RAW_CANARY_EVIDENCE",
+        "PYTHON",
+        "SOFFICE",
+        "REAL_FILINGS_REQUEST",
+        "REAL_FILINGS_EXPECTATIONS"
+      ]
     },
     {
       "id": "case-compiler-equivalence",

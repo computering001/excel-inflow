@@ -1,0 +1,53 @@
+{
+  "$id": "equation-graph/1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "graph_id", "period_scope", "edge_direction", "nodes", "edges"],
+  "properties": {
+    "schema_version": { "const": "equation-graph/1.0" },
+    "graph_id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+    "period_scope": { "const": "single_forecast_period_template" },
+    "edge_direction": { "const": "economic_precedent_to_dependent" },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "domain", "kind", "tolerance_class", "circularity_behavior"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "role": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "domain": {
+          "enum": ["control", "income_statement", "cash_flow_statement", "debt_schedule", "cash_waterfall", "interest_schedule", "lease_schedule"]
+        },
+        "kind": { "enum": ["control", "input", "calculation", "aggregate", "statement_output", "schedule_output"] },
+        "tolerance_class": { "enum": ["currency", "ratio", "percentage", "control", "default"] },
+        "circularity_behavior": { "enum": ["zero_when_off", "live_when_off", "uncontrolled"] }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "type", "activation"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "from": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "to": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$" },
+        "type": {
+          "enum": ["control_gate", "aggregation", "schedule_to_statement", "statement_dependency", "cash_flow_bridge", "cash_waterfall", "balance_rollforward", "interest_base", "noncash_bridge", "liquidity_constraint"]
+        },
+        "activation": { "enum": ["always", "circularity_on", "circularity_off"] }
+      }
+    }
+  }
+}

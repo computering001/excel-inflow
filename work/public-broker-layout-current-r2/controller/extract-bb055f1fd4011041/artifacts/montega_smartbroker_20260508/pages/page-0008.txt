@@ -1,0 +1,83 @@
+SMARTBROKER HOLDING AG
+
+
+DCF Modell
+
+                                                                                                        Terminal
+Angaben in Mio. EUR                          2025e     2026e     2027e    2028e     2029e    2030e     2031e
+                                                                                                       Value
+
+ Umsatz                                  68,9         70,1      84,0       101,0        116,2        130,1      143,2       146,1
+
+ Veränderung                                 31,3%         1,7%       19,9%      20,2%       15,0%       12,0%        10,1%       2,0%
+
+ EBIT                                        -10,3       -6,9      -0,6        13,4        15,4         26,1      36,4       37,5
+
+ EBIT-Marge                                -15,0%      -9,8%      -0,7%       13,3%       13,3%       20,1%     25,4%      25,7%
+
+ NOPAT                                    -10,5       -7,8      -0,5        9,4          11,5        18,3      25,5       26,3
+
+ Abschreibungen                              10,2         7,0        5,3          5,1        8,3          8,1        7,9        2,0
+
+ in % vom Umsatz                            14,9%       10,0%       6,3%         5,1%        7,2%       6,2%      5,5%        1,4%
+
+ Liquiditätsveränderung
+
+ - Working Capital                            -1,0       -0,5      -0,8       -0,9       -0,8       -0,8       -0,7       -0,2
+
+ - Investitionen                                -1,9        -1,9       -2,0       -2,0       -2,0       -2,0      -2,0       -2,0
+
+ Investitionsquote                           2,8%        2,7%       2,3%       2,0%         1,7%         1,5%        1,4%        1,4%
+
+ Übriges
+
+ Free Cash Flow (WACC-Modell)               4,5       -3,2           2,1          11,6        17,0       23,6      30,6        26,1
+
+ WACC                                    8,4%       8,4%       8,4%       8,4%       8,4%       8,4%      8,4%      8,4%
+
+ Present Value                                 4,5        -3,0            1,8         9,2         12,5         15,9           19,1      233,9
+
+ Kumuliert                                 4,5          1,5        3,3        12,6       25,0        41,0       60,1     294,0
+
+
+                                      Annahmen: Umsatzwachstumsraten und Margenerwartungen  Wertermittlung (Mio. EUR)
+                                                        Kurzfristiges Umsatzwachstum                   2025-2028          13,6%
+  Total present value (Tpv)             294,0
+                                                          Mittelfristiges Umsatzwachstum                    2025-2031          13,0%
+  Terminal Value                      233,9
+                                                     Langfristiges Umsatzwachstum                  ab 2032          2,0%
+  Anteil vom Tpv-Wert              80%
+                                                        Kurzfristige EBIT-Marge                          2025-2028           -3,1%
+  Verbindlichkeiten                        6,2
+                                                           Mittelfristige EBIT-Marge                          2025-2031          6,6%
+  Liquide Mittel                          22,0
+                                                     Langfristige EBIT-Marge                        ab 2032         25,7%
+  Eigenkapitalwert                  309,9
+
+                                                    Sensitivität Wert je Aktie (EUR)         ewiges Wachstum
+  Aktienzahl (Mio.)                         16,78    WACC               1,25%         1,75%      2,00%       2,25%       2,75%
+ Wert je Aktie (EUR)                   18,46           8,93%          15,76         16,55         16,99         17,46          18,51
+
+  +Upside / -Downside             43%           8,68%         16,36          17,22          17,70           18,21         19,37
+  Aktienkurs (EUR)                      12,90          8,43%            17,01          17,94        18,46         19,03         20,31
+                                                           8,18%          17,70          18,72         19,30         19,92         21,33
+
+                                                       7,93%         18,45          19,57        20,20       20,89       22,46  Modellparameter
+
+  Fremdkapitalquote                 25,0%      Sensitivität Wert je Aktie (EUR)         EBIT-Marge ab 2032e
+
+  Fremdkapitalzins                     4,0%    WACC            20,70%       23,20%      25,70%      28,20%      30,70%
+
+  Marktrendite                         9,0%           8,93%          14,53          15,76         16,99           18,21        19,44
+  risikofreie Rendite                   2,50%           8,68%              15,11         16,40          17,70        18,99       20,28
+                                               8,43%          15,74            17,10        18,46         19,83           21,19
+  Beta                                         1,20             8,18%           16,41          17,85         19,30       20,74         22,18
+                                                       7,93%            17,15          18,67        20,20         21,73        23,25 WACC                              8,4%
+
+  ewiges Wachstum                    2,0%                                                                                              Quelle: Montega
+
+
+
+
+
+ Wir verbinden Emittenten und Investoren                                                                              Financials | 8

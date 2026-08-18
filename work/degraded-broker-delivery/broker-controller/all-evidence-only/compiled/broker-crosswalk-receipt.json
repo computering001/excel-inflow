@@ -1,0 +1,31 @@
+{
+  "schema_version": "broker-crosswalk-receipt/1.2",
+  "run_id": "degraded_close_regression",
+  "bundle_sha256": "ad4edd2145a79084745616ef4018f7cd98dbc98442550a4ac4c0c537cf4d27bc",
+  "crosswalk_sha256": "ce8520d56a26b88182dc05650d10061a88024ddbd24b0425baa066cfe5b7e00a",
+  "mapping_count": 0,
+  "mappings": [],
+  "table_reviews_sha256": "16535d5378813c88481ebda933797d806a4ad69f35c6a4035b13f6d74f423da3",
+  "coverage_ledger_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "coverage_summary": {
+    "table_count": 4,
+    "table_review_count": 4,
+    "detected_forecast_candidate_count": 0,
+    "coverage_entry_count": 0,
+    "unresolved_candidate_count": 0,
+    "terminal_quarantined_candidate_count": 0,
+    "unresolved_selected_candidate_count": 0,
+    "semantic_quality_violation_count": 0,
+    "candidate_manifest_count": 0,
+    "candidate_authority": "deterministic_manifest",
+    "mapping_count": 0,
+    "derived_mapping_count": 0,
+    "disposition_counts": {}
+  },
+  "coverage_ledger": [],
+  "derived_mappings": [],
+  "candidate_manifest_sha256": "092ed588126a43a9aaecb79c5139d83508a0b645c74fb72b4cef6cb686a73345",
+  "crosswalk_canonical_sha256": "4a44220655e42b466e99737e2ef3f53565615c3262d161572b802e28d5e0e752",
+  "independent_semantic_report_sha256": "87650a2175883cf7d89667d60caae59e22d7661e23c172e92229306ea5e67986",
+  "status": "PASS"
+}

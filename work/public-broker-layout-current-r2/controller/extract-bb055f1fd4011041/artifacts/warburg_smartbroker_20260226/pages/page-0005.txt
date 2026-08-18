@@ -1,0 +1,77 @@
+Smartbroker
+
+
+Consolidated profit & loss
+
+ In EUR m                                             2021       2022       2023       2024      2025e      2026e      2027e
+
+ Sales                                                   48.20       52.79       46.54       52.48       67.44       70.90       82.19
+ Change Sales yoy                                        70.9 %       9.5 %      -11.8 %      12.8 %      28.5 %       5.1 %      15.9 %
+
+ Increase / decrease in inventory                               -0.01        0.00        0.00        0.00        0.00        0.00        0.00
+Own work capitalised                                        0.88        2.39        2.54        0.04        0.00        0.00        0.00
+ Total Sales                                              49.07       55.18       49.09       52.52       67.44       70.90       82.19
+ Material expenses                                        25.85       21.06       21.22       20.93       33.93       32.56       34.97
+ Gross profit                                             23.22       34.12       27.87       31.59       33.52       38.34       47.22
+ Gross profit margin                                       48.2 %      64.6 %      59.9 %      60.2 %      49.7 %      54.1 %      57.5 %
+
+ Personnel expenses                                      12.64       18.75       20.26       20.83       28.30       28.94       29.75
+ Other operating income                                     0.63        1.36        1.79        4.97        0.00        0.00        0.00
+ Other operating expenses                                   7.65        7.96        8.05        6.76        5.71        7.33        6.13
+ Unfrequent items                                           0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ EBITDA                                                   3.56        8.77        1.34        8.97        -0.50        2.07       11.34
+ Margin                                                      7.4 %      16.6 %       2.9 %      17.1 %       -0.7 %       2.9 %      13.8 %
+
+ Depreciation of fixed assets                                  0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ EBITA                                                     3.56        8.77        1.34        8.97        -0.50        2.07       11.34
+ Amortisation of intangible assets                             3.80       17.19        6.57       10.67       11.56       10.19       11.41
+ Goodwill amortisation                                       0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ EBIT                                                      0.35        -8.41        -5.22        -1.70       -12.06        -8.12        -0.06
+ Margin                                                      0.7 %      -15.9 %      -11.2 %       -3.2 %      -17.9 %      -11.5 %       -0.1 %
+ EBIT adj.                                                  0.35        -8.41        -5.22        -1.70       -12.06        -8.12        -0.06
+
+ Interest income                                             0.01        0.03        0.29        0.30        0.00        0.00        0.00
+ Interest expenses                                           0.16        0.38        0.25        0.18        0.00        0.00        0.00
+ Other financial income (loss)                                 0.23        1.17        0.08        0.10        0.00        0.00        0.00
+EBT                                                       0.04        -9.93        -5.25        -1.69       -12.06        -8.12        -0.06
+ Margin                                                      0.1 %      -18.8 %      -11.3 %       -3.2 %      -17.9 %      -11.5 %       -0.1 %
+
+ Total taxes                                                 0.58        0.13        0.67        -0.29        -0.30        -0.20        0.10
+ Net income from continuing operations                     -0.54       -10.07        -5.92        -1.39       -11.76        -7.92        -0.16
+ Income from discontinued operations (net of tax)               0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ Net income before minorities                                -0.54       -10.07        -5.92        -1.39       -11.76        -7.92        -0.16
+ Minority interest                                            0.02        0.00        0.05        -0.01        0.00        0.00        0.00
+ Net income                                                  -0.56       -10.07        -5.98        -1.39       -11.76        -7.92        -0.16
+ Margin                                                         -1.2 %      -19.1 %      -12.8 %       -2.6 %      -17.4 %      -11.2 %       -0.2 %
+
+ Number of shares, average                                15.10       15.68       15.68       16.78       16.78       16.78       16.78
+EPS                                                          -0.04        -0.64        -0.38        -0.08        -0.70        -0.47        -0.01
+EPS adj.                                                      -0.04        -0.64        -0.38        -0.08        -0.70        -0.47        -0.01
+
+ *Adjustments made for:
+
+ Guidance: 2026: Revenue EUR 66-72m; EBITDA EUR -1.5m - +1.5m
+
+
+Financial Ratios
+
+                                                    2021       2022       2023       2024      2025e      2026e      2027e
+
+Total Operating Costs / Sales                              94.4 %      87.9 %     102.6 %      83.0 %     100.7 %      97.1 %      86.2 %
+Operating Leverage                                             -1.2 x          n.a.        3.2 x        -5.3 x       21.4 x        -6.4 x        -6.2 x
+EBITDA / Interest expenses                                21.8 x       23.2 x        5.5 x       50.4 x          n.a.          n.a.          n.a.
+Tax rate (EBT)                                       1394.2 %       -1.3 %      -12.7 %      17.4 %       2.5 %       2.5 %    -159.8 %
+Dividend Payout Ratio                                       0.0 %       0.0 %       0.0 %       0.0 %       0.0 %       0.0 %       0.0 %
+Sales per Employee                                                n.a.          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+
+
+Sales, EBITDA                         Operating Performance                Performance per Share
+in EUR m                                              in %
+
+
+
+
+
+Source: Warburg Research                                    Source: Warburg Research                                    Source: Warburg Research
+
+                        COM M ENT      Published 26.02.2026       5

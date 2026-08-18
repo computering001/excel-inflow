@@ -1,0 +1,1 @@
+{"crosswalk_sha256":"27c9e16c71cb9e2ee969a6c23eec8312f06707f8c0c605a53e283dfac5b55176","instrument_count":1,"schema_version":"dcs-crosswalk-proposal-receipt/1.0","status":"NEEDS_EVIDENCE","unresolved":[{"description":"Missing Terms Loan","instrument_id":"missing_terms_loan_1_2","missing_fields":["maturity"],"row_id":"s001!row:2"}]}

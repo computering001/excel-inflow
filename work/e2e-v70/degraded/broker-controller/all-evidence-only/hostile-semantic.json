@@ -1,0 +1,17 @@
+{
+  "schema_version": "broker-semantic-verification-report/1.0",
+  "status": "BLOCKED",
+  "total_violation_count": 1,
+  "candidate_manifest_sha256": "092ed588126a43a9aaecb79c5139d83508a0b645c74fb72b4cef6cb686a73345",
+  "crosswalk_sha256": "6ef22ec929f44461d50947fade4b7775c15aae8c28f630f0d3eb6a4e6153b1d1",
+  "candidate_count": 0,
+  "coverage_entry_count": 0,
+  "terminal_quarantined_candidate_count": 0,
+  "unresolved_selected_candidate_count": 0,
+  "findings": [
+    {
+      "code": "SEM-EMPTY-AUTHORITY-ACTIVE",
+      "message": "A fully evidence-only broker lane cannot carry candidate dispositions, mappings or derivations."
+    }
+  ]
+}

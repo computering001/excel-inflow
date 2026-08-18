@@ -1659,7 +1659,10 @@ for (const definition of allStatementRows) {
     proFormaActualValue === null &&
     !proFormaActualFormula &&
     (declaredActual === null || declaredActual === undefined) &&
-    definition.historical_authority === "schedule_link";
+    (definition.historical_authority === "schedule_link" ||
+      (definition.formula_authority === "compiler" &&
+        ["rcf_draw", "rcf_repayment"].includes(definition.movement_type) &&
+        !(definition.historical_dependency_refs?.length)));
   if (structurallyBlankSchedule) continue;
   const formulaTies =
     String(proFormaActualFormula).replace(/^=/, "") ===

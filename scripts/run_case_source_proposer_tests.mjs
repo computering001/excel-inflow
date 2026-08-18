@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { proposeCaseSource } from "./lib/case_source_proposer.mjs";
+import {
+  proposeCaseSource,
+  writeRuntimeEvidenceLanes,
+} from "./lib/case_source_proposer.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
 
 function manifest(statement, rows) {
@@ -55,15 +58,16 @@ assert.equal(result.statement_map.income_statement.length, 5);
 assert.equal(result.statement_map.cash_flow.length, 10);
 assert.equal(result.statement_map.income_statement[0].role, "revenue");
 assert.equal(result.statement_map.income_statement[0].broker_metric_id, "revenue");
-assert.equal(result.statement_map.income_statement[2].role, "operating_profit");
+assert.equal(result.statement_map.income_statement[2].role, "ebit");
 assert.equal(result.statement_map.income_statement[3].role, "is_da_expense");
 assert.equal(result.statement_map.income_statement[4].role, "net_income");
-assert.equal(result.statement_map.cash_flow[0].role, "cash_flow_profit_before_tax");
+assert.equal(result.statement_map.cash_flow[0].role, "cash_flow_net_income");
 assert.equal(result.statement_map.cash_flow[1].role, "cash_flow_da");
 assert.equal(result.statement_map.cash_flow[2].role, "cash_flow_tax_addback");
 assert.equal(result.statement_map.cash_flow[3].role, "cash_generated_from_operations");
 assert.equal(result.statement_map.cash_flow[4].role, "cash_from_operations");
-assert.equal(result.statement_map.cash_flow[6].role, "capex");
+assert.equal(result.statement_map.cash_flow[6].role, undefined);
+assert.equal(result.statement_map.cash_flow[6].row_id, "ppe_purchases");
 assert.equal(result.statement_map.cash_flow[7].role, "lease_principal");
 assert.equal(result.statement_map.cash_flow[8].role, "net_change_in_cash");
 assert.equal(result.statement_map.cash_flow[9].role, "ending_cash");
@@ -76,4 +80,105 @@ assert.equal(new Set([
   ...result.statement_map.cash_flow,
 ].map((row) => row.row_id)).size, 15);
 
-console.log(JSON.stringify({ status: "PASS", checks: 22 }, null, 2));
+const attributionIncome = manifest("income_statement", [
+  { source_line_id: "is.net", ordinal: 1, raw_label: "Profit for the period", values: [100, 110, 120], material: true },
+  { source_line_id: "is.owners", ordinal: 2, raw_label: "Owners of the parent", values: [94, 103, 112], material: true },
+  { source_line_id: "is.nci", ordinal: 3, raw_label: "Non-controlling interests", values: [6, 7, 8], material: true },
+]);
+const attributionEvidence = structuredClone(evidence);
+attributionEvidence.face_statement_manifests.income_statement = [attributionIncome];
+const attributionSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Attribution Test plc", reporting_currency: "GBP" },
+  },
+  caseEvidence: attributionEvidence,
+});
+assert.equal(
+  attributionSource.statement_map.income_statement[1].role,
+  "owners_of_parent",
+  "The proposer did not preserve parent-owner attribution as a semantic output.",
+);
+assert.equal(
+  attributionSource.statement_map.income_statement[2].role,
+  "non_controlling_interests",
+  "The proposer did not preserve non-controlling attribution as a semantic output.",
+);
+
+const dcsBoundEvidence = structuredClone(evidence);
+dcsBoundEvidence.lanes.policy_evidence = {
+  rcf: { instrument_id: "rcf", commitment_fee_convention: "bps_on_undrawn" },
+};
+dcsBoundEvidence.lanes.instrument_term_authorities = [{
+  instrument_id: "rcf",
+  model_field: "commitment_fee_convention",
+  output_value: "bps_on_undrawn",
+}];
+const dcsBound = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Universal Test plc", reporting_currency: "GBP" },
+    policies: { rcf: { commitment_fee_convention: "none" } },
+  },
+  caseEvidence: dcsBoundEvidence,
+});
+assert.equal(
+  dcsBound.policies.rcf.commitment_fee_convention,
+  undefined,
+  "A stale declaration overwrote exact DCS commitment-fee authority.",
+);
+
+const firstRunEvidence = {
+  filings: {
+    historical_periods: ["2023-12-31", "2024-12-31", "2025-12-31"],
+    forecast_periods: ["2026-12-31", "2027-12-31", "2028-12-31"],
+    historical_gross_debt: [40, 45, 50],
+    reported_lease_liability: 7,
+    maximum_residual_percentage: 0.02,
+  },
+  source_inventory: [income, cashFlow].map((item) => ({
+    source_id: item.source_id,
+    publication_date: "2026-03-01",
+  })),
+  broker_pack: {},
+  case_evidence: structuredClone(evidence),
+};
+writeRuntimeEvidenceLanes({ evidence: firstRunEvidence, caseSource: result });
+const runtimeLanes = firstRunEvidence.case_evidence.lanes;
+assert.equal(runtimeLanes.periods.length, 6, "The runtime writer did not author 3H+3F periods.");
+assert.deepEqual(
+  runtimeLanes.operating_metrics.revenue.values.slice(0, 3),
+  [100, 110, 120],
+  "The runtime writer did not project filed revenue history.",
+);
+assert.deepEqual(
+  runtimeLanes.operating_metrics.adjusted_ebitda.values.slice(0, 3),
+  [24, 26, 30],
+  "The runtime writer did not derive the filed EBIT plus D&A bridge.",
+);
+assert.deepEqual(
+  runtimeLanes.operating_metrics.capex.values.slice(0, 3),
+  [5, 6, 7],
+  "The runtime writer did not project capex on the model outflow basis.",
+);
+assert.equal(runtimeLanes.policy_evidence.cash.opening_cash, 14);
+assert.deepEqual(runtimeLanes.debt_reconciliation.reported_opening_gross_debt, [40, 45, 50]);
+assert.deepEqual(runtimeLanes.historical_supplement.prior_cash_and_cash_equivalents, [10, 12]);
+assert.equal(runtimeLanes.provenance.revenue.length, 3);
+assert.equal(runtimeLanes.provenance.revenue[0].document, income.source_id);
+
+const richerEvidence = structuredClone(firstRunEvidence);
+const sealedOperatingLane = {
+  revenue: {
+    values: [999, 999, 999, null, null, null],
+    forecast_method: "sealed_fixture",
+    source_kind: "independently_verified",
+  },
+};
+richerEvidence.case_evidence.lanes.operating_metrics = structuredClone(sealedOperatingLane);
+writeRuntimeEvidenceLanes({ evidence: richerEvidence, caseSource: result });
+assert.deepEqual(
+  richerEvidence.case_evidence.lanes.operating_metrics,
+  sealedOperatingLane,
+  "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
+);
+
+console.log(JSON.stringify({ status: "PASS", checks: 36 }, null, 2));

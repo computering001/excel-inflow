@@ -1,0 +1,4 @@
+Security Description,Security Type,CCY,Amount Outstanding,Maturity Date,Coupon Rate,Balance Basis,Facility Size,Amount Drawn,Committed,Fee Convention,Commitment Fee Bps,Issue Date,Clean Price,YTW,OAS
+Zero Commercial Paper,commercial paper,USD,0,2027-06-30,,reporting_currency_carrying_value,,,,,,2026-01-02,100,0.04,55
+Committed Revolving Credit Facility,RCF,USD,0,2029-12-31,,reporting_currency_carrying_value,1000,0,yes,,,2024-05-01,100,0.03,75
+USD 5% Senior Notes,bond,USD,500,2030-09,0.05,reporting_currency_carrying_value,,,,,,2025-09-15,98.5,0.052,120

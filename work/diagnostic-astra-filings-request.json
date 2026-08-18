@@ -1,0 +1,24 @@
+{
+  "schema_version": "filings-extraction-request/1.0",
+  "run_id": "diagnostic-astra-richness",
+  "documents": [
+    {
+      "document_id": "annual-report-2025",
+      "attachment_id": "annual-report-2025",
+      "source_id": "annual_report_2025",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase9-public-company-tests-v1/sources/astrazeneca-ar-2025.pdf",
+      "media_type": "application/pdf",
+      "expected_sha256": "5a381c1c5df1ca277e95985a6b1b6b3ad371914a4b18a824e22ba541fbf44097"
+    }
+  ],
+  "filing_facts": {
+    "entity_name": "AstraZeneca PLC",
+    "reporting_currency": "USD",
+    "units": "millions",
+    "fiscal_calendar_kind": "fixed_date",
+    "historical_periods": ["2023-12-31", "2024-12-31", "2025-12-31"],
+    "forecast_periods": ["2026-12-31", "2027-12-31", "2028-12-31"],
+    "reported_gross_debt": 27819,
+    "reported_cash": 5698
+  }
+}

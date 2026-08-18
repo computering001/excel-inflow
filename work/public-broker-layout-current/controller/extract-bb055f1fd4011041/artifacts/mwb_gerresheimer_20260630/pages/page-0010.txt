@@ -1,0 +1,26 @@
+mwb research AG
+Page 10 of 18
+
+
+Risk
+
+
+The chart displays the distribution of daily returns of Gerresheimer AG over the last
+3 years, compared to the same distribution for West Pharmaceutical Services, Inc..
+We have also included the distribution for the index Germany DAX (TR). The
+distribution gives a better understanding of risk than measures like volatility, which
+assume that log returns are normally distributed. In reality, they are skewed (down
+moves are larger) and have fat tails (large moves occur more often than predicted).
+Also, volatility treats up and down moves the same, while investors are more worried
+about down moves. For Gerresheimer AG, the worst day during the past 3 years was
+11/02/2026 with a share price decline of -31.4%. The best day was 20/03/2026
+when the share price increased by 21.8%.
+
+
+Risk – Daily Returns Distribution (trailing 3 years)
+
+
+
+
+
+Source: FactSet, mwb research

@@ -1,0 +1,65 @@
+mwb research AG
+Page 13 of 18
+
+
+
+
+ Balance sheet (EURm)                                2023        2024        2025       2026E       2027E       2028E
+ Intangible assets (exl. Goodwill)                         593         560         604         578         556         537
+ Goodwill                                             670         676         871         871         871         871
+ Property, plant and equipment                              1,269         1,506         1,857         1,893         1,886         1,859
+ Financial assets                                       41          52          21          21          21          21
+ FIXED ASSETS                                          2,572        2,794        3,353        3,364        3,334        3,288
+ Inventories                                           327         361         450         484         486         484
+ Accounts receivable                                    268         272         332         284         283         280
+ Other current assets                                   112          92         148         148         148         148
+ Liquid assets                                         122         186         173           -45           -18         102
+ Deferred taxes                                         12          49          37          37          37          37
+ Deferred charges and prepaid expenses                      5          17           0          20          20          21
+ CURRENT ASSETS                                    847         978        1,140         927         956        1,072
+ TOTAL ASSETS                                         3,419        3,773        4,493        4,291        4,290        4,360
+ SHAREHOLDERS EQUITY                                 1,440        1,478        1,081        1,074        1,092        1,141
+ MINORITY INTEREST                                    27          28          26          26          26          26
+ Long-term debt                                       658         917         1,600         1,575         1,550         1,550
+ Provisions for pensions and similar obligations               114         111         102         126         129         132
+ Other provisions                                       303         153         331         174         179         182
+ Non-current liabilities                                    1,076        1,181        2,032        1,876        1,858        1,864
+ short-term liabilities to banks                             388         370         576         556         541         541
+ Accounts payable                                     306         362         431         395         401         406
+ Advance payments received on orders                       0           0           0           0           0           0
+ Other liabilities (incl. from lease and rental contracts)          160         339         331         348         357         366
+ Deferred taxes                                         22          16          16          16          16          16
+ Deferred income                                        0           0           0           0           0           0
+ Current liabilities                                     877        1,087        1,354        1,315        1,315        1,329
+ TOTAL LIABILITIES AND SHAREHOLDERS EQUITY           3,419        3,773        4,493        4,291        4,290        4,360
+
+
+ Balance sheet (common size)                          2023        2024        2025       2026E       2027E       2028E
+ Intangible assets (excl. Goodwill)                      17%        15%        13%        13%        13%        12%
+ Goodwill                                        20%        18%        19%        20%        20%        20%
+ Property, plant and equipment                         37%        40%        41%        44%        44%        43%
+ Financial assets                                  1%        1%        0%        0%        0%        0%
+ FIXED ASSETS                                   75%        74%        75%        78%        78%        75%
+ Inventories                                      10%        10%        10%        11%        11%        11%
+ Accounts receivable                               8%        7%        7%        7%        7%        6%
+ Other current assets                               3%        2%        3%        3%        3%        3%
+ Liquid assets                                    4%        5%        4%          -1%          -0%        2%
+ Deferred taxes                                   0%        1%        1%        1%        1%        1%
+ Deferred charges and prepaid expenses                  0%        0%        0%        0%        0%        0%
+ CURRENT ASSETS                                25%        26%        25%        22%        22%        25%
+ TOTAL ASSETS                                  100%       100%       100%       100%       100%       100%
+ SHAREHOLDERS EQUITY                            42%        39%        24%        25%        25%        26%
+ MINORITY INTEREST                               1%        1%        1%        1%        1%        1%
+ Long-term debt                                   19%        24%        36%        37%        36%        36%
+ Provisions for pensions and similar obligations             3%        3%        2%        3%        3%        3%
+ Other provisions                                  9%        4%        7%        4%        4%        4%
+ Non-current liabilities                              31%        31%        45%        44%        43%        43%
+ short-term liabilities to banks                         11%        10%        13%        13%        13%        12%
+ Accounts payable                                 9%        10%        10%        9%        9%        9%
+ Advance payments received on orders                   0%        0%        0%        0%        0%        0%
+ Other liabilities (incl. from lease and rental contracts)         5%        9%        7%        8%        8%        8%
+ Deferred taxes                                   1%        0%        0%        0%        0%        0%
+ Deferred income                                  0%        0%        0%        0%        0%        0%
+ Current liabilities                                  26%        29%        30%        31%        31%        30%
+ TOTAL LIABILITIES AND SHAREHOLDERS EQUITY         100%       100%       100%       100%       100%       100%
+ Source: Company data; mwb research

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-degraded-close-receipt-v1.schema.json",
+  "title": "Atomic non-blocking broker degraded-close receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "run_id",
+    "cache_key",
+    "bundle_sha256",
+    "broker_pack_sha256",
+    "source_tables_sha256",
+    "crosswalk_receipt_sha256",
+    "semantic_report_sha256",
+    "checkpoint_set_sha256",
+    "quarantined_conflict_count",
+    "quarantined_surface_count",
+    "terminal_quarantined_candidate_count",
+    "unresolved_selected_candidate_count",
+    "model_consumption_added",
+    "continuation_status"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-degraded-close-receipt/1.0" },
+    "status": { "const": "PASS" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bundle_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "broker_pack_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_tables_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "crosswalk_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "semantic_report_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "checkpoint_set_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "quarantined_conflict_count": { "type": "integer", "minimum": 0 },
+    "quarantined_surface_count": { "type": "integer", "minimum": 0 },
+    "terminal_quarantined_candidate_count": { "type": "integer", "minimum": 0 },
+    "unresolved_selected_candidate_count": { "const": 0 },
+    "model_consumption_added": { "const": 0 },
+    "continuation_status": {
+      "enum": ["PRIMARY_AUTHORITY_AVAILABLE", "DEFER_TO_FORECAST_WATERFALL"]
+    }
+  },
+  "allOf": [
+    {
+      "anyOf": [
+        { "properties": { "quarantined_conflict_count": { "minimum": 1 } } },
+        { "properties": { "quarantined_surface_count": { "minimum": 1 } } },
+        { "properties": { "terminal_quarantined_candidate_count": { "minimum": 1 } } }
+      ]
+    }
+  ]
+}

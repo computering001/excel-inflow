@@ -1,0 +1,53 @@
+{
+  "schema_version": "broker-semantic-verification-report/1.0",
+  "status": "BLOCKED",
+  "total_violation_count": 8,
+  "candidate_manifest_sha256": "90573b022e49757f3625b1015ff3d05bbb3bbc6e8587b98549ac2eb7a09d496d",
+  "crosswalk_sha256": "f6b9a976ab71001b245b64b24c20b505192124f1a95ff4a6df46ed88628bb67a",
+  "candidate_count": 14,
+  "coverage_entry_count": 14,
+  "terminal_quarantined_candidate_count": 0,
+  "unresolved_selected_candidate_count": 0,
+  "findings": [
+    {
+      "code": "SEM-QUARANTINED-CANDIDATE-ACTIVE",
+      "message": "A quarantined source candidate must remain quarantined and cannot become a model input.",
+      "candidate_id": "bc-e4eeb089cb6aef577eca59d8"
+    },
+    {
+      "code": "SEM-MODEL-USE",
+      "message": "Unsupported model_use 'selected_value'.",
+      "candidate_id": "bc-e4eeb089cb6aef577eca59d8"
+    },
+    {
+      "code": "SEM-NUMERIC-UNOWNED",
+      "message": "Numeric candidate has no safe model use.",
+      "candidate_id": "bc-e4eeb089cb6aef577eca59d8"
+    },
+    {
+      "code": "SEM-CUSTOM-NOT-REFERENCE",
+      "message": "Unknown numeric concepts must be retained as custom.* reference-only evidence.",
+      "candidate_id": "bc-e4eeb089cb6aef577eca59d8"
+    },
+    {
+      "code": "SEM-QUARANTINED-CANDIDATE-ACTIVE",
+      "message": "A quarantined source candidate must remain quarantined and cannot become a model input.",
+      "candidate_id": "bc-9c3617ab6c968faa18976f16"
+    },
+    {
+      "code": "SEM-MODEL-USE",
+      "message": "Unsupported model_use 'selected_value'.",
+      "candidate_id": "bc-9c3617ab6c968faa18976f16"
+    },
+    {
+      "code": "SEM-NUMERIC-UNOWNED",
+      "message": "Numeric candidate has no safe model use.",
+      "candidate_id": "bc-9c3617ab6c968faa18976f16"
+    },
+    {
+      "code": "SEM-CUSTOM-NOT-REFERENCE",
+      "message": "Unknown numeric concepts must be retained as custom.* reference-only evidence.",
+      "candidate_id": "bc-9c3617ab6c968faa18976f16"
+    }
+  ]
+}

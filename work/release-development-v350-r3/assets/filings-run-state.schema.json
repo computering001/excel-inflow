@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/filings-run-state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "pipeline_status", "user_blocking", "blocker_class", "request_sha256", "source_sha256", "runtime_closure_sha256", "cache_key", "artifacts", "artifact_sha256", "tasks", "attempts", "summary"],
+  "properties": {
+    "schema_version": { "const": "filings-run-state/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "pipeline_status": { "enum": ["NEEDS_EXTRACTION", "NEEDS_EXTRACTION_REVIEW", "BLOCKED_INTERNAL", "BLOCKED_INPUT", "PASS"] },
+    "user_blocking": { "type": "boolean" },
+    "blocker_class": { "enum": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE", null] },
+    "request_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_sha256": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+    "runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "artifacts": { "type": "object", "additionalProperties": { "type": "string" } },
+    "artifact_sha256": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+    "tasks": { "type": "array", "items": { "type": "object" } },
+    "attempts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["response_sha256", "count", "limit"],
+      "properties": {
+        "response_sha256": { "type": "array", "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "uniqueItems": true },
+        "count": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "summary": { "type": "object" }
+  }
+}

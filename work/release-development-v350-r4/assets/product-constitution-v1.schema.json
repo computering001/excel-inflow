@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/product-constitution-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "objective",
+    "visible_milestones",
+    "evidence_lanes",
+    "authority_ladder",
+    "broker_rules",
+    "causal_blocker_rule",
+    "hard_block_domains",
+    "runtime_gates",
+    "release_only_gates"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-product-constitution/1.0" },
+    "objective": { "type": "string", "minLength": 20 },
+    "visible_milestones": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": { "enum": ["company", "filings", "brokers", "debt", "build", "deliver"] }
+    },
+    "evidence_lanes": { "type": "object" },
+    "authority_ladder": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "broker_rules": { "type": "object" },
+    "causal_blocker_rule": { "type": "object" },
+    "hard_block_domains": { "type": "array", "minItems": 1, "uniqueItems": true },
+    "runtime_gates": { "type": "array", "minItems": 1, "uniqueItems": true },
+    "release_only_gates": { "type": "array", "minItems": 1, "uniqueItems": true }
+  }
+}

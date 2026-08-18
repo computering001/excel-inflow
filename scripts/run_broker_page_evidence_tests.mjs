@@ -20,6 +20,11 @@ const check = (condition, message) => {
 };
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "broker-page-evidence-"));
 const modelCase = JSON.parse(await fs.readFile(casePath, "utf8"));
+// This test mutates only workbook presentation by attaching synthetic page
+// images.  Frozen certification cases may predate the production evidence
+// contract fields, so run the disposable derivative under the explicit
+// reference-parity profile rather than weakening production-model validation.
+modelCase.execution_profile = "reference_parity";
 const generatedPng = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64",
@@ -34,7 +39,9 @@ const images = [
 ];
 const imageHashes = await Promise.all(images.map(async (image) => sha256(await fs.readFile(image))));
 const names = Object.keys(Object.values(modelCase.broker_pack.metrics)[0].brokers);
-modelCase.broker_pack.page_evidence = names.map((houseName, index) => ({
+modelCase.broker_archive = {
+  schema_version: "broker-archive/1.0",
+  page_evidence: names.map((houseName, index) => ({
   house_id: `house_${index + 1}`,
   house_name: houseName,
   source_id: `broker_${index + 1}`,
@@ -48,7 +55,10 @@ modelCase.broker_pack.page_evidence = names.map((houseName, index) => ({
     artifact_path: images[imageIndex],
     artifact_sha256: imageHashes[imageIndex],
   })),
-}));
+  })),
+};
+delete modelCase.broker_pack.page_evidence;
+delete modelCase.broker_pack.raw_tables;
 modelCase.broker_pack.source_mappings = names.flatMap((houseName, houseIndex) =>
   Object.entries(modelCase.broker_pack.metrics).flatMap(([metricId, metric]) =>
     (metric.brokers?.[houseName] ?? []).flatMap((value, periodIndex) =>
@@ -92,6 +102,17 @@ const namesInPlan = plan.workbook.sheets.map((sheet) => sheet.name);
 check(!namesInPlan.includes("> Brokers"), "page-image mode must not emit the obsolete broker divider");
 const brokerSheets = plan.workbook.sheets.filter((sheet) => /^B\d{2} /.test(sheet.name));
 check(brokerSheets.length === names.length, "one Bxx page sheet is required per house");
+for (const sheet of brokerSheets) {
+  check(
+    Object.values(sheet.cells ?? {}).every((cell) => !cell?.f && cell?.t !== "f"),
+    `${sheet.name} must be screenshot/metadata only and contain no formula dependency`,
+  );
+  check(
+    (sheet.conditional_formats ?? []).length === 0 &&
+      (sheet.data_validations ?? []).length === 0,
+    `${sheet.name} must not carry calculation controls`,
+  );
+}
 check(brokerSheets[0].images?.length === 2, "multi-page reports must retain every page");
 check(
   brokerSheets[0].images[0].anchor === "B4" && brokerSheets[0].images[1].anchor === "V4",
@@ -153,4 +174,4 @@ try {
   tamperBlocked = true;
 }
 check(tamperBlocked, "a stale broker page-image hash must block rendering");
-console.log(JSON.stringify({ status: "PASS", houses: names.length, pages: media.length, horizontal_pages: 2, oracle: "PASS", validator_violations: 0, tamper_blocked: true, root }));
+console.log(JSON.stringify({ status: "PASS", houses: names.length, pages: media.length, horizontal_pages: 2, screenshot_only_tabs: brokerSheets.length, calculation_dependencies: 0, oracle: "PASS", validator_violations: 0, tamper_blocked: true, root }));

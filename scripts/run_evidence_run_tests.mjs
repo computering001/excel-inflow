@@ -531,6 +531,73 @@ function buildCleanEvidenceRun(baseCase, fixture) {
       }
     }
   }
+  // Keep the synthetic filing internally coherent.  The legacy bracket case
+  // predates the executable cash roll-forward and supplied a zero FX row even
+  // though opening cash + the three activity buckets did not equal filed
+  // ending cash.  A "clean evidence" fixture must not depend on that
+  // contradiction being silently tolerated; put the residual in the explicit
+  // translation line, exactly where a real face cash-flow statement carries
+  // it.
+  const cashRows = modelCase.statement_structure?.cash_flow ?? [];
+  const cashRole = (semanticRole) =>
+    cashRows.find((row) => row.semantic_role === semanticRole);
+  const openingCash = cashRole("opening_cash");
+  const endingCash = cashRole("ending_cash");
+  const fxEffect = cashRole("fx_effect_on_cash");
+  const netCashMovement = cashRole("net_change_in_cash");
+  const statementRowsById = new Map(
+    [
+      ...(modelCase.statement_structure?.income_statement ?? []),
+      ...cashRows,
+    ].map((row) => [row.row_id, row]),
+  );
+  const resolveSyntheticHistory = (row, periodIndex, visiting = new Set()) => {
+    if (!row || visiting.has(row.row_id)) return null;
+    if (finite(row.values?.[periodIndex])) return Number(row.values[periodIndex]);
+    const refs = row.calculation?.refs ?? [];
+    if (refs.length === 0) return null;
+    const next = new Set(visiting).add(row.row_id);
+    const values = refs.map((ref) => {
+      const dependency = statementRowsById.get(ref) ?? modelCase.operating_metrics?.[ref];
+      return resolveSyntheticHistory(
+        dependency ? { row_id: dependency.row_id ?? ref, ...dependency } : null,
+        periodIndex,
+        next,
+      );
+    });
+    if (!values.every(finite)) return null;
+    switch (row.calculation.operator) {
+      case "sum": return values.reduce((total, value) => total + Number(value), 0);
+      case "subtract": return values.slice(1).reduce(
+        (total, value) => total - Number(value),
+        Number(values[0]),
+      );
+      case "link": return Number(values[0]);
+      case "negate": return -Number(values[0]);
+      case "negate_sum": return -values.reduce(
+        (total, value) => total + Number(value),
+        0,
+      );
+      default: return null;
+    }
+  };
+  const netCashMovementHistory = [0, 1, 2].map((periodIndex) =>
+    resolveSyntheticHistory(netCashMovement, periodIndex),
+  );
+  if (
+    openingCash && endingCash && fxEffect && netCashMovement &&
+    [openingCash, endingCash].every((row) =>
+      (row.values ?? []).slice(0, 3).length === 3 &&
+      (row.values ?? []).slice(0, 3).every(finite),
+    ) && netCashMovementHistory.every(finite)
+  ) {
+    fxEffect.values = [0, 1, 2].map(
+      (periodIndex) =>
+        Number(endingCash.values[periodIndex]) -
+        Number(openingCash.values[periodIndex]) -
+        Number(netCashMovementHistory[periodIndex]),
+    ).concat((fxEffect.values ?? []).slice(3, 6));
+  }
   const historical = modelCase.periods
     .filter((period) => period.status === "historical")
     .map((period) => period.date);

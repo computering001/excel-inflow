@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-run-state.schema.json",
+  "title": "Resumable Excel Inflow broker evidence transaction",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "workGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "cache_key", "status", "revision", "nodes",
+        "open_task_ids", "completed_node_ids", "frontier_history_sha256",
+        "current_frontier_sha256", "monotonic_from_prior", "violations",
+        "graph_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "broker-work-graph/1.0" },
+        "cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "status": { "enum": ["OPEN", "CLOSED"] },
+        "revision": { "type": "integer", "minimum": 0 },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["node_id", "node_kind"]
+          }
+        },
+        "open_task_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "completed_node_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "frontier_history_sha256": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "uniqueItems": true
+        },
+        "current_frontier_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "monotonic_from_prior": { "const": true },
+        "violations": { "type": "array", "maxItems": 0 },
+        "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "pipeline_status",
+    "user_blocking",
+    "blocker_class",
+    "request_sha256",
+    "source_sha256",
+    "runtime_closure_sha256",
+    "cache_key",
+    "checkpoints",
+    "artifacts",
+    "artifact_sha256",
+    "tasks",
+    "fixed_point",
+    "work_graph",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-run-state/1.0" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "pipeline_status": {
+      "enum": [
+        "NEEDS_VISION",
+        "NEEDS_RESOLUTION",
+        "NEEDS_CROSSWALK",
+        "NEEDS_CROSSWALK_REVIEW",
+        "PASS",
+        "PASS_DEGRADED",
+        "BLOCKED_INPUT",
+        "BLOCKED_INTERNAL"
+      ]
+    },
+    "user_blocking": { "type": "boolean" },
+    "blocker_class": {
+      "type": ["string", "null"],
+      "enum": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE", null]
+    },
+    "request_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "source_sha256": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    },
+    "runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "cache_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "checkpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "status", "input_sha256", "output_sha256", "reused"],
+        "properties": {
+          "stage": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["PASS", "NEEDS_WORK", "BLOCKED"] },
+          "input_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "output_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "reused": { "type": "boolean" }
+        }
+      }
+    },
+    "artifacts": { "type": "object" },
+    "artifact_sha256": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "task_kind", "task_id", "user_blocking", "remedy",
+          "attempt_budget", "progress_measure", "model_host_response_boundary"
+        ],
+        "properties": {
+          "task_kind": { "type": "string", "minLength": 1 },
+          "task_id": { "type": "string", "pattern": "^broker-task-[a-f0-9]{24}$" },
+          "user_blocking": { "const": false },
+          "remedy": {
+            "type": "object",
+            "required": ["remedy_id", "deterministic_steps", "resume_protocol"]
+          },
+          "attempt_budget": {
+            "type": "object",
+            "required": [
+              "attempts_used", "attempt_limit", "attempts_remaining",
+              "accepted_execution_receipt_sha256"
+            ],
+            "properties": {
+              "attempts_used": { "type": "integer", "minimum": 0 },
+              "attempt_limit": { "type": "integer", "minimum": 1 },
+              "attempts_remaining": { "type": "integer", "minimum": 0 },
+              "accepted_execution_receipt_sha256": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "uniqueItems": true
+              }
+            }
+          },
+          "progress_measure": {
+            "type": "object",
+            "required": [
+              "stage", "stage_ordinal", "defect_ordinal", "defect_count",
+              "passed_checkpoint_count", "task_input_sha256"
+            ]
+          },
+          "model_host_response_boundary": {
+            "type": "object",
+            "required": [
+              "boundary_schema_version", "boundary_sha256", "producer_kind",
+              "response_schema_path", "response_schema_sha256",
+              "expected_response_files", "source_and_validator_mutation_forbidden",
+              "response_must_be_hash_bound", "python_may_not_author_response"
+            ]
+          }
+        }
+      }
+    },
+    "fixed_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "status", "stage", "stage_ordinal",
+        "passed_checkpoint_count", "remaining_task_count", "progress_score",
+        "progress_sha256", "task_set_sha256", "unchanged_retry_count",
+        "unchanged_retry_limit", "monotonic_from_prior",
+        "checkpoint_reuse_required", "terminal_reasons", "work_graph"
+      ],
+      "properties": {
+        "schema_version": { "const": "broker-internal-fixed-point/1.0" },
+        "status": { "enum": ["OPEN", "CLOSED", "NOT_APPLICABLE", "TERMINAL_DEFECT"] },
+        "stage": { "type": "string", "minLength": 1 },
+        "stage_ordinal": { "type": "integer", "minimum": 0 },
+        "passed_checkpoint_count": { "type": "integer", "minimum": 0 },
+        "remaining_task_count": { "type": "integer", "minimum": 0 },
+        "progress_score": { "type": "integer" },
+        "progress_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "task_set_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "unchanged_retry_count": { "type": "integer", "minimum": 0 },
+        "unchanged_retry_limit": { "type": "integer", "minimum": 1 },
+        "monotonic_from_prior": { "type": "boolean" },
+        "checkpoint_reuse_required": { "const": true },
+        "terminal_reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "work_graph": { "$ref": "#/$defs/workGraph" }
+      }
+    },
+    "work_graph": { "$ref": "#/$defs/workGraph" },
+    "attempts": {
+      "type": "object",
+      "properties": {
+        "execution_response_sha256": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "uniqueItems": true
+        },
+        "vision_response_sha256": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "uniqueItems": true
+        },
+        "vision_attempt_count": { "type": "integer", "minimum": 0 },
+        "vision_attempt_limit": { "type": "integer", "minimum": 1 },
+        "task_execution_receipts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "uniqueItems": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "pipeline_status": { "const": "PASS_DEGRADED" } },
+        "required": ["pipeline_status"]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "type": "object",
+            "required": ["degraded_close_receipt"]
+          },
+          "artifact_sha256": {
+            "type": "object",
+            "required": ["degraded_close_receipt"]
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "degraded",
+              "quarantined_conflict_count",
+              "quarantined_surface_count"
+            ],
+            "properties": { "degraded": { "const": true } }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-preview-v1.schema.json",
+  "title": "Sealed Stage-2 broker selection preview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "selection_mode",
+    "broker_pack_sha256",
+    "broker_source_tables_sha256",
+    "broker_crosswalk_receipt_sha256",
+    "pack_recommended_primary_house_id",
+    "recommended_primary_house_id",
+    "recommended_primary_house_name",
+    "headline_anchor",
+    "headline_anchor_coverage",
+    "forecast_periods",
+    "primary_eligible_house_ids",
+    "selection_cases",
+    "selected_value_count",
+    "evidence_inventory",
+    "evidence_only_quarantine",
+    "forecast_waterfall_reasons",
+    "violations",
+    "preview_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-preview/1.0" },
+    "status": { "enum": ["PASS", "BLOCK"] },
+    "selection_mode": { "enum": ["primary_house", "forecast_waterfall"] },
+    "broker_pack_sha256": { "$ref": "#/$defs/sha256" },
+    "broker_source_tables_sha256": { "$ref": "#/$defs/sha256" },
+    "broker_crosswalk_receipt_sha256": { "$ref": "#/$defs/sha256" },
+    "pack_recommended_primary_house_id": { "type": ["string", "null"] },
+    "recommended_primary_house_id": { "type": ["string", "null"] },
+    "recommended_primary_house_name": { "type": ["string", "null"] },
+    "headline_anchor": { "enum": ["ebit", "adjusted_ebitda", null] },
+    "headline_anchor_coverage": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["by_period", "minimum", "total"],
+        "properties": {
+          "by_period": { "$ref": "#/$defs/integerSeries3" },
+          "minimum": { "type": "integer", "minimum": 0 },
+          "total": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "forecast_periods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "primary_eligible_house_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "selection_cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/selectionCase" }
+    },
+    "selected_value_count": { "type": "integer", "minimum": 0 },
+    "evidence_inventory": { "$ref": "#/$defs/evidenceInventory" },
+    "evidence_only_quarantine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terminal_quarantined_candidate_count",
+        "unresolved_selected_candidate_count",
+        "unresolved_candidate_count",
+        "quarantined_candidates",
+        "note"
+      ],
+      "properties": {
+        "terminal_quarantined_candidate_count": { "type": "integer", "minimum": 0 },
+        "unresolved_selected_candidate_count": { "type": "integer", "minimum": 0 },
+        "unresolved_candidate_count": { "type": "integer", "minimum": 0 },
+        "quarantined_candidates": { "type": "array", "items": { "type": "object" } },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "forecast_waterfall_reasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "violations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "preview_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "integerSeries3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "integer", "minimum": 0 }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table_id", "row", "column", "source_ref", "raw_value",
+        "coefficient", "contribution", "cell_authority_status",
+        "selectable", "artifact_link"
+      ],
+      "properties": {
+        "table_id": { "type": "string", "minLength": 1 },
+        "row": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "source_ref": { "type": "string", "minLength": 1 },
+        "raw_value": { "type": "number" },
+        "coefficient": { "type": "number" },
+        "contribution": { "type": "number" },
+        "cell_authority_status": { "type": "string", "minLength": 1 },
+        "selectable": { "type": "boolean" },
+        "conflict_id": { "type": "string", "minLength": 1 },
+        "artifact_link": { "type": "string", "minLength": 1 }
+      }
+    },
+    "provenance": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["mapping_id", "definition_id", "review_status", "rationale", "components"],
+      "properties": {
+        "mapping_id": { "type": ["string", "null"] },
+        "definition_id": { "type": ["string", "null"] },
+        "review_status": { "type": ["string", "null"] },
+        "rationale": { "type": ["string", "null"] },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" }
+        }
+      }
+    },
+    "alternate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["house_id", "house_name", "value", "status"],
+      "properties": {
+        "house_id": { "type": "string", "minLength": 1 },
+        "house_name": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "status": { "enum": ["verified_alternate", "evidence_only_alternate"] },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "contributor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["house_id", "house_name", "value", "selectable", "provenance"],
+      "properties": {
+        "house_id": { "type": "string", "minLength": 1 },
+        "house_name": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "selectable": { "type": "boolean" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "selectedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selection_kind", "metric_id", "period_index", "period",
+        "house_id", "house_name", "value", "selectable", "alternates"
+      ],
+      "properties": {
+        "selection_kind": {
+          "enum": ["primary_house", "attributed_flex", "consensus_flex"]
+        },
+        "metric_id": { "type": "string", "minLength": 1 },
+        "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "period": { "type": ["string", "null"], "format": "date" },
+        "house_id": { "type": ["string", "null"] },
+        "house_name": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "selectable": { "type": "boolean" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "contributors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contributor" }
+        },
+        "alternates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/alternate" }
+        }
+      }
+    },
+    "fallbackPeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric_id", "period_index", "period", "reason"],
+      "properties": {
+        "metric_id": { "type": "string", "minLength": 1 },
+        "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "period": { "type": ["string", "null"], "format": "date" },
+        "reason": { "type": "string", "minLength": 1 },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "selectionCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "house_id", "house_name", "pack_eligibility", "headline_anchor",
+        "status", "selected_values", "selected_value_count",
+        "fallback_periods", "violations"
+      ],
+      "properties": {
+        "house_id": { "type": "string", "minLength": 1 },
+        "house_name": { "type": "string", "minLength": 1 },
+        "pack_eligibility": { "type": ["string", "null"] },
+        "headline_anchor": { "enum": ["ebit", "adjusted_ebitda", null] },
+        "status": { "enum": ["PASS", "BLOCK"] },
+        "selected_values": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/selectedValue" }
+        },
+        "selected_value_count": { "type": "integer", "minimum": 0 },
+        "fallback_periods": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fallbackPeriod" }
+        },
+        "violations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "tableInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table_id", "title", "source_location", "workbook_presentation",
+        "row_count", "cell_count", "quarantined_cell_count",
+        "canonical_table_sha256", "artifact_link"
+      ],
+      "properties": {
+        "table_id": { "type": "string", "minLength": 1 },
+        "title": { "type": ["string", "null"] },
+        "source_location": { "type": "string", "minLength": 1 },
+        "workbook_presentation": { "enum": ["analytical_table", "evidence_only"] },
+        "row_count": { "type": "integer", "minimum": 0 },
+        "cell_count": { "type": "integer", "minimum": 0 },
+        "quarantined_cell_count": { "type": "integer", "minimum": 0 },
+        "canonical_table_sha256": { "$ref": "#/$defs/sha256" },
+        "artifact_link": { "type": "string", "minLength": 1 }
+      }
+    },
+    "houseInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "house_id", "house_name", "source_id", "file_name",
+        "content_sha256", "tables"
+      ],
+      "properties": {
+        "house_id": { "type": "string", "minLength": 1 },
+        "house_name": { "type": "string", "minLength": 1 },
+        "source_id": { "type": "string", "minLength": 1 },
+        "file_name": { "type": ["string", "null"] },
+        "content_sha256": { "$ref": "#/$defs/sha256" },
+        "tables": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tableInventory" }
+        }
+      }
+    },
+    "evidenceInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_artifact", "source_artifact_link", "source_artifact_canonical_sha256", "raw_house_count",
+        "raw_table_count", "analytical_table_count",
+        "evidence_only_table_count", "raw_cell_count",
+        "quarantined_cell_count", "houses"
+      ],
+      "properties": {
+        "source_artifact": { "const": "broker-source-tables.json" },
+        "source_artifact_link": { "type": "string", "minLength": 1 },
+        "source_artifact_canonical_sha256": { "$ref": "#/$defs/sha256" },
+        "raw_house_count": { "type": "integer", "minimum": 0 },
+        "raw_table_count": { "type": "integer", "minimum": 0 },
+        "analytical_table_count": { "type": "integer", "minimum": 0 },
+        "evidence_only_table_count": { "type": "integer", "minimum": 0 },
+        "raw_cell_count": { "type": "integer", "minimum": 0 },
+        "quarantined_cell_count": { "type": "integer", "minimum": 0 },
+        "houses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/houseInventory" }
+        }
+      }
+    }
+  }
+}

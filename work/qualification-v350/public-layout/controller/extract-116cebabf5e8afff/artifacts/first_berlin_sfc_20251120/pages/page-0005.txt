@@ -1,0 +1,44 @@
+20 November 2025                                                                                SFC Energy AG
+
+
+VALUATION MODEL
+
+DCF valuation model
+ All figure s in EUR '00 0                              20 25 E   2 02 6 E   2 02 7E   20 28 E   2 0 29 E   2 03 0E   20 31E   20 32 E
+Ne t sa les                                           146 ,5 80  15 4,3 42  17 5,95 0  198 ,8 2 3  2 22 ,199  2 46 ,0 3 9 2 70 ,0 75 29 3,97 8
+NOPLAT                                                       1,9 8 1    5 ,4 30    11,2 85   14 ,20 8   17 ,4 69   19,85 9   2 2,14 6   2 4,36 6
+ + depreciation & amortisation                                 7,955     8,090     8,185     8,229     7,494     7,159      7,101     7,232
+ Net operating cash flow                                      9,936     13,519    19,470    22,436    24,963    27,018    29,247    31,598
+ - total investments (CAPEX and WC)                                           - 21,118     3,102       - 13,294     - 14,422     - 15,234     - 15,999     - 16,673     - 17,204
+ Capital expenditures                                                                - 6,743      - 6,174      - 5,982      - 5,965      - 6,565      - 7,158      - 7,734      - 8,285
+ Working capital                                                                       - 14,376    9,276       - 7,312      - 8,457      - 8,669      - 8,842      - 8,939      - 8,919
+ Free cash flows (FCF)                                                               - 11,182    16,621     6,176      8,015     9,729      11,019     12,575    14,394
+PV of FCF's                                                                        - 11,08 9   15,2 80   5,26 4    6 ,3 31    7,12 5    7,4 80    7 ,9 14    8 ,3 96
+
+ All figures in thousands
+PV of FCFs in explicit period (2025E- 2039E)       115,711
+PV of FCFs in terminal period                    219,216
+ Enterprise value (EV)                       334,928
+ + Net cash / - net debt (pro forma)              42,868                                                             Terminal growth rate:     3.0%
+ + Investments / minority interests                              - 64                                                             Terminal EBIT margin:     12.1%
+ Shareholder value                         377,732
+ Diluted number of shares                        18,001
+ Fair value per share in EUR                   20.98
+
+                                                                                          Terminal grow th rate
+WACC                                 7.9%                1.5%    2.0%    2.5%    3.0%    3.5%    4.0%    4.5%
+ Cost of equity                               10.8%        6.4%     25.67     27.06     28.82     31.09     34.16     38.52     45.22
+ Pre- tax cost of debt                         5.0%        6.9%     22.95     23.98     25.24     26.83     28.89     31.67     35.62
+ Tax rate                                 30.0%        7.4%     20.72     21.49     22.42     23.57     25.00     26.87     29.38
+ After- tax cost of debt                        3.5%   WACC    7.9%     18.86     19.45     20.15     20.98     22.02     23.32     25.01
+ Share of equity capital                      60.0%        8.4%     17.29     17.74     18.28     18.91     19.66     20.60     21.77
+ Share of debt capital                       40.0%        8.9%     15.95     16.30     16.71     17.19     17.76     18.44     19.29
+ Price target in EUR                           21.00        9.4%     14.79     15.07     15.39     15.76     16.19     16.70     17.32
+
+ * for layout purposes the model shows numbers only to 2032, but runs until 2039
+
+
+
+
+
+                                                       Page 5/12

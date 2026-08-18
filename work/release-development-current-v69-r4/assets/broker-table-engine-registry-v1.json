@@ -1,0 +1,29 @@
+{
+  "schema_version": "broker-table-engine-registry/1.0",
+  "policy": {
+    "required_provider": null,
+    "fallback_order": ["rogo_vision", "surya_layout", "docling"],
+    "optional_provider_absence_is_blocking": false,
+    "all_outputs_require_existing_dual_read_and_semantic_gates": true,
+    "weights_may_not_be_bundled": true
+  },
+  "providers": {
+    "rogo_vision": {
+      "provision": "model_host",
+      "capability": "multimodal rendered-table transcription",
+      "required": true
+    },
+    "surya_layout": {
+      "provision": "optional_host_python",
+      "module": "surya",
+      "capability": "layout and table-region detection",
+      "required": false
+    },
+    "docling": {
+      "provision": "optional_host_python",
+      "module": "docling",
+      "capability": "document and table structure extraction",
+      "required": false
+    }
+  }
+}

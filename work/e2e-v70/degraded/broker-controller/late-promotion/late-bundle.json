@@ -1,0 +1,103 @@
+{
+  "artifact_root": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/late-promotion/artifacts",
+  "canonical_findings": [
+    {
+      "document_id": "late",
+      "id": "broker_canonical.physical_capture_reconciliation_required",
+      "message": "Native token multiplicity requires a rendered recovery pass.",
+      "model_linked": false,
+      "scope": "physical_capture",
+      "severity": "needs_vision",
+      "surface_id": "late.p4"
+    }
+  ],
+  "created_at": "2026-08-14T00:00:00Z",
+  "documents": [
+    {
+      "artifacts": [
+        {
+          "artifact_id": "late-census",
+          "kind": "surface_census",
+          "path": "late/p4.census.json",
+          "sha256": "a8cfb4424ef0d98d54781dc065d847bf0acbb9bf30eb6e62b4bc6eef972e92c7"
+        },
+        {
+          "artifact_id": "late-image",
+          "kind": "page_image",
+          "path": "late/page4.png",
+          "sha256": "cd706c185a0589c760074a298d5702a36e5fba5e8ed59c9baff3a322a7616d72"
+        }
+      ],
+      "document_id": "late",
+      "extraction_status": "needs_vision",
+      "file_name": "late.pdf",
+      "house_id": "late",
+      "house_name": "Late Promotion House",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": []
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_id": "fixture.late",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "late-image"
+          ],
+          "height": 792,
+          "image_count": 1,
+          "kind": "image_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "pass",
+            "native_text": "empty",
+            "tables": "none",
+            "vision": "required"
+          },
+          "native_text_chars": 0,
+          "native_word_count": 0,
+          "numeric_token_count": 0,
+          "ordinal": 4,
+          "source_table_numeric_tokens": [],
+          "surface_census_artifact_id": "late-census",
+          "surface_id": "late.p4",
+          "table_count": 0,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 0,
+              "lane_id": "image_render",
+              "status": "empty"
+            }
+          ],
+          "uncovered_numeric_regions": [
+            {
+              "bbox": [
+                10,
+                10,
+                300,
+                180
+              ],
+              "disposition": "requires_vision",
+              "material": true,
+              "region_id": "late.p4.r1"
+            }
+          ],
+          "whole_surface_numeric_token_count": 0,
+          "width": 612
+        }
+      ],
+      "tables": []
+    }
+  ],
+  "extractor_version": "fixture/1.0",
+  "findings": [],
+  "gate_status": "NEEDS_VISION",
+  "run_id": "late-promotion-regression",
+  "schema_version": "broker-extraction-bundle/1.0",
+  "summary": {}
+}

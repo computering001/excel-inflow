@@ -1,0 +1,29 @@
+{
+  "document_id": "jpm",
+  "kind": "pdf_page",
+  "material_uncovered_region_count": 0,
+  "nonblank_cell_count": 9,
+  "schema_version": "broker-surface-census/1.0",
+  "source_numeric_tokens": [
+    "101",
+    "111",
+    "19",
+    "21"
+  ],
+  "source_table_numeric_tokens": [
+    "101",
+    "111",
+    "19",
+    "21"
+  ],
+  "surface_id": "jpm.p1",
+  "table_discovery_lanes": [
+    {
+      "candidate_count": 1,
+      "lane_id": "native_pdf_lines",
+      "status": "pass"
+    }
+  ],
+  "uncovered_numeric_regions": [],
+  "whole_surface_numeric_token_count": 4
+}

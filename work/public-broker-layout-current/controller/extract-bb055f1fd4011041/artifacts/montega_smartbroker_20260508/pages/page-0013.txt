@@ -1,0 +1,71 @@
+SMARTBROKER HOLDING AG
+
+
+Discounted-Cashflow (DCF)-Modell: Im DCF-Modell werden Prognosen für den zukünftigen Free Cashflow verwendet und abgezinst, um ihren
+Barwert zu ermitteln. In der Regel werden die gewichteten durchschnittlichen Kapitalkosten (WACC) als Abzinsungssatz verwendet, um den
+Zeitwert des Geldes, die Risiken der Cashflows und die Finanzierungsstruktur des Unternehmens zu reflektieren. Der Unternehmenswert wird
+mithilfe der DCF-Analyse abgeleitet.
+Eine Sensitivitätsanalyse wesentlicher zugrunde liegender Bewertungsparameter (WACC, Wachstumsrate, EBIT-Marge) ist in den jeweiligen
+DCF-Modellen abgebildet und veranschaulicht die Bandbreite möglicher Unternehmenswerte pro Aktie bei Variation der Annahmen.
+PeerGroup-Vergleiche: Ein relativer Bewertungsansatz, der zur Herleitung des Unternehmenswertes verwendet wird. Die Peergroup besteht in
+der Regel aus hinreichend vergleichbaren börsennotierten Unternehmen. Vergleiche können auf Umsatz-, Ergebnis- (z.B. EBITDA, EBIT, EPS) oder
+anderen Messgrößen basieren.
+Historische  Multiple-Bewertung  (gegebenenfalls):  Eine  Bewertungsmethode,  bei  der  der  Unternehmenswert  anhand  historischer
+Bewertungsmultiplikatoren (z.B. EV/EBITDA, KGV) des Unternehmens in Relation zu aktuellen oder prognostizierten Finanzkennzahlen ermittelt
+wird.
+Sum-of-the-parts-Modell (gegebenenfalls):  Eine Bewertung,  die den Unternehmenswert aus der Summe des Wertes der einzelnen
+Vermögenswerte ableitet. Der Eigenkapitalwert wird durch Abziehen der Nettoverschuldung bestimmt.
+Das Ergebnis dieser fundamentalen Bewertung wird gegebenenfalls angepasst, um der Einschätzung des Analysten bezüglich der zu
+erwartenden Entwicklung der Anlegerstimmung und deren Auswirkungen auf den Aktienkurs Rechnung zu tragen.
+Unabhängig von der verwendeten Bewertungsmethode besteht das Risiko, dass das Kursziel nicht erreicht wird. Wesentliche Einflussfaktoren
+können insbesondere Abweichungen der tatsächlichen Geschäftsentwicklung von den im Bewertungsmodell unterstellten Erwartungen,
+Veränderungen der Kapitalmarktbewertung (z.B. Bewertungsmultiplikatoren oder Diskontierungssätze), Anpassungen von Risikoaufschlägen,
+veränderte  Finanzierungsbedingungen,  regulatorische  Eingriffe  mit  unmittelbaren  Auswirkungen  auf  Geschäftsmodell, Margen  oder
+Kapitalstruktur, Kapitalmaßnahmen sowie eine geringere Marktliquidität der Aktie sein.
+Zukunftsgerichtete Aussagen, Prognosen, Schätzungen, Kursziele und Szenarien beruhen auf Annahmen und Erwartungen, die sich als
+unzutreffend erweisen können. Unerwartete wirtschaftliche, regulatorische oder unternehmensspezifische Entwicklungen können dazu führen,
+dass tatsächliche Ergebnisse wesentlich von den hier dargestellten Einschätzungen abweichen. Bei Anlagen in ausländischen Märkten und
+Instrumenten  bestehen  zusätzliche   Risiken,  insbesondere  aus  Wechselkursänderungen  sowie  politischen  und  regulatorischen
+Rahmenbedingungen.
+Diese Ausarbeitung reflektiert die Meinung des jeweiligen Verfassers zum Zeitpunkt ihrer Erstellung. Eine Änderung der der Bewertung
+zugrundeliegenden fundamentalen Faktoren kann nachträglich dazu führen, dass die Bewertung nicht mehr zutreffend ist.
+Vergangene Wertentwicklungen sind kein verlässlicher Indikator für zukünftige Ergebnisse.
+Bedeutung des Anlageurteils
+
+Der Anlagehorizont für die nachfolgenden Anlageurteile beträgt in der Regel zwölf Monate, sofern textlich nicht explizit ein anderer Zeithorizont
+genannt wird.
+
+ Anlageempfehlung              Erwartete Entwicklung des Preises des Finanzinstruments (innerhalb von 12 Monaten)
+
+ Kaufen                         Der Preis des analysierten Finanzinstruments steigt.
+
+ Halten                          Der Preis des analysierten Finanzinstruments bleibt weitestgehend stabil.
+
+ Verkaufen                       Der Preis des analysierten Finanzinstruments fällt.
+
+ Empfehlung ausgesetzt            Die Informationslage lässt eine fundierte Beurteilung des Unternehmens momentan nicht zu.
+
+Informationsquellen und Aktualisierung
+
+Die dieser Publikation zugrunde liegenden Informationen stammen aus öffentlich zugänglichen Quellen, aus Unternehmensangaben sowie aus
+Gesprächen mit Unternehmensvertretern, die Montega zum Zeitpunkt der Erstellung für zuverlässig hielt. Eine Garantie für die Richtigkeit,
+Vollständigkeit oder Aktualität der verwendeten Informationen kann jedoch nicht übernommen werden. Eine unabhängige Überprüfung
+sämtlicher Daten hat nicht stattgefunden.
+Die Aktualisierung der vorliegenden Publikation erfolgt bei Anlässen, die nach Einschätzung von Montega kursrelevant sein können. Ob und in
+welchem zeitlichen Abstand eine Aktualisierung dieser Ausarbeitung erfolgt, ist vorab nicht festgelegt worden. Montega übernimmt keine
+Verpflichtung, diese Publikation zu aktualisieren, zu korrigieren oder an veränderte Marktbedingungen anzupassen.
+Auf das Einstellen der regelmäßigen Kommentierung von Anlässen im Zusammenhang mit dem Emittenten (Coverage) wird vorab
+hingewiesen. Sofern nicht anders angegeben, beziehen sich Kursangaben auf den Schlusskurs des letzten Börsentages vor Veröffentlichung
+dieser Analyse.
+Statistische Verteilung und Historie der Anlageempfehlungen
+
+Eine tabellarische Übersicht der individuellen Anlageempfehlungen der  letzten zwölf Monate – einschließlich Veröffentlichungsdatum,
+verantwortlichem Analysten, jeweiligem Kursziel, maßgeblichem Marktpreis zum Zeitpunkt der Veröffentlichung sowie der entsprechenden
+Empfehlung –  ist für den jeweiligen Emittenten über folgende Übersichtsseite zugänglich. In der jeweiligen Einzelansicht  ist zudem die
+statistische Verteilung aller Anlageempfehlungen der Coverage der Montega AG einsehbar.
+
+
+
+
+
+ Wir verbinden Emittenten und Investoren                                                                         Disclaimer | 13

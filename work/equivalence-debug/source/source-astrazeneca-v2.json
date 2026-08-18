@@ -1,0 +1,4465 @@
+{
+  "caseSource": {
+    "schema_version": "case-source-v1",
+    "identity": {
+      "case_id": "astrazeneca_2025",
+      "issuer_name": "AstraZeneca PLC",
+      "reporting_currency": "USD",
+      "units": "millions",
+      "fiscal_year_end": "12-31",
+      "presentation_profile": "crh_dynamic"
+    },
+    "evidence_refs": {
+      "face_statement_manifests": {
+        "income_statement": [
+          {
+            "source_id": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "digest": "0fdf6550cade3a8a0402009b41b3b1deae16f6bc12ae4dd30b9f340a2ef31826"
+          }
+        ],
+        "cash_flow": [
+          {
+            "source_id": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "digest": "3cf33bc028760463cd37a92d9ccfe5dd0590d855ed3cddfdc09ccaed0d97ba18"
+          }
+        ]
+      }
+    },
+    "statement_map": {
+      "income_statement": [
+        {
+          "source_line_id": "is.product_sales",
+          "row_id": "product_sales",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.alliance_revenue",
+          "row_id": "alliance_revenue",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.product_revenue",
+          "row_id": "product_revenue",
+          "disposition": "keep",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "is.collaboration",
+          "row_id": "collaboration_revenue",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.total_revenue",
+          "row_id": "revenue",
+          "disposition": "keep",
+          "role": "revenue",
+          "reported_parent": true,
+          "broker_metric_id": "revenue"
+        },
+        {
+          "source_line_id": "is.cost_sales",
+          "row_id": "cost_of_sales",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.gross_profit",
+          "row_id": "gross_profit",
+          "disposition": "keep",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "is.distribution",
+          "row_id": "distribution_expense",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.rd",
+          "row_id": "research_and_development",
+          "disposition": "keep",
+          "label_override": "Research and development expense"
+        },
+        {
+          "source_line_id": "is.sga",
+          "row_id": "selling_general_administrative",
+          "disposition": "keep",
+          "label_override": "Selling, general and administrative expense"
+        },
+        {
+          "source_line_id": "is.other_operating",
+          "row_id": "other_operating_income",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.operating_profit",
+          "row_id": "operating_profit",
+          "disposition": "keep",
+          "forecast_derive_as": {
+            "operator": "subtract",
+            "refs": [
+              "adjusted_ebitda",
+              "depreciation_and_amortisation"
+            ]
+          },
+          "role": "ebit"
+        },
+        {
+          "source_line_id": "is.finance_income",
+          "row_id": "interest_income",
+          "disposition": "keep",
+          "role": "interest_income"
+        },
+        {
+          "source_line_id": "is.finance_expense",
+          "row_id": "interest_expense",
+          "disposition": "keep",
+          "role": "interest_expense"
+        },
+        {
+          "source_line_id": "is.associate_losses",
+          "row_id": "associate_joint_venture_losses",
+          "disposition": "keep",
+          "label_override": "Share of after tax losses in associates and joint ventures"
+        },
+        {
+          "source_line_id": "is.pbt",
+          "row_id": "pre_tax_income",
+          "disposition": "keep",
+          "role": "pre_tax_income",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "is.tax",
+          "row_id": "tax_expense",
+          "disposition": "keep",
+          "forecast_derive_as": {
+            "operator": "tax",
+            "refs": [
+              "pre_tax_income",
+              "effective_tax_rate"
+            ]
+          },
+          "role": "tax_expense"
+        },
+        {
+          "source_line_id": "is.profit",
+          "row_id": "net_income",
+          "disposition": "keep",
+          "role": "net_income",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "is.parent",
+          "row_id": "owners_of_parent",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "is.nci",
+          "row_id": "non_controlling_interests",
+          "disposition": "keep"
+        }
+      ],
+      "cash_flow": [
+        {
+          "source_line_id": "cf.pbt",
+          "row_id": "cash_flow_net_income",
+          "disposition": "keep",
+          "role": "cash_flow_net_income"
+        },
+        {
+          "source_line_id": "cf.finance",
+          "row_id": "cash_flow_finance_result",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.associate",
+          "row_id": "cash_flow_associate_losses",
+          "disposition": "keep",
+          "label_override": "Share of after tax losses in associates and joint ventures"
+        },
+        {
+          "source_line_id": "cf.da",
+          "row_id": "cash_flow_da",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.receivables",
+          "row_id": "receivables_movement",
+          "disposition": "keep",
+          "label_override": "Increase in trade and other receivables"
+        },
+        {
+          "source_line_id": "cf.inventory",
+          "row_id": "inventory_movement",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.payables",
+          "row_id": "payables_provisions_movement",
+          "disposition": "keep",
+          "label_override": "Increase in trade and other payables and provisions"
+        },
+        {
+          "source_line_id": "cf.intangible_gains",
+          "row_id": "gains_on_intangible_disposals",
+          "disposition": "keep",
+          "label_override": "Gains on disposal of intangible assets"
+        },
+        {
+          "source_line_id": "cf.contingent_fv",
+          "row_id": "contingent_consideration_fair_value",
+          "disposition": "keep",
+          "label_override": "Fair value movements on contingent consideration"
+        },
+        {
+          "source_line_id": "cf.non_cash",
+          "row_id": "non_cash_other_movements",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.cash_generated",
+          "row_id": "cash_generated_from_operations",
+          "disposition": "keep",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "cf.interest_paid",
+          "row_id": "interest_paid",
+          "disposition": "keep",
+          "forecast_derive_as": {
+            "operator": "link",
+            "refs": [
+              "interest_expense"
+            ]
+          }
+        },
+        {
+          "source_line_id": "cf.tax_paid",
+          "row_id": "tax_paid",
+          "disposition": "keep",
+          "forecast_derive_as": {
+            "operator": "link",
+            "refs": [
+              "tax_expense"
+            ]
+          }
+        },
+        {
+          "source_line_id": "cf.cfo",
+          "row_id": "cash_from_operations",
+          "disposition": "keep",
+          "label_override": "Net cash inflow from operating activities",
+          "role": "cash_from_operations",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "cf.subsidiaries",
+          "row_id": "subsidiary_acquisitions",
+          "disposition": "keep",
+          "label_override": "Acquisition of subsidiaries, net of cash acquired"
+        },
+        {
+          "source_line_id": "cf.employee_awards",
+          "row_id": "employee_awards_business_combinations",
+          "disposition": "keep",
+          "label_override": "Employee share awards attributable to business combinations"
+        },
+        {
+          "source_line_id": "cf.contingent_payment",
+          "row_id": "contingent_consideration_payments",
+          "disposition": "keep",
+          "label_override": "Payment of contingent consideration from business combinations"
+        },
+        {
+          "source_line_id": "cf.ppe",
+          "row_id": "ppe_purchases",
+          "disposition": "keep",
+          "label_override": "Purchase of property, plant and equipment"
+        },
+        {
+          "source_line_id": "cf.ppe_disposal",
+          "row_id": "ppe_disposals",
+          "disposition": "keep",
+          "label_override": "Disposal of property, plant and equipment"
+        },
+        {
+          "source_line_id": "cf.intangibles",
+          "row_id": "intangible_purchases",
+          "disposition": "keep",
+          "label_override": "Purchase of intangible assets"
+        },
+        {
+          "source_line_id": "cf.intangible_disposal",
+          "row_id": "intangible_disposals",
+          "disposition": "keep",
+          "label_override": "Disposal of intangible assets"
+        },
+        {
+          "source_line_id": "cf.profit_participation",
+          "row_id": "profit_participation_liability",
+          "disposition": "keep",
+          "label_override": "Movement in profit-participation liability"
+        },
+        {
+          "source_line_id": "cf.investment_purchase",
+          "row_id": "non_current_investment_purchases",
+          "disposition": "keep",
+          "label_override": "Purchase of non-current asset investments"
+        },
+        {
+          "source_line_id": "cf.investment_disposal",
+          "row_id": "non_current_investment_disposals",
+          "disposition": "keep",
+          "label_override": "Disposal of non-current asset investments"
+        },
+        {
+          "source_line_id": "cf.short_term_investments",
+          "row_id": "short_term_investment_movement",
+          "disposition": "keep",
+          "label_override": "Movement in short-term investments, fixed deposits and other instruments"
+        },
+        {
+          "source_line_id": "cf.associate_payments",
+          "row_id": "associate_joint_venture_payments",
+          "disposition": "keep",
+          "label_override": "Payments to associates and joint ventures"
+        },
+        {
+          "source_line_id": "cf.associate_disposals",
+          "row_id": "associate_joint_venture_disposals",
+          "disposition": "keep",
+          "label_override": "Disposal of investments in associates and joint ventures"
+        },
+        {
+          "source_line_id": "cf.interest_received",
+          "row_id": "interest_received",
+          "disposition": "keep",
+          "forecast_derive_as": {
+            "operator": "link",
+            "refs": [
+              "interest_income"
+            ]
+          }
+        },
+        {
+          "source_line_id": "cf.cfi",
+          "row_id": "cash_from_investing",
+          "disposition": "keep",
+          "label_override": "Net cash outflow from investing activities",
+          "role": "cash_from_investing",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "cf.pre_financing",
+          "row_id": "cash_before_financing",
+          "disposition": "keep",
+          "label_override": "Net cash inflow before financing activities",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "cf.share_issuance",
+          "row_id": "share_issuance",
+          "disposition": "keep",
+          "label_override": "Proceeds from issue of share capital"
+        },
+        {
+          "source_line_id": "cf.ebt_shares",
+          "row_id": "employee_benefit_trust_shares",
+          "disposition": "keep",
+          "label_override": "Own shares purchased by Employee Benefit Trusts"
+        },
+        {
+          "source_line_id": "cf.nci",
+          "row_id": "nci_acquisitions",
+          "disposition": "keep",
+          "label_override": "Payments to acquire non-controlling interests"
+        },
+        {
+          "source_line_id": "cf.debt_issue",
+          "row_id": "debt_issuance",
+          "disposition": "keep",
+          "label_override": "Issue of loans and borrowings",
+          "role": "debt_issuance"
+        },
+        {
+          "source_line_id": "cf.debt_repay",
+          "row_id": "debt_repayment",
+          "disposition": "keep",
+          "label_override": "Repayment of loans and borrowings",
+          "role": "debt_repayment"
+        },
+        {
+          "source_line_id": "cf.dividends",
+          "row_id": "dividends",
+          "disposition": "keep",
+          "role": "dividends",
+          "broker_metric_id": "dividends"
+        },
+        {
+          "source_line_id": "cf.dividend_hedges",
+          "row_id": "dividend_hedges",
+          "disposition": "keep",
+          "label_override": "Hedge contracts relating to dividend payments"
+        },
+        {
+          "source_line_id": "cf.leases",
+          "row_id": "lease_principal",
+          "disposition": "keep",
+          "label_override": "Repayment of obligations under leases",
+          "role": "lease_principal"
+        },
+        {
+          "source_line_id": "cf.short_borrowings",
+          "row_id": "short_term_borrowings_movement",
+          "disposition": "keep",
+          "label_override": "Movement in short-term borrowings"
+        },
+        {
+          "source_line_id": "cf.acerta",
+          "row_id": "acerta_liability_payment",
+          "disposition": "keep",
+          "label_override": "Payment of Acerta Pharma share purchase liability"
+        },
+        {
+          "source_line_id": "cf.cff",
+          "row_id": "cash_from_financing",
+          "disposition": "keep",
+          "label_override": "Net cash outflow from financing activities",
+          "role": "cash_from_financing",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "cf.net_change",
+          "row_id": "net_change_in_cash",
+          "disposition": "keep",
+          "label_override": "Net increase/(decrease) in Cash and cash equivalents",
+          "role": "net_change_in_cash",
+          "reported_parent": true
+        },
+        {
+          "source_line_id": "cf.opening",
+          "row_id": "opening_cash",
+          "disposition": "keep",
+          "label_override": "Cash and cash equivalents at the beginning of the period",
+          "role": "opening_cash"
+        },
+        {
+          "source_line_id": "cf.fx",
+          "row_id": "fx_effect_on_cash",
+          "disposition": "keep",
+          "label_override": "Exchange rate effects",
+          "role": "fx_effect_on_cash"
+        },
+        {
+          "source_line_id": "cf.ending",
+          "row_id": "ending_cash",
+          "disposition": "keep",
+          "label_override": "Cash and cash equivalents at the end of the period",
+          "role": "ending_cash",
+          "reported_parent": true
+        }
+      ]
+    },
+    "derived_rows": [],
+    "consumption": {},
+    "policies": {
+      "rcf": {
+        "commitment_fee_convention": "bps_on_undrawn"
+      },
+      "cash": {
+        "eligible_cash_question_id": "derived.cash.eligible",
+        "cash_yield_question_id": "derived.cash.yield",
+        "interest_income_cash_flow_classification": "investing"
+      },
+      "lease": {
+        "mode": "flat_replacement",
+        "include_in_gross_debt": true,
+        "include_in_net_debt": true,
+        "include_in_leverage": true,
+        "forecast_basis_question_id": "derived.lease.forecast_basis"
+      }
+    },
+    "answers": [
+      {
+        "question_id": "derived.cash.eligible",
+        "round": "derived",
+        "answer": 1
+      },
+      {
+        "question_id": "derived.cash.yield",
+        "round": "derived",
+        "answer": [
+          0.04,
+          0.035,
+          0.03
+        ]
+      },
+      {
+        "question_id": "derived.lease.forecast_basis",
+        "round": "derived",
+        "answer": {
+          "principal_repayment": [
+            390,
+            410,
+            430
+          ],
+          "additions": [
+            390,
+            410,
+            430
+          ],
+          "effective_rate": [
+            0.045,
+            0.045,
+            0.045
+          ]
+        }
+      }
+    ]
+  },
+  "evidence": {
+    "face_statement_manifests": {
+      "income_statement": [
+        {
+          "schema_version": "face-statement-manifest/1.0",
+          "statement": "income_statement",
+          "statement_order": 1,
+          "source_id": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "page_or_note": "face statement",
+          "periods": [
+            "FY1",
+            "FY2",
+            "FY3"
+          ],
+          "complete_face_statement": true,
+          "row_count": 20,
+          "rows": [
+            {
+              "source_line_id": "is.product_sales",
+              "raw_label": "Product Sales",
+              "values": [
+                43789,
+                50938,
+                55573
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.product_revenue",
+              "ordinal": 1
+            },
+            {
+              "source_line_id": "is.alliance_revenue",
+              "raw_label": "Alliance Revenue",
+              "values": [
+                1428,
+                2212,
+                3067
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.product_revenue",
+              "ordinal": 2
+            },
+            {
+              "source_line_id": "is.product_revenue",
+              "raw_label": "Product Revenue",
+              "values": [
+                45217,
+                53150,
+                58640
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.total_revenue",
+              "is_subtotal": true,
+              "ordinal": 3
+            },
+            {
+              "source_line_id": "is.collaboration",
+              "raw_label": "Collaboration Revenue",
+              "values": [
+                594,
+                923,
+                99
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.total_revenue",
+              "ordinal": 4
+            },
+            {
+              "source_line_id": "is.total_revenue",
+              "raw_label": "Total Revenue",
+              "values": [
+                45811,
+                54073,
+                58739
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.gross_profit",
+              "is_subtotal": true,
+              "ordinal": 5
+            },
+            {
+              "source_line_id": "is.cost_sales",
+              "raw_label": "Cost of sales",
+              "values": [
+                -8268,
+                -10207,
+                -10633
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.gross_profit",
+              "ordinal": 6
+            },
+            {
+              "source_line_id": "is.gross_profit",
+              "raw_label": "Gross profit",
+              "values": [
+                37543,
+                43866,
+                48106
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 7
+            },
+            {
+              "source_line_id": "is.distribution",
+              "raw_label": "Distribution expense",
+              "values": [
+                -539,
+                -555,
+                -579
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "ordinal": 8
+            },
+            {
+              "source_line_id": "is.rd",
+              "raw_label": "Research and development",
+              "values": [
+                -10935,
+                -13583,
+                -14232
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "ordinal": 9
+            },
+            {
+              "source_line_id": "is.sga",
+              "raw_label": "Selling, general and administrative",
+              "values": [
+                -19216,
+                -19977,
+                -19933
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "ordinal": 10
+            },
+            {
+              "source_line_id": "is.other_operating",
+              "raw_label": "Other operating income and expense",
+              "values": [
+                1340,
+                252,
+                381
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "ordinal": 11
+            },
+            {
+              "source_line_id": "is.operating_profit",
+              "raw_label": "Operating profit",
+              "values": [
+                8193,
+                10003,
+                13743
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.pbt",
+              "ordinal": 12
+            },
+            {
+              "source_line_id": "is.finance_income",
+              "raw_label": "Finance income",
+              "values": [
+                344,
+                458,
+                360
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.pbt",
+              "ordinal": 13
+            },
+            {
+              "source_line_id": "is.finance_expense",
+              "raw_label": "Finance expense",
+              "values": [
+                -1626,
+                -1742,
+                -1694
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.pbt",
+              "ordinal": 14
+            },
+            {
+              "source_line_id": "is.associate_losses",
+              "raw_label": "Associate and JV losses",
+              "values": [
+                -12,
+                -28,
+                -7
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.pbt",
+              "ordinal": 15
+            },
+            {
+              "source_line_id": "is.pbt",
+              "raw_label": "Profit before tax",
+              "values": [
+                6899,
+                8691,
+                12402
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.profit",
+              "is_subtotal": true,
+              "ordinal": 16
+            },
+            {
+              "source_line_id": "is.tax",
+              "raw_label": "Taxation",
+              "values": [
+                -938,
+                -1650,
+                -2169
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "parent_source_line_id": "is.profit",
+              "ordinal": 17
+            },
+            {
+              "source_line_id": "is.profit",
+              "raw_label": "Profit for the period",
+              "values": [
+                5961,
+                7041,
+                10233
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 18
+            },
+            {
+              "source_line_id": "is.parent",
+              "raw_label": "Owners of the Parent",
+              "values": [
+                5955,
+                7035,
+                10225
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "ordinal": 19
+            },
+            {
+              "source_line_id": "is.nci",
+              "raw_label": "Non-controlling interests",
+              "values": [
+                6,
+                6,
+                8
+              ],
+              "page_or_note": "page 125",
+              "material": true,
+              "ordinal": 20
+            }
+          ],
+          "rows_sha256": "0fdf6550cade3a8a0402009b41b3b1deae16f6bc12ae4dd30b9f340a2ef31826"
+        }
+      ],
+      "cash_flow": [
+        {
+          "schema_version": "face-statement-manifest/1.0",
+          "statement": "cash_flow",
+          "statement_order": 1,
+          "source_id": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "page_or_note": "face statement",
+          "periods": [
+            "FY1",
+            "FY2",
+            "FY3"
+          ],
+          "complete_face_statement": true,
+          "row_count": 45,
+          "rows": [
+            {
+              "source_line_id": "cf.pbt",
+              "raw_label": "Profit before tax",
+              "values": [
+                6899,
+                8691,
+                12402
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 1
+            },
+            {
+              "source_line_id": "cf.finance",
+              "raw_label": "Finance income and expense",
+              "values": [
+                1282,
+                1284,
+                1334
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 2
+            },
+            {
+              "source_line_id": "cf.associate",
+              "raw_label": "Associate and JV losses",
+              "values": [
+                12,
+                28,
+                7
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 3
+            },
+            {
+              "source_line_id": "cf.da",
+              "raw_label": "Depreciation, amortisation and impairment",
+              "values": [
+                5387,
+                6688,
+                5733
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 4
+            },
+            {
+              "source_line_id": "cf.receivables",
+              "raw_label": "Increase in receivables",
+              "values": [
+                -1425,
+                -1624,
+                -1728
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 5
+            },
+            {
+              "source_line_id": "cf.inventory",
+              "raw_label": "Increase in inventories",
+              "values": [
+                -669,
+                -131,
+                -755
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 6
+            },
+            {
+              "source_line_id": "cf.payables",
+              "raw_label": "Increase in payables and provisions",
+              "values": [
+                2394,
+                862,
+                1346
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 7
+            },
+            {
+              "source_line_id": "cf.intangible_gains",
+              "raw_label": "Gains on intangible disposals",
+              "values": [
+                -251,
+                -64,
+                -168
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 8
+            },
+            {
+              "source_line_id": "cf.contingent_fv",
+              "raw_label": "Contingent consideration fair value",
+              "values": [
+                549,
+                311,
+                -97
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 9
+            },
+            {
+              "source_line_id": "cf.non_cash",
+              "raw_label": "Non-cash and other movements",
+              "values": [
+                -386,
+                -121,
+                662
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated",
+              "ordinal": 10
+            },
+            {
+              "source_line_id": "cf.cash_generated",
+              "raw_label": "Cash generated from operations",
+              "values": [
+                13792,
+                15924,
+                18736
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfo",
+              "is_subtotal": true,
+              "ordinal": 11
+            },
+            {
+              "source_line_id": "cf.interest_paid",
+              "raw_label": "Interest paid",
+              "values": [
+                -1081,
+                -1313,
+                -1316
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfo",
+              "ordinal": 12
+            },
+            {
+              "source_line_id": "cf.tax_paid",
+              "raw_label": "Tax paid",
+              "values": [
+                -2366,
+                -2750,
+                -2845
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfo",
+              "ordinal": 13
+            },
+            {
+              "source_line_id": "cf.cfo",
+              "raw_label": "Net operating cash flow",
+              "values": [
+                10345,
+                11861,
+                14575
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.pre_financing",
+              "is_subtotal": true,
+              "ordinal": 14
+            },
+            {
+              "source_line_id": "cf.subsidiaries",
+              "raw_label": "Acquisition of subsidiaries",
+              "values": [
+                -189,
+                -2771,
+                -66
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 15
+            },
+            {
+              "source_line_id": "cf.employee_awards",
+              "raw_label": "Employee awards on business combinations",
+              "values": [
+                -84,
+                -3,
+                0
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 16
+            },
+            {
+              "source_line_id": "cf.contingent_payment",
+              "raw_label": "Contingent consideration paid",
+              "values": [
+                -826,
+                -1008,
+                -1164
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 17
+            },
+            {
+              "source_line_id": "cf.ppe",
+              "raw_label": "Purchase of PP&E",
+              "values": [
+                -1361,
+                -1924,
+                -2810
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 18
+            },
+            {
+              "source_line_id": "cf.ppe_disposal",
+              "raw_label": "Disposal of PP&E",
+              "values": [
+                132,
+                55,
+                13
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 19
+            },
+            {
+              "source_line_id": "cf.intangibles",
+              "raw_label": "Purchase of intangibles",
+              "values": [
+                -2417,
+                -2662,
+                -3095
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 20
+            },
+            {
+              "source_line_id": "cf.intangible_disposal",
+              "raw_label": "Disposal of intangibles",
+              "values": [
+                291,
+                123,
+                136
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 21
+            },
+            {
+              "source_line_id": "cf.profit_participation",
+              "raw_label": "Profit-participation liability",
+              "values": [
+                190,
+                0,
+                0
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 22
+            },
+            {
+              "source_line_id": "cf.investment_purchase",
+              "raw_label": "Non-current investment purchases",
+              "values": [
+                -136,
+                -96,
+                -229
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 23
+            },
+            {
+              "source_line_id": "cf.investment_disposal",
+              "raw_label": "Non-current investment disposals",
+              "values": [
+                32,
+                78,
+                0
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 24
+            },
+            {
+              "source_line_id": "cf.short_term_investments",
+              "raw_label": "Short-term investment movement",
+              "values": [
+                97,
+                30,
+                131
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 25
+            },
+            {
+              "source_line_id": "cf.associate_payments",
+              "raw_label": "Payments to associates and JVs",
+              "values": [
+                -80,
+                -158,
+                -10
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 26
+            },
+            {
+              "source_line_id": "cf.associate_disposals",
+              "raw_label": "Disposal of associates and JVs",
+              "values": [
+                0,
+                13,
+                0
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 27
+            },
+            {
+              "source_line_id": "cf.interest_received",
+              "raw_label": "Interest received",
+              "values": [
+                287,
+                343,
+                286
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cfi",
+              "ordinal": 28
+            },
+            {
+              "source_line_id": "cf.cfi",
+              "raw_label": "Net investing cash flow",
+              "values": [
+                -4064,
+                -7980,
+                -6808
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.pre_financing",
+              "is_subtotal": true,
+              "ordinal": 29
+            },
+            {
+              "source_line_id": "cf.pre_financing",
+              "raw_label": "Net cash before financing",
+              "values": [
+                6281,
+                3881,
+                7767
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 30
+            },
+            {
+              "source_line_id": "cf.share_issuance",
+              "raw_label": "Share capital proceeds",
+              "values": [
+                33,
+                38,
+                40
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 31
+            },
+            {
+              "source_line_id": "cf.ebt_shares",
+              "raw_label": "Employee Benefit Trust share purchases",
+              "values": [
+                0,
+                -81,
+                -521
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 32
+            },
+            {
+              "source_line_id": "cf.nci",
+              "raw_label": "NCI acquisitions",
+              "values": [
+                0,
+                0,
+                -183
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 33
+            },
+            {
+              "source_line_id": "cf.debt_issue",
+              "raw_label": "Issue of loans",
+              "values": [
+                3816,
+                6492,
+                15
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 34
+            },
+            {
+              "source_line_id": "cf.debt_repay",
+              "raw_label": "Repayment of loans",
+              "values": [
+                -4942,
+                -4652,
+                -2029
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 35
+            },
+            {
+              "source_line_id": "cf.dividends",
+              "raw_label": "Dividends paid",
+              "values": [
+                -4481,
+                -4629,
+                -4971
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 36
+            },
+            {
+              "source_line_id": "cf.dividend_hedges",
+              "raw_label": "Dividend hedge contracts",
+              "values": [
+                -19,
+                16,
+                113
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 37
+            },
+            {
+              "source_line_id": "cf.leases",
+              "raw_label": "Lease repayments",
+              "values": [
+                -268,
+                -316,
+                -372
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 38
+            },
+            {
+              "source_line_id": "cf.short_borrowings",
+              "raw_label": "Short-term borrowings movement",
+              "values": [
+                161,
+                -31,
+                364
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 39
+            },
+            {
+              "source_line_id": "cf.acerta",
+              "raw_label": "Acerta liability payment",
+              "values": [
+                -867,
+                -833,
+                0
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.cff",
+              "ordinal": 40
+            },
+            {
+              "source_line_id": "cf.cff",
+              "raw_label": "Net financing cash flow",
+              "values": [
+                -6567,
+                -3996,
+                -7544
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.net_change",
+              "is_subtotal": true,
+              "ordinal": 41
+            },
+            {
+              "source_line_id": "cf.net_change",
+              "raw_label": "Net change in cash",
+              "values": [
+                -286,
+                -115,
+                223
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.ending",
+              "is_subtotal": true,
+              "ordinal": 42
+            },
+            {
+              "source_line_id": "cf.opening",
+              "raw_label": "Opening cash",
+              "values": [
+                5983,
+                5637,
+                5429
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.ending",
+              "ordinal": 43
+            },
+            {
+              "source_line_id": "cf.fx",
+              "raw_label": "Exchange effects",
+              "values": [
+                -60,
+                -93,
+                46
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "parent_source_line_id": "cf.ending",
+              "ordinal": 44
+            },
+            {
+              "source_line_id": "cf.ending",
+              "raw_label": "Ending cash",
+              "values": [
+                5637,
+                5429,
+                5698
+              ],
+              "page_or_note": "page 128",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 45
+            }
+          ],
+          "rows_sha256": "3cf33bc028760463cd37a92d9ccfe5dd0590d855ed3cddfdc09ccaed0d97ba18"
+        }
+      ]
+    },
+    "lanes": {
+      "statement_expansions": [],
+      "policy_evidence": {
+        "rcf": {
+          "instrument_id": "rcf",
+          "capacity": 4900,
+          "opening_draw": 0,
+          "commitment_fee_value": 25
+        },
+        "cash": {
+          "opening_cash": 5698,
+          "historical_year_end_cash": [
+            5637,
+            5429,
+            5698
+          ],
+          "minimum_cash_override": null
+        },
+        "lease": {
+          "opening_liability": 1803
+        }
+      },
+      "source_coverage_review": {
+        "status": "complete",
+        "reviewed_at": "2026-07-25",
+        "review_evidence": "Every line on the three-year consolidated comprehensive income statement (page 125) and cash-flow statement (page 128) was mapped to a visible row or documented model subtotal."
+      },
+      "periods": [
+        {
+          "date": "2023-12-31",
+          "status": "historical"
+        },
+        {
+          "date": "2024-12-31",
+          "status": "historical"
+        },
+        {
+          "date": "2025-12-31",
+          "status": "historical"
+        },
+        {
+          "date": "2026-12-31",
+          "status": "forecast"
+        },
+        {
+          "date": "2027-12-31",
+          "status": "forecast"
+        },
+        {
+          "date": "2028-12-31",
+          "status": "forecast"
+        }
+      ],
+      "modules": {
+        "multi_currency": true,
+        "historical_normalisation": false,
+        "acquisition": true
+      },
+      "controls": {
+        "broker_case": "Consensus",
+        "circularity": 1,
+        "debt_maturities_roll": 1
+      },
+      "operating_metrics": {
+        "revenue": {
+          "values": [
+            45811,
+            54073,
+            58739,
+            63438,
+            67879,
+            71952
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "broker",
+          "note": "2023-2025 company reported; 2026-2028 test-only broker-style inputs."
+        },
+        "adjusted_ebitda": {
+          "values": [
+            13580,
+            16691,
+            19476,
+            21569,
+            23758,
+            25903
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "broker",
+          "note": "Historical values are a reported EBITDA proxy (operating profit plus depreciation, amortisation and impairment); forecast values are test-only."
+        },
+        "depreciation_and_amortisation": {
+          "values": [
+            5387,
+            6688,
+            5733,
+            5709,
+            5770,
+            5756
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "company_reported",
+          "note": "Historical depreciation, amortisation and impairment; forecast from a visible revenue ratio."
+        },
+        "change_in_working_capital": {
+          "values": [
+            300,
+            -893,
+            -1137,
+            -705,
+            -666,
+            -611
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "company_reported",
+          "note": "Historical trade receivable, inventory and payable/provision cash-flow movements."
+        },
+        "capex": {
+          "values": [
+            3778,
+            4586,
+            5905,
+            6344,
+            6788,
+            7195
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "company_reported",
+          "note": "Historical PP&E and intangible purchases; forecast from a visible revenue ratio."
+        },
+        "tax": {
+          "values": [
+            2366,
+            2750,
+            2845,
+            null,
+            null,
+            null
+          ],
+          "forecast_method": "not_applicable",
+          "source_kind": "company_reported",
+          "note": "Historical cash taxes; forecast tax is formula-driven."
+        },
+        "recurring_disclosed_adjustments": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "inferred"
+        },
+        "other_non_cash": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "inferred"
+        },
+        "other_investing": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "inferred"
+        },
+        "dividends_and_buybacks": {
+          "values": [
+            4487,
+            4683,
+            5367,
+            5200,
+            5400,
+            5600
+          ],
+          "forecast_method": "company_assumption",
+          "source_kind": "company_reported",
+          "note": "Historical ordinary dividends; forecast is test-only."
+        }
+      },
+      "forecast_assumptions": {
+        "revenue_growth": [
+          0.08,
+          0.07,
+          0.06
+        ],
+        "adjusted_ebitda_margin": [
+          0.34,
+          0.35,
+          0.36
+        ],
+        "da_to_revenue": [
+          0.09,
+          0.085,
+          0.08
+        ],
+        "effective_tax_rate": [
+          0.18,
+          0.18,
+          0.18
+        ],
+        "capex_to_revenue": [
+          0.1,
+          0.1,
+          0.1
+        ],
+        "working_capital_to_revenue_change": [
+          0.15,
+          0.15,
+          0.15
+        ],
+        "dividends_and_buybacks": [
+          5200,
+          5400,
+          5600
+        ],
+        "other_non_cash": [
+          0,
+          0,
+          0
+        ],
+        "other_investing": [
+          0,
+          0,
+          0
+        ]
+      },
+      "instruments": [
+        {
+          "instrument_id": "az_usd_2026_070",
+          "display_order": 1,
+          "name": "$1.2bn 0.700% bond due Apr-2026",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1200,
+          "maturity_date": "2026-04-08",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.007,
+            0.007,
+            0.007
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2026_120",
+          "display_order": 2,
+          "name": "$1.25bn 1.200% bond due May-2026",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1250,
+          "maturity_date": "2026-05-28",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.012,
+            0.012,
+            0.012
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2027_480",
+          "display_order": 3,
+          "name": "$1.25bn 4.800% bond due Feb-2027",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1250,
+          "maturity_date": "2027-02-26",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.048,
+            0.048,
+            0.048
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_eur_2027_swapped",
+          "display_order": 4,
+          "name": "€750m 3.625% bond due Mar-2027 (swap-adjusted rate)",
+          "class": "fixed_bond",
+          "currency": "EUR",
+          "opening_balance": 750,
+          "maturity_date": "2027-03-03",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0441,
+            0.0441,
+            0.0441
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2027_3125",
+          "display_order": 5,
+          "name": "$750m 3.125% bond due Jun-2027",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 750,
+          "maturity_date": "2027-06-12",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.03125,
+            0.03125,
+            0.03125
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2028_4875",
+          "display_order": 6,
+          "name": "$1.1bn 4.875% bond due Mar-2028",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1100,
+          "maturity_date": "2028-03-03",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.04875,
+            0.04875,
+            0.04875
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_eur_2028_swapped",
+          "display_order": 7,
+          "name": "€800m 1.250% bond due May-2028 (swap-adjusted rate)",
+          "class": "fixed_bond",
+          "currency": "EUR",
+          "opening_balance": 800,
+          "maturity_date": "2028-05-12",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0297,
+            0.0297,
+            0.0297
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2028_175",
+          "display_order": 8,
+          "name": "$1.25bn 1.750% bond due May-2028",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1250,
+          "maturity_date": "2028-05-28",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0175,
+            0.0175,
+            0.0175
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2029_400",
+          "display_order": 9,
+          "name": "$1.0bn 4.000% bond due Jan-2029",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1000,
+          "maturity_date": "2029-01-17",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.04,
+            0.04,
+            0.04
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2029_485",
+          "display_order": 10,
+          "name": "$1.25bn 4.850% bond due Feb-2029",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1250,
+          "maturity_date": "2029-02-26",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0485,
+            0.0485,
+            0.0485
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_eur_2029_0375",
+          "display_order": 11,
+          "name": "€800m 0.375% bond due Jun-2029",
+          "class": "fixed_bond",
+          "currency": "EUR",
+          "opening_balance": 800,
+          "maturity_date": "2029-06-03",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.00375,
+            0.00375,
+            0.00375
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2030_490",
+          "display_order": 12,
+          "name": "$650m 4.900% bond due Mar-2030",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 650,
+          "maturity_date": "2030-03-03",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.049,
+            0.049,
+            0.049
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_eur_2030_swapped",
+          "display_order": 13,
+          "name": "€650m bond due Aug-2030 (SOFR swap-adjusted)",
+          "class": "fixed_bond",
+          "currency": "EUR",
+          "opening_balance": 650,
+          "maturity_date": "2030-08-05",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "floating",
+          "coupon_or_all_in_rate": [
+            0,
+            0,
+            0
+          ],
+          "benchmark": "SOFR",
+          "benchmark_rate": [
+            0.0317,
+            0.0271,
+            0.0248
+          ],
+          "spread_bps": 80,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2030_1375",
+          "display_order": 14,
+          "name": "$1.3bn 1.375% bond due Aug-2030",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1300,
+          "maturity_date": "2030-08-06",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.01375,
+            0.01375,
+            0.01375
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2031_490",
+          "display_order": 15,
+          "name": "$1.0bn 4.900% bond due Feb-2031",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1000,
+          "maturity_date": "2031-02-26",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.049,
+            0.049,
+            0.049
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2031_225",
+          "display_order": 16,
+          "name": "$750m 2.250% bond due May-2031",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 750,
+          "maturity_date": "2031-05-28",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0225,
+            0.0225,
+            0.0225
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_gbp_2031_575",
+          "display_order": 17,
+          "name": "£350m 5.750% bond due Nov-2031",
+          "class": "fixed_bond",
+          "currency": "GBP",
+          "opening_balance": 350,
+          "maturity_date": "2031-11-13",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0575,
+            0.0575,
+            0.0575
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_eur_2032_swapped",
+          "display_order": 18,
+          "name": "€750m 3.750% bond due Mar-2032 (swap-adjusted rate)",
+          "class": "fixed_bond",
+          "currency": "EUR",
+          "opening_balance": 750,
+          "maturity_date": "2032-03-03",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.0434,
+            0.0434,
+            0.0434
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2033_4875",
+          "display_order": 19,
+          "name": "$500m 4.875% bond due Mar-2033",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 500,
+          "maturity_date": "2033-03-03",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.04875,
+            0.04875,
+            0.04875
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_eur_2033_swapped",
+          "display_order": 20,
+          "name": "€750m bond due Aug-2033 (SOFR swap-adjusted)",
+          "class": "fixed_bond",
+          "currency": "EUR",
+          "opening_balance": 750,
+          "maturity_date": "2033-08-05",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "floating",
+          "coupon_or_all_in_rate": [
+            0,
+            0,
+            0
+          ],
+          "benchmark": "SOFR",
+          "benchmark_rate": [
+            0.035,
+            0.0304,
+            0.0281
+          ],
+          "spread_bps": 95,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_2034_500",
+          "display_order": 21,
+          "name": "$1.5bn 5.000% bond due Feb-2034",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 1500,
+          "maturity_date": "2034-02-26",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.05,
+            0.05,
+            0.05
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_usd_long_dated_pool",
+          "display_order": 22,
+          "name": "$5.75bn long-dated bond pool due 2037-2051",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 5750,
+          "maturity_date": "2051-05-28",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.04829,
+            0.04829,
+            0.04829
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "az_other_borrowings",
+          "display_order": 50,
+          "name": "$717m short-term and other borrowing pool",
+          "class": "other_debt",
+          "currency": "USD",
+          "opening_balance": 717,
+          "maturity_date": "2026-12-31",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "manual_all_in",
+          "coupon_or_all_in_rate": [
+            0.045,
+            0.045,
+            0.045
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "instrument_id": "rcf",
+          "display_order": 99,
+          "name": "$4.9bn committed bank facilities",
+          "class": "rcf",
+          "currency": "USD",
+          "opening_balance": 0,
+          "maturity_date": "2031-04-30",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "manual_all_in",
+          "coupon_or_all_in_rate": [
+            0.047,
+            0.042,
+            0.039
+          ],
+          "benchmark": null,
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": null,
+          "facility_capacity": 4900,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "debt_reconciliation": {
+        "reported_opening_gross_debt": 26971.1,
+        "maximum_residual_percentage": 0.05,
+        "note": "Instrument register reconciles to the supplied certification debt evidence, translated into USD at the last historical period-end rates. Was 26067 until 2026-07-26 — the untranslated sum of USD, EUR and GBP native balances, 904.1 below the workbook's own USD gross-debt row."
+      },
+      "historical_interest_reconciliation": {
+        "reported_interest_basis": "filed_finance_expense_including_lease_interest",
+        "reported_interest": [
+          1626,
+          1742,
+          1694
+        ],
+        "identified_interest": [
+          1626,
+          1742,
+          1694
+        ],
+        "maximum_plug_percentage": 0.1
+      },
+      "historical_supplement": {
+        "prior_cash_and_cash_equivalents": [
+          5983,
+          5637
+        ],
+        "prior_gross_debt_excluding_leases": [
+          27494,
+          28843
+        ],
+        "prior_lease_liabilities": [
+          1128,
+          1452
+        ],
+        "debt_interest_expense": [
+          1099,
+          1330,
+          1255
+        ],
+        "lease_interest_expense": [
+          33,
+          61,
+          80
+        ],
+        "interest_income": [
+          344,
+          458,
+          360
+        ]
+      },
+      "other_interest": [
+        250,
+        250,
+        250
+      ],
+      "non_cash_interest": [
+        0,
+        0,
+        0
+      ],
+      "acquisition": {
+        "enabled": 0,
+        "transaction_enterprise_value": 20000,
+        "entry_ev_to_ebitda": 12.5,
+        "acquisition_debt_amount": 10000,
+        "incremental_rate": 0.045,
+        "close_year": 2027,
+        "close_month": 6
+      },
+      "fx": {
+        "EUR": {
+          "quote": "reporting_per_native",
+          "average_rates": [
+            1.08,
+            1.08,
+            1.13,
+            1.17,
+            1.16,
+            1.15
+          ],
+          "period_end_rates": [
+            1.1,
+            1.04,
+            1.174,
+            1.17,
+            1.16,
+            1.15
+          ]
+        },
+        "GBP": {
+          "quote": "reporting_per_native",
+          "average_rates": [
+            1.24,
+            1.28,
+            1.34,
+            1.34,
+            1.33,
+            1.32
+          ],
+          "period_end_rates": [
+            1.27,
+            1.25,
+            1.346,
+            1.34,
+            1.33,
+            1.32
+          ]
+        }
+      },
+      "broker_pack": {
+        "source_label": "Illustrative local broker pack for architecture testing; historical values use official AstraZeneca reporting.",
+        "forecast_periods": [
+          "2026-12-31",
+          "2027-12-31",
+          "2028-12-31"
+        ],
+        "metrics": {
+          "revenue": {
+            "label": "Total Revenue",
+            "provider_consensus": [
+              63438,
+              67879,
+              71952
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                62169.24,
+                66521.42,
+                70512.95999999999
+              ],
+              "Broker Beta": [
+                63438,
+                67879,
+                71952
+              ],
+              "Broker Gamma": [
+                64706.76,
+                69236.58,
+                73391.04000000001
+              ]
+            }
+          },
+          "adjusted_ebitda": {
+            "label": "EBITDA proxy",
+            "provider_consensus": [
+              21569,
+              23758,
+              25903
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                21137.62,
+                23282.84,
+                25384.94
+              ],
+              "Broker Beta": [
+                21569,
+                23758,
+                25903
+              ],
+              "Broker Gamma": [
+                22000.38,
+                24233.16,
+                26421.06
+              ]
+            }
+          },
+          "depreciation_and_amortisation": {
+            "label": "Depreciation, amortisation and impairment",
+            "provider_consensus": [
+              5709,
+              5770,
+              5756
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                5594.82,
+                5654.599999999999,
+                5640.88
+              ],
+              "Broker Beta": [
+                5709,
+                5770,
+                5756
+              ],
+              "Broker Gamma": [
+                5823.18,
+                5885.400000000001,
+                5871.12
+              ]
+            }
+          },
+          "effective_tax_rate": {
+            "label": "Effective tax rate",
+            "provider_consensus": [
+              0.18,
+              0.18,
+              0.18
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                0.1764,
+                0.1764,
+                0.1764
+              ],
+              "Broker Beta": [
+                0.18,
+                0.18,
+                0.18
+              ],
+              "Broker Gamma": [
+                0.18359999999999999,
+                0.18359999999999999,
+                0.18359999999999999
+              ]
+            }
+          },
+          "change_in_working_capital": {
+            "label": "Change in working capital",
+            "provider_consensus": [
+              -705,
+              -666,
+              -611
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                -690.9,
+                -652.68,
+                -598.78
+              ],
+              "Broker Beta": [
+                -705,
+                -666,
+                -611
+              ],
+              "Broker Gamma": [
+                -719.1,
+                -679.32,
+                -623.22
+              ]
+            }
+          },
+          "capex": {
+            "label": "Capital expenditure",
+            "provider_consensus": [
+              6344,
+              6788,
+              7195
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                6217.12,
+                6652.24,
+                7051.099999999999
+              ],
+              "Broker Beta": [
+                6344,
+                6788,
+                7195
+              ],
+              "Broker Gamma": [
+                6470.88,
+                6923.76,
+                7338.900000000001
+              ]
+            }
+          },
+          "dividends": {
+            "label": "Dividends",
+            "provider_consensus": [
+              5200,
+              5400,
+              5600
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                5096,
+                5292,
+                5488
+              ],
+              "Broker Beta": [
+                5200,
+                5400,
+                5600
+              ],
+              "Broker Gamma": [
+                5304,
+                5508,
+                5712
+              ]
+            }
+          },
+          "share_buybacks": {
+            "label": "Share buybacks",
+            "provider_consensus": [
+              0,
+              0,
+              0
+            ],
+            "brokers": {
+              "Broker Alpha": [
+                0,
+                0,
+                0
+              ],
+              "Broker Beta": [
+                0,
+                0,
+                0
+              ],
+              "Broker Gamma": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      },
+      "provenance": {
+        "product_sales": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Product Sales",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Product Sales",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Product Sales",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "alliance_revenue": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Alliance Revenue",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Alliance Revenue",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Alliance Revenue",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "collaboration_revenue": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Collaboration Revenue",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Collaboration Revenue",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Collaboration Revenue",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "cost_of_sales": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Cost of sales",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Cost of sales",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Cost of sales",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "distribution_expense": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Distribution expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Distribution expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Distribution expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "research_and_development": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Research and development expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Research and development expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Research and development expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "selling_general_administrative": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Selling, general and administrative expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Selling, general and administrative expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Selling, general and administrative expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "other_operating_income": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Other operating income and expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Other operating income and expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Other operating income and expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "operating_profit": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Operating profit",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Operating profit",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Operating profit",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "interest_income": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "page 125",
+            "units": "USD millions",
+            "source_label": "Finance income",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "page 125",
+            "units": "USD millions",
+            "source_label": "Finance income",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "page 125",
+            "units": "USD millions",
+            "source_label": "Finance income",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "interest_expense": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "page 125",
+            "units": "USD millions",
+            "source_label": "Finance expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "page 125",
+            "units": "USD millions",
+            "source_label": "Finance expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "page 125",
+            "units": "USD millions",
+            "source_label": "Finance expense",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "associate_joint_venture_losses": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share of after tax losses in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share of after tax losses in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share of after tax losses in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "tax_expense": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Taxation",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Taxation",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Taxation",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "owners_of_parent": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Owners of the Parent",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Owners of the Parent",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Owners of the Parent",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "non_controlling_interests": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Non-controlling interests",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Non-controlling interests",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Non-controlling interests",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "depreciation_and_amortisation": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Depreciation, amortisation and impairment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Depreciation, amortisation and impairment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Depreciation, amortisation and impairment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "cash_flow_associate_losses": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share of after tax losses in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share of after tax losses in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share of after tax losses in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "receivables_movement": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in trade and other receivables",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in trade and other receivables",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in trade and other receivables",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "inventory_movement": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in inventories",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in inventories",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in inventories",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "payables_provisions_movement": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in trade and other payables and provisions",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in trade and other payables and provisions",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Increase in trade and other payables and provisions",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "gains_on_intangible_disposals": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Gains on disposal of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Gains on disposal of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Gains on disposal of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "contingent_consideration_fair_value": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Fair value movements on contingent consideration",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Fair value movements on contingent consideration",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Fair value movements on contingent consideration",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "non_cash_other_movements": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Non-cash and other movements",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Non-cash and other movements",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Non-cash and other movements",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "interest_paid": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Interest paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Interest paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Interest paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "tax_paid": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Tax paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Tax paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Tax paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "subsidiary_acquisitions": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Acquisition of subsidiaries, net of cash acquired",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Acquisition of subsidiaries, net of cash acquired",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Acquisition of subsidiaries, net of cash acquired",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "employee_awards_business_combinations": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Employee share awards attributable to business combinations",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Employee share awards attributable to business combinations",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Employee share awards attributable to business combinations",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "contingent_consideration_payments": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payment of contingent consideration from business combinations",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payment of contingent consideration from business combinations",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payment of contingent consideration from business combinations",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "ppe_purchases": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "intangible_purchases": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "ppe_disposals": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of property, plant and equipment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of property, plant and equipment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of property, plant and equipment",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "intangible_disposals": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of intangible assets",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "profit_participation_liability": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in profit-participation liability",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in profit-participation liability",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in profit-participation liability",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "non_current_investment_purchases": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of non-current asset investments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of non-current asset investments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Purchase of non-current asset investments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "non_current_investment_disposals": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of non-current asset investments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of non-current asset investments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of non-current asset investments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "short_term_investment_movement": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in short-term investments, fixed deposits and other instruments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in short-term investments, fixed deposits and other instruments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in short-term investments, fixed deposits and other instruments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "associate_joint_venture_payments": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payments to associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payments to associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payments to associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "associate_joint_venture_disposals": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of investments in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of investments in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Disposal of investments in associates and joint ventures",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "interest_received": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Interest received",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Interest received",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Interest received",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "share_issuance": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Proceeds from issue of share capital",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Proceeds from issue of share capital",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Proceeds from issue of share capital",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "employee_benefit_trust_shares": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Own shares purchased by Employee Benefit Trusts",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Own shares purchased by Employee Benefit Trusts",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Own shares purchased by Employee Benefit Trusts",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "nci_acquisitions": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payments to acquire non-controlling interests",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payments to acquire non-controlling interests",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payments to acquire non-controlling interests",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "debt_issuance": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Issue of loans and borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Issue of loans and borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Issue of loans and borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "debt_repayment": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Repayment of loans and borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Repayment of loans and borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Repayment of loans and borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "dividends": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Dividends paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Dividends paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Dividends paid",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "dividend_hedges": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Hedge contracts relating to dividend payments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Hedge contracts relating to dividend payments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Hedge contracts relating to dividend payments",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "lease_principal": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Repayment of obligations under leases",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Repayment of obligations under leases",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Repayment of obligations under leases",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "short_term_borrowings_movement": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in short-term borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in short-term borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Movement in short-term borrowings",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "acerta_liability_payment": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payment of Acerta Pharma share purchase liability",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payment of Acerta Pharma share purchase liability",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Payment of Acerta Pharma share purchase liability",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "share_buybacks": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share buybacks",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share buybacks",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Share buybacks",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "rcf_draw": [],
+        "rcf_repayment": [],
+        "opening_cash": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Cash and cash equivalents at the beginning of the period",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Cash and cash equivalents at the beginning of the period",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Cash and cash equivalents at the beginning of the period",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ],
+        "fx_effect_on_cash": [
+          {
+            "period_index": 0,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Exchange rate effects",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 1,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Exchange rate effects",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          },
+          {
+            "period_index": 2,
+            "document": "AstraZeneca Annual Report & Form 20-F Information 2025 - Financial Statements",
+            "publication_date": "2026-02-10",
+            "page_or_note": "pages 125 and 128",
+            "units": "USD millions",
+            "source_label": "Exchange rate effects",
+            "transformation": "Directly mapped from the disclosed statement using the model sign convention."
+          }
+        ]
+      }
+    }
+  }
+}

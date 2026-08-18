@@ -1,0 +1,230 @@
+{
+  "artifact_root": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/canonical-late-promotion/artifacts",
+  "created_at": "2026-08-14T00:00:00Z",
+  "documents": [
+    {
+      "artifacts": [
+        {
+          "artifact_id": "minted-census",
+          "kind": "surface_census",
+          "path": "minted/p1.census.json",
+          "sha256": "18b4de6be6628df2137d4991c4a3bd5d17454b3d49cfca92cfeb773ffb73d3aa"
+        },
+        {
+          "artifact_id": "minted-image",
+          "kind": "page_image",
+          "path": "minted/page1.png",
+          "sha256": "3e35311fddf0c908242dd36a3f4413d10dba8e9d3fda67cea21fb81332e9ad73"
+        }
+      ],
+      "document_id": "minted",
+      "extraction_status": "complete",
+      "file_name": "minted.pdf",
+      "house_id": "minted",
+      "house_name": "Minted Task House",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [
+          "100",
+          "110"
+        ],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": [
+          "100",
+          "110"
+        ]
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_id": "fixture.minted",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "minted-census",
+            "minted-image"
+          ],
+          "height": 792,
+          "image_count": 1,
+          "kind": "pdf_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "none",
+            "native_text": "pass",
+            "tables": "pass",
+            "vision": "not_required"
+          },
+          "native_text_chars": 420,
+          "native_word_count": 80,
+          "numeric_token_count": 2,
+          "ordinal": 1,
+          "source_table_numeric_tokens": [
+            "100",
+            "110",
+            "999"
+          ],
+          "surface_census_artifact_id": "minted-census",
+          "surface_id": "minted.p1",
+          "table_count": 1,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 1,
+              "lane_id": "native_pdf_lines",
+              "status": "pass"
+            }
+          ],
+          "uncovered_numeric_regions": [],
+          "whole_surface_numeric_token_count": 2,
+          "width": 612
+        }
+      ],
+      "tables": [
+        {
+          "bbox": [
+            10,
+            10,
+            300,
+            180
+          ],
+          "confidence": 1.0,
+          "extraction_method": "vision_pass1",
+          "rows": [
+            [
+              {
+                "column": 1,
+                "raw_text": "Metric",
+                "row": 1,
+                "source_ref": "fixture:r1c1",
+                "value": "Metric",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "FY26E",
+                "row": 1,
+                "source_ref": "fixture:r1c2",
+                "value": "FY26E",
+                "value_kind": "text"
+              },
+              {
+                "column": 3,
+                "raw_text": "FY27E",
+                "row": 1,
+                "source_ref": "fixture:r1c3",
+                "value": "FY27E",
+                "value_kind": "text"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Revenue",
+                "row": 2,
+                "source_ref": "fixture:r2c1",
+                "value": "Revenue",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "100",
+                "row": 2,
+                "source_ref": "fixture:r2c2",
+                "value": "100",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "110",
+                "row": 2,
+                "source_ref": "fixture:r2c3",
+                "value": "110",
+                "value_kind": "number"
+              }
+            ]
+          ],
+          "source_location": "page 1",
+          "surface_id": "minted.p1",
+          "table_id": "minted-t1",
+          "title": "Forecasts",
+          "units": "USDm"
+        },
+        {
+          "bbox": [
+            10,
+            10,
+            300,
+            180
+          ],
+          "confidence": 1.0,
+          "extraction_method": "vision_pass2",
+          "rows": [
+            [
+              {
+                "column": 1,
+                "raw_text": "Metric",
+                "row": 1,
+                "source_ref": "fixture:r1c1",
+                "value": "Metric",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "FY26E",
+                "row": 1,
+                "source_ref": "fixture:r1c2",
+                "value": "FY26E",
+                "value_kind": "text"
+              },
+              {
+                "column": 3,
+                "raw_text": "FY27E",
+                "row": 1,
+                "source_ref": "fixture:r1c3",
+                "value": "FY27E",
+                "value_kind": "text"
+              }
+            ],
+            [
+              {
+                "column": 1,
+                "raw_text": "Revenue",
+                "row": 2,
+                "source_ref": "fixture:r2c1",
+                "value": "Revenue",
+                "value_kind": "text"
+              },
+              {
+                "column": 2,
+                "raw_text": "101",
+                "row": 2,
+                "source_ref": "fixture:r2c2",
+                "value": "101",
+                "value_kind": "number"
+              },
+              {
+                "column": 3,
+                "raw_text": "110",
+                "row": 2,
+                "source_ref": "fixture:r2c3",
+                "value": "110",
+                "value_kind": "number"
+              }
+            ]
+          ],
+          "source_location": "page 1",
+          "surface_id": "minted.p1",
+          "table_id": "minted-rendered-conflict",
+          "title": "Forecasts",
+          "units": "USDm"
+        }
+      ]
+    }
+  ],
+  "extractor_version": "fixture/1.0",
+  "findings": [],
+  "gate_status": "PASS",
+  "run_id": "canonical-late-promotion-regression",
+  "schema_version": "broker-extraction-bundle/1.0",
+  "summary": {}
+}

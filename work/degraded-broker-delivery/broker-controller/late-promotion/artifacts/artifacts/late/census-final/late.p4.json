@@ -1,0 +1,31 @@
+{
+  "document_id": "late",
+  "kind": "image_page",
+  "material_uncovered_region_count": 0,
+  "nonblank_cell_count": 0,
+  "schema_version": "broker-surface-census/1.0",
+  "source_numeric_tokens": [],
+  "source_table_numeric_tokens": [],
+  "surface_id": "late.p4",
+  "table_discovery_lanes": [
+    {
+      "candidate_count": 0,
+      "lane_id": "image_render",
+      "status": "empty"
+    }
+  ],
+  "uncovered_numeric_regions": [
+    {
+      "bbox": [
+        10,
+        10,
+        300,
+        180
+      ],
+      "disposition": "quarantined_evidence_only",
+      "material": true,
+      "region_id": "late.p4.r1"
+    }
+  ],
+  "whole_surface_numeric_token_count": 0
+}

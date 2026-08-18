@@ -1,0 +1,47 @@
+{
+  "completed_at": "2026-08-15T11:49:44.450Z",
+  "counts": {
+    "BLOCKED": 0,
+    "FAIL": 0,
+    "PASS": 1
+  },
+  "golden_actions_performed": false,
+  "inputs": {
+    "BROKER_CORPUS": null,
+    "BROKER_REAL_PACK_MANIFEST": null,
+    "CASES": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases",
+    "DEGRADED_DELIVERY_REPORT": null,
+    "FIXED_POINT_CASES_MANIFEST": null,
+    "PYTHON": null,
+    "RAW_CANARY_EVIDENCE": null,
+    "REPRESENTATIVE": null,
+    "SOFFICE": null,
+    "USABLE_BROKER_WORKBOOK": null
+  },
+  "kind": "source_owned_lean_development_gate",
+  "native_excel_actions_performed": false,
+  "phases": [
+    "cohort"
+  ],
+  "registry_path": "assets/development-test-registry.json",
+  "release_actions_performed": false,
+  "results": [
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_case_compiler_equivalence.mjs",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/v2-certification/cases"
+      ],
+      "duration_ms": 2275.79475,
+      "exit_code": 0,
+      "id": "case-compiler-equivalence",
+      "phase": "cohort",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "\n=== astrazeneca-v2.json: 0 economic diffs (+1 presentation, +28 inert-ft, +934 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+0 named capture-vs-legacy-default rows)\n\n=== kerry-acquisition-on-v2.json: 0 economic diffs (+12 presentation, +28 inert-ft, +707 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+2 named capture-vs-legacy-default rows)\n\n=== kerry-stressed-liquidity-v2.json: 0 economic diffs (+12 presentation, +28 inert-ft, +707 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+2 named capture-vs-legacy-default rows)\n\n=== kerry-v2.json: 0 economic diffs (+12 presentation, +28 inert-ft, +707 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+2 named capture-vs-legacy-default rows)\n\n=== kingspan-v2.json: 0 economic diffs (+19 presentation, +31 inert-ft, +899 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+0 named capture-vs-legacy-default rows)\n\n=== smurfit-full-reference-v2.json: 0 economic diffs (+125 presentation, +37 inert-ft, +735 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+2 named capture-vs-legacy-default rows)\n\n=== standard-maximal-v2.json: 0 economic diffs (+11 presentation, +2 inert-ft, +475 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+0 named capture-vs-legacy-default rows)\n\n=== standard-net-cash-v2.json: 0 economic diffs (+11 presentation, +1 inert-ft, +465 justified), 0 compile blocks (clean)\n  SOLVE(compiled): OK (3 periods)\n  PLAN: EQUAL (+0 named capture-vs-legacy-default rows)\n\nTOTAL path diffs across cohort: 0\nTOTAL compile blocks across cohort: 0\nTOTAL failed compiled solves: 0\nTOTAL hard plan diffs: 0\nTOTAL failed plan compiles: 0\n"
+    }
+  ],
+  "schema_version": "development-gate-report/1.0",
+  "started_at": "2026-08-15T11:49:42.172Z",
+  "status": "PASS"
+}

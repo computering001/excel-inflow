@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Broker metric dictionary",
+  "description": "The closed target vocabulary a broker crosswalk may map into, and the consumption tiers derived from it. Prose fields are addressed to the model that performs the mapping; the enumerated fields are what deterministic gates enforce.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "consumption", "flex", "banned_totals", "metrics"],
+  "properties": {
+    "schema_version": { "const": "broker-metric-dictionary/1.0" },
+    "doctrine": { "type": "string", "minLength": 1 },
+    "authority": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "consumption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["core", "required_for_primary_house", "headline_anchors"],
+      "properties": {
+        "core": { "$ref": "#/$defs/idList" },
+        "required_for_primary_house": { "$ref": "#/$defs/idList" },
+        "headline_anchors": { "$ref": "#/$defs/idList" },
+        "_note": { "type": "string" },
+        "degrees_of_freedom": { "type": "string" }
+      }
+    },
+    "flex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eligibility", "eligible_concepts"],
+      "properties": {
+        "eligibility": { "type": "string", "minLength": 1 },
+        "why_cash_flow_only": { "type": "string" },
+        "eligible_concepts": { "$ref": "#/$defs/idList" }
+      }
+    },
+    "banned_totals": { "$ref": "#/$defs/idList" },
+    "_banned_totals_note": { "type": "string" },
+    "overlap_groups": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "unit_classes": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/metric" }
+    }
+  },
+  "$defs": {
+    "metricId": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "idList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/metricId" }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "display_label",
+        "definition",
+        "statement_family",
+        "unit_class",
+        "leaf",
+        "tier",
+        "overlap_group"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/metricId" },
+        "display_label": { "type": "string", "minLength": 1 },
+        "definition": { "type": "string", "minLength": 1 },
+        "statement_family": {
+          "enum": ["income", "cash_flow", "balance", "per_share", "market", "other"]
+        },
+        "unit_class": {
+          "enum": ["currency", "percent", "per_share", "ratio", "multiple", "count"]
+        },
+        "leaf": {
+          "type": "boolean",
+          "description": "True when the concept is an individual line item rather than a subtotal over other lines. The flex gate requires leaf true AND independent arithmetic confirmation, so a mis-flagged entry cannot admit a subtotal on its own."
+        },
+        "tier": {
+          "enum": ["core", "flex_eligible", "reference"],
+          "description": "core is consumable without election; flex_eligible may be elected under the cash-flow-leaf rule; reference is evidence and display only, never a model input."
+        },
+        "overlap_group": {
+          "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }],
+          "description": "Concepts that can double-count each other. At most one member of a group may drive the model, which is what stops an elected lease-payment line from being spent twice inside a lease-inclusive capex figure."
+        },
+        "disambiguation": { "type": "string" },
+        "examples": { "type": "array", "items": { "type": "string" } },
+        "counter_examples": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+mwb research AG
+Page 14 of 18
+
+
+
+
+
+ Cash flow statement (EURm)                           2023        2024        2025       2026E       2027E       2028E
+ Net profit/loss                                        120          84          -319              -6          19          50
+ Depreciation of fixed assets (incl. leases)                   130         146         261         219         222         221
+ Amortisation of goodwill                                  0           0           0           0           0           0
+ Amortisation of intangible assets                          53          53         261          60          58          56
+ Others                                                        -40           -58           -23          -132           7           6
+ Cash flow from operations before changes in w/c             263         225         180         142         306         333
+ Increase/decrease in inventory                                 -22           -33           5           -33              -2           2
+ Increase/decrease in accounts receivable                       -10              -3           -38          48           1           3
+ Increase/decrease in accounts payable                     64          61          56           -36           6           5
+ Increase/decrease in other w/c positions                     0           -11           7              -2           8           9
+ Increase/decrease in working capital                       32          14          29           -24          12          19
+ Cash flow from operating activities                       295         239         210         118         318         351
+ CAPEX                                                    -328          -370          -308          -290          -250          -231
+ Payments for acquisitions                                 0              -9          -373           0           0           0
+ Financial investments                                   20          24          10           0           0           0
+ Income from asset disposals                               1          10           9           0           0           0
+ Cash flow from investing activities                         -307         -346         -662         -290         -250         -231
+ Cash flow before financing                                     -13          -107          -452          -172          68         121
+ Increase/decrease in debt position                           -165         237         486           -45           -40           0
+ Purchase of own shares                                  0           0           0           0           0           0
+ Capital measures                                      272           0           0           0           0           0
+ Dividends paid                                                 -45           -45              -2              -1              -1              -1
+ Others                                                        -21           -22           -31           0           0           0
+ Effects of exchange rate changes on cash                          -3              -1           0           0           0           0
+ Cash flow from financing activities                        37         168         453          -46          -41            -1
+ Increase/decrease in liquid assets                         24          62           -11          -218          27         119
+ Liquid assets at end of period                           122         184         173          -45          -18         101
+ Source: Company data; mwb research
+
+
+ Regional sales split (EURm)                            2023       2024        2025      2026E       2027E       2028E
+ Domestic                                             380        365          334         334          342          349
+ Europe (ex domestic)                                   797        835         1,122        1,122         1,150         1,173
+ The Americas                                         529        513          550         550          564          575
+ Asia                                                  0          0            0           0            0            0
+ Rest of World                                         284        278          315         315          323          330
+ Total sales                                              1,990       1,991         2,321        2,321         2,379         2,426
+
+ Regional sales split (common size)                       2023       2024        2025      2026E       2027E       2028E
+ Domestic                                             19.1%      18.3%        14.4%       14.4%        14.4%        14.4%
+ Europe (ex domestic)                                   40.1%      42.0%        48.3%       48.3%        48.3%        48.3%
+ The Americas                                         26.6%      25.7%        23.7%       23.7%        23.7%        23.7%
+ Asia                                                   0.0%        0.0%         0.0%        0.0%         0.0%         0.0%
+ Rest of World                                         14.3%      14.0%        13.6%       13.6%        13.6%        13.6%
+ Total sales                                       100%      100%        100%       100%        100%        100%
+Source: Company data; mwb research

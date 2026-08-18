@@ -1,0 +1,74 @@
+Smartbroker
+
+
+Consolidated balance sheet
+
+ In EUR m                                            2021       2022       2023       2024      2025e      2026e      2027e
+
+ Assets
+
+ Goodwill and other intangible assets                        37.47       33.64       38.77       31.78       25.71       25.50       24.10
+ thereof other intangible assets                             14.39       12.83       21.14       16.76       10.20       10.01        8.61
+ thereof Goodwill                                          22.59       20.81       17.63       15.02       15.02       15.00       15.00
+ Property, plant and equipment                               0.91        1.77        1.84        1.53        1.55        1.56        1.58
+ Financial assets                                            2.23        1.50        1.06        0.87        0.87        0.87        0.87
+ Other long-term assets                                      0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ Fixed assets                                            40.60       36.91       41.67       34.19       28.13       27.94       26.55
+ Inventories                                                 0.00        0.00        0.00        0.00        0.10        0.10        0.10
+ Accounts receivable                                        6.97        6.15        7.08        5.22        7.40        8.20        9.00
+ Liquid assets                                            25.53       27.37       12.26       22.01       12.41        3.96        4.79
+ Other short-term assets                                     2.28        3.49        2.82        1.94        1.94        1.94        1.94
+ Current assets                                          34.78       37.02       22.17       29.18       21.85       14.21       15.83
+ Total Assets                                            75.40       73.90       63.80       63.40       50.00       42.10       42.40
+
+ Liabilities and shareholders' equity
+
+ Subscribed capital                                        15.10       15.68       15.68       16.78       16.78       16.78       16.78
+ Capital reserve                                           29.27       38.73       38.73       45.27       45.27       45.27       45.27
+ Retained earnings                                          4.39        -5.65       -11.52       -12.90       -24.66       -32.58       -32.74
+ Other equity components                                    0.30        0.64        0.18        0.00        0.50        0.40        0.50
+ Shareholders' equity                                      49.06       49.40       43.07       49.15       37.89       29.87       29.81
+ Minority interest                                            0.40        0.04        -0.02        -0.03        -0.03        -0.03        -0.03
+ Total equity                                             49.46       49.43       43.05       49.13       37.86       29.85       29.78
+ Provisions                                                 6.11        4.01        3.38        3.72        3.72        3.72        3.72
+ thereof provisions for pensions and similar obligations          0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ Financial liabilities (total)                                    5.70       14.87       10.45        6.19        4.50        4.50        4.50
+ Short-term financial liabilities                                 0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ Accounts payable                                           8.88        2.98        3.85        2.62        2.20        2.30        2.70
+ Other liabilities                                             5.22        2.64        3.11        1.71        1.71        1.71        1.71
+ Liabilities                                               25.92       24.50       20.79       14.24       12.13       12.23       12.63
+ Total liabilities and shareholders' equity                  75.40       73.90       63.80       63.40       50.00       42.10       42.40
+
+Financial Ratios
+
+                                                    2021       2022       2023       2024      2025e      2026e      2027e
+
+Efficiency of Capital Employment
+Operating Assets Turnover                                   -44.2 x       11.1 x        9.3 x       12.7 x        9.8 x        9.4 x       10.3 x
+Capital Employed Turnover                                   1.6 x        1.4 x        1.1 x        1.6 x        2.3 x        2.3 x        2.8 x
+ROA                                                            -1.4 %      -27.3 %      -14.3 %       -4.1 %      -41.8 %      -28.3 %       -0.6 %
+Return on Capital
+ROCE (NOPAT)                                                    n.a.          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+ROE                                                            -1.4 %      -20.5 %      -12.9 %       -3.0 %      -27.0 %      -23.4 %       -0.5 %
+Adj. ROE                                                       -1.4 %      -20.5 %      -12.9 %       -3.0 %      -27.0 %      -23.4 %       -0.5 %
+Balance sheet quality
+Net Debt                                                   -19.82       -12.51        -1.82       -15.82        -7.91        0.54        -0.29
+Net Financial Debt                                          -19.82       -12.51        -1.82       -15.82        -7.91        0.54        -0.29
+Net Gearing                                                -40.1 %      -25.3 %       -4.2 %      -32.2 %      -20.9 %       1.8 %       -1.0 %
+Net Fin. Debt / EBITDA                                             n.a.          n.a.          n.a.          n.a.          n.a.      26.0 %          n.a.
+Book Value / Share                                             3.2          3.2          2.7          2.9          2.3          1.8          1.8
+Book value per share ex intangibles                             0.8          1.0          0.3          1.0          0.7          0.3          0.3
+
+
+
+
+ROCE Development                    Net debt                          Book Value per Share
+                                                         in EUR m                                              in EUR
+
+
+
+
+
+Source: Warburg Research                                    Source: Warburg Research                                    Source: Warburg Research
+
+                        COM M ENT      Published 26.02.2026       6

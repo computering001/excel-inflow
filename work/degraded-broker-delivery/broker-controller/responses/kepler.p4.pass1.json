@@ -1,0 +1,45 @@
+{
+  "document_id": "kepler",
+  "image_sha256": "77c4e890fe4fab80fc945e87aab1b387fdab9131b0e39cc58bc2ed8f27120ad9",
+  "method": "vision_model",
+  "pass_index": 1,
+  "producer_fingerprint": "alpha-fingerprint-1",
+  "producer_id": "alpha-pass1",
+  "schema_version": "broker-vision-result/1.0",
+  "surface_disposition": "analytical_tables",
+  "surface_id": "kepler.p4",
+  "tables": [
+    {
+      "bbox": [
+        10,
+        10,
+        300,
+        180
+      ],
+      "rows": [
+        [
+          "Metric",
+          "2027E",
+          "2028E"
+        ],
+        [
+          "Alpha series",
+          "100",
+          "110"
+        ],
+        [
+          "Beta series",
+          "20",
+          "22"
+        ]
+      ],
+      "title": "Forecast table",
+      "transcription_structure": {
+        "is_grid": true,
+        "period_headers": 2,
+        "row_labels": true
+      },
+      "units": "USDm"
+    }
+  ]
+}

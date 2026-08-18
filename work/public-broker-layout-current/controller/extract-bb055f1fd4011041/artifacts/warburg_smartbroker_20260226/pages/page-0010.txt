@@ -1,0 +1,65 @@
+Smartbroker
+
+
+INVESTMENT RECOMMENDATION
+
+Investment recommendation: expected direction of the share price development of the financial instrument up to the given price target in the opinion of
+the analyst who covers this financial instrument.
+
+
+-B-       Buy:                        The price of the analysed financial instrument is expected to rise over the next 12 months.
+
+-H-        Hold:                        The price of the analysed financial instrument is expected to remain mostly flat over the next 12 months.
+
+-S-          Sell:                        The price of the analysed financial instrument is expected to fall over the next 12 months.
+
+ “-“         Rating suspended:            The available information currently does not permit an evaluation of the company.
+
+
+
+WARBURG RESEARCH GMBH – ANALYSED RESEARCH UNIVERSE BY RATING
+
+Rating                                   Number of stocks                      % of Universe
+
+Buy                                                              135                                                  72
+
+Hold                                                               44                                                  24
+
+Sell                                                                5                                                   3
+
+Rating suspended                                                     3                                                   2
+
+Total                                                             187                                                 100
+
+
+
+WARBURG RESEARCH GMBH – ANALYSED RESEARCH UNIVERSE BY RATING …
+
+… taking into account only those companies for which affiliated companies provided major investment services in the last
+twelve months.
+
+Rating                                   Number of stocks                      % of Universe
+
+Buy                                                                2                                                 100
+
+Hold                                                               0                                                   0
+
+Sell                                                                0                                                   0
+
+Rating suspended                                                     0                                                   0
+
+Total                                                               2                                                 100
+
+
+
+PRICE AND RATING HISTORY SMARTBROKER AS OF 26.02.2026
+
+                                                                           Markings in the chart show rating changes by Warburg Research
+                                                     GmbH in the last 12 months. Every marking details the date and
+                                                                                      closing price on the day of the rating change.
+
+
+
+
+
+                        COM M ENT      Published 26.02.2026     10

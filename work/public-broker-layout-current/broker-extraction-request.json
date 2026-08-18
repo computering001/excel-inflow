@@ -1,0 +1,511 @@
+{
+  "documents": [
+    {
+      "document_id": "montega_smartbroker_20260508",
+      "expected_sha256": "a932b086d1bc1c62f2f03af3fb422fa943270f1cb944c6de19fc2ad7ea04d32a",
+      "house_id": "montega",
+      "house_name": "Montega Research",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/01-montega-smartbroker-2026-05-08.pdf",
+      "published_date": "2026-05-08",
+      "source_id": "public_test.montega_smartbroker_20260508"
+    },
+    {
+      "document_id": "warburg_smartbroker_20260226",
+      "expected_sha256": "38d4dee011dab30746c55a8d4c540da4002866cfe414b885583d5a1eaa56036f",
+      "house_id": "warburg",
+      "house_name": "Warburg Research",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/02-warburg-smartbroker-2026-02-26.pdf",
+      "published_date": "2026-02-26",
+      "source_id": "public_test.warburg_smartbroker_20260226"
+    },
+    {
+      "document_id": "gbc_smartbroker_20260107",
+      "expected_sha256": "cfd925506f1bb0f691a579801139b3cd6cd3469da66db575af2be2fb855302c4",
+      "house_id": "gbc",
+      "house_name": "GBC Research",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/03-gbc-smartbroker-2026-01-07.pdf",
+      "published_date": "2026-01-07",
+      "source_id": "public_test.gbc_smartbroker_20260107"
+    },
+    {
+      "document_id": "first_berlin_sfc_20251120",
+      "expected_sha256": "b072239f0f585c0c1792e32b5cfbba3441eda291c9ba324d74d3575e16c65b48",
+      "house_id": "first_berlin",
+      "house_name": "First Berlin Equity Research",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/04-first-berlin-sfc-energy-2025-11-20.pdf",
+      "published_date": "2025-11-20",
+      "source_id": "public_test.first_berlin_sfc_20251120"
+    },
+    {
+      "document_id": "metzler_sfc_20250827",
+      "expected_sha256": "81b2bc0605f3316346f97b0db4a9aa9802fb9b66449cd5634cce1f20ebd6daaf",
+      "house_id": "metzler",
+      "house_name": "Metzler Research",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/05-metzler-sfc-energy-2025-08-27.pdf",
+      "published_date": "2025-08-27",
+      "source_id": "public_test.metzler_sfc_20250827"
+    },
+    {
+      "document_id": "quirin_psi_20251104",
+      "expected_sha256": "5f471d328f5fa5cb348bb1aaf644cb4d78cb9d9c5f33568fe8fc404d84ffbfd7",
+      "house_id": "quirin",
+      "house_name": "Quirin Privatbank",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/06-quirin-psi-2025-11-04.pdf",
+      "published_date": "2025-11-04",
+      "source_id": "public_test.quirin_psi_20251104"
+    },
+    {
+      "document_id": "mwb_gerresheimer_20260630",
+      "expected_sha256": "3dc9e86b128b5f59bf50d4a04eabdc03096c15b95843d1762781ff00cc335d99",
+      "house_id": "mwb",
+      "house_name": "mwb research",
+      "media_type": "application/pdf",
+      "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/pdfs/07-mwb-gerresheimer-2026-06-30.pdf",
+      "published_date": "2026-06-30",
+      "source_id": "public_test.mwb_gerresheimer_20260630"
+    }
+  ],
+  "model_context": {
+    "as_of": "2026-12-31",
+    "forecast_periods": [
+      "2027-12-31",
+      "2028-12-31",
+      "2029-12-31"
+    ],
+    "model_demand_graph": {
+      "as_of": "2026-12-31",
+      "counts": {
+        "forecast_nodes": 27,
+        "material_nodes": 27,
+        "source_rows": 9
+      },
+      "forecast_periods": [
+        "2027-12-31",
+        "2028-12-31",
+        "2029-12-31"
+      ],
+      "graph_sha256": "79bba2393ba8fb33c5fa4dfba028cf4113e843291c0b22eebd1c96e045308f25",
+      "nodes": [
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Revenue",
+          "material": true,
+          "node_id": "public.0.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.0"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Revenue",
+          "material": true,
+          "node_id": "public.0.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.0"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Revenue",
+          "material": true,
+          "node_id": "public.0.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.0"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "EBIT",
+          "material": true,
+          "node_id": "public.1.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.1"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "EBIT",
+          "material": true,
+          "node_id": "public.1.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.1"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "EBIT",
+          "material": true,
+          "node_id": "public.1.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.1"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Adjusted EBITDA",
+          "material": true,
+          "node_id": "public.2.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.2"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Adjusted EBITDA",
+          "material": true,
+          "node_id": "public.2.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.2"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Adjusted EBITDA",
+          "material": true,
+          "node_id": "public.2.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.2"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Depreciation and amortisation",
+          "material": true,
+          "node_id": "public.3.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.3"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Depreciation and amortisation",
+          "material": true,
+          "node_id": "public.3.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.3"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Depreciation and amortisation",
+          "material": true,
+          "node_id": "public.3.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.3"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Effective tax rate",
+          "material": true,
+          "node_id": "public.4.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.4"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Effective tax rate",
+          "material": true,
+          "node_id": "public.4.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.4"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Effective tax rate",
+          "material": true,
+          "node_id": "public.4.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "income_statement",
+          "source_line_id": "public.4"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Capital expenditure",
+          "material": true,
+          "node_id": "public.5.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.5"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Capital expenditure",
+          "material": true,
+          "node_id": "public.5.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.5"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Capital expenditure",
+          "material": true,
+          "node_id": "public.5.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.5"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Change in working capital",
+          "material": true,
+          "node_id": "public.6.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.6"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Change in working capital",
+          "material": true,
+          "node_id": "public.6.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.6"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Change in working capital",
+          "material": true,
+          "node_id": "public.6.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.6"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Dividends paid",
+          "material": true,
+          "node_id": "public.7.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.7"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Dividends paid",
+          "material": true,
+          "node_id": "public.7.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.7"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Dividends paid",
+          "material": true,
+          "node_id": "public.7.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.7"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Share buybacks",
+          "material": true,
+          "node_id": "public.8.fy1",
+          "parent_label": null,
+          "period_end": "2027-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.8"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Share buybacks",
+          "material": true,
+          "node_id": "public.8.fy2",
+          "parent_label": null,
+          "period_end": "2028-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.8"
+        },
+        {
+          "allowed_authorities": [
+            "selected_broker",
+            "historical_inference"
+          ],
+          "definition_signature_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "has_historical_value": true,
+          "label": "Share buybacks",
+          "material": true,
+          "node_id": "public.8.fy3",
+          "parent_label": null,
+          "period_end": "2029-12-31",
+          "section": "cash_flow",
+          "source_line_id": "public.8"
+        }
+      ],
+      "reporting_currency": "USD",
+      "run_id": "public_broker_layout_corpus_20260812",
+      "schema_version": "pre-broker-model-demand/1.0",
+      "units": "millions"
+    },
+    "reporting_currency": "USD",
+    "units": "millions"
+  },
+  "run_id": "public_broker_layout_corpus_20260812",
+  "schema_version": "broker-extraction-request/1.0"
+}

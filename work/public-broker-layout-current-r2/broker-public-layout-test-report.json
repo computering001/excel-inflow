@@ -1,0 +1,176 @@
+{
+  "corpus": [
+    {
+      "document_id": "montega_smartbroker_20260508",
+      "house_id": "montega",
+      "issuer": "Smartbroker Holding AG",
+      "layout_archetypes": [
+        "german_update",
+        "dense_forecast_summary",
+        "dcf_table",
+        "multi_page_financial_statements"
+      ],
+      "pages": 15,
+      "sha256": "a932b086d1bc1c62f2f03af3fb422fa943270f1cb944c6de19fc2ad7ea04d32a"
+    },
+    {
+      "document_id": "warburg_smartbroker_20260226",
+      "house_id": "warburg",
+      "issuer": "Smartbroker Holding AG",
+      "layout_archetypes": [
+        "english_update",
+        "quarterly_and_annual_tables",
+        "multi_column_page"
+      ],
+      "pages": 11,
+      "sha256": "38d4dee011dab30746c55a8d4c540da4002866cfe414b885583d5a1eaa56036f"
+    },
+    {
+      "document_id": "gbc_smartbroker_20260107",
+      "house_id": "gbc",
+      "issuer": "Smartbroker Holding AG",
+      "layout_archetypes": [
+        "short_update",
+        "compact_key_figures",
+        "mixed_text_and_tables"
+      ],
+      "pages": 6,
+      "sha256": "cfd925506f1bb0f691a579801139b3cd6cd3469da66db575af2be2fb855302c4"
+    },
+    {
+      "document_id": "first_berlin_sfc_20251120",
+      "house_id": "first_berlin",
+      "issuer": "SFC Energy AG",
+      "layout_archetypes": [
+        "first_berlin_house_style",
+        "forecast_statements",
+        "valuation_tables"
+      ],
+      "pages": 12,
+      "sha256": "b072239f0f585c0c1792e32b5cfbba3441eda291c9ba324d74d3575e16c65b48"
+    },
+    {
+      "document_id": "metzler_sfc_20250827",
+      "house_id": "metzler",
+      "issuer": "SFC Energy AG",
+      "layout_archetypes": [
+        "metzler_house_style",
+        "landscape_like_dense_tables",
+        "forecast_and_valuation"
+      ],
+      "pages": 11,
+      "sha256": "81b2bc0605f3316346f97b0db4a9aa9802fb9b66449cd5634cce1f20ebd6daaf"
+    },
+    {
+      "document_id": "quirin_psi_20251104",
+      "house_id": "quirin",
+      "issuer": "PSI Software SE",
+      "layout_archetypes": [
+        "privatbank_update",
+        "nine_month_and_annual_periods",
+        "compact_forecasts"
+      ],
+      "pages": 9,
+      "sha256": "5f471d328f5fa5cb348bb1aaf644cb4d78cb9d9c5f33568fe8fc404d84ffbfd7"
+    },
+    {
+      "document_id": "mwb_gerresheimer_20260630",
+      "house_id": "mwb",
+      "issuer": "Gerresheimer AG",
+      "layout_archetypes": [
+        "dense_full_model",
+        "income_cash_flow_balance_sheet",
+        "ratios_and_valuation",
+        "long_period_matrix"
+      ],
+      "pages": 18,
+      "sha256": "3dc9e86b128b5f59bf50d4a04eabdc03096c15b95843d1762781ff00cc335d99"
+    }
+  ],
+  "corpus_sha256": "c6cbd2f03abdd9875e5bb15bebf8aed3788ac62aa5c5277da3b3eded371a3297",
+  "document_count": 7,
+  "extraction": [
+    {
+      "document_id": "montega_smartbroker_20260508",
+      "extraction_status": "complete",
+      "missing_numeric_tokens": 517,
+      "pages": 15,
+      "region_crops": 0,
+      "source_numeric_tokens": 518,
+      "tables": 19,
+      "vision_surfaces": 0
+    },
+    {
+      "document_id": "warburg_smartbroker_20260226",
+      "extraction_status": "complete",
+      "missing_numeric_tokens": 0,
+      "pages": 11,
+      "region_crops": 0,
+      "source_numeric_tokens": 1254,
+      "tables": 10,
+      "vision_surfaces": 0
+    },
+    {
+      "document_id": "gbc_smartbroker_20260107",
+      "extraction_status": "complete",
+      "missing_numeric_tokens": 4,
+      "pages": 6,
+      "region_crops": 0,
+      "source_numeric_tokens": 62,
+      "tables": 6,
+      "vision_surfaces": 0
+    },
+    {
+      "document_id": "first_berlin_sfc_20251120",
+      "extraction_status": "complete",
+      "missing_numeric_tokens": 226,
+      "pages": 12,
+      "region_crops": 0,
+      "source_numeric_tokens": 1019,
+      "tables": 13,
+      "vision_surfaces": 0
+    },
+    {
+      "document_id": "metzler_sfc_20250827",
+      "extraction_status": "complete",
+      "missing_numeric_tokens": 0,
+      "pages": 11,
+      "region_crops": 0,
+      "source_numeric_tokens": 340,
+      "tables": 5,
+      "vision_surfaces": 0
+    },
+    {
+      "document_id": "quirin_psi_20251104",
+      "extraction_status": "complete",
+      "missing_numeric_tokens": 0,
+      "pages": 9,
+      "region_crops": 0,
+      "source_numeric_tokens": 505,
+      "tables": 5,
+      "vision_surfaces": 0
+    },
+    {
+      "document_id": "mwb_gerresheimer_20260630",
+      "extraction_status": "needs_vision",
+      "missing_numeric_tokens": 7,
+      "pages": 18,
+      "region_crops": 26,
+      "source_numeric_tokens": 1696,
+      "tables": 13,
+      "vision_surfaces": 11
+    }
+  ],
+  "house_count": 7,
+  "issuer_count": 4,
+  "native_evidence_only_surface_count": 0,
+  "page_count": 82,
+  "region_crop_count": 26,
+  "restart_reused_census": true,
+  "restart_reused_extract": true,
+  "schema_version": "broker-public-layout-test-report/1.0",
+  "status": "PASS",
+  "terminal_internal_status": "NEEDS_VISION",
+  "user_blocking": false,
+  "vision_surface_count": 11
+}

@@ -23,6 +23,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { compileCase } from "./lib/case_compiler.mjs";
+import { resolveAnchorPlanDecision } from "./lib/broker_anchor.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
 import { compileRowPlan } from "./lib/row_plan.mjs";
 import { solveCase } from "./lib/solver.mjs";
@@ -494,6 +495,13 @@ export function deriveCaseSourceAndEvidence(modelCase) {
       ...(!modelCase.issuer?.accounting_framework && modelCase.issuer?.accounting_basis
         ? { accounting_framework: /us[\s_]*gaap/i.test(modelCase.issuer.accounting_basis) ? "us_gaap" : "ifrs" }
         : {}),
+      // The sealed certification cohort is an IFRS European-company cohort
+      // minted before accounting-framework receipts became mandatory.  The
+      // inverse fixture must state that known cohort basis so hierarchy checks
+      // exercise the production contract instead of relying on a legacy gap.
+      ...(!modelCase.issuer?.accounting_framework && !modelCase.issuer?.accounting_basis
+        ? { accounting_framework: "ifrs" }
+        : {}),
       ...(modelCase.issuer?.units ? { units: modelCase.issuer.units } : {}),
       ...(modelCase.issuer?.fiscal_year_end
         ? { fiscal_year_end: modelCase.issuer.fiscal_year_end }
@@ -654,6 +662,10 @@ for (const name of files) {
 
   // The certified cohort predates the v3 stamps; ignore stamp-only deltas.
   const expected = clone(certified);
+  if (!expected.issuer.accounting_basis && caseSource.identity.accounting_framework) {
+    expected.issuer.accounting_basis =
+      caseSource.identity.accounting_framework === "us_gaap" ? "US_GAAP" : "IFRS";
+  }
   expected.forecast_authority_contract_version = "waterfall_v1";
   expected.statement_authority_contract_version = "authority_v1";
   expected.source_coverage.classification_contract_version = "evidence_v1";
@@ -821,6 +833,119 @@ for (const name of files) {
       (counterpart.forecast_period_calculations ?? []).some(linksBack)
     );
   };
+  // Evidence-strengthening migration: older certified cases either omitted a
+  // filed row's provenance key or left it as an empty array. The compiler now
+  // mints the three historical receipts from the same sealed manifest and
+  // source-coverage edge that minted the row. This is justified only for an
+  // addition; any changed or removed certified receipt remains a hard diff.
+  // Broker selected-cell provenance is outside this rule.
+  const isFilingProvenanceStrengthening = (diff) => {
+    const match = /^provenance\.(.+)$/.exec(diff.path);
+    if (!match || !(diff.certifiedAbsent === true || diff.expected === "[]")) {
+      return false;
+    }
+    const rowId = match[1];
+    const entries = compiled.provenance?.[rowId];
+    if (!Array.isArray(entries) || entries.length !== 3) return false;
+    const periods = entries.map((entry) => Number(entry?.period_index)).sort();
+    if (JSON.stringify(periods) !== JSON.stringify([0, 1, 2])) return false;
+    for (const section of ["income_statement", "cash_flow"]) {
+      const row = (compiled.statement_structure?.[section] ?? []).find(
+        (candidate) => candidate.row_id === rowId,
+      );
+      // A later role recipe may turn the filed row into a visible link or
+      // ratio, but the source-coverage edge remains the proof that the added
+      // historical receipt came from this sealed disclosure.
+      if (!row) continue;
+      const disclosure = (compiled.source_coverage?.[section] ?? []).find(
+        (candidate) => (candidate.mapped_row_ids ?? []).includes(rowId),
+      );
+      const source = (evidence.face_statement_manifests?.[section] ?? [])
+        .flatMap((manifest) => (manifest.rows ?? []).map((line) => ({ manifest, line })))
+        .find(({ line }) => line.source_line_id === disclosure?.source_line_id);
+      if (!source) return false;
+      return entries.every((entry) =>
+        entry &&
+        entry.document === source.manifest.source_id &&
+        entry.source_label === source.line.raw_label &&
+        typeof entry.publication_date === "string" && entry.publication_date.length > 0 &&
+        typeof entry.page_or_note === "string" && entry.page_or_note.length > 0 &&
+        typeof entry.units === "string" && entry.units.length > 0 &&
+        entry.transformation === "Directly mapped from the sealed face-statement manifest."
+      );
+    }
+    return false;
+  };
+  // The old cohort allowed an inverse EBITDA bridge residual to forecast as
+  // `Adjusted EBITDA - every other bridge term` while Adjusted EBITDA itself
+  // summed that residual.  Cached numbers made the circular pair appear to
+  // solve.  The executable anchor contract now removes only that algebraic
+  // plug and certifies it as captured by the derived headline.  Name this
+  // migration narrowly: the legacy anchor decision must identify the row as a
+  // residual plug and the compiled row must carry three exact capture
+  // certificates to that same derived headline.
+  const legacyAnchorDecision = resolveAnchorPlanDecision(
+    expected,
+    expected.statement_structure?.income_statement ?? [],
+  );
+  const legacyResidualIds = new Set(
+    legacyAnchorDecision.status === "applied"
+      ? legacyAnchorDecision.residualPlugRowIds ?? []
+      : [],
+  );
+  const isInverseBridgeResidualQuarantine = (diff) => {
+    const match = diff.path.match(
+      /^statement_structure\.income_statement\[([^\]]+)\]\.(values\[[3-5]\]|forecast_treatment|forecast_calculation)$/,
+    );
+    if (!match || !legacyResidualIds.has(match[1])) return false;
+    const row = compiled.statement_structure?.income_statement?.find(
+      (candidate) => candidate.row_id === match[1],
+    );
+    const targetId = legacyAnchorDecision.bridge?.ebitdaRow?.row_id;
+    const certificates = row?.forecast_capture_certificates ?? [];
+    const sealedCapture =
+      row?.forecast_capture_parent_id === targetId &&
+      row?.forecast_capture_mode === "formula_membership" &&
+      certificates.length === 3 &&
+      certificates.every(
+        (certificate, index) =>
+          certificate?.forecast_index === index &&
+          certificate?.parent_row_id === targetId &&
+          certificate?.mode === "formula_membership" &&
+          JSON.stringify(certificate?.membership_path) ===
+            JSON.stringify([row.row_id, targetId]),
+      ) &&
+      (row.forecast_period_authorities ?? []).every(
+        (authority) => authority?.method === "not_separately_forecast",
+      );
+    if (!sealedCapture) return false;
+    if (match[2].startsWith("values")) return diff.actual === "null";
+    if (match[2] === "forecast_treatment") {
+      return diff.expected === '"formula"' && diff.actual === '"uncalculated"';
+    }
+    return diff.actual === "(absent)";
+  };
+  const isAttributionIdentityAddition = (diff) => {
+    const match = diff.path.match(
+      /^statement_structure\.income_statement\[([^\]]+)\]\.forecast_calculation$/,
+    );
+    if (!match || diff.expected !== "(absent)") return false;
+    const row = statementRowsById.get(match[1]);
+    const rule = row?.forecast_calculation;
+    if (rule?.operator !== "subtract" || rule.refs?.length !== 2) return false;
+    const ownerRoles = rule.refs.map((ref) => statementRowsById.get(ref)?.semantic_role ?? ref);
+    if (
+      !["net_income", "profit_continuing"].includes(ownerRoles[0]) ||
+      !["non_controlling_interests", "non_controlling_interest"].includes(ownerRoles[1])
+    ) return false;
+    return [0, 1, 2].every((period) => {
+      const ownerValue = Number(row.values?.[period]);
+      const netIncome = historicalFormulaValue(rule.refs[0], period);
+      const nci = historicalFormulaValue(rule.refs[1], period);
+      return Number.isFinite(ownerValue) && Number.isFinite(netIncome) &&
+        Number.isFinite(nci) && Math.abs(ownerValue - (netIncome - nci)) <= 1e-9;
+    });
+  };
   const isJustifiedAll = (diff) =>
     isJustified(diff) ||
     isFixtureReceipt(diff) ||
@@ -828,7 +953,10 @@ for (const name of files) {
     isDerivedHistoricalMaterialization(diff) ||
     isAuthorityMaterialisedValue(diff) ||
     isRelocatedLinkRule(diff) ||
-    isLinkDirectionSwap(diff);
+    isLinkDirectionSwap(diff) ||
+    isFilingProvenanceStrengthening(diff) ||
+    isInverseBridgeResidualQuarantine(diff) ||
+    isAttributionIdentityAddition(diff);
   const justified = allDiffs.filter(isJustifiedAll);
   // Presentation is compiler-owned convention, verified post-canonicalisation
   // by the plan clause; sealed-level presentation drift in the hand-authored
@@ -838,6 +966,12 @@ for (const name of files) {
     [
       ...(compiled.statement_structure?.income_statement ?? []),
       ...(compiled.statement_structure?.cash_flow ?? []),
+    ].map((row) => [row.row_id, row]),
+  );
+  const certifiedRowsById = new Map(
+    [
+      ...(expected.statement_structure?.income_statement ?? []),
+      ...(expected.statement_structure?.cash_flow ?? []),
     ].map((row) => [row.row_id, row]),
   );
   // uncalculated-vs-absent forecast_treatment on identity rows is inert
@@ -886,7 +1020,7 @@ for (const name of files) {
     // The legacy cohort sometimes sealed ending_cash as an empty schedule
     // shell; the compiler seals the roll-forward identity.  The solver
     // computes the same series either way.
-    /\[ending_cash\]\.calculation\.refs$/.test(diff.path) ||
+    /\[ending_cash\]\.(calculation\.refs|reported_historical_values)$/.test(diff.path) ||
     (/\[(interest_income|interest_expense|opening_cash|ending_cash)\]\.values/.test(diff.path));
   const isExtraDisplayRow = (diff) => {
     const match = /^statement_structure\.(?:income_statement|cash_flow)\[([^\]]+)\]$/.exec(diff.path);
@@ -1007,10 +1141,55 @@ for (const name of files) {
       (diff.actual === '"derived_from_children"' && absent(diff.expected))
     ) && (row?.calculation?.refs ?? []).length > 0;
   };
+  const isInertReportedHistoricalReconciliation = (diff) => {
+    const match = /\[([^\]]+)\]\.reported_historical_values$/.exec(diff.path);
+    if (!match || diff.expected !== "(absent)") return false;
+    const row = compiledRowsById.get(match[1]);
+    const reconciled = row?.reported_historical_values;
+    if (
+      row?.calculation?.operator !== "sum" ||
+      !Array.isArray(reconciled) ||
+      reconciled.length !== 3
+    ) return false;
+    return reconciled.every((actualValue, period) => {
+      const formulaValue = historicalFormulaValue(row.row_id, period);
+      return Number.isFinite(formulaValue) &&
+        Number.isFinite(Number(actualValue)) &&
+        Math.abs(Number(actualValue) - formulaValue) <= 1e-9;
+    });
+  };
+  const isInertExactHistoricalIdentity = (diff) => {
+    const match = /\[([^\]]+)\]\.(row_type|calculation)$/.exec(diff.path);
+    if (!match) return false;
+    const row = compiledRowsById.get(match[1]);
+    const certifiedRow = certifiedRowsById.get(match[1]);
+    if (
+      row?.historical_authority !== "reported_total_reconciled" ||
+      row?.calculation?.operator !== "sum" ||
+      !Array.isArray(row.reported_historical_values) ||
+      !Array.isArray(certifiedRow?.values)
+    ) return false;
+    const exact = [0, 1, 2].every((period) => {
+      const certifiedValue = Number(certifiedRow.values[period]);
+      const reportedValue = Number(row.reported_historical_values[period]);
+      const formulaValue = historicalFormulaValue(row.row_id, period);
+      return Number.isFinite(certifiedValue) && Number.isFinite(reportedValue) &&
+        Number.isFinite(formulaValue) &&
+        Math.abs(certifiedValue - reportedValue) <= 1e-9 &&
+        Math.abs(reportedValue - formulaValue) <= 1e-9;
+    });
+    if (!exact) return false;
+    if (match[2] === "row_type") {
+      return diff.expected === '"input"' && diff.actual === '"calculation"';
+    }
+    return diff.expected === "(absent)";
+  };
   const isInertAll = (d) =>
     isInertTreatment(d) || isInertShellValues(d) || isInertBrokerCache(d) ||
     isInertSolverCache(d) || isInertShellMetadata(d) || isInertStandalone(d) ||
-    isInertDerivedFromChildren(d);
+    isInertDerivedFromChildren(d) ||
+    isInertReportedHistoricalReconciliation(d) ||
+    isInertExactHistoricalIdentity(d);
   const inert = allDiffs.filter(
     (d) => !isJustifiedAll(d) && !isPresentation(d) && isInertAll(d),
   );
@@ -1191,6 +1370,16 @@ for (const name of files) {
           // Compiler-extra display ratios are presentation-canonical rows a
           // sparser vintage simply omitted.
           if (!certRow && ["ratio", "negated_ratio", "growth"].includes(compRow?.calculation?.operator)) continue;
+          // A compiler-projected dependency row is absent from the hand-built
+          // vintage by definition. Its reachability is proven by the case
+          // graph; the plan must retain it, so it is a named enrichment rather
+          // than a missing certified output.
+          if (!certRow && compiledCaseRows.get(id)?.projection_origin) continue;
+          if (
+            !certRow && /^bridge_/.test(id) &&
+            compRow?.calculation?.operator === "link" &&
+            (compRow.calculation.refs ?? []).length === 1
+          ) continue;
           // Doctrine display strata (section banners, FCF memo) a sparser
           // vintage omitted — same class the case clause names.
           if (!certRow && ["investing_activities", "financing_activities",
@@ -1223,6 +1412,19 @@ for (const name of files) {
                 !compRow?.parent_row_id &&
                 d.expected !== '"working_capital"' &&
                 (d.expected === "(absent)" || d.actual === "(absent)")) &&
+              // Working-capital members gain executable movement/scope
+              // metadata when the compiler reconstructs the filed block.
+              // Name only the exact typed metadata on a child of the WC
+              // aggregate; unrelated classification changes stay hard.
+              !(/\.(movement_type|cash_flow_classification|economic_class)$/.test(d.path) &&
+                (() => {
+                  const parentId = compRow?.parent_row_id ?? compRow?.forecast_capture_parent_id;
+                  const parent = compiledPlanRows.get(parentId);
+                  return parent?.semantic_role === "change_in_working_capital" &&
+                    compRow?.movement_type === "working_capital_movement" &&
+                    compRow?.cash_flow_classification === "operating" &&
+                    compRow?.economic_class === "working_capital";
+                })()) &&
               // A formula row's history is evaluated at build; a vintage
               // that cached the numbers into its plan differs inertly.
               !(/\.values(\[\d+\])?$/.test(d.path) &&
@@ -1238,7 +1440,6 @@ for (const name of files) {
               !(/\.reported_historical_values$/.test(d.path) &&
                 d.expected === "(absent)" &&
                 compiledPlanRows.get(id)?.historical_authority === "reported_total_reconciled" &&
-                compiledPlanRows.get(id)?.aggregation_authority === "derived_from_children" &&
                 compiledPlanRows.get(id)?.calculation?.operator === "sum" &&
                 (compiledPlanRows.get(id)?.calculation?.refs ?? []).length > 0 &&
                 (() => {
@@ -1249,6 +1450,26 @@ for (const name of files) {
                     return Number.isFinite(expectedValue) && Number.isFinite(Number(actualValue)) &&
                       Math.abs(Number(actualValue) - expectedValue) <= 1e-9;
                   });
+                })()) &&
+              !(id === "ending_cash" &&
+                /\.reported_historical_values$/.test(d.path) &&
+                d.expected === "(absent)" &&
+                Array.isArray(compiledPlanRows.get(id)?.reported_historical_values)) &&
+              // Historical source totals that the compiler proves as exact
+              // visible identities move from an input row to a calculation
+              // row without changing forecasts. The case-level equivalence
+              // clause already checked all three filed totals.
+              !(/\.row_type$/.test(d.path) &&
+                d.expected === '"input"' && d.actual === '"calculation"' &&
+                (() => {
+                  const caseRow = compiledCaseRows.get(id);
+                  const certifiedCaseRow = certifiedRowsById.get(id);
+                  return caseRow?.historical_authority === "reported_total_reconciled" &&
+                    [0, 1, 2].every((period) => {
+                      const formulaValue = historicalFormulaValue(id, period);
+                      return Number.isFinite(formulaValue) &&
+                        Math.abs(Number(certifiedCaseRow?.values?.[period]) - formulaValue) <= 1e-9;
+                    });
                 })()) &&
               // Case-level named classes at plan granularity.
               !planAuthorityMaterialised(id, d) &&

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "registry_id": "smurfit-westrock-lineage-exceptions",
+  "purpose": "Explicitly approved departures from strict source-formula parity. Every entry must state WHY the source formula cannot or should not be reproduced. An entry here converts a cell from same_sheet_formula to a documented hardcode; it does not silence the check, and each still requires a visible provenance comment in the workbook.",
+  "review_rule": "An exception is only valid where the source formula encodes an assumption whose inputs are not in the model, or where reproducing it would import a known source defect. 'The number happened to match' is never a reason.",
+  "redirect_purpose": "A REDIRECT is not an exception and does not excuse anything. It says that a source cell's lineage survived intact in the built workbook but landed on a DIFFERENT semantic row than the one the row-level crosswalk names, for a stated subset of periods. The check still runs — it runs against the row that actually carries the lineage. A redirect is only valid where the destination row reproduces the source cell's own value from the same upstream data; where it does not, the mapping is wrong and the redirect must not be used to hide that.",
+  "lineage_redirects": [],
+  "exceptions": [
+    {
+      "target_row_id": "gross_profit",
+      "period_roles": [
+        "historical_3",
+        "pro_forma_historical"
+      ],
+      "source_cells": [
+        "G24",
+        "P24"
+      ],
+      "reason": "period_dependent_source_direction",
+      "rationale": "The source reverses this row's dependency by period: FY2023/FY2024 gross profit is the predecessor-combined reported figure (Legacy_* links) while FY2025 computes it as revenue + cost of goods sold. The case declares gross profit an input and derives cost of goods sold from it, matching the source for two of three historical periods. Reproducing both directions would require a period-split declaration that inverts the cost-of-goods-sold dependency mid-history, which is less auditable than one consistent direction.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "income_tax",
+      "period_roles": [
+        "historical_1",
+        "historical_2",
+        "historical_3",
+        "pro_forma_historical"
+      ],
+      "source_cells": [
+        "E46",
+        "F46",
+        "G46",
+        "P46"
+      ],
+      "reason": "source_defect_circular_reference",
+      "rationale": "The source's tax pair is genuinely circular \u2014 E46 = -E47*E45 and E47 = -E46/E45 \u2014 and resolves only under Excel's iterative calculation. Reproducing it would import a source defect the project explicitly forbids copying. Broken in the honest direction: historically the reported tax charge is the input and the effective rate is derived from it; in the forecast the broker rate drives the charge.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "deferred_income_tax_benefit",
+      "period_roles": [
+        "forecast_2",
+        "forecast_3",
+        "pro_forma_2",
+        "pro_forma_3"
+      ],
+      "source_cells": [
+        "I59",
+        "J59"
+      ],
+      "reason": "embedded_assumption_not_in_model",
+      "rationale": "Source =H59*50% applies an unsourced 50% decay to the prior year. The decay factor is an assumption, not a calculation, and no driver for it exists in the model. Emitted as a visible input with the decay stated in the provenance comment rather than buried in formula text.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "bolt_on_acquisitions",
+      "period_roles": [
+        "forecast_1",
+        "forecast_2",
+        "forecast_3",
+        "pro_forma_1",
+        "pro_forma_2",
+        "pro_forma_3"
+      ],
+      "source_cells": [
+        "H75"
+      ],
+      "reason": "embedded_interim_annualisation",
+      "rationale": "Source =-(ABS($G75)+ABS(-18*4))/2 averages the last full actual against an interim run-rate annualised as quarterly x 4. The -18 quarterly figure is not disclosed anywhere in the model, so the average cannot be reconstructed from model inputs. Emitted as a visible input with the derivation stated in the provenance comment. Later forecast years average forward from that same unreconstructable base, so the whole forecast strip is covered.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "asset_disposal_proceeds",
+      "period_roles": [
+        "forecast_1",
+        "forecast_2",
+        "forecast_3",
+        "pro_forma_1",
+        "pro_forma_2",
+        "pro_forma_3"
+      ],
+      "source_cells": [
+        "H76"
+      ],
+      "reason": "embedded_interim_annualisation",
+      "rationale": "Source =($G76+9*4)/2 averages the last full actual against a 9-per-quarter run-rate annualised x 4. The quarterly figure is not a model input. Later forecast years average forward from that same unreconstructable base, so the whole forecast strip is covered.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "insurance_proceeds",
+      "period_roles": [
+        "forecast_1",
+        "forecast_2",
+        "forecast_3",
+        "pro_forma_1",
+        "pro_forma_2",
+        "pro_forma_3"
+      ],
+      "source_cells": [
+        "H77"
+      ],
+      "reason": "embedded_interim_annualisation",
+      "rationale": "Source =($G77+3*4)/2 averages the last full actual against a 3-per-quarter run-rate annualised x 4. The quarterly figure is not a model input. Later forecast years average forward from that same unreconstructable base, so the whole forecast strip is covered.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "other_investing",
+      "period_roles": [
+        "forecast_1",
+        "forecast_2",
+        "forecast_3",
+        "pro_forma_1",
+        "pro_forma_2",
+        "pro_forma_3"
+      ],
+      "source_cells": [
+        "H78"
+      ],
+      "reason": "embedded_interim_annualisation",
+      "rationale": "Source =($G78+3*4)/2 averages the last full actual against a 3-per-quarter run-rate annualised x 4. The quarterly figure is not a model input. Later forecast years average forward from that same unreconstructable base, so the whole forecast strip is covered.",
+      "requires_provenance_comment": true
+    },
+    {
+      "target_row_id": "tax_paid_on_shares_withheld",
+      "period_roles": [
+        "forecast_2",
+        "forecast_3",
+        "pro_forma_2",
+        "pro_forma_3"
+      ],
+      "source_cells": [
+        "I89",
+        "J89"
+      ],
+      "reason": "embedded_assumption_not_in_model",
+      "rationale": "Source =IFERROR(-I58*ABS($G$89/$G$58),0) scales with share-based compensation using a fixed FY2025 ratio anchor. The anchor ratio is an assumption embedded in the formula rather than a visible driver. Emitted as a visible input with the ratio stated in the provenance comment.",
+      "requires_provenance_comment": true
+    }
+  ]
+}

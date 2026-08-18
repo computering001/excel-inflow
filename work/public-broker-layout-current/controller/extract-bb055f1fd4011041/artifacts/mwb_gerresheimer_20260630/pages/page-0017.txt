@@ -1,0 +1,78 @@
+mwb research AG
+Page 17 of 18
+
+
+Important disclosures
+
+
+1. General Information/Liabilities This research report has been produced for the    The decision on the choice of the financial instruments analyzed in this
+information purposes of institutional investors only, and is not in any way a    document was solely made by mwb research AG. The opinions and estimates in
+personal recommendation, offer or solicitation to buy or sell the financial     this research report are subject to change without notice.  It is within the
+instruments mentioned herein. The document  is confidential and  is made     discretion of mwb research AG whether and when it publishes an update to this
+available by mwb research AG, exclusively to selected recipients [in DE, GB, FR,    research report, but in general updates are created on a regular basis, after 6
+CH, US, UK, Scandinavia, and Benelux or, in individual cases, also in other    months at the  latest. A  sensitivity analysis  is included and published  in
+countries]. A distribution to private investors in the sense of the German    company’s initial studies.
+Securities Trading Act (WpHG) is excluded. It is not allowed to pass the research
+report on to persons other than the intended recipient without the permission of     5. Date and time of first publication of this financial analysis
+mwb research AG. Reproduction of this document, in whole or in part, is not    30-Jun-26 12:11:34
+permitted without prior permission mwb research AG. All rights reserved. Under
+no circumstances shall mwb research AG, any of its employees involved in the     6. Risk information
+preparation, have any  liability for possible errors or incompleteness of the     •    Stock exchange investments and investments in companies (shares) are
+information included in this research report – neither in relation to indirect or         always speculative and involve the risk of total loss.
+direct nor consequential damages. Liability for damages arising either directly or    •    This is particularly true in respect of investments in companies which are
+as a consequence of the use of information, opinions and estimates is also          not established and/or small and have no established business or
+excluded. Past performance of a financial instrument is not necessarily indicative          corporate assets.
+of future performance.                                                            •    Share prices may fluctuate significantly. This is particularly true for shares
+                                                                                      with low liquidity (market breadth). Even small orders can have a significant
+2. Responsibilities This research report was prepared by the research analyst         impact on the share price.
+named on the front page (the ʺProducerʺ). The Producer is solely responsible for    •     In the case of shares in narrow markets, it may also happen that there is no
+the views and estimates expressed in this report. The report has been prepared          or very little actual trading there and that published prices are not based on
+independently. The content of the research report was not influenced by the          actual trading but have only been provided by a stockbroker.
+issuer of the analyzed financial instrument at any time. It may be possible that    •     In such markets a shareholder cannot expect to find a buyer for his shares
+parts of the research report were handed out to the issuer for information           at all and/or at reasonable prices. In such narrow markets there is a very
+purposes prior to the publication without any major amendments                        high possibility of manipulating prices and in such markets there are often
+being made thereafter.                                                               considerable price fluctuations.
+                                                                                  •    An investment in shares with low liquidity and low market capitalization is
+3. Organizational Requirements mwb research AG took internal organizational          therefore highly speculative and represents a very high risk.
+and regulative precautions to avoid or accordingly disclose possible conflicts of     •    There is no regulated market for unlisted shares and securities and a sale
+interest in connection with the preparation and distribution of the research report.            is not possible or only possible on an individual basis.
+All members of mwb research AG involved in the preparation of the research
+report are subject to internal compliance regulations. No part of the Producer’s     7. Major Sources of Information Part of the information required for this research
+compensation is directly or indirectly related to the preparation of this financial     report was made available by the issuer of the financial instrument. Furthermore,
+analysis. In case a research analyst or a closely related person is confronted with     this report  is based on publicly available sources (such as, for example,
+a conflict of interest, the research analyst is restricted from covering this    Bloomberg, Reuters, VWD-Trader and the relevant daily press) believed to be
+company.                                                                                     reliable. mwb research AG has checked the information for plausibility but not for
+                                                                           accuracy or completeness.
+4. Information Concerning the Methods of Valuation/Update The determination
+of the fair value per share, i.e. the price target, and the resultant rating is done on     8. Competent Supervisory Authority mwb research AG are under supervision of
+the basis of the adjusted free cash flow (adj. FCF) method and on the basis of    the BaFin – German Federal Financial Supervisory Authority (Bundesanstalt für
+the discounted cash flow – DCF model. Furthermore, a peer group comparison     Finanzdienstleistungsaufsicht), Graurheindorfer Straße 108, 53117 Bonn and
+is made. The adj. FCF method is based on the assumption that investors    Marie-Curie-Straße 24 – 28, 60439 Frankfurt a.M. This document is distributed in
+purchase assets only at a price (enterprise value) at which the operating cash    the UK under a MiFID EEA branch passport and in compliance with the applicable
+flow return after taxes on this investment exceeds their opportunity costs in the   FCA requirements.
+form of a hurdle rate. The operating cash flow is calculated as EBITDA less
+maintenance capex and taxes. Within the framework of the DCF approach, the     9. Specific Comments for Recipients Outside of Germany This research report
+future free cash flows are calculated initially on the basis of a fictitious capital     is subject to the law of the Federal Republic of Germany. The distribution of this
+structure of 100% equity, i.e. interest and repayments on debt capital are not    information to other states in particular to the USA, Canada, Australia and Japan
+factored in initially. The adjustment towards the actual capital structure is done   may be restricted or prohibited by the laws applicable within this state.
+by discounting the calculated free cash flows with the weighted average cost of
+capital (WACC), which takes into account both the cost of equity capital and the    10. Miscellaneous According to Article 4(1) No.  i of the delegated regulation
+cost of debt. After discounting, the calculated total enterprise value is reduced    2016/958 supplementing regulation 596/2014 of the European Parliament,
+by the interest-bearing debt capital in order to arrive at the equity value. Detailed     further information regarding investment recommendations of the  last 12
+information on the valuation principles and methods used and the underlying    months are published free of charge under https:// www.mwb.-research.com.
+assumptions can be found at https://www.mwb.-research.com.
+
+mwb research AG uses the following three-step rating system for the analyzed
+companies:
+
+•    Speculative (Spec.) BUY: Sustainable upside potential of more than 25%
+      within 12 months, above average risk
+
+•    BUY: Sustainable upside potential of more than 10% within 12 months
+
+•    SELL: Sustainable downside potential of more than 10% within 12 months.
+
+•    HOLD: Upside/downside potential is limited. No immediate catalyst visible.
+
+NB: The ratings of mwb research AG are not based on a performance that is
+expected to be “relative“ to the market.

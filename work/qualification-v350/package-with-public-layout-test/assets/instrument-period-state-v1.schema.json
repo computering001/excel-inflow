@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/instrument-period-state-v1.schema.json",
+  "title": "Excel Inflow instrument-period state v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "reporting_currency",
+    "forecast_period_ids",
+    "states",
+    "definition_basis_graph"
+  ],
+  "properties": {
+    "schema_version": { "const": "instrument-period-state/1.0" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "forecast_period_ids": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "states": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/state" }
+    },
+    "definition_basis_graph": { "$ref": "#/$defs/definitionBasisGraph" }
+  },
+  "$defs": {
+    "amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis_amount", "reporting_amount", "translation_rate"],
+      "properties": {
+        "basis_amount": { "type": "number" },
+        "reporting_amount": { "type": "number" },
+        "translation_rate": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "inclusionFlags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gross_debt",
+        "net_debt",
+        "leverage",
+        "liquidity",
+        "mandatory_repayment",
+        "interest"
+      ],
+      "properties": {
+        "gross_debt": { "type": "boolean" },
+        "net_debt": { "type": "boolean" },
+        "leverage": { "type": "boolean" },
+        "liquidity": { "type": "boolean" },
+        "mandatory_repayment": { "type": "boolean" },
+        "interest": { "type": "boolean" }
+      }
+    },
+    "translation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "basis_currency", "opening_rate", "flow_rate", "closing_rate"],
+      "properties": {
+        "method": {
+          "enum": [
+            "native_principal_to_reporting",
+            "reporting_currency_carrying_value_no_translation",
+            "reporting_currency_no_translation"
+          ]
+        },
+        "basis_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "opening_rate": { "type": "number", "exclusiveMinimum": 0 },
+        "flow_rate": { "type": "number", "exclusiveMinimum": 0 },
+        "closing_rate": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_id",
+        "instrument_id",
+        "period_id",
+        "period_index",
+        "class",
+        "family",
+        "currency",
+        "balance_basis",
+        "opening",
+        "issuance",
+        "fair_value_movement",
+        "other_non_cash_movement",
+        "pik_accretion",
+        "scheduled_amortisation",
+        "maturity_repayment",
+        "ending_pre_repayment",
+        "ending_post_repayment",
+        "average_interest_balance",
+        "active_fraction",
+        "repayment_state",
+        "pricing_state",
+        "inclusion",
+        "translation"
+      ],
+      "properties": {
+        "state_id": { "type": "string", "minLength": 3 },
+        "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "period_id": { "type": "string", "format": "date" },
+        "period_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "class": {
+          "enum": [
+            "fixed_bond",
+            "floating_loan",
+            "commercial_paper",
+            "securitisation",
+            "rcf",
+            "other_debt",
+            "lease_liability"
+          ]
+        },
+        "family": {
+          "enum": [
+            "bond",
+            "term_loan",
+            "commercial_paper",
+            "securitisation",
+            "revolving_credit_facility",
+            "other_debt",
+            "lease"
+          ]
+        },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "balance_basis": {
+          "enum": ["native_principal", "reporting_currency_carrying_value"]
+        },
+        "opening": { "$ref": "#/$defs/amount" },
+        "issuance": { "$ref": "#/$defs/amount" },
+        "fair_value_movement": { "$ref": "#/$defs/amount" },
+        "other_non_cash_movement": { "$ref": "#/$defs/amount" },
+        "pik_accretion": { "$ref": "#/$defs/amount" },
+        "scheduled_amortisation": { "$ref": "#/$defs/amount" },
+        "maturity_repayment": { "$ref": "#/$defs/amount" },
+        "ending_pre_repayment": { "$ref": "#/$defs/amount" },
+        "ending_post_repayment": { "$ref": "#/$defs/amount" },
+        "average_interest_balance": { "$ref": "#/$defs/amount" },
+        "active_fraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "repayment_state": {
+          "enum": [
+            "none",
+            "scheduled",
+            "maturity",
+            "scheduled_and_maturity",
+            "discretionary_rcf",
+            "lease_principal"
+          ]
+        },
+        "pricing_state": {
+          "enum": [
+            "priced_cash",
+            "priced_pik",
+            "priced_cash_and_pik",
+            "residual_interest_plug",
+            "not_interest_bearing"
+          ]
+        },
+        "inclusion": { "$ref": "#/$defs/inclusionFlags" },
+        "translation": { "$ref": "#/$defs/translation" }
+      }
+    },
+    "definitionNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "basis", "operation", "dependencies", "source_selector"],
+      "properties": {
+        "node_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
+        "basis": {
+          "enum": [
+            "model",
+            "model_lease_exclusive",
+            "model_lease_inclusive",
+            "company_reported",
+            "cash_eligibility",
+            "cash_liquidity",
+            "leverage"
+          ]
+        },
+        "operation": {
+          "enum": ["sum_states", "sum_cash_buckets", "sum_adjustments", "add", "subtract", "select"]
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" }
+        },
+        "source_selector": { "type": ["string", "null"] }
+      }
+    },
+    "definitionBasisGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graph_version", "reporting_currency", "reported_net_debt_basis_status", "nodes"],
+      "properties": {
+        "graph_version": { "const": "definition-basis-graph/1.0" },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "reported_net_debt_basis_status": {
+          "enum": ["proven_same", "reconciled_difference", "reported_unreconciled", "not_disclosed"]
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 14,
+          "maxItems": 14,
+          "items": { "$ref": "#/$defs/definitionNode" }
+        }
+      }
+    }
+  }
+}

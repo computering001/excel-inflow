@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-scoped-broker-concept-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "metric_id",
+    "section",
+    "definition",
+    "unit_kind",
+    "sign_convention",
+    "parent_row_id",
+    "placement_anchor",
+    "materiality",
+    "forecast_behavior",
+    "additive",
+    "double_count_proof",
+    "row_relation",
+    "review_status",
+    "contract_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "run-scoped-broker-concept/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "metric_id": { "type": "string", "pattern": "^run\\.[a-z0-9][a-z0-9_.-]*$" },
+    "section": { "enum": ["income_statement", "cash_flow"] },
+    "definition": { "type": "string", "minLength": 12 },
+    "unit_kind": { "enum": ["currency", "ratio", "percent_decimal"] },
+    "sign_convention": { "enum": ["positive", "negative", "source_signed"] },
+    "parent_row_id": { "type": "string", "minLength": 1 },
+    "placement_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation", "row_id"],
+      "properties": {
+        "relation": { "enum": ["before", "after", "child_of"] },
+        "row_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "materiality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["is_material", "basis", "threshold", "observed_value"],
+      "properties": {
+        "is_material": { "type": "boolean" },
+        "basis": { "enum": ["headline_anchor", "revenue", "absolute_currency"] },
+        "threshold": { "type": "number", "minimum": 0 },
+        "observed_value": { "type": "number" }
+      }
+    },
+    "forecast_behavior": {
+      "enum": ["independent_input", "driver", "carry_forward", "reference_only"]
+    },
+    "additive": { "type": "boolean" },
+    "double_count_proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "compared_metric_ids", "rationale"],
+      "properties": {
+        "status": { "const": "no_overlap" },
+        "compared_metric_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rationale": { "type": "string", "minLength": 12 }
+      }
+    },
+    "row_relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "row_id"],
+      "properties": {
+        "mode": { "enum": ["existing_company_row", "new_company_specific_row"] },
+        "row_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "review_status": { "const": "reviewed" },
+    "contract_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "adapter_metadata": {
+    "as_of": "2025-12-31",
+    "date_basis": "last_fiscal_year_end",
+    "entity_name": "Controlled Issuer",
+    "reporting_currency": "USD",
+    "system": "FactSet DCS",
+    "units": "millions"
+  },
+  "expected_sha256": "57f39fcd7bfebd8e1a64856773529b0a1fb0e6350610ff415b0a19b00e3e87aa",
+  "run_id": "dcs_controller_test",
+  "schema_version": "dcs-extraction-request/1.0",
+  "source_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/full-local-gate-v72/dcs-controller-fixed-point/structured.csv"
+}

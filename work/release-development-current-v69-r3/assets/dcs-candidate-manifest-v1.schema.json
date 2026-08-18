@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-candidate-manifest-v1.schema.json",
+  "title": "Immutable DCS row and cell candidate universe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_sha256", "source_tables_sha256", "rows", "cells", "counts"],
+  "properties": {
+    "schema_version": {"const": "dcs-candidate-manifest/1.0"},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_tables_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_id", "sheet_id", "row", "row_sha256", "cell_ids"],
+        "properties": {
+          "row_id": {"type": "string"},
+          "sheet_id": {"type": "string"},
+          "row": {"type": "integer", "minimum": 1},
+          "row_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "cell_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cell_id", "row_id", "address", "value_type", "cell_sha256"],
+        "properties": {
+          "cell_id": {"type": "string"},
+          "row_id": {"type": "string"},
+          "address": {"type": "string"},
+          "value_type": {"type": "string"},
+          "cell_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rows", "nonblank_cells"],
+      "properties": {
+        "rows": {"type": "integer", "minimum": 1},
+        "nonblank_cells": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+mwb research AG
+Page 2 of 18
+
+
+Gerresheimer AG
+
+Germany  | Health Care  | MCap EUR 950m  | EV EUR 3,054m
+
+SELL (SELL)                      Target price    EUR 12.50 (12.50)              MAIN AUTHOR
+                                    Current price    EUR 27.50                    Harald Hof
+                               Up/downside    -54.5%                      h.hof@mwb-research.com
+                                                                     +49 40 309 293-58
+
+
+
+FY25 figures confirm elevated equity and credit risk. SELL.
+
+FY 2025 released. Gerresheimer (GXI) has finally published its audited FY25 annual
+report  after months of delay. While the publication removes one element of
+uncertainty around the missing accounts, it does not resolve the core investment
+concerns. The reported numbers point to a materially weaker earnings profile than our
+prior FY25 estimates, while the BaFin review has not been closed but expanded to
+additional accounting areas. As a result, the equity story remains dominated by
+governance, accounting, refinancing and balance sheet risks.                                             Source: Company data, mwb research
+
+Sales broadly in line, earnings quality materially weaker. On a reported basis, FY25
+                                                                             High/low 52 weeks      52.00 / 14.83sales came in at EUR 2,321m, slightly above our estimate of EUR 2,309m. However,
+                                                                              Price/Book Ratio                 0.9xthe negative surprise was below the top  line. Reported EBIT was EUR -209m,
+materially below our EUR -125m estimate. Reported net loss reached EUR -319m
+                                                                                  Ticker / Symbolsversus our previous EUR -179m forecast, while reported EPS came in at EUR -9.27
+                                                                                     ISIN               DE000A0LD6E6compared with our EUR -5.08 estimate. In other words, sales delivery was not the
+                                                     WKN                    A0LD6Eissue, but earnings quality was. The P/L was burdened by higher depreciation,
+                                                                        Bloomberg                  GXI:GRamortization and impairments, elevated special charges, high financial expenses (due
+to Bormioli M&A) and a much lower tax benefit than expected. The fact that this
+                                                                     Changes in estimatesdeterioration occurred despite a broadly resilient revenue base suggests that the
+                                                                                                                             Sales     EBIT    EPS
+operating platform, asset base and balance sheet assumptions are under more
+                                                                                         2026E    old         2,333     158     1.12
+pressure than previously modeled.                                                   ∆           -0.5%   -37.4%    na%
+                                                                                         2027E    old         2,379     167     1.33
+BaFin review: Scope expanded, not closed. A key takeaway is the status of the BaFin          ∆          0.0%   -22.6%   -58.9%
+review. The review has not been completed. Instead, the scope has been expanded.    2028E    old         2,426     183     1.43
+In addition to the already known issues around revenue recognition, particularly bill-          ∆          0.0%     0.0%     0.0%
+and-hold arrangements, the review now also covers further areas such as lease
+liabilities, disclosures on useful lives of intangible assets and potential impairments   Key share data
+in Advanced Technologies. The 2025 half-year financial report is also subject to   Number of shares: (in m pcs)    34.54
+additional review, including risk reporting, impairments and bill-and-hold revenue   Book value per share: (in EUR)   31.30
+recognition. This means the regulatory risk has broadened rather than narrowed. For  Ø trading vol.: (12 months)    319,700
+investors, the critical question remains whether the ongoing review could lead to
+further adjustments and whether any such findings could create additional pressure   Major shareholders
+on covenants, confidence and valuation.                                                         - continued -    AOC Gecko SARL             10.6%
+ Gerresheimer AG        2023     2024     2025    2026E    2027E    2028E   NN Leven N.V.                18.9%
+ Sales                    1,990      1,991      2,321      2,321      2,379      2,426   JPMorgan Chase & Co          7.0%
+ Growth yoy               9.5%      0.0%     16.6%      0.0%      2.5%      2.0%    Free Float                    63.4%
+ EBITDA                 401      360      312      378      409      459
+ EBIT                   218      161       -209       99      129      183   Company description
+ Net profit                116       82       -320           -6       19       49    Gerresheimer is a pharmaceutical and
+ Net debt (net cash)        924      1,100      2,003      2,176      2,109      1,989    health  care  packaging  company.   It
+ Net debt/EBITDA           2.3x       3.1x       6.4x       5.7x       5.2x       4.3x    operates   through  two   segments:
+ EPS reported              3.48       2.38       -9.27       -0.16       0.55       1.43    Plastics  and  Devices,  and  Primary
+ DPS                      1.25       0.04       0.04       0.04       0.04       0.04    Packaging  Glass. The  Plastics  and
+ Dividend yield            4.5%      0.1%      0.1%      0.1%      0.1%      0.1%    Devices segment produces standard
+ Gross profit margin      27.7%     28.5%     18.3%     26.9%     27.6%     28.8%    and  customized  products  for  drug
+ EBITDA margin          20.1%     18.1%     13.5%     16.3%     17.2%     18.9%     delivery, such as insulin pens, inhalers,
+ EBIT margin            10.9%      8.1%      -9.0%      4.3%      5.4%      7.5%                                                                       and  prefillable syringes. The Primary
+ ROCE                   7.4%      5.3%      -5.6%      2.8%      3.7%      5.1%
+                                                                            Packaging Glass segment focuses on
+ EV/EBITDA                5.0x       6.0x       9.8x       8.6x       7.8x       6.7x
+                                                                                   the production of packaging of glass
+ EV/EBIT                   9.1x      13.4x      -14.6x      32.9x      24.7x      16.8x
+                                                                         such as jars, ampoules, injection vials. PER                       7.9x      11.5x       -3.0x    -171.2x      50.3x      19.2x
+ FCF yield               18.0%      8.8%     -14.0%     -10.6%     10.2%     13.7%
+ Source: Company data, mwb research

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-preview-confirmation-v1.schema.json",
+  "title": "Hash-bound Stage-2 broker primary-house confirmation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "preview_sha256",
+    "selected_house_id",
+    "confirmed"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-preview-confirmation/1.0" },
+    "preview_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "selected_house_id": { "type": "string", "minLength": 1 },
+    "confirmed": { "const": true }
+  }
+}

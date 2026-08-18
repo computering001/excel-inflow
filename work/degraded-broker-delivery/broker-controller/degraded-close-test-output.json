@@ -1,0 +1,21 @@
+{
+  "all_evidence_only": {
+    "broker_pack_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/all-evidence-only/compiled/broker-pack.json",
+    "crosswalk_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/all-evidence-only/crosswalk.json",
+    "crosswalk_receipt_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/all-evidence-only/compiled/broker-crosswalk-receipt.json",
+    "extraction_bundle_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/all-evidence-only/verified-bundle.json",
+    "semantic_report_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/all-evidence-only/semantic.json",
+    "source_tables_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/all-evidence-only/compiled/broker-source-tables.json"
+  },
+  "controller_state_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/broker-run-state.json",
+  "degraded_artifacts": {
+    "broker_pack_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-pack.json",
+    "crosswalk_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/crosswalk.json",
+    "crosswalk_receipt_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-crosswalk-receipt.json",
+    "extraction_bundle_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/verified-7a63b27a34a161eb-degraded.json",
+    "semantic_report_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/semantic-7a63b27a34a161eb-277e97ad4a9b.json",
+    "source_tables_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-source-tables.json"
+  },
+  "schema_version": "broker-degraded-close-test-output/1.0",
+  "status": "PASS"
+}

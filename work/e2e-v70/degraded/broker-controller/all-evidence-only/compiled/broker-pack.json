@@ -1,0 +1,552 @@
+{
+  "schema_version": "broker-pack/1.0",
+  "pack_kind": "broker_forecast_set",
+  "as_of": "2026-06-30",
+  "source_label": "5-house broker pack extracted and cell-crosswalked from hash-bound source documents",
+  "reporting_currency": "USD",
+  "units": "millions",
+  "forecast_periods": [
+    "2027-12-31",
+    "2028-12-31",
+    "2029-12-31"
+  ],
+  "metrics": {
+    "capex": {
+      "concept_id": "capex",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "capex",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.capex",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Capex",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "change_in_working_capital": {
+      "concept_id": "change_in_working_capital",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "change_in_working_capital",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.change_in_working_capital",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Change In Working Capital",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "depreciation_and_amortisation": {
+      "concept_id": "depreciation_and_amortisation",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "depreciation_and_amortisation",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.depreciation_and_amortisation",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Depreciation And Amortisation",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "dividends": {
+      "concept_id": "dividends",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "dividends",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.dividends",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Dividends",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "ebit": {
+      "concept_id": "ebit",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "ebit",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.ebit",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Ebit",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "effective_tax_rate": {
+      "concept_id": "effective_tax_rate",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "effective_tax_rate",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.effective_tax_rate",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Effective Tax Rate",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "revenue": {
+      "concept_id": "revenue",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "revenue",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.revenue",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Revenue",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    }
+  },
+  "flex_elections": [],
+  "election_gauge": [],
+  "houses": [
+    {
+      "house_id": "jpm",
+      "house_name": "J.P. Morgan",
+      "published_date": "2026-06-30",
+      "analyst": null,
+      "document": {
+        "file_name": "jpm.pdf",
+        "media_type": "application/pdf",
+        "text_extractable": true,
+        "extraction_method": "native",
+        "extraction_evidence_sha256": "608216080c5fd604de3985c56cb081c1203cbff1afeffea03cefba0069aadfa8",
+        "page_reference": "See broker-source-tables.json and broker-crosswalk-receipt.json"
+      },
+      "estimates": {
+        "capex": [
+          null,
+          null,
+          null
+        ],
+        "change_in_working_capital": [
+          null,
+          null,
+          null
+        ],
+        "depreciation_and_amortisation": [
+          null,
+          null,
+          null
+        ],
+        "dividends": [
+          null,
+          null,
+          null
+        ],
+        "ebit": [
+          null,
+          null,
+          null
+        ],
+        "effective_tax_rate": [
+          null,
+          null,
+          null
+        ],
+        "revenue": [
+          null,
+          null,
+          null
+        ]
+      },
+      "eligibility": "reference_only",
+      "verified_forecast_cell_count": 0,
+      "missing_primary_metrics": [
+        "capex",
+        "change_in_working_capital",
+        "depreciation_and_amortisation",
+        "dividends",
+        "ebit_or_adjusted_ebitda",
+        "effective_tax_rate",
+        "revenue"
+      ],
+      "digest": [],
+      "digest_coverage": {
+        "mapped_concepts": 0,
+        "dictionary_concepts": 63,
+        "grade_counts": {
+          "native": 0,
+          "dual_read": 0,
+          "adjudicated": 0,
+          "derived": 0
+        }
+      }
+    },
+    {
+      "house_id": "kepler",
+      "house_name": "Kepler Cheuvreux",
+      "published_date": "2026-06-30",
+      "analyst": null,
+      "document": {
+        "file_name": "kepler.pdf",
+        "media_type": "application/pdf",
+        "text_extractable": false,
+        "extraction_method": "verified_image_transcription",
+        "extraction_evidence_sha256": "608216080c5fd604de3985c56cb081c1203cbff1afeffea03cefba0069aadfa8",
+        "page_reference": "See broker-source-tables.json and broker-crosswalk-receipt.json"
+      },
+      "estimates": {
+        "capex": [
+          null,
+          null,
+          null
+        ],
+        "change_in_working_capital": [
+          null,
+          null,
+          null
+        ],
+        "depreciation_and_amortisation": [
+          null,
+          null,
+          null
+        ],
+        "dividends": [
+          null,
+          null,
+          null
+        ],
+        "ebit": [
+          null,
+          null,
+          null
+        ],
+        "effective_tax_rate": [
+          null,
+          null,
+          null
+        ],
+        "revenue": [
+          null,
+          null,
+          null
+        ]
+      },
+      "eligibility": "reference_only",
+      "verified_forecast_cell_count": 0,
+      "missing_primary_metrics": [
+        "capex",
+        "change_in_working_capital",
+        "depreciation_and_amortisation",
+        "dividends",
+        "ebit_or_adjusted_ebitda",
+        "effective_tax_rate",
+        "revenue"
+      ],
+      "digest": [],
+      "digest_coverage": {
+        "mapped_concepts": 0,
+        "dictionary_concepts": 63,
+        "grade_counts": {
+          "native": 0,
+          "dual_read": 0,
+          "adjudicated": 0,
+          "derived": 0
+        }
+      }
+    },
+    {
+      "house_id": "berenberg",
+      "house_name": "Berenberg",
+      "published_date": "2026-06-30",
+      "analyst": null,
+      "document": {
+        "file_name": "berenberg.pdf",
+        "media_type": "application/pdf",
+        "text_extractable": false,
+        "extraction_method": "evidence_only_quarantine",
+        "extraction_evidence_sha256": "608216080c5fd604de3985c56cb081c1203cbff1afeffea03cefba0069aadfa8",
+        "page_reference": "See broker-source-tables.json and broker-crosswalk-receipt.json"
+      },
+      "estimates": {
+        "capex": [
+          null,
+          null,
+          null
+        ],
+        "change_in_working_capital": [
+          null,
+          null,
+          null
+        ],
+        "depreciation_and_amortisation": [
+          null,
+          null,
+          null
+        ],
+        "dividends": [
+          null,
+          null,
+          null
+        ],
+        "ebit": [
+          null,
+          null,
+          null
+        ],
+        "effective_tax_rate": [
+          null,
+          null,
+          null
+        ],
+        "revenue": [
+          null,
+          null,
+          null
+        ]
+      },
+      "eligibility": "reference_only",
+      "verified_forecast_cell_count": 0,
+      "missing_primary_metrics": [
+        "capex",
+        "change_in_working_capital",
+        "depreciation_and_amortisation",
+        "dividends",
+        "ebit_or_adjusted_ebitda",
+        "effective_tax_rate",
+        "revenue"
+      ],
+      "digest": [],
+      "digest_coverage": {
+        "mapped_concepts": 0,
+        "dictionary_concepts": 63,
+        "grade_counts": {
+          "native": 0,
+          "dual_read": 0,
+          "adjudicated": 0,
+          "derived": 0
+        }
+      }
+    },
+    {
+      "house_id": "bnp",
+      "house_name": "BNP Paribas",
+      "published_date": "2026-06-30",
+      "analyst": null,
+      "document": {
+        "file_name": "bnp.pdf",
+        "media_type": "application/pdf",
+        "text_extractable": true,
+        "extraction_method": "native",
+        "extraction_evidence_sha256": "608216080c5fd604de3985c56cb081c1203cbff1afeffea03cefba0069aadfa8",
+        "page_reference": "See broker-source-tables.json and broker-crosswalk-receipt.json"
+      },
+      "estimates": {
+        "capex": [
+          null,
+          null,
+          null
+        ],
+        "change_in_working_capital": [
+          null,
+          null,
+          null
+        ],
+        "depreciation_and_amortisation": [
+          null,
+          null,
+          null
+        ],
+        "dividends": [
+          null,
+          null,
+          null
+        ],
+        "ebit": [
+          null,
+          null,
+          null
+        ],
+        "effective_tax_rate": [
+          null,
+          null,
+          null
+        ],
+        "revenue": [
+          null,
+          null,
+          null
+        ]
+      },
+      "eligibility": "reference_only",
+      "verified_forecast_cell_count": 0,
+      "missing_primary_metrics": [
+        "capex",
+        "change_in_working_capital",
+        "depreciation_and_amortisation",
+        "dividends",
+        "ebit_or_adjusted_ebitda",
+        "effective_tax_rate",
+        "revenue"
+      ],
+      "digest": [],
+      "digest_coverage": {
+        "mapped_concepts": 0,
+        "dictionary_concepts": 63,
+        "grade_counts": {
+          "native": 0,
+          "dual_read": 0,
+          "adjudicated": 0,
+          "derived": 0
+        }
+      }
+    },
+    {
+      "house_id": "jefferies",
+      "house_name": "Jefferies",
+      "published_date": "2026-06-30",
+      "analyst": null,
+      "document": {
+        "file_name": "jefferies.pdf",
+        "media_type": "application/pdf",
+        "text_extractable": true,
+        "extraction_method": "native",
+        "extraction_evidence_sha256": "608216080c5fd604de3985c56cb081c1203cbff1afeffea03cefba0069aadfa8",
+        "page_reference": "See broker-source-tables.json and broker-crosswalk-receipt.json"
+      },
+      "estimates": {
+        "capex": [
+          null,
+          null,
+          null
+        ],
+        "change_in_working_capital": [
+          null,
+          null,
+          null
+        ],
+        "depreciation_and_amortisation": [
+          null,
+          null,
+          null
+        ],
+        "dividends": [
+          null,
+          null,
+          null
+        ],
+        "ebit": [
+          null,
+          null,
+          null
+        ],
+        "effective_tax_rate": [
+          null,
+          null,
+          null
+        ],
+        "revenue": [
+          null,
+          null,
+          null
+        ]
+      },
+      "eligibility": "reference_only",
+      "verified_forecast_cell_count": 0,
+      "missing_primary_metrics": [
+        "capex",
+        "change_in_working_capital",
+        "depreciation_and_amortisation",
+        "dividends",
+        "ebit_or_adjusted_ebitda",
+        "effective_tax_rate",
+        "revenue"
+      ],
+      "digest": [],
+      "digest_coverage": {
+        "mapped_concepts": 0,
+        "dictionary_concepts": 63,
+        "grade_counts": {
+          "native": 0,
+          "dual_read": 0,
+          "adjudicated": 0,
+          "derived": 0
+        }
+      }
+    }
+  ],
+  "recommended_primary_house_id": null,
+  "eligibility_summary": {
+    "primary_eligible_house_count": 0,
+    "supplemental_eligible_house_count": 0,
+    "reference_only_house_count": 5,
+    "run_can_continue_without_broker_question": true
+  }
+}

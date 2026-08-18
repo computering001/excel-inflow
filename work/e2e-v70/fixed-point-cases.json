@@ -1,0 +1,8 @@
+{
+  "schema_version": "fixed-point-case-manifest/1.0",
+  "cases": [
+    "degraded/forecast-waterfall-model-case.json",
+    "../release-smoke-cases-current/compiled-standard-maximal-v2.json",
+    "../equivalence-debug/compiled/compiled-astrazeneca-v2.json"
+  ]
+}

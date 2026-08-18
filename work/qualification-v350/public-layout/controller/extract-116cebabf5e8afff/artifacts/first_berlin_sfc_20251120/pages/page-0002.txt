@@ -1,0 +1,63 @@
+20 November 2025                                                                                SFC Energy AG
+
+
+
+Q3 significantly weaker y/y Revenue retreated 15% y/y to €29.1m due to weaker demand
+in both segments. The gross profit dove 29% to €10.2m, and the gross margin retreated by
+almost 7 PP to 35.2%, suppressed by negative exchange rate effects, tariffs, and a worse
+product mix. Adjusted EBIT declined 91% to €0.4m, burdened by higher IT costs (new ERP
+software) and higher capitalised R&D costs. Higher interest and tax expenses led to a net
+loss of €-1.5m.
+
+Figure 1: Reported figures versus forecasts
+ All figures in €m               Q3-25A    Q3-25E      Delta     Q3-24A      Delta     9M/25A    9M/24A      Delta
+ Sales                               29.1        32.7      -11%        34.3      -15%       102.7       105.2      -2%
+ Gross profit                         10.2        11.6      -12%        14.4      -29%        41.5        43.9       -6%
+ margin                        35.2%     35.4%                42.0%                40.4%     41.8%
+ EBITDA                               2.3          2.2      3%         4.8       -53%         6.8         15.5      -56%
+ margin                        7.8%      6.7%                14.1%                6.7%      15.3%
+ Adjusted EBITDA                      2.3          2.2      4%         5.7       -60%        10.8        18.2      -41%
+ margin                        7.8%      6.7%                16.6%                10.5%     17.3%
+ EBIT                                  0.4          0.3      21%         3.3       -89%         1.1         10.9      -90%
+ margin                        1.2%      0.9%                 9.5%                 1.0%      11.0%
+ Adjusted EBIT                         0.4          0.3      26%         4.1       -91%         5.0         13.7      -63%
+ margin                        1.3%      0.9%                12.1%                4.9%      13.0%
+ Net income                             -1.5         0.0               -           2.3               -           -1.2         8.2               -
+ margin                          -5.1%      0.0%                 6.7%                  -1.2%      8.3%
+EPS (diluted, in €)                     -0.06        0.00              -          0.09              -          -0.06        0.43              -
+Source: First Berlin Equity Research, SFC Energy AG
+
+
+Both segments reported significantly weaker figures in Q3 The Clean Energy segment
+suffered from weaker than expected demand from new clients in the US and lower defence
+business. Segment revenue thus declined 12% y/y to €19.8m. The gross margin fell by 9 PP
+to 40% due to adverse exchange rates & tariffs and a worse product mix. Adjusted segment
+EBITDA retreated 58% y/y to €1.8m (see figure 2).
+
+Figure 2: Reported segment figures versus forecasts
+ All figures in €m               Q3-25A    Q3-25E      Delta     Q3-24A      Delta     9M-25A    9M-24A      Delta
+Clean Energy
+ Sales                               19.8        20.1       -1%        22.5      -12%        71.5        73.4       -3%
+ Gross profit                           7.9          7.7      3%         11.0      -28%        32.2        35.4       -9%
+ margin                        40.0%     38.3%                49.0%                45.1%     48.2%
+ Adjusted EBITDA                      1.8          0.5      260%        4.2       -58%         7.5         12.3      -39%
+ margin                        8.9%      2.5%                18.6%                10.5%     20.5%
+Clean Power Management
+ Sales                                 9.3         12.7      -26%        11.8      -21%        31.2        31.8       -2%
+ Gross profit                           2.3          3.9       -41%         3.4       -31%         9.3          8.6      8%
+ margin                        24.9%     30.8%                28.5%                29.7%     26.9%
+ Adjusted EBITDA                      0.5          1.7       -70%         1.5       -66%         3.3          3.2      3%
+ margin                        5.4%      13.4%                12.8%                10.5%     10.0%
+Group
+ Sales                               29.1        32.7      -11%        34.3      -15%       102.7       105.2      -2%
+ Gross profit                         10.2        11.6      -12%        14.4      -29%        41.5        43.9       -6%
+ margin                        35.1%     35.4%                41.9%                40.4%     41.8%
+ Adjusted EBITDA                      2.3          2.2      4%          5.7       -60%        10.8        18.2      -41%
+ margin                        7.8%      6.7%                16.6%                10.5%     17.3%
+Source: First Berlin Equity Research, SFC Energy AG
+
+
+
+
+
+                                                       Page 2/12

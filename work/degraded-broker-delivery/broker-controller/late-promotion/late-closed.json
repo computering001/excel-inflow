@@ -1,0 +1,210 @@
+{
+  "artifact_root": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/late-promotion/artifacts",
+  "canonical_findings": [
+    {
+      "document_id": "late",
+      "id": "broker_canonical.physical_capture_reconciliation_required",
+      "message": "Native token multiplicity requires a rendered recovery pass. Closed by a hash-bound late-promotion evidence-only quarantine.",
+      "model_linked": false,
+      "scope": "physical_capture",
+      "severity": "warning",
+      "surface_id": "late.p4"
+    }
+  ],
+  "created_at": "2026-08-14T00:00:00Z",
+  "documents": [
+    {
+      "artifacts": [
+        {
+          "artifact_id": "late-census",
+          "kind": "surface_census",
+          "path": "late/p4.census.json",
+          "sha256": "a8cfb4424ef0d98d54781dc065d847bf0acbb9bf30eb6e62b4bc6eef972e92c7"
+        },
+        {
+          "artifact_id": "late-image",
+          "kind": "page_image",
+          "path": "late/page4.png",
+          "sha256": "cd706c185a0589c760074a298d5702a36e5fba5e8ed59c9baff3a322a7616d72"
+        },
+        {
+          "artifact_id": "late.census-final-late.p4.json",
+          "kind": "surface_census",
+          "path": "artifacts/late/census-final/late.p4.json",
+          "sha256": "458d23a75c1057ad52099ea8aeba2bc2179a93530c21a6fd5db18e338501cb05"
+        }
+      ],
+      "document_id": "late",
+      "extraction_status": "complete",
+      "file_name": "late.pdf",
+      "house_id": "late",
+      "house_name": "Late Promotion House",
+      "media_type": "application/pdf",
+      "numeric_ledger": {
+        "captured_tokens": [],
+        "duplicate_tokens": [],
+        "missing_tokens": [],
+        "recall": 1.0,
+        "source_tokens": []
+      },
+      "published_date": "2026-06-30",
+      "raw_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "source_id": "fixture.late",
+      "surfaces": [
+        {
+          "artifact_refs": [
+            "late-image",
+            "late.census-final-late.p4.json"
+          ],
+          "height": 792,
+          "image_count": 1,
+          "kind": "image_page",
+          "lane_status": {
+            "geometry": "pass",
+            "images": "pass",
+            "native_text": "empty",
+            "tables": "none",
+            "vision": "complete"
+          },
+          "native_text_chars": 0,
+          "native_word_count": 0,
+          "numeric_token_count": 0,
+          "ordinal": 4,
+          "source_table_numeric_tokens": [],
+          "surface_census_artifact_id": "late.census-final-late.p4.json",
+          "surface_id": "late.p4",
+          "table_count": 0,
+          "table_discovery_lanes": [
+            {
+              "candidate_count": 0,
+              "lane_id": "image_render",
+              "status": "empty"
+            }
+          ],
+          "uncovered_numeric_regions": [
+            {
+              "bbox": [
+                10,
+                10,
+                300,
+                180
+              ],
+              "disposition": "quarantined_evidence_only",
+              "material": true,
+              "region_id": "late.p4.r1"
+            }
+          ],
+          "whole_surface_numeric_token_count": 0,
+          "width": 612,
+          "vision_disposition": "quarantined_evidence_only",
+          "quarantine": {
+            "model_use": "prohibited",
+            "reason_id": "late_promoted_non_model_linked_without_task",
+            "scope": "surface",
+            "closure_basis": "late_promotion_non_model_linked",
+            "task_artifact_status": "late_promotion_absent",
+            "page_image_sha256": "cd706c185a0589c760074a298d5702a36e5fba5e8ed59c9baff3a322a7616d72",
+            "finding_ids": [
+              "broker_canonical.physical_capture_reconciliation_required"
+            ],
+            "response_sha256s": [
+              "d95e94d8e67ae06b1ba614dc970cd6b284ef588c1c25c4863750660a81939b54",
+              "7d961a938ef1dbbad9f69d84789b4ff66da927ccdd99f0e0eba8c118de4989ec"
+            ]
+          },
+          "vision_reason": null,
+          "vision_conflict_summary": {
+            "conflict_count": 0,
+            "quarantined_conflict_count": 0,
+            "resolved_conflict_count": 0
+          }
+        }
+      ],
+      "tables": [],
+      "canonical_tables": [],
+      "physical_capture_receipts": [
+        {
+          "surface_id": "late.p4",
+          "status": "PASS_EVIDENCE_ONLY",
+          "verification_basis": "bounded_quarantine_after_exhaustion",
+          "physical_capture_complete": true,
+          "analytical_table_count": 0,
+          "source_table_numeric_token_count": 0,
+          "captured_numeric_token_count": 0,
+          "missing_native_tokens": [],
+          "unowned_native_tokens": [],
+          "model_linked_accuracy_status": "PENDING_SEMANTIC_CROSSWALK"
+        }
+      ]
+    }
+  ],
+  "extractor_version": "fixture/1.0",
+  "findings": [
+    {
+      "id": "broker_vision.surface_quarantined_after_bounded_recovery",
+      "severity": "warning",
+      "document_id": "late",
+      "surface_id": "late.p4",
+      "quarantine_reason_id": "late_promoted_non_model_linked_without_task",
+      "message": "Canonical reconciliation promoted this native-pass page only after extraction, so no extraction-time vision task exists. Every promotion finding is explicitly non-model-linked. The surface is preserved as evidence-only after bounded recovery was exhausted; no cell from it is model-eligible."
+    },
+    {
+      "id": "broker_canonical.surface_quarantined_evidence_only",
+      "severity": "warning",
+      "scope": "physical_capture",
+      "model_linked": false,
+      "document_id": "late",
+      "surface_id": "late.p4",
+      "message": "Bounded reconciliation was exhausted; the surface is preserved as evidence-only and contributes no model-eligible table."
+    }
+  ],
+  "gate_status": "PASS",
+  "run_id": "late-promotion-regression",
+  "schema_version": "broker-extraction-bundle/1.0",
+  "summary": {
+    "document_count": 1,
+    "surface_count": 1,
+    "table_count": 0,
+    "cell_count": 0,
+    "numeric_token_count": 0,
+    "native_numeric_recall": 1.0,
+    "unresolved_surface_count": 0,
+    "material_uncovered_region_count": 0,
+    "duplicate_cell_count": 0,
+    "vision_conflict_count": 0,
+    "quarantined_conflict_count": 0,
+    "quarantined_surface_count": 1,
+    "degraded": true
+  },
+  "canonical_tables_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "physical_capture_receipt": {
+    "schema_version": "broker-physical-capture-receipt/1.0",
+    "status": "PASS",
+    "surface_count": 1,
+    "complete_surface_count": 1,
+    "analytical_surface_count": 0,
+    "evidence_only_surface_count": 1,
+    "pending_surface_ids": [],
+    "model_linked_accuracy_status": "PENDING_SEMANTIC_CROSSWALK"
+  },
+  "candidate_manifest": {
+    "schema_version": "broker-candidate-manifest/1.0",
+    "manifest_version": "broker-candidate-manifest/1.0",
+    "run_id": "late-promotion-regression",
+    "source_bundle_sha256": "f7718761f1e96f7b53dbc653f22b858a09ddbce3d52ddd8d65638431f7bcb2ae",
+    "canonical_tables_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "candidates": [],
+    "findings": [],
+    "gate_status": "PASS",
+    "summary": {
+      "candidate_count": 0,
+      "numeric_candidate_count": 0,
+      "header_candidate_count": 0,
+      "unresolved_period_header_count": 0,
+      "quarantined_candidate_count": 0,
+      "finding_count": 0
+    },
+    "manifest_sha256": "0b1487f063a864f7fbbfac9d0a60aacfd4b4454abcfcc645200b4ba171dffc8a"
+  },
+  "vision_conflict_manifests": []
+}

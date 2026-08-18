@@ -1,0 +1,517 @@
+{
+  "artifact_sha256": {
+    "broker_crosswalk_receipt": "443c9ba1d6d96e530dd830d481264e07968d2673c235e16344c0b388e78bbfbf",
+    "broker_pack": "9c05d4a431d00a0a5a973d3817c184fbe20271c7ef901890b9f1e1bd09fa391e",
+    "broker_semantic_verification": "94e450650de284e760c7fd79061582f7171311be352e051e2ea2822bd796d6e7",
+    "broker_source_tables": "981333be4a6e4eacf276fcc1a6bbee46c78041277213ef9c0ea3eb597e4ca380",
+    "crosswalk": "277e97ad4a9b787961bb2b97f337a91f2b610adaf580adf01810f057da11c4e5",
+    "degraded_close_bundle": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+    "degraded_close_receipt": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+    "extraction_bundle": "11c997ea48b8405d4d1501fdfabc04d66c45cda281cad84aa024e054be2c7aae",
+    "semantic_report": "94e450650de284e760c7fd79061582f7171311be352e051e2ea2822bd796d6e7",
+    "source_tables": "981333be4a6e4eacf276fcc1a6bbee46c78041277213ef9c0ea3eb597e4ca380",
+    "surface_census": "b05058da59f2b3d2487dcf20a359928f855f46662e1aa6784e4d083cfc03aa2c",
+    "verified_bundle": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9"
+  },
+  "artifacts": {
+    "broker_crosswalk_receipt": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-crosswalk-receipt.json",
+    "broker_pack": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-pack.json",
+    "broker_semantic_verification": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-semantic-verification-report.json",
+    "broker_source_tables": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-source-tables.json",
+    "crosswalk": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/crosswalk.json",
+    "degraded_close_bundle": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/verified-7a63b27a34a161eb-degraded.json",
+    "degraded_close_receipt": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/broker-degraded-close-receipt.json",
+    "extraction_bundle": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/extract-7a63b27a34a161eb/broker-extraction-bundle.json",
+    "semantic_report": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/semantic-7a63b27a34a161eb-277e97ad4a9b.json",
+    "source_tables": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/compiled-7a63b27a34a161eb-277e97ad4a9b/broker-source-tables.json",
+    "surface_census": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/surface-census-7a63b27a34a161eb.json",
+    "verified_bundle": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/degraded-broker-delivery/broker-controller/controller/verified-7a63b27a34a161eb-degraded.json"
+  },
+  "attempts": {
+    "execution_response_sha256": [
+      "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c",
+      "277e97ad4a9b787961bb2b97f337a91f2b610adaf580adf01810f057da11c4e5"
+    ],
+    "task_execution_receipts": {
+      "broker-task-5cfb85b3dd9f48a8f11e4b02": [
+        "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c"
+      ],
+      "broker-task-f099dd2321b3d50917ed7f14": [
+        "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c"
+      ]
+    },
+    "vision_attempt_count": 1,
+    "vision_attempt_limit": 3,
+    "vision_response_sha256": [
+      "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c"
+    ]
+  },
+  "blocker_class": null,
+  "cache_key": "7a63b27a34a161eb7ad1d2461020a016b96bbb2a101def39e91a8b59826d2e53",
+  "checkpoints": [
+    {
+      "input_sha256": "7a63b27a34a161eb7ad1d2461020a016b96bbb2a101def39e91a8b59826d2e53",
+      "output_sha256": "11c997ea48b8405d4d1501fdfabc04d66c45cda281cad84aa024e054be2c7aae",
+      "reused": true,
+      "stage": "extract",
+      "status": "PASS"
+    },
+    {
+      "input_sha256": "a23dfa0f10e5fe0a0869d64c8f94580a7d387d72aaba75a9fb41080f6543bb66",
+      "output_sha256": "b05058da59f2b3d2487dcf20a359928f855f46662e1aa6784e4d083cfc03aa2c",
+      "reused": true,
+      "stage": "surface_census",
+      "status": "PASS"
+    },
+    {
+      "input_sha256": "42480b7f198a351b45a7546e8f4effbd3a48a6225c55e74aebcf9c616d319912",
+      "output_sha256": "65c0b71dbbc148a021da5754491333825eca9cd1203e9e08c1d220833a1c1e5d",
+      "reused": false,
+      "stage": "vision",
+      "status": "NEEDS_WORK"
+    },
+    {
+      "input_sha256": "c7b201a516c1b03ca2afd7546b8132fdedf6696e1dbeb3c23f96ee3055138852",
+      "output_sha256": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+      "reused": true,
+      "stage": "physical_degraded_close",
+      "status": "PASS"
+    },
+    {
+      "input_sha256": "5f064e57c5358f5c25368ef882c495cf49bebd082b43ff3d64884c5bc598b370",
+      "output_sha256": "94e450650de284e760c7fd79061582f7171311be352e051e2ea2822bd796d6e7",
+      "reused": false,
+      "stage": "semantic_verification",
+      "status": "PASS"
+    },
+    {
+      "input_sha256": "a03496c869b091e5b7e2dd289acf4ac70da046142cef5cf6741128041c3485cd",
+      "output_sha256": "9c05d4a431d00a0a5a973d3817c184fbe20271c7ef901890b9f1e1bd09fa391e",
+      "reused": false,
+      "stage": "pack_compilation",
+      "status": "PASS"
+    },
+    {
+      "input_sha256": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+      "output_sha256": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+      "reused": false,
+      "stage": "degraded_delivery_close",
+      "status": "PASS"
+    }
+  ],
+  "fixed_point": {
+    "checkpoint_reuse_required": true,
+    "monotonic_from_prior": true,
+    "passed_checkpoint_count": 6,
+    "progress_score": 19000000,
+    "progress_sha256": "084e10bec15a41c73080fe326a3812667b7d106ee21553db9a52bd5a1466a4f1",
+    "remaining_task_count": 0,
+    "schema_version": "broker-internal-fixed-point/1.0",
+    "stage": "pass",
+    "stage_ordinal": 0,
+    "status": "CLOSED",
+    "task_set_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "terminal_reasons": [],
+    "unchanged_retry_count": 0,
+    "unchanged_retry_limit": 3,
+    "work_graph": {
+      "cache_key": "7a63b27a34a161eb7ad1d2461020a016b96bbb2a101def39e91a8b59826d2e53",
+      "completed_node_ids": [
+        "broker-task-25ef8ed914afe3080d453444",
+        "broker-task-47da561462a8d91a867a4c96",
+        "broker-task-5cfb85b3dd9f48a8f11e4b02",
+        "broker-task-82e8d7b60637a1afe3eec8b7",
+        "broker-task-837d7349305f519fb0b57220",
+        "broker-task-e7e9460fbd95ecdc7efcedaa",
+        "broker-task-f099dd2321b3d50917ed7f14",
+        "broker-work-20de740d3c1fa9ab346ebe6e",
+        "broker-work-228a828afe39ba717c0df809",
+        "broker-work-23e7730612308f896e649c84",
+        "broker-work-455ccccaea89b77315f632cb",
+        "broker-work-a0a29bf9da613fd403ab84c8",
+        "broker-work-acca0867e9474d55686ec19e",
+        "broker-work-cb9b45e45357824a0edb3207",
+        "broker-work-df07bac565e8cba227050f51"
+      ],
+      "current_frontier_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "frontier_history_sha256": [
+        "97829c08428928c0b4830011458f6328871a6daed87fc1b0e159d5d50862e676",
+        "4c62a67f2261c06ca4836f8404445642be20c7d92b874b796ce69907223bd816",
+        "75f84eb7fc520df466af19cbaae7901c71f7595c9bfcee5bae38d6d38c9c8ae1",
+        "52983b1a7a304888e03493b9b3006c41745808197b173dd9828d05e5c2facfd0",
+        "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      ],
+      "graph_sha256": "084e10bec15a41c73080fe326a3812667b7d106ee21553db9a52bd5a1466a4f1",
+      "monotonic_from_prior": true,
+      "nodes": [
+        {
+          "document_id": "kepler",
+          "node_id": "broker-task-25ef8ed914afe3080d453444",
+          "node_kind": "task",
+          "surface_id": "kepler.p4",
+          "task_input_sha256": "25ef8ed914afe3080d453444c2fb4990624f6a98ea903af5620d680eae642702",
+          "task_kind": "independent_table_transcription"
+        },
+        {
+          "document_id": "berenberg",
+          "node_id": "broker-task-47da561462a8d91a867a4c96",
+          "node_kind": "task",
+          "surface_id": "berenberg.p4",
+          "task_input_sha256": "47da561462a8d91a867a4c962704840f5cf8e8261c95403cafa086f974f8e7c7",
+          "task_kind": "bounded_capture_adjudication"
+        },
+        {
+          "document_id": "kepler",
+          "node_id": "broker-task-5cfb85b3dd9f48a8f11e4b02",
+          "node_kind": "task",
+          "surface_id": "kepler.p4",
+          "task_input_sha256": "5cfb85b3dd9f48a8f11e4b020279766193e1db8dc1fd4c398ce0ab3ed6307b8c",
+          "task_kind": "independent_table_transcription"
+        },
+        {
+          "document_id": "berenberg",
+          "node_id": "broker-task-82e8d7b60637a1afe3eec8b7",
+          "node_kind": "task",
+          "surface_id": "berenberg.p4",
+          "task_input_sha256": "82e8d7b60637a1afe3eec8b785e6b758c773f7323286445d9fe9be36576f2526",
+          "task_kind": "independent_table_transcription"
+        },
+        {
+          "document_id": "kepler",
+          "node_id": "broker-task-837d7349305f519fb0b57220",
+          "node_kind": "task",
+          "surface_id": "kepler.p4",
+          "task_input_sha256": "837d7349305f519fb0b57220438f8c3914ff2af616ed05ae9c0a6ede7f63dc97",
+          "task_kind": "bounded_capture_adjudication"
+        },
+        {
+          "document_id": null,
+          "node_id": "broker-task-e7e9460fbd95ecdc7efcedaa",
+          "node_kind": "task",
+          "surface_id": null,
+          "task_input_sha256": "e7e9460fbd95ecdc7efcedaa341d2f4a0d30793140d70d691e4618f9ba7042c9",
+          "task_kind": "semantic_crosswalk_review"
+        },
+        {
+          "document_id": "berenberg",
+          "node_id": "broker-task-f099dd2321b3d50917ed7f14",
+          "node_kind": "task",
+          "surface_id": "berenberg.p4",
+          "task_input_sha256": "f099dd2321b3d50917ed7f1470b15f5df0bacafa4cb2343540fa3830a09b65cd",
+          "task_kind": "independent_table_transcription"
+        },
+        {
+          "input_sha256": "7a63b27a34a161eb7ad1d2461020a016b96bbb2a101def39e91a8b59826d2e53",
+          "node_id": "broker-work-20de740d3c1fa9ab346ebe6e",
+          "node_kind": "checkpoint",
+          "output_sha256": "11c997ea48b8405d4d1501fdfabc04d66c45cda281cad84aa024e054be2c7aae",
+          "stage": "extract",
+          "status": "PASS"
+        },
+        {
+          "input_sha256": "5f064e57c5358f5c25368ef882c495cf49bebd082b43ff3d64884c5bc598b370",
+          "node_id": "broker-work-228a828afe39ba717c0df809",
+          "node_kind": "checkpoint",
+          "output_sha256": "94e450650de284e760c7fd79061582f7171311be352e051e2ea2822bd796d6e7",
+          "stage": "semantic_verification",
+          "status": "PASS"
+        },
+        {
+          "node_id": "broker-work-23e7730612308f896e649c84",
+          "node_kind": "execution_receipt",
+          "receipt_sha256": "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c",
+          "task_id": "broker-task-f099dd2321b3d50917ed7f14"
+        },
+        {
+          "input_sha256": "a58a0265d2722399e2fcf18266f9a14b23e768ab74286f67f428bdb2fbb12bd1",
+          "node_id": "broker-work-29e8fead3b1124813c09432e",
+          "node_kind": "checkpoint",
+          "output_sha256": "4d95c70db602ea3bbd2c84c7339ceab65075a3df781728e25175b7322c51002f",
+          "stage": "vision",
+          "status": "NEEDS_WORK"
+        },
+        {
+          "input_sha256": "42480b7f198a351b45a7546e8f4effbd3a48a6225c55e74aebcf9c616d319912",
+          "node_id": "broker-work-2ea8cfdf7bbef3655bb46524",
+          "node_kind": "checkpoint",
+          "output_sha256": "65c0b71dbbc148a021da5754491333825eca9cd1203e9e08c1d220833a1c1e5d",
+          "stage": "vision",
+          "status": "NEEDS_WORK"
+        },
+        {
+          "input_sha256": "c7b201a516c1b03ca2afd7546b8132fdedf6696e1dbeb3c23f96ee3055138852",
+          "node_id": "broker-work-455ccccaea89b77315f632cb",
+          "node_kind": "checkpoint",
+          "output_sha256": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+          "stage": "physical_degraded_close",
+          "status": "PASS"
+        },
+        {
+          "input_sha256": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+          "node_id": "broker-work-58420d70a54b55d12f4c86e2",
+          "node_kind": "checkpoint",
+          "output_sha256": null,
+          "stage": "semantic_crosswalk",
+          "status": "NEEDS_WORK"
+        },
+        {
+          "input_sha256": "a23dfa0f10e5fe0a0869d64c8f94580a7d387d72aaba75a9fb41080f6543bb66",
+          "node_id": "broker-work-a0a29bf9da613fd403ab84c8",
+          "node_kind": "checkpoint",
+          "output_sha256": "b05058da59f2b3d2487dcf20a359928f855f46662e1aa6784e4d083cfc03aa2c",
+          "stage": "surface_census",
+          "status": "PASS"
+        },
+        {
+          "input_sha256": "a03496c869b091e5b7e2dd289acf4ac70da046142cef5cf6741128041c3485cd",
+          "node_id": "broker-work-acca0867e9474d55686ec19e",
+          "node_kind": "checkpoint",
+          "output_sha256": "9c05d4a431d00a0a5a973d3817c184fbe20271c7ef901890b9f1e1bd09fa391e",
+          "stage": "pack_compilation",
+          "status": "PASS"
+        },
+        {
+          "input_sha256": "11c997ea48b8405d4d1501fdfabc04d66c45cda281cad84aa024e054be2c7aae",
+          "node_id": "broker-work-b9006d36b7b64254c7898d46",
+          "node_kind": "checkpoint",
+          "output_sha256": null,
+          "stage": "vision",
+          "status": "NEEDS_WORK"
+        },
+        {
+          "input_sha256": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+          "node_id": "broker-work-cb9b45e45357824a0edb3207",
+          "node_kind": "checkpoint",
+          "output_sha256": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+          "stage": "degraded_delivery_close",
+          "status": "PASS"
+        },
+        {
+          "node_id": "broker-work-df07bac565e8cba227050f51",
+          "node_kind": "execution_receipt",
+          "receipt_sha256": "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c",
+          "task_id": "broker-task-5cfb85b3dd9f48a8f11e4b02"
+        }
+      ],
+      "open_task_ids": [],
+      "revision": 6,
+      "schema_version": "broker-work-graph/1.0",
+      "status": "CLOSED",
+      "violations": []
+    }
+  },
+  "pipeline_status": "PASS_DEGRADED",
+  "request_sha256": "94aeed0c151269e0e4f1df12b46ae4e7851945e134f2fab3651a49043b86a22e",
+  "run_id": "degraded_close_regression",
+  "runtime_closure_sha256": "1210c37c38392a2cae7d359ff97f14bdbe23fac1191e0cbd91854ed483078702",
+  "schema_version": "broker-run-state/1.0",
+  "source_sha256": {
+    "berenberg": "803fb60b5a24c1af9595b2a83e681d0761c0be56d5e59f70ec5d808b8193741c",
+    "bnp": "4ff34dcab929e69440f414562b457d899deaff28c2b666de23d14a026e5e513b",
+    "jefferies": "5c3092b7b0a5b84b52d9703b6e6d5632b2ba062230905b12b87fb66d2b06e8a8",
+    "jpm": "3d6060f23a84988c87934443d6195cb9fb176cef648891b6d0be281720ac0be3",
+    "kepler": "2bf37b795e8c2bd520f8c361650d2b2e9ec8a0af273c0d8bee91c163dee4fe58"
+  },
+  "summary": {
+    "cell_count": 36,
+    "continuation_status": "PRIMARY_AUTHORITY_AVAILABLE",
+    "degraded": true,
+    "document_count": 5,
+    "excluded_house_count": 0,
+    "model_demand_graph_sha256": null,
+    "primary_eligible_house_count": 0,
+    "quarantined_conflict_count": 2,
+    "quarantined_surface_count": 1,
+    "recommended_primary_house_id": null,
+    "supplemental_eligible_house_count": 0,
+    "surface_count": 5,
+    "table_count": 4
+  },
+  "tasks": [],
+  "user_blocking": false,
+  "work_graph": {
+    "cache_key": "7a63b27a34a161eb7ad1d2461020a016b96bbb2a101def39e91a8b59826d2e53",
+    "completed_node_ids": [
+      "broker-task-25ef8ed914afe3080d453444",
+      "broker-task-47da561462a8d91a867a4c96",
+      "broker-task-5cfb85b3dd9f48a8f11e4b02",
+      "broker-task-82e8d7b60637a1afe3eec8b7",
+      "broker-task-837d7349305f519fb0b57220",
+      "broker-task-e7e9460fbd95ecdc7efcedaa",
+      "broker-task-f099dd2321b3d50917ed7f14",
+      "broker-work-20de740d3c1fa9ab346ebe6e",
+      "broker-work-228a828afe39ba717c0df809",
+      "broker-work-23e7730612308f896e649c84",
+      "broker-work-455ccccaea89b77315f632cb",
+      "broker-work-a0a29bf9da613fd403ab84c8",
+      "broker-work-acca0867e9474d55686ec19e",
+      "broker-work-cb9b45e45357824a0edb3207",
+      "broker-work-df07bac565e8cba227050f51"
+    ],
+    "current_frontier_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+    "frontier_history_sha256": [
+      "97829c08428928c0b4830011458f6328871a6daed87fc1b0e159d5d50862e676",
+      "4c62a67f2261c06ca4836f8404445642be20c7d92b874b796ce69907223bd816",
+      "75f84eb7fc520df466af19cbaae7901c71f7595c9bfcee5bae38d6d38c9c8ae1",
+      "52983b1a7a304888e03493b9b3006c41745808197b173dd9828d05e5c2facfd0",
+      "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    ],
+    "graph_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "monotonic_from_prior": true,
+    "nodes": [
+      {
+        "document_id": "kepler",
+        "node_id": "broker-task-25ef8ed914afe3080d453444",
+        "node_kind": "task",
+        "surface_id": "kepler.p4",
+        "task_input_sha256": "25ef8ed914afe3080d453444c2fb4990624f6a98ea903af5620d680eae642702",
+        "task_kind": "independent_table_transcription"
+      },
+      {
+        "document_id": "berenberg",
+        "node_id": "broker-task-47da561462a8d91a867a4c96",
+        "node_kind": "task",
+        "surface_id": "berenberg.p4",
+        "task_input_sha256": "47da561462a8d91a867a4c962704840f5cf8e8261c95403cafa086f974f8e7c7",
+        "task_kind": "bounded_capture_adjudication"
+      },
+      {
+        "document_id": "kepler",
+        "node_id": "broker-task-5cfb85b3dd9f48a8f11e4b02",
+        "node_kind": "task",
+        "surface_id": "kepler.p4",
+        "task_input_sha256": "5cfb85b3dd9f48a8f11e4b020279766193e1db8dc1fd4c398ce0ab3ed6307b8c",
+        "task_kind": "independent_table_transcription"
+      },
+      {
+        "document_id": "berenberg",
+        "node_id": "broker-task-82e8d7b60637a1afe3eec8b7",
+        "node_kind": "task",
+        "surface_id": "berenberg.p4",
+        "task_input_sha256": "82e8d7b60637a1afe3eec8b785e6b758c773f7323286445d9fe9be36576f2526",
+        "task_kind": "independent_table_transcription"
+      },
+      {
+        "document_id": "kepler",
+        "node_id": "broker-task-837d7349305f519fb0b57220",
+        "node_kind": "task",
+        "surface_id": "kepler.p4",
+        "task_input_sha256": "837d7349305f519fb0b57220438f8c3914ff2af616ed05ae9c0a6ede7f63dc97",
+        "task_kind": "bounded_capture_adjudication"
+      },
+      {
+        "document_id": null,
+        "node_id": "broker-task-e7e9460fbd95ecdc7efcedaa",
+        "node_kind": "task",
+        "surface_id": null,
+        "task_input_sha256": "e7e9460fbd95ecdc7efcedaa341d2f4a0d30793140d70d691e4618f9ba7042c9",
+        "task_kind": "semantic_crosswalk_review"
+      },
+      {
+        "document_id": "berenberg",
+        "node_id": "broker-task-f099dd2321b3d50917ed7f14",
+        "node_kind": "task",
+        "surface_id": "berenberg.p4",
+        "task_input_sha256": "f099dd2321b3d50917ed7f1470b15f5df0bacafa4cb2343540fa3830a09b65cd",
+        "task_kind": "independent_table_transcription"
+      },
+      {
+        "input_sha256": "7a63b27a34a161eb7ad1d2461020a016b96bbb2a101def39e91a8b59826d2e53",
+        "node_id": "broker-work-20de740d3c1fa9ab346ebe6e",
+        "node_kind": "checkpoint",
+        "output_sha256": "11c997ea48b8405d4d1501fdfabc04d66c45cda281cad84aa024e054be2c7aae",
+        "stage": "extract",
+        "status": "PASS"
+      },
+      {
+        "input_sha256": "5f064e57c5358f5c25368ef882c495cf49bebd082b43ff3d64884c5bc598b370",
+        "node_id": "broker-work-228a828afe39ba717c0df809",
+        "node_kind": "checkpoint",
+        "output_sha256": "94e450650de284e760c7fd79061582f7171311be352e051e2ea2822bd796d6e7",
+        "stage": "semantic_verification",
+        "status": "PASS"
+      },
+      {
+        "node_id": "broker-work-23e7730612308f896e649c84",
+        "node_kind": "execution_receipt",
+        "receipt_sha256": "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c",
+        "task_id": "broker-task-f099dd2321b3d50917ed7f14"
+      },
+      {
+        "input_sha256": "a58a0265d2722399e2fcf18266f9a14b23e768ab74286f67f428bdb2fbb12bd1",
+        "node_id": "broker-work-29e8fead3b1124813c09432e",
+        "node_kind": "checkpoint",
+        "output_sha256": "4d95c70db602ea3bbd2c84c7339ceab65075a3df781728e25175b7322c51002f",
+        "stage": "vision",
+        "status": "NEEDS_WORK"
+      },
+      {
+        "input_sha256": "42480b7f198a351b45a7546e8f4effbd3a48a6225c55e74aebcf9c616d319912",
+        "node_id": "broker-work-2ea8cfdf7bbef3655bb46524",
+        "node_kind": "checkpoint",
+        "output_sha256": "65c0b71dbbc148a021da5754491333825eca9cd1203e9e08c1d220833a1c1e5d",
+        "stage": "vision",
+        "status": "NEEDS_WORK"
+      },
+      {
+        "input_sha256": "c7b201a516c1b03ca2afd7546b8132fdedf6696e1dbeb3c23f96ee3055138852",
+        "node_id": "broker-work-455ccccaea89b77315f632cb",
+        "node_kind": "checkpoint",
+        "output_sha256": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+        "stage": "physical_degraded_close",
+        "status": "PASS"
+      },
+      {
+        "input_sha256": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+        "node_id": "broker-work-58420d70a54b55d12f4c86e2",
+        "node_kind": "checkpoint",
+        "output_sha256": null,
+        "stage": "semantic_crosswalk",
+        "status": "NEEDS_WORK"
+      },
+      {
+        "input_sha256": "a23dfa0f10e5fe0a0869d64c8f94580a7d387d72aaba75a9fb41080f6543bb66",
+        "node_id": "broker-work-a0a29bf9da613fd403ab84c8",
+        "node_kind": "checkpoint",
+        "output_sha256": "b05058da59f2b3d2487dcf20a359928f855f46662e1aa6784e4d083cfc03aa2c",
+        "stage": "surface_census",
+        "status": "PASS"
+      },
+      {
+        "input_sha256": "a03496c869b091e5b7e2dd289acf4ac70da046142cef5cf6741128041c3485cd",
+        "node_id": "broker-work-acca0867e9474d55686ec19e",
+        "node_kind": "checkpoint",
+        "output_sha256": "9c05d4a431d00a0a5a973d3817c184fbe20271c7ef901890b9f1e1bd09fa391e",
+        "stage": "pack_compilation",
+        "status": "PASS"
+      },
+      {
+        "input_sha256": "11c997ea48b8405d4d1501fdfabc04d66c45cda281cad84aa024e054be2c7aae",
+        "node_id": "broker-work-b9006d36b7b64254c7898d46",
+        "node_kind": "checkpoint",
+        "output_sha256": null,
+        "stage": "vision",
+        "status": "NEEDS_WORK"
+      },
+      {
+        "input_sha256": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+        "node_id": "broker-work-cb9b45e45357824a0edb3207",
+        "node_kind": "checkpoint",
+        "output_sha256": "68a82feb1590bad6ff2b6b44116f5cba46394daacc528265fa4623d07bd34298",
+        "stage": "degraded_delivery_close",
+        "status": "PASS"
+      },
+      {
+        "node_id": "broker-work-df07bac565e8cba227050f51",
+        "node_kind": "execution_receipt",
+        "receipt_sha256": "8a9a33b7af17eca5fea1d700bb0c436a8afe1c2edbb73dbcc3d8a2a83670626c",
+        "task_id": "broker-task-5cfb85b3dd9f48a8f11e4b02"
+      }
+    ],
+    "open_task_ids": [],
+    "revision": 6,
+    "schema_version": "broker-work-graph/1.0",
+    "status": "CLOSED",
+    "violations": []
+  }
+}

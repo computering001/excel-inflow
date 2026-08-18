@@ -1,0 +1,4512 @@
+{
+  "schema_version": "evidence-run/1.0",
+  "run_id": "standard_net_cash_evidence_test",
+  "created_at": "2026-08-02T12:00:00Z",
+  "mode": "first_run",
+  "company_name": "Standard Net Cash Co",
+  "source_inventory": [
+    {
+      "source_id": "factset_export",
+      "kind": "user_factset_export",
+      "name": "factset-debt.xlsx",
+      "origin": "uploaded",
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "publication_date": null,
+      "as_of_date": "2025-12-31",
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "broker_1",
+      "kind": "user_broker_research",
+      "name": "a-2025-12-31.pdf",
+      "origin": "uploaded",
+      "media_type": "application/pdf",
+      "publication_date": "2025-12-31",
+      "as_of_date": null,
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "broker_2",
+      "kind": "user_broker_research",
+      "name": "b-2025-12-31.pdf",
+      "origin": "uploaded",
+      "media_type": "application/pdf",
+      "publication_date": "2025-12-31",
+      "as_of_date": null,
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "broker_3",
+      "kind": "user_broker_research",
+      "name": "c-2025-12-31.pdf",
+      "origin": "uploaded",
+      "media_type": "application/pdf",
+      "publication_date": "2025-12-31",
+      "as_of_date": null,
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "annual_report",
+      "kind": "company_annual_report",
+      "name": "FY25 annual report",
+      "origin": "retrieved",
+      "media_type": "application/pdf",
+      "publication_date": "2026-03-01",
+      "as_of_date": "2025-12-31",
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "broker-pack",
+      "kind": "user_broker_research",
+      "name": "Reference broker pack",
+      "origin": "generated",
+      "media_type": "application/json",
+      "publication_date": "2025-12-31",
+      "as_of_date": null,
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "policy.acquisitions_default",
+      "kind": "user_answer",
+      "name": "Reference acquisition policy",
+      "origin": "generated",
+      "media_type": "application/json",
+      "publication_date": null,
+      "as_of_date": null,
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "text_extractable": true,
+      "status": "used"
+    },
+    {
+      "source_id": "policy.fx_translation",
+      "kind": "user_answer",
+      "name": "Reference FX policy",
+      "origin": "generated",
+      "media_type": "application/json",
+      "publication_date": null,
+      "as_of_date": null,
+      "entity_name": "Standard Net Cash Co",
+      "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "text_extractable": true,
+      "status": "used"
+    }
+  ],
+  "retrieval_log": [
+    {
+      "fact_id": "latest_audited_filing",
+      "selected_source_id": "annual_report",
+      "precedence_rank": 1,
+      "reason": "Latest audited annual filing for the selected entity and period.",
+      "supersedes_source_ids": []
+    }
+  ],
+  "filings": {
+    "entity_name": "Standard Net Cash Co",
+    "reporting_currency": "USD",
+    "units": "millions",
+    "fiscal_calendar_kind": "fixed_date",
+    "historical_periods": [
+      "2023-12-31",
+      "2024-12-31",
+      "2025-12-31"
+    ],
+    "forecast_periods": [
+      "2026-12-31",
+      "2027-12-31",
+      "2028-12-31"
+    ],
+    "reported_gross_debt": 80,
+    "reported_cash": 400,
+    "reported_gross_interest": null,
+    "reported_lease_liability": null,
+    "fiscal_label": "FY25",
+    "maximum_residual_percentage": 0.01,
+    "restricted_cash": null,
+    "leverage_basis": "includes_leases",
+    "minimum_operating_cash": 100,
+    "announced_acquisition": null,
+    "face_statement_manifests": {
+      "income_statement": [
+        {
+          "schema_version": "face-statement-manifest/1.0",
+          "statement": "income_statement",
+          "statement_order": 1,
+          "source_id": "annual_report",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "page_or_note": "face statement",
+          "periods": [
+            "2023-12-31",
+            "2024-12-31",
+            "2025-12-31"
+          ],
+          "complete_face_statement": true,
+          "row_count": 14,
+          "rows": [
+            {
+              "source_line_id": "is.revenue",
+              "raw_label": "Revenue",
+              "values": [
+                1000,
+                1000,
+                1000
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+              "material": true,
+              "ordinal": 1
+            },
+            {
+              "source_line_id": "is.revenue_growth",
+              "raw_label": "Revenue growth %",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"revenue_growth\"",
+              "material": true,
+              "ordinal": 2
+            },
+            {
+              "source_line_id": "is.adjusted_ebitda",
+              "raw_label": "Adjusted EBITDA",
+              "values": [
+                200,
+                200,
+                200
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+              "material": true,
+              "parent_source_line_id": "is.ebit",
+              "ordinal": 3
+            },
+            {
+              "source_line_id": "is.adjusted_ebitda_margin",
+              "raw_label": "Adjusted EBITDA margin",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_margin\"",
+              "material": true,
+              "ordinal": 4
+            },
+            {
+              "source_line_id": "is.is_da_expense",
+              "raw_label": "Depreciation and amortisation",
+              "values": [
+                -50,
+                -50,
+                -50
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+              "material": true,
+              "parent_source_line_id": "is.ebit",
+              "ordinal": 5
+            },
+            {
+              "source_line_id": "is.ebit",
+              "raw_label": "EBIT",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 6
+            },
+            {
+              "source_line_id": "is.operating_profit",
+              "raw_label": "Operating profit",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+              "material": true,
+              "parent_source_line_id": "is.pre_tax_income",
+              "ordinal": 7
+            },
+            {
+              "source_line_id": "is.interest_income",
+              "raw_label": "Finance income",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+              "material": true,
+              "parent_source_line_id": "is.pre_tax_income",
+              "ordinal": 8
+            },
+            {
+              "source_line_id": "is.interest_expense",
+              "raw_label": "Finance costs",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+              "material": true,
+              "parent_source_line_id": "is.pre_tax_income",
+              "ordinal": 9
+            },
+            {
+              "source_line_id": "is.pre_tax_income",
+              "raw_label": "Profit before taxation",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+              "material": true,
+              "parent_source_line_id": "is.net_income",
+              "is_subtotal": true,
+              "ordinal": 10
+            },
+            {
+              "source_line_id": "is.effective_tax_rate",
+              "raw_label": "Effective tax rate",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"effective_tax_rate\"",
+              "material": true,
+              "ordinal": 11
+            },
+            {
+              "source_line_id": "is.tax_expense",
+              "raw_label": "Income taxes",
+              "values": [
+                -31,
+                -31,
+                -31
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+              "material": true,
+              "parent_source_line_id": "is.net_income",
+              "ordinal": 12
+            },
+            {
+              "source_line_id": "is.net_income",
+              "raw_label": "Profit after taxation",
+              "values": [
+                119,
+                119,
+                119
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 13
+            },
+            {
+              "source_line_id": "is.adjusted_ebitda_reconciliation",
+              "raw_label": "Adjusted EBITDA reconciliation",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+              "material": true,
+              "ordinal": 14
+            }
+          ],
+          "rows_sha256": "6b746ac3cbe81a57e22f33fe2a3c48aa2d4a2c86aa8f21b93ca3b4d2a0a00efb"
+        }
+      ],
+      "cash_flow": [
+        {
+          "schema_version": "face-statement-manifest/1.0",
+          "statement": "cash_flow",
+          "statement_order": 1,
+          "source_id": "annual_report",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "page_or_note": "face statement",
+          "periods": [
+            "2023-12-31",
+            "2024-12-31",
+            "2025-12-31"
+          ],
+          "complete_face_statement": true,
+          "row_count": 28,
+          "rows": [
+            {
+              "source_line_id": "cf.cash_flow_net_income",
+              "raw_label": "Profit after taxation",
+              "values": [
+                119,
+                119,
+                119
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_flow_profit_before_tax",
+              "ordinal": 1
+            },
+            {
+              "source_line_id": "cf.cash_flow_tax_addback",
+              "raw_label": "Income tax charge",
+              "values": [
+                31,
+                31,
+                31
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_flow_profit_before_tax",
+              "ordinal": 2
+            },
+            {
+              "source_line_id": "cf.cash_flow_profit_before_tax",
+              "raw_label": "Profit before taxation",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "is_subtotal": true,
+              "ordinal": 3
+            },
+            {
+              "source_line_id": "cf.cash_flow_da",
+              "raw_label": "Depreciation and amortisation",
+              "values": [
+                50,
+                50,
+                50
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "ordinal": 4
+            },
+            {
+              "source_line_id": "cf.net_finance_result",
+              "raw_label": "Net finance result",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+              "material": true,
+              "ordinal": 5
+            },
+            {
+              "source_line_id": "cf.finance_costs_net_addback",
+              "raw_label": "Net finance costs add-back",
+              "values": [
+                -5,
+                -5,
+                -5
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "ordinal": 6
+            },
+            {
+              "source_line_id": "cf.change_in_working_capital",
+              "raw_label": "Change in working capital",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "ordinal": 7
+            },
+            {
+              "source_line_id": "cf.cash_generated_from_operations",
+              "raw_label": "Cash generated from operations",
+              "values": [
+                195,
+                195,
+                195
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "is_subtotal": true,
+              "ordinal": 8
+            },
+            {
+              "source_line_id": "cf.income_taxes_paid",
+              "raw_label": "Income taxes paid",
+              "values": [
+                -31,
+                -31,
+                -31
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "ordinal": 9
+            },
+            {
+              "source_line_id": "cf.finance_income_received",
+              "raw_label": "Finance income received",
+              "values": [
+                10,
+                10,
+                10
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "ordinal": 10
+            },
+            {
+              "source_line_id": "cf.finance_costs_paid",
+              "raw_label": "Finance costs paid",
+              "values": [
+                -5,
+                -5,
+                -5
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "ordinal": 11
+            },
+            {
+              "source_line_id": "cf.cash_from_operations",
+              "raw_label": "Net cash from operating activities",
+              "values": [
+                169,
+                169,
+                169
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+              "material": true,
+              "parent_source_line_id": "cf.net_change_in_cash",
+              "is_subtotal": true,
+              "ordinal": 12
+            },
+            {
+              "source_line_id": "cf.capex",
+              "raw_label": "Purchase of property, plant and equipment",
+              "values": [
+                -100,
+                -100,
+                -100
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_investing",
+              "ordinal": 13
+            },
+            {
+              "source_line_id": "cf.acquisitions_net_of_cash",
+              "raw_label": "Acquisitions, net of cash acquired",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_investing",
+              "ordinal": 14
+            },
+            {
+              "source_line_id": "cf.cash_from_investing",
+              "raw_label": "Net cash used in investing activities",
+              "values": [
+                -100,
+                -100,
+                -100
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+              "material": true,
+              "parent_source_line_id": "cf.net_change_in_cash",
+              "is_subtotal": true,
+              "ordinal": 15
+            },
+            {
+              "source_line_id": "cf.dividends",
+              "raw_label": "Dividends paid",
+              "values": [
+                -60,
+                -60,
+                -60
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 16
+            },
+            {
+              "source_line_id": "cf.lease_principal",
+              "raw_label": "Payment of lease liabilities",
+              "values": [
+                -4,
+                -4,
+                -4
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 17
+            },
+            {
+              "source_line_id": "cf.debt_repayment",
+              "raw_label": "Repayment of borrowings",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 18
+            },
+            {
+              "source_line_id": "cf.debt_issuance",
+              "raw_label": "Proceeds from borrowings",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 19
+            },
+            {
+              "source_line_id": "cf.rcf_draw",
+              "raw_label": "RCF draw",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 20
+            },
+            {
+              "source_line_id": "cf.rcf_repayment",
+              "raw_label": "RCF repayment",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 21
+            },
+            {
+              "source_line_id": "cf.cash_from_financing",
+              "raw_label": "Net cash from financing activities",
+              "values": [
+                -64,
+                -64,
+                -64
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+              "material": true,
+              "parent_source_line_id": "cf.net_change_in_cash",
+              "is_subtotal": true,
+              "ordinal": 22
+            },
+            {
+              "source_line_id": "cf.fx_effect_on_cash",
+              "raw_label": "Effect of exchange rate changes on cash",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+              "material": true,
+              "ordinal": 23
+            },
+            {
+              "source_line_id": "cf.net_change_in_cash",
+              "raw_label": "Net increase/(decrease) in cash and cash equivalents",
+              "values": [
+                5,
+                5,
+                5
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 24
+            },
+            {
+              "source_line_id": "cf.opening_cash",
+              "raw_label": "Opening cash",
+              "values": [
+                370,
+                380,
+                390
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+              "material": true,
+              "ordinal": 25
+            },
+            {
+              "source_line_id": "cf.ending_cash",
+              "raw_label": "Ending cash",
+              "values": [
+                380,
+                390,
+                400
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+              "material": true,
+              "ordinal": 26
+            },
+            {
+              "source_line_id": "cf.free_cash_flow",
+              "raw_label": "Free cash flow",
+              "values": [
+                69,
+                69,
+                69
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+              "material": true,
+              "ordinal": 27
+            },
+            {
+              "source_line_id": "cf.free_cash_flow_conversion",
+              "raw_label": "Free cash flow conversion",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow_conversion\"",
+              "material": true,
+              "ordinal": 28
+            }
+          ],
+          "rows_sha256": "cabc9501c023c63dc1712752ed6b9a31c07b572cd92e3f3f163757f7f330a3c5"
+        }
+      ]
+    },
+    "income_statement": [
+      {
+        "source_line_id": "is.revenue",
+        "label": "Revenue",
+        "values": [
+          1000,
+          1000,
+          1000
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.revenue_growth",
+        "label": "Revenue growth %",
+        "values": [
+          null,
+          null,
+          null
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"revenue_growth\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda",
+        "label": "Adjusted EBITDA",
+        "values": [
+          200,
+          200,
+          200
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda_margin",
+        "label": "Adjusted EBITDA margin",
+        "values": [
+          null,
+          null,
+          null
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_margin\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.is_da_expense",
+        "label": "Depreciation and amortisation",
+        "values": [
+          -50,
+          -50,
+          -50
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.ebit",
+        "label": "EBIT",
+        "values": [
+          150,
+          150,
+          150
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.operating_profit",
+        "label": "Operating profit",
+        "values": [
+          150,
+          150,
+          150
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.interest_income",
+        "label": "Finance income",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.interest_expense",
+        "label": "Finance costs",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.pre_tax_income",
+        "label": "Profit before taxation",
+        "values": [
+          150,
+          150,
+          150
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.effective_tax_rate",
+        "label": "Effective tax rate",
+        "values": [
+          null,
+          null,
+          null
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"effective_tax_rate\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.tax_expense",
+        "label": "Income taxes",
+        "values": [
+          -31,
+          -31,
+          -31
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.net_income",
+        "label": "Profit after taxation",
+        "values": [
+          119,
+          119,
+          119
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda_reconciliation",
+        "label": "Adjusted EBITDA reconciliation",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+        "face_statement": true,
+        "material": true
+      }
+    ],
+    "cash_flow": [
+      {
+        "source_line_id": "cf.cash_flow_net_income",
+        "label": "Profit after taxation",
+        "values": [
+          119,
+          119,
+          119
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_flow_tax_addback",
+        "label": "Income tax charge",
+        "values": [
+          31,
+          31,
+          31
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_flow_profit_before_tax",
+        "label": "Profit before taxation",
+        "values": [
+          150,
+          150,
+          150
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_flow_da",
+        "label": "Depreciation and amortisation",
+        "values": [
+          50,
+          50,
+          50
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.net_finance_result",
+        "label": "Net finance result",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.finance_costs_net_addback",
+        "label": "Net finance costs add-back",
+        "values": [
+          -5,
+          -5,
+          -5
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.change_in_working_capital",
+        "label": "Change in working capital",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_generated_from_operations",
+        "label": "Cash generated from operations",
+        "values": [
+          195,
+          195,
+          195
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.income_taxes_paid",
+        "label": "Income taxes paid",
+        "values": [
+          -31,
+          -31,
+          -31
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.finance_income_received",
+        "label": "Finance income received",
+        "values": [
+          10,
+          10,
+          10
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.finance_costs_paid",
+        "label": "Finance costs paid",
+        "values": [
+          -5,
+          -5,
+          -5
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_from_operations",
+        "label": "Net cash from operating activities",
+        "values": [
+          169,
+          169,
+          169
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.capex",
+        "label": "Purchase of property, plant and equipment",
+        "values": [
+          -100,
+          -100,
+          -100
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.acquisitions_net_of_cash",
+        "label": "Acquisitions, net of cash acquired",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_from_investing",
+        "label": "Net cash used in investing activities",
+        "values": [
+          -100,
+          -100,
+          -100
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.dividends",
+        "label": "Dividends paid",
+        "values": [
+          -60,
+          -60,
+          -60
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.lease_principal",
+        "label": "Payment of lease liabilities",
+        "values": [
+          -4,
+          -4,
+          -4
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.debt_repayment",
+        "label": "Repayment of borrowings",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.debt_issuance",
+        "label": "Proceeds from borrowings",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.rcf_draw",
+        "label": "RCF draw",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.rcf_repayment",
+        "label": "RCF repayment",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.cash_from_financing",
+        "label": "Net cash from financing activities",
+        "values": [
+          -64,
+          -64,
+          -64
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.fx_effect_on_cash",
+        "label": "Effect of exchange rate changes on cash",
+        "values": [
+          0,
+          0,
+          0
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.net_change_in_cash",
+        "label": "Net increase/(decrease) in cash and cash equivalents",
+        "values": [
+          5,
+          5,
+          5
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.opening_cash",
+        "label": "Opening cash",
+        "values": [
+          370,
+          380,
+          390
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.ending_cash",
+        "label": "Ending cash",
+        "values": [
+          380,
+          390,
+          400
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.free_cash_flow",
+        "label": "Free cash flow",
+        "values": [
+          69,
+          69,
+          69
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+        "face_statement": true,
+        "material": true
+      },
+      {
+        "source_line_id": "cf.free_cash_flow_conversion",
+        "label": "Free cash flow conversion",
+        "values": [
+          null,
+          null,
+          null
+        ],
+        "source_id": "annual_report",
+        "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow_conversion\"",
+        "face_statement": true,
+        "material": true
+      }
+    ]
+  },
+  "dcs_export": {
+    "schema_version": "dcs-export/1.0",
+    "export_kind": "debt_instrument_detail",
+    "as_of": "2025-12-31",
+    "source": {
+      "system": "FactSet DCS",
+      "date_basis": "last_fiscal_year_end",
+      "exported_at": "2025-12-31",
+      "report_name": "Debt Capital Structure — instrument detail"
+    },
+    "entity": {
+      "name": "Standard Net Cash Co",
+      "consolidation_level": "group"
+    },
+    "reporting_currency": "USD",
+    "units": "millions",
+    "columns": [
+      {
+        "field": "outstanding_amount",
+        "currency": "USD",
+        "units": "millions"
+      },
+      {
+        "field": "facility_limit",
+        "currency": "USD",
+        "units": "millions"
+      },
+      {
+        "field": "drawn_amount",
+        "currency": "USD",
+        "units": "millions"
+      }
+    ],
+    "instruments": [
+      {
+        "instrument_id": "sncc_bond_2033",
+        "source_row": "dcs.1",
+        "description": "5.000% senior notes due Jun-2033",
+        "instrument_type": "fixed_bond",
+        "currency": "USD",
+        "outstanding_amount": 80,
+        "maturity_date": "2033-06-30",
+        "maturity_precision": "day",
+        "maturity_treatment": "contractual",
+        "next_call_date": null,
+        "rate_type": "fixed",
+        "coupon_rate": 0.05,
+        "refinancing_intent": null
+      },
+      {
+        "instrument_id": "sncc_rcf",
+        "source_row": "dcs.2",
+        "description": "Committed revolving credit facility",
+        "instrument_type": "rcf",
+        "currency": "USD",
+        "outstanding_amount": 0,
+        "maturity_date": "2030-06-30",
+        "maturity_precision": "day",
+        "maturity_treatment": "contractual",
+        "rate_type": "floating",
+        "reference_rate": "SOFR 3M",
+        "margin_bps": 60,
+        "facility_limit": 100,
+        "drawn_amount": 0,
+        "benchmark_curve": {
+          "resolved": [
+            0,
+            0,
+            0
+          ]
+        },
+        "committed": true,
+        "is_backstop_for_paper": false
+      }
+    ]
+  },
+  "broker_pack": {
+    "schema_version": "broker-pack/1.0",
+    "pack_kind": "broker_forecast_set",
+    "as_of": "2025-12-31",
+    "source_label": "3-house pack, notes dated within twelve months of 2025-12-31",
+    "reporting_currency": "USD",
+    "units": "millions",
+    "forecast_periods": [
+      "2026-12-31",
+      "2027-12-31",
+      "2028-12-31"
+    ],
+    "metrics": {
+      "revenue": {
+        "label": "Revenue",
+        "unit_kind": "currency"
+      },
+      "adjusted_ebitda": {
+        "label": "Adj. EBITDA",
+        "unit_kind": "currency"
+      },
+      "ebit": {
+        "label": "EBIT",
+        "unit_kind": "currency"
+      },
+      "depreciation_and_amortisation": {
+        "label": "D&A",
+        "unit_kind": "currency"
+      },
+      "effective_tax_rate": {
+        "label": "Effective tax rate",
+        "unit_kind": "percent_decimal"
+      },
+      "capex": {
+        "label": "Capex",
+        "unit_kind": "currency",
+        "sign_convention": "outflow_positive"
+      },
+      "change_in_working_capital": {
+        "label": "Change in working capital",
+        "unit_kind": "currency",
+        "sign_convention": "outflow_negative"
+      },
+      "dividends": {
+        "label": "Dividends",
+        "unit_kind": "currency",
+        "sign_convention": "outflow_positive"
+      }
+    },
+    "houses": [
+      {
+        "house_id": "a",
+        "house_name": "A",
+        "published_date": "2025-12-31",
+        "analyst": null,
+        "document": {
+          "file_name": "a-2025-12-31.pdf",
+          "media_type": "application/pdf",
+          "text_extractable": true,
+          "page_reference": "forecast summary"
+        },
+        "estimates": {
+          "revenue": [
+            1030,
+            1060.9,
+            1092.73
+          ],
+          "adjusted_ebitda": [
+            206,
+            212.18,
+            218.55
+          ],
+          "ebit": [
+            154.5,
+            159.13,
+            163.91
+          ],
+          "depreciation_and_amortisation": [
+            50.5,
+            51.01,
+            51.52
+          ],
+          "effective_tax_rate": [
+            0.21,
+            0.21,
+            0.21
+          ],
+          "capex": [
+            102,
+            104.04,
+            106.12
+          ],
+          "change_in_working_capital": [
+            -10.2,
+            -10.4,
+            -10.61
+          ],
+          "dividends": [
+            20.8,
+            21.63,
+            22.5
+          ]
+        }
+      },
+      {
+        "house_id": "b",
+        "house_name": "B",
+        "published_date": "2025-12-31",
+        "analyst": null,
+        "document": {
+          "file_name": "b-2025-12-31.pdf",
+          "media_type": "application/pdf",
+          "text_extractable": true,
+          "page_reference": "forecast summary"
+        },
+        "estimates": {
+          "revenue": [
+            1034,
+            1069.16,
+            1105.51
+          ],
+          "adjusted_ebitda": [
+            206.8,
+            213.83,
+            221.1
+          ],
+          "ebit": [
+            155.1,
+            160.37,
+            165.83
+          ],
+          "depreciation_and_amortisation": [
+            50.5,
+            51.01,
+            51.52
+          ],
+          "effective_tax_rate": [
+            0.21,
+            0.21,
+            0.21
+          ],
+          "capex": [
+            102,
+            104.04,
+            106.12
+          ],
+          "change_in_working_capital": [
+            -10.2,
+            -10.4,
+            -10.61
+          ],
+          "dividends": [
+            20.8,
+            21.63,
+            22.5
+          ]
+        }
+      },
+      {
+        "house_id": "c",
+        "house_name": "C",
+        "published_date": "2025-12-31",
+        "analyst": null,
+        "document": {
+          "file_name": "c-2025-12-31.pdf",
+          "media_type": "application/pdf",
+          "text_extractable": true,
+          "page_reference": "forecast summary"
+        },
+        "estimates": {
+          "revenue": [
+            1038,
+            1077.44,
+            1118.39
+          ],
+          "adjusted_ebitda": [
+            207.6,
+            215.49,
+            223.68
+          ],
+          "ebit": [
+            155.7,
+            161.62,
+            167.76
+          ],
+          "depreciation_and_amortisation": [
+            50.5,
+            51.01,
+            51.52
+          ],
+          "effective_tax_rate": [
+            0.21,
+            0.21,
+            0.21
+          ],
+          "capex": [
+            102,
+            104.04,
+            106.12
+          ],
+          "change_in_working_capital": [
+            -10.2,
+            -10.4,
+            -10.61
+          ],
+          "dividends": [
+            20.8,
+            21.63,
+            22.5
+          ]
+        }
+      }
+    ]
+  },
+  "forecast_context": {
+    "contract_version": "forecast-evidence/1.0",
+    "reviewed_at": "2026-08-02",
+    "public_results_source_ids": [
+      "annual_report"
+    ],
+    "latest_public_results_source_id": "annual_report",
+    "guidance_status": "reviewed_none",
+    "guidance_source_ids": [],
+    "guidance_review_note": "The fixture annual report was reviewed and contains no separate forecast guidance used by this synthetic case."
+  },
+  "decisions": {
+    "restatements": [
+      {
+        "period": "2023-12-31",
+        "basis": "as_reported",
+        "source_ids": [
+          "annual_report"
+        ],
+        "bridge_status": "not_required",
+        "reason": "No restatement or predecessor bridge is required in the fixture."
+      },
+      {
+        "period": "2024-12-31",
+        "basis": "as_reported",
+        "source_ids": [
+          "annual_report"
+        ],
+        "bridge_status": "not_required",
+        "reason": "No restatement or predecessor bridge is required in the fixture."
+      },
+      {
+        "period": "2025-12-31",
+        "basis": "as_reported",
+        "source_ids": [
+          "annual_report"
+        ],
+        "bridge_status": "not_required",
+        "reason": "No restatement or predecessor bridge is required in the fixture."
+      }
+    ],
+    "groupings": [],
+    "manual_debt_supplements": [],
+    "stated_assumptions": []
+  },
+  "case_source": {
+    "schema_version": "case-source-v1",
+    "identity": {
+      "case_id": "standard_net_cash",
+      "issuer_name": "Standard Net Cash Co",
+      "reporting_currency": "USD",
+      "units": "millions",
+      "fiscal_year_end": "12-31",
+      "presentation_profile": "crh_dynamic",
+      "execution_profile": "reference_parity"
+    },
+    "evidence_refs": {
+      "evidence_run_sha256": null,
+      "filings": [
+        {
+          "source_id": "annual_report",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      ],
+      "face_statement_manifests": {
+        "income_statement": [
+          {
+            "source_id": "annual_report",
+            "digest": "6b746ac3cbe81a57e22f33fe2a3c48aa2d4a2c86aa8f21b93ca3b4d2a0a00efb"
+          }
+        ],
+        "cash_flow": [
+          {
+            "source_id": "annual_report",
+            "digest": "cabc9501c023c63dc1712752ed6b9a31c07b572cd92e3f3f163757f7f330a3c5"
+          }
+        ]
+      }
+    },
+    "statement_map": {
+      "income_statement": [
+        {
+          "source_line_id": "is.revenue",
+          "row_id": "revenue",
+          "disposition": "keep",
+          "role": "revenue",
+          "broker_metric_id": "revenue"
+        },
+        {
+          "source_line_id": "is.revenue_growth",
+          "row_id": "revenue_growth",
+          "disposition": "keep",
+          "header": true
+        },
+        {
+          "source_line_id": "is.adjusted_ebitda",
+          "row_id": "adjusted_ebitda",
+          "disposition": "keep",
+          "role": "adjusted_ebitda",
+          "broker_metric_id": "adjusted_ebitda",
+          "parent_source_line_id": "is.ebit"
+        },
+        {
+          "source_line_id": "is.adjusted_ebitda_margin",
+          "row_id": "adjusted_ebitda_margin",
+          "disposition": "keep",
+          "header": true
+        },
+        {
+          "source_line_id": "is.is_da_expense",
+          "row_id": "is_da_expense",
+          "disposition": "keep",
+          "role": "is_da_expense",
+          "parent_source_line_id": "is.ebit"
+        },
+        {
+          "source_line_id": "is.ebit",
+          "row_id": "ebit",
+          "disposition": "keep",
+          "role": "ebit",
+          "broker_metric_id": "ebit"
+        },
+        {
+          "source_line_id": "is.operating_profit",
+          "row_id": "operating_profit",
+          "disposition": "keep",
+          "role": "operating_profit",
+          "parent_source_line_id": "is.pre_tax_income"
+        },
+        {
+          "source_line_id": "is.interest_income",
+          "row_id": "interest_income",
+          "disposition": "keep",
+          "role": "interest_income",
+          "parent_source_line_id": "is.pre_tax_income"
+        },
+        {
+          "source_line_id": "is.interest_expense",
+          "row_id": "interest_expense",
+          "disposition": "keep",
+          "role": "interest_expense",
+          "parent_source_line_id": "is.pre_tax_income"
+        },
+        {
+          "source_line_id": "is.pre_tax_income",
+          "row_id": "pre_tax_income",
+          "disposition": "keep",
+          "role": "pre_tax_income",
+          "parent_source_line_id": "is.net_income"
+        },
+        {
+          "source_line_id": "is.effective_tax_rate",
+          "row_id": "effective_tax_rate",
+          "disposition": "keep",
+          "role": "effective_tax_rate",
+          "broker_metric_id": "effective_tax_rate",
+          "header": true
+        },
+        {
+          "source_line_id": "is.tax_expense",
+          "row_id": "tax_expense",
+          "disposition": "keep",
+          "role": "tax_expense",
+          "parent_source_line_id": "is.net_income"
+        },
+        {
+          "source_line_id": "is.net_income",
+          "row_id": "net_income",
+          "disposition": "keep",
+          "role": "net_income"
+        },
+        {
+          "source_line_id": "is.adjusted_ebitda_reconciliation",
+          "row_id": "adjusted_ebitda_reconciliation",
+          "disposition": "keep"
+        }
+      ],
+      "cash_flow": [
+        {
+          "source_line_id": "cf.cash_flow_net_income",
+          "row_id": "cash_flow_net_income",
+          "disposition": "keep",
+          "role": "cash_flow_net_income",
+          "parent_source_line_id": "cf.cash_flow_profit_before_tax"
+        },
+        {
+          "source_line_id": "cf.cash_flow_tax_addback",
+          "row_id": "cash_flow_tax_addback",
+          "disposition": "keep",
+          "role": "cash_flow_tax_addback",
+          "parent_source_line_id": "cf.cash_flow_profit_before_tax"
+        },
+        {
+          "source_line_id": "cf.cash_flow_profit_before_tax",
+          "row_id": "cash_flow_profit_before_tax",
+          "disposition": "keep",
+          "role": "cash_flow_profit_before_tax",
+          "parent_source_line_id": "cf.cash_generated_from_operations"
+        },
+        {
+          "source_line_id": "cf.cash_flow_da",
+          "row_id": "cash_flow_da",
+          "disposition": "keep",
+          "role": "cash_flow_da",
+          "parent_source_line_id": "cf.cash_generated_from_operations"
+        },
+        {
+          "source_line_id": "cf.net_finance_result",
+          "row_id": "net_finance_result",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.finance_costs_net_addback",
+          "row_id": "net_finance_addback",
+          "disposition": "keep",
+          "role": "net_finance_addback",
+          "parent_source_line_id": "cf.cash_generated_from_operations"
+        },
+        {
+          "source_line_id": "cf.change_in_working_capital",
+          "row_id": "change_in_working_capital",
+          "disposition": "keep",
+          "role": "change_in_working_capital",
+          "broker_metric_id": "change_in_working_capital",
+          "parent_source_line_id": "cf.cash_generated_from_operations"
+        },
+        {
+          "source_line_id": "cf.cash_generated_from_operations",
+          "row_id": "cash_generated_from_operations",
+          "disposition": "keep",
+          "role": "cash_generated_from_operations",
+          "parent_source_line_id": "cf.cash_from_operations"
+        },
+        {
+          "source_line_id": "cf.income_taxes_paid",
+          "row_id": "cash_taxes",
+          "disposition": "keep",
+          "role": "cash_taxes",
+          "parent_source_line_id": "cf.cash_from_operations"
+        },
+        {
+          "source_line_id": "cf.finance_income_received",
+          "row_id": "cash_interest_received",
+          "disposition": "keep",
+          "role": "cash_interest_received",
+          "parent_source_line_id": "cf.cash_from_operations"
+        },
+        {
+          "source_line_id": "cf.finance_costs_paid",
+          "row_id": "cash_interest_paid",
+          "disposition": "keep",
+          "role": "cash_interest_paid",
+          "parent_source_line_id": "cf.cash_from_operations"
+        },
+        {
+          "source_line_id": "cf.cash_from_operations",
+          "row_id": "cash_from_operations",
+          "disposition": "keep",
+          "role": "cash_from_operations",
+          "parent_source_line_id": "cf.net_change_in_cash"
+        },
+        {
+          "source_line_id": "cf.capex",
+          "row_id": "ppe_purchases",
+          "disposition": "keep",
+          "parent_source_line_id": "cf.cash_from_investing"
+        },
+        {
+          "source_line_id": "cf.acquisitions_net_of_cash",
+          "row_id": "acquisitions_net_of_cash",
+          "disposition": "keep",
+          "role": "acquisitions_net_of_cash",
+          "parent_source_line_id": "cf.cash_from_investing"
+        },
+        {
+          "source_line_id": "cf.cash_from_investing",
+          "row_id": "cash_from_investing",
+          "disposition": "keep",
+          "role": "cash_from_investing",
+          "parent_source_line_id": "cf.net_change_in_cash"
+        },
+        {
+          "source_line_id": "cf.dividends",
+          "row_id": "dividends",
+          "disposition": "keep",
+          "role": "dividends",
+          "broker_metric_id": "dividends",
+          "parent_source_line_id": "cf.cash_from_financing"
+        },
+        {
+          "source_line_id": "cf.lease_principal",
+          "row_id": "lease_principal",
+          "disposition": "keep",
+          "role": "lease_principal",
+          "parent_source_line_id": "cf.cash_from_financing"
+        },
+        {
+          "source_line_id": "cf.debt_repayment",
+          "row_id": "debt_repayment",
+          "disposition": "keep",
+          "role": "debt_repayment",
+          "parent_source_line_id": "cf.cash_from_financing"
+        },
+        {
+          "source_line_id": "cf.debt_issuance",
+          "row_id": "debt_issuance",
+          "disposition": "keep",
+          "role": "debt_issuance",
+          "parent_source_line_id": "cf.cash_from_financing"
+        },
+        {
+          "source_line_id": "cf.rcf_draw",
+          "row_id": "rcf_draw",
+          "disposition": "keep",
+          "parent_source_line_id": "cf.cash_from_financing"
+        },
+        {
+          "source_line_id": "cf.rcf_repayment",
+          "row_id": "rcf_repayment",
+          "disposition": "keep",
+          "parent_source_line_id": "cf.cash_from_financing"
+        },
+        {
+          "source_line_id": "cf.cash_from_financing",
+          "row_id": "cash_from_financing",
+          "disposition": "keep",
+          "role": "cash_from_financing",
+          "parent_source_line_id": "cf.net_change_in_cash"
+        },
+        {
+          "source_line_id": "cf.fx_effect_on_cash",
+          "row_id": "fx_effect_on_cash",
+          "disposition": "keep",
+          "role": "fx_effect_on_cash"
+        },
+        {
+          "source_line_id": "cf.net_change_in_cash",
+          "row_id": "net_change_in_cash",
+          "disposition": "keep",
+          "role": "net_change_in_cash"
+        },
+        {
+          "source_line_id": "cf.opening_cash",
+          "row_id": "opening_cash",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.ending_cash",
+          "row_id": "ending_cash",
+          "disposition": "keep",
+          "role": "ending_cash"
+        },
+        {
+          "source_line_id": "cf.free_cash_flow",
+          "row_id": "free_cash_flow",
+          "disposition": "keep"
+        },
+        {
+          "source_line_id": "cf.free_cash_flow_conversion",
+          "row_id": "free_cash_flow_conversion",
+          "disposition": "keep",
+          "header": true
+        }
+      ]
+    },
+    "derived_rows": [
+      {
+        "row_id": "cash_flow_adjustments",
+        "section": "cash_flow",
+        "label": "Adjustments for",
+        "operator": "header",
+        "insert_after": "cash_flow_profit_before_tax"
+      }
+    ],
+    "consumption": {},
+    "policies": {
+      "rcf": {
+        "commitment_fee_convention": "none"
+      },
+      "cash": {
+        "minimum_cash_question_id": "derived.cash.minimum_cash",
+        "eligible_cash_question_id": "derived.cash.eligible",
+        "cash_yield_question_id": "derived.cash.yield"
+      },
+      "lease": {
+        "mode": "flat_replacement",
+        "include_in_gross_debt": true,
+        "include_in_net_debt": true,
+        "include_in_leverage": true,
+        "forecast_basis_question_id": "derived.lease.forecast_basis"
+      }
+    },
+    "answers": [
+      {
+        "question_id": "derived.cash.minimum_cash",
+        "round": "derived",
+        "answer": 100
+      },
+      {
+        "question_id": "derived.cash.eligible",
+        "round": "derived",
+        "answer": 1
+      },
+      {
+        "question_id": "derived.cash.yield",
+        "round": "derived",
+        "answer": [
+          0.025,
+          0.025,
+          0.025
+        ]
+      },
+      {
+        "question_id": "derived.forecast.acquisitions_net_of_cash",
+        "round": "derived",
+        "answer": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "question_id": "derived.lease.forecast_basis",
+        "round": "derived",
+        "answer": {
+          "principal_repayment": [
+            4,
+            4,
+            4
+          ],
+          "additions": [
+            4,
+            4,
+            4
+          ],
+          "effective_rate": [
+            0.05,
+            0.05,
+            0.05
+          ]
+        }
+      }
+    ]
+  },
+  "case_evidence": {
+    "face_statement_manifests": {
+      "income_statement": [
+        {
+          "schema_version": "face-statement-manifest/1.0",
+          "statement": "income_statement",
+          "statement_order": 1,
+          "source_id": "annual_report",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "page_or_note": "face statement",
+          "periods": [
+            "2023-12-31",
+            "2024-12-31",
+            "2025-12-31"
+          ],
+          "complete_face_statement": true,
+          "row_count": 14,
+          "rows": [
+            {
+              "source_line_id": "is.revenue",
+              "raw_label": "Revenue",
+              "values": [
+                1000,
+                1000,
+                1000
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+              "material": true,
+              "ordinal": 1
+            },
+            {
+              "source_line_id": "is.revenue_growth",
+              "raw_label": "Revenue growth %",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"revenue_growth\"",
+              "material": true,
+              "ordinal": 2
+            },
+            {
+              "source_line_id": "is.adjusted_ebitda",
+              "raw_label": "Adjusted EBITDA",
+              "values": [
+                200,
+                200,
+                200
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+              "material": true,
+              "parent_source_line_id": "is.ebit",
+              "ordinal": 3
+            },
+            {
+              "source_line_id": "is.adjusted_ebitda_margin",
+              "raw_label": "Adjusted EBITDA margin",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_margin\"",
+              "material": true,
+              "ordinal": 4
+            },
+            {
+              "source_line_id": "is.is_da_expense",
+              "raw_label": "Depreciation and amortisation",
+              "values": [
+                -50,
+                -50,
+                -50
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+              "material": true,
+              "parent_source_line_id": "is.ebit",
+              "ordinal": 5
+            },
+            {
+              "source_line_id": "is.ebit",
+              "raw_label": "EBIT",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 6
+            },
+            {
+              "source_line_id": "is.operating_profit",
+              "raw_label": "Operating profit",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+              "material": true,
+              "parent_source_line_id": "is.pre_tax_income",
+              "ordinal": 7
+            },
+            {
+              "source_line_id": "is.interest_income",
+              "raw_label": "Finance income",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+              "material": true,
+              "parent_source_line_id": "is.pre_tax_income",
+              "ordinal": 8
+            },
+            {
+              "source_line_id": "is.interest_expense",
+              "raw_label": "Finance costs",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+              "material": true,
+              "parent_source_line_id": "is.pre_tax_income",
+              "ordinal": 9
+            },
+            {
+              "source_line_id": "is.pre_tax_income",
+              "raw_label": "Profit before taxation",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+              "material": true,
+              "parent_source_line_id": "is.net_income",
+              "is_subtotal": true,
+              "ordinal": 10
+            },
+            {
+              "source_line_id": "is.effective_tax_rate",
+              "raw_label": "Effective tax rate",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"effective_tax_rate\"",
+              "material": true,
+              "ordinal": 11
+            },
+            {
+              "source_line_id": "is.tax_expense",
+              "raw_label": "Income taxes",
+              "values": [
+                -31,
+                -31,
+                -31
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+              "material": true,
+              "parent_source_line_id": "is.net_income",
+              "ordinal": 12
+            },
+            {
+              "source_line_id": "is.net_income",
+              "raw_label": "Profit after taxation",
+              "values": [
+                119,
+                119,
+                119
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 13
+            },
+            {
+              "source_line_id": "is.adjusted_ebitda_reconciliation",
+              "raw_label": "Adjusted EBITDA reconciliation",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+              "material": true,
+              "ordinal": 14
+            }
+          ],
+          "rows_sha256": "6b746ac3cbe81a57e22f33fe2a3c48aa2d4a2c86aa8f21b93ca3b4d2a0a00efb"
+        }
+      ],
+      "cash_flow": [
+        {
+          "schema_version": "face-statement-manifest/1.0",
+          "statement": "cash_flow",
+          "statement_order": 1,
+          "source_id": "annual_report",
+          "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "page_or_note": "face statement",
+          "periods": [
+            "2023-12-31",
+            "2024-12-31",
+            "2025-12-31"
+          ],
+          "complete_face_statement": true,
+          "row_count": 28,
+          "rows": [
+            {
+              "source_line_id": "cf.cash_flow_net_income",
+              "raw_label": "Profit after taxation",
+              "values": [
+                119,
+                119,
+                119
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_flow_profit_before_tax",
+              "ordinal": 1
+            },
+            {
+              "source_line_id": "cf.cash_flow_tax_addback",
+              "raw_label": "Income tax charge",
+              "values": [
+                31,
+                31,
+                31
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_flow_profit_before_tax",
+              "ordinal": 2
+            },
+            {
+              "source_line_id": "cf.cash_flow_profit_before_tax",
+              "raw_label": "Profit before taxation",
+              "values": [
+                150,
+                150,
+                150
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "is_subtotal": true,
+              "ordinal": 3
+            },
+            {
+              "source_line_id": "cf.cash_flow_da",
+              "raw_label": "Depreciation and amortisation",
+              "values": [
+                50,
+                50,
+                50
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "ordinal": 4
+            },
+            {
+              "source_line_id": "cf.net_finance_result",
+              "raw_label": "Net finance result",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+              "material": true,
+              "ordinal": 5
+            },
+            {
+              "source_line_id": "cf.finance_costs_net_addback",
+              "raw_label": "Net finance costs add-back",
+              "values": [
+                -5,
+                -5,
+                -5
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "ordinal": 6
+            },
+            {
+              "source_line_id": "cf.change_in_working_capital",
+              "raw_label": "Change in working capital",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_generated_from_operations",
+              "ordinal": 7
+            },
+            {
+              "source_line_id": "cf.cash_generated_from_operations",
+              "raw_label": "Cash generated from operations",
+              "values": [
+                195,
+                195,
+                195
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "is_subtotal": true,
+              "ordinal": 8
+            },
+            {
+              "source_line_id": "cf.income_taxes_paid",
+              "raw_label": "Income taxes paid",
+              "values": [
+                -31,
+                -31,
+                -31
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "ordinal": 9
+            },
+            {
+              "source_line_id": "cf.finance_income_received",
+              "raw_label": "Finance income received",
+              "values": [
+                10,
+                10,
+                10
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "ordinal": 10
+            },
+            {
+              "source_line_id": "cf.finance_costs_paid",
+              "raw_label": "Finance costs paid",
+              "values": [
+                -5,
+                -5,
+                -5
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_operations",
+              "ordinal": 11
+            },
+            {
+              "source_line_id": "cf.cash_from_operations",
+              "raw_label": "Net cash from operating activities",
+              "values": [
+                169,
+                169,
+                169
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+              "material": true,
+              "parent_source_line_id": "cf.net_change_in_cash",
+              "is_subtotal": true,
+              "ordinal": 12
+            },
+            {
+              "source_line_id": "cf.capex",
+              "raw_label": "Purchase of property, plant and equipment",
+              "values": [
+                -100,
+                -100,
+                -100
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_investing",
+              "ordinal": 13
+            },
+            {
+              "source_line_id": "cf.acquisitions_net_of_cash",
+              "raw_label": "Acquisitions, net of cash acquired",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_investing",
+              "ordinal": 14
+            },
+            {
+              "source_line_id": "cf.cash_from_investing",
+              "raw_label": "Net cash used in investing activities",
+              "values": [
+                -100,
+                -100,
+                -100
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+              "material": true,
+              "parent_source_line_id": "cf.net_change_in_cash",
+              "is_subtotal": true,
+              "ordinal": 15
+            },
+            {
+              "source_line_id": "cf.dividends",
+              "raw_label": "Dividends paid",
+              "values": [
+                -60,
+                -60,
+                -60
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 16
+            },
+            {
+              "source_line_id": "cf.lease_principal",
+              "raw_label": "Payment of lease liabilities",
+              "values": [
+                -4,
+                -4,
+                -4
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 17
+            },
+            {
+              "source_line_id": "cf.debt_repayment",
+              "raw_label": "Repayment of borrowings",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 18
+            },
+            {
+              "source_line_id": "cf.debt_issuance",
+              "raw_label": "Proceeds from borrowings",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 19
+            },
+            {
+              "source_line_id": "cf.rcf_draw",
+              "raw_label": "RCF draw",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 20
+            },
+            {
+              "source_line_id": "cf.rcf_repayment",
+              "raw_label": "RCF repayment",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+              "material": true,
+              "parent_source_line_id": "cf.cash_from_financing",
+              "ordinal": 21
+            },
+            {
+              "source_line_id": "cf.cash_from_financing",
+              "raw_label": "Net cash from financing activities",
+              "values": [
+                -64,
+                -64,
+                -64
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+              "material": true,
+              "parent_source_line_id": "cf.net_change_in_cash",
+              "is_subtotal": true,
+              "ordinal": 22
+            },
+            {
+              "source_line_id": "cf.fx_effect_on_cash",
+              "raw_label": "Effect of exchange rate changes on cash",
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+              "material": true,
+              "ordinal": 23
+            },
+            {
+              "source_line_id": "cf.net_change_in_cash",
+              "raw_label": "Net increase/(decrease) in cash and cash equivalents",
+              "values": [
+                5,
+                5,
+                5
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+              "material": true,
+              "is_subtotal": true,
+              "ordinal": 24
+            },
+            {
+              "source_line_id": "cf.opening_cash",
+              "raw_label": "Opening cash",
+              "values": [
+                370,
+                380,
+                390
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+              "material": true,
+              "ordinal": 25
+            },
+            {
+              "source_line_id": "cf.ending_cash",
+              "raw_label": "Ending cash",
+              "values": [
+                380,
+                390,
+                400
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+              "material": true,
+              "ordinal": 26
+            },
+            {
+              "source_line_id": "cf.free_cash_flow",
+              "raw_label": "Free cash flow",
+              "values": [
+                69,
+                69,
+                69
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+              "material": true,
+              "ordinal": 27
+            },
+            {
+              "source_line_id": "cf.free_cash_flow_conversion",
+              "raw_label": "Free cash flow conversion",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow_conversion\"",
+              "material": true,
+              "ordinal": 28
+            }
+          ],
+          "rows_sha256": "cabc9501c023c63dc1712752ed6b9a31c07b572cd92e3f3f163757f7f330a3c5"
+        }
+      ]
+    },
+    "lanes": {
+      "statement_expansions": [],
+      "policy_evidence": {
+        "rcf": {
+          "instrument_id": "sncc_rcf",
+          "capacity": 100,
+          "opening_draw": 0,
+          "commitment_fee_value": 0
+        },
+        "cash": {
+          "opening_cash": 400,
+          "historical_year_end_cash": [
+            380,
+            390,
+            400
+          ]
+        },
+        "lease": {
+          "historical_liabilities": [
+            20,
+            20,
+            20
+          ]
+        }
+      },
+      "source_coverage_review": {
+        "status": "complete",
+        "reviewed_at": "2026-07-26",
+        "review_evidence": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY. Every line in this case is generated by that specification: there is no issuer, no filing, no broker note and no third-party research behind any figure. The inventory is complete against the specification because the specification IS the source."
+      },
+      "periods": [
+        {
+          "date": "2023-12-31",
+          "status": "historical"
+        },
+        {
+          "date": "2024-12-31",
+          "status": "historical"
+        },
+        {
+          "date": "2025-12-31",
+          "status": "historical"
+        },
+        {
+          "date": "2026-12-31",
+          "status": "forecast"
+        },
+        {
+          "date": "2027-12-31",
+          "status": "forecast"
+        },
+        {
+          "date": "2028-12-31",
+          "status": "forecast"
+        }
+      ],
+      "modules": {
+        "multi_currency": false,
+        "historical_normalisation": false,
+        "acquisition": true
+      },
+      "controls": {
+        "broker_case": "Consensus",
+        "circularity": 1,
+        "debt_maturities_roll": 1
+      },
+      "operating_metrics": {
+        "revenue": {
+          "values": [
+            1000,
+            1000,
+            1000,
+            1000,
+            1000,
+            1000
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. Flat by construction so every derived figure is a round number."
+        },
+        "adjusted_ebitda": {
+          "values": [
+            200,
+            200,
+            200,
+            200,
+            200,
+            200
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. A flat 20.0% margin on flat revenue."
+        },
+        "depreciation_and_amortisation": {
+          "values": [
+            50,
+            50,
+            50,
+            50,
+            50,
+            50
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. 5.0% of revenue."
+        },
+        "change_in_working_capital": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. Zero, because revenue is flat."
+        },
+        "capex": {
+          "values": [
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. 10.0% of revenue, twice D&A."
+        },
+        "tax": {
+          "values": [
+            31,
+            31,
+            31,
+            null,
+            null,
+            null
+          ],
+          "forecast_method": "not_applicable",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. Forecast tax is formula-driven from the visible rate."
+        },
+        "ebit": {
+          "values": [
+            150,
+            150,
+            150,
+            150,
+            150,
+            150
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied"
+        },
+        "recurring_disclosed_adjustments": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied"
+        },
+        "other_non_cash": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied"
+        },
+        "other_investing": {
+          "values": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied"
+        },
+        "dividends_and_buybacks": {
+          "values": [
+            60,
+            60,
+            60,
+            70,
+            70,
+            70
+          ],
+          "forecast_method": "supplied_exact",
+          "source_kind": "user_supplied",
+          "note": "Synthetic. Set so forecast free cash flow after leases is fully distributed and cash holds at exactly 400."
+        }
+      },
+      "forecast_assumptions": {
+        "revenue_growth": [
+          0,
+          0,
+          0
+        ],
+        "adjusted_ebitda_margin": [
+          0.2,
+          0.2,
+          0.2
+        ],
+        "da_to_revenue": [
+          0.05,
+          0.05,
+          0.05
+        ],
+        "effective_tax_rate": [
+          0.2,
+          0.2,
+          0.2
+        ],
+        "capex_to_revenue": [
+          0.1,
+          0.1,
+          0.1
+        ],
+        "working_capital_to_revenue_change": [
+          0,
+          0,
+          0
+        ],
+        "dividends_and_buybacks": [
+          70,
+          70,
+          70
+        ],
+        "other_non_cash": [
+          0,
+          0,
+          0
+        ],
+        "other_investing": [
+          0,
+          0,
+          0
+        ],
+        "fx_effect_on_cash": [
+          0,
+          0,
+          0
+        ]
+      },
+      "instruments": [
+        {
+          "instrument_id": "sncc_bond_2033",
+          "display_order": 1,
+          "name": "5.000% senior notes due Jun-2033",
+          "class": "fixed_bond",
+          "currency": "USD",
+          "opening_balance": 80,
+          "maturity_date": "2033-06-30",
+          "maturity_precision": "day",
+          "maturity_treatment": "contractual",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "fixed",
+          "coupon_or_all_in_rate": [
+            0.05,
+            0.05,
+            0.05
+          ],
+          "facility_capacity": null,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "source_line_ids": [],
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ],
+          "balance_basis": "native_principal"
+        },
+        {
+          "instrument_id": "sncc_rcf",
+          "display_order": 99,
+          "name": "Committed revolving credit facility",
+          "class": "rcf",
+          "currency": "USD",
+          "opening_balance": 0,
+          "maturity_date": "2030-06-30",
+          "maturity_precision": "day",
+          "maturity_treatment": "contractual",
+          "scheduled_amortisation": [
+            0,
+            0,
+            0
+          ],
+          "new_issuance": [
+            0,
+            0,
+            0
+          ],
+          "rate_type": "floating",
+          "benchmark": "SOFR 3M",
+          "benchmark_rate": [
+            0,
+            0,
+            0
+          ],
+          "spread_bps": 60,
+          "facility_capacity": 100,
+          "include_in_gross_debt": true,
+          "include_in_net_debt": true,
+          "cash_interest": true,
+          "source_line_ids": [],
+          "other_non_cash_movement": [
+            0,
+            0,
+            0
+          ],
+          "balance_basis": "native_principal"
+        }
+      ],
+      "debt_reconciliation": {
+        "reported_opening_gross_debt": 80,
+        "maximum_residual_percentage": 0.05,
+        "note": "Synthetic. The single bond IS the whole debt register; there is no residual pool."
+      },
+      "historical_interest_reconciliation": {
+        "reported_interest_basis": "filed_finance_expense_including_lease_interest",
+        "reported_interest": [
+          5,
+          5,
+          5
+        ],
+        "identified_interest": [
+          5,
+          5,
+          5
+        ],
+        "maximum_plug_percentage": 0.1
+      },
+      "historical_supplement": {
+        "prior_cash_and_cash_equivalents": [
+          380,
+          390
+        ],
+        "prior_gross_debt_excluding_leases": [
+          80,
+          80
+        ],
+        "prior_lease_liabilities": [
+          20,
+          20
+        ],
+        "debt_interest_expense": [
+          4,
+          4,
+          4
+        ],
+        "lease_interest_expense": [
+          1,
+          1,
+          1
+        ],
+        "interest_income": [
+          10,
+          10,
+          10
+        ]
+      },
+      "other_interest": [
+        0,
+        0,
+        0
+      ],
+      "non_cash_interest": [
+        0,
+        0,
+        0
+      ],
+      "acquisition": {
+        "enabled": 0,
+        "transaction_enterprise_value": 500,
+        "entry_ev_to_ebitda": 10,
+        "acquisition_debt_amount": 250,
+        "incremental_rate": 0.06,
+        "close_year": 2027,
+        "close_month": 6
+      },
+      "broker_pack": {
+        "source_label": "3-house pack, notes dated within twelve months of 2025-12-31",
+        "forecast_periods": [
+          "2026-12-31",
+          "2027-12-31",
+          "2028-12-31"
+        ],
+        "metrics": {
+          "revenue": {
+            "label": "Revenue",
+            "provider_consensus": [
+              1034,
+              1069.1666666666667,
+              1105.5433333333333
+            ],
+            "brokers": {
+              "A": [
+                1030,
+                1060.9,
+                1092.73
+              ],
+              "B": [
+                1034,
+                1069.16,
+                1105.51
+              ],
+              "C": [
+                1038,
+                1077.44,
+                1118.39
+              ]
+            }
+          },
+          "adjusted_ebitda": {
+            "label": "Adj. EBITDA",
+            "provider_consensus": [
+              206.79999999999998,
+              213.83333333333334,
+              221.10999999999999
+            ],
+            "brokers": {
+              "A": [
+                206,
+                212.18,
+                218.55
+              ],
+              "B": [
+                206.8,
+                213.83,
+                221.1
+              ],
+              "C": [
+                207.6,
+                215.49,
+                223.68
+              ]
+            }
+          },
+          "ebit": {
+            "label": "EBIT",
+            "provider_consensus": [
+              155.1,
+              160.37333333333333,
+              165.83333333333334
+            ],
+            "brokers": {
+              "A": [
+                154.5,
+                159.13,
+                163.91
+              ],
+              "B": [
+                155.1,
+                160.37,
+                165.83
+              ],
+              "C": [
+                155.7,
+                161.62,
+                167.76
+              ]
+            }
+          },
+          "depreciation_and_amortisation": {
+            "label": "D&A",
+            "provider_consensus": [
+              50.5,
+              51.01,
+              51.52
+            ],
+            "brokers": {
+              "A": [
+                50.5,
+                51.01,
+                51.52
+              ],
+              "B": [
+                50.5,
+                51.01,
+                51.52
+              ],
+              "C": [
+                50.5,
+                51.01,
+                51.52
+              ]
+            }
+          },
+          "effective_tax_rate": {
+            "label": "Effective tax rate",
+            "provider_consensus": [
+              0.21,
+              0.21,
+              0.21
+            ],
+            "brokers": {
+              "A": [
+                0.21,
+                0.21,
+                0.21
+              ],
+              "B": [
+                0.21,
+                0.21,
+                0.21
+              ],
+              "C": [
+                0.21,
+                0.21,
+                0.21
+              ]
+            }
+          },
+          "capex": {
+            "label": "Capex",
+            "provider_consensus": [
+              102,
+              104.04,
+              106.12
+            ],
+            "brokers": {
+              "A": [
+                102,
+                104.04,
+                106.12
+              ],
+              "B": [
+                102,
+                104.04,
+                106.12
+              ],
+              "C": [
+                102,
+                104.04,
+                106.12
+              ]
+            }
+          },
+          "change_in_working_capital": {
+            "label": "Change in working capital",
+            "provider_consensus": [
+              -10.2,
+              -10.4,
+              -10.61
+            ],
+            "brokers": {
+              "A": [
+                -10.2,
+                -10.4,
+                -10.61
+              ],
+              "B": [
+                -10.2,
+                -10.4,
+                -10.61
+              ],
+              "C": [
+                -10.2,
+                -10.4,
+                -10.61
+              ]
+            }
+          },
+          "dividends": {
+            "label": "Dividends",
+            "provider_consensus": [
+              20.8,
+              21.63,
+              22.5
+            ],
+            "brokers": {
+              "A": [
+                20.8,
+                21.63,
+                22.5
+              ],
+              "B": [
+                20.8,
+                21.63,
+                22.5
+              ],
+              "C": [
+                20.8,
+                21.63,
+                22.5
+              ]
+            }
+          }
+        },
+        "house_metadata": {
+          "A": {
+            "published_date": "2025-12-31",
+            "document": "a-2025-12-31.pdf",
+            "source_id": "broker_1"
+          },
+          "B": {
+            "published_date": "2025-12-31",
+            "document": "b-2025-12-31.pdf",
+            "source_id": "broker_2"
+          },
+          "C": {
+            "published_date": "2025-12-31",
+            "document": "c-2025-12-31.pdf",
+            "source_id": "broker_3"
+          }
+        }
+      },
+      "provenance": {
+        "revenue": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+            "units": "USD millions",
+            "source_label": "Revenue",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+            "units": "USD millions",
+            "source_label": "Revenue",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"revenue\"",
+            "units": "USD millions",
+            "source_label": "Revenue",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "operating_profit": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+            "units": "USD millions",
+            "source_label": "Operating profit",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+            "units": "USD millions",
+            "source_label": "Operating profit",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"operating_profit\"",
+            "units": "USD millions",
+            "source_label": "Operating profit",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "tax_expense": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+            "units": "USD millions",
+            "source_label": "Income taxes",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+            "units": "USD millions",
+            "source_label": "Income taxes",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"tax_expense\"",
+            "units": "USD millions",
+            "source_label": "Income taxes",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "depreciation_and_amortisation": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, income_statement line \"depreciation_and_amortisation\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          }
+        ],
+        "cash_flow_tax_addback": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+            "units": "USD millions",
+            "source_label": "Income tax charge",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+            "units": "USD millions",
+            "source_label": "Income tax charge",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_tax_addback\"",
+            "units": "USD millions",
+            "source_label": "Income tax charge",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "finance_costs_net_addback": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+            "units": "USD millions",
+            "source_label": "Net finance costs add-back",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+            "units": "USD millions",
+            "source_label": "Net finance costs add-back",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+            "units": "USD millions",
+            "source_label": "Net finance costs add-back",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          }
+        ],
+        "change_in_working_capital": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+            "units": "USD millions",
+            "source_label": "Change in working capital",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+            "units": "USD millions",
+            "source_label": "Change in working capital",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"change_in_working_capital\"",
+            "units": "USD millions",
+            "source_label": "Change in working capital",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "income_taxes_paid": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+            "units": "USD millions",
+            "source_label": "Income taxes paid",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+            "units": "USD millions",
+            "source_label": "Income taxes paid",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+            "units": "USD millions",
+            "source_label": "Income taxes paid",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          }
+        ],
+        "finance_income_received": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+            "units": "USD millions",
+            "source_label": "Finance income received",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+            "units": "USD millions",
+            "source_label": "Finance income received",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+            "units": "USD millions",
+            "source_label": "Finance income received",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          }
+        ],
+        "finance_costs_paid": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+            "units": "USD millions",
+            "source_label": "Finance costs paid",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+            "units": "USD millions",
+            "source_label": "Finance costs paid",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+            "units": "USD millions",
+            "source_label": "Finance costs paid",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          }
+        ],
+        "capex": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-07-26",
+            "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Generated by the standardised bracket-case specification. No filing, broker note or third-party source exists for this figure; the issuer is not a real company."
+          }
+        ],
+        "acquisitions_net_of_cash": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+            "units": "USD millions",
+            "source_label": "Acquisitions, net of cash acquired",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+            "units": "USD millions",
+            "source_label": "Acquisitions, net of cash acquired",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"acquisitions_net_of_cash\"",
+            "units": "USD millions",
+            "source_label": "Acquisitions, net of cash acquired",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "dividends": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+            "units": "USD millions",
+            "source_label": "Dividends paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+            "units": "USD millions",
+            "source_label": "Dividends paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"dividends\"",
+            "units": "USD millions",
+            "source_label": "Dividends paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "lease_principal": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+            "units": "USD millions",
+            "source_label": "Payment of lease liabilities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+            "units": "USD millions",
+            "source_label": "Payment of lease liabilities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"lease_principal\"",
+            "units": "USD millions",
+            "source_label": "Payment of lease liabilities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "debt_repayment": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+            "units": "USD millions",
+            "source_label": "Repayment of borrowings",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+            "units": "USD millions",
+            "source_label": "Repayment of borrowings",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"debt_repayment\"",
+            "units": "USD millions",
+            "source_label": "Repayment of borrowings",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "debt_issuance": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+            "units": "USD millions",
+            "source_label": "Proceeds from borrowings",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+            "units": "USD millions",
+            "source_label": "Proceeds from borrowings",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"debt_issuance\"",
+            "units": "USD millions",
+            "source_label": "Proceeds from borrowings",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "rcf_draw": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+            "units": "USD millions",
+            "source_label": "RCF draw",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+            "units": "USD millions",
+            "source_label": "RCF draw",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"rcf_draw\"",
+            "units": "USD millions",
+            "source_label": "RCF draw",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "rcf_repayment": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+            "units": "USD millions",
+            "source_label": "RCF repayment",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+            "units": "USD millions",
+            "source_label": "RCF repayment",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"rcf_repayment\"",
+            "units": "USD millions",
+            "source_label": "RCF repayment",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "fx_effect_on_cash": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+            "units": "USD millions",
+            "source_label": "Effect of exchange rate changes on cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+            "units": "USD millions",
+            "source_label": "Effect of exchange rate changes on cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"fx_effect_on_cash\"",
+            "units": "USD millions",
+            "source_label": "Effect of exchange rate changes on cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "opening_cash": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+            "units": "USD millions",
+            "source_label": "Opening cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+            "units": "USD millions",
+            "source_label": "Opening cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"opening_cash\"",
+            "units": "USD millions",
+            "source_label": "Opening cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "ending_cash": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+            "units": "USD millions",
+            "source_label": "Ending cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+            "units": "USD millions",
+            "source_label": "Ending cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"ending_cash\"",
+            "units": "USD millions",
+            "source_label": "Ending cash",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "interest_income": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+            "units": "USD millions",
+            "source_label": "Finance income",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+            "units": "USD millions",
+            "source_label": "Finance income",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"interest_income\"",
+            "units": "USD millions",
+            "source_label": "Finance income",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "interest_expense": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+            "units": "USD millions",
+            "source_label": "Finance costs",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+            "units": "USD millions",
+            "source_label": "Finance costs",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"interest_expense\"",
+            "units": "USD millions",
+            "source_label": "Finance costs",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "adjusted_ebitda": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+            "units": "USD millions",
+            "source_label": "Adjusted EBITDA",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+            "units": "USD millions",
+            "source_label": "Adjusted EBITDA",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda\"",
+            "units": "USD millions",
+            "source_label": "Adjusted EBITDA",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "is_da_expense": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"is_da_expense\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "ebit": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+            "units": "USD millions",
+            "source_label": "EBIT",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+            "units": "USD millions",
+            "source_label": "EBIT",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"ebit\"",
+            "units": "USD millions",
+            "source_label": "EBIT",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "pre_tax_income": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+            "units": "USD millions",
+            "source_label": "Profit before taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+            "units": "USD millions",
+            "source_label": "Profit before taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"pre_tax_income\"",
+            "units": "USD millions",
+            "source_label": "Profit before taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "net_income": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+            "units": "USD millions",
+            "source_label": "Profit after taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+            "units": "USD millions",
+            "source_label": "Profit after taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"net_income\"",
+            "units": "USD millions",
+            "source_label": "Profit after taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "adjusted_ebitda_reconciliation": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+            "units": "USD millions",
+            "source_label": "Adjusted EBITDA reconciliation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+            "units": "USD millions",
+            "source_label": "Adjusted EBITDA reconciliation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, income_statement line \"adjusted_ebitda_reconciliation\"",
+            "units": "USD millions",
+            "source_label": "Adjusted EBITDA reconciliation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_flow_net_income": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+            "units": "USD millions",
+            "source_label": "Profit after taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+            "units": "USD millions",
+            "source_label": "Profit after taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_net_income\"",
+            "units": "USD millions",
+            "source_label": "Profit after taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_flow_profit_before_tax": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+            "units": "USD millions",
+            "source_label": "Profit before taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+            "units": "USD millions",
+            "source_label": "Profit before taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_profit_before_tax\"",
+            "units": "USD millions",
+            "source_label": "Profit before taxation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_flow_da": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_flow_da\"",
+            "units": "USD millions",
+            "source_label": "Depreciation and amortisation",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "net_finance_result": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+            "units": "USD millions",
+            "source_label": "Net finance result",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+            "units": "USD millions",
+            "source_label": "Net finance result",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"net_finance_result\"",
+            "units": "USD millions",
+            "source_label": "Net finance result",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "net_finance_addback": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+            "units": "USD millions",
+            "source_label": "Net finance costs add-back",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+            "units": "USD millions",
+            "source_label": "Net finance costs add-back",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_net_addback\"",
+            "units": "USD millions",
+            "source_label": "Net finance costs add-back",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_generated_from_operations": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+            "units": "USD millions",
+            "source_label": "Cash generated from operations",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+            "units": "USD millions",
+            "source_label": "Cash generated from operations",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_generated_from_operations\"",
+            "units": "USD millions",
+            "source_label": "Cash generated from operations",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_taxes": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+            "units": "USD millions",
+            "source_label": "Income taxes paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+            "units": "USD millions",
+            "source_label": "Income taxes paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"income_taxes_paid\"",
+            "units": "USD millions",
+            "source_label": "Income taxes paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_interest_received": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+            "units": "USD millions",
+            "source_label": "Finance income received",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+            "units": "USD millions",
+            "source_label": "Finance income received",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_income_received\"",
+            "units": "USD millions",
+            "source_label": "Finance income received",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_interest_paid": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+            "units": "USD millions",
+            "source_label": "Finance costs paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+            "units": "USD millions",
+            "source_label": "Finance costs paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"finance_costs_paid\"",
+            "units": "USD millions",
+            "source_label": "Finance costs paid",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_from_operations": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+            "units": "USD millions",
+            "source_label": "Net cash from operating activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+            "units": "USD millions",
+            "source_label": "Net cash from operating activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_operations\"",
+            "units": "USD millions",
+            "source_label": "Net cash from operating activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "ppe_purchases": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"capex\"",
+            "units": "USD millions",
+            "source_label": "Purchase of property, plant and equipment",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_from_investing": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+            "units": "USD millions",
+            "source_label": "Net cash used in investing activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+            "units": "USD millions",
+            "source_label": "Net cash used in investing activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_investing\"",
+            "units": "USD millions",
+            "source_label": "Net cash used in investing activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "cash_from_financing": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+            "units": "USD millions",
+            "source_label": "Net cash from financing activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+            "units": "USD millions",
+            "source_label": "Net cash from financing activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"cash_from_financing\"",
+            "units": "USD millions",
+            "source_label": "Net cash from financing activities",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "net_change_in_cash": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+            "units": "USD millions",
+            "source_label": "Net increase/(decrease) in cash and cash equivalents",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+            "units": "USD millions",
+            "source_label": "Net increase/(decrease) in cash and cash equivalents",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"net_change_in_cash\"",
+            "units": "USD millions",
+            "source_label": "Net increase/(decrease) in cash and cash equivalents",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ],
+        "free_cash_flow": [
+          {
+            "period_index": 0,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+            "units": "USD millions",
+            "source_label": "Free cash flow",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 1,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+            "units": "USD millions",
+            "source_label": "Free cash flow",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          },
+          {
+            "period_index": 2,
+            "document": "annual_report",
+            "publication_date": "2026-03-01",
+            "page_or_note": "Synthetic specification, cash_flow line \"free_cash_flow\"",
+            "units": "USD millions",
+            "source_label": "Free cash flow",
+            "transformation": "Exact filed value retained by the proposer-native evidence fixture."
+          }
+        ]
+      }
+    }
+  }
+}

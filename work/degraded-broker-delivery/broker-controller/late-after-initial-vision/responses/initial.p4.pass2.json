@@ -1,0 +1,13 @@
+{
+  "document_id": "initial",
+  "image_sha256": "f1a054707057134850b2c47da0b0f79cef8b2040222c76cc93e4bfdca81c9d0b",
+  "method": "ocr_geometry",
+  "non_tabular_reason": "narrative page",
+  "pass_index": 2,
+  "producer_fingerprint": "live-beta-fingerprint-2",
+  "producer_id": "live-beta-pass2",
+  "schema_version": "broker-vision-result/1.0",
+  "surface_disposition": "verified_non_tabular",
+  "surface_id": "initial.p4",
+  "tables": []
+}

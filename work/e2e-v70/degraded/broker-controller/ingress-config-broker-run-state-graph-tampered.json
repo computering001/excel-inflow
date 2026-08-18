@@ -1,0 +1,66 @@
+{
+  "attachments": {
+    "fixture.berenberg": {
+      "file_name": "berenberg.pdf",
+      "raw_sha256": "803fb60b5a24c1af9595b2a83e681d0761c0be56d5e59f70ec5d808b8193741c"
+    },
+    "fixture.bnp": {
+      "file_name": "bnp.pdf",
+      "raw_sha256": "4ff34dcab929e69440f414562b457d899deaff28c2b666de23d14a026e5e513b"
+    },
+    "fixture.jefferies": {
+      "file_name": "jefferies.pdf",
+      "raw_sha256": "5c3092b7b0a5b84b52d9703b6e6d5632b2ba062230905b12b87fb66d2b06e8a8"
+    },
+    "fixture.jpm": {
+      "file_name": "jpm.pdf",
+      "raw_sha256": "3d6060f23a84988c87934443d6195cb9fb176cef648891b6d0be281720ac0be3"
+    },
+    "fixture.kepler": {
+      "file_name": "kepler.pdf",
+      "raw_sha256": "2bf37b795e8c2bd520f8c361650d2b2e9ec8a0af273c0d8bee91c163dee4fe58"
+    }
+  },
+  "broker_pack_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/controller/compiled-394ebf161877b480-277e97ad4a9b/broker-pack.json",
+  "declaration": {
+    "crosswalk_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/crosswalk.json",
+    "crosswalk_receipt_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/controller/compiled-394ebf161877b480-277e97ad4a9b/broker-crosswalk-receipt.json",
+    "extraction_bundle_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/controller/verified-394ebf161877b480-degraded.json",
+    "run_state_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/controller/broker-run-state-graph-tampered.json",
+    "semantic_verification_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/controller/semantic-394ebf161877b480-277e97ad4a9b.json",
+    "source_tables_path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller/controller/compiled-394ebf161877b480-277e97ad4a9b/broker-source-tables.json"
+  },
+  "source_inventory": [
+    {
+      "kind": "user_broker_research",
+      "source_id": "fixture.jpm",
+      "status": "used",
+      "text_extractable": true
+    },
+    {
+      "kind": "user_broker_research",
+      "source_id": "fixture.kepler",
+      "status": "used",
+      "text_extractable": false
+    },
+    {
+      "kind": "user_broker_research",
+      "source_id": "fixture.berenberg",
+      "status": "used",
+      "text_extractable": false
+    },
+    {
+      "kind": "user_broker_research",
+      "source_id": "fixture.bnp",
+      "status": "used",
+      "text_extractable": true
+    },
+    {
+      "kind": "user_broker_research",
+      "source_id": "fixture.jefferies",
+      "status": "used",
+      "text_extractable": true
+    }
+  ],
+  "spec_dir": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/degraded/broker-controller"
+}

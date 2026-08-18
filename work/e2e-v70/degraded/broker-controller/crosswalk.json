@@ -1,0 +1,914 @@
+{
+  "as_of": "2026-06-30",
+  "coverage_ledger": [
+    {
+      "candidate_id": "bc-7711b01032a22b924418d269",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "non_periodic",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "bnp",
+      "label": "Metric",
+      "model_use": "reference_only",
+      "parent_candidate_id": null,
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 1,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 1
+        },
+        {
+          "column": 2,
+          "row": 1
+        },
+        {
+          "column": 3,
+          "row": 1
+        }
+      ],
+      "table_id": "ct-0d3dfefa57fa7ba8065d"
+    },
+    {
+      "candidate_id": "bc-594e44975bccf953636d0e5b",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "bnp",
+      "label": "Alpha series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-7711b01032a22b924418d269",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 2,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 2
+        },
+        {
+          "column": 2,
+          "row": 2
+        },
+        {
+          "column": 3,
+          "row": 2
+        }
+      ],
+      "table_id": "ct-0d3dfefa57fa7ba8065d"
+    },
+    {
+      "candidate_id": "bc-f968de4ab73da58112e7f7f7",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "bnp",
+      "label": "Beta series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-7711b01032a22b924418d269",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 3,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 3
+        },
+        {
+          "column": 2,
+          "row": 3
+        },
+        {
+          "column": 3,
+          "row": 3
+        }
+      ],
+      "table_id": "ct-0d3dfefa57fa7ba8065d"
+    },
+    {
+      "candidate_id": "bc-401388bc3a0c4bf27e34999e",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "non_periodic",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "jefferies",
+      "label": "Metric",
+      "model_use": "reference_only",
+      "parent_candidate_id": null,
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 1,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 1
+        },
+        {
+          "column": 2,
+          "row": 1
+        },
+        {
+          "column": 3,
+          "row": 1
+        }
+      ],
+      "table_id": "ct-273226cd5e82a5b90055"
+    },
+    {
+      "candidate_id": "bc-f6614a296aa074e2e57996a7",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "jefferies",
+      "label": "Alpha series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-401388bc3a0c4bf27e34999e",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 2,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 2
+        },
+        {
+          "column": 2,
+          "row": 2
+        },
+        {
+          "column": 3,
+          "row": 2
+        }
+      ],
+      "table_id": "ct-273226cd5e82a5b90055"
+    },
+    {
+      "candidate_id": "bc-697f4ca48d22d244e4f3f972",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "jefferies",
+      "label": "Beta series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-401388bc3a0c4bf27e34999e",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 3,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 3
+        },
+        {
+          "column": 2,
+          "row": 3
+        },
+        {
+          "column": 3,
+          "row": 3
+        }
+      ],
+      "table_id": "ct-273226cd5e82a5b90055"
+    },
+    {
+      "candidate_id": "bc-d0aa06e56f3a1a88a0ac2b9b",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "non_periodic",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "jpm",
+      "label": "Metric",
+      "model_use": "reference_only",
+      "parent_candidate_id": null,
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 1,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 1
+        },
+        {
+          "column": 2,
+          "row": 1
+        },
+        {
+          "column": 3,
+          "row": 1
+        }
+      ],
+      "table_id": "ct-1ca889a51b3196bc12c8"
+    },
+    {
+      "candidate_id": "bc-2a41b32323586d35b6e722a8",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "jpm",
+      "label": "Alpha series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-d0aa06e56f3a1a88a0ac2b9b",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 2,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 2
+        },
+        {
+          "column": 2,
+          "row": 2
+        },
+        {
+          "column": 3,
+          "row": 2
+        }
+      ],
+      "table_id": "ct-1ca889a51b3196bc12c8"
+    },
+    {
+      "candidate_id": "bc-d57af981580e0531b2d12583",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "jpm",
+      "label": "Beta series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-d0aa06e56f3a1a88a0ac2b9b",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 3,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 3
+        },
+        {
+          "column": 2,
+          "row": 3
+        },
+        {
+          "column": 3,
+          "row": 3
+        }
+      ],
+      "table_id": "ct-1ca889a51b3196bc12c8"
+    },
+    {
+      "candidate_id": "bc-3f475e8680e0f42eab60953b",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "non_periodic",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "kepler",
+      "label": "Metric",
+      "model_use": "reference_only",
+      "parent_candidate_id": null,
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 1,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 1
+        },
+        {
+          "column": 2,
+          "row": 1
+        },
+        {
+          "column": 3,
+          "row": 1
+        }
+      ],
+      "table_id": "ct-d018a48accb55dd65187"
+    },
+    {
+      "candidate_id": "bc-6cfa974495a05f4f9c329000",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "kepler",
+      "label": "Alpha series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-3f475e8680e0f42eab60953b",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 2,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 2
+        },
+        {
+          "column": 3,
+          "row": 2
+        }
+      ],
+      "table_id": "ct-d018a48accb55dd65187"
+    },
+    {
+      "candidate_id": "bc-e4eeb089cb6aef577eca59d8",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "quarantined_conflict",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "kepler",
+      "label": "Alpha series",
+      "model_use": "unresolved",
+      "parent_candidate_id": "bc-3f475e8680e0f42eab60953b",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 2,
+      "source_cells": [
+        {
+          "column": 2,
+          "row": 2
+        }
+      ],
+      "table_id": "ct-d018a48accb55dd65187"
+    },
+    {
+      "candidate_id": "bc-6d9e3d2378c45064f208735d",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "not_model_relevant",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "kepler",
+      "label": "Beta series",
+      "model_use": "reference_only",
+      "parent_candidate_id": "bc-3f475e8680e0f42eab60953b",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        1
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 3,
+      "source_cells": [
+        {
+          "column": 1,
+          "row": 3
+        },
+        {
+          "column": 3,
+          "row": 3
+        }
+      ],
+      "table_id": "ct-d018a48accb55dd65187"
+    },
+    {
+      "candidate_id": "bc-9c3617ab6c968faa18976f16",
+      "concept_id": "custom.fixture_reference",
+      "definition_evidence": "Fixture table caption and units row preserved verbatim from the rendered page.",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "custom.fixture_reference",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.custom.fixture_reference",
+      "disposition": "quarantined_conflict",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "house_id": "kepler",
+      "label": "Beta series",
+      "model_use": "unresolved",
+      "parent_candidate_id": "bc-3f475e8680e0f42eab60953b",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0
+      ],
+      "rationale": "Fixture candidate retained as evidence only; nothing in this regression consumes broker values.",
+      "review_status": "reviewed",
+      "row": 3,
+      "source_cells": [
+        {
+          "column": 2,
+          "row": 3
+        }
+      ],
+      "table_id": "ct-d018a48accb55dd65187"
+    }
+  ],
+  "forecast_periods": [
+    "2027-12-31",
+    "2028-12-31",
+    "2029-12-31"
+  ],
+  "mappings": [],
+  "metrics": {
+    "capex": {
+      "concept_id": "capex",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "capex",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.capex",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Capex",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "change_in_working_capital": {
+      "concept_id": "change_in_working_capital",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "change_in_working_capital",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.change_in_working_capital",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Change In Working Capital",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "depreciation_and_amortisation": {
+      "concept_id": "depreciation_and_amortisation",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "depreciation_and_amortisation",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.depreciation_and_amortisation",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Depreciation And Amortisation",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "dividends": {
+      "concept_id": "dividends",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "dividends",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.dividends",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Dividends",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "ebit": {
+      "concept_id": "ebit",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "ebit",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.ebit",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Ebit",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "effective_tax_rate": {
+      "concept_id": "effective_tax_rate",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "effective_tax_rate",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.effective_tax_rate",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Effective Tax Rate",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "revenue": {
+      "concept_id": "revenue",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "revenue",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.revenue",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Revenue",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    }
+  },
+  "reporting_currency": "USD",
+  "run_id": "degraded_close_regression",
+  "schema_version": "broker-crosswalk/1.2",
+  "table_reviews": [
+    {
+      "classification": "annual_forecast",
+      "header_rows": [
+        1
+      ],
+      "house_id": "jpm",
+      "period_columns": [
+        {
+          "column": 2,
+          "period_basis": "annual_forecast",
+          "period_index": 0
+        },
+        {
+          "column": 3,
+          "period_basis": "annual_forecast",
+          "period_index": 1
+        }
+      ],
+      "rationale": "Fixture forecast grid reviewed; every candidate retained as reference-only evidence.",
+      "review_status": "reviewed",
+      "table_id": "ct-1ca889a51b3196bc12c8"
+    },
+    {
+      "classification": "annual_forecast",
+      "header_rows": [
+        1
+      ],
+      "house_id": "kepler",
+      "period_columns": [
+        {
+          "column": 2,
+          "period_basis": "annual_forecast",
+          "period_index": 0
+        },
+        {
+          "column": 3,
+          "period_basis": "annual_forecast",
+          "period_index": 1
+        }
+      ],
+      "rationale": "Fixture forecast grid reviewed; every candidate retained as reference-only evidence.",
+      "review_status": "reviewed",
+      "table_id": "ct-d018a48accb55dd65187"
+    },
+    {
+      "classification": "annual_forecast",
+      "header_rows": [
+        1
+      ],
+      "house_id": "bnp",
+      "period_columns": [
+        {
+          "column": 2,
+          "period_basis": "annual_forecast",
+          "period_index": 0
+        },
+        {
+          "column": 3,
+          "period_basis": "annual_forecast",
+          "period_index": 1
+        }
+      ],
+      "rationale": "Fixture forecast grid reviewed; every candidate retained as reference-only evidence.",
+      "review_status": "reviewed",
+      "table_id": "ct-0d3dfefa57fa7ba8065d"
+    },
+    {
+      "classification": "annual_forecast",
+      "header_rows": [
+        1
+      ],
+      "house_id": "jefferies",
+      "period_columns": [
+        {
+          "column": 2,
+          "period_basis": "annual_forecast",
+          "period_index": 0
+        },
+        {
+          "column": 3,
+          "period_basis": "annual_forecast",
+          "period_index": 1
+        }
+      ],
+      "rationale": "Fixture forecast grid reviewed; every candidate retained as reference-only evidence.",
+      "review_status": "reviewed",
+      "table_id": "ct-273226cd5e82a5b90055"
+    }
+  ],
+  "units": "millions"
+}

@@ -1,0 +1,70 @@
+COMPANY NOTE                               QUIRIN PRIVATBANK EQUITY RESEARCH
+
+
+4 November          2025
+
+PSI   Software         AG           Strong 9M, guidance confirmed
+
+Rating                   Hold (Buy)                            On October 30, 2025, PSI released its 9M 2025 results and confirmed its guidance for
+Share price (EUR)               45.10    2025. Revenue growth was strong (+14.8% yoy to EUR 203.6m), exceeding our
+Target price (EUR)       45.00 (36.50)    estimate by 1.0%. Growth was supported by higher demand across all segments,
+                                               particularly in Grid & Energy Management, which benefited from strong projectBloomberg               PSAN GY
+                                                 activity despite restructuring. The adjusted EBIT margin of 2.8% was in line with our
+Sector                       Software
+                                           estimate, while the unadjusted margin improved slightly from -10.9% to -10.0% yoy,
+                                       mainly affected by restructuring and transaction costs linked to the Warburg Pincus
+Share data                             agreement. PSI reaffirmed its full-year guidance of around 10.0% yoy revenue growth
+                                   and an adjusted EBIT margin of around 4.0%, in line with our expectations. We raiseShares out (m)                      15.5
+                                      our target price to EUR 45.00 (previously EUR 36.50) due to the Warburg Pincus dealDaily volume shs (m)                  1.8
+                                   and change our recommendation to Hold.Free float (%)                     74.10
+Market cap (EUR m)             699
+                                         Grid & Energy Management drives growth
+EV (EUR m)                    740
+                                     Revenues  in 9M 2025 increased by 14.8% yoy to EUR 203.6m, exceeding our
+DPS (EUR)                      0.00
+                                         expectation by 1.0%. Order intake was strong with EUR 269.0m, up 36.4% yoy,
+Dividend yield (%)                  0.0
+                                               reflecting solid demand across core business areas. The Grid & Energy Management
+Payout ratio (%)                    0.0
+                                    segment was the main contributor, posting a 28.3% yoy increase to EUR 96.9m,
+                                       supported by strong market activity despite ongoing restructuring efforts. The DiscretePerformance
+                                        Manufacturing segment also showed dynamic momentum with revenues up 27.0% yoyytd (%)                              113.7
+                                          to EUR 25.5m, reflecting progress in cloud and SaaS transformation. Logistics revenues12 months (%)                   109.8
+                                         rose 16.1% yoy to EUR 25.4m. Process Industries & Metals grew by 9.0% yoy to EUR12 months rel. (%)                 100.1
+                                        53.1m. Overall, the sale of the Mobility division was offset by organic growth across
+Index                    TecDAX
+                                        remaining segments.
+
+Share price performance               One-time charges affect margin
+                                   The adjusted EBIT margin of 9M 2025 was 2.8%, in line with our estimate. The
+                                        unadjusted EBIT margin increased  slightly from -10.9% to -10.0% yoy, reflecting
+                                                significant one-time charges. The margin was primarily impacted by restructuring
+                                      expenses in the Grid & Energy Management segment and transaction costs related to
+                                         the Warburg Pincus investment agreement.
+
+                                    Guidance confirmed
+                                           PSI confirmed its guidance for 2025, forecasting revenue growth of around 10.0% yoy
+                                    and an adjusted EBIT margin of around 4.0%, both in line with our adjusted estimates.
+                                   The outlook  reflects management’s expectation of continued order and revenue
+                                     growth supported by a strong order intake of EUR 269.0m (+36.4% yoy) and a stable
+                                         order backlog of EUR 188.0m, despite the sale of the Mobility division. The company
+                                             anticipates that restructuring measures in the Grid & Energy Management segment and
+Source: Bloomberg                          the cloud and SaaS transformation in Discrete Manufacturing will continue to weigh on
+                                                    profitability in the short term. However, the ongoing cost reduction program and
+Next triggers                              operational improvements  should  support margin  recovery once  the one-time
+tba                                    expenses of roughly EUR 12.0m and transaction costs in the low double-digit million
+                                EUR range related to the Warburg Pincus deal phase out.
+
+
+Analysts
+Sebastian Droste – Financial Analyst
+T +49 (0) 69 2475049 26               Key figures                      2023    2024    2025e    2026e    2027e
+sebastian.droste@quirinprivatbank.de       Sales          EUR m            270      261      287       317      352
+                                       EBIT          EUR m             6       -15       -13       16       26
+                                   EPS           EUR               0.02      -1.35     -0.75      0.61      1.04
+                                            Sales growth    %                   8.9      -3.4      10.0      10.5       11.0
+                                   EBITDA margin  %                     7.5      -0.2       0.2       9.0      10.5
+                                       EBIT margin    %                      2.1      -5.8      -4.5        5.2        7.3
+                                          EV/Sales           ratio                 1.41       1.36      2.54      2.25      1.98
+Please see final page for important disclaimers     EV/EBITDA        ratio                18.9    -566.5    1270.7      25.0      18.9
+and disclosures                                  Source: Bloomberg, Company data, Quirin Privatbank estimates

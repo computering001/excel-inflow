@@ -1,0 +1,594 @@
+{
+  "completed_at": "2026-08-15T11:44:13.436Z",
+  "counts": {
+    "BLOCKED": 1,
+    "FAIL": 5,
+    "PASS": 36
+  },
+  "golden_actions_performed": false,
+  "inputs": {
+    "BROKER_CORPUS": null,
+    "BROKER_REAL_PACK_MANIFEST": null,
+    "CASES": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases",
+    "FIXED_POINT_CASES_MANIFEST": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/excel-inflow-graph-loop-repair-20260812/fixed-point-cases.json",
+    "REPRESENTATIVE": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/c1-2101.json"
+  },
+  "kind": "source_owned_lean_development_gate",
+  "native_excel_actions_performed": false,
+  "phases": [
+    "workflow",
+    "evidence",
+    "forecast",
+    "graph",
+    "economics"
+  ],
+  "registry_path": "assets/development-test-registry.json",
+  "release_actions_performed": false,
+  "results": [
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_workflow_state_tests.mjs"
+      ],
+      "duration_ms": 200.051875,
+      "exit_code": 0,
+      "id": "workflow-state-contract",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "  PASS  canonical contract loads\n  PASS  broker intake requires an explicit choice before completion\n  PASS  one visible progress scale maps internal checkpoints without leaking stage numbers\n  PASS  screen response semantics reject contradictory or ambiguous actions\n  PASS  broker-only delivery block\n  PASS  broker defects degrade and cannot claim a delivery block\n  PASS  undeclared fatal reason\n  PASS  only the four declared fatal reasons can block delivery\n  PASS  valid internal and user-owned states are accepted\n  PASS  every internal evidence state has a declared route to a closed lane\n  PASS  internal work can never become an action-required user message\n  PASS  internal work cannot masquerade as a user upload blocker\n  PASS  user-blocking boolean cannot disagree with ownership\n  PASS  legal resumable transitions are accepted\n  PASS  same-evidence fatal input block cannot silently become pass\n  PASS  filing extraction work cannot become a user blocker\n  PASS  a delivered run cannot silently regress into an earlier flow state\n  PASS  user-flow normalisation persists typed ownership\n  PASS  optional broker control-plane defects cannot terminate the company run\n  PASS  an untyped user-flow block is forbidden\n  PASS  action-required is only legal at the decisions stage\n  PASS  stage receipts enforce the same stage-state contract\n  PASS  stage receipt mutation cannot request a decision at inputs\n  PASS  Python controllers consume the same canonical contract\n\n24/24 workflow-state checks passed.\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_decision_round_tests.mjs"
+      ],
+      "duration_ms": 1221.052042,
+      "exit_code": 0,
+      "id": "decision-round-batching",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"survivor_count\":6,\"current_round_count\":5,\"remaining_question_count\":1}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_entity_identity_tests.mjs"
+      ],
+      "duration_ms": 75.566041,
+      "exit_code": 0,
+      "id": "entity-identity",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":6}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_layered_graph_constitution_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/c1-2101.json"
+      ],
+      "duration_ms": 155.359833,
+      "exit_code": 1,
+      "id": "layered-graph-constitution",
+      "phase": "graph",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/lib/statement_topology.mjs:782\n    throw new Error(\n          ^\n\nError: cash_flow visible statement topology is invalid (2): SOURCE_ORDER_INVERSION:cash_flow_adjustments, NON_CONTIGUOUS_FAMILY:cash_generated_from_operations.\n    at assertStatementTopology (file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/lib/statement_topology.mjs:782:11)\n    at compileRowPlan (file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/lib/row_plan.mjs:3633:3)\n    at file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_layered_graph_constitution_tests.mjs:20:14\n\nNode.js v22.23.2\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_equation_graph_tests.mjs"
+      ],
+      "duration_ms": 171.803375,
+      "exit_code": 0,
+      "id": "equation-graph-and-scc",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"total_violations\": 0,\n  \"graph_schema_version\": \"equation-graph/1.0\",\n  \"convergence_contract_version\": \"convergence-contract/1.0\",\n  \"policy_schema_version\": \"economic-solve-policy/1.0\",\n  \"structural_scc_count\": 1,\n  \"active_scc_count\": {\n    \"circularity_off\": 0,\n    \"circularity_on\": 1\n  },\n  \"off_state_live_edge_count\": 42,\n  \"iteration_state_size\": 13,\n  \"mutations\": [\n    {\n      \"name\": \"missing cash to interest income\",\n      \"status\": \"PASS\",\n      \"total_violations\": 5\n    },\n    {\n      \"name\": \"missing ending RCF to RCF interest\",\n      \"status\": \"PASS\",\n      \"total_violations\": 5\n    },\n    {\n      \"name\": \"missing statement start to CFO\",\n      \"status\": \"PASS\",\n      \"total_violations\": 5\n    },\n    {\n      \"name\": \"missing CFO to cash\",\n      \"status\": \"PASS\",\n      \"total_violations\": 3\n    },\n    {\n      \"name\": \"unrelated cycle\",\n      \"status\": \"PASS\",\n      \"total_violations\": 6\n    },\n    {\n      \"name\": \"reverse statement schedule direction\",\n      \"status\": \"PASS\",\n      \"total_violations\": 6\n    },\n    {\n      \"name\": \"missing circularity gate\",\n      \"status\": \"PASS\",\n      \"total_violations\": 2\n    },\n    {\n      \"name\": \"gate RCF sweep off\",\n      \"status\": \"PASS\",\n      \"total_violations\": 2\n    },\n    {\n      \"name\": \"policy role drift\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    },\n    {\n      \"name\": \"state tolerance class drift\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    },\n    {\n      \"name\": \"workbook tolerance drift\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    },\n    {\n      \"name\": \"strict schema rejects extension\",\n      \"status\": \"PASS\",\n      \"total_violations\": 1\n    }\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_fixed_point_constitution_tests.mjs",
+        "--manifest",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/excel-inflow-graph-loop-repair-20260812/fixed-point-cases.json"
+      ],
+      "duration_ms": 2575.4385,
+      "exit_code": 0,
+      "id": "fixed-point-multi-archetype",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"archetypes\": [\n    {\n      \"case_id\": \"astrazeneca_2025\",\n      \"circularity_on\": {\n        \"iterations\": 8,\n        \"residual\": 3.4924596548080444e-10,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 0\n      }\n    },\n    {\n      \"case_id\": \"kerry_group_acquisition_on_2025\",\n      \"circularity_on\": {\n        \"iterations\": 7,\n        \"residual\": 1.0713669951201155e-9,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 0\n      }\n    },\n    {\n      \"case_id\": \"kerry_group_stressed_liquidity_2025\",\n      \"circularity_on\": {\n        \"iterations\": 8,\n        \"residual\": 4.180591872682271e-9,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 3\n      }\n    },\n    {\n      \"case_id\": \"kerry_group_2025\",\n      \"circularity_on\": {\n        \"iterations\": 7,\n        \"residual\": 1.0713669951201155e-9,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 0\n      }\n    },\n    {\n      \"case_id\": \"kingspan_group_2025\",\n      \"circularity_on\": {\n        \"iterations\": 8,\n        \"residual\": 3.7457255075423745e-9,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 3\n      }\n    },\n    {\n      \"case_id\": \"smurfit_westrock_full_reference_2026\",\n      \"circularity_on\": {\n        \"iterations\": 7,\n        \"residual\": 4.472411774258944e-9,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 0\n      }\n    },\n    {\n      \"case_id\": \"standard_maximal\",\n      \"circularity_on\": {\n        \"iterations\": 8,\n        \"residual\": 1.1562732993297686e-9,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 3\n      }\n    },\n    {\n      \"case_id\": \"standard_net_cash\",\n      \"circularity_on\": {\n        \"iterations\": 2,\n        \"residual\": 0,\n        \"active_scc_nodes\": 13\n      },\n      \"circularity_off\": {\n        \"iterations\": 1,\n        \"residual\": 0,\n        \"active_scc_nodes\": 0,\n        \"material_sweep_periods\": 0\n      }\n    }\n  ],\n  \"mutations\": [\n    {\n      \"name\": \"interest survives breaker\",\n      \"status\": \"PASS\",\n      \"violations\": 1\n    },\n    {\n      \"name\": \"solver vector missing node\",\n      \"status\": \"PASS\",\n      \"violations\": 3\n    },\n    {\n      \"name\": \"runtime tolerance drift\",\n      \"status\": \"PASS\",\n      \"violations\": 1\n    },\n    {\n      \"name\": \"reported convergence tolerance drift\",\n      \"status\": \"PASS\",\n      \"violations\": 1\n    },\n    {\n      \"name\": \"disabled RCF sweep\",\n      \"status\": \"PASS\",\n      \"violations\": 2\n    }\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_instrument_period_state_tests.mjs"
+      ],
+      "duration_ms": 107.140458,
+      "exit_code": 0,
+      "id": "instrument-period-state",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"schema_version\": \"instrument-period-state/1.0\",\n  \"state_count\": 39,\n  \"definition_node_count\": 14,\n  \"violations\": 0,\n  \"mutations\": [\n    \"double_fx\",\n    \"rcf_mandatory_repayment\",\n    \"definition_membership\",\n    \"mandatory_membership\",\n    \"semantic_membership_binding\",\n    \"legacy_native_basis_migration\",\n    \"non_maturing_with_in_horizon_date\",\n    \"multi_rcf_role_separation\",\n    \"no_rcf_state_graph\",\n    \"no_rcf_ordinary_revolver_maturity\",\n    \"residual_pricing_authority\",\n    \"zero_balance_maturity_exclusion\",\n    \"issuance_before_maturity_inclusion\"\n  ]\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_forecast_behavior_tests.mjs"
+      ],
+      "duration_ms": 81.876333,
+      "exit_code": 0,
+      "id": "forecast-behavior",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"tests\": 28,\n  \"adversarial_mutations_caught\": 7,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_forecast_observation_tests.mjs"
+      ],
+      "duration_ms": 163.658375,
+      "exit_code": 0,
+      "id": "forecast-observation-ledger",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "PASS annual, H1, Q3, quarterly, guidance, broker and user observations pass\nPASS normalization and digest are independent of source record order\nPASS observationsForConcept supports period end and forecast index selectors\nPASS unknown source id blocks\nPASS incompatible definition and units block\nPASS strict schema rejects unknown ledger and record fields\nPASS YTD evidence without reported_through blocks\nPASS duplicate writer blocks\nPASS observation outside the fiscal forecast horizon blocks\nPASS partial period misclassified as annual blocks\nPASS evidence-run validator invokes the optional ledger contract\nPASS evidence-run validator rejects a receipt not bound to its ledger\nPASS deployment profile includes the ledger schema and runtime library\n\n13/13 forecast-observation tests pass\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_resolution_v2_tests.mjs"
+      ],
+      "duration_ms": 99.629625,
+      "exit_code": 0,
+      "id": "evidence-resolution-v2",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 29,\n  \"verified_observations\": 18,\n  \"degraded_quarantines\": 2,\n  \"authority_nodes\": 8\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_run_constitution_graph_tests.mjs"
+      ],
+      "duration_ms": 86.126291,
+      "exit_code": 0,
+      "id": "run-constitution-graph",
+      "phase": "graph",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"positive_checks\": 15,\n  \"adversarial_mutations\": 5,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_product_constitution_tests.mjs"
+      ],
+      "duration_ms": 60.760834,
+      "exit_code": 0,
+      "id": "product-constitution",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"product_constitution_sha256\": \"07b39324841888a82fc7fe23b3a670244b9f6b96057f007e6d76ff7d0d98bc21\",\n  \"causal_matrix_checks\": 5,\n  \"broker_delivery_block_mutations\": 4,\n  \"zero_broker_fallback\": \"PASS\",\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_delivery_constitution_tests.mjs"
+      ],
+      "duration_ms": 49.855458,
+      "exit_code": 0,
+      "id": "delivery-constitution",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"schema_errors\": 0,\n  \"broker_degradation_mutations\": 13,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_controller_exit_inventory_tests.mjs"
+      ],
+      "duration_ms": 52.667833,
+      "exit_code": 0,
+      "id": "controller-terminal-exits",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 62,\n  \"public_exit_count\": 8,\n  \"delegate_exit_count\": 18,\n  \"public_controller_count\": 1\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_dynamic_concept_tests.mjs"
+      ],
+      "duration_ms": 120.934417,
+      "exit_code": 0,
+      "id": "broker-dynamic-concepts",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 11,\n  \"mutation_count\": 4\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_forecast_topology_tests.mjs"
+      ],
+      "duration_ms": 108.535875,
+      "exit_code": 0,
+      "id": "forecast-topology",
+      "phase": "forecast",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"tests\": 27,\n  \"mutations_caught\": 4,\n  \"captured_paths\": 6,\n  \"cash_flow_event_method\": \"explicit_zero\"\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_statement_classifier_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/c1-2101.json"
+      ],
+      "duration_ms": 175.782958,
+      "exit_code": 1,
+      "id": "statement-classifier",
+      "phase": "evidence",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_statement_classifier_tests.mjs:15\nfunction assert(condition, message) { if (!condition) throw new Error(message); }\n                                                            ^\n\nError: Evidence fixture did not pass baseline coverage.\n    at assert (file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_statement_classifier_tests.mjs:15:61)\n    at file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_statement_classifier_tests.mjs:110:1\n\nNode.js v22.23.2\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_case_source_proposer_tests.mjs"
+      ],
+      "duration_ms": 82.662625,
+      "exit_code": 0,
+      "id": "case-source-proposer",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 23\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_case_authorship_boundary_tests.mjs"
+      ],
+      "duration_ms": 188.161833,
+      "exit_code": 0,
+      "id": "case-authorship-boundary",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "PASS case-authorship boundary: declarations compile; caller case and split manifests block\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_pipeline_tests.py"
+      ],
+      "duration_ms": 448.098667,
+      "exit_code": 0,
+      "id": "attachment-evidence-controller",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 23, \"status\": \"PASS\", \"total_violation_count\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_intake_tests.mjs"
+      ],
+      "duration_ms": 191.897791,
+      "exit_code": 0,
+      "id": "broker-intake-choice",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"checks\": 19,\n  \"total_violations\": 0\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_degraded_close_tests.py"
+      ],
+      "duration_ms": 2840.528291,
+      "exit_code": 0,
+      "id": "broker-degraded-close",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 74, \"status\": \"PASS\", \"statuses\": [\"NEEDS_VISION\", \"NEEDS_RESOLUTION\", \"NEEDS_CROSSWALK\", \"NEEDS_RESOLUTION\", \"PASS_DEGRADED\"]}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_demand_selection_tests.py"
+      ],
+      "duration_ms": 355.032875,
+      "exit_code": 0,
+      "id": "broker-demand-selection",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 16, \"status\": \"PASS\", \"violations\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_migration_tests.py"
+      ],
+      "duration_ms": 1193.287208,
+      "exit_code": 0,
+      "id": "broker-carrier-migration",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"checks\": 25, \"status\": \"PASS\", \"statuses\": [\"NEEDS_CROSSWALK\", \"PASS_DEGRADED\"]}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_preview_tests.mjs"
+      ],
+      "duration_ms": 193.907167,
+      "exit_code": 0,
+      "id": "broker-preview-gate",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "PASS sealed preview is deterministic, schema-valid and screen-safe\nPASS evidence-only tables remain visible inventory but cannot be selected\nPASS file API binds exact artifact bytes for proof-gate use\nPASS confirmation is hash-bound and selects only an eligible coherent house\nPASS ordinary Stage 2 auto-selects a clean house without a user stop\nPASS automatic broker selection receipt and run carrier preserve the seal\nPASS stale preview hash is rejected\nPASS mixed-house primary period mutation is rejected\nPASS selected quarantined source cell falls through without poisoning its house\nPASS unselected quarantined cell remains evidence-only without poisoning clean selections\nPASS no coherent house succeeds through a zero-consumption forecast-waterfall preview\nPASS named-house gaps never mix to consensus while explicit consensus remains available\nPASS named primary house owns a complete local headline anchor\n13/13 broker preview tests pass\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_page_evidence_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/c1-2101.json"
+      ],
+      "duration_ms": 219.479333,
+      "exit_code": 1,
+      "id": "broker-page-evidence",
+      "phase": "evidence",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "node:internal/errors:983\n  const err = new Error(message);\n              ^\n\nError: Command failed: node scripts/build_dynamic_model.mjs /var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/broker-page-evidence-80S0kg/case.json --out /var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/broker-page-evidence-80S0kg/plan/model.xlsx --plan-only\nError: Invalid v2 case:\n- production_model requires source_coverage.classification_contract_version=evidence_v1; an absent or legacy evidence contract cannot enter the builder.\n- production_model requires statement_authority_contract_version=authority_v1.\n- production_model requires forecast_authority_contract_version=waterfall_v1; legacy blank and implicit-zero forecasts cannot enter the builder.\n    at main (file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/build_dynamic_model.mjs:11718:11)\n\n    at genericNodeError (node:internal/errors:983:15)\n    at wrappedFn (node:internal/errors:537:14)\n    at checkExecSyncError (node:child_process:916:11)\n    at execFileSync (node:child_process:952:15)\n    at file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_page_evidence_tests.mjs:86:1 {\n  status: 1,\n  signal: null,\n  output: [\n    null,\n    Buffer(0) [Uint8Array] [],\n    Buffer(525) [Uint8Array] [\n       69, 114, 114, 111, 114,  58,  32,  73, 110, 118,  97, 108,\n      105, 100,  32, 118,  50,  32,  99,  97, 115, 101,  58,  10,\n       45,  32, 112, 114, 111, 100, 117,  99, 116, 105, 111, 110,\n       95, 109, 111, 100, 101, 108,  32, 114, 101, 113, 117, 105,\n      114, 101, 115,  32, 115, 111, 117, 114,  99, 101,  95,  99,\n      111, 118, 101, 114,  97, 103, 101,  46,  99, 108,  97, 115,\n      115, 105, 102, 105,  99,  97, 116, 105, 111, 110,  95,  99,\n      111, 110, 116, 114,  97,  99, 116,  95, 118, 101, 114, 115,\n      105, 111, 110,  61,\n      ... 425 more items\n    ]\n  ],\n  pid: 89857,\n  stdout: Buffer(0) [Uint8Array] [],\n  stderr: Buffer(525) [Uint8Array] [\n     69, 114, 114, 111, 114,  58,  32,  73, 110, 118,  97, 108,\n    105, 100,  32, 118,  50,  32,  99,  97, 115, 101,  58,  10,\n     45,  32, 112, 114, 111, 100, 117,  99, 116, 105, 111, 110,\n     95, 109, 111, 100, 101, 108,  32, 114, 101, 113, 117, 105,\n    114, 101, 115,  32, 115, 111, 117, 114,  99, 101,  95,  99,\n    111, 118, 101, 114,  97, 103, 101,  46,  99, 108,  97, 115,\n    115, 105, 102, 105,  99,  97, 116, 105, 111, 110,  95,  99,\n    111, 110, 116, 114,  97,  99, 116,  95, 118, 101, 114, 115,\n    105, 111, 110,  61,\n    ... 425 more items\n  ]\n}\n\nNode.js v22.23.2\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_internal_fixed_point_tests.py"
+      ],
+      "duration_ms": 148.977667,
+      "exit_code": 0,
+      "id": "internal-evidence-fixed-point",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"blocker_class\": \"INTERNAL_WORK\", \"state\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-fixed-point-_q_lvk_7/broker-run-state.json\", \"status\": \"NEEDS_VISION\", \"task_count\": 1, \"user_blocking\": false}\n{\"blocker_class\": \"INTERNAL_WORK\", \"state\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-fixed-point-_q_lvk_7/broker-run-state.json\", \"status\": \"NEEDS_VISION\", \"task_count\": 1, \"user_blocking\": false}\n{\"blocker_class\": \"INTERNAL_WORK\", \"state\": \"/var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-fixed-point-_q_lvk_7/broker-run-state.json\", \"status\": \"NEEDS_VISION\", \"task_count\": 1, \"user_blocking\": false}\n{\"checks\": 51, \"mutation_checks\": 10, \"positive_checks\": 41, \"status\": \"PASS\", \"total_violation_count\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_work_graph_tests.py"
+      ],
+      "duration_ms": 38.951667,
+      "exit_code": 0,
+      "id": "broker-work-graph",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"closure_sha256\": \"c08af21423538965a0107ffc8fe974e6f30ce72731d23f4a1042000767296a9e\", \"mutation_checks\": 6, \"positive_checks\": 10, \"status\": \"PASS\", \"total_violation_count\": 0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_dcs_evidence_tests.py",
+        "--out",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/full-local-gate.ZeoBD1/dcs-lossless-evidence"
+      ],
+      "duration_ms": 681.529917,
+      "exit_code": 0,
+      "id": "dcs-lossless-evidence",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"schema_version\": \"dcs-evidence-tests/1.0\",\n  \"status\": \"PASS\",\n  \"positive_checks\": 11,\n  \"adversarial_mutations_caught\": 5,\n  \"mutations\": {\n    \"schema-extra\": [\n      \"DCS-SCHEMA-CONTRACT\"\n    ],\n    \"drop-zero-cp\": [\n      \"DCS-MODEL-EVIDENCE-ROW-OWNER\",\n      \"DCS-ORPHAN-MODEL-EVIDENCE\"\n    ],\n    \"drop-zero-rcf\": [\n      \"DCS-MODEL-EVIDENCE-ROW-OWNER\",\n      \"DCS-ORPHAN-MODEL-EVIDENCE\"\n    ],\n    \"wrong-cell\": [\n      \"DCS-AUTHORITY-CELL-DISPOSITION\",\n      \"DCS-AUTHORITY-VALUE\"\n    ],\n    \"economic-tamper\": [\n      \"DCS-ORACLE-MATURITY-CONVENTION\",\n      \"DCS-ORACLE-PROJECTION-VALUE\"\n    ]\n  }\n}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_dcs_pipeline_tests.py",
+        "--out",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/full-local-gate.ZeoBD1/dcs-controller-fixed-point"
+      ],
+      "duration_ms": 722.460583,
+      "exit_code": 0,
+      "id": "dcs-controller-fixed-point",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"mutation_checks\": 6, \"positive_checks\": 9, \"resume_reused_all\": true, \"schema_version\": \"dcs-pipeline-tests/1.0\", \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_physical_reconciliation_tests.py"
+      ],
+      "duration_ms": 56.363333,
+      "exit_code": 0,
+      "id": "broker-physical-reconciliation",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"adversarial_mutations_caught\": 5, \"native_recovery_status\": \"NEEDS_VISION\", \"positive_archetypes\": 5, \"rendered_disagreement_status\": \"NEEDS_RESOLUTION\", \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_period_header_tests.py"
+      ],
+      "duration_ms": 755.756834,
+      "exit_code": 0,
+      "id": "broker-period-header-recovery",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"controller_statuses\": [\"NEEDS_RESOLUTION\", \"NEEDS_CROSSWALK\", \"PASS\"], \"locally_quarantined_columns\": 1, \"mutations_caught\": 2, \"positive_checks\": 14, \"resolved_headers\": 2, \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_house_exclusion_tests.py"
+      ],
+      "duration_ms": 935.241416,
+      "exit_code": 0,
+      "id": "broker-house-exclusion",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"controller_status\": \"PASS_DEGRADED\", \"excluded_house\": \"kepler\", \"mutations_caught\": 3, \"positive_checks\": 14, \"remaining_mapping_count\": 0, \"status\": \"PASS\", \"terminal_candidate_count\": 2}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_table_engine_tests.py"
+      ],
+      "duration_ms": 43.420792,
+      "exit_code": 0,
+      "id": "broker-table-engine-adapter",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"mutations_caught\": 1, \"positive_checks\": 7, \"status\": \"PASS\"}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_filings_pipeline_tests.mjs"
+      ],
+      "duration_ms": 1859.691541,
+      "exit_code": 0,
+      "id": "filings-controller",
+      "phase": "evidence",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":34,\"total_violation_count\":0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_orchestration_tests.mjs"
+      ],
+      "duration_ms": 91.919459,
+      "exit_code": 0,
+      "id": "evidence-orchestration",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\"status\":\"PASS\",\"checks\":8,\"total_violation_count\":0}\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_run_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases"
+      ],
+      "duration_ms": 102.054125,
+      "exit_code": 1,
+      "id": "evidence-run-compiler",
+      "phase": "evidence",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "node:internal/fs/promises:639\n  return new FileHandle(await PromisePrototypeThen(\n                        ^\n\nError: ENOENT: no such file or directory, open '/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/standard-net-cash-v2.json'\n    at async open (node:internal/fs/promises:639:25)\n    at async Object.readFile (node:internal/fs/promises:1252:14)\n    at async file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_run_tests.mjs:778:3 {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'open',\n  path: '/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/standard-net-cash-v2.json'\n}\n\nNode.js v22.23.2\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_user_flow_tests.mjs"
+      ],
+      "duration_ms": 11070.027375,
+      "exit_code": 0,
+      "id": "production-user-flow",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "  PASS  bare chat invocation is routed to the canonical Company screen\n  PASS  vNext is the single public Company-screen controller\n  PASS  production controller owns one canonical six-milestone visible journey\n  PASS  successful ordinary transitions emit ASCII while JSON remains pure\n  PASS  no-question production path pauses after decisions\n  PASS  run carrier references the canonical evidence snapshot without copying it\n  PASS  run carrier preserves a sealed broker choice and never infers zero files as skip\n  PASS  identical restart reuses all completed stages\n  PASS  tampered stage output invalidates only that stage\n  PASS  question path stops once and never treats action-required as success\n  PASS  delivery blocker constitution covers every terminal user-flow outcome\n  PASS  supplied answer persists and resumes deterministically\n  PASS  invalid evidence blocks before reconciliation\n  PASS  a case edited while the run waited blocks the resume by name\n\n14/14 production user-flow tests pass\n"
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_degraded_broker_delivery_tests.mjs",
+        "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases"
+      ],
+      "duration_ms": 2997.883167,
+      "exit_code": 1,
+      "id": "degraded-broker-delivery",
+      "phase": "workflow",
+      "signal": null,
+      "status": "FAIL",
+      "stderr": "node:internal/errors:983\n  const err = new Error(message);\n              ^\n\nError: Command failed: /Users/archiepreston/.hermes/node/bin/node /Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_run_tests.mjs /Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases --emit-clean /var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-degraded-delivery.1XwxKY/clean-evidence-run.json\nnode:internal/fs/promises:639\n  return new FileHandle(await PromisePrototypeThen(\n                        ^\n\nError: ENOENT: no such file or directory, open '/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/standard-net-cash-v2.json'\n    at async open (node:internal/fs/promises:639:25)\n    at async Object.readFile (node:internal/fs/promises:1252:14)\n    at async file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_run_tests.mjs:778:3 {\n  errno: -2,\n  code: 'ENOENT',\n  syscall: 'open',\n  path: '/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/standard-net-cash-v2.json'\n}\n\nNode.js v22.23.2\n\n    at genericNodeError (node:internal/errors:983:15)\n    at wrappedFn (node:internal/errors:537:14)\n    at ChildProcess.exithandler (node:child_process:417:12)\n    at ChildProcess.emit (node:events:519:28)\n    at maybeClose (node:internal/child_process:1101:16)\n    at ChildProcess._handle.onexit (node:internal/child_process:304:5) {\n  code: 1,\n  killed: false,\n  signal: null,\n  cmd: '/Users/archiepreston/.hermes/node/bin/node /Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_run_tests.mjs /Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases --emit-clean /var/folders/jg/2tdjsh_s0jlgf2jdrk037_zr0000gn/T/excel-inflow-degraded-delivery.1XwxKY/clean-evidence-run.json',\n  stdout: '',\n  stderr: 'node:internal/fs/promises:639\\n' +\n    '  return new FileHandle(await PromisePrototypeThen(\\n' +\n    '                        ^\\n' +\n    '\\n' +\n    \"Error: ENOENT: no such file or directory, open '/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/standard-net-cash-v2.json'\\n\" +\n    '    at async open (node:internal/fs/promises:639:25)\\n' +\n    '    at async Object.readFile (node:internal/fs/promises:1252:14)\\n' +\n    '    at async file:///Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_evidence_run_tests.mjs:778:3 {\\n' +\n    '  errno: -2,\\n' +\n    \"  code: 'ENOENT',\\n\" +\n    \"  syscall: 'open',\\n\" +\n    \"  path: '/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/debt-model-unified-reset/phase8-structural-cohort-v1/cases/standard-net-cash-v2.json'\\n\" +\n    '}\\n' +\n    '\\n' +\n    'Node.js v22.23.2\\n'\n}\n\nNode.js v22.23.2\n",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_broker_exit_fault_injection_tests.mjs"
+      ],
+      "duration_ms": 45.797041,
+      "exit_code": 0,
+      "id": "broker-exit-fault-injection",
+      "phase": "workflow",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"schema_version\": \"broker-exit-fault-injection-report/1.0\",\n  \"status\": \"PASS\",\n  \"injected_exit_classes\": 4,\n  \"constitution_broker_reasons\": 13,\n  \"checks\": 56,\n  \"broker_caused_hard_blocks\": 0\n}\n"
+    },
+    {
+      "duration_ms": 0,
+      "exit_code": null,
+      "id": "universal-broker-delivery-matrix",
+      "missing": [
+        "DEGRADED_DELIVERY_REPORT",
+        "USABLE_BROKER_WORKBOOK"
+      ],
+      "phase": "workflow",
+      "status": "BLOCKED",
+      "stderr": "Missing required test custody input(s): DEGRADED_DELIVERY_REPORT, USABLE_BROKER_WORKBOOK",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "/Users/archiepreston/.hermes/node/bin/node",
+        "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/scripts/run_opening_debt_reconciliation_tests.mjs"
+      ],
+      "duration_ms": 129.906708,
+      "exit_code": 0,
+      "id": "opening-debt-reconciliation",
+      "phase": "economics",
+      "status": "PASS",
+      "stderr": "",
+      "stdout": "{\n  \"status\": \"PASS\",\n  \"positive\": [\n    \"native_principal_translated_at_last_historical_period_end\",\n    \"reporting_currency_carrying_value_not_double_translated\",\n    \"case_only_release_uses_canonical_opening_state\",\n    \"coverage_uses_canonical_opening_state\",\n    \"raw_dcs_reporting_currency_contract_preserved\"\n  ],\n  \"mutations\": [\n    \"missing_fx_blocks\",\n    \"incorrect_native_basis_creates_reconciliation_failure\"\n  ]\n}\n"
+    }
+  ],
+  "schema_version": "development-gate-report/1.0",
+  "started_at": "2026-08-15T11:43:58.613Z",
+  "status": "FAIL"
+}

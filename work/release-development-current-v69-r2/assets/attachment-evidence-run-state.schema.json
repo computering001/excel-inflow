@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/attachment-evidence-run-state.schema.json",
+  "title": "Resumable attachment-evidence production transaction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "pipeline_status", "user_blocking",
+    "blocker_class", "controller_spec_sha256", "runtime_closure_sha256",
+    "workflow_transaction_sha256",
+    "lane_states", "checkpoints", "artifacts", "artifact_sha256", "tasks", "fixed_point", "summary"
+  ],
+  "properties": {
+    "schema_version": { "const": "attachment-evidence-run-state/1.0" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "pipeline_status": {
+      "enum": ["NEEDS_INTERNAL_WORK", "PASS", "BLOCKED_INPUT", "BLOCKED_INTERNAL"]
+    },
+    "user_blocking": { "type": "boolean" },
+    "blocker_class": {
+      "type": ["string", "null"],
+      "enum": ["INTERNAL_WORK", "USER_EVIDENCE", "USER_DECISION", "FATAL_SOURCE", null]
+    },
+    "controller_spec_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "workflow_transaction_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "lane_states": { "type": "object", "additionalProperties": { "type": "object" } },
+    "checkpoints": { "type": "array", "items": { "type": "object" } },
+    "artifacts": { "type": "object", "additionalProperties": { "type": "string" } },
+    "artifact_sha256": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    },
+    "tasks": { "type": "array", "items": { "type": "object" } },
+    "fixed_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "status", "progress_sha256", "lane_progress",
+        "remaining_task_count", "aggregate_terminal_defect_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "attachment-internal-fixed-point/1.0" },
+        "status": { "enum": ["OPEN", "CLOSED", "USER_BOUNDARY", "TERMINAL_DEFECT"] },
+        "progress_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "lane_progress": { "type": "object", "additionalProperties": { "type": "object" } },
+        "remaining_task_count": { "type": "integer", "minimum": 0 },
+        "aggregate_terminal_defect_count": { "type": "integer", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "summary": { "type": "object" }
+  }
+}

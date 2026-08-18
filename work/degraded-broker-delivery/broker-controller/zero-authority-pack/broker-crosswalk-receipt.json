@@ -1,0 +1,557 @@
+{
+  "schema_version": "broker-crosswalk-receipt/1.2",
+  "run_id": "degraded_close_regression",
+  "bundle_sha256": "8174cf698d21ad5a13b8b52ff42625e58a7bab82999b3f8365b4de984e9e8eb9",
+  "crosswalk_sha256": "9a212102c7354f5f19fb58048c9016813a1b69ae4e96d01788d584ed171854cd",
+  "mapping_count": 0,
+  "mappings": [],
+  "table_reviews_sha256": "f47a1c7c9feac3176f8a826234a21d68a608616fece971a10ab06f612488ec06",
+  "coverage_ledger_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "terminal_recovery_sha256": "065a5b61b0ec0d65acdf9e3f14cfce9c6512f7f640f19ac4a050762ef49b6685",
+  "coverage_summary": {
+    "table_count": 4,
+    "table_review_count": 4,
+    "detected_forecast_candidate_count": 14,
+    "coverage_entry_count": 14,
+    "unresolved_candidate_count": 0,
+    "terminal_quarantined_candidate_count": 14,
+    "unresolved_selected_candidate_count": 0,
+    "semantic_quality_violation_count": 0,
+    "candidate_manifest_count": 14,
+    "candidate_authority": "deterministic_manifest",
+    "mapping_count": 0,
+    "derived_mapping_count": 0,
+    "disposition_counts": {
+      "preserve_unconsumed_quarantine": 14
+    }
+  },
+  "coverage_ledger": [
+    {
+      "candidate_id": "bc-2a41b32323586d35b6e722a8",
+      "document_id": "jpm",
+      "house_id": "jpm",
+      "table_id": "ct-1ca889a51b3196bc12c8",
+      "row": 2,
+      "label": "Alpha series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 2,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-3f475e8680e0f42eab60953b",
+      "document_id": "kepler",
+      "house_id": "kepler",
+      "table_id": "ct-d018a48accb55dd65187",
+      "row": 1,
+      "label": "Metric",
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "source_cells": [
+        {
+          "row": 1,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-401388bc3a0c4bf27e34999e",
+      "document_id": "jefferies",
+      "house_id": "jefferies",
+      "table_id": "ct-273226cd5e82a5b90055",
+      "row": 1,
+      "label": "Metric",
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "source_cells": [
+        {
+          "row": 1,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-594e44975bccf953636d0e5b",
+      "document_id": "bnp",
+      "house_id": "bnp",
+      "table_id": "ct-0d3dfefa57fa7ba8065d",
+      "row": 2,
+      "label": "Alpha series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 2,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-697f4ca48d22d244e4f3f972",
+      "document_id": "jefferies",
+      "house_id": "jefferies",
+      "table_id": "ct-273226cd5e82a5b90055",
+      "row": 3,
+      "label": "Beta series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 3,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-6cfa974495a05f4f9c329000",
+      "document_id": "kepler",
+      "house_id": "kepler",
+      "table_id": "ct-d018a48accb55dd65187",
+      "row": 2,
+      "label": "Alpha series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 2,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-6d9e3d2378c45064f208735d",
+      "document_id": "kepler",
+      "house_id": "kepler",
+      "table_id": "ct-d018a48accb55dd65187",
+      "row": 3,
+      "label": "Beta series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 3,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-7711b01032a22b924418d269",
+      "document_id": "bnp",
+      "house_id": "bnp",
+      "table_id": "ct-0d3dfefa57fa7ba8065d",
+      "row": 1,
+      "label": "Metric",
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "source_cells": [
+        {
+          "row": 1,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-9c3617ab6c968faa18976f16",
+      "document_id": "kepler",
+      "house_id": "kepler",
+      "table_id": "ct-d018a48accb55dd65187",
+      "row": 3,
+      "label": "Beta series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0
+      ],
+      "source_cells": [
+        {
+          "row": 3,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "quarantined_conflict"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-d0aa06e56f3a1a88a0ac2b9b",
+      "document_id": "jpm",
+      "house_id": "jpm",
+      "table_id": "ct-1ca889a51b3196bc12c8",
+      "row": 1,
+      "label": "Metric",
+      "period_basis": "non_periodic",
+      "period_indexes": [],
+      "source_cells": [
+        {
+          "row": 1,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 1,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-d57af981580e0531b2d12583",
+      "document_id": "jpm",
+      "house_id": "jpm",
+      "table_id": "ct-1ca889a51b3196bc12c8",
+      "row": 3,
+      "label": "Beta series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 3,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-e4eeb089cb6aef577eca59d8",
+      "document_id": "kepler",
+      "house_id": "kepler",
+      "table_id": "ct-d018a48accb55dd65187",
+      "row": 2,
+      "label": "Alpha series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0
+      ],
+      "source_cells": [
+        {
+          "row": 2,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "quarantined_conflict"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-f6614a296aa074e2e57996a7",
+      "document_id": "jefferies",
+      "house_id": "jefferies",
+      "table_id": "ct-273226cd5e82a5b90055",
+      "row": 2,
+      "label": "Alpha series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 2,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 2,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    },
+    {
+      "candidate_id": "bc-f968de4ab73da58112e7f7f7",
+      "document_id": "bnp",
+      "house_id": "bnp",
+      "table_id": "ct-0d3dfefa57fa7ba8065d",
+      "row": 3,
+      "label": "Beta series",
+      "period_basis": "annual_forecast",
+      "period_indexes": [
+        0,
+        1
+      ],
+      "source_cells": [
+        {
+          "row": 3,
+          "column": 1,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 2,
+          "raw_value": null,
+          "authority_status": "verified"
+        },
+        {
+          "row": 3,
+          "column": 3,
+          "raw_value": null,
+          "authority_status": "verified"
+        }
+      ],
+      "disposition": "preserve_unconsumed_quarantine",
+      "model_use": "unresolved",
+      "model_consumption": "prohibited",
+      "finding_codes": [
+        "TERMINAL-ZERO-BROKER-AUTHORITY"
+      ],
+      "rationale": "Bounded internal recovery exhausted; preserve the raw candidate, prohibit model consumption, and continue through the forecast waterfall.",
+      "review_status": "reviewed"
+    }
+  ],
+  "derived_mappings": [],
+  "candidate_manifest_sha256": "90573b022e49757f3625b1015ff3d05bbb3bbc6e8587b98549ac2eb7a09d496d",
+  "crosswalk_canonical_sha256": "f253abb965d06fa8f629bc54b7a2caedb89e233f5952b74b24a0dc40d2013ebe",
+  "independent_semantic_report_sha256": "f590efda8d7ce41b8b07f2705418d3a2b542d6cc6d01f5939dd7e4b7d5e9f533",
+  "status": "PASS"
+}

@@ -1,0 +1,73 @@
+Smartbroker
+
+
+Consolidated cash flow statement
+
+In EUR m                                            2021       2022       2023       2024      2025e      2026e      2027e
+
+Net income                                                   -0.54       -10.07        -5.92        -1.39       -11.76        -7.92        -0.16
+Depreciation of fixed assets                                  0.00        0.00        0.00        0.00        0.00        0.00        0.00
+Amortisation of goodwill                                     0.00        0.00        0.00        0.00        0.00        0.00        0.00
+Amortisation of intangible assets                             3.80       17.19        6.57       10.67       11.56       10.19       11.41
+Increase/decrease in long-term provisions                     3.29        0.00        0.00        0.00        0.00        0.00        0.00
+Other non-cash income and expenses                        0.72        0.00        -0.27        0.15        0.00        0.00        0.00
+Cash Flow before NWC change                            7.27        7.12        0.38        9.42        -0.20        2.27       11.24
+Increase / decrease in inventory                              0.01        0.00        0.00        0.00        -0.10        0.00        0.00
+Increase / decrease in accounts receivable                     -2.26        0.82        -0.94        1.86        -2.18        -0.80        -0.80
+Increase / decrease in accounts payable                      9.03        -5.80        0.75        -1.29        -0.42        0.10        0.40
+Increase / decrease in other working capital positions           -0.11        0.00        0.00        0.00        0.00        0.00        0.00
+Increase / decrease in working capital (total)                   6.67        -4.98        -0.19        0.57        -2.70        -0.70        -0.40
+Net cash provided by operating activities [1]              13.93        2.14        0.19        9.99        -2.90        1.57       10.84
+
+Investments in intangible assets                             -10.00       -15.00        -5.00        -5.00        -5.00       -10.00       -10.00
+Investments in property, plant and equipment                  -0.02        -0.02        -0.02        -0.02        -0.02        -0.02        -0.02
+Payments for acquisitions                                     -9.14        0.00        0.00        0.00        0.00        0.00        0.00
+Financial investments                                         -1.82        0.00        0.00        -0.39        0.00        0.00        0.00
+Income from asset disposals                                 0.00        0.00        0.29        0.04        0.00        0.00        0.00
+Net cash provided by investing activities [2]               -19.80       -15.02       -11.01        -3.43        -5.02       -10.02       -10.02
+
+Change in financial liabilities                                   -1.80        9.16        -4.51        -4.26        -1.69        0.00        0.00
+Dividends paid                                             0.00        0.00        0.00        0.00        0.00        0.00        0.00
+Purchase of own shares                                     0.00        0.00        0.00        0.00        0.00        0.00        0.00
+Capital measures                                         19.13       10.03        0.00        0.00        0.00        0.00        0.00
+Other                                                         -0.16        0.00        0.22        7.47        0.00        0.00        0.00
+Net cash provided by financing activities [3]              17.16       19.20        -4.29        3.21        -1.69        0.00        0.00
+
+Change in liquid funds [1]+[2]+[3]                        11.30        6.32       -15.11        9.77        -9.60        -8.45        0.83
+Effects of exchange-rate changes on cash                    0.15        0.00        0.00        -0.03        0.00        0.00        0.00
+Cash and cash equivalent at end of period                25.52       31.85       12.26       22.01       12.41        3.96        4.79
+
+
+Financial Ratios
+
+                                                    2021       2022       2023       2024      2025e      2026e      2027e
+
+Cash Flow
+FCF                                                       1.45       -12.88       -11.11        6.13        -7.91        -8.45        0.83
+Free Cash Flow / Sales                                      3.0 %      -24.4 %      -23.9 %      11.7 %      -11.7 %      -11.9 %       1.0 %
+Free Cash Flow Potential                                    2.98        8.64        0.68        9.26        -0.20        2.27       11.24
+Free Cash Flow / Net Profit                               -259.4 %     127.9 %     185.9 %    -442.8 %      67.3 %     106.7 %    -508.7 %
+Interest Received / Avg. Cash                                0.0 %       0.1 %       1.5 %       1.7 %       0.0 %       0.0 %       0.0 %
+Interest Paid / Avg. Debt                                     2.5 %       3.7 %       1.9 %       2.1 %       0.0 %       0.0 %       0.0 %
+Management of Funds
+Investment ratio                                          20.8 %      28.4 %      10.8 %       9.6 %       7.4 %      14.1 %      12.2 %
+Maint. Capex / Sales                                         0.0 %       0.0 %       0.0 %       0.0 %       0.0 %       0.0 %       0.0 %
+Capex / Dep                                           312.1 %      87.4 %      76.4 %      47.0 %      43.4 %      98.3 %      87.8 %
+Avg. Working Capital / Sales                                 0.8 %       0.9 %       6.6 %       5.5 %       5.9 %       8.0 %       7.5 %
+Trade Debtors / Trade Creditors                            78.5 %     206.2 %     183.9 %     199.2 %     336.4 %     356.5 %     333.3 %
+Inventory Turnover                                    6062.8 x    7019.3 x   21218.0 x   10466.0 x     339.3 x     325.6 x     349.7 x
+Receivables collection period (days)                         53         43         56         36         40         42         40
+Payables payment period (days)                           125         52         66         46         24         26         28
+Cash conversion cycle (Days)                                 -74          -12          -12            -9         17         18         13
+
+
+
+                                      Free Cash Flow Generation            Working Capital
+
+
+
+
+
+                                                             Source: Warburg Research                                    Source: Warburg Research
+
+                        COM M ENT      Published 26.02.2026       7

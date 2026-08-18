@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/model-demand-graph-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "product_constitution_sha256", "case_id", "forecast_periods", "nodes", "edges", "counts", "graph_sha256"],
+  "properties": {
+    "schema_version": { "const": "model-demand-graph/1.0" },
+    "product_constitution_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "forecast_periods": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "string", "format": "date" } },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["node_id", "node_kind", "section", "concept_id", "source_line_ids", "period_end", "required", "material", "authority_class", "allowed_authorities", "reachable_outputs"],
+        "properties": {
+          "node_id": { "type": "string", "minLength": 1 },
+          "node_kind": { "enum": ["forecast_state", "contractual_term"] },
+          "section": { "type": "string", "minLength": 1 },
+          "concept_id": { "type": "string", "minLength": 1 },
+          "source_line_ids": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "instrument_id": { "type": "string", "minLength": 1 },
+          "period_end": { "type": ["string", "null"], "format": "date" },
+          "required": { "type": "boolean" },
+          "material": { "type": "boolean" },
+          "authority_class": { "enum": ["identity", "schedule", "independent_input", "captured", "contractual"] },
+          "allowed_authorities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "reachable_outputs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "kind"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "kind": { "const": "depends_on" }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forecast_states", "contractual_terms", "required_material", "edges"],
+      "properties": {
+        "forecast_states": { "type": "integer", "minimum": 0 },
+        "contractual_terms": { "type": "integer", "minimum": 0 },
+        "required_material": { "type": "integer", "minimum": 0 },
+        "edges": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

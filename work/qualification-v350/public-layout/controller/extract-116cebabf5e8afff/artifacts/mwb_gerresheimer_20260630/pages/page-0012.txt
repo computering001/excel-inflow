@@ -1,0 +1,57 @@
+mwb research AG
+Page 12 of 18
+
+Financials
+
+
+
+ Profit and loss (EURm)                                2023        2024        2025       2026E       2027E       2028E
+ Sales                                                   1,990        1,991        2,321        2,321        2,379        2,426
+ Sales growth                                           9.5%         0.0%       16.6%         0.0%         2.5%         2.0%
+ Cost of sales                                              1,440         1,423         1,896         1,697         1,722         1,727
+ Gross profit                                         551         568         425         623         657         699
+ SG&A expenses                                       326         387         439         464         471         461
+ Research and development                               16          24          81          26          26          32
+ Other operating expenses (income)                             -10              -4         115          35          31          24
+ EBITDA                                             401         360         312         378         409         459
+ Depreciation                                          130         156         342         219         222         221
+ EBITA                                               271         205           -30         159         187         238
+ Amortisation of goodwill and intangible assets                53          44         179          60          58          56
+ EBIT                                               218         161         -209          99         129         183
+ Financial result                                                -50           -51          -121          -106          -102          -111
+ Recurring pretax income from continuing operations          167         110          -330              -8          28          72
+ Extraordinary income/loss                                 0           0           0           0           0           0
+ Earnings before taxes                                  167         110          -330              -8          28          72
+ Taxes                                               47          26           -11              -2           8          22
+ Net income from continuing operations                     120          84          -319              -6          19          50
+ Result from discontinued operations (net of tax)                0           0           0           0           0           0
+ Net income                                          120          84         -319            -6          19          50
+ Minority interest                                                     -4              -2              -2           0              -0              -1
+ Net profit (reported)                                    116          82          -320              -6          19          49
+ Average number of shares                                 33.34        34.54        34.54        34.54        34.54        34.54
+ EPS reported                                              3.48         2.38         -9.27         -0.16         0.55         1.43
+
+
+ Profit and loss (common size)                          2023        2024        2025       2026E       2027E       2028E
+ Sales                                          100%       100%       100%       100%       100%       100%
+ Cost of sales                                     72%        71%        82%        73%        72%        71%
+ Gross profit                                     28%        29%        18%        27%        28%        29%
+ SG&A expenses                                   16%        19%        19%        20%        20%        19%
+ Research and development                           1%        1%        3%        1%        1%        1%
+ Other operating expenses (income)                         -0%          -0%        5%        1%        1%        1%
+ EBITDA                                        20%        18%        13%        16%        17%        19%
+ Depreciation                                    7%        8%        15%        9%        9%        9%
+ EBITA                                          14%        10%          -1%        7%        8%        10%
+ Amortisation of goodwill and intangible assets             3%        2%        8%        3%        2%        2%
+ EBIT                                           11%        8%         -9%        4%        5%        8%
+ Financial result                                          -3%          -3%          -5%          -5%          -4%          -5%
+ Recurring pretax income from continuing operations          8%        6%         -14%          -0%        1%        3%
+ Extraordinary income/loss                           0%        0%        0%        0%        0%        0%
+ Earnings before taxes                              8%        6%         -14%          -0%        1%        3%
+ Taxes                                         2%        1%          -0%          -0%        0%        1%
+ Net income from continuing operations                  6%        4%         -14%          -0%        1%        2%
+ Result from discontinued operations (net of tax)            0%        0%        0%        0%        0%        0%
+ Net income                                     6%        4%        -14%         -0%        1%        2%
+ Minority interest                                         -0%          -0%          -0%        0%          -0%          -0%
+ Net profit (reported)                               6%        4%        -14%         -0%        1%        2%
+ Source: Company data; mwb research

@@ -1,0 +1,7 @@
+{
+  "document_id": "berenberg",
+  "instruction": "Read the complete grid twice, independently.",
+  "region_crops": [],
+  "schema_version": "broker-vision-task/1.0",
+  "surface_id": "berenberg.p4"
+}

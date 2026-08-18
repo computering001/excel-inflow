@@ -1,0 +1,90 @@
+Smartbroker
+
+(CDAX, Telecom/Internet, SB1 GR)
+
+
+                                    Value Indicators:           EUR Warburg Risk Score:         2.9  Description:
+Buy                               DCF:                         18.58  Balance Sheet Score:               4.8
+                                                                                                                          Operator of the brokerage service
+                                                                                 Market Liquidity Score:              1.0
+                                                                                                                         Smartbroker and financial portals
+ EUR 18.60
+                                    Market Snapshot:         EUR m  Shareholders:                Key Figures (WRe):        2025e
+                                            Market cap:                  190.53  Freefloat                      36.00 %  Beta:                            1.4
+ Price             EUR 12.15    No. of shares (m):              15.68  Executive & Supervisory Board   5.00 %  Price / Book:                   5.4 x
+ Upside               53.1 %    EV:                         191.07  André Kolbinger               59.00 %  Equity Ratio:                76 %
+                                                   Freefloat MC:                  68.59
+                             Ø Trad. Vol. (30d):            72.83 th
+
+Preliminary 2025 figures in line; Further improvement expected in 2026
+
+ Stated Figures FY/2025:                                 Comment on Figures:
+                                                                                    Preliminary 2025 figures show that Smartbroker has met its guidance,
+   in EUR m                           2025   2025e   2024      yoy
+                                                                            which was raised twice.
+  Total revenues                           69.0    67.4    52.5    31%    Revenue grew by 31% to EUR 69m (WRe: EUR 67.4m), placing the result
+  EBITDA                                    0.0     -0.5      1.4      n.a.     at the upper end of the final guidance range of EUR 65–70m.
+                                                                                    EBITDA  was  broadly  balanced  (WRe:  –0.5m).  Excluding  CAC,
+                                                                              Smartbroker would have reported a clearly positive operating EBITDA of
+                                                       EUR 10m.
+
+ With new customer growth of 77k (previous year: 76k), Smartbroker fell slightly short of its revised guidance of 80k. However, this represents a clear
+ improvement compared with new customer acquisition in 2024 (14k) and, in our view, demonstrates the acceptance of the smartbroker+ platform.
+ Management expects this trend to continue in 2026, with new customer growth of ~100k. The average CAC in 2025 was approximately EUR 129 per
+ new customer.
+ Guidance: For 2026, management expects sales to move sideways in a range of EUR 67m–72m (WRe: 70.9m). This already takes the expected effects
+  of the discontinuation of payment‑for‑order‑flow (PFOF) into account from July 2026. However, no changes are planned for end-customers. After 9M/25,
+ these payments accounted for approximately 15% of total revenues.
+ Management expects EBITDA to range from EUR –1.5m to EUR +1.5m. The discontinuation of PFOF payments is expected to be almost completely
+  offset by cost‑cutting measures already initiated. Rising marketing costs of EUR 12.5m (EUR +2.5m vs 2025) have also been taken into account. The
+ goal is to further improve adjusted EBITDA before CAC.
+ In the portal business (wallstreet‑online, finanznachrichten.de, etc.), revenue of EUR 28m and EBITDA of EUR 6m are expected in 2026. The resulting
+ EBITDA margin of 21% would be higher than in 2024 (19%), but probably lower than the, still unreported, 2025 margin (WRe: 25%). However, in our
+  view, it would continue to deliver a very stable contribution to earnings and cash flow.
+ In terms of new customer acquisition, management is counting on a further acceleration from 77k to 100k in 2026. To this end, the marketing budget is
+ planned to increase by EUR 2.5m to EUR 12.5m, which corresponds to an average CAC per customer of EUR 125. Further investments are planned in
+ products and technology, reflecting the increased focus on trading‑savvy customers who could generate additional revenue growth. For example, there
+ are plans to expand the IT team by 20 positions with a focus on AI and trader needs (e.g. optimised desktop version, junior accounts). This is expected
+  to result in a further increase in new customers to 130k by 2027 (previously 100k). The 13k new customers acquired in January and February, together
+  with a record month of trades, support the targeted growth path.
+ Conclusion: The targets for 2026 are ambitious, but the company has already significantly exceeded its original targets in 2025. The clear customer
+ focus and technological development should support growth, suggesting that our previous estimates should be achievable. Possible effects from the
+ implementation of a product for retirement provision, “Altersvorsorgedepot”, could further strengthen sales and customer growth. We confirm our Buy
+ recommendation with a price target of EUR 18.60.
+
+
+                                   FY End: 31.12.       CAGR
+                                                         in EUR m              (24-27e)      2021      2022      2023      2024     2025e     2026e     2027e
+
+                                           Sales                  16.1 %      48.20      52.79      46.54      52.48      67.44      70.90      82.19
+                                      Change Sales yoy                  70.9 %       9.5 %     -11.8 %     12.8 %     28.5 %       5.1 %     15.9 %
+                                          Gross profit margin                  48.2 %     64.6 %     59.9 %     60.2 %     49.7 %     54.1 %     57.5 %
+                                    EBITDA                  8.2 %       3.56        8.77        1.34        8.97       -0.50        2.07      11.34
+                                            Margin                                7.4 %     16.6 %       2.9 %     17.1 %      -0.7 %       2.9 %     13.8 %
+                                       EBIT                                    -       0.35       -8.41       -5.22       -1.70      -12.06       -8.12       -0.06
+                                            Margin                                0.7 %     -15.9 %     -11.2 %      -3.2 %     -17.9 %     -11.5 %      -0.1 %
+                                         Net income                           -       -0.56      -10.07       -5.98       -1.39      -11.76       -7.92       -0.16
+
+                                 EPS                                     -       -0.04       -0.64       -0.38       -0.08       -0.70       -0.47       -0.01
+                                 EPS adj.                               -       -0.04       -0.64       -0.38       -0.08       -0.70       -0.47       -0.01
+                                DPS                                     -       0.00        0.00        0.00        0.00        0.00        0.00        0.00
+ Rel. Performance vs CDAX:              Dividend Yield                             n.a.          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+                                  FCFPS                               0.10       -0.82       -0.71        0.37       -0.47       -0.50        0.05
+ 1 month:                            -16.7 %
+                                 EV / Sales                             6.6 x        3.9 x        3.1 x        2.0 x        2.9 x        2.9 x        2.5 x
+ 6 months:                            6.0 %
+                                 EV / EBITDA                        89.6 x      23.7 x     107.8 x      11.7 x          n.a.      98.8 x      18.0 x
+ Year to date:                        -20.2 %   EV / EBIT                         913.4 x          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+ Trailing 12 months:                 10.5 %   P / E                                        n.a.          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+                                 P / E adj.                                   n.a.          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+ Company events:                   FCF Potential Yield                  0.9 %       4.2 %       0.5 %       8.8 %      -0.1 %       1.1 %       5.5 %
+ 30.06.26                 AR 2025   Net Debt                            -19.82      -12.51       -1.82      -15.82       -7.91        0.54       -0.29
+ 09.09.26                       H1   ROE                                   -1.4 %     -20.5 %     -12.9 %      -3.0 %     -27.0 %     -23.4 %      -0.5 %
+                               ROCE (NOPAT)                           n.a.          n.a.          n.a.          n.a.          n.a.          n.a.          n.a.
+                                         Guidance:         2026: Revenue EUR 66-72m; EBITDA EUR -1.5m - +1.5m
+
+
+Ana lys t
+Andreas Pläsier            COM M ENT     Published 26.02.2026 08:15     1
+aplaesier@warburg-research.com
++49 40 309537-246

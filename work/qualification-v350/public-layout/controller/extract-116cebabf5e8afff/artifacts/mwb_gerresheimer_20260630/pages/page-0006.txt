@@ -1,0 +1,61 @@
+ mwb research AG
+ Page 6 of 18
+
+Valuation
+
+ DCF Model
+
+ The DCF model results in a fair value of EUR 12.43 per share:
+
+ Top-line growth: We expect Gerresheimer AG to grow revenues at a CAGR of 2.1%
+ between 2026E and 2033E. The long-term growth rate is set at 2.0%.
+
+ ROCE. Returns on capital are developing from 2.8% in 2026E to 6.7% in 2033E.
+
+ WACC. Starting point is an equity beta of 2.40. Unleverering and correcting for mean
+ reversion yields an asset beta of 1.11. Combined with a risk-free rate of 2.0% and an
+ equity risk premium of 6.0% this yields cost of equity of 15.7%. With pre-tax cost of
+ borrowing at 5.0%, a tax rate of 30% and target debt/equity of 1.5 this results in a
+ long-term WACC of 8.4%.
+
+
+DCF (EURm)                                                                                                               Terminal
+                             2026E     2027E     2028E     2029E     2030E     2031E     2032E     2033E
+(except per share data and beta)                                                                                                   value
+NOPAT                            74        90       127       161       171       174       177        170
+Depreciation & amortization           280       279       276       271       267       264       262        261
+Change in working capital                -24        12        19        17        15        14        15         13
+Chg. in long-term provisions            -132         7         6         6         6         7         7          7
+Capex                               -290       -250       -231       -235       -240       -245       -250         -255
+Cash flow                               -92       139       197       220       220       214       211        196        3,130
+Present value                           -81       115       150       154       142       128       116        100        1,590
+WACC                             8.7%       8.3%       8.3%       8.4%       8.4%       8.4%       8.4%        8.4%        8.4%
+
+DCF per share derived from                       DCF avg. growth and earnings assumptions
+                                                       Planning horizon avg. revenue growth (2026E-2033E)                          2.1%
+Total present value                   2,413             Terminal value growth (2033E - infinity)                                      2.0%
+Mid-year adj. total present value       2,513             Terminal year ROCE                                                      6.7%
+Net debt / cash                      2,003             Terminal year WACC                                                     8.4%
+Financial assets                     21
+Provisions and off b/s debt           102             Terminal WACC derived from
+Equity value                       429            Cost of borrowing (before taxes)                                           5.0%
+No. of shares outstanding              34.5             Long-term tax rate                                               30%
+                                                          Equity beta                                                                   2.40
+Discounted cash flow / share         12.43             Unlevered beta (industry or company)                                           1.11
+upside/(downside)                 -54.8%             Target debt / equity                                                               1.5
+                                                       Relevered beta                                                               2.28
+                                                             Risk-free rate                                                           2.0%
+                                                          Equity risk premium                                                      6.0%
+Share price                        27.50            Cost of equity                                                         15.7%
+
+Sensitivity analysis DCF
+
+
+                            Long term growth                                                   Share of present value
+                               1.0%       1.5%       2.0%       2.5%       3.0%
+                   2.0%            -9.8         -8.1         -6.1         -4.0         -1.5               2026E-2029E                14.0%       WACC
+    in             1.0%            -3.0         -0.7         1.9         4.9         8.4               2030E-2033E                20.1%
+                   0.0%           5.5         8.7        12.4       16.7       21.9                 terminal value               65.9%                            (%-points)                    -1.0%         16.8        21.4       26.9       33.5       41.6           Change                    -2.0%         32.2        39.3       47.9       58.8       72.9
+
+
+Source: mwb research

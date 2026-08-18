@@ -1,0 +1,215 @@
+{
+  "as_of": "2026-06-30",
+  "coverage_ledger": [],
+  "forecast_periods": [
+    "2027-12-31",
+    "2028-12-31",
+    "2029-12-31"
+  ],
+  "mappings": [],
+  "metrics": {
+    "capex": {
+      "concept_id": "capex",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "capex",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.capex",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Capex",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "change_in_working_capital": {
+      "concept_id": "change_in_working_capital",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "change_in_working_capital",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.change_in_working_capital",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Change In Working Capital",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "depreciation_and_amortisation": {
+      "concept_id": "depreciation_and_amortisation",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "depreciation_and_amortisation",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.depreciation_and_amortisation",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Depreciation And Amortisation",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "dividends": {
+      "concept_id": "dividends",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "dividends",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.dividends",
+      "economic_domain": "cash_flow",
+      "evidence_kind": "broker_estimate",
+      "label": "Dividends",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "ebit": {
+      "concept_id": "ebit",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "ebit",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.ebit",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Ebit",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "effective_tax_rate": {
+      "concept_id": "effective_tax_rate",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "effective_tax_rate",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.effective_tax_rate",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Effective Tax Rate",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    },
+    "revenue": {
+      "concept_id": "revenue",
+      "definition_fingerprint": {
+        "accounting_basis": "ifrs",
+        "cash_flow_basis": "not_applicable",
+        "concept_id": "revenue",
+        "currency": "USD",
+        "lease_basis": "not_applicable",
+        "measurement_basis": "reported",
+        "operating_scope": "continuing",
+        "period_basis": "annual_forecast",
+        "restatement_basis": "not_applicable",
+        "sign_convention": "as_reported",
+        "units": "millions"
+      },
+      "definition_id": "dict.revenue",
+      "economic_domain": "operating",
+      "evidence_kind": "broker_estimate",
+      "label": "Revenue",
+      "model_use": "reference_only",
+      "semantic_role": "operating_forecast",
+      "unit_kind": "currency"
+    }
+  },
+  "reporting_currency": "USD",
+  "run_id": "degraded_close_regression",
+  "schema_version": "broker-crosswalk/1.2",
+  "table_reviews": [
+    {
+      "classification": "non_forecast",
+      "header_rows": [],
+      "house_id": "jpm",
+      "period_columns": [],
+      "rationale": "The extraction-owned surface disposition prohibits model use; the preserved table is evidence only.",
+      "review_status": "reviewed",
+      "table_id": "ct-1ca889a51b3196bc12c8"
+    },
+    {
+      "classification": "non_forecast",
+      "header_rows": [],
+      "house_id": "kepler",
+      "period_columns": [],
+      "rationale": "The extraction-owned surface disposition prohibits model use; the preserved table is evidence only.",
+      "review_status": "reviewed",
+      "table_id": "ct-d018a48accb55dd65187"
+    },
+    {
+      "classification": "non_forecast",
+      "header_rows": [],
+      "house_id": "bnp",
+      "period_columns": [],
+      "rationale": "The extraction-owned surface disposition prohibits model use; the preserved table is evidence only.",
+      "review_status": "reviewed",
+      "table_id": "ct-0d3dfefa57fa7ba8065d"
+    },
+    {
+      "classification": "non_forecast",
+      "header_rows": [],
+      "house_id": "jefferies",
+      "period_columns": [],
+      "rationale": "The extraction-owned surface disposition prohibits model use; the preserved table is evidence only.",
+      "review_status": "reviewed",
+      "table_id": "ct-273226cd5e82a5b90055"
+    }
+  ],
+  "units": "millions"
+}

@@ -38,6 +38,7 @@ if (supplied) {
   const noQuestions = JSON.parse(
     await fs.readFile(new URL("./flow-fixtures/no-questions.json", import.meta.url), "utf8"),
   );
+  const unresolvedIntents = [null, "ask", "unclear", "unknown", null, "ask"];
   const extraMaturities = Array.from({ length: 6 }, (_, index) => ({
     instrument_id: `decision_round_note_${index + 1}`,
     source_row: `decision.round.${index + 1}`,
@@ -50,7 +51,7 @@ if (supplied) {
     maturity_treatment: "contractual",
     rate_type: "fixed",
     coupon_rate: 0.05,
-    refinancing_intent: null,
+    refinancing_intent: unresolvedIntents[index],
   }));
   base.instruments.push(
     ...extraMaturities.map((row, index) => ({
@@ -88,9 +89,12 @@ const plan = planQuestions({
 if (process.env.DECISION_ROUND_DEBUG === "1") {
   process.stderr.write(`${JSON.stringify({ status: plan.status, detected: plan.detected, candidates: plan.candidates, blocked: plan.blocked, assumptions: plan.assumptions, survivors: plan.survivors.map((entry) => entry.id) }, null, 2)}\n`);
 }
-if (plan.status === "inputs_look_wrong") throw new Error("question cardinality still masquerades as bad evidence");
-if (plan.survivors.length <= 5) throw new Error(`fixture did not produce more than five material decisions (${plan.survivors.length})`);
-if (plan.status !== "ask" || plan.questions.length !== 5) throw new Error("first decision batch is not exactly five");
-if (plan.remaining_question_count !== plan.survivors.length - 5) throw new Error("remaining question count is not preserved");
-if (plan.pending_questions.length !== plan.remaining_question_count) throw new Error("pending question identities are not preserved");
-process.stdout.write(`${JSON.stringify({ status: "PASS", survivor_count: plan.survivors.length, current_round_count: plan.questions.length, remaining_question_count: plan.remaining_question_count ?? 0 })}\n`);
+const maturityQuestions = (plan.detected ?? []).filter((entry) => entry.kind === "refinance_at_maturity");
+if (maturityQuestions.length !== 0) throw new Error("toggle-covered maturities still produced questions");
+if ((plan.survivors ?? []).some((entry) => entry.kind === "refinance_at_maturity")) {
+  throw new Error("toggle-covered maturities survived deterministic pruning");
+}
+if ((plan.pending_questions ?? []).some((id) => id.startsWith("refinance_at_maturity:"))) {
+  throw new Error("toggle-covered maturities leaked into a second decision round");
+}
+process.stdout.write(`${JSON.stringify({ status: "PASS", maturity_question_count: 0, pending_maturity_question_count: 0, total_violation_count: 0 })}\n`);

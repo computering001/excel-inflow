@@ -44,7 +44,11 @@ function usage() {
     "  [--broker-corpus <external-corpus.json>]",
     "  [--broker-real-pack-manifest <external-reviewed-pack-manifest.json>]",
     "  [--fixed-point-cases-manifest <external-case-manifest.json>]",
-    "  [--python <python>] [--out <report-directory>]",
+    "  [--degraded-delivery-report <report.json>] [--usable-broker-workbook <workbook.xlsx>]",
+    "  [--raw-canary-evidence <evidence-run.json>] [--python <python>] [--soffice <path>]",
+    "  [--real-filings-request <raw-annual-report-request.json>]",
+    "  [--real-filings-expectations <run-scoped-expectations.json>]",
+    "  [--out <report-directory>]",
     "  [--concurrency <1-4>] [--timeout-ms <milliseconds>]",
   ].join("\n");
 }
@@ -82,6 +86,23 @@ function substitutions(options) {
     FIXED_POINT_CASES_MANIFEST: options["fixed-point-cases-manifest"]
       ? path.resolve(options["fixed-point-cases-manifest"])
       : null,
+    DEGRADED_DELIVERY_REPORT: options["degraded-delivery-report"]
+      ? path.resolve(options["degraded-delivery-report"])
+      : null,
+    USABLE_BROKER_WORKBOOK: options["usable-broker-workbook"]
+      ? path.resolve(options["usable-broker-workbook"])
+      : null,
+    RAW_CANARY_EVIDENCE: options["raw-canary-evidence"]
+      ? path.resolve(options["raw-canary-evidence"])
+      : null,
+    REAL_FILINGS_REQUEST: options["real-filings-request"]
+      ? path.resolve(options["real-filings-request"])
+      : null,
+    REAL_FILINGS_EXPECTATIONS: options["real-filings-expectations"]
+      ? path.resolve(options["real-filings-expectations"])
+      : null,
+    PYTHON: options.python ? path.resolve(options.python) : null,
+    SOFFICE: options.soffice ? path.resolve(options.soffice) : null,
   };
 }
 

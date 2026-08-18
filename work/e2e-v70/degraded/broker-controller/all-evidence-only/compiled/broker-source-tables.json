@@ -1,0 +1,225 @@
+{
+  "schema_version": "broker-source-tables/1.0",
+  "run_id": "degraded_close_regression",
+  "houses": [
+    {
+      "house_id": "jpm",
+      "house_name": "J.P. Morgan",
+      "source_id": "fixture.jpm",
+      "content_sha256": "3d6060f23a84988c87934443d6195cb9fb176cef648891b6d0be281720ac0be3",
+      "published_date": "2026-06-30",
+      "file_name": "jpm.pdf",
+      "pages": [],
+      "tables": [
+        {
+          "table_id": "ct-1ca889a51b3196bc12c8",
+          "title": "Forecasts",
+          "source_location": "page 1",
+          "units": "USDm",
+          "extraction_method": "native_pdf_lines",
+          "workbook_presentation": "evidence_only",
+          "workbook_presentation_reason": "The source surface is independently model-prohibited after bounded review; the table remains visible evidence only.",
+          "rows": [
+            [
+              "Metric",
+              "2027E",
+              "2028E"
+            ],
+            [
+              "Alpha series",
+              "101",
+              "111"
+            ],
+            [
+              "Beta series",
+              "19",
+              "21"
+            ]
+          ],
+          "cell_authorities": []
+        }
+      ]
+    },
+    {
+      "house_id": "kepler",
+      "house_name": "Kepler Cheuvreux",
+      "source_id": "fixture.kepler",
+      "content_sha256": "2bf37b795e8c2bd520f8c361650d2b2e9ec8a0af273c0d8bee91c163dee4fe58",
+      "published_date": "2026-06-30",
+      "file_name": "kepler.pdf",
+      "pages": [],
+      "tables": [
+        {
+          "table_id": "ct-d018a48accb55dd65187",
+          "title": "Forecast table",
+          "source_location": "kepler.p4, vision table 1",
+          "units": "USDm",
+          "extraction_method": "vision_pass_consensus",
+          "workbook_presentation": "evidence_only",
+          "workbook_presentation_reason": "The source surface is independently model-prohibited after bounded review; the table remains visible evidence only.",
+          "rows": [
+            [
+              "Metric",
+              "2027E",
+              "2028E"
+            ],
+            [
+              "Alpha series",
+              "100",
+              "110"
+            ],
+            [
+              "Beta series",
+              "20",
+              "22"
+            ]
+          ],
+          "cell_authorities": [
+            {
+              "row": 1,
+              "column": 1,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            },
+            {
+              "row": 1,
+              "column": 2,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            },
+            {
+              "row": 1,
+              "column": 3,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            },
+            {
+              "row": 2,
+              "column": 1,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            },
+            {
+              "row": 2,
+              "column": 2,
+              "status": "quarantined_conflict",
+              "conflict_id": "bvc-187f61ae7a82035806af7b77",
+              "basis": "unresolved_after_targeted_adjudication"
+            },
+            {
+              "row": 2,
+              "column": 3,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            },
+            {
+              "row": 3,
+              "column": 1,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            },
+            {
+              "row": 3,
+              "column": 2,
+              "status": "quarantined_conflict",
+              "conflict_id": "bvc-2ee35f0f9dd3af5d2f0d5cd9",
+              "basis": "unresolved_after_targeted_adjudication"
+            },
+            {
+              "row": 3,
+              "column": 3,
+              "status": "verified_adjudicated",
+              "basis": "bounded_conflict_quarantine"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "house_id": "berenberg",
+      "house_name": "Berenberg",
+      "source_id": "fixture.berenberg",
+      "content_sha256": "803fb60b5a24c1af9595b2a83e681d0761c0be56d5e59f70ec5d808b8193741c",
+      "published_date": "2026-06-30",
+      "file_name": "berenberg.pdf",
+      "pages": [],
+      "tables": []
+    },
+    {
+      "house_id": "bnp",
+      "house_name": "BNP Paribas",
+      "source_id": "fixture.bnp",
+      "content_sha256": "4ff34dcab929e69440f414562b457d899deaff28c2b666de23d14a026e5e513b",
+      "published_date": "2026-06-30",
+      "file_name": "bnp.pdf",
+      "pages": [],
+      "tables": [
+        {
+          "table_id": "ct-0d3dfefa57fa7ba8065d",
+          "title": "Forecasts",
+          "source_location": "page 1",
+          "units": "USDm",
+          "extraction_method": "native_pdf_lines",
+          "workbook_presentation": "evidence_only",
+          "workbook_presentation_reason": "The source surface is independently model-prohibited after bounded review; the table remains visible evidence only.",
+          "rows": [
+            [
+              "Metric",
+              "2027E",
+              "2028E"
+            ],
+            [
+              "Alpha series",
+              "99",
+              "108"
+            ],
+            [
+              "Beta series",
+              "18",
+              "20"
+            ]
+          ],
+          "cell_authorities": []
+        }
+      ]
+    },
+    {
+      "house_id": "jefferies",
+      "house_name": "Jefferies",
+      "source_id": "fixture.jefferies",
+      "content_sha256": "5c3092b7b0a5b84b52d9703b6e6d5632b2ba062230905b12b87fb66d2b06e8a8",
+      "published_date": "2026-06-30",
+      "file_name": "jefferies.pdf",
+      "pages": [],
+      "tables": [
+        {
+          "table_id": "ct-273226cd5e82a5b90055",
+          "title": "Forecasts",
+          "source_location": "page 1",
+          "units": "USDm",
+          "extraction_method": "native_pdf_lines",
+          "workbook_presentation": "evidence_only",
+          "workbook_presentation_reason": "The source surface is independently model-prohibited after bounded review; the table remains visible evidence only.",
+          "rows": [
+            [
+              "Metric",
+              "2027E",
+              "2028E"
+            ],
+            [
+              "Alpha series",
+              "102",
+              "112"
+            ],
+            [
+              "Beta series",
+              "20",
+              "23"
+            ]
+          ],
+          "cell_authorities": []
+        }
+      ]
+    }
+  ]
+}
