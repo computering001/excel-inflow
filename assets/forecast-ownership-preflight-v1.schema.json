@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/forecast-ownership-preflight-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "checkpoint",
+    "case_id",
+    "status",
+    "violations",
+    "controller_signal",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "forecast-ownership-preflight/1.0" },
+    "checkpoint": {
+      "enum": ["A_STRUCTURAL", "B_SELECTED_AUTHORITY", "C_PHYSICAL"]
+    },
+    "case_id": { "type": ["string", "null"] },
+    "status": { "enum": ["PASS", "BLOCK"] },
+    "violations": { "type": "array", "items": { "type": "string" } },
+    "controller_signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "reason", "resume_from"],
+      "properties": {
+        "action": {
+          "enum": ["continue", "cancel_descendants_preserve_checkpoint"]
+        },
+        "reason": { "type": ["string", "null"] },
+        "resume_from": {
+          "enum": [
+            "structural_ownership",
+            "selected_forecast_ownership",
+            "physical_ownership"
+          ]
+        }
+      }
+    },
+    "receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "topology_input_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "resolved_topology_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "structural_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "selected_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "census_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "solver_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["standalone_forecast_periods", "pro_forma_forecast_periods"],
+      "properties": {
+        "standalone_forecast_periods": { "type": ["integer", "null"], "minimum": 0 },
+        "pro_forma_forecast_periods": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "families": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/family" }
+    },
+    "resolutions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/resolution" }
+    },
+    "rejected_authorities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejectedAuthority" }
+    },
+    "destinations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/destination" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "checkpoint": { "const": "A_STRUCTURAL" } } },
+      "then": { "required": ["topology_input_sha256", "families"] }
+    },
+    {
+      "if": { "properties": { "checkpoint": { "const": "B_SELECTED_AUTHORITY" } } },
+      "then": {
+        "required": [
+          "structural_receipt_sha256",
+          "resolutions",
+          "rejected_authorities",
+          "resolved_topology_sha256"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "checkpoint": { "const": "C_PHYSICAL" } } },
+      "then": { "required": ["selected_receipt_sha256", "census_sha256", "solver_binding", "destinations"] }
+    }
+  ],
+  "$defs": {
+    "rowIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section", "parent_row_id", "child_row_ids", "schedule_child_row_ids",
+        "permitted_modes", "candidate_broker_demand_row_ids", "broker_demand_owner_row_ids"
+      ],
+      "properties": {
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "parent_row_id": { "type": "string", "minLength": 1 },
+        "child_row_ids": { "$ref": "#/$defs/rowIds" },
+        "schedule_child_row_ids": { "$ref": "#/$defs/rowIds" },
+        "permitted_modes": {
+          "type": "array",
+          "items": { "enum": ["parent_owned", "children_owned", "schedule_owned", "captured_by_ancestor"] },
+          "uniqueItems": true
+        },
+        "candidate_broker_demand_row_ids": { "$ref": "#/$defs/rowIds" },
+        "broker_demand_owner_row_ids": { "$ref": "#/$defs/rowIds" }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "parent_row_id", "forecast_index", "selected_mode", "child_row_ids"],
+      "properties": {
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "parent_row_id": { "type": "string", "minLength": 1 },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "selected_mode": { "enum": ["parent_owned", "children_owned", "schedule_owned", "captured_by_ancestor", "unresolved"] },
+        "child_row_ids": { "$ref": "#/$defs/rowIds" }
+      }
+    },
+    "rejectedAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_id", "forecast_index", "authority", "rejection_reason"],
+      "properties": {
+        "row_id": { "type": "string", "minLength": 1 },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "authority": { "type": ["object", "null"] },
+        "rejection_reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section", "parent_row_id", "parent_destination_row", "forecast_index",
+        "parent_owner_class", "child_destination_rows"
+      ],
+      "properties": {
+        "section": { "enum": ["income_statement", "cash_flow"] },
+        "parent_row_id": { "type": "string", "minLength": 1 },
+        "parent_destination_row": { "type": ["integer", "null"], "minimum": 1 },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "parent_owner_class": { "enum": ["absent", "identity", "schedule", "direct"] },
+        "selected_mode": {
+          "type": ["string", "null"],
+          "enum": ["parent_owned", "children_owned", "schedule_owned", "captured_by_ancestor", "unresolved", null]
+        },
+        "child_destination_rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["row_id", "row", "owner_class"],
+            "properties": {
+              "row_id": { "type": "string", "minLength": 1 },
+              "row": { "type": ["integer", "null"], "minimum": 1 },
+              "owner_class": { "enum": ["absent", "identity", "schedule", "direct"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

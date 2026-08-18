@@ -127,6 +127,7 @@
     "economic-ontology-v2.json",
     "experience-trace-v1.schema.json",
     "forecast-authority-ledger-v2.schema.json",
+    "forecast-ownership-preflight-v1.schema.json",
     "host-experience-envelope-v1.schema.json",
     "performance-policy-v1.json",
     "product-delivery-constitution-v2.json"
@@ -219,6 +220,7 @@
     "filings-acquisition-request-v2.schema.json": "Versioned filing acquisition request contract included in the filings runtime closure and loaded through the filings registry rather than a statically resolvable JS asset literal.",
     "filings-source-registry-v2.schema.json": "Versioned internal-source/user-override filing registry contract loaded by run_filings_pipeline through the shared ASSETS path variable, which the static asset scanner does not resolve.",
     "forecast-authority-ledger-v2.schema.json": "Schema for the sealed row-period forecast authority ledger. The ledger module resolves the asset dynamically and runtime evidence members bind it independently.",
+    "forecast-ownership-preflight-v1.schema.json": "Hash-bound structural, selected-authority and physical ownership receipts. Checkpoint B retains every displaced authority and checkpoint C binds the sealed census to workbook destinations before emission.",
     "host-experience-envelope-v1.schema.json": "Host boundary envelope contract for joining Rogo/platform waits with Excel Inflow component traces. It is consumed by the external trace compiler and installed-host evidence path.",
     "performance-policy-v1.json": "Canonical v3.6 timing classification and promotion policy, including external-wait classification and 30/120/300 second unknown-gap thresholds; loaded through runtime tracing helpers.",
     "product-identity-v2.schema.json": "Closed source/runtime/package/deployment identity vocabulary. Package mode is development or certified; mutable deployment status is a separate identity dimension.",
@@ -311,6 +313,7 @@
     "lib/flow_screens.mjs",
     "lib/forecast_authority.mjs",
     "lib/forecast_authority_ledger.mjs",
+    "lib/forecast_ownership_resolver.mjs",
     "lib/forecast_behavior.mjs",
     "lib/forecast_candidate_compiler.mjs",
     "lib/forecast_observation.mjs",

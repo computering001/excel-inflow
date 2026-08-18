@@ -2,6 +2,10 @@ import { canonicalJson, hashValue } from './run_store.mjs';
 import { canonicalSemanticRole, isStructuredEventRole } from './semantic_roles.mjs';
 import { classifyForecastBehavior } from './forecast_behavior.mjs';
 import { sealOwnershipCensus, verifyOwnershipCensus } from './ownership_census.mjs';
+import {
+  resolveSelectedForecastOwnership,
+  verifySelectedForecastOwnership,
+} from './forecast_ownership_resolver.mjs';
 
 export const FORECAST_AUTHORITY_LEDGER_VERSION = 'forecast-authority-ledger/2.0';
 
@@ -211,6 +215,7 @@ export function buildForecastAuthorityLedger(modelCase) {
   return {...body,ledger_sha256:hashValue(body)};
 }
 export function sealForecastAuthorityLedger(modelCase) {
+  resolveSelectedForecastOwnership(modelCase);
   const ledger=buildForecastAuthorityLedger(modelCase);
   modelCase.forecast_authority_ledger_version=FORECAST_AUTHORITY_LEDGER_VERSION;
   modelCase.forecast_authority_ledger=ledger;
@@ -237,6 +242,7 @@ export function verifyForecastAuthorityLedger(modelCase) {
   ) {
     throw new Error(`forecast authority ledger drift: expected ${expected.ledger_sha256}, received ${actual.ledger_sha256}`);
   }
+  verifySelectedForecastOwnership(modelCase);
   verifyOwnershipCensus(modelCase);
   return actual;
 }

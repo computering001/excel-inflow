@@ -1213,6 +1213,15 @@
       "test_class": "unit"
     },
     {
+      "id": "forecast-ownership-preflight",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_ownership_preflight_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "forecast-authority-ranking",
       "phase": "forecast",
       "runtime": "node",

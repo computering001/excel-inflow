@@ -1470,6 +1470,17 @@
     },
     "ownership_census": {
       "type": "object"
+    },
+    "forecast_ownership_preflight_version": {
+      "const": "forecast-ownership-preflight/1.0"
+    },
+    "forecast_ownership_preflights": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "structural": { "type": "object" },
+        "selected": { "type": "object" }
+      }
     }
   },
   "allOf": [
@@ -2215,6 +2226,10 @@
           "type": "string",
           "minLength": 1,
           "description": "Reviewer-facing rationale for capturing this forecast row in its declared economic parent."
+        },
+        "forecast_schedule_coownership_permitted": {
+          "type": "boolean",
+          "description": "Explicitly permits a schedule-owned descendant to remain live beside a directly forecast aggregate for the same period. Absence means the face detail is captured to preserve one visible writer."
         },
         "forecast_capture_certificates": {
           "type": "array",

@@ -25,9 +25,10 @@ function historicalOwner(row) {
   return "unresolved";
 }
 
-function forecastOwner(row, authority) {
+function forecastOwner(row, authority, forecastIndex) {
   if (row?.row_type === "header" || authority?.method === "not_applicable") return "not_applicable";
-  if (row?.forecast_capture_parent_id || authority?.method === "not_separately_forecast") return "captured";
+  const capturedThisPeriod = authority?.method === "not_separately_forecast";
+  if (capturedThisPeriod) return "captured";
   if (!authority && (row?.calculation || row?.forecast_calculation || row?.forecast_treatment === "formula")) return "parent_owned";
   if (!authority && ["schedule", "schedule_link"].includes(row?.forecast_treatment)) return "schedule_owned";
   if (!authority && row?.row_type === "uncalculated") return "not_applicable";
@@ -194,7 +195,7 @@ export function buildOwnershipCensus(modelCase) {
       const isHistorical = period.status === "historical";
       const forecastIndex = isHistorical ? -1 : forecastPeriods.findIndex((candidate) => candidate === period);
       const authority = isHistorical ? null : row?.forecast_period_authorities?.[forecastIndex] ?? null;
-      const owner = isHistorical ? historyOwner : forecastOwner(row, authority);
+      const owner = isHistorical ? historyOwner : forecastOwner(row, authority, forecastIndex);
       const status = ["blocked", "unresolved"].includes(owner) && material(row) ? "BLOCK" : "PASS";
       if (status === "BLOCK") violations.push(`${rowId}:${period.date} has unresolved ${period.status} ownership`);
       records.push({
@@ -219,7 +220,10 @@ export function buildOwnershipCensus(modelCase) {
           row?.schedule_owner ??
           authority?.producer ??
           (row?.calculation || row?.forecast_calculation ? rowId : null),
-        capture_parent: row?.forecast_capture_parent_id ?? row?.parent_row_id ?? null,
+        capture_parent:
+          owner === "schedule_owned" && row?.forecast_schedule_coownership_permitted === true
+            ? null
+            : row?.forecast_capture_parent_id ?? row?.parent_row_id ?? null,
         selected_evidence: authority ? {
           source_kind: authority.source_kind ?? authority.origin ?? null,
           source_id: authority.source_id ?? null,

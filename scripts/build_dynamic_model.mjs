@@ -78,6 +78,7 @@ import {
   resolvedLeaseInterestBasis,
 } from "./lib/lease_policy.mjs";
 import { resolveForecastAuthority } from "./lib/forecast_authority.mjs";
+import { assertPhysicalOwnershipPreflight } from "./lib/forecast_ownership_resolver.mjs";
 import { explicitPlausibilityAcknowledgements } from "./lib/plausibility_acknowledgements.mjs";
 import { compileStatementFormula } from "./lib/formula_dsl.mjs";
 import {
@@ -12211,6 +12212,17 @@ async function main(packaging = null) {
     instrumentPeriodState,
   });
   const rowPlan = compileRowPlan(modelCase, { instrumentPeriodState });
+  if (modelCase.forecast_ownership_preflight_version) {
+    rowPlan.forecast_ownership_preflight = assertPhysicalOwnershipPreflight(
+      modelCase,
+      rowPlan,
+      { standaloneSolution, proFormaSolution },
+    );
+  } else if (modelCase.execution_profile === "production_model") {
+    throw new Error(
+      "Production model is missing sealed forecast ownership preflights before emission.",
+    );
+  }
   rowPlan.broker_metric_rows = brokerMetricRowMap(modelCase);
   const semanticManifest = compileSemanticManifest(modelCase, rowPlan, {
     instrumentPeriodState,

@@ -29,6 +29,7 @@ import { validateCaseShape } from "./solver.mjs";
 import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
+import { compileStructuralOwnershipPreflight } from "./forecast_ownership_resolver.mjs";
 import { isRankedTotalIdentity } from "./row_plan.mjs";
 import {
   applyTier1AnchorOwnership,
@@ -3544,6 +3545,15 @@ export function compileCase(caseSource, evidence = {}) {
     }
   }
   const behaviorMap = applyConsumptionDoctrine(modelCase, report, derivedRowIds, caseSource.answers ?? []);
+  const structuralOwnership = compileStructuralOwnershipPreflight(modelCase);
+  for (const message of structuralOwnership.violations) {
+    report.add(
+      "forecast_ownership.preflight_a",
+      "BLOCK",
+      message,
+      "Resolve the filing-derived aggregate topology before broker demand or forecast selection.",
+    );
+  }
 
   // Phase G — the forecast lane is MINTED, never authored.  One call creates
   // authorities and their rules together, which is what makes FR-9 (an
