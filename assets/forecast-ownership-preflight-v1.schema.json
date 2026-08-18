@@ -71,6 +71,19 @@
       "type": "array",
       "items": { "$ref": "#/$defs/rejectedAuthority" }
     },
+    "degraded_authorities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_id", "forecast_index", "method"],
+        "properties": {
+          "row_id": {"type": "string", "minLength": 1},
+          "forecast_index": {"type": "integer", "minimum": 0, "maximum": 2},
+          "method": {"const": "historical_average"}
+        }
+      }
+    },
     "destinations": {
       "type": "array",
       "items": { "$ref": "#/$defs/destination" }

@@ -60,6 +60,10 @@ def fixture() -> dict:
                         "House C": [104, 114, 124],
                     },
                     "provider_consensus": [99, 116, 125],
+                    "provider_consensus_source": {
+                        "source_note": "Neutral provider consensus note",
+                        "period_lineage": ["page 1 / D4", "page 1 / E4", "page 1 / F4"],
+                    },
                     "consensus_membership": membership,
                 }
             }

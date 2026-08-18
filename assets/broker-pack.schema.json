@@ -19,7 +19,8 @@
     "units",
     "forecast_periods",
     "metrics",
-    "houses"
+    "houses",
+    "freshness_policy"
   ],
   "properties": {
     "schema_version": {
@@ -98,6 +99,34 @@
             "null"
           ]
         }
+      }
+    },
+    "provider_consensus_source": {
+      "type": "object",
+      "description": "Required alongside provider_consensus. Per-metric source note plus exact period page/cell lineage.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_note", "period_lineage"],
+        "properties": {
+          "source_note": {"type": "string", "minLength": 1},
+          "period_lineage": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "freshness_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as_of", "max_age_days", "stale_house_count"],
+      "properties": {
+        "as_of": {"type": "string", "format": "date"},
+        "max_age_days": {"type": "integer", "minimum": 1},
+        "stale_house_count": {"type": "integer", "minimum": 0}
       }
     },
     "recommended_primary_house_id": {
@@ -248,6 +277,12 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {"required": ["provider_consensus"]},
+      "then": {"required": ["provider_consensus_source"]}
+    }
+  ],
   "$defs": {
     "metricDeclaration": {
       "type": "object",
@@ -440,6 +475,9 @@
         "house_id",
         "house_name",
         "published_date",
+        "freshness_status",
+        "freshness_age_days",
+        "freshness_max_age_days",
         "document",
         "estimates"
       ],
@@ -458,6 +496,17 @@
           "type": "string",
           "format": "date",
           "description": "Date of the note. Required here; see x_contract_notes.estimate_date_gap for why it cannot currently round-trip into a v2 case."
+        },
+        "freshness_status": {
+          "enum": ["current", "stale"]
+        },
+        "freshness_age_days": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "freshness_max_age_days": {
+          "type": "integer",
+          "minimum": 1
         },
         "analyst": {
           "type": [

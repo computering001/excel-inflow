@@ -66,6 +66,12 @@ function fixture(provider = [99, 116, 125]) {
             "House C": [104, 114, 124],
           },
           ...(provider ? { provider_consensus: provider } : {}),
+          ...(provider ? {
+            provider_consensus_source: {
+              source_note: "Neutral provider consensus note",
+              period_lineage: ["page 1 / cell D4", "page 1 / cell E4", "page 1 / cell F4"],
+            },
+          } : {}),
           consensus_membership: membership,
         },
       },
@@ -118,6 +124,14 @@ assert(/^IFERROR\(AVERAGE\(/.test(modelCell.formula), "Model Consensus is not a 
 assert(modelCell.font.color === "FF000000", "Model Consensus formula is not black");
 assert(providerCell.value === 99 && providerCell.formula === undefined, "Provider Consensus is not the exact source value");
 assert(providerCell.font.color === "FF0000FF", "Provider Consensus source value is not blue");
+assert(
+  present.sheet._comments.some((comment) =>
+    comment.cell === `D${providerRow}` &&
+    comment.text.includes("Neutral provider consensus note") &&
+    comment.text.includes("page 1 / cell D4"),
+  ),
+  "Provider Consensus omitted source note/page-cell lineage",
+);
 assert(selectedCell.formula.includes(`D${modelRow}`), "Selected Forecast does not offer Model Consensus");
 assert(selectedCell.formula.includes(`D${providerRow}`), "Selected Forecast does not offer Provider Consensus");
 assert(

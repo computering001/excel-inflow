@@ -1022,20 +1022,26 @@ export function applyBrokerPreviewSelectionToCaseEvidence(
     preview.broker_authority_policy === "zero_broker"
   ) {
     brokerPack.metrics = Object.fromEntries(
-      Object.entries(metrics).map(([metricId, metric]) => [
-        metricId,
-        {
-          ...metric,
-          provider_consensus: [null, null, null],
-          brokers: Object.fromEntries(
-            Object.keys(metric.brokers ?? {}).map((houseName) => {
-              suppressedObservationCount += (metric.brokers?.[houseName] ?? [])
-                .filter((value) => value !== null && value !== undefined).length;
-              return [houseName, [null, null, null]];
-            }),
-          ),
-        },
-      ]),
+      Object.entries(metrics).map(([metricId, metric]) => {
+        const {
+          provider_consensus: _providerConsensus,
+          provider_consensus_source: _providerConsensusSource,
+          ...withoutProviderConsensus
+        } = metric;
+        return [
+          metricId,
+          {
+            ...withoutProviderConsensus,
+            brokers: Object.fromEntries(
+              Object.keys(metric.brokers ?? {}).map((houseName) => {
+                suppressedObservationCount += (metric.brokers?.[houseName] ?? [])
+                  .filter((value) => value !== null && value !== undefined).length;
+                return [houseName, [null, null, null]];
+              }),
+            ),
+          },
+        ];
+      }),
     );
   } else {
     for (const fallback of verified.selection.fallback_periods ?? []) {
@@ -1076,21 +1082,27 @@ export function projectZeroBrokerAuthorityCaseEvidence(caseEvidence) {
   if (brokerPack && typeof brokerPack === "object") {
     brokerPack.recommended_primary_house_id = null;
     brokerPack.metrics = Object.fromEntries(
-      Object.entries(brokerPack.metrics ?? {}).map(([metricId, metric]) => [
-        metricId,
-        {
-          ...metric,
-          provider_consensus: [null, null, null],
-          brokers: Object.fromEntries(
-            Object.entries(metric.brokers ?? {}).map(([houseName, series]) => {
-              suppressedObservationCount += (series ?? []).filter(
-                (value) => value !== null && value !== undefined,
-              ).length;
-              return [houseName, [null, null, null]];
-            }),
-          ),
-        },
-      ]),
+      Object.entries(brokerPack.metrics ?? {}).map(([metricId, metric]) => {
+        const {
+          provider_consensus: _providerConsensus,
+          provider_consensus_source: _providerConsensusSource,
+          ...withoutProviderConsensus
+        } = metric;
+        return [
+          metricId,
+          {
+            ...withoutProviderConsensus,
+            brokers: Object.fromEntries(
+              Object.entries(metric.brokers ?? {}).map(([houseName, series]) => {
+                suppressedObservationCount += (series ?? []).filter(
+                  (value) => value !== null && value !== undefined,
+                ).length;
+                return [houseName, [null, null, null]];
+              }),
+            ),
+          },
+        ];
+      }),
     );
     brokerPack.source_mappings = [];
     brokerPack.selected_observations = [];

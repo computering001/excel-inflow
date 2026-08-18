@@ -11,6 +11,7 @@ ordinary readable broker report.
 from __future__ import annotations
 
 import argparse
+import atexit
 import copy
 import hashlib
 import json
@@ -18,6 +19,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,16 @@ ROOT = HERE.parent
 RUNTIME_MANIFEST = ROOT / "assets" / "broker-runtime-members.json"
 MODEL_HOST_BOUNDARY = ROOT / "assets" / "broker-model-host-response-boundary-v1.json"
 VISION_ATTEMPT_LIMIT = 3
+SEMANTIC_FRONTIER_COMMANDS = {
+    "compile_broker_vision.py",
+    "compile_broker_canonical_tables.py",
+    "broker_period_recovery.py",
+    "verify_broker_semantics.py",
+    "broker_terminal_recovery.py",
+}
+ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS = 180.0
+ACTIVE_SEMANTIC_BUDGET_EXECUTIONS: list[dict[str, Any]] = []
+ACTIVE_SEMANTIC_BUDGET_PATH: Path | None = None
 
 def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
@@ -720,18 +732,61 @@ def task_family_execution_count(
 
 
 def run(command: list[str], allowed: set[int]) -> subprocess.CompletedProcess[str]:
-    completed = subprocess.run(
-        command,
-        cwd=HERE,
-        text=True,
-        capture_output=True,
-        check=False,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-    )
+    semantic_frontier = Path(command[1]).name in SEMANTIC_FRONTIER_COMMANDS if len(command) > 1 else False
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=HERE,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS if semantic_frontier else None,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+    except subprocess.TimeoutExpired as error:
+        if semantic_frontier:
+            ACTIVE_SEMANTIC_BUDGET_EXECUTIONS.append({
+                "frontier": Path(command[1]).name,
+                "budget_ms": round(ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS * 1000),
+                "duration_ms": round((time.monotonic() - started) * 1000),
+                "outcome": "TIMEOUT",
+            })
+            write_semantic_budget_receipt()
+        raise RuntimeError(
+            f"Bounded broker semantic frontier timed out after {ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS:.3f} seconds"
+        ) from error
+    if semantic_frontier:
+        ACTIVE_SEMANTIC_BUDGET_EXECUTIONS.append({
+            "frontier": Path(command[1]).name,
+            "budget_ms": round(ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS * 1000),
+            "duration_ms": round((time.monotonic() - started) * 1000),
+            "outcome": "PASS" if completed.returncode in allowed else "FAIL",
+        })
+        write_semantic_budget_receipt()
     if completed.returncode not in allowed:
         detail = (completed.stderr or completed.stdout).strip()
         raise RuntimeError(f"Command failed ({completed.returncode}): {' '.join(command)}\n{detail[-4000:]}")
     return completed
+
+
+def write_semantic_budget_receipt() -> None:
+    if ACTIVE_SEMANTIC_BUDGET_PATH is None:
+        return
+    body = {
+        "schema_version": "broker-semantic-frontier-budget-receipt/1.0",
+        "per_frontier_budget_ms": round(ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS * 1000),
+        "executions": ACTIVE_SEMANTIC_BUDGET_EXECUTIONS,
+        "status": "PASS" if all(
+            item["outcome"] == "PASS" and
+            item["duration_ms"] <= item["budget_ms"] + 1000
+            for item in ACTIVE_SEMANTIC_BUDGET_EXECUTIONS
+        ) else "DEGRADED",
+    }
+    atomic_json(ACTIVE_SEMANTIC_BUDGET_PATH, {
+        **body,
+        "receipt_sha256": sha256_bytes(canonical_bytes(body)),
+    })
 
 
 def checkpoint(
@@ -1330,6 +1385,8 @@ def main() -> int:
     parser.add_argument("--responses")
     parser.add_argument("--crosswalk")
     parser.add_argument("--native-preflight", help="Demand-independent native extraction bundle to reuse when source hashes match")
+    parser.add_argument("--native-timeout-ms", type=int, default=120_000)
+    parser.add_argument("--semantic-frontier-timeout-ms", type=int, default=180_000)
     parser.add_argument(
         "--close-optional",
         action="store_true",
@@ -1337,9 +1394,19 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    global ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS, ACTIVE_SEMANTIC_BUDGET_PATH
+    if not 0 < args.native_timeout_ms <= 120_000:
+        raise ValueError("Per-document broker-native timeout must be within 1..120000 ms.")
+    if not 0 < args.semantic_frontier_timeout_ms <= 180_000:
+        raise ValueError("Per-frontier broker semantic timeout must be within 1..180000 ms.")
+    ACTIVE_SEMANTIC_FRONTIER_TIMEOUT_SECONDS = args.semantic_frontier_timeout_ms / 1000
+
     request_path = Path(args.request).resolve()
     output_root = Path(args.out).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    ACTIVE_SEMANTIC_BUDGET_PATH = output_root / "broker-semantic-frontier-budget-receipt.json"
+    atexit.register(write_semantic_budget_receipt)
+    write_semantic_budget_receipt()
     state_path = output_root / "broker-run-state.json"
     checkpoints: list[dict[str, Any]] = []
     artifacts: dict[str, Any] = {}
@@ -1437,13 +1504,19 @@ def main() -> int:
             if bundle_path.exists():
                 bundle_path.unlink()
     if not extract_reused:
-        run([sys.executable, str(HERE / "extract_broker_evidence.py"), str(request_path), "--out", str(extraction_root)], {0, 2})
+        run([
+            sys.executable, str(HERE / "extract_broker_evidence.py"), str(request_path),
+            "--out", str(extraction_root), "--native-timeout-ms", str(args.native_timeout_ms),
+        ], {0, 2})
         if not bundle_path.is_file():
             raise RuntimeError("Broker extraction did not write its evidence bundle.")
         seal_checkpoint(bundle_path, extract_receipt, extract_input)
     bundle = read_json(bundle_path, "broker extraction bundle")
     checkpoint(checkpoints, stage="extract", status="PASS" if bundle.get("gate_status") != "BLOCKED" else "BLOCKED", input_digest=extract_input, output=bundle_path, reused=extract_reused)
     artifacts["extraction_bundle"] = str(bundle_path)
+    if bundle.get("native_budget_receipt"):
+        artifacts["broker_native_budget_receipt"] = bundle["native_budget_receipt"]
+    artifacts["broker_semantic_frontier_budget_receipt"] = str(ACTIVE_SEMANTIC_BUDGET_PATH)
     if bundle.get("gate_status") == "BLOCKED":
         write_state(
             state_path,

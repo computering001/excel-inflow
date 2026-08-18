@@ -20,6 +20,7 @@ import {
   verifyPhase9Evidence,
 } from "./lib/phase9_broker_e2e_evidence.mjs";
 import { canonicalise, hashValue } from "./lib/run_store.mjs";
+import { sealBrokerConsensusMembership } from "./lib/broker_consensus.mjs";
 
 const exec = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -165,7 +166,31 @@ async function buildBrokerPack(scenarioRoot, scenarioId, config) {
         fiscal_calendar: issuer.fiscal_calendar ?? "fixed_date",
       },
       provider_consensus: providerConsensus,
+      provider_consensus_source: {
+        source_note: `${scenarioId} provider consensus fixture`,
+        period_lineage: periods.map((period) => `${scenarioId} | ${metricId} | ${period}`),
+      },
       brokers,
+      consensus_membership: sealBrokerConsensusMembership({
+        schema_version: "broker-consensus-membership/1.0",
+        metric_id: metricId,
+        contributors: Object.keys(brokers).sort().map((houseName) => ({
+          house_name: houseName,
+          status: "included",
+          reasons: [],
+          definition_signature: {
+            metric_id: metricId,
+            accounting_basis: issuer.accounting_basis ?? null,
+            operation_scope: "continuing",
+            adjustment_basis: metricId.startsWith("adjusted_") ? "adjusted" : "statutory",
+            currency: issuer.reporting_currency,
+            units: issuer.units,
+            fiscal_calendar: issuer.fiscal_calendar ?? "fixed_date",
+          },
+          period_status: ["included", "included", "included"],
+          period_reasons: [[], [], []],
+        })),
+      }),
     };
   }
   const rawTables = [];

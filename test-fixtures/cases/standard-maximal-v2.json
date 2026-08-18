@@ -2220,6 +2220,151 @@
             12914.74,
             13436.721
           ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "revenue",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "revenue",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "revenue",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "revenue",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "revenue",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "revenue",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "4b780cf84a86371e211f8dbc2f28b46a8cb2e6d19e0b3b858b20c187981ad0bb"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Revenue",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
+          ]
         }
       },
       "adjusted_ebitda": {
@@ -2254,6 +2399,151 @@
             1825.394,
             1898.467,
             1975.461
+          ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "adjusted_ebitda",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "adjusted_ebitda",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "adjusted",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "adjusted_ebitda",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "adjusted",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "adjusted_ebitda",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "adjusted",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "adjusted_ebitda",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "adjusted",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "adjusted_ebitda",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "adjusted",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "b68dcf12a0164ac18ff01c7770b055f3f9bfebc768fcf16d99cf82c3c574aab0"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Adjusted EBITDA",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
           ]
         }
       },
@@ -2290,6 +2580,151 @@
             1265.118,
             1316.666
           ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "ebit",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "ebit",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "ebit",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "ebit",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "ebit",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "ebit",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "718e3b4f865d16f8845015f09a990eb7f3d7f4a4f2bf3e10bab558a02e7b5623"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — EBIT",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
+          ]
         }
       },
       "depreciation_and_amortisation": {
@@ -2324,6 +2759,151 @@
             608.946,
             633.349,
             658.795
+          ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "depreciation_and_amortisation",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "depreciation_and_amortisation",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "depreciation_and_amortisation",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "depreciation_and_amortisation",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "depreciation_and_amortisation",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "depreciation_and_amortisation",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "ac0a2ee40ee06f04f212cef7d8a20917736f7358b8af5d29fe852f05d56e9a9d"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Depreciation and amortisation",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
           ]
         }
       },
@@ -2360,6 +2940,151 @@
             0.245,
             0.246
           ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "effective_tax_rate",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "effective_tax_rate",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "effective_tax_rate",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "effective_tax_rate",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "effective_tax_rate",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "effective_tax_rate",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "e9283c991a3f60f6eb2683e273e8b63ee209add0c0254c401152548eb3adfbde"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Effective tax rate",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
+          ]
         }
       },
       "capex": {
@@ -2394,6 +3119,151 @@
             436.621,
             454.034,
             472.384
+          ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "capex",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "capex",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "capex",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "capex",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "capex",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "capex",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "49de838f4feb646f93f9f450f9520abe90f5819f1b4f26e952d7e9dbde09ae2f"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Capital expenditure",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
           ]
         }
       },
@@ -2430,6 +3300,151 @@
             -85.624,
             -89.82
           ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "change_in_working_capital",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "change_in_working_capital",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "change_in_working_capital",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "change_in_working_capital",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "change_in_working_capital",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "change_in_working_capital",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "0ee13c9ebd8f99a1c16da526ba164c3011c750e38f33f22ca1ba86cc5bf672fe"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Change in working capital",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
+          ]
         }
       },
       "dividends": {
@@ -2464,6 +3479,151 @@
             170.412,
             176.842,
             183.273
+          ]
+        },
+        "consensus_membership": {
+          "schema_version": "broker-consensus-membership/1.0",
+          "metric_id": "dividends",
+          "contributors": [
+            {
+              "house_name": "Broker A",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "dividends",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker B",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "dividends",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker C",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "dividends",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker D",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "dividends",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            },
+            {
+              "house_name": "Broker E",
+              "status": "included",
+              "reasons": [],
+              "definition_signature": {
+                "metric_id": "dividends",
+                "accounting_basis": null,
+                "operation_scope": "continuing",
+                "adjustment_basis": "statutory",
+                "currency": "USD",
+                "units": "millions",
+                "fiscal_calendar": "fixed_date",
+                "cash_flow_basis": null,
+                "lease_basis": null
+              },
+              "period_status": [
+                "included",
+                "included",
+                "included"
+              ],
+              "period_reasons": [
+                [],
+                [],
+                []
+              ]
+            }
+          ],
+          "membership_sha256": "0c2bf387e1e56efbb495f028a3aafe93a6ebb4f925e3e6feeb1583537fe27335"
+        },
+        "provider_consensus_source": {
+          "source_note": "Synthetic broker pack. Broker A through Broker E are placeholder houses invented for this standardised test case; no licensed research is reproduced or implied. — Dividends",
+          "period_lineage": [
+            "Synthetic specification | 2026-12-31 | provider_consensus[0]",
+            "Synthetic specification | 2027-12-31 | provider_consensus[1]",
+            "Synthetic specification | 2028-12-31 | provider_consensus[2]"
           ]
         }
       }

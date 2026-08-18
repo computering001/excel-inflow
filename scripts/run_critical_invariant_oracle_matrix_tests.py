@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent Phase-4 economic mutation matrix.
+"""Mixed-scope Phase-4 economic mutation matrix.
 
 This oracle is deliberately stdlib-only and imports no production module.  It
 challenges neutral economic facts directly, then verifies that the durable
@@ -66,7 +66,7 @@ def validate_matrix(candidate: dict) -> list[dict]:
     assert candidate["bindings"]["registry_sha256"] == sha256(REGISTRY_PATH)
     declared = tests[ORACLE_ID]
     assert declared["script"] == Path(__file__).name
-    assert declared["test_class"] == "independent_economic_oracle"
+    assert declared["test_class"] == "mutation"
     domains = candidate["domains"]
     assert {entry["domain"] for entry in domains} == required_domains
     assert len(domains) == len(required_domains)
@@ -75,12 +75,18 @@ def validate_matrix(candidate: dict) -> list[dict]:
     assert all(entry["mutations"] for entry in domains)
     assert len({mutation["mutation_id"] for mutation in all_mutations}) == len(all_mutations)
     for entry in domains:
+        assert entry.get("evidence_scope") in {
+            "emitted_candidate_artifact", "synthetic_unit_only"
+        }
         oracle_ids = entry["independent_oracle_test_ids"]
         assert oracle_ids and len(oracle_ids) == len(set(oracle_ids))
         for oracle_id in oracle_ids:
             oracle = tests[oracle_id]
-            assert oracle["test_class"] in {"independent_economic_oracle", "frozen_authority"}
-            assert oracle["test_class"] != "synthetic_integration"
+            if entry["evidence_scope"] == "emitted_candidate_artifact":
+                assert oracle["test_class"] in {"independent_economic_oracle", "frozen_authority"}
+            else:
+                assert oracle_id == ORACLE_ID
+                assert oracle["test_class"] == "mutation"
     return domains
 
 
@@ -109,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix="critical-artifact-matrix-") as temporar
     report_lines = [line for line in completed.stdout.splitlines() if line.strip()]
     artifact_report = json.loads(report_lines[-1])
 assert artifact_report["status"] == "PASS"
-assert artifact_report["artifact_origin"] == "real_candidate_emission"
+assert artifact_report["artifact_origin"] == "real_candidate_emission_with_sealed_source_arithmetic"
 assert artifact_report["production_imports"] == []
 artifact_mutations = {
     (item["domain"], item["mutation_id"]): item["caught"]
@@ -172,6 +178,15 @@ print(json.dumps({
     "production_imports": [],
     "artifact_oracle_production_imports": artifact_report["production_imports"],
     "artifact_origin": artifact_report["artifact_origin"],
+    "claim_scope": "MIXED_ARTIFACT_AND_EXPLICIT_SYNTHETIC_UNIT_COVERAGE",
+    "artifact_domains": sorted(
+        entry["domain"] for entry in domains
+        if entry["evidence_scope"] == "emitted_candidate_artifact"
+    ),
+    "synthetic_unit_domains": sorted(
+        entry["domain"] for entry in domains
+        if entry["evidence_scope"] == "synthetic_unit_only"
+    ),
     "artifact_mutations_caught": artifact_report["mutations_caught"],
     "total_violations": 0,
 }, sort_keys=True))

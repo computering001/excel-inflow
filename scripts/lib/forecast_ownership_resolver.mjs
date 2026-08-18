@@ -360,6 +360,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
     throw new Error(`forecast ownership preflight A blocked: ${structural.violations.join("; ")}`);
   }
   const resolutions = [];
+  const degradedAuthorities = [];
   const rejectedAuthorities = [];
   const violations = [];
   for (const { section, rows } of rowsBySection(modelCase)) {
@@ -374,14 +375,14 @@ export function resolveSelectedForecastOwnership(modelCase) {
       for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
         const parentMethod = methodAt(parent, forecastIndex);
         const parentClass = ownershipClass(parentMethod);
-        const childStates = children.map((row) => ({
+        let childStates = children.map((row) => ({
           row,
           owner_class: ownershipClass(methodAt(row, forecastIndex)),
         }));
-        const materialChildStates = childStates.filter(({ row }) =>
+        let materialChildStates = childStates.filter(({ row }) =>
           sourceOwnedMateriality(modelCase, row)
         );
-        const completeMaterialChildren = materialChildStates.every(
+        let completeMaterialChildren = materialChildStates.every(
           ({ owner_class }) => owner_class !== "absent",
         );
         const strongestChild = strongestDirectChild(
@@ -425,6 +426,47 @@ export function resolveSelectedForecastOwnership(modelCase) {
         else if (
           completeMaterialChildren
         ) selectedMode = "children_owned";
+
+        // The controller may make one bounded downstream-only recovery pass.
+        // It fills only genuinely missing material children with a deterministic
+        // historical-average authority when three historical observations exist;
+        // it never overwrites a selected source or turns unresolved evidence into zero.
+        if (
+          !selectedMode &&
+          process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE === "historical_average" &&
+          parentHasCompilableIdentity
+        ) {
+          for (const { row: child, owner_class: ownerClass } of materialChildStates) {
+            if (ownerClass !== "absent") continue;
+            const history = (child.values ?? []).slice(0, 3)
+              .map(Number)
+              .filter(Number.isFinite);
+            if (history.length !== 3) continue;
+            child.forecast_period_authorities ??= [];
+            child.forecast_period_authorities[forecastIndex] = {
+              method: "historical_average",
+              source_kind: "historical_inference",
+              source_id: `ownership-degradation:${child.row_id}:fy${forecastIndex + 1}`,
+              value: history.reduce((sum, value) => sum + value, 0) / history.length,
+            };
+            degradedAuthorities.push({
+              row_id: child.row_id,
+              forecast_index: forecastIndex,
+              method: "historical_average",
+            });
+          }
+          childStates = children.map((row) => ({
+            row,
+            owner_class: ownershipClass(methodAt(row, forecastIndex)),
+          }));
+          materialChildStates = childStates.filter(({ row }) =>
+            sourceOwnedMateriality(modelCase, row)
+          );
+          completeMaterialChildren = materialChildStates.every(
+            ({ owner_class }) => owner_class !== "absent",
+          );
+          if (completeMaterialChildren) selectedMode = "children_owned";
+        }
 
         if (!selectedMode) {
           violations.push(
@@ -515,6 +557,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
     structural_receipt_sha256: structural.receipt_sha256,
     resolutions,
     rejected_authorities: retainedRejectedAuthorities,
+    degraded_authorities: degradedAuthorities,
     violations,
     resolved_topology_sha256: hashValue(topologyProjection(modelCase)),
     controller_signal: {

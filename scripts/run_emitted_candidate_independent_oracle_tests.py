@@ -61,7 +61,10 @@ def build_candidate(representative: Path, output: Path) -> tuple[Path, Path, Pat
         env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": str(HERE)},
     )
     source_arithmetic = output / "source-arithmetic-artifact.json"
-    run([sys.executable, str(HERE / "emit_source_arithmetic_candidate_artifact.py"), "--out", str(source_arithmetic)])
+    run([
+        sys.executable, str(HERE / "emit_source_arithmetic_candidate_artifact.py"),
+        "--model-case", str(case_path), "--out", str(source_arithmetic),
+    ])
     return (
         workbook,
         case_path,
@@ -144,6 +147,7 @@ def main() -> int:
     consensus_mutations = [
         ("named-source-black", "CONSENSUS_NAMED_SOURCE_NOT_BLUE", lambda wb: setattr(wb["Brokers"]["D5"], "font", copy.copy(wb["Brokers"]["D10"].font))),
         ("provider-black", "CONSENSUS_PROVIDER_NOT_BLUE", lambda wb: setattr(wb["Brokers"]["D11"], "font", copy.copy(wb["Brokers"]["D10"].font))),
+        ("provider-lineage-removed", "CONSENSUS_PROVIDER_LINEAGE", lambda wb: setattr(wb["Brokers"]["D11"], "comment", None)),
         ("model-blue", "CONSENSUS_MODEL_NOT_BLACK", lambda wb: setattr(wb["Brokers"]["D10"], "font", copy.copy(wb["Brokers"]["D5"].font))),
         ("selected-cross-sheet-black", "CONSENSUS_CROSS_SHEET_LINK_NOT_GREEN", lambda wb: setattr(wb["Operating Model"]["J18"], "font", copy.copy(wb["Brokers"]["D10"].font))),
         ("provider-enters-model-membership", "CONSENSUS_MEMBERSHIP_INVALID", lambda wb: setattr(wb["Brokers"]["D10"], "value", '=IFERROR(AVERAGE(D5,D6,D7,D8,D9,D11),"")')),
@@ -228,9 +232,10 @@ def main() -> int:
     record("forecast_ownership", "duplicate-forecast-writer", "FORECAST_OWNERSHIP_DUPLICATE_WRITER", findings)
 
     arithmetic = json.loads(source_arithmetic.read_text(encoding="utf-8"))
-    compatible_child = next(row for row in arithmetic["rows"] if row["source_line_id"] == "compatible_a")
+    compatible_child = next(row for row in arithmetic["rows"] if row.get("parent_source_line_id"))
+    compatible_parent = next(row for row in arithmetic["rows"] if row["source_line_id"] == compatible_child["parent_source_line_id"])
     dimensional = copy.deepcopy(arithmetic)
-    next(row for row in dimensional["rows"] if row["source_line_id"] == "compatible_a")["reporting_currency"] = "USD"
+    next(row for row in dimensional["rows"] if row["source_line_id"] == compatible_child["source_line_id"])["reporting_currency"] = "USD"
     dimensional_path = output / "mutation-source-dimension.json"
     dimensional_path.write_text(json.dumps(dimensional, indent=2) + "\n", encoding="utf-8")
     findings = []
@@ -238,7 +243,7 @@ def main() -> int:
     record("source_arithmetic_dimensional_compatibility", "linked-child-wrong-currency", "SOURCE_ARITHMETIC_DIMENSION", findings)
 
     arithmetic_value = copy.deepcopy(arithmetic)
-    next(row for row in arithmetic_value["rows"] if row["source_line_id"] == "compatible_total")["values"][1] += 1
+    next(row for row in arithmetic_value["rows"] if row["source_line_id"] == compatible_parent["source_line_id"])["values"][1] += 1
     arithmetic_value_path = output / "mutation-source-value.json"
     arithmetic_value_path.write_text(json.dumps(arithmetic_value, indent=2) + "\n", encoding="utf-8")
     findings = []
@@ -275,7 +280,7 @@ def main() -> int:
             "operating_model_delta": expected_delta,
         },
         "production_imports": production_imports,
-        "artifact_origin": "real_candidate_emission",
+        "artifact_origin": "real_candidate_emission_with_sealed_source_arithmetic",
         "native_excel": "NOT_RUN_PORTABLE_OOXML_AND_LIBREOFFICE",
         "total_violations": 0,
     }

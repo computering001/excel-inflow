@@ -62,6 +62,12 @@ function modelCase({
           definition_signature: structuredClone(signature),
           brokers,
           ...(provider ? { provider_consensus: provider } : {}),
+          ...(provider ? {
+            provider_consensus_source: {
+              source_note: "Neutral provider consensus note",
+              period_lineage: ["p1/table/cell", "p2/table/cell", "p3/table/cell"],
+            },
+          } : {}),
           consensus_membership: membership,
         },
       },
@@ -179,6 +185,16 @@ try {
   staleCaught = /hash/.test(String(error));
 }
 check(staleCaught, "stale membership mutation escaped its seal");
+
+const unsealed = modelCase();
+delete unsealed.broker_pack.metrics.adjusted_ebitda.consensus_membership;
+let unsealedCaught = false;
+try {
+  compileBrokerConsensusMetric(unsealed, "adjusted_ebitda");
+} catch (error) {
+  unsealedCaught = /requires sealed consensus membership/.test(String(error));
+}
+check(unsealedCaught, "an absent membership silently inferred all visible houses");
 
 console.log(JSON.stringify({
   status: "PASS",

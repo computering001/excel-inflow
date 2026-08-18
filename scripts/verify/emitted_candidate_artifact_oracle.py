@@ -9,6 +9,7 @@ compiler, forecast compiler, row planner, solver or workbook emitter.
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import re
 from collections import defaultdict
@@ -150,6 +151,8 @@ def inspect_consensus(workbook_path: Path, findings: list[dict]) -> dict:
                 provider_cell = brokers[f"{column}{provider_row}"]
                 if _colour(provider_cell) != BLUE or not _finite(provider_cell.value):
                     _finding(findings, "CONSENSUS_PROVIDER_NOT_BLUE", cell=provider_cell.coordinate)
+                if not provider_cell.comment or "Provider consensus source:" not in provider_cell.comment.text:
+                    _finding(findings, "CONSENSUS_PROVIDER_LINEAGE", cell=provider_cell.coordinate)
             selected_formula = _normal_formula(selected_cell.value)
             if f"{column}{model_row}" not in _formula_refs(selected_cell.value):
                 _finding(findings, "CONSENSUS_SELECTED_MISSING_MODEL", cell=selected_cell.coordinate)
@@ -327,6 +330,13 @@ def inspect_acquisition_and_lease(workbook_path: Path, model_case_path: Path, fi
 
 def inspect_source_arithmetic(artifact_path: Path, findings: list[dict]) -> dict:
     artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    declared = artifact.get("artifact_sha256")
+    body = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
+    expected = hashlib.sha256(
+        (json.dumps(body, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    ).hexdigest()
+    if declared != expected or not artifact.get("source_model_case_sha256"):
+        _finding(findings, "SOURCE_ARITHMETIC_SEAL")
     rows = {str(row["source_line_id"]): row for row in artifact.get("rows") or []}
     dimensions = ("numeric_type", "reporting_currency", "units", "sign_convention")
     families: dict[str, list[dict]] = defaultdict(list)

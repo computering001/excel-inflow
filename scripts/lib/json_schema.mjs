@@ -113,6 +113,16 @@ function validateNode(value, schema, rootSchema, path, errors) {
         seen.add(canonical);
       }
     }
+    if (schema.contains) {
+      const containsMatch = value.some((item, index) => {
+        const candidateErrors = [];
+        validateNode(item, schema.contains, rootSchema, `${path}[${index}]`, candidateErrors);
+        return candidateErrors.length === 0;
+      });
+      if (!containsMatch) {
+        errors.push(`${path} must contain at least one item matching the required schema.`);
+      }
+    }
     const prefixCount = schema.prefixItems?.length ?? 0;
     for (let index = 0; index < Math.min(prefixCount, value.length); index += 1) {
       validateNode(value[index], schema.prefixItems[index], rootSchema, `${path}[${index}]`, errors);

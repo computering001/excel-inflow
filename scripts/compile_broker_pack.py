@@ -10,6 +10,7 @@ import math
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,20 @@ DISPOSITIONS = {
     "partial_period_evidence", "supplemental_check", "duplicate",
     "not_model_relevant", "unusable", "quarantined_conflict",
 }
+BROKER_FRESHNESS_MAX_AGE_DAYS = 180
+
+
+def broker_freshness(published_date: str, as_of: str) -> dict[str, Any]:
+    age_days = max(0, (date.fromisoformat(as_of) - date.fromisoformat(published_date)).days)
+    return {
+        "freshness_status": (
+            "current" if age_days <= BROKER_FRESHNESS_MAX_AGE_DAYS else "stale"
+        ),
+        "freshness_age_days": age_days,
+        "freshness_max_age_days": BROKER_FRESHNESS_MAX_AGE_DAYS,
+    }
+
+
 MODEL_RELEVANT_LABEL = re.compile(
     r"(?:revenue|sales|profit|ebit|ebitda|income|tax|depreciat|amortis|impair|"
     r"cash\s*(?:flow|from)|working\s*capital|capex|capital\s*expenditure|acquisition|"
@@ -1430,17 +1445,25 @@ def main() -> int:
         complete_core = all(metric_coverage.get(metric_id, 0) == 3 for metric_id in required_house_metrics)
         complete_headline = any(metric_coverage.get(metric_id, 0) == 3 for metric_id in headline_metrics)
         active_value_count = sum(metric_coverage.values())
+        freshness = broker_freshness(
+            str(document["published_date"]), str(crosswalk["as_of"])
+        )
+        age_days = freshness["freshness_age_days"]
+        freshness_status = freshness["freshness_status"]
         eligibility = (
             "primary_eligible"
-            if complete_core and complete_headline
+            if freshness_status == "current" and complete_core and complete_headline
             else "supplemental_eligible"
-            if active_value_count > 0
+            if freshness_status == "current" and active_value_count > 0
             else "reference_only"
         )
         houses.append({
             "house_id": house_id,
             "house_name": document["house_name"],
             "published_date": document["published_date"],
+            "freshness_status": freshness_status,
+            "freshness_age_days": age_days,
+            "freshness_max_age_days": BROKER_FRESHNESS_MAX_AGE_DAYS,
             "analyst": None,
             "document": {
                 "file_name": document["file_name"],
@@ -1609,7 +1632,15 @@ def main() -> int:
             # the sealed preview selects the ordinary forecast waterfall.
             "run_can_continue_without_broker_question": True,
         },
+        "freshness_policy": {
+            "as_of": crosswalk["as_of"],
+            "max_age_days": BROKER_FRESHNESS_MAX_AGE_DAYS,
+            "stale_house_count": sum(
+                house["freshness_status"] == "stale" for house in houses
+            ),
+        },
         **({"provider_consensus": crosswalk["provider_consensus"]} if crosswalk.get("provider_consensus") else {}),
+        **({"provider_consensus_source": crosswalk["provider_consensus_source"]} if crosswalk.get("provider_consensus_source") else {}),
     }
     def workbook_pages(document: dict[str, Any]) -> list[dict[str, Any]]:
         artifacts = {

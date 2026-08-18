@@ -74,10 +74,14 @@ const pythonTreeTimeout = spawnSync(python, ["-c", [
   "root=pathlib.Path(tempfile.mkdtemp(prefix='phase5-python-tree-'))",
   "pidfile=root/'grandchild.pid'",
   "script=root/'tree.py'",
-  "script.write_text(\"import pathlib,subprocess,sys,time\\np=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'])\\npathlib.Path(sys.argv[1]).write_text(str(p.pid))\\ntime.sleep(60)\\n\")",
+  "script.write_text(\"import pathlib,subprocess,sys,time\\np=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'],start_new_session=True)\\npathlib.Path(sys.argv[1]).write_text(str(p.pid))\\ntime.sleep(60)\\n\")",
   "result=run([sys.executable,str(script),str(pidfile)],timeout_seconds=1)",
   "assert result.returncode == 124",
-  "assert 'process tree termination verified' in result.stderr",
+  "grandchild=int(pidfile.read_text())",
+  "try: os.kill(grandchild,0); alive=True",
+  "except ProcessLookupError: alive=False",
+  "assert not alive",
+  "assert '\"verified\": true' in result.stderr and '\"survivor_pids\": []' in result.stderr",
 ].join("\n")], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
 check(pythonTreeTimeout.status === 0, `filings lane timeout did not terminate its process group: ${pythonTreeTimeout.stderr}`);
 

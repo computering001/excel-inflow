@@ -23,6 +23,10 @@ import { renderBrokerPreviewScreen, inspectScreen } from "./lib/flow_screens.mjs
 import { validateJsonSchema } from "./lib/json_schema.mjs";
 import { FLOW_CONTROLLER_VERSION, createStageReceipt } from "./lib/flow_runtime.mjs";
 import { verifyRunCarrier, writeRunCarrier } from "./lib/run_carrier.mjs";
+import {
+  brokerMetricDefinitionSignature,
+  sealBrokerConsensusMembership,
+} from "./lib/broker_consensus.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -31,6 +35,22 @@ const assert = (condition, message) => {
 };
 
 const clone = (value) => structuredClone(value);
+const sealCaseMemberships = (modelCase) => {
+  for (const [metricId, metric] of Object.entries(modelCase.broker_pack?.metrics ?? {})) {
+    const signature = brokerMetricDefinitionSignature(modelCase, metricId);
+    metric.consensus_membership = sealBrokerConsensusMembership({
+      schema_version: "broker-consensus-membership/1.0",
+      metric_id: metricId,
+      contributors: Object.keys(metric.brokers ?? {}).sort().map((houseName) => ({
+        house_name: houseName, status: "included", reasons: [],
+        definition_signature: signature,
+        period_status: ["included", "included", "included"],
+        period_reasons: [[], [], []],
+      })),
+    });
+  }
+  return modelCase;
+};
 
 /**
  * Repository-owned broker-preview fixture.
@@ -607,6 +627,7 @@ await test("forecast-waterfall mode consumes compatible broker evidence when it 
       },
     },
   };
+  sealCaseMemberships(modelCase);
   const selection = resolveBrokerForecastSelection(modelCase, "revenue", 0);
   assert(selection.value === 101, `forecast waterfall rejected compatible broker evidence: ${selection.value}`);
   assert(
@@ -632,6 +653,7 @@ await test("named-house gaps never mix to consensus while explicit consensus rem
       },
     },
   };
+  sealCaseMemberships(modelCase);
   const missing = resolveBrokerForecastSelection(modelCase, "revenue", 1);
   assert(missing.value === null, "named-house gap borrowed another house");
   assert(missing.source_kind === "named_house_unavailable", "wrong named-house gap status");
@@ -670,6 +692,7 @@ await test("named primary house owns a complete local headline anchor", () => {
       },
     },
   };
+  sealCaseMemberships(modelCase);
   const named = selectBrokerAnchor(modelCase, []);
   assert(named.supported, "complete named house was not supported");
   assert(named.headline_anchor === "adjusted_ebitda", "named house lost to global EBIT breadth");

@@ -412,6 +412,21 @@ assert.throws(
   /preflight B blocked.*unresolved material ownership/,
   "material source evidence did not restore the missing-child blocker",
 );
+const deterministicallyRecoverable = structuredClone(immaterialMissingChild);
+delete deterministicallyRecoverable.forecast_ownership_preflights;
+deterministicallyRecoverable.source_coverage.cash_flow[0].material = true;
+const missingPayable = deterministicallyRecoverable.statement_structure.cash_flow[3];
+missingPayable.values = [10, 12, 14, null, null, null];
+const priorDegradation = process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE;
+process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE = "historical_average";
+const recoveredReceipt = resolveSelectedForecastOwnership(deterministicallyRecoverable);
+if (priorDegradation === undefined) delete process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE;
+else process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE = priorDegradation;
+assert.equal(recoveredReceipt.status, "PASS");
+assert.equal(recoveredReceipt.degraded_authorities.length, 3);
+assert.ok(missingPayable.forecast_period_authorities.every(
+  (item) => item.method === "historical_average" && item.source_kind === "historical_inference",
+));
 
 // Row order and issuer wording do not change the selected modes.
 const reordered = workingCapitalFixture();

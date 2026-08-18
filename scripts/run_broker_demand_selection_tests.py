@@ -155,14 +155,18 @@ def bundle(root: Path, *, conflicting_house: bool = False) -> dict[str, Any]:
         rows = copy.deepcopy(ROWS)
         if conflicting_house and house_id == "bravo":
             rows.append(["Revenue", "999", "999", "999"])
-        documents.append(build_house(
+        document = build_house(
             document_id=house_id,
             house_id=house_id,
             house_name=house_id.title(),
             artifact_root=artifacts,
             vision_required=False,
             clean_rows=rows,
-        ))
+        )
+        # Keep this deterministic selection fixture exactly on the production
+        # freshness boundary: 180 days before the 2026-12-31 model as-of date.
+        document["published_date"] = "2026-07-04"
+        documents.append(document)
     result = {
         "schema_version": "broker-extraction-bundle/1.0",
         "run_id": "broker_demand_selection",

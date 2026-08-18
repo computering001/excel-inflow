@@ -1718,14 +1718,21 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       contributors: (sourcePack.houses ?? [])
         .filter((house) => Object.hasOwn(brokers, house.house_name))
         .map((house) => {
-          const included =
+          const current = house.freshness_status === "current";
+          const included = current && (
             house.eligibility === undefined ||
             ["primary_eligible", "supplemental_eligible"].includes(
               house.eligibility,
-            );
-          const reason = included
-            ? []
-            : [`source house eligibility is ${house.eligibility ?? "not declared"}`];
+            )
+          );
+          const reason = included ? [] : [
+            ...(current ? [] : [
+              `outside freshness policy: ${house.freshness_age_days ?? "unknown"} days old; maximum ${house.freshness_max_age_days ?? "unknown"}`,
+            ]),
+            ...(["primary_eligible", "supplemental_eligible"].includes(house.eligibility)
+              ? []
+              : [`source house eligibility is ${house.eligibility ?? "not declared"}`]),
+          ];
           return {
             house_name: house.house_name,
             status: included ? "included" : "excluded",
@@ -1753,6 +1760,13 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
       ...(Array.isArray(providerConsensus)
         ? { provider_consensus: structuredClone(providerConsensus) }
         : {}),
+      ...(Array.isArray(providerConsensus)
+        ? {
+          provider_consensus_source: structuredClone(
+            sourcePack.provider_consensus_source?.[metricId],
+          ),
+        }
+        : {}),
       consensus_membership: membership,
       brokers,
     };
@@ -1769,6 +1783,9 @@ export async function compileBrokerEvidence({ declaration, specDir, evidence, so
         house.house_name,
         {
           published_date: house.published_date,
+          freshness_status: house.freshness_status,
+          freshness_age_days: house.freshness_age_days,
+          freshness_max_age_days: house.freshness_max_age_days,
           document: house.document?.file_name ?? "preserved broker source",
           ...(house.document?.source_id
             ? { source_id: house.document.source_id }

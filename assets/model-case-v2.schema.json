@@ -478,6 +478,17 @@
                 "type": "string",
                 "format": "date"
               },
+              "freshness_status": {
+                "enum": ["current", "stale"]
+              },
+              "freshness_age_days": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "freshness_max_age_days": {
+                "type": "integer",
+                "minimum": 1
+              },
               "document": {
                 "type": "string",
                 "minLength": 1
@@ -2751,6 +2762,7 @@
       "additionalProperties": false,
       "required": [
         "label",
+        "consensus_membership",
         "brokers"
       ],
       "properties": {
@@ -2863,6 +2875,30 @@
             ]
           }
         },
+        "provider_consensus_source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_note",
+            "period_lineage"
+          ],
+          "properties": {
+            "source_note": {
+              "type": "string",
+              "minLength": 1
+            },
+            "period_lineage": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Exact provider page/cell, note/table/cell, or equivalent stable source reference for the period."
+              }
+            }
+          }
+        },
         "consensus_membership": {
           "$ref": "#/$defs/brokerConsensusMembership"
         },
@@ -2880,7 +2916,22 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["provider_consensus"],
+            "properties": {
+              "provider_consensus": {
+                "contains": {"type": "number"}
+              }
+            }
+          },
+          "then": {
+            "required": ["provider_consensus_source"]
+          }
+        }
+      ]
     },
     "brokerConsensusMembership": {
       "type": "object",

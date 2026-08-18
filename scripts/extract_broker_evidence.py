@@ -1961,11 +1961,14 @@ def main() -> int:
     parser.add_argument("request", help="broker-extraction-request/1.0 JSON")
     parser.add_argument("--out", required=True, help="output directory outside the skill tree")
     parser.add_argument("--render-dpi", type=int, default=150)
+    parser.add_argument("--native-timeout-ms", type=int, default=120_000)
     args = parser.parse_args()
     request_path = Path(args.request).resolve()
     output_root = Path(args.out).resolve()
     request = json.loads(request_path.read_text("utf-8"))
     validate_request(request)
+    if not 0 < args.native_timeout_ms <= 120_000:
+        raise ValueError("Per-document broker-native timeout must be within 1..120000 ms.")
     demand_contract = ensure_core_broker_demand_contract(
         compile_broker_demand_contract(request.get("model_context") or {})
     )
@@ -1976,7 +1979,16 @@ def main() -> int:
 
     documents: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
+    native_budget_executions: list[dict[str, Any]] = []
+    def native_timeout(_signum, _frame):
+        raise TimeoutError(
+            f"broker native extraction exceeded {args.native_timeout_ms} ms for one document"
+        )
+    prior_alarm_handler = signal.signal(signal.SIGALRM, native_timeout)
     for descriptor in request["documents"]:
+        native_started = time.monotonic()
+        outcome = "PASS"
+        signal.setitimer(signal.ITIMER_REAL, args.native_timeout_ms / 1000)
         try:
             documents.append(extract_document(
                 output_root,
@@ -1987,6 +1999,16 @@ def main() -> int:
                 vision_house_id,
             ))
         except Exception as error:
+            if isinstance(error, TimeoutError):
+                outcome = "TIMEOUT"
+                findings.append({
+                    "id": "broker_extraction.document_native_timeout",
+                    "severity": "blocker",
+                    "document_id": descriptor.get("document_id"),
+                    "surface_id": None,
+                    "message": str(error),
+                })
+                continue
             try:
                 if descriptor.get("media_type") != "application/pdf":
                     raise
@@ -2021,6 +2043,7 @@ def main() -> int:
                     ),
                 })
             except Exception as fallback_error:
+                outcome = "FAIL"
                 findings.append({
                     "id": "broker_extraction.document_failed",
                     "severity": "blocker",
@@ -2028,6 +2051,31 @@ def main() -> int:
                     "surface_id": None,
                     "message": f"primary: {error}; rendered fallback: {fallback_error}",
                 })
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            native_budget_executions.append({
+                "document_id": descriptor.get("document_id"),
+                "budget_ms": args.native_timeout_ms,
+                "duration_ms": round((time.monotonic() - native_started) * 1000),
+                "outcome": outcome,
+            })
+    signal.signal(signal.SIGALRM, prior_alarm_handler)
+
+    native_budget_body = {
+        "schema_version": "broker-native-budget-receipt/1.0",
+        "per_document_budget_ms": args.native_timeout_ms,
+        "executions": native_budget_executions,
+        "status": "PASS" if all(
+            item["outcome"] == "PASS" and item["duration_ms"] <= args.native_timeout_ms + 1000
+            for item in native_budget_executions
+        ) else "DEGRADED",
+    }
+    native_budget_receipt = {
+        **native_budget_body,
+        "receipt_sha256": hashlib.sha256(canonical_json(native_budget_body)).hexdigest(),
+    }
+    native_budget_path = output_root / "broker-native-budget-receipt.json"
+    native_budget_path.write_bytes(canonical_json(native_budget_receipt))
 
     house_ranking: list[dict[str, Any]] = []
     if documents:
@@ -2096,6 +2144,8 @@ def main() -> int:
             "house_ranking": house_ranking,
         },
         "artifact_root": str(output_root),
+        "native_budget_receipt": str(native_budget_path),
+        "native_budget_receipt_sha256": sha256_file(native_budget_path),
         "documents": documents,
         "summary": {
             "document_count": len(documents),

@@ -237,18 +237,32 @@ def run(
         stdout, stderr = process.communicate(timeout=timeout_seconds)
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     except subprocess.TimeoutExpired as error:
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+        targeted = snapshot_process_tree(process.pid)
+        signal_process_tree(targeted, signal.SIGTERM)
         try:
             stdout, stderr = process.communicate(timeout=1)
         except subprocess.TimeoutExpired:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            targeted = sorted(set(targeted + snapshot_process_tree(process.pid)))
+            signal_process_tree(targeted, signal.SIGKILL)
             stdout, stderr = process.communicate()
+        deadline = time.monotonic() + 2
+        survivors = [pid for pid in targeted if process_exists(pid)]
+        while survivors and time.monotonic() < deadline:
+            time.sleep(0.025)
+            survivors = [pid for pid in targeted if process_exists(pid)]
+        if survivors:
+            raise RuntimeError(
+                "controller timeout retained live descendant pids: "
+                + ",".join(str(pid) for pid in survivors)
+            )
+        termination = {
+            "schema_version": "process-tree-termination/1.0",
+            "root_pid": process.pid,
+            "targeted_pids": targeted,
+            "survivor_pids": [],
+            "verified": True,
+        }
+        termination["receipt_sha256"] = sha256_value(termination)
         def text(value: Any) -> str:
             return value.decode(errors="replace") if isinstance(value, bytes) else str(value or "")
         return subprocess.CompletedProcess(
@@ -256,8 +270,55 @@ def run(
             124,
             text(stdout or error.stdout),
             text(stderr or error.stderr)
-            + f"\ncontroller timeout after {timeout_seconds} seconds; process tree termination verified",
+            + f"\ncontroller timeout after {timeout_seconds} seconds; "
+            + json.dumps(termination, sort_keys=True),
         )
+
+
+def process_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def snapshot_process_tree(root_pid: int) -> list[int]:
+    completed = subprocess.run(
+        ["ps", "-axo", "pid=,ppid="], text=True, capture_output=True, check=False
+    )
+    if completed.returncode != 0:
+        return [root_pid]
+    children: dict[int, list[int]] = {}
+    for line in completed.stdout.splitlines():
+        fields = line.split()
+        if len(fields) != 2:
+            continue
+        pid, parent = map(int, fields)
+        children.setdefault(parent, []).append(pid)
+    result: list[int] = []
+    pending = [root_pid]
+    while pending:
+        pid = pending.pop()
+        if pid in result:
+            continue
+        result.append(pid)
+        pending.extend(children.get(pid, []))
+    return result
+
+
+def signal_process_tree(pids: list[int], requested_signal: signal.Signals) -> None:
+    for pid in reversed(pids):
+        try:
+            os.killpg(pid, requested_signal)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            os.kill(pid, requested_signal)
+        except (ProcessLookupError, PermissionError):
+            pass
 
 
 def lane_timeout_budget(kind: str, request_path: Path) -> int:
@@ -311,6 +372,11 @@ def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root
         "--out",
         str(output_root / kind),
     ]
+    if kind == "broker":
+        command.extend([
+            "--native-timeout-ms", "120000",
+            "--semantic-frontier-timeout-ms", "180000",
+        ])
     for field, option in (("responses_path", "--responses"), ("crosswalk_path", "--crosswalk")):
         target = resolve(base, declaration.get(field))
         if target is not None and (kind == "broker" or field != "responses_path"):

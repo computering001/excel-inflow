@@ -609,6 +609,47 @@ async function main() {
       artifacts.ownership_preflight_controller_action = actionPath;
       artifacts.case_compile_report = compileReportPath;
       checkpoints.push(await checkpoint("ownership_preflight", "BLOCKED_RESUMABLE", actionPath));
+      const recoveryBudget = Math.max(
+        1,
+        ACTIVE_RUNTIME_BUDGET.budgets_ms.case_compilation_and_ownership -
+          Number(firstExecution.duration_ms ?? 0),
+      );
+      const recoveryExecution = await run(process.execPath, firstArgs, {
+        timeout: recoveryBudget,
+        budgetStage: "case_compilation_and_ownership",
+        env: {
+          ...runtimeEnv,
+          EXCEL_INFLOW_OWNERSHIP_DEGRADE: "historical_average",
+        },
+        progress: {
+          stage: "ownership topology recovery",
+          documentsTotal: 1,
+          documentsComplete: 0,
+        },
+      });
+      const recovered = await readJson(
+        userFlowResultPath,
+        "ownership-recovered user-flow result",
+      ).catch(() => null);
+      action.recovery_execution = {
+        exit_code: recoveryExecution.code,
+        duration_ms: recoveryExecution.duration_ms,
+        timed_out: recoveryExecution.timed_out,
+        termination_verified: recoveryExecution.termination_verified,
+        status: recovered?.status ?? "ABSENT",
+        reentered_filings: false,
+        reentered_dcs: false,
+        reentered_broker: false,
+        user_reupload_required: false,
+      };
+      const recoveredUnsigned = { ...action };
+      delete recoveredUnsigned.action_sha256;
+      action.action_sha256 = digestBytes(canonicalJson(recoveredUnsigned));
+      await writeJson(actionPath, action);
+      if (recoveryExecution.code === 0 && recovered?.status === "PAUSED") {
+        userFlowResult = recovered;
+        checkpoints.push(await checkpoint("ownership_topology_recovery", "PASS", userFlowResultPath));
+      }
     }
   }
   if (userFlowResult.status === "ACTION_REQUIRED") {

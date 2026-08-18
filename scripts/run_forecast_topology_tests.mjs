@@ -11,6 +11,7 @@ import { validateForecastAuthorities } from "./lib/forecast_authority.mjs";
 import {
   canonicalForecastStatementDependencies,
 } from "./lib/layered_graph_constitution.mjs";
+import { sealBrokerConsensusMembership } from "./lib/broker_consensus.mjs";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -488,6 +489,16 @@ const unavailableBrokerParent = {
       capex: {
         provider_consensus: [null, null, null],
         brokers: { "House A": [null, null, null] },
+        consensus_membership: sealBrokerConsensusMembership({
+          schema_version: "broker-consensus-membership/1.0",
+          metric_id: "capex",
+          contributors: [{
+            house_name: "House A", status: "included", reasons: [],
+            definition_signature: {},
+            period_status: ["included", "included", "included"],
+            period_reasons: [[], [], []],
+          }],
+        }),
       },
     },
   },

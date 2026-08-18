@@ -14,6 +14,7 @@ import { classifyStatementLine } from "./lib/statement_classifier.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
 import { deriveCaseSourceAndEvidence } from "./run_case_compiler_equivalence.mjs";
 import { proposeCaseSource } from "./lib/case_source_proposer.mjs";
+import { sealBrokerConsensusMembership } from "./lib/broker_consensus.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const casesDirectory = path.resolve(
@@ -111,10 +112,28 @@ function brokerCasePack(pack) {
     );
     metrics[metricId] = {
       label: descriptor.label,
-      ...(Array.isArray(pack.provider_consensus?.[metricId])
-        ? { provider_consensus: pack.provider_consensus[metricId] }
+      ...(Array.isArray(pack.provider_consensus?.[metricId]) &&
+          pack.provider_consensus[metricId].some((value) =>
+            value !== null && value !== undefined && Number.isFinite(Number(value))
+          )
+        ? {
+          provider_consensus: pack.provider_consensus[metricId],
+          provider_consensus_source: pack.provider_consensus_source?.[metricId],
+        }
         : {}),
       brokers,
+      consensus_membership: sealBrokerConsensusMembership({
+        schema_version: "broker-consensus-membership/1.0",
+        metric_id: metricId,
+        contributors: Object.keys(brokers).sort().map((houseName) => ({
+          house_name: houseName,
+          status: "included",
+          reasons: [],
+          definition_signature: {},
+          period_status: ["included", "included", "included"],
+          period_reasons: [[], [], []],
+        })),
+      }),
     };
   }
   return {

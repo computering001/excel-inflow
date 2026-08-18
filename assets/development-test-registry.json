@@ -674,12 +674,30 @@
       "runtime": "python",
       "script": "run_real_filing_corpus_extraction_outcomes.py",
       "arguments": [
-        {"name": "arg_1", "value": "--manifest", "type": "literal"},
-        {"name": "real_filing_corpus_manifest", "source": "REAL_FILING_CORPUS_MANIFEST", "type": "file"},
-        {"name": "arg_3", "value": "--out", "type": "literal"},
-        {"name": "test_out", "source": "TEST_OUT", "type": "file"}
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "real_filing_corpus_manifest",
+          "source": "REAL_FILING_CORPUS_MANIFEST",
+          "type": "file"
+        },
+        {
+          "name": "arg_3",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
       ],
-      "requires": ["REAL_FILING_CORPUS_MANIFEST"],
+      "requires": [
+        "REAL_FILING_CORPUS_MANIFEST"
+      ],
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "real_corpus"
@@ -1141,7 +1159,7 @@
       ],
       "timeout_seconds": 900,
       "mutates_product_tree": false,
-      "test_class": "independent_economic_oracle"
+      "test_class": "mutation"
     },
     {
       "id": "semantic-role-closure",
@@ -1660,6 +1678,15 @@
       "runtime": "node",
       "script": "run_phase5_operational_runtime_tests.mjs",
       "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "broker-freshness-policy",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_broker_freshness_policy_tests.py",
+      "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "mutation"
     }

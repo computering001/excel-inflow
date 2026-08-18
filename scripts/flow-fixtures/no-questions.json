@@ -196,7 +196,10 @@
               21.63,
               22.5
             ]
-          }
+          },
+          "freshness_age_days": 0,
+          "freshness_max_age_days": 180,
+          "freshness_status": "current"
         },
         {
           "house_id": "b",
@@ -250,7 +253,10 @@
               21.63,
               22.5
             ]
-          }
+          },
+          "freshness_age_days": 0,
+          "freshness_max_age_days": 180,
+          "freshness_status": "current"
         },
         {
           "house_id": "c",
@@ -304,9 +310,17 @@
               21.63,
               22.5
             ]
-          }
+          },
+          "freshness_age_days": 0,
+          "freshness_max_age_days": 180,
+          "freshness_status": "current"
         }
-      ]
+      ],
+      "freshness_policy": {
+        "as_of": "2025-12-31",
+        "max_age_days": 180,
+        "stale_house_count": 0
+      }
     }
   },
   "expect": {

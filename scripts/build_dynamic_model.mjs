@@ -2169,7 +2169,11 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         : `='Operating Model'!${HISTORICAL_COLUMNS.at(-1)}${definition.row}`
       : null;
 
-    const compiledConsensus = compileBrokerConsensusMetric(modelCase, metricId);
+    // Production workbook emission is fail-closed on the hash-bound contributor
+    // census. There is deliberately no visible-house inference fallback.
+    const compiledConsensus = compileBrokerConsensusMetric(modelCase, metricId, {
+      requireSealed: true,
+    });
     // An attributed flex election still names its selected house on the final
     // Selected Forecast row. It never borrows the Model Consensus label.
     const election = (modelCase.broker_pack?.flex_elections ?? []).find(
@@ -2282,6 +2286,16 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         sheet,
         `${FORECAST_COLUMNS_BROKERS[0]}${row}:${LAST_COLUMN}${row}`,
       );
+      const providerSource = metric.provider_consensus_source;
+      for (let index = 0; index < 3; index += 1) {
+        const address = `${FORECAST_COLUMNS_BROKERS[index]}${row}`;
+        addCommentOnce(
+          workbook,
+          sheet,
+          address,
+          `Provider consensus source: ${providerSource.source_note} | ${providerSource.period_lineage[index]}`,
+        );
+      }
       markLiveCaseAcross(row);
       row += 1;
       differenceRow = row;

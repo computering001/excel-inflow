@@ -94,37 +94,22 @@ export function verifyBrokerConsensusMembership(membership) {
   return membership;
 }
 
-function inferredMembership(modelCase, metricId, metric) {
-  const signature = brokerMetricDefinitionSignature(modelCase, metricId);
-  return {
-    schema_version: BROKER_CONSENSUS_MEMBERSHIP_VERSION,
-    metric_id: metricId,
-    contributors: Object.keys(metric?.brokers ?? {})
-      .sort()
-      .map((houseName) => ({
-        house_name: houseName,
-        status: "included",
-        reasons: [],
-        definition_signature: signature,
-        period_status: [
-          PERIOD_STATUS_INCLUDED,
-          PERIOD_STATUS_INCLUDED,
-          PERIOD_STATUS_INCLUDED,
-        ],
-        period_reasons: [[], [], []],
-      })),
-  };
-}
-
-function membershipForMetric(modelCase, metricId, metric, requireSealed) {
+function membershipForMetric(metricId, metric) {
   const supplied = metric?.consensus_membership;
   if (!supplied) {
-    if (requireSealed) {
-      throw new Error(
-        `Broker metric ${metricId} requires sealed consensus membership.`,
-      );
+    if (Object.keys(metric?.brokers ?? {}).length === 0) {
+      return {
+        membership: {
+          schema_version: BROKER_CONSENSUS_MEMBERSHIP_VERSION,
+          metric_id: metricId,
+          contributors: [],
+        },
+        sealed: false,
+      };
     }
-    return { membership: inferredMembership(modelCase, metricId, metric), sealed: false };
+    throw new Error(
+      `Broker metric ${metricId} requires sealed consensus membership.`,
+    );
   }
   verifyBrokerConsensusMembership(supplied);
   if (supplied.metric_id !== metricId) {
@@ -176,6 +161,24 @@ export function providerConsensusIsSupplied(metric) {
   );
 }
 
+function verifyProviderConsensusSource(metric, metricId) {
+  if (!providerConsensusIsSupplied(metric)) return null;
+  const source = metric?.provider_consensus_source;
+  if (
+    !source ||
+    typeof source.source_note !== "string" ||
+    !source.source_note.trim() ||
+    !Array.isArray(source.period_lineage) ||
+    source.period_lineage.length !== 3 ||
+    source.period_lineage.some((entry) => typeof entry !== "string" || !entry.trim())
+  ) {
+    throw new Error(
+      `Broker metric ${metricId} has Provider Consensus without exact source note and period lineage.`,
+    );
+  }
+  return source;
+}
+
 export function normalizeBrokerSelection(selection) {
   return selection === "Consensus" ? "Model Consensus" : selection;
 }
@@ -183,17 +186,13 @@ export function normalizeBrokerSelection(selection) {
 export function compileBrokerConsensusMetric(
   modelCase,
   metricId,
-  { requireSealed = false } = {},
+  _options = {},
 ) {
   const metric = modelCase?.broker_pack?.metrics?.[metricId];
   if (!metric) return null;
+  verifyProviderConsensusSource(metric, metricId);
   const targetSignature = brokerMetricDefinitionSignature(modelCase, metricId);
-  const { membership, sealed } = membershipForMetric(
-    modelCase,
-    metricId,
-    metric,
-    requireSealed,
-  );
+  const { membership, sealed } = membershipForMetric(metricId, metric);
   const byName = new Map(
     membership.contributors.map((entry) => [entry.house_name, entry]),
   );
@@ -307,7 +306,7 @@ export function resolveBrokerConsensusSelection(
   modelCase,
   metricId,
   forecastIndex,
-  { requireSealed = false } = {},
+  _options = {},
 ) {
   const metric = modelCase?.broker_pack?.metrics?.[metricId];
   if (!metric) {
@@ -318,9 +317,7 @@ export function resolveBrokerConsensusSelection(
       substituted: false,
     };
   }
-  const compiled = compileBrokerConsensusMetric(modelCase, metricId, {
-    requireSealed,
-  });
+  const compiled = compileBrokerConsensusMetric(modelCase, metricId);
   const selected = normalizeBrokerSelection(
     modelCase.controls?.broker_case ?? "Model Consensus",
   );
