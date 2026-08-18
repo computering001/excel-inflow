@@ -22,7 +22,11 @@ import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circu
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
 import { compilePerformanceReceipt } from "./lib/performance_receipt.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
-import { createProgressHeartbeat } from "./lib/progress_heartbeat.mjs";
+import {
+  compileProgressEvidence,
+  createProgressHeartbeat,
+  validateProgressEvidence,
+} from "./lib/progress_heartbeat.mjs";
 import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
 
 
@@ -34,6 +38,10 @@ let ACTIVE_PERFORMANCE = null;
 let ACTIVE_EXPERIENCE_TRACE = null;
 let ACTIVE_EXPERIENCE_ROOT_SPAN = null;
 let ACTIVE_SOURCE_IDENTITY = null;
+let ACTIVE_PROGRESS_STARTED_AT = null;
+let ACTIVE_PROGRESS_STARTED_EPOCH_MS = null;
+let ACTIVE_PROGRESS_ACTIVITY_COUNTER = 0;
+let ACTIVE_PROGRESS_EVENTS = [];
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
@@ -112,7 +120,15 @@ async function writeJson(target, value) {
 
 async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000, progress = null } = {}) {
   const started = Date.now();
-  const heartbeat = progress ? createProgressHeartbeat(progress) : null;
+  const activityId = progress ? `activity_${String(++ACTIVE_PROGRESS_ACTIVITY_COUNTER).padStart(2, "0")}` : null;
+  const heartbeat = progress ? createProgressHeartbeat({
+    ...progress,
+    observe: (event) => ACTIVE_PROGRESS_EVENTS.push({
+      ...event,
+      activity_id: activityId,
+      controller_elapsed_ms: Date.now() - ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+    }),
+  }) : null;
   const spanId = ACTIVE_EXPERIENCE_TRACE?.start(
     `subprocess:${path.basename(command)}`,
     "run_excel_inflow_vnext",
@@ -168,6 +184,19 @@ async function checkpoint(id, status, target = null) {
 }
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
+  if (ACTIVE_PROGRESS_EVENTS.length > 0) {
+    const progressEvidence = compileProgressEvidence({
+      controllerStartedAt: ACTIVE_PROGRESS_STARTED_AT,
+      events: ACTIVE_PROGRESS_EVENTS,
+    });
+    const progressErrors = validateProgressEvidence(progressEvidence);
+    if (progressErrors.length > 0) {
+      throw new Error(`Progress evidence failed closed: ${progressErrors.join(", ")}`);
+    }
+    const progressEvidencePath = path.join(out, "progress-evidence.json");
+    await writeJson(progressEvidencePath, progressEvidence);
+    artifacts = { ...artifacts, progress_evidence: progressEvidencePath };
+  }
   if (ACTIVE_EXPERIENCE_TRACE && ACTIVE_EXPERIENCE_ROOT_SPAN) {
     const traceStatus = status === "PASS_PENDING_MANUAL"
       ? "PASS"
@@ -212,6 +241,10 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
 }
 
 async function main() {
+  ACTIVE_PROGRESS_STARTED_AT = new Date().toISOString();
+  ACTIVE_PROGRESS_STARTED_EPOCH_MS = Date.now();
+  ACTIVE_PROGRESS_ACTIVITY_COUNTER = 0;
+  ACTIVE_PROGRESS_EVENTS = [];
   ACTIVE_PERFORMANCE = {
     schema_version: "excel-inflow-performance/1.0",
     started_at: new Date().toISOString(),
