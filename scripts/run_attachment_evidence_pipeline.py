@@ -768,17 +768,35 @@ def project_broker_demand_to_structural_owners(
     projected = dict(graph_body)
     projected["nodes"] = projected_nodes
     counts = dict(projected.get("counts") or {})
-    demand_nodes = [node for node in projected_nodes if node.get("node_kind") == "model_demand"]
+    demand_nodes = [
+        node for node in projected_nodes
+        if graph.get("schema_version") == "pre-broker-model-demand/1.0"
+        or node.get("node_kind") == "model_demand"
+    ]
     counts["source_rows"] = len({
         str(node.get("source_line_id")) for node in demand_nodes if node.get("source_line_id")
     })
-    counts["model_demand_concepts"] = len({
-        str(node.get("metric_id")) for node in demand_nodes if node.get("metric_id")
-    })
-    counts["model_demand_nodes"] = len(demand_nodes)
-    counts["material_model_demand_nodes"] = sum(
-        1 for node in demand_nodes if node.get("material") is True
-    )
+    if graph.get("schema_version") == "pre-broker-model-demand/1.0":
+        for key in (
+            "model_demand_concepts",
+            "model_demand_nodes",
+            "material_model_demand_nodes",
+        ):
+            counts.pop(key, None)
+        counts["forecast_nodes"] = len(demand_nodes)
+        counts["material_nodes"] = sum(
+            1 for node in demand_nodes if node.get("material") is True
+        )
+    else:
+        counts.pop("forecast_nodes", None)
+        counts.pop("material_nodes", None)
+        counts["model_demand_concepts"] = len({
+            str(node.get("metric_id")) for node in demand_nodes if node.get("metric_id")
+        })
+        counts["model_demand_nodes"] = len(demand_nodes)
+        counts["material_model_demand_nodes"] = sum(
+            1 for node in demand_nodes if node.get("material") is True
+        )
     projected["counts"] = counts
     projected_graph = {**projected, "graph_sha256": sha256_value(projected)}
     projection_body = {

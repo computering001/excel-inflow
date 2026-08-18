@@ -9,6 +9,8 @@
     "run_id",
     "created_at",
     "extractor_version",
+    "native_budget_receipt",
+    "native_budget_receipt_sha256",
     "documents",
     "summary",
     "gate_status"
@@ -28,6 +30,14 @@
     "extractor_version": {
       "type": "string",
       "minLength": 1
+    },
+    "native_budget_receipt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "native_budget_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     },
     "artifact_root": {
       "type": "string",
