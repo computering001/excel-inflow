@@ -693,6 +693,35 @@ function brokerCandidateResolution(modelCase, row, forecastIndex) {
     }
     const selection = resolveBrokerForecastSelection(modelCase, metricId, forecastIndex);
     if (finite(selection?.value)) {
+      const archiveHouses = [
+        ...(modelCase?.broker_archive?.page_evidence ?? modelCase?.broker_pack?.page_evidence ?? []),
+        ...(modelCase?.broker_archive?.raw_tables ?? modelCase?.broker_pack?.raw_tables ?? []),
+      ];
+      const houseIdByName = new Map(
+        archiveHouses.map((house) => [String(house?.house_name ?? ""), String(house?.house_id ?? "")]),
+      );
+      const selectedHouseNames = selection.source_kind === "named_house_mean"
+        ? [...(selection.contributors ?? [])].map(String)
+        : ["named_house", "high", "low"].includes(selection.source_kind)
+          ? [String(selection.source_name ?? "")].filter(Boolean)
+          : [];
+      const selectedHouseIds = selectedHouseNames.map(
+        (houseName) => houseIdByName.get(houseName) ?? houseName,
+      );
+      const selectedMappings = (modelCase?.broker_pack?.source_mappings ?? [])
+        .filter((mapping) =>
+          mapping?.metric_id === metricId &&
+          Number(mapping?.period_index) === forecastIndex &&
+          (selectedHouseIds.length === 0 || selectedHouseIds.includes(String(mapping?.house_id ?? ""))),
+        );
+      const sourcePageCells = [...new Set(selectedMappings.flatMap((mapping) =>
+        (mapping?.components ?? []).map((component) => String(component?.source_ref ?? "")).filter(Boolean),
+      ))].sort();
+      const compatibilityFlags = {
+        definition: compatibility.compatible,
+        period: true,
+        units: true,
+      };
       return {
         candidate: {
           method: "broker_consensus",
@@ -703,6 +732,16 @@ function brokerCandidateResolution(modelCase, row, forecastIndex) {
           source_bindings: ["broker-pack"],
           broker_metric_id: metricId,
           broker_selection: structuredClone(selection),
+          source_page_cell: sourcePageCells.length > 0 ? sourcePageCells.join(" | ") : null,
+          house_id: selectedHouseNames.length > 0
+            ? selectedHouseNames.join(", ")
+            : String(selection.source_name ?? "Provider consensus"),
+          definition_id: metric?.definition_id ?? `dict.${metricId}`,
+          units: brokerDefinition.units ?? modelCase?.issuer?.units ?? null,
+          compatibility: compatibilityFlags,
+          compatibility_score:
+            Object.values(compatibilityFlags).filter(Boolean).length /
+            Object.values(compatibilityFlags).length,
           note: `Selected ${metricId} from the declared broker case.`,
         },
         rejection: null,
@@ -1137,12 +1176,17 @@ export function compileForecastPlan(
       for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
         const stateId = `${section}.${row.row_id}.fy${forecastIndex + 1}`;
         let candidates = [];
-        const declared = declaredCandidate(row, forecastIndex);
-        const brokerResolution = brokerCandidateResolution(
-          modelCase,
-          row,
-          forecastIndex,
-        );
+        const derivedBrokerHeadline =
+          section === "income_statement" &&
+          anchorSelection.supported &&
+          row.semantic_role === anchorSelection.derived;
+        let declared = declaredCandidate(row, forecastIndex);
+        if (derivedBrokerHeadline && declared?.method === "broker_consensus") {
+          declared = null;
+        }
+        const brokerResolution = derivedBrokerHeadline
+          ? { candidate: null, rejection: null }
+          : brokerCandidateResolution(modelCase, row, forecastIndex);
         const broker = brokerResolution.candidate;
         if (
           declared?.method === "broker_consensus" &&
@@ -1491,6 +1535,17 @@ function authorityFromState(state, candidate) {
     material: state.material,
   };
   if (candidate?.source_id) authority.source_id = candidate.source_id;
+  for (const field of [
+    "source_page_cell",
+    "house_id",
+    "definition_id",
+    "units",
+    "compatibility_score",
+  ]) {
+    if (candidate?.[field] !== undefined && candidate?.[field] !== null) {
+      authority[field] = structuredClone(candidate[field]);
+    }
+  }
   if (candidate?.as_of_date) authority.as_of_date = candidate.as_of_date;
   if (finite(candidate?.confidence)) authority.confidence = Number(candidate.confidence);
   if (state?.selected_rank_vector) {
@@ -1502,7 +1557,7 @@ function authorityFromState(state, candidate) {
       state.broker_rejection_reasons,
     );
   }
-  if (finite(state.value) && ["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "user_assumption", "explicit_zero"].includes(state.method)) authority.value = Number(state.value);
+  if (finite(state.value) && ["actual_plus_remainder", "contractual_commitment", "company_guidance", "company_indication", "broker_consensus", "user_assumption", "explicit_zero"].includes(state.method)) authority.value = Number(state.value);
   if (candidate?.partial_period) authority.partial_period = structuredClone(candidate.partial_period);
   if (candidate?.guidance_range) authority.guidance_range = structuredClone(candidate.guidance_range);
   if (candidate?.zero_basis) authority.zero_basis = candidate.zero_basis;

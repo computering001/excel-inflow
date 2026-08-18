@@ -1867,6 +1867,29 @@
           "type": "string",
           "minLength": 1
         },
+        "source_page_cell": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact broker page/cell reference or the stable joined references supporting a selected broker authority."
+        },
+        "house_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Selected broker house or stable joined house names for a named-house mean."
+        },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "compatibility_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
         "as_of_date": {
           "type": "string",
           "format": "date"

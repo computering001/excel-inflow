@@ -779,6 +779,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "phase9-broker-end-to-end-scenarios",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_phase9_broker_e2e_scenarios.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "raw-canary-fixture-custody",
       "phase": "proof",
       "runtime": "node",

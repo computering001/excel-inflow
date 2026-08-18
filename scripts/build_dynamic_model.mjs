@@ -1400,7 +1400,7 @@ const QUALITY_FALLBACK_METHODS = new Set([
 function workbookQualityDisclosure(modelCase, brokerEvidence) {
   const houses = brokerNames(modelCase);
   const selection = String(modelCase.controls?.broker_case ?? "Not selected");
-  const selectedMetricIds = consumedBrokerMetricIds(modelCase);
+  const configuredMetricIds = consumedBrokerMetricIds(modelCase);
   const ledgerRows = modelCase.forecast_authority_ledger?.rows ?? [];
   const fallbackCount = ledgerRows.filter(
     (entry) =>
@@ -1418,19 +1418,25 @@ function workbookQualityDisclosure(modelCase, brokerEvidence) {
   const ledgerSelectedMetricIds = [...new Set((ledger?.selected_metric_traces ?? [])
     .filter((entry) => ["selected_broker", "broker_consensus"].includes(entry.method))
     .map((entry) => entry.demand_concept))].sort();
-  const selectedIds = [...selectedMetricIds].sort();
+  const selectedMetricIds = ledger?.ledger_sha256
+    ? ledgerSelectedMetricIds
+    : [];
+  const configuredIds = new Set(configuredMetricIds);
   const authorityLedgerReconciliation = !ledger?.ledger_sha256
     ? "NOT SEALED"
-    : JSON.stringify(ledgerSelectedMetricIds) === JSON.stringify(selectedIds)
+    : ledgerSelectedMetricIds.every((metricId) => configuredIds.has(metricId))
       ? "PASS"
       : "BLOCK";
-  const selectedHouses = ["Consensus", "High", "Low"].includes(selection)
+  const selectedHouses = selectedMetricIds.length === 0
+    ? []
+    : ["Consensus", "High", "Low"].includes(selection)
     ? houses
     : houses.includes(selection)
       ? [selection]
       : [];
+  const brokerUnavailable = selectedMetricIds.length === 0;
   const degraded =
-    selection === "Forecast Waterfall" ||
+    brokerUnavailable ||
     authorityLedgerReconciliation === "BLOCK" ||
     fallbackCount > 0 ||
     rejectedAuthorityCount > 0 ||
@@ -1440,9 +1446,11 @@ function workbookQualityDisclosure(modelCase, brokerEvidence) {
     source_identity: `${modelCase.case_id} · contract v${modelCase.contract_version}`,
     source_label: modelCase.broker_pack?.source_label ?? "No broker source label declared",
     broker_status:
-      selection === "Forecast Waterfall"
+      brokerUnavailable
         ? "DEGRADED — company evidence / forecast waterfall"
-        : `${selection} selected`,
+        : selection === "Forecast Waterfall"
+          ? "Forecast Waterfall — broker authority used"
+          : `${selection} selected`,
     selected_house_count: selectedHouses.length,
     selected_metric_ids: selectedMetricIds,
     fallback_count: fallbackCount,
@@ -2250,10 +2258,15 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         const range = brokerRows.length
           ? `${column}${brokerRows[0]}:${column}${brokerRows.at(-1)}`
           : null;
+        const consensusFormula = brokerRows.length === 1
+          ? `=${column}${brokerRows[0]}`
+          : range
+            ? `=IFERROR(AVERAGE(${range}),0)`
+            : "=0";
         applyFormula(
           sheet,
           `${column}${row}`,
-          range ? `=IFERROR(AVERAGE(${range}),0)` : "=0",
+          consensusFormula,
         );
       }
     }

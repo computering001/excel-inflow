@@ -242,7 +242,7 @@ await test("no-question production path pauses after decisions", async () => {
     `compiled decision case fails build coverage: ${coverage.checks.filter((item) => item.status === "BLOCK").map((item) => item.id).join(", ")}`,
   );
   const aliasOwner = modelCase.statement_structure.income_statement.find(
-    (row) => Array.isArray(row.role_aliases) && row.role_aliases.length > 0,
+    (row) => Array.isArray(row.role_aliases) && row.role_aliases.includes("ebit"),
   );
   assert(aliasOwner?.role_aliases.includes("ebit"), "collapsed EBIT identity has no typed role alias");
   const mutated = structuredClone(modelCase);
