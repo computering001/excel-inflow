@@ -60,7 +60,8 @@ for candidate in candidates:
     assert SHA256_RE.fullmatch(raw_hash)
     assert candidate["candidate_id"] == sha256(f"real-filing-candidate:{raw_hash}")[:16]
     raw_hashes.append(raw_hash)
-    assert candidate["blocker_codes"]
+    candidate_eligible = all(candidate["qualifications"].values())
+    assert bool(candidate["blocker_codes"]) is (not candidate_eligible)
     for witness_group in ("document_metric_witnesses", "statement_heading_witnesses"):
         for witness in candidate.get(witness_group, []):
             assert set(witness) in (
@@ -82,8 +83,8 @@ for candidate in candidates:
     if all(qualifications[field] for field in required):
         eligible.append(candidate["candidate_id"])
 
-assert len(eligible) == inventory["eligible_candidate_count"] == 0
-assert inventory["assessment_status"] == "HASH_BOUND_CUSTODY_ESTABLISHED_NO_EXACT_CONTRACT_PASS"
+assert len(eligible) == inventory["eligible_candidate_count"] == 1
+assert inventory["assessment_status"] == "HASH_BOUND_CUSTODY_ESTABLISHED_EXACT_CONTRACT_PASS"
 
 selected = next(
     candidate
@@ -94,9 +95,11 @@ assert selected["custody_class"] == "official_public_external"
 assert selected["qualifications"]["request_expectations_pair"] is True
 assert selected["qualifications"]["three_period_face_statements_selected"] is True
 assert selected["qualifications"]["selected_authority_has_pure_da_or_ebitda"] is True
-assert selected["qualifications"]["real_raw_canary_pass"] is False
+assert selected["qualifications"]["separate_interest_authorities_available"] is True
+assert selected["qualifications"]["explicit_fx_or_source_proven_zero_available"] is True
+assert selected["qualifications"]["real_raw_canary_pass"] is True
 assert selected["proof"]["native_pipeline_status"] == "PASS"
-assert selected["proof"]["real_raw_canary_status"] == "BLOCKED_INTERNAL"
+assert selected["proof"]["real_raw_canary_status"] == "PASS"
 assert all(
     SHA256_RE.fullmatch(value)
     for key, value in selected["proof"].items()

@@ -244,6 +244,50 @@ def displayed_decimal_places(text: str) -> int | None:
     return len(number.rsplit(".", 1)[1]) if "." in number else 0
 
 
+def _group_page_words(words: list[tuple[Any, ...]], page_number: int) -> list[dict[str, Any]]:
+    """Recover logical statement lines from source-visible word geometry.
+
+    Some filing generators vertically centre the three numeric cells against a
+    two-line caption. Their centres can therefore sit about half a text line
+    below the caption's first line. A five-point band joins that printed row
+    while remaining well inside the normal statement-row pitch. The grouping
+    remains geometric: no caption, value or issuer-specific wording is used.
+    """
+
+    grouped: list[list[tuple[Any, ...]]] = []
+    for word in sorted(words, key=lambda item: (float(item[1]), float(item[0]))):
+        centre = (float(word[1]) + float(word[3])) / 2
+        group = next(
+            (
+                candidate for candidate in reversed(grouped[-8:])
+                if abs(
+                    sum((float(item[1]) + float(item[3])) / 2 for item in candidate) / len(candidate)
+                    - centre
+                ) <= 5.0
+            ),
+            None,
+        )
+        if group is None:
+            group = []
+            grouped.append(group)
+        group.append(word)
+    lines = []
+    for line_words in grouped:
+        line_words.sort(key=lambda word: float(word[0]))
+        lines.append({
+            "page": page_number,
+            "x0": min(float(word[0]) for word in line_words),
+            "x1": max(float(word[2]) for word in line_words),
+            "y0": min(float(word[1]) for word in line_words),
+            "words": [
+                {"x0": float(word[0]), "x1": float(word[2]), "text": str(word[4])}
+                for word in line_words
+            ],
+            "text": " ".join(str(word[4]) for word in line_words).strip(),
+        })
+    return lines
+
+
 def pdf_lines(target: Path) -> list[dict[str, Any]]:
     try:
         import fitz  # type: ignore
@@ -252,33 +296,7 @@ def pdf_lines(target: Path) -> list[dict[str, Any]]:
     document = fitz.open(target)
     lines: list[dict[str, Any]] = []
     for page_index, page in enumerate(document):
-        grouped: list[list[tuple[Any, ...]]] = []
-        for word in sorted(page.get_text("words", sort=True), key=lambda item: (float(item[1]), float(item[0]))):
-            centre = (float(word[1]) + float(word[3])) / 2
-            group = next(
-                (
-                    candidate for candidate in reversed(grouped[-8:])
-                    if abs(
-                        sum((float(item[1]) + float(item[3])) / 2 for item in candidate) / len(candidate)
-                        - centre
-                    ) <= 2.5
-                ),
-                None,
-            )
-            if group is None:
-                group = []
-                grouped.append(group)
-            group.append(word)
-        for words in grouped:
-            words.sort(key=lambda word: float(word[0]))
-            lines.append({
-                "page": page_index + 1,
-                "x0": min(float(word[0]) for word in words),
-                "x1": max(float(word[2]) for word in words),
-                "y0": min(float(word[1]) for word in words),
-                "words": [{"x0": float(word[0]), "x1": float(word[2]), "text": str(word[4])} for word in words],
-                "text": " ".join(str(word[4]) for word in words).strip(),
-            })
+        lines.extend(_group_page_words(page.get_text("words", sort=True), page_index + 1))
     document.close()
     return sorted(lines, key=lambda line: (line["page"], line["y0"], line["x0"]))
 
@@ -335,11 +353,13 @@ def _is_period_header(line: dict[str, Any], periods: list[str]) -> bool:
         residue = re.sub(rf"\b{re.escape(year)}\b", " ", residue)
     residue = re.sub(
         r"\b(?:notes?|year|years|ended|ending|for|the|period|periods|audited|unaudited|"
-        r"current|prior|restated|reported)\b",
+        r"current|prior|restated|reported|january|february|march|april|may|june|july|"
+        r"august|september|october|november|december)\b",
         " ",
         residue,
         flags=re.I,
     )
+    residue = re.sub(r"\b(?:[12]?\d|3[01])\b", " ", residue)
     residue = re.sub(r"[(),:;/|–—-]", " ", residue)
     residue = re.sub(r"\s+", " ", residue).strip()
     return not residue or _unit_header_text(residue) is not None
@@ -557,6 +577,69 @@ def nearest_typed_observations(
     return assigned, states, precisions
 
 
+def _merge_wrapped_caption_lines(
+    lines: list[dict[str, Any]], columns_by_page: dict[int, list[float]],
+) -> list[dict[str, Any]]:
+    """Join a lower-case caption continuation that owns the period values."""
+
+    merged: list[dict[str, Any]] = []
+    index = 0
+    while index < len(lines):
+        current = lines[index]
+        if index + 1 >= len(lines):
+            merged.append(current)
+            break
+        following = lines[index + 1]
+        page = int(current.get("page") or 0)
+        columns = columns_by_page.get(page, [])
+        if page != int(following.get("page") or -1) or len(columns) != 3:
+            merged.append(current)
+            index += 1
+            continue
+        data_left = min(columns) - 20
+        current_runs = [
+            run for run in numeric_runs(current.get("words", [])) if run["x1"] >= data_left
+        ]
+        following_runs = [
+            run for run in numeric_runs(following.get("words", [])) if run["x1"] >= data_left
+        ]
+        current_label_words = [
+            word for word in current.get("words", [])
+            if word["x0"] < data_left and parse_number(word["text"]) is None
+        ]
+        following_label_words = [
+            word for word in following.get("words", [])
+            if word["x0"] < data_left and parse_number(word["text"]) is None
+        ]
+        following_label = " ".join(word["text"] for word in following_label_words).strip()
+        vertical_gap = float(following.get("y0") or 0) - float(current.get("y0") or 0)
+        join = (
+            not current_runs
+            and len(following_runs) >= 3
+            and bool(current_label_words)
+            and bool(re.match(r"^[a-z]", following_label))
+            and 0 < vertical_gap <= 16
+            and abs(float(current.get("x0") or 0) - float(following.get("x0") or 0)) <= 12
+        )
+        if not join:
+            merged.append(current)
+            index += 1
+            continue
+        numeric_words = [
+            word for word in following.get("words", []) if word["x0"] >= data_left
+        ]
+        combined_words = [*current_label_words, *following_label_words, *numeric_words]
+        merged.append({
+            **current,
+            "x0": min(float(word["x0"]) for word in combined_words),
+            "x1": max(float(word["x1"]) for word in combined_words),
+            "words": combined_words,
+            "text": " ".join(str(word["text"]) for word in combined_words).strip(),
+        })
+        index += 2
+    return merged
+
+
 def infer_structural_roles(rows: list[dict[str, Any]]) -> None:
     """Stamp a heading only from positive hierarchy evidence.
 
@@ -616,6 +699,31 @@ def _finite_series(row: dict[str, Any]) -> list[float] | None:
     return result
 
 
+def _typed_partial_series(row: dict[str, Any]) -> list[float | None] | None:
+    """Return typed numerics while preserving dash/blank/N/A as unknown."""
+
+    values = row.get("values")
+    states = row.get("value_states")
+    if not isinstance(values, list) or len(values) != 3:
+        return None
+    result: list[float | None] = []
+    for index, value in enumerate(values):
+        state = states[index] if isinstance(states, list) and len(states) == 3 else None
+        if state not in {"reported_number", "reported_zero"}:
+            result.append(None)
+            continue
+        if value is None or isinstance(value, bool):
+            result.append(None)
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            result.append(None)
+            continue
+        result.append(number if math.isfinite(number) else None)
+    return result if any(value is not None for value in result) else None
+
+
 def _explicit_zero_series(row: dict[str, Any]) -> bool:
     series = _finite_series(row)
     if series is None or any(value != 0 for value in series):
@@ -664,6 +772,38 @@ def _series_sum_matches(parent_row: dict[str, Any], child_rows: list[dict[str, A
         )
         for index in range(3)
     )
+
+
+def _partial_series_sum_matches(
+    parent_row: dict[str, Any], child_rows: list[dict[str, Any]],
+) -> bool:
+    """Prove a subtotal on every period whose children are all reported.
+
+    A dash or blank remains unknown and is never turned into zero. Two exact
+    fully observed periods, a printed subtotal, source adjacency and the same
+    statement surface are required before a partial comparative can join the
+    family. The later face-additivity check deliberately skips the incomplete
+    period while preserving its typed source state.
+    """
+
+    parent = _finite_series(parent_row)
+    children = [_typed_partial_series(row) for row in child_rows]
+    if parent is None or len(children) < 2 or any(series is None for series in children):
+        return False
+    proved_periods = 0
+    for period in range(3):
+        if any(series[period] is None for series in children if series is not None):
+            continue
+        calculated = sum(series[period] for series in children if series is not None)
+        if not math.isclose(
+            calculated,
+            parent[period],
+            rel_tol=0.0,
+            abs_tol=_source_tolerance(parent_row, period),
+        ):
+            return False
+        proved_periods += 1
+    return proved_periods >= 2
 
 
 def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
@@ -730,10 +870,61 @@ def infer_source_arithmetic_links(rows: list[dict[str, Any]]) -> None:
                     continue
                 informative.append(index)
             key = tuple(informative)
-            if len(key) < 2:
+            # One informative nested subtotal plus explicit printed zero rows
+            # is still a rival source family. Retaining it as an ambiguity
+            # witness prevents an arithmetically equivalent EBITDA bridge from
+            # being mistaken for the pre-tax hierarchy; caption geometry then
+            # selects the nearer printed subtotal boundary.
+            nested_subtotal_witness = any(
+                rows[index].get("is_subtotal") for index in family
+            )
+            if len(key) < 2 and not (len(key) == 1 and nested_subtotal_witness):
                 continue
             if key not in seen:
                 seen.add(key); unique.append(informative)
+        if len(unique) == 1:
+            matches[parent_index] = unique
+
+    # Many US-GAAP faces align every caption at the same x-coordinate, so the
+    # PDF carries no indentation signal. For a visibly printed subtotal only,
+    # test suffixes of the preceding numeric surface. Exact equality in all
+    # available periods supplies the missing structure. Blank narrative lines
+    # are ignored; partial rows retain their unknown state and need two other
+    # complete comparative periods to prove membership.
+    for parent_index, parent_row in enumerate(rows):
+        if (
+            parent_index in matches
+            or not parent_row.get("is_subtotal")
+        ):
+            continue
+        candidates = [
+            index
+            for index in range(max(0, parent_index - 64), parent_index)
+            if (
+                _typed_partial_series(rows[index]) is not None
+                and int(rows[index].get("hierarchy_level") or 0)
+                == int(parent_row.get("hierarchy_level") or 0)
+            )
+        ]
+        families: list[list[int]] = []
+        for start in range(len(candidates) - 1):
+            family = candidates[start:]
+            # A flat face may legitimately carry one nested subtotal into a
+            # larger total (for example operating profit into pre-tax income).
+            # Two or more prior subtotals are an arithmetic bridge, not a
+            # single parent family: EBITDA plus D&A can coincidentally equal
+            # operating profit or pre-tax income and must not mint hierarchy.
+            if sum(bool(rows[index].get("is_subtotal")) for index in family) > 1:
+                continue
+            if _partial_series_sum_matches(parent_row, [rows[index] for index in family]):
+                families.append(family)
+        unique = []
+        seen = set()
+        for family in families:
+            key = tuple(family)
+            if key not in seen:
+                seen.add(key)
+                unique.append(family)
         if len(unique) == 1:
             matches[parent_index] = unique
 
@@ -776,6 +967,11 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
     walk is retained only for rows that remain unowned after structural proof.
     """
     infer_source_arithmetic_links(rows)
+    arithmetic_parents = {
+        row["parent_source_line_id"]
+        for row in rows
+        if row.get("parent_source_line_id")
+    }
 
     """Bind indented face rows to the next visible subtotal one level above.
 
@@ -790,7 +986,7 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
         level = int(row.get("hierarchy_level") or 0)
         if level > 0 and not row.get("parent_source_line_id"):
             parent = next_subtotal_by_level.get(level - 1)
-            if parent:
+            if parent and parent not in arithmetic_parents:
                 row["parent_source_line_id"] = parent
         # A row only becomes a hierarchy owner when the source surface says it
         # is a total.  Unknown labels are preserved but do not invent families.
@@ -865,6 +1061,7 @@ def extract_statement(
         if len(local_columns) == 3:
             inherited_columns = local_columns
         columns_by_page[page] = inherited_columns
+    window = _merge_wrapped_caption_lines(window, columns_by_page)
     source_unit_labels = list(dict.fromkeys(
         unit_label
         for line in window

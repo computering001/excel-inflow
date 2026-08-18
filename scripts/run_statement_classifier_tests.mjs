@@ -517,6 +517,12 @@ if (workingCapitalChildren.size > 0) {
       cashGeneratedPlanRow.calculation.refs.every((ref) => !workingCapitalChildren.has(ref)),
     "Cash generated from operations bypassed the selected working-capital parent.",
   );
+  assert(
+    parentFirstCash
+      .filter((row) => workingCapitalChildren.has(row.row_id))
+      .every((row) => row.economic_class === "working_capital"),
+    "A derived working-capital child lost the economic class required by its hierarchy.",
+  );
 }
 
 const workingCapitalBypassCase = clone(fixture);

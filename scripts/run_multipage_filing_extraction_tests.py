@@ -100,6 +100,127 @@ def check(condition: bool, message: str) -> None:
         failures.append(message)
 
 
+# A source-visible two-line caption may vertically centre its period values
+# between the caption lines. The production grouping must attach those values
+# to the first caption line without reaching the next normal statement row.
+wrapped_words = [
+    (10.0, 100.0, 40.0, 107.5, "Effect", 0, 0, 0),
+    (42.0, 100.0, 90.0, 107.5, "of exchange", 0, 0, 1),
+    (100.0, 104.5, 110.0, 112.0, "1", 0, 1, 0),
+    (200.0, 104.5, 210.0, 112.0, "2", 0, 2, 0),
+    (300.0, 104.5, 310.0, 112.0, "3", 0, 3, 0),
+    (10.0, 109.0, 70.0, 116.5, "including cash", 0, 4, 0),
+    (10.0, 121.0, 80.0, 128.5, "Next row", 0, 5, 0),
+]
+grouped_wrapped = extractor._group_page_words(wrapped_words, 7)
+check(
+    len(grouped_wrapped) == 3
+    and [run["value"] for run in extractor.numeric_runs(grouped_wrapped[0]["words"])] == [1.0, 2.0, 3.0]
+    and grouped_wrapped[-1]["text"] == "Next row",
+    "vertically centred values were not joined to their wrapped caption, or crossed into the next row",
+)
+mutated_values = [
+    (word[0], word[1] + 1.0, word[2], word[3] + 1.0, *word[4:])
+    if word[4] in {"1", "2", "3"} else word
+    for word in wrapped_words
+]
+check(
+    not extractor.numeric_runs(extractor._group_page_words(mutated_values, 7)[0]["words"]),
+    "a value row beyond the five-point source-geometry boundary was still joined to the caption",
+)
+
+dated_period_header = value_line(
+    1, 20.0, "For the years ended December", ["2023", "2024", "2025"], page_one_columns,
+)
+check(
+    extractor._is_period_header(dated_period_header, PERIODS),
+    "a month-ended three-period header entered the economic row surface",
+)
+dated_period_header_mutation = copy.deepcopy(dated_period_header)
+dated_period_header_mutation["text"] += " Revenue"
+dated_period_header_mutation["words"].append(
+    {"x0": 82.0, "x1": 96.0, "text": "Revenue"}
+)
+check(
+    not extractor._is_period_header(dated_period_header_mutation, PERIODS),
+    "an economic line was discarded merely because it carried three year tokens",
+)
+
+wrapped_caption = [
+    text_line(1, 40.0, "Income before tax and income from equity"),
+    value_line(1, 50.0, "method investments", ["10", "11", "12"], page_one_columns),
+]
+joined_caption = extractor._merge_wrapped_caption_lines(
+    wrapped_caption, {1: page_one_columns},
+)
+check(
+    len(joined_caption) == 1
+    and joined_caption[0]["text"].startswith(
+        "Income before tax and income from equity method investments"
+    )
+    and [run["value"] for run in extractor.numeric_runs(joined_caption[0]["words"])]
+    == [10.0, 11.0, 12.0],
+    "a lower-case wrapped caption did not retain the period values on one economic row",
+)
+wrapped_caption_mutation = copy.deepcopy(wrapped_caption)
+wrapped_caption_mutation[1]["text"] = wrapped_caption_mutation[1]["text"].replace(
+    "method", "Method", 1,
+)
+wrapped_caption_mutation[1]["words"][0]["text"] = "Method investments"
+check(
+    len(extractor._merge_wrapped_caption_lines(
+        wrapped_caption_mutation, {1: page_one_columns},
+    )) == 2,
+    "a capitalized independent row was merged as a caption continuation",
+)
+
+flat_partial_total = [
+    {"source_line_id": "cf.start", "hierarchy_level": 0, "is_subtotal": True, "values": [10, 11, 12], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+    {"source_line_id": "cf.header", "hierarchy_level": 0, "is_subtotal": False, "values": [None, None, None], "value_states": ["reported_blank"] * 3, "value_precisions": [None, None, None]},
+    {"source_line_id": "cf.adjustment", "hierarchy_level": 0, "is_subtotal": False, "values": [2, 3, 4], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+    {"source_line_id": "cf.partial", "hierarchy_level": 0, "is_subtotal": False, "values": [None, 1, 2], "value_states": ["reported_dash", "reported_number", "reported_number"], "value_precisions": [None, 0, 0]},
+    {"source_line_id": "cf.total", "hierarchy_level": 0, "is_subtotal": True, "values": [12, 15, 18], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+]
+extractor.infer_source_arithmetic_links(flat_partial_total)
+check(
+    [row.get("parent_source_line_id") for row in flat_partial_total[:4]]
+    == ["cf.total", None, "cf.total", "cf.total"],
+    "a flat, two-period-proved subtotal did not recover its numeric source members",
+)
+flat_partial_mutation = copy.deepcopy(flat_partial_total)
+for row in flat_partial_mutation:
+    row.pop("parent_source_line_id", None)
+flat_partial_mutation[-1]["values"][-1] = 19
+extractor.infer_source_arithmetic_links(flat_partial_mutation)
+check(
+    all(not row.get("parent_source_line_id") for row in flat_partial_mutation[:-1]),
+    "a subtotal with only one complete matching period survived the arithmetic mutation",
+)
+flat_income_mutation = copy.deepcopy(flat_partial_total)
+for row in flat_income_mutation:
+    row["source_line_id"] = row["source_line_id"].replace("cf.", "is.")
+    row.pop("parent_source_line_id", None)
+flat_income_mutation[2]["is_subtotal"] = True
+extractor.infer_source_arithmetic_links(flat_income_mutation)
+check(
+    all(not row.get("parent_source_line_id") for row in flat_income_mutation[:-1]),
+    "a flat income-statement coincidence was promoted to a source hierarchy",
+)
+bridge_coincidence = [
+    {"source_line_id": "is.ebitda", "hierarchy_level": 1, "is_subtotal": True, "values": [200, 200, 200], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+    {"source_line_id": "is.da", "hierarchy_level": 1, "is_subtotal": False, "values": [-50, -50, -50], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+    {"source_line_id": "is.operating_profit", "hierarchy_level": 1, "is_subtotal": True, "values": [150, 150, 150], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+    {"source_line_id": "is.finance", "hierarchy_level": 1, "is_subtotal": False, "values": [0, 0, 0], "value_states": ["reported_zero"] * 3, "value_precisions": [0, 0, 0]},
+    {"source_line_id": "is.pbt", "hierarchy_level": 0, "is_subtotal": True, "values": [150, 150, 150], "value_states": ["reported_number"] * 3, "value_precisions": [0, 0, 0]},
+]
+extractor.infer_parent_links(bridge_coincidence)
+check(
+    [row.get("parent_source_line_id") for row in bridge_coincidence[:-1]]
+    == ["is.operating_profit", "is.operating_profit", "is.pbt", "is.pbt"],
+    "caption fallback expanded a proved pre-tax family across an EBITDA bridge",
+)
+
+
 check(
     extractor.STRICT_HEADINGS["income_statement"].fullmatch(
         "CONSOLIDATED STATEMENTS OF OPERATIONS"
@@ -292,7 +413,7 @@ if manifest is not None:
 report = {
     "kind": "multipage-filing-extraction-tests/1.0",
     "status": "FAIL" if failures else "PASS",
-    "checks": 18,
+    "checks": 28,
     "mutations_rejected": mutations_rejected,
     "mutations_total": 8,
     "violations": len(failures),

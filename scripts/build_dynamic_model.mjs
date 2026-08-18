@@ -3685,6 +3685,9 @@ function configureOperatingModel(
       if (!statementByRole.has(alias)) statementByRole.set(alias, row);
     }
   }
+  const statementById = new Map(
+    allStatementRows.map((definition) => [definition.row_id, definition]),
+  );
   const nonBalancingCashBuckets = cashBucketPlans.filter(
     (bucket) =>
       bucket.forecast_treatment !== "balancing" &&
@@ -3696,27 +3699,57 @@ function configureOperatingModel(
       .map((bucket) => `${column}${bucket.balance_row}`);
     return sumCellFormula(cells);
   };
+  const declaredStatementSumFormula = (definition, column, identityName) => {
+    const historicalIdentity = definition?.calculation;
+    const historicalRefs = historicalIdentity?.refs ?? [];
+    if (historicalIdentity?.operator === "sum" && historicalRefs.length > 0) {
+      const cells = historicalRefs.map((rowId) => {
+        const row = statementById.get(rowId)?.row;
+        if (!Number.isInteger(row)) {
+          throw new Error(`${identityName} references missing statement row ${rowId}.`);
+        }
+        return `${column}${row}`;
+      });
+      return sumCellFormula(cells);
+    }
+    const candidates = [
+      definition?.forecast_calculation,
+      ...(definition?.forecast_period_calculations ?? []),
+    ].filter((rule) => rule?.operator === "sum" && (rule.refs?.length ?? 0) > 0);
+    const rule = candidates[0];
+    if (!rule) {
+      throw new Error(`${identityName} requires a declared statement sum identity.`);
+    }
+    const refs = rule.refs;
+    if (
+      candidates.some(
+        (candidate) => JSON.stringify(candidate.refs) !== JSON.stringify(refs),
+      )
+    ) {
+      throw new Error(`${identityName} has inconsistent declared forecast identities.`);
+    }
+    const cells = refs.map((rowId) => {
+      const row = statementById.get(rowId)?.row;
+      if (!Number.isInteger(row)) {
+        throw new Error(`${identityName} references missing statement row ${rowId}.`);
+      }
+      return `${column}${row}`;
+    });
+    return sumCellFormula(cells);
+  };
   const cashReconciliationFormula = (column) => {
-    const rows = [
-      statementByRole.get("cash_from_operations")?.row,
-      statementByRole.get("cash_from_investing")?.row,
-      statementByRole.get("cash_from_financing")?.row,
-      statementByRole.get("non_balancing_cash_bucket_movement")?.row,
-    ].filter(Number.isInteger);
-    return sumCellFormula(rows.map((row) => `${column}${row}`));
+    return declaredStatementSumFormula(
+      statementByRole.get("net_change_in_cash"),
+      column,
+      "Net change in cash",
+    );
   };
   const endingCashStatementFormula = (column) => {
-    const rows = [
-      statementByRole.get("opening_cash")?.row,
-      statementByRole.get("net_change_in_cash")?.row,
-      statementByRole.get("fx_effect_on_cash")?.row,
-    ].filter(Number.isInteger);
-    if (rows.length < 2) {
-      throw new Error(
-        "Ending cash requires opening cash and net change in cash statement roles.",
-      );
-    }
-    return sumCellFormula(rows.map((row) => `${column}${row}`));
+    return declaredStatementSumFormula(
+      statementByRole.get("ending_cash"),
+      column,
+      "Ending cash",
+    );
   };
   const nonBalancingBucketMovementFormula = (
     column,
@@ -6366,9 +6399,6 @@ function configureOperatingModel(
   const openingCashRow = statementByRole.get("opening_cash")?.row;
   const balancingCashBucket = cashBucketPlans.find(
     (bucket) => bucket.forecast_treatment === "balancing",
-  );
-  const statementById = new Map(
-    allStatementRows.map((definition) => [definition.row_id, definition]),
   );
   const financingDefinition = statementByRole.get("cash_from_financing");
   const financingRows = [];

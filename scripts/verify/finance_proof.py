@@ -330,6 +330,26 @@ class Proof:
             role = statement_row.get("semantic_role")
             if role and role not in cash_flow_spine:
                 cash_flow_spine[role] = statement_row.get("row")
+        income_statement_spine = {}
+        for statement_row in (row_map.get("statement_rows") or {}).get("income_statement") or []:
+            role = statement_row.get("semantic_role")
+            if role and role not in income_statement_spine:
+                income_statement_spine[role] = statement_row.get("row")
+        selected_ebitda_basis = case.get("selected_ebitda_basis") or {}
+        selected_ebitda_row = rows_by_id.get(selected_ebitda_basis.get("row_id"))
+        if selected_ebitda_row is None:
+            selected_ebitda_row = income_statement_spine.get(
+                selected_ebitda_basis.get("semantic_role")
+            )
+        if selected_ebitda_row is None:
+            selected_ebitda_row = (
+                income_statement_spine.get("adjusted_ebitda")
+                or income_statement_spine.get("reported_ebitda")
+            )
+        if selected_ebitda_row is None:
+            raise ValueError(
+                "The finance proof cannot resolve the case's selected EBITDA basis to a visible statement row."
+            )
         instrument_plans = {
             item["instrument_id"]: item for item in row_map["instruments"]
         }
@@ -956,7 +976,7 @@ class Proof:
                 if "net_debt_including_leases" in debt_rows:
                     self.compare("debt-summary", block_name, index, "net_debt_including_leases", self.value(column, debt_rows["net_debt_including_leases"]), net_ex_leases + visible_lease)
 
-                ebitda = number(self.value(column, rows_by_id["adjusted_ebitda"]))
+                ebitda = number(self.value(column, selected_ebitda_row))
                 expected_leverage = None if abs(ebitda) <= ABS_TOLERANCE else (debt_for_leverage + lease_in_leverage - eligible_cash) / ebitda
                 if expected_leverage is not None:
                     self.compare("leverage", block_name, index, "net_debt_to_adjusted_ebitda", self.value(column, debt_rows["net_debt_to_adjusted_ebitda"]), expected_leverage)

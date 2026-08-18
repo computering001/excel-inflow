@@ -5,7 +5,7 @@ import {
   writeRuntimeEvidenceLanes,
 } from "./lib/case_source_proposer.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
-import { compileCase } from "./lib/case_compiler.mjs";
+import { compileCase, sourceHistoricalSumMatches } from "./lib/case_compiler.mjs";
 
 function manifest(statement, rows) {
   const value = {
@@ -54,6 +54,31 @@ const result = proposeCaseSource({
   },
   caseEvidence: evidence,
 });
+
+const inclusiveCashChange = { values: [9, 12, 15] };
+const activityCashFlows = [
+  { values: [10, 20, 30] },
+  { values: [-3, -6, -9] },
+  { values: [1, -4, -9] },
+];
+const filedFxCash = { values: [1, 2, 3] };
+assert.equal(
+  sourceHistoricalSumMatches(inclusiveCashChange, [...activityCashFlows, filedFxCash]),
+  true,
+  "A filed cash-change total that includes FX was not proved from its source histories.",
+);
+assert.equal(
+  sourceHistoricalSumMatches(inclusiveCashChange, activityCashFlows),
+  false,
+  "A cash-change total including FX was misread as an activity-only subtotal.",
+);
+const fxMutation = structuredClone(filedFxCash);
+fxMutation.values[2] = 4;
+assert.equal(
+  sourceHistoricalSumMatches(inclusiveCashChange, [...activityCashFlows, fxMutation]),
+  false,
+  "A one-period FX mutation survived the source cash-change identity proof.",
+);
 
 assert.equal(result.statement_map.income_statement.length, 5);
 assert.equal(result.statement_map.cash_flow.length, 10);
@@ -151,6 +176,68 @@ assert.deepEqual(
   restrictedCashSource.statement_map.cash_flow.map((row) => row.role),
   ["opening_cash", "ending_cash"],
   "Canonical restricted-cash balance captions were not mapped to the cash bridge.",
+);
+
+const genericUsGaapIncome = manifest("income_statement", [{
+  source_line_id: "is.total_revenues",
+  ordinal: 1,
+  raw_label: "Total revenues",
+  values: [100, 110, 120],
+  material: true,
+}, {
+  source_line_id: "is.pre_tax",
+  ordinal: 2,
+  raw_label: "Income before income tax expense and income from equity method investments",
+  values: [20, 21, 22],
+  material: true,
+}]);
+const genericUsGaapCashFlow = manifest("cash_flow", [
+  { source_line_id: "cf.dda", ordinal: 1, raw_label: "Depreciation, depletion and amortization", values: [4, 5, 6], material: true },
+  { source_line_id: "cf.capex", ordinal: 2, raw_label: "Purchases of property, plant and equipment, and intangibles", values: [-5, -6, -7], material: true },
+  { source_line_id: "cf.debt_issuance", ordinal: 3, raw_label: "Proceeds from debt issuances", values: [8, 9, 10], material: true },
+  { source_line_id: "cf.debt_repayment", ordinal: 4, raw_label: "Payments on debt", values: [-3, -4, -5], material: true },
+  { source_line_id: "cf.financing", ordinal: 5, raw_label: "Net cash provided by (used in) financing activities", values: [5, 5, 5], material: true },
+  { source_line_id: "cf.change", ordinal: 6, raw_label: "Increase (decrease) in cash and cash equivalents, including restricted cash", values: [2, -1, 3], material: true },
+  { source_line_id: "cf.open", ordinal: 7, raw_label: "Cash and cash equivalents and restricted cash at the beginning of year", values: [8, 10, 9], material: true },
+  { source_line_id: "cf.end", ordinal: 8, raw_label: "Cash and cash equivalents and restricted cash at the end of year", values: [10, 9, 12], material: true },
+]);
+const genericUsGaapSource = proposeCaseSource({
+  declarations: { identity: { issuer_name: "Generic US GAAP Test", reporting_currency: "USD" } },
+  caseEvidence: {
+    face_statement_manifests: {
+      income_statement: [genericUsGaapIncome],
+      cash_flow: [genericUsGaapCashFlow],
+    },
+    lanes: {},
+  },
+});
+assert.deepEqual(
+  genericUsGaapSource.statement_map.income_statement.map((row) => row.role),
+  ["revenue", "pre_tax_income"],
+  "Generic US-GAAP revenue and pre-tax captions did not retain their economic roles.",
+);
+assert.deepEqual(
+  genericUsGaapSource.statement_map.cash_flow.map((row) => row.role),
+  ["cash_flow_da", "capex", "debt_issuance", "debt_repayment", "cash_from_financing", "net_change_in_cash", "opening_cash", "ending_cash"],
+  "Generic US-GAAP face-statement captions did not retain their exact economic roles.",
+);
+const impairmentMutation = structuredClone(genericUsGaapCashFlow);
+impairmentMutation.rows[0].raw_label = "Depreciation, depletion, amortization and impairment";
+impairmentMutation.rows_sha256 = faceStatementManifestDigest(impairmentMutation);
+const impairmentMutationSource = proposeCaseSource({
+  declarations: { identity: { issuer_name: "Generic US GAAP Mutation", reporting_currency: "USD" } },
+  caseEvidence: {
+    face_statement_manifests: {
+      income_statement: [genericUsGaapIncome],
+      cash_flow: [impairmentMutation],
+    },
+    lanes: {},
+  },
+});
+assert.notEqual(
+  impairmentMutationSource.statement_map.cash_flow[0].role,
+  "cash_flow_da",
+  "Adding impairment to a DDA caption was still admitted as pure D&A.",
 );
 
 const typedIncome = manifest("income_statement", [
@@ -270,6 +357,40 @@ assert.equal(
   "The proposer did not preserve non-controlling attribution as a semantic output.",
 );
 
+const sourceProvedAttribution = manifest("income_statement", [
+  { source_line_id: "is.net", ordinal: 1, raw_label: "Net income", values: [100, 110, 120], material: true, parent_source_line_id: "is.owner" },
+  { source_line_id: "is.redeemable_nci", ordinal: 2, raw_label: "Net income attributable to redeemable noncontrolling interests", values: [-2, -3, -4], material: true, parent_source_line_id: "is.owner" },
+  { source_line_id: "is.nci", ordinal: 3, raw_label: "Net income loss attributable to noncontrolling interests", values: [-1, -2, -3], material: true, parent_source_line_id: "is.owner" },
+  { source_line_id: "is.owner", ordinal: 4, raw_label: "Net income attributable to Example Group", values: [97, 105, 113], material: true, is_subtotal: true },
+]);
+const sourceProvedAttributionResult = proposeCaseSource({
+  declarations: { identity: { issuer_name: "Example Group", reporting_currency: "USD" } },
+  caseEvidence: {
+    face_statement_manifests: { income_statement: [sourceProvedAttribution], cash_flow: [cashFlow] },
+    lanes: {},
+  },
+});
+assert.deepEqual(
+  sourceProvedAttributionResult.statement_map.income_statement.map((row) => row.role),
+  ["net_income", "redeemable_non_controlling_interests", "non_controlling_interests", "owners_of_parent"],
+  "A source-proved issuer-named owner attribution was not preserved.",
+);
+const attributionTopologyMutation = structuredClone(sourceProvedAttribution);
+delete attributionTopologyMutation.rows[0].parent_source_line_id;
+attributionTopologyMutation.rows_sha256 = faceStatementManifestDigest(attributionTopologyMutation);
+const attributionTopologyMutationResult = proposeCaseSource({
+  declarations: { identity: { issuer_name: "Example Group", reporting_currency: "USD" } },
+  caseEvidence: {
+    face_statement_manifests: { income_statement: [attributionTopologyMutation], cash_flow: [cashFlow] },
+    lanes: {},
+  },
+});
+assert.notEqual(
+  attributionTopologyMutationResult.statement_map.income_statement[3].role,
+  "owners_of_parent",
+  "Issuer wording assigned owner attribution after the source hierarchy proof was removed.",
+);
+
 const dcsBoundEvidence = structuredClone(evidence);
 dcsBoundEvidence.lanes.policy_evidence = {
   rcf: { instrument_id: "rcf", commitment_fee_convention: "bps_on_undrawn" },
@@ -367,6 +488,96 @@ assert.equal(
   "FCF conversion did not consume the selected reported-EBITDA basis.",
 );
 
+function cashConventionManifest(netChangeValues, openingValues, endingValues) {
+  const typed = (sourceLineId, ordinal, rawLabel, values) => ({
+    source_line_id: sourceLineId,
+    ordinal,
+    raw_label: rawLabel,
+    values,
+    value_states: values.map((value) => value === 0 ? "reported_zero" : "reported_number"),
+    value_precisions: [0, 0, 0],
+    material: true,
+  });
+  return manifest("cash_flow", [
+    typed("cf.cfo", 1, "Net cash provided by operating activities", [10, 20, 30]),
+    typed("cf.cfi", 2, "Net cash used in investing activities", [-3, -6, -9]),
+    typed("cf.cff", 3, "Net cash used in financing activities", [1, -4, -9]),
+    typed("cf.fx", 4, "Effect of exchange rate changes on cash", [1, 2, 3]),
+    typed("cf.change", 5, "Net increase in cash and cash equivalents", netChangeValues),
+    typed("cf.open", 6, "Cash and cash equivalents at beginning of year", openingValues),
+    typed("cf.end", 7, "Cash and cash equivalents at end of year", endingValues),
+  ]);
+}
+
+function compileCashConvention(cashManifest, issuerName) {
+  const caseEvidence = {
+    face_statement_manifests: {
+      income_statement: [income],
+      cash_flow: [cashManifest],
+    },
+    lanes: structuredClone(firstRunEvidence.case_evidence.lanes),
+  };
+  const source = proposeCaseSource({
+    declarations: {
+      identity: { issuer_name: issuerName, reporting_currency: "USD" },
+      consumption: {},
+      policies: {},
+      answers: [],
+    },
+    caseEvidence,
+  });
+  return compileCase(source, caseEvidence).model_case;
+}
+
+const inclusiveConvention = compileCashConvention(
+  cashConventionManifest([9, 12, 15], [100, 109, 121], [109, 121, 136]),
+  "Inclusive FX Convention Test Co",
+);
+const inclusiveCashRows = new Map(
+  inclusiveConvention.statement_structure.cash_flow.map((row) => [row.semantic_role, row]),
+);
+assert(
+  inclusiveCashRows.get("net_change_in_cash").calculation.refs.includes(
+    inclusiveCashRows.get("fx_effect_on_cash").row_id,
+  ),
+  "The inclusive source convention omitted FX from net cash change.",
+);
+assert(
+  !inclusiveCashRows.get("ending_cash").calculation.refs.includes(
+    inclusiveCashRows.get("fx_effect_on_cash").row_id,
+  ),
+  "The inclusive source convention double-counted FX in ending cash.",
+);
+
+const exclusiveConvention = compileCashConvention(
+  cashConventionManifest([8, 10, 12], [100, 108, 118], [109, 120, 133]),
+  "Exclusive FX Convention Test Co",
+);
+const exclusiveCashRows = new Map(
+  exclusiveConvention.statement_structure.cash_flow.map((row) => [row.semantic_role, row]),
+);
+assert(
+  !exclusiveCashRows.get("net_change_in_cash").calculation.refs.includes(
+    exclusiveCashRows.get("fx_effect_on_cash").row_id,
+  ),
+  "The exclusive source convention added FX to net cash change.",
+);
+assert(
+  exclusiveCashRows.get("ending_cash").calculation.refs.includes(
+    exclusiveCashRows.get("fx_effect_on_cash").row_id,
+  ),
+  "The exclusive source convention omitted FX from ending cash.",
+);
+
+assert.throws(
+  () => compileCashConvention(
+    cashConventionManifest([9, 10, 15], [100, 109, 119], [109, 121, 137]),
+    "Contradictory FX Convention Mutation Co",
+  ),
+  /mixes inclusive and exclusive FX conventions/,
+  "A mixed-period cash FX convention did not fail closed.",
+);
+
 const unsupportedIncome = manifest(
   "income_statement",
   income.rows.filter((row) => row.source_line_id !== "is.da"),
@@ -444,4 +655,4 @@ assert.deepEqual(
   "The runtime writer overwrote richer residual-interest evidence.",
 );
 
-console.log(JSON.stringify({ status: "PASS", checks: 54 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 59 }, null, 2));

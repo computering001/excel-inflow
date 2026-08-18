@@ -180,6 +180,69 @@ function typedNumericSeries(line) {
   return numbers.every((value) => value !== null) ? numbers : null;
 }
 
+function sourceHistoricalSeries(line) {
+  const values = line?.reported_historical_values ?? line?.values;
+  if (!Array.isArray(values) || values.length < 3) return null;
+  const states = typedHistoricalStates(line);
+  const numbers = values.slice(0, 3).map((value, period) => {
+    if (!["reported_number", "reported_zero"].includes(states[period])) return null;
+    if (value === null || value === undefined || typeof value === "boolean") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  });
+  return numbers.every((value) => value !== null) ? numbers : null;
+}
+
+function sourceHistoricalSumMatchPeriods(parent, members) {
+  const target = sourceHistoricalSeries(parent);
+  const series = (members ?? []).map((member) => sourceHistoricalSeries(member));
+  if (!target || series.length === 0 || series.some((values) => values === null)) {
+    return null;
+  }
+  return target.map((value, period) =>
+    Math.abs(
+      series.reduce((sum, values) => sum + values[period], 0) - value,
+    ) <= sourceTolerance(parent, period),
+  );
+}
+
+export function sourceHistoricalSumMatches(parent, members) {
+  const matches = sourceHistoricalSumMatchPeriods(parent, members);
+  return Array.isArray(matches) && matches.every(Boolean);
+}
+
+function resolveFiledCashChangeConvention(netChange, activityMembers, fxRow) {
+  const excludesFx = sourceHistoricalSumMatchPeriods(netChange, activityMembers);
+  const includesFx = sourceHistoricalSumMatchPeriods(
+    netChange,
+    [...activityMembers, fxRow],
+  );
+  if (!excludesFx || !includesFx) {
+    throw new Error(
+      "Cash-change convention requires three typed reported periods for the filed total, activities and FX line.",
+    );
+  }
+  const periodConventions = excludesFx.map((excludes, period) => {
+    const includes = includesFx[period];
+    if (includes && excludes) return "neutral_fx";
+    if (includes) return "includes_fx";
+    if (excludes) return "excludes_fx";
+    throw new Error(
+      `Filed cash-change identity is contradictory in historical period ${period + 1}: ` +
+      "it matches neither activities nor activities plus FX at source precision.",
+    );
+  });
+  const directional = new Set(
+    periodConventions.filter((convention) => convention !== "neutral_fx"),
+  );
+  if (directional.size > 1) {
+    throw new Error(
+      "Filed cash-change identity mixes inclusive and exclusive FX conventions across historical periods.",
+    );
+  }
+  return directional.has("includes_fx") ? "includes_fx" : "excludes_fx";
+}
+
 /**
  * Derive the statement skeleton for one section: filed lines from the sealed
  * manifests, dispositions/roles/parentage from the statement map.  The map may
@@ -1661,11 +1724,24 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   const netChange = role("net_change_in_cash");
   const cfoRow = role("cash_from_operations");
   const cfiRow = role("cash_from_investing");
+  const fxRow = role("fx_effect_on_cash");
+  let filedChangeIncludesFx = false;
   if (netChange && cfoRow && cfiRow && cff) {
+    const activityMembers = [cfoRow, cfiRow, cff];
+    filedChangeIncludesFx = Boolean(
+      fxRow &&
+      resolveFiledCashChangeConvention(netChange, activityMembers, fxRow) ===
+        "includes_fx"
+    );
     netChange.row_type = "calculation";
     netChange.calculation = {
       operator: "sum",
-      refs: [cfoRow.row_id, cfiRow.row_id, cff.row_id],
+      refs: [
+        cfoRow.row_id,
+        cfiRow.row_id,
+        cff.row_id,
+        ...(filedChangeIncludesFx ? [fxRow.row_id] : []),
+      ],
     };
     netChange.historical_authority = "derived_formula";
     netChange.style_role = "total";
@@ -1674,17 +1750,20 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // The cash roll-forward reads opening → movement → translation.
   const endingCash2 = role("ending_cash");
   const openingCash = role("opening_cash");
-  const fxRow = role("fx_effect_on_cash");
   if (endingCash2 && openingCash && netChange) {
     // Net change is the sum of operating, investing and financing activities;
     // translation sits outside that subtotal. Whenever the filed statement
     // carries an FX/translation row it is therefore an explicit roll-forward
     // dependency, even if the legacy ending-cash shell had no refs yet.
-    const hadFx = Boolean(fxRow);
+    const hadSeparateFx = Boolean(fxRow && !filedChangeIncludesFx);
     endingCash2.row_type = "calculation";
     endingCash2.calculation = {
       operator: "sum",
-      refs: [openingCash.row_id, netChange.row_id, ...(hadFx ? [fxRow.row_id] : [])],
+      refs: [
+        openingCash.row_id,
+        netChange.row_id,
+        ...(hadSeparateFx ? [fxRow.row_id] : []),
+      ],
     };
     endingCash2.historical_authority = "derived_formula";
     // The filed historical balances stay: the bucket-tie check reconciles

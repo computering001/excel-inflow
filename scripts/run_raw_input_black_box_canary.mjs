@@ -891,6 +891,16 @@ if (rawFilingKind === "generated_complete_face_statements") {
       ),
     ]),
   );
+  const visibleRolesBySection = Object.fromEntries(
+    ["income_statement", "cash_flow"].map((section) => [
+      section,
+      new Set(
+        (rowMap.statement_rows?.[section] ?? [])
+          .filter((row) => Number.isInteger(row.row) && row.semantic_role)
+          .map((row) => row.semantic_role),
+      ),
+    ]),
+  );
   const missingFiledRows = [];
   for (const section of ["income_statement", "cash_flow"]) {
     for (const entry of compiledEvidence.case_source?.statement_map?.[section] ?? []) {
@@ -899,16 +909,18 @@ if (rawFilingKind === "generated_complete_face_statements") {
       }
     }
   }
-  const requiredModelRows = [
-    ["income_statement", "adjusted_ebitda"],
+  const selectedEbitdaRole =
+    deliveredModelCase.selected_ebitda_basis?.semantic_role ?? "adjusted_ebitda";
+  const requiredModelRoles = [
+    ["income_statement", selectedEbitdaRole],
     ["income_statement", "depreciation_and_amortisation"],
     ["cash_flow", "change_in_working_capital"],
     ["cash_flow", "capex"],
     ["cash_flow", "ending_cash"],
   ];
-  const missingRequiredRows = requiredModelRows
-    .filter(([section, rowId]) => !visibleBySection[section].has(rowId))
-    .map(([section, rowId]) => `${section}.${rowId}`);
+  const missingRequiredRoles = requiredModelRoles
+    .filter(([section, role]) => !visibleRolesBySection[section].has(role))
+    .map(([section, role]) => `${section}.${role}`);
   const minimumVisibleRows = realFilingExpectations.minimum_visible_rows ?? rawStatementCounts;
   if (
     rowMap.authority_profile !== "maximal" ||
@@ -916,11 +928,11 @@ if (rawFilingKind === "generated_complete_face_statements") {
     visibleBySection.income_statement.size < Number(minimumVisibleRows.income_statement) ||
     visibleBySection.cash_flow.size < Number(minimumVisibleRows.cash_flow) ||
     missingFiledRows.length > 0 ||
-    missingRequiredRows.length > 0
+    missingRequiredRoles.length > 0
   ) {
     throw new Error(
       "Real-filing canary collapsed its maximal statement surface: " +
-      JSON.stringify({ missingFiledRows, missingRequiredRows }),
+      JSON.stringify({ missingFiledRows, missingRequiredRoles }),
     );
   }
 }

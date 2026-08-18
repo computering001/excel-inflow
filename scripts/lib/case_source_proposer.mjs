@@ -6,7 +6,7 @@ const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
 
 const CORE_ROLE_ALIASES = Object.freeze({
   income_statement: Object.freeze({
-    revenue: ["revenue", "revenues", "turnover", "net sales", "total net sales", "total revenue"],
+    revenue: ["revenue", "revenues", "turnover", "net sales", "total net sales", "total revenue", "total revenues"],
     gross_profit: ["gross profit"],
     ebit: ["ebit", "earnings before interest and tax", "earnings before interest and taxes"],
     operating_profit: ["operating profit", "operating income"],
@@ -23,6 +23,8 @@ const CORE_ROLE_ALIASES = Object.freeze({
     depreciation_and_amortisation: [
       "depreciation and amortisation",
       "depreciation and amortization",
+      "depreciation depletion and amortisation",
+      "depreciation depletion and amortization",
     ],
     depreciation_amortisation_and_impairment: [
       "depreciation amortisation and impairment",
@@ -38,6 +40,7 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "profit before taxation",
       "income before tax",
       "income before income taxes",
+      "income before income tax expense and income from equity method investments",
       "pre tax profit",
     ],
     tax_expense: ["income tax expense", "tax expense", "taxation", "income taxes"],
@@ -57,11 +60,15 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "attributable to owners of the parent",
       "attributable to equity holders of the parent",
     ],
+    redeemable_non_controlling_interests: [
+      "net income attributable to redeemable noncontrolling interests",
+    ],
     non_controlling_interests: [
       "non controlling interests",
       "non-controlling interests",
       "attributable to non controlling interests",
       "attributable to non-controlling interests",
+      "net income loss attributable to noncontrolling interests",
     ],
   }),
   cash_flow: Object.freeze({
@@ -98,6 +105,7 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "net cash inflow from financing activities",
       "net cash outflow from financing activities",
       "net cash used in financing activities",
+      "net cash provided by used in financing activities",
       "cash flow from financing activities",
     ],
     net_change_in_cash: [
@@ -108,12 +116,14 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "decrease in cash and cash equivalents",
       "net increase decrease in cash and cash equivalents",
       "net increase decrease in cash and cash equivalents in the period",
+      "increase decrease in cash and cash equivalents including restricted cash",
     ],
     opening_cash: [
       "cash and cash equivalents at beginning of year",
       "cash and cash equivalents at beginning of period",
       "cash and cash equivalents at the beginning of the period",
       "cash and cash equivalents at start of year",
+      "cash and cash equivalents and restricted cash at the beginning of year",
       "cash cash equivalents and restricted cash and cash equivalents beginning balances",
     ],
     ending_cash: [
@@ -121,12 +131,15 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "cash and cash equivalents at end of period",
       "cash and cash equivalents at the end of the period",
       "cash and cash equivalents at year end",
+      "cash and cash equivalents and restricted cash at the end of year",
       "cash cash equivalents and restricted cash and cash equivalents ending balances",
       "ending cash",
     ],
     cash_flow_da: [
       "depreciation and amortisation",
       "depreciation and amortization",
+      "depreciation depletion and amortisation",
+      "depreciation depletion and amortization",
     ],
     cash_flow_da_and_impairment: [
       "depreciation amortisation and impairment",
@@ -152,17 +165,20 @@ const CORE_ROLE_ALIASES = Object.freeze({
     capex: [
       "capital expenditure",
       "capital expenditures",
+      "purchases of property plant and equipment and intangibles",
     ],
     dividends: ["dividends paid", "dividend paid"],
     debt_issuance: [
       "issue of loans and borrowings",
       "proceeds from loans and borrowings",
+      "proceeds from debt issuances",
       "proceeds from issue of debt",
       "debt issuance",
     ],
     debt_repayment: [
       "repayment of loans and borrowings",
       "repayments of loans and borrowings",
+      "payments on debt",
       "repayment of debt",
       "debt repayment",
     ],
@@ -198,6 +214,7 @@ const CANONICAL_ROW_ID_ALIASES = Object.freeze({
       "decrease in receivables",
     ],
     inventory_movement: [
+      "inventories",
       "increase in inventories",
       "decrease in inventories",
       "movement in inventories",
@@ -349,6 +366,61 @@ function proposeSection(caseEvidence, section, used) {
         used,
       ),
     );
+  }
+
+  // Multiple separately filed attribution adjustments (for example ordinary
+  // and redeemable NCI) remain distinct source rows, but only one row can own
+  // the canonical NCI semantic output. Prefer the ordinary NCI caption; every
+  // sibling remains in the source-proved owner subtotal as a visible child.
+  if (section === "income_statement") {
+    const nciLines = lines.filter(
+      ({ row }) => roleBySource.get(row.source_line_id) === "non_controlling_interests",
+    );
+    if (nciLines.length > 1) {
+      const preferred = nciLines.find(
+        ({ row }) => !/\bredeemable\b/.test(normalise(row.raw_label)),
+      ) ?? nciLines[0];
+      for (const { row } of nciLines) {
+        if (row === preferred.row) continue;
+        roleBySource.set(row.source_line_id, null);
+        const previousRowId = rowIdBySource.get(row.source_line_id);
+        if (previousRowId) used.delete(previousRowId);
+        rowIdBySource.set(
+          row.source_line_id,
+          sanitizeRowId(row.raw_label ?? row.source_line_id, used),
+        );
+      }
+    }
+  }
+
+  // A source-proved attribution subtotal can name the issuer rather than the
+  // generic phrase "owners of the parent". The filed arithmetic hierarchy is
+  // the authority: the subtotal must own both net income and a separately
+  // classified NCI adjustment. Issuer wording alone never assigns this role.
+  if (section === "income_statement") {
+    for (const { row } of lines) {
+      if (roleBySource.get(row.source_line_id) || row.is_subtotal !== true) continue;
+      const childRoles = lines
+        .filter((entry) => entry.row.parent_source_line_id === row.source_line_id)
+        .map((entry) => roleBySource.get(entry.row.source_line_id))
+        .filter(Boolean);
+      const attributionCaption = /^(?:net income|net profit|profit).* attributable to\b/.test(
+        normalise(row.raw_label),
+      );
+      if (
+        attributionCaption &&
+        childRoles.includes("net_income") &&
+        childRoles.includes("non_controlling_interests")
+      ) {
+        roleBySource.set(row.source_line_id, "owners_of_parent");
+        const previousRowId = rowIdBySource.get(row.source_line_id);
+        if (previousRowId) used.delete(previousRowId);
+        rowIdBySource.set(
+          row.source_line_id,
+          sanitizeRowId("owners_of_parent", used),
+        );
+      }
+    }
   }
 
   // A filed operating-profit line is the model's EBIT authority when the

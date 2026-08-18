@@ -1783,6 +1783,23 @@ function consolidateConstituents(rows, spec) {
     }
     return consolidated;
   }
+  if (
+    !consolidated &&
+    constituents.length === 1 &&
+    spec.promoteSingleConstituent === true
+  ) {
+    // A one-line economic class already is the aggregate. Adding a synthetic
+    // parent above it creates a one-child identity whose forecast authority
+    // can only point back to the child, producing an avoidable two-cell cycle.
+    // Preserve the issuer caption and row id, and type that sole filed line as
+    // the aggregate authority instead.
+    const sole = constituents[0];
+    sole.semantic_role = spec.semantic_role;
+    sole.economic_class ??= spec.childEconomicClass;
+    sole.display_role = "component";
+    sole.formula_role = sole.calculation ? "derived_total" : "input";
+    return sole;
+  }
   let constituentIdSet = new Set(constituents.map((row) => row.row_id));
 
   // The company already reports the consolidated line: adopt it rather than
@@ -3422,6 +3439,8 @@ export function normaliseStatementRows(
       },
       presentation_style_role: "subsection",
       aggregation_authority: "derived_from_children",
+      childEconomicClass: "working_capital",
+      promoteSingleConstituent: true,
       captureForecastInParent: true,
     });
 

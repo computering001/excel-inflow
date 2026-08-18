@@ -287,6 +287,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "cash-fx-identity-workbook",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_cash_fx_identity_workbook_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "typed-filing-values-and-row-identity",
       "phase": "evidence",
       "runtime": "python",

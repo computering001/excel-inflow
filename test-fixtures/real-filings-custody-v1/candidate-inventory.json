@@ -1,10 +1,10 @@
 {
   "schema_version": "real-filing-custody-inventory/1.0",
-  "assessment_source_commit": "5e407436c4e83bb11fced8878905f513b5c6dc05",
-  "assessment_status": "HASH_BOUND_CUSTODY_ESTABLISHED_NO_EXACT_CONTRACT_PASS",
-  "candidate_set_sha256": "1c7c092b3cf42e30bcdb578e66b6b837199a4cacd718321f58564d284dc4bb3d",
-  "candidate_count": 5,
-  "eligible_candidate_count": 0,
+  "assessment_source_commit": "7efe6fc8f726951e05dcf930aff93bf3ed0bbde2",
+  "assessment_status": "HASH_BOUND_CUSTODY_ESTABLISHED_EXACT_CONTRACT_PASS",
+  "candidate_set_sha256": "01cd818d2ed703e0ac583e8099ea574362ca8117fe76a52193d7511ddc5891ab",
+  "candidate_count": 6,
+  "eligible_candidate_count": 1,
   "eligibility_contract": {
     "required_boolean_fields": [
       "lawful_local_or_official_public",
@@ -18,7 +18,7 @@
       "real_raw_canary_pass"
     ]
   },
-  "selected_custody_candidate_id": "ff6bb04a0be2b5d6",
+  "selected_custody_candidate_id": "bcdd76091c073f7a",
   "candidates": [
     {
       "candidate_id": "027438039c266b49",
@@ -215,6 +215,58 @@
         "attachment_state_sha256": "eecb40e9bf4f98bf3fe803efcd14ad9c0fb5eb9a3da52805d7da24616e6f59aa",
         "native_pipeline_status": "PASS",
         "real_raw_canary_status": "BLOCKED_INTERNAL"
+      }
+    },
+    {
+      "candidate_id": "bcdd76091c073f7a",
+      "custody_class": "official_public_external",
+      "raw_sha256": "fc2a3d82835d9d016f126511096ec86731f96326196263db1795dd525c4f004b",
+      "official_locator_sha256": "358591c0302a916f3cc6d7c71d6850a4bc83985cb7418273e92cb9895310cb30",
+      "qualifications": {
+        "lawful_local_or_official_public": true,
+        "raw_sha256_bound": true,
+        "request_expectations_pair": true,
+        "three_period_face_statements_selected": true,
+        "selected_authority_has_pure_da_or_ebitda": true,
+        "separate_interest_authorities_available": true,
+        "explicit_fx_or_source_proven_zero_available": true,
+        "native_filing_lane_pass": true,
+        "real_raw_canary_pass": true
+      },
+      "document_metric_witnesses": [
+        {
+          "metric_kind": "interest_expense",
+          "page_ordinal": 14,
+          "line_sha256": "4a99ce0a313c6738b2c725d6dc89d54ac4e4e40c0fd637784bb90e40717a8bc3"
+        },
+        {
+          "metric_kind": "interest_income",
+          "page_ordinal": 32,
+          "line_sha256": "d70f80a553b51e32b0c85613ae29b673b24ab53e3559a6f80f9310685813b9b3"
+        },
+        {
+          "metric_kind": "pure_da",
+          "page_ordinal": 35,
+          "line_sha256": "5a2525163e7faee60acb1dd173260a18dffa02ca71ae4bed14595f25e528e532"
+        },
+        {
+          "metric_kind": "fx_cash",
+          "page_ordinal": 53,
+          "line_sha256": "502224a7ddd6bfb12880a84ec99f3b1a8ff7891c17f738d03df30a9aa43b238c"
+        }
+      ],
+      "blocker_codes": [],
+      "proof": {
+        "request_sha256": "478307d2b1aabb97ea7d4424f9254a85726fe17ebc46ee7b6dc8cc327f49d9f5",
+        "expectations_sha256": "3669470d1f1a4e293a8d55f84e673203cfea599445ecd96cbd308f3a973abb29",
+        "filings_state_sha256": "a983f0d7a783629bf833e5645948e687a977567ede41e0a14357fd2e133b56d2",
+        "filings_bundle_sha256": "2e0ea9d180bb8eac4e15a81c5ecd501e5f1e8bbe91093fb9f2625946637326c1",
+        "compiled_validation_sha256": "3860653f6a1cf24e0a1580ef425c768cc8dc53496e69a0cbef6b0c117f1601a5",
+        "attachment_state_sha256": "1d66f2d07a83b7a51cd2ee2d65b01aad08d105e39c3d686c27caed5529124107",
+        "delivery_attestation_sha256": "60132b3436763bbae6e1554bc70acdd0d15354e1178e7991e1855e913d3b81e6",
+        "economic_signature_sha256": "bb6042361e6230f2970dcb7177f17646eed447e81b086e666444c473f579fbf5",
+        "native_pipeline_status": "PASS",
+        "real_raw_canary_status": "PASS"
       }
     }
   ]
