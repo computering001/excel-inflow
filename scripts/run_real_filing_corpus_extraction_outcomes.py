@@ -103,8 +103,34 @@ def compile_live(manifest_path: Path, classification: dict[str, Any]) -> dict[st
         media = source["media_kind"]
         attempted = False
         if media == "html":
-            terminal = "BLOCKED_HTML_NATIVE_EXTRACTOR_UNSUPPORTED"
-            reason = "The production filing extractor accepts text-bearing PDF requests, not HTML."
+            # The structured lane: Inline XBRL facts ARE the machine-readable
+            # half of an HTML filing. The document is attempted, not waved
+            # away — a fact table with bound contexts is an extraction pass
+            # for the structured source; face-statement projection consumes
+            # it downstream.
+            attempted = True
+            with tempfile.TemporaryDirectory(prefix="inline-xbrl-outcome-") as temp:
+                facts_path = Path(temp) / "facts.json"
+                completed = subprocess.run(
+                    [sys.executable, str(Path(__file__).resolve().parent / "extract_inline_xbrl.py"),
+                     str(target), "--out", str(facts_path)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=300,
+                )
+                if completed.returncode == 0 and facts_path.is_file():
+                    fact_table = json.loads(facts_path.read_text("utf-8"))
+                    receipt_sha = digest_bytes(facts_path.read_bytes())
+                    terminal = "EXTRACTION_PASS"
+                    reason = (
+                        "The Inline XBRL structured lane extracted "
+                        f"{fact_table['fact_count']} facts across {fact_table['context_count']} contexts."
+                    )
+                else:
+                    terminal = "NEEDS_EXTRACTION_REVIEW"
+                    receipt_sha = None
+                    reason = (
+                        "The Inline XBRL structured lane could not produce a fact table: "
+                        f"{(completed.stderr or b'').decode()[-200:]}"
+                    )
         else:
             attempted = True
             facts = EXTRACTION_FACTS_BY_SHA.get(raw_sha)
