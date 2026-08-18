@@ -9,8 +9,6 @@
     "run_id",
     "created_at",
     "extractor_version",
-    "native_budget_receipt",
-    "native_budget_receipt_sha256",
     "documents",
     "summary",
     "gate_status"
