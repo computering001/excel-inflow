@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   aggregateGateReports,
+  effectiveTestMetadata,
   selectRegistryTests,
   testIdSetSha256,
   testProfile,
@@ -25,6 +26,11 @@ const ids = registry.tests.map((test) => test.id);
 assert.equal(new Set(ids).size, ids.length, "Registry test ids are not unique.");
 for (const test of registry.tests) {
   assert(fs.existsSync(path.join(root, "scripts", test.script)), `Registry script is absent for ${test.id}.`);
+  const metadata = effectiveTestMetadata(registry, test);
+  assert.ok(metadata.owner, `Registry test ${test.id} has no effective owner.`);
+  assert.ok(metadata.declared_test_class, `Registry test ${test.id} has no declared test class.`);
+  assert.ok(metadata.audit_class, `Registry test ${test.id} has no canonical audit class.`);
+  assert.deepEqual(metadata.expected_exit_contract, { BLOCKED: 1, FAIL: 1, PASS: 0 });
 }
 assert.equal(registry.tests.find((test) => test.id === "acquisition-valuation-contract")?.script, "run_acquisition_valuation_contract_tests.mjs");
 assert.equal(registry.tests.find((test) => test.id === "broker-period-independent-oracle")?.test_class, "mutation");
@@ -76,7 +82,7 @@ assert.doesNotMatch(
 
 console.log(JSON.stringify({
   status: "PASS",
-  checks: 20 + registry.tests.length,
+  checks: 20 + (registry.tests.length * 5),
   registry_tests: registry.tests.length,
   portable_tests: portable.length,
   custody_tests: custody.length,

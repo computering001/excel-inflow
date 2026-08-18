@@ -17,6 +17,10 @@ const FORBIDDEN = Object.freeze([
   ["heredoc source authoring", /<<[-]?['\"]?[A-Za-z_][A-Za-z0-9_]*['\"]?/],
 ]);
 const ACTION_USE = /^\s*-?\s*uses:\s*([^\s#]+)(?:\s*#.*)?$/gm;
+const REQUIRED_LANES = Object.freeze([
+  "static-schema", "semantic-authority", "broker", "finance-schedule",
+  "workbook", "package", "runtime",
+]);
 
 function findings(text) {
   return FORBIDDEN
@@ -28,7 +32,10 @@ const workflowFiles = fs
   .readdirSync(workflowsDirectory)
   .filter((name) => /\.ya?ml$/i.test(name))
   .sort();
-assert(workflowFiles.length > 0, "Repository has no PR/main CI workflow.");
+function assertWorkflowInventory(files) {
+  assert(files.length > 0, "Repository has no PR/main CI workflow.");
+}
+assertWorkflowInventory(workflowFiles);
 
 let checks = 1;
 for (const name of workflowFiles) {
@@ -45,7 +52,12 @@ for (const name of workflowFiles) {
   );
   assert.match(text, /run_development_gate\.mjs[\s\S]*--profile portable/, `${name} does not execute the portable registry partition.`);
   assert.match(text, /aggregate_development_gate_reports\.mjs[\s\S]*--profile portable/, `${name} does not aggregate exact-once portable coverage.`);
-  checks += 8;
+  for (const lane of REQUIRED_LANES) assert.match(text, new RegExp(`lane: ${lane}`), `${name} omits required phase lane ${lane}.`);
+  assert.match(text, /--profile custody/, `${name} silently excludes custody tests instead of enumerating them.`);
+  assert.match(text, /compare_development_gate_reports\.mjs/, `${name} has no current-SHA serial\/parallel comparison.`);
+  assert.match(text, /run_current_package_source_identity_check\.mjs/, `${name} has no package\/source identity check.`);
+  assert.match(text, /compile_ci_gate_matrix\.mjs/, `${name} has no complete CI matrix compilation.`);
+  checks += 19;
 }
 
 const clean = fs.readFileSync(
@@ -66,10 +78,16 @@ assert(
   [...mutableAction.matchAll(ACTION_USE)].some((match) => !/@[a-f0-9]{40}$/.test(match[1])),
   "A mutable action reference escaped governance lint.",
 );
+assert.throws(
+  () => assertWorkflowInventory([]),
+  /no PR\/main CI workflow/,
+  "Deleting the governed CI workflow escaped governance mutation coverage.",
+);
 
 console.log(JSON.stringify({
   status: "PASS",
   workflow_count: workflowFiles.length,
   checks,
-  mutations_caught: mutations.length + 1,
+  mutations_caught: mutations.length + 2,
+  workflow_deletion_mutation_caught: true,
 }, null, 2));

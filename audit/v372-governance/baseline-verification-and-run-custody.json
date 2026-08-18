@@ -1,0 +1,57 @@
+{
+  "schema_version": "baseline-verification-and-run-custody/1.0",
+  "recorded_at": "2026-08-18T00:00:00Z",
+  "recording_policy": "contemporaneous_observation_only_no_retroactive_chronology_claim",
+  "baseline": {
+    "commit": "200c3a4ab073ef614b529978a31092a882d56261",
+    "tree": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+    "parent": "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
+    "committed_at": "2026-08-17T22:50:07+01:00",
+    "git_signature_status": "N",
+    "git_signature_interpretation": "UNSIGNED_NOT_VERIFIED",
+    "verification_claim": false
+  },
+  "baseline_ci_runs": [
+    {
+      "database_id": 32073120387,
+      "event": "push",
+      "head_sha": "200c3a4ab073ef614b529978a31092a882d56261",
+      "workflow": "Read-only development gate",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-17T21:50:10Z",
+      "updated_at": "2026-08-17T21:50:26Z",
+      "url": "https://github.com/computering001/excel-inflow/actions/runs/32073120387"
+    },
+    {
+      "database_id": 32073013591,
+      "event": "pull_request",
+      "head_sha": "41df09473fd6f295c5d5f0e4ef51c4e054068761",
+      "workflow": "Read-only development gate",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-17T21:48:50Z",
+      "updated_at": "2026-08-17T21:49:05Z",
+      "url": "https://github.com/computering001/excel-inflow/actions/runs/32073013591"
+    }
+  ],
+  "current_candidate_ci_run_at_recording": {
+    "database_id": 32114915642,
+    "event": "pull_request",
+    "head_sha": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+    "workflow": "Read-only development gate",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-08-18T08:09:12Z",
+    "updated_at": "2026-08-18T08:11:25Z",
+    "url": "https://github.com/computering001/excel-inflow/actions/runs/32114915642"
+  },
+  "chronology_deviation": {
+    "status": "IRREDUCIBLE_HISTORICAL_DEVIATION",
+    "baseline_identity_commit": "fd24e35df80c34fc288fe5fa8e062ce9c2216934",
+    "baseline_identity_committed_at": "2026-08-18T06:29:03+01:00",
+    "machine_readable_risk_register_commit": "00872dc99c982315cc26e08d4b5a345dbc8d7fc5",
+    "machine_readable_risk_register_committed_at": "2026-08-18T07:18:03+01:00",
+    "finding": "The machine-readable risk register was not committed before repair work began. This record does not rewrite or imply an earlier chronology."
+  }
+}

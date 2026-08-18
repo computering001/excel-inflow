@@ -9,8 +9,10 @@ Build a formula-driven corporate debt-overlay workbook with exactly **three hist
 An end-user company workbook has exactly one top-level producer. The vNext
 candidate uses `scripts/run_excel_inflow_vnext.mjs`; it owns raw evidence,
 authority resolution and quality classification, then delegates the unchanged
-workbook stage internally to `scripts/run_user_flow.mjs`. The v64 implementation
-is an internal rollback delegate, not a second end-user entry point. Never
+workbook stage internally to `scripts/run_user_flow.mjs`. That workbook-stage
+controller is a package-retained internal delegate, not a second end-user entry
+point. Rollback is selected only by a versioned installed-package identity,
+never by a hard-coded controller nickname. Never
 sequence both routes by hand, and never
 construct a workbook directly in chat, with ad-hoc Python/OpenPyXL, from a
 compact or generic template, through a lower-level emitter command, or by
@@ -46,9 +48,10 @@ Run one deterministic graph:
 that proven graph. It invokes the raw filings, broker and DCS transaction,
 pauses at the compiled model-decision boundary, seals one model-demand graph,
 one `selected-authority-contract/1.0` and one run-constitution graph, and only
-then delegates the unchanged workbook stage to `run_user_flow.mjs`. The v64
-controller remains the rollback implementation; it is not rewritten or removed
-during vNext certification.
+then delegates the unchanged workbook stage to `run_user_flow.mjs`. The
+workbook-stage controller remains package-retained for compatibility; it is not
+rewritten or removed during candidate certification and it is never itself a
+product-version or installation selector.
 
 The selected-authority contract is the executable evidence resolver and the
 sole upstream forecast writer. It is compiled from the complete candidate
@@ -673,6 +676,7 @@ node scripts/debt-model-economics.mjs validate-case <case.json>
 node scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xlsx>
 python3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json
 python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>
+node scripts/inspect_workbook_semantics.mjs <workbook.xlsx> --out <inventory.json>
 ```
 
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.

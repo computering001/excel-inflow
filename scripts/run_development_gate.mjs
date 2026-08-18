@@ -20,6 +20,7 @@ import { promisify } from "node:util";
 import {
   DEVELOPMENT_GATE_PROFILES,
   canonical,
+  effectiveTestMetadata,
   selectRegistryTests,
   testIdSetSha256,
 } from "./lib/development_gate_contract.mjs";
@@ -161,7 +162,7 @@ async function sourceIdentity() {
   };
 }
 
-function redactedExecutionResult(result) {
+function redactedExecutionResult(result, metadata) {
   const stdout = String(result.stdout ?? "");
   const stderr = String(result.stderr ?? "");
   return canonical({
@@ -182,6 +183,7 @@ function redactedExecutionResult(result) {
       sha256: null,
     },
     detail_policy: "protected_details_redacted",
+    metadata,
   });
 }
 
@@ -339,7 +341,10 @@ const rawResults = await runPool(selectedTests, concurrency, {
   timeoutMs,
   out,
 });
-const results = rawResults.map(redactedExecutionResult);
+const results = rawResults.map((result, index) => redactedExecutionResult(
+  result,
+  effectiveTestMetadata(registry, selectedTests[index]),
+));
 const counts = Object.fromEntries(
   ["PASS", "FAIL", "BLOCKED"].map((status) => [
     status,

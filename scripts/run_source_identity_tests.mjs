@@ -9,6 +9,7 @@ import {
   resolveSourceIdentity,
   assertCertifiedProductionIdentity,
 } from "./lib/source_identity.mjs";
+import { generatedInstructionSurfaces } from "./generate_canonical_instructions.mjs";
 const exec = promisify(execFile);
 const identity = await resolveSourceIdentity({ skillRoot: new URL("../", import.meta.url).pathname });
 assert.ok(identity.source_commit);
@@ -39,6 +40,17 @@ assert.doesNotThrow(() => assertCertifiedProductionIdentity(production));
 assert.throws(
   () => assertCertifiedProductionIdentity({ ...production, deployment_status: "installed_candidate" }),
   /deployment_status=production_promoted/,
+);
+
+const skillInstructions = await fs.readFile(new URL("../SKILL.md", import.meta.url), "utf8");
+assert.doesNotThrow(() => generatedInstructionSurfaces(skillInstructions));
+assert.throws(
+  () => generatedInstructionSurfaces(skillInstructions.replace(
+    "package-retained internal delegate",
+    "v64 implementation is an internal rollback delegate",
+  )),
+  /obsolete nickname-based rollback wording/,
+  "Obsolete nickname-based rollback wording escaped canonical instruction generation.",
 );
 assert.throws(
   () => assertCertifiedProductionIdentity({
@@ -95,4 +107,4 @@ try {
   await fs.rm(fixtureRoot, { recursive: true, force: true });
 }
 
-console.log(JSON.stringify({ status: "PASS", checks: 20 }));
+console.log(JSON.stringify({ status: "PASS", checks: 22, instruction_rollback_mutations_caught: 1 }));

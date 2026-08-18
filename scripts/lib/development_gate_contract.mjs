@@ -35,6 +35,34 @@ export function testProfile(test) {
     : "portable";
 }
 
+export function effectiveTestMetadata(registry, test) {
+  const contract = registry.metadata_contract;
+  if (!contract || contract.schema_version !== "development-test-metadata/1.0") {
+    throw new Error("Registry metadata contract is absent or unsupported.");
+  }
+  const owner = contract.owner_by_phase?.[test.phase];
+  const declaredTestClass = test.test_class;
+  const auditClass = contract.audit_class_by_test_class?.[declaredTestClass];
+  if (!owner) throw new Error(`Registry test ${test.id} has no owner for phase ${test.phase}.`);
+  if (!declaredTestClass || !auditClass) {
+    throw new Error(`Registry test ${test.id} has no canonical test-class mapping.`);
+  }
+  if (!contract.allowed_audit_classes?.includes(auditClass)) {
+    throw new Error(`Registry test ${test.id} resolves to disallowed audit class ${auditClass}.`);
+  }
+  for (const [status, exitCode] of Object.entries({ PASS: 0, FAIL: 1, BLOCKED: 1 })) {
+    if (contract.expected_exit_contract?.[status] !== exitCode) {
+      throw new Error(`Registry expected-exit contract for ${status} must be ${exitCode}.`);
+    }
+  }
+  return canonical({
+    owner,
+    declared_test_class: declaredTestClass,
+    audit_class: auditClass,
+    expected_exit_contract: contract.expected_exit_contract,
+  });
+}
+
 export function selectRegistryTests(registry, { profile = "all", phases = null } = {}) {
   if (!DEVELOPMENT_GATE_PROFILES.includes(profile)) {
     throw new Error(`Unknown development-gate profile ${profile}.`);

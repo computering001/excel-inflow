@@ -1,0 +1,21 @@
+{
+  "schema_version": "historical-identity-classification/1.0",
+  "subject": {
+    "path": "audit/v370/package-identity.json",
+    "sha256": "a1fe89074d528cc4724adbb39b13c288649ec6ef011b390097ed312968674953",
+    "embedded_source_commit": "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
+    "embedded_release_name": "Excel Inflow v3.6.0"
+  },
+  "classification": "HISTORICAL_V370_AUDIT_CAPTURE_OF_V360_DEVELOPMENT_BYTES",
+  "active_authority": false,
+  "production_certification": false,
+  "historical_bytes_mutated": false,
+  "interpretation": "The v370 directory name identifies the audit campaign, not the product version declared by these frozen bytes. The embedded v3.6.0 identity remains preserved as historical evidence and cannot govern a v3.7.x source, package, tag or installation.",
+  "current_authority_pointer": "audit/v372-governance/current-identity-convergence.json",
+  "immutability_checks": {
+    "audit/v370/baseline-fingerprint.json": "3208adcdebf33ec762b7530af3533f7458e4a259c94824b8a08fc3afc74f4311",
+    "audit/v370/baseline-gate-report.json": "447a28a4e15dd7cbbd2e416489dd3748a653f3a4965912ffa99dec3557a08a8c",
+    "audit/v370/final-source-test-report.json": "06ba2ad342eea6da05267b9c66d07cc5c16d2d694b109eec502968cec5ba8681",
+    "audit/v370/implementation-ledger.json": "8d43d6c39599d41aa1bf22c567f038e9914db69e05d4a931d43029745b99f148"
+  }
+}

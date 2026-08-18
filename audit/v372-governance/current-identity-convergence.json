@@ -1,0 +1,124 @@
+{
+  "schema_version": "current-identity-convergence/1.0",
+  "release": {
+    "name": "Excel Inflow v3.7.2",
+    "skill_version": "3.7.2",
+    "mode": "development",
+    "deployment_status": "not_installed",
+    "production_certified": false
+  },
+  "current_source_contract_matrix": {
+    "policy": "ASSERT_CURRENT_CHECKOUT_HEAD values are generated and compared by the package/source CI job for the exact checked-out SHA; NOT_APPLICABLE is an explicit non-authority state, not a blank.",
+    "fields": {
+      "product_version": {
+        "runtime_manifest": "3.7.2",
+        "release_manifest": "3.7.2",
+        "package_manifest": "3.7.2",
+        "instructions": "CANONICAL_SOURCE_NO_SEPARATE_VERSION_AUTHORITY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "package_mode": {
+        "runtime_manifest": "development",
+        "release_manifest": "development",
+        "package_manifest": "development",
+        "instructions": "DEVELOPMENT_ROUTE_ONLY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "deployment_status": {
+        "runtime_manifest": "not_installed",
+        "release_manifest": "not_installed",
+        "package_manifest": "not_installed",
+        "instructions": "INSTALLATION_IDENTITY_REQUIRED_BEFORE_DELIVERY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "source_commit": {
+        "runtime_manifest": "RESOLVED_FROM_GIT_NOT_EMBEDDED",
+        "release_manifest": "ASSERT_CURRENT_CHECKOUT_HEAD",
+        "package_manifest": "ASSERT_CURRENT_CHECKOUT_HEAD",
+        "instructions": "NOT_AN_IDENTITY_AUTHORITY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "source_tree": {
+        "runtime_manifest": "RESOLVED_FROM_GIT_NOT_EMBEDDED",
+        "release_manifest": "ASSERT_CURRENT_CHECKOUT_HEAD_TREE",
+        "package_manifest": "ASSERT_CURRENT_CHECKOUT_HEAD_TREE",
+        "instructions": "NOT_AN_IDENTITY_AUTHORITY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "runtime_closure": {
+        "runtime_manifest": "COMPUTED_BY_PACKAGE_COMPILER",
+        "release_manifest": "ASSERT_NON_NULL_COMPUTED_SHA256",
+        "package_manifest": "ASSERT_NON_NULL_COMPUTED_SHA256",
+        "instructions": "NOT_AN_IDENTITY_AUTHORITY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "full_package_inventory": {
+        "runtime_manifest": "NOT_AN_IDENTITY_AUTHORITY",
+        "release_manifest": "COMPUTED_AFTER_PACKAGE_SEAL",
+        "package_manifest": "COMPUTED_AFTER_PACKAGE_SEAL",
+        "instructions": "NOT_AN_IDENTITY_AUTHORITY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "archive_hash": {
+        "runtime_manifest": "NOT_AN_IDENTITY_AUTHORITY",
+        "release_manifest": "EXTERNAL_DEVELOPMENT_RELEASE_CUSTODY",
+        "package_manifest": "EXTERNAL_DEVELOPMENT_RELEASE_CUSTODY",
+        "instructions": "NOT_AN_IDENTITY_AUTHORITY",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "installation_version": {
+        "runtime_manifest": "not_installed",
+        "release_manifest": "not_installed",
+        "package_manifest": "not_installed",
+        "instructions": "VERSIONED_INSTALLED_PACKAGE_IDENTITY_REQUIRED",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      },
+      "rollback_version": {
+        "runtime_manifest": "VERSIONED_INSTALLED_PACKAGE_ONLY",
+        "release_manifest": "VERSIONED_INSTALLED_PACKAGE_ONLY",
+        "package_manifest": "VERSIONED_INSTALLED_PACKAGE_ONLY",
+        "instructions": "NO_HARD_CODED_CONTROLLER_NICKNAME",
+        "attestation": "NOT_APPLICABLE_DEVELOPMENT_PACKAGE",
+        "installed_receipt": "NOT_AVAILABLE_USER_HOLD"
+      }
+    }
+  },
+  "published_candidate_basis": {
+    "source_commit": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+    "source_tree": "3ee6c51175417484b6e317d55355844a9191fbd7",
+    "tag": "excel-inflow-v3.7.2-development",
+    "tag_resolves_to": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+    "package_branch": "packages/excel-inflow-v3.7.2-development",
+    "package_commit": "ca0d9a3e53cb53865492a30c5bdcae88dc21d5ba",
+    "package_tree": "cb633567ed156d31fb3bccb9ddddd22b847d38ed",
+    "release_manifest_sha256": "a633c468ca1af153f25fe265968ddb5562ad6a8cd977c809c75ef7219cb39073",
+    "runtime_code_closure_sha256": "bc6828cb4555ced0b66daf9153339229bbc89097d5de7a89c07ae91380f17350",
+    "complete_package_inventory_sha256": "56d8e2d3d86092e02e0432eecc77101da6e3d89116cffb163f537eb47786726e",
+    "archive_sha256": "8a3b4721f8c15b2f57a687f9eab7c0ae5b0b09cd55f6d593fe2f7ea8bb1113cb"
+  },
+  "convergence_matrix": [
+    { "surface": "source", "identity": "bf4da1080e9d4d01c48129a2d980dbca935f6136", "classification": "PUBLISHED_CANDIDATE_SOURCE" },
+    { "surface": "package_manifest_source", "identity": "bf4da1080e9d4d01c48129a2d980dbca935f6136", "classification": "MATCH" },
+    { "surface": "development_tag", "identity": "bf4da1080e9d4d01c48129a2d980dbca935f6136", "classification": "MATCH" },
+    { "surface": "package_branch", "identity": "ca0d9a3e53cb53865492a30c5bdcae88dc21d5ba", "classification": "PACKAGING_COMMIT_BOUND_TO_SOURCE" },
+    { "surface": "release_asset", "identity": "8a3b4721f8c15b2f57a687f9eab7c0ae5b0b09cd55f6d593fe2f7ea8bb1113cb", "classification": "DEVELOPMENT_ARCHIVE" },
+    { "surface": "installed_host", "identity": null, "classification": "HELD_BY_USER_NOT_INSTALLED" }
+  ],
+  "governance_source_policy": {
+    "statement": "Every later governance/source SHA must compile and prove its own package identity; it must not inherit this published package identity by assertion.",
+    "enforcement": [
+      "scripts/run_current_package_source_identity_check.mjs",
+      ".github/workflows/read-only-development-gate.yml"
+    ]
+  },
+  "historical_identity_pointer": "audit/v372-governance/historical-v370-identity-classification.json"
+}

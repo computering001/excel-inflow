@@ -7,6 +7,47 @@
     "missing_required_input": "BLOCK",
     "nonzero_exit": "FAIL"
   },
+  "metadata_contract": {
+    "schema_version": "development-test-metadata/1.0",
+    "owner_by_phase": {
+      "workflow": "runtime-governance",
+      "evidence": "evidence-authority",
+      "graph": "semantic-constitution",
+      "economics": "finance-schedule",
+      "economic": "finance-schedule",
+      "forecast": "forecast-authority",
+      "proof": "release-proof",
+      "real_corpus": "broker-and-real-corpus",
+      "cohort": "workbook-oracle",
+      "performance": "runtime-performance"
+    },
+    "expected_exit_contract": {
+      "PASS": 0,
+      "FAIL": 1,
+      "BLOCKED": 1
+    },
+    "audit_class_by_test_class": {
+      "unit": "unit",
+      "synthetic_integration": "component_integration",
+      "component_integration": "component_integration",
+      "cross_layer_integration": "cross_layer_integration",
+      "mutation": "cross_layer_integration",
+      "independent_economic_oracle": "independent_economic_oracle",
+      "frozen_authority": "workbook_oracle",
+      "real_corpus": "real_corpus",
+      "installed_host": "installed_host"
+    },
+    "allowed_audit_classes": [
+      "unit",
+      "component_integration",
+      "cross_layer_integration",
+      "independent_economic_oracle",
+      "workbook_oracle",
+      "real_corpus",
+      "installed_host",
+      "visual_manual"
+    ]
+  },
   "tests": [
     {
       "id": "workflow-state-contract",
@@ -925,37 +966,55 @@
       "id": "source-arithmetic-topology",
       "phase": "evidence",
       "runtime": "python",
-      "script": "run_source_arithmetic_topology_tests.py"
+      "script": "run_source_arithmetic_topology_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
     },
     {
       "id": "semantic-role-closure",
       "phase": "forecast",
       "runtime": "node",
-      "script": "run_semantic_role_closure_tests.mjs"
+      "script": "run_semantic_role_closure_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "cross_layer_integration"
     },
     {
       "id": "public-state-ownership",
       "phase": "workflow",
       "runtime": "node",
-      "script": "run_public_state_ownership_tests.mjs"
+      "script": "run_public_state_ownership_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
     },
     {
       "id": "broker-core-demand-quality",
       "phase": "evidence",
       "runtime": "python",
-      "script": "run_broker_core_demand_tests.py"
+      "script": "run_broker_core_demand_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "component_integration"
     },
     {
       "id": "nonrecurring-forecast-policy",
       "phase": "forecast",
       "runtime": "node",
-      "script": "run_nonrecurring_forecast_policy_tests.mjs"
+      "script": "run_nonrecurring_forecast_policy_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
     },
     {
       "id": "source-release-identity",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_source_identity_tests.mjs"
+      "script": "run_source_identity_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "typed-product-identity-vocabulary",
@@ -988,13 +1047,19 @@
       "id": "test-registry-contract",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_test_registry_contract_tests.mjs"
+      "script": "run_test_registry_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "portability-contract",
       "phase": "proof",
       "runtime": "node",
-      "script": "run_portability_contract_tests.mjs"
+      "script": "run_portability_contract_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
     },
     {
       "id": "installed-host-broker-receipt-contract",
@@ -1015,7 +1080,10 @@
       ],
       "requires": [
         "INSTALLED_HOST_BROKER_RECEIPT"
-      ]
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "installed_host"
     },
     {
       "id": "source-arithmetic-oracle",
