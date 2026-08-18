@@ -603,6 +603,45 @@
       "test_class": "real_corpus"
     },
     {
+      "id": "real-filing-corpus-classification",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "compile_real_filing_corpus_receipt.py",
+      "arguments": [
+        {
+          "name": "real_filing_corpus_manifest",
+          "source": "REAL_FILING_CORPUS_MANIFEST",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        },
+        {
+          "name": "arg_4",
+          "value": "--expect",
+          "type": "literal"
+        },
+        {
+          "name": "arg_5",
+          "value": "test-fixtures/real-filings-custody-v1/corpus-classification-receipt.json",
+          "type": "literal"
+        }
+      ],
+      "requires": [
+        "REAL_FILING_CORPUS_MANIFEST"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
+    },
+    {
       "id": "broker-real-pack-completion",
       "phase": "real_corpus",
       "runtime": "python",

@@ -20,157 +20,198 @@
   },
   "corpus_design_matrix": {
     "schema_version": "real-filing-corpus-design-matrix/1.0",
-    "matrix_status": "INCOMPLETE_EXTERNAL_EVIDENCE",
+    "matrix_status": "COMPLETE_HASH_BOUND_COVERAGE",
     "classification_contract": "A category is verified only by candidate hashes plus a hash-bound external classification receipt. Raw document bytes, locators and source text remain outside the repository.",
     "dimensions": {
       "accounting_framework": [
         {
           "category_id": "ifrs",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "IFRS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "921c3225f6960acd"
+          ],
+          "classification_receipt_sha256": "f33b4bfd21b787ff56b0ddc0390fb5b25019d7aa80ccbdf8d2b1e18fdd8f3e1f",
+          "blocker_code": null
         },
         {
           "category_id": "us_gaap",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "US_GAAP_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "26982d474427eed2"
+          ],
+          "classification_receipt_sha256": "9e7c16a52853b9f0550ba7750dea960155fcce3e28a388a5922991f7eb1dedbf",
+          "blocker_code": null
         }
       ],
       "issuer_region": [
         {
           "category_id": "uk",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "UK_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "680a5c0c098b8432"
+          ],
+          "classification_receipt_sha256": "e1568ba465d85c1b7be584ee2a13c1aff0e97e7f9cf4f9fd9d303cf635c4bc59",
+          "blocker_code": null
         },
         {
           "category_id": "eu",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "EU_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "921c3225f6960acd"
+          ],
+          "classification_receipt_sha256": "0489055ae145d79bf5badd2e1fc58d7839659b3d939b6d0903795160e3bb694a",
+          "blocker_code": null
         },
         {
           "category_id": "us",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "US_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "a022b1655565975b"
+          ],
+          "classification_receipt_sha256": "53116880fe167eb72403e88c60eb12c442bd1d1ba61b479f11ab81430e46df48",
+          "blocker_code": null
         },
         {
           "category_id": "ireland",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "IRELAND_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "26982d474427eed2"
+          ],
+          "classification_receipt_sha256": "f5f7f6d95d030a7d88ace7eac087219ccbb1f5f5a7106b33f469b86835f1b734",
+          "blocker_code": null
         }
       ],
       "reporting_period": [
         {
           "category_id": "annual",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "ANNUAL_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "26982d474427eed2"
+          ],
+          "classification_receipt_sha256": "37aa4ab7474dd140edd8b8254e33a7cf7f9679a718b2686fe8c9a33b1d1387b8",
+          "blocker_code": null
         },
         {
           "category_id": "interim",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "INTERIM_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "b6eed0750605a2b1"
+          ],
+          "classification_receipt_sha256": "15a8bf6d4b1eef6e7cb6c38597bea1c0d2912a025a5dd0b821de989743667d28",
+          "blocker_code": null
         }
       ],
       "document_format": [
         {
           "category_id": "html",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "HTML_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "a022b1655565975b"
+          ],
+          "classification_receipt_sha256": "51ec9260442b67a1d0cb29402b4650d1100a9914389538199f8fbd7ae424318a",
+          "blocker_code": null
         },
         {
           "category_id": "native_pdf",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "NATIVE_PDF_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "921c3225f6960acd"
+          ],
+          "classification_receipt_sha256": "c5c94fea960fc92845db625f076b350a1bb65e9a77829aac9355699d6ab8ea59",
+          "blocker_code": null
         },
         {
           "category_id": "scanned_pdf",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "SCANNED_PDF_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "bdab86e13e84bd31"
+          ],
+          "classification_receipt_sha256": "8b3a3a2f79cd8dc9fb6fdf43a9c109eb2afaafd3d6cd3d58be2790f7bc4f86c9",
+          "blocker_code": null
         }
       ],
       "statement_structure": [
         {
           "category_id": "multi_page_cash_flow",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "MULTI_PAGE_CASH_FLOW_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "f62a779dd3299b56"
+          ],
+          "classification_receipt_sha256": "90344e263edc9db40d3b852da12900619197910edbbddab7aaa801b3fbc82056",
+          "blocker_code": null
         },
         {
           "category_id": "repeated_headers",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "REPEATED_HEADERS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "f62a779dd3299b56"
+          ],
+          "classification_receipt_sha256": "2628193da4ccd18a818290c9150db2ed1d8c8aaed7e71d406b9533bdf4e78b88",
+          "blocker_code": null
         },
         {
           "category_id": "parent_first_subtotals",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "PARENT_FIRST_SUBTOTALS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "26982d474427eed2"
+          ],
+          "classification_receipt_sha256": "e69581561a8a8f02df3ad3ada8fc1b1e836ea2fd95ec181de5c4b56c0801dac5",
+          "blocker_code": null
         },
         {
           "category_id": "parent_last_subtotals",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "PARENT_LAST_SUBTOTALS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "f62a779dd3299b56"
+          ],
+          "classification_receipt_sha256": "9fb7c349ea41b1daff571d339c915d22acdcbd5f4e910557a8473dba95b8dbfe",
+          "blocker_code": null
         },
         {
           "category_id": "different_units",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "DIFFERENT_UNITS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "bdab86e13e84bd31"
+          ],
+          "classification_receipt_sha256": "447d63ce43a967d901b8350f08296ac12c25a517988878d0891c78a300def9aa",
+          "blocker_code": null
         },
         {
           "category_id": "dashes_blanks_zeroes",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "DASHES_BLANKS_ZEROES_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "a022b1655565975b",
+            "b6eed0750605a2b1"
+          ],
+          "classification_receipt_sha256": "f6b544bd853e9bed2b841817be4d3e980774f97911fca522b90199553508453b",
+          "blocker_code": null
         },
         {
           "category_id": "footnote_references",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "FOOTNOTE_REFERENCES_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "b6eed0750605a2b1"
+          ],
+          "classification_receipt_sha256": "be4b8376d0959a1aabfff1bfd72732d305d9a4fdd7acd325347a67a6a76a64ec",
+          "blocker_code": null
         },
         {
           "category_id": "long_captions",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "LONG_CAPTIONS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "f62a779dd3299b56"
+          ],
+          "classification_receipt_sha256": "d9a24a4a9515766f917f96218bd785d664065a9cf69cfc46605197c4fbce89c3",
+          "blocker_code": null
         },
         {
           "category_id": "unfamiliar_adjusted_profit_terms",
-          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
-          "candidate_ids": [],
-          "classification_receipt_sha256": null,
-          "blocker_code": "UNFAMILIAR_ADJUSTED_PROFIT_TERMS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+          "status": "HASH_BOUND_VERIFIED",
+          "candidate_ids": [
+            "26982d474427eed2"
+          ],
+          "classification_receipt_sha256": "32f1175199ec155d04bb70836d1a2b4f19e26ce209a8c207f5b442a452ad7993",
+          "blocker_code": null
         }
       ]
     }

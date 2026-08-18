@@ -1,0 +1,382 @@
+{
+  "candidate_set_sha256": "e55f5fdedc9db35d3d76c90369eba41fb8a3c99c0f8b906b2d3fc1508c960568",
+  "categories": [
+    {
+      "candidate_ids": [
+        "921c3225f6960acd"
+      ],
+      "category_id": "ifrs",
+      "dimension": "accounting_framework",
+      "proof_kind": "dimension",
+      "proof_sha256": "f33b4bfd21b787ff56b0ddc0390fb5b25019d7aa80ccbdf8d2b1e18fdd8f3e1f",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "9ec4a9f3e0b630772410d1ee9a66ea3c930ecec9bf34e277ed179eeff8ac1e73"
+    },
+    {
+      "candidate_ids": [
+        "26982d474427eed2"
+      ],
+      "category_id": "us_gaap",
+      "dimension": "accounting_framework",
+      "proof_kind": "dimension",
+      "proof_sha256": "9e7c16a52853b9f0550ba7750dea960155fcce3e28a388a5922991f7eb1dedbf",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "f91f65b4779b0e260e45fb0eb30f04d68012b753de2a1d1880cf799ce05a63b6"
+    },
+    {
+      "candidate_ids": [
+        "a022b1655565975b"
+      ],
+      "category_id": "html",
+      "dimension": "document_format",
+      "proof_kind": "media_probe",
+      "proof_sha256": "51ec9260442b67a1d0cb29402b4650d1100a9914389538199f8fbd7ae424318a",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "d851291107eba75e40d39747253e718673e4ffcf3c3b59963820b02b127198e5"
+    },
+    {
+      "candidate_ids": [
+        "921c3225f6960acd"
+      ],
+      "category_id": "native_pdf",
+      "dimension": "document_format",
+      "proof_kind": "media_probe",
+      "proof_sha256": "c5c94fea960fc92845db625f076b350a1bb65e9a77829aac9355699d6ab8ea59",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "d7986ec1f2abf2c6f4bc63a73ae6ec58dda0664e8f9b4f49e1a3df945d03cd7d"
+    },
+    {
+      "candidate_ids": [
+        "bdab86e13e84bd31"
+      ],
+      "category_id": "scanned_pdf",
+      "dimension": "document_format",
+      "proof_kind": "media_probe",
+      "proof_sha256": "8b3a3a2f79cd8dc9fb6fdf43a9c109eb2afaafd3d6cd3d58be2790f7bc4f86c9",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "18d43b448c35d4d12781b6854120c8ef5189289d3e8a26461221209b2293d6f4"
+    },
+    {
+      "candidate_ids": [
+        "921c3225f6960acd"
+      ],
+      "category_id": "eu",
+      "dimension": "issuer_region",
+      "proof_kind": "dimension",
+      "proof_sha256": "0489055ae145d79bf5badd2e1fc58d7839659b3d939b6d0903795160e3bb694a",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "7e4b4ee9c4f77783cc900bda0d54855e1309ab5b1bf75e3b5261955085ec86b8"
+    },
+    {
+      "candidate_ids": [
+        "26982d474427eed2"
+      ],
+      "category_id": "ireland",
+      "dimension": "issuer_region",
+      "proof_kind": "dimension",
+      "proof_sha256": "f5f7f6d95d030a7d88ace7eac087219ccbb1f5f5a7106b33f469b86835f1b734",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "85ecacd7671168f7418f169d39ff910f135fdd811f7b604b02feb2db5cf998b1"
+    },
+    {
+      "candidate_ids": [
+        "680a5c0c098b8432"
+      ],
+      "category_id": "uk",
+      "dimension": "issuer_region",
+      "proof_kind": "dimension",
+      "proof_sha256": "e1568ba465d85c1b7be584ee2a13c1aff0e97e7f9cf4f9fd9d303cf635c4bc59",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "b27681a24065f944afcb324ae3d115305e477ed8f5aacc860b2b55ef9eb8cdbc"
+    },
+    {
+      "candidate_ids": [
+        "a022b1655565975b"
+      ],
+      "category_id": "us",
+      "dimension": "issuer_region",
+      "proof_kind": "dimension",
+      "proof_sha256": "53116880fe167eb72403e88c60eb12c442bd1d1ba61b479f11ab81430e46df48",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "dbc58da3452898ae9837f785498e13c21e5d0bac1ca7142403f5c100ec3875ca"
+    },
+    {
+      "candidate_ids": [
+        "26982d474427eed2"
+      ],
+      "category_id": "annual",
+      "dimension": "reporting_period",
+      "proof_kind": "dimension",
+      "proof_sha256": "37aa4ab7474dd140edd8b8254e33a7cf7f9679a718b2686fe8c9a33b1d1387b8",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "5876e57d0bd9dd43b09aad2a518037605626df1d366477b99215d26449bb24e0"
+    },
+    {
+      "candidate_ids": [
+        "b6eed0750605a2b1"
+      ],
+      "category_id": "interim",
+      "dimension": "reporting_period",
+      "proof_kind": "dimension",
+      "proof_sha256": "15a8bf6d4b1eef6e7cb6c38597bea1c0d2912a025a5dd0b821de989743667d28",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "de43aa6f20f0789d21b6cf8ef95fa56492c333f283964aa1f12e260ec37a5baf"
+    },
+    {
+      "candidate_ids": [
+        "a022b1655565975b",
+        "b6eed0750605a2b1"
+      ],
+      "category_id": "dashes_blanks_zeroes",
+      "dimension": "statement_structure",
+      "proof_kind": "cell_states",
+      "proof_sha256": "f6b544bd853e9bed2b841817be4d3e980774f97911fca522b90199553508453b",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 3,
+      "witnesses_sha256": "c0e83ba623ff93e4d335a05b3310899535b269ec16e5f1fdca1df7a549617ef3"
+    },
+    {
+      "candidate_ids": [
+        "bdab86e13e84bd31"
+      ],
+      "category_id": "different_units",
+      "dimension": "statement_structure",
+      "proof_kind": "different_units",
+      "proof_sha256": "447d63ce43a967d901b8350f08296ac12c25a517988878d0891c78a300def9aa",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 2,
+      "witnesses_sha256": "808331eee76805dbb2f1527246592e771ae1dba31d8a992e7c93749a746a4bc0"
+    },
+    {
+      "candidate_ids": [
+        "b6eed0750605a2b1"
+      ],
+      "category_id": "footnote_references",
+      "dimension": "statement_structure",
+      "proof_kind": "footnote_reference",
+      "proof_sha256": "be4b8376d0959a1aabfff1bfd72732d305d9a4fdd7acd325347a67a6a76a64ec",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 3,
+      "witnesses_sha256": "a4759d18f6f476c91c11007a1e889a3216cf6e8cdc528b4872ff65aa5728d7b2"
+    },
+    {
+      "candidate_ids": [
+        "f62a779dd3299b56"
+      ],
+      "category_id": "long_captions",
+      "dimension": "statement_structure",
+      "proof_kind": "long_caption",
+      "proof_sha256": "d9a24a4a9515766f917f96218bd785d664065a9cf69cfc46605197c4fbce89c3",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "ba9bcb5ae4ca11aaa91940a2d329d951238a4c9ccb0e74d5801880a8d90f019a"
+    },
+    {
+      "candidate_ids": [
+        "f62a779dd3299b56"
+      ],
+      "category_id": "multi_page_cash_flow",
+      "dimension": "statement_structure",
+      "proof_kind": "adjacent_cash_flow",
+      "proof_sha256": "90344e263edc9db40d3b852da12900619197910edbbddab7aaa801b3fbc82056",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 3,
+      "witnesses_sha256": "ccd8c4099b4b2c726659e4ea08539b51b213209748609660fc062dc8917cbe5a"
+    },
+    {
+      "candidate_ids": [
+        "26982d474427eed2"
+      ],
+      "category_id": "parent_first_subtotals",
+      "dimension": "statement_structure",
+      "proof_kind": "parent_order",
+      "proof_sha256": "e69581561a8a8f02df3ad3ada8fc1b1e836ea2fd95ec181de5c4b56c0801dac5",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 3,
+      "witnesses_sha256": "ced82862f12fb8c7be98708c5f62864005d6b40712941f2b3363123800be9881"
+    },
+    {
+      "candidate_ids": [
+        "f62a779dd3299b56"
+      ],
+      "category_id": "parent_last_subtotals",
+      "dimension": "statement_structure",
+      "proof_kind": "parent_order",
+      "proof_sha256": "9fb7c349ea41b1daff571d339c915d22acdcbd5f4e910557a8473dba95b8dbfe",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 3,
+      "witnesses_sha256": "79bb707418d578431b7034f7128740d43677ebce892367f1905e17070604c2f1"
+    },
+    {
+      "candidate_ids": [
+        "f62a779dd3299b56"
+      ],
+      "category_id": "repeated_headers",
+      "dimension": "statement_structure",
+      "proof_kind": "adjacent_cash_flow",
+      "proof_sha256": "2628193da4ccd18a818290c9150db2ed1d8c8aaed7e71d406b9533bdf4e78b88",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 3,
+      "witnesses_sha256": "ccd8c4099b4b2c726659e4ea08539b51b213209748609660fc062dc8917cbe5a"
+    },
+    {
+      "candidate_ids": [
+        "26982d474427eed2"
+      ],
+      "category_id": "unfamiliar_adjusted_profit_terms",
+      "dimension": "statement_structure",
+      "proof_kind": "adjusted_profit_term",
+      "proof_sha256": "32f1175199ec155d04bb70836d1a2b4f19e26ce209a8c207f5b442a452ad7993",
+      "status": "HASH_BOUND_VERIFIED",
+      "witness_count": 1,
+      "witnesses_sha256": "b5001a0a3a8fe7ad4571fdd6b38ad20485b95856af7b5106fe72e02727480341"
+    }
+  ],
+  "category_count": 20,
+  "corpus_id_sha256": "a905ae169d189aa40791ed4003b3d3f194c058a3b326ecb4191f8c2361b3137e",
+  "coverage_sha256": "ba18a508ae54328e670193b4f29a3776ccad30470375996750369331705c3ab5",
+  "document_count": 8,
+  "documents": [
+    {
+      "candidate_id": "07d5c35e0bb05342",
+      "document_id_sha256": "8a9e54e3fddf5f6bc13fc0e64fb4706a628e77e5b0b9c3dc7d95f2cdf8bfcc97",
+      "media_kind": "html",
+      "media_metrics": {
+        "html_blocks": 273,
+        "html_cells": 4191,
+        "inline_xbrl_markers": 677
+      },
+      "raw_byte_count": 765973,
+      "raw_sha256": "3a3d9336a924488440e83b811ba354f654738cc822b6eb69ed6063e8cf348542",
+      "source_host": "www.sec.gov",
+      "source_locator_sha256": "7e7d3a9ca6fca897f0c4e11ac9152c25652d1fc250c06ba0a11ed3ec23bdd348"
+    },
+    {
+      "candidate_id": "26982d474427eed2",
+      "document_id_sha256": "a7718856c1f15bc183fb5e363506e2a668600355eed21c5eac528cc5ea4c22fe",
+      "media_kind": "pdf",
+      "media_metrics": {
+        "full_page_raster_fraction_ppm": 96774,
+        "full_page_raster_pages": 12,
+        "median_native_text_characters_per_page": 3377,
+        "native_text_characters": 434818,
+        "pdf_pages": 124
+      },
+      "raw_byte_count": 8170293,
+      "raw_sha256": "596d7443051fef134c502bb0fc9a2895245cdce9de8b1a982345da91eb57f158",
+      "source_host": "www.crh.com",
+      "source_locator_sha256": "96b40e467dce65db892c0746d27e3e5a43eb5ebe3c53ff925b792fc35d8a8fef"
+    },
+    {
+      "candidate_id": "680a5c0c098b8432",
+      "document_id_sha256": "723c038967f65bc59daa6725b050c9ffdb3a484c0a55d134936bdd67574ada57",
+      "media_kind": "pdf",
+      "media_metrics": {
+        "full_page_raster_fraction_ppm": 0,
+        "full_page_raster_pages": 0,
+        "median_native_text_characters_per_page": 3110,
+        "native_text_characters": 808621,
+        "pdf_pages": 260
+      },
+      "raw_byte_count": 14123000,
+      "raw_sha256": "9dd5e1a8cf1e79fbbcec4c9df93b55c70adbe8e44dd96d7441e131ea309dbbc9",
+      "source_host": "www.southernwater.co.uk",
+      "source_locator_sha256": "be7f0be471d77e5283475225238935c777949044107ce1e137d779068671d4cb"
+    },
+    {
+      "candidate_id": "921c3225f6960acd",
+      "document_id_sha256": "8d250416fef0844215c68bb263fe38b4bac9d59eb8286142a97f1fa8c600b663",
+      "media_kind": "pdf",
+      "media_metrics": {
+        "full_page_raster_fraction_ppm": 35714,
+        "full_page_raster_pages": 2,
+        "median_native_text_characters_per_page": 2285,
+        "native_text_characters": 120004,
+        "pdf_pages": 56
+      },
+      "raw_byte_count": 471399,
+      "raw_sha256": "393bfa60adfd86ca63ce0c09600326b7b5adddc0840eba323ac12a94b4549b32",
+      "source_host": "assets.new.siemens.com",
+      "source_locator_sha256": "23d0f1ac9860e958bab0efdebc39f2fada80cd0b2ec254ed0e652c4eaa0973ec"
+    },
+    {
+      "candidate_id": "a022b1655565975b",
+      "document_id_sha256": "f7624e30c9e29c2c673f908b40c556435d172917ee56e9aaefedb93723d2b13e",
+      "media_kind": "html",
+      "media_metrics": {
+        "html_blocks": 699,
+        "html_cells": 6443,
+        "inline_xbrl_markers": 1170
+      },
+      "raw_byte_count": 1520208,
+      "raw_sha256": "548ae59778cf08ee0f2ee088e7ece20d947076c3c01f74d2d65db4c2777e436a",
+      "source_host": "www.sec.gov",
+      "source_locator_sha256": "9a1590d0917107a7b31cc7b82b144987885c7c2fac68bc1d8c58fc81a10e3731"
+    },
+    {
+      "candidate_id": "b6eed0750605a2b1",
+      "document_id_sha256": "7bd662203210f3cff54fb6154f02f182fbc5056b5024f03beddb58080b38007b",
+      "media_kind": "pdf",
+      "media_metrics": {
+        "full_page_raster_fraction_ppm": 105263,
+        "full_page_raster_pages": 2,
+        "median_native_text_characters_per_page": 2152,
+        "native_text_characters": 35248,
+        "pdf_pages": 19
+      },
+      "raw_byte_count": 229323,
+      "raw_sha256": "1c2e4fdb9bcafa25f871394031e92a71e5399b7ceaa96cb1d4f6d2593f61efd1",
+      "source_host": "assets.new.siemens.com",
+      "source_locator_sha256": "917088a1dce9e17daacc27735260bd4b845bcbe8492abd8a53831724c7aa7818"
+    },
+    {
+      "candidate_id": "bdab86e13e84bd31",
+      "document_id_sha256": "115fe1568db91be9cd68a5b96bae1c7b467e6b7bfbfae1250528c85b6e42d132",
+      "media_kind": "pdf",
+      "media_metrics": {
+        "full_page_raster_fraction_ppm": 1000000,
+        "full_page_raster_pages": 69,
+        "median_native_text_characters_per_page": 1793,
+        "native_text_characters": 126651,
+        "pdf_pages": 69
+      },
+      "raw_byte_count": 23583072,
+      "raw_sha256": "ca2ec7b1273c61498a6881ed3109419c99ef83031b1707232114c5c77230d126",
+      "source_host": "investors.coca-colacompany.com",
+      "source_locator_sha256": "b30713793b2c2bd8a7cd7c9637caa6bdb215bd8f07e3c8bf40a3384f532b9917"
+    },
+    {
+      "candidate_id": "f62a779dd3299b56",
+      "document_id_sha256": "f0b29b611c715b6b59d7e54e0adda0b14587401150fdbae9b81554bea1d35cbe",
+      "media_kind": "pdf",
+      "media_metrics": {
+        "full_page_raster_fraction_ppm": 1000000,
+        "full_page_raster_pages": 189,
+        "median_native_text_characters_per_page": 2529,
+        "native_text_characters": 474747,
+        "pdf_pages": 189
+      },
+      "raw_byte_count": 8807906,
+      "raw_sha256": "a74d2221373b5f27392c92025aee7956bee5619e0a31fc51f10824766e0a1ccd",
+      "source_host": "www.sec.gov",
+      "source_locator_sha256": "96f5b377e402b43b8be5d3d3b5f1271a024e96cd8825374a84d2b04b3c3d6a99"
+    }
+  ],
+  "licensed_or_public_document_bytes_in_repository": false,
+  "schema_version": "real-filing-corpus-classification-receipt/1.0",
+  "source_text_in_receipt": false,
+  "status": "PASS",
+  "verified_category_count": 20,
+  "violations": 0
+}

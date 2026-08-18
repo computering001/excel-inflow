@@ -13,6 +13,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 INVENTORY = ROOT / "test-fixtures" / "real-filings-custody-v1" / "candidate-inventory.json"
+RECEIPT = ROOT / "test-fixtures" / "real-filings-custody-v1" / "corpus-classification-receipt.json"
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 FORBIDDEN_KEYS = {
     "company",
@@ -48,6 +49,10 @@ REQUIRED_MATRIX = {
 
 def sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def walk(value: Any, trail: tuple[str, ...] = ()) -> None:
@@ -129,30 +134,155 @@ def validate_corpus_matrix(matrix: dict, known_candidate_ids: set[str]) -> list[
     return errors
 
 
+def validate_classification_receipt(receipt: dict) -> list[str]:
+    errors: list[str] = []
+    if set(receipt) != {
+        "schema_version", "status", "corpus_id_sha256", "document_count",
+        "candidate_set_sha256", "documents", "category_count",
+        "verified_category_count", "categories", "coverage_sha256",
+        "licensed_or_public_document_bytes_in_repository", "source_text_in_receipt",
+        "violations",
+    }:
+        errors.append("receipt fields are not exact")
+    if receipt.get("schema_version") != "real-filing-corpus-classification-receipt/1.0":
+        errors.append("wrong receipt schema version")
+    if receipt.get("status") != "PASS" or receipt.get("violations") != 0:
+        errors.append("receipt does not pass")
+    if receipt.get("licensed_or_public_document_bytes_in_repository") is not False:
+        errors.append("receipt permits source document bytes in the repository")
+    if receipt.get("source_text_in_receipt") is not False:
+        errors.append("receipt permits source text")
+    if not SHA256_RE.fullmatch(str(receipt.get("corpus_id_sha256", ""))):
+        errors.append("receipt corpus id hash is invalid")
+
+    documents = receipt.get("documents")
+    if not isinstance(documents, list):
+        return [*errors, "receipt documents are not a list"]
+    if receipt.get("document_count") != len(documents) or not documents:
+        errors.append("receipt document count is wrong")
+    raw_hashes: list[str] = []
+    receipt_candidate_ids: set[str] = set()
+    for document in documents:
+        if not isinstance(document, dict) or set(document) != {
+            "document_id_sha256", "candidate_id", "raw_sha256", "raw_byte_count",
+            "source_host", "source_locator_sha256", "media_kind", "media_metrics",
+        }:
+            errors.append("receipt document fields are not exact")
+            continue
+        raw_hash = str(document["raw_sha256"])
+        if not SHA256_RE.fullmatch(raw_hash):
+            errors.append("receipt document hash is invalid")
+            continue
+        expected_candidate_id = sha256(f"real-filing-candidate:{raw_hash}")[:16]
+        if document["candidate_id"] != expected_candidate_id:
+            errors.append("receipt candidate id is not bound to its raw hash")
+        if document["candidate_id"] in receipt_candidate_ids:
+            errors.append("receipt candidate id is duplicated")
+        receipt_candidate_ids.add(document["candidate_id"])
+        raw_hashes.append(raw_hash)
+        if not SHA256_RE.fullmatch(str(document["document_id_sha256"])):
+            errors.append("receipt document id hash is invalid")
+        if not SHA256_RE.fullmatch(str(document["source_locator_sha256"])):
+            errors.append("receipt source locator hash is invalid")
+        if not isinstance(document["raw_byte_count"], int) or document["raw_byte_count"] <= 0:
+            errors.append("receipt byte count is invalid")
+        if document["media_kind"] not in {"html", "pdf"}:
+            errors.append("receipt media kind is invalid")
+        if not isinstance(document["media_metrics"], dict) or not document["media_metrics"]:
+            errors.append("receipt media metrics are absent")
+        host = document["source_host"]
+        if not isinstance(host, str) or not host or any(token in host for token in ("/", ":", " ")):
+            errors.append("receipt source host is invalid")
+    expected_candidate_set = sha256("\n".join(sorted(raw_hashes)) + "\n")
+    if receipt.get("candidate_set_sha256") != expected_candidate_set:
+        errors.append("receipt candidate set hash is wrong")
+
+    categories = receipt.get("categories")
+    if not isinstance(categories, list):
+        return [*errors, "receipt categories are not a list"]
+    expected_pairs = {
+        (dimension, category)
+        for dimension, category_ids in REQUIRED_MATRIX.items()
+        for category in category_ids
+    }
+    actual_pairs: list[tuple[str, str]] = []
+    for category in categories:
+        if not isinstance(category, dict) or set(category) != {
+            "dimension", "category_id", "status", "candidate_ids", "proof_kind",
+            "proof_sha256", "witness_count", "witnesses_sha256",
+        }:
+            errors.append("receipt category fields are not exact")
+            continue
+        pair = (category["dimension"], category["category_id"])
+        actual_pairs.append(pair)
+        if category["status"] != "HASH_BOUND_VERIFIED":
+            errors.append("receipt category is not verified")
+        candidate_ids = category["candidate_ids"]
+        if (
+            not isinstance(candidate_ids, list)
+            or not candidate_ids
+            or len(candidate_ids) != len(set(candidate_ids))
+            or any(candidate_id not in receipt_candidate_ids for candidate_id in candidate_ids)
+        ):
+            errors.append("receipt category candidates are invalid")
+        if not isinstance(category["proof_kind"], str) or not category["proof_kind"]:
+            errors.append("receipt proof kind is absent")
+        if not SHA256_RE.fullmatch(str(category["proof_sha256"])):
+            errors.append("receipt proof hash is invalid")
+        if not SHA256_RE.fullmatch(str(category["witnesses_sha256"])):
+            errors.append("receipt witness hash is invalid")
+        if not isinstance(category["witness_count"], int) or category["witness_count"] <= 0:
+            errors.append("receipt witness count is invalid")
+    if len(actual_pairs) != len(set(actual_pairs)) or set(actual_pairs) != expected_pairs:
+        errors.append("receipt category coverage is not exact")
+    if receipt.get("category_count") != len(categories):
+        errors.append("receipt category count is wrong")
+    if receipt.get("verified_category_count") != len(categories):
+        errors.append("receipt verified category count is wrong")
+    if receipt.get("coverage_sha256") != sha256(canonical_json(categories)):
+        errors.append("receipt coverage hash is wrong")
+    return errors
+
+
 inventory = json.loads(INVENTORY.read_text("utf-8"))
+receipt = json.loads(RECEIPT.read_text("utf-8"))
 assert inventory["schema_version"] == "real-filing-custody-inventory/1.1"
 walk(inventory)
+walk(receipt)
+assert not validate_classification_receipt(receipt)
 
 candidates = inventory["candidates"]
 assert len(candidates) == inventory["candidate_count"]
 assert len({candidate["candidate_id"] for candidate in candidates}) == len(candidates)
 candidate_ids = {candidate["candidate_id"] for candidate in candidates}
+receipt_candidate_ids = {document["candidate_id"] for document in receipt["documents"]}
 
 matrix = inventory["corpus_design_matrix"]
-assert not validate_corpus_matrix(matrix, candidate_ids)
+assert not validate_corpus_matrix(matrix, receipt_candidate_ids)
 unavailable_categories = sorted(
     f"{dimension}.{entry['category_id']}"
     for dimension, entries in matrix["dimensions"].items()
     for entry in entries
     if entry["status"] == "UNAVAILABLE_EXTERNAL_EVIDENCE"
 )
-assert len(unavailable_categories) == 20
+assert unavailable_categories == []
+assert matrix["matrix_status"] == "COMPLETE_HASH_BOUND_COVERAGE"
+
+receipt_categories = {
+    (entry["dimension"], entry["category_id"]): entry
+    for entry in receipt["categories"]
+}
+for dimension, entries in matrix["dimensions"].items():
+    for entry in entries:
+        receipt_entry = receipt_categories[(dimension, entry["category_id"])]
+        assert entry["candidate_ids"] == receipt_entry["candidate_ids"]
+        assert entry["classification_receipt_sha256"] == receipt_entry["proof_sha256"]
 
 # Each fail-closed rule must reject independently after the surrounding matrix
 # remains structurally valid; none may rely on the production inventory being
 # incomplete for a different reason.
 matrix_mutations: list[tuple[str, dict, str]] = []
-known_candidate = sorted(candidate_ids)[0]
+known_candidate = sorted(receipt_candidate_ids)[0]
 missing_category = deepcopy(matrix)
 missing_category["dimensions"]["document_format"].pop()
 matrix_mutations.append(("missing_category", missing_category, "categories are not exact"))
@@ -163,7 +293,10 @@ fake_verified["dimensions"]["accounting_framework"][0].update({
 })
 matrix_mutations.append(("verified_without_receipt", fake_verified, "lacks hash-bound evidence"))
 fabricated_unavailable = deepcopy(matrix)
-fabricated_unavailable["dimensions"]["reporting_period"][0]["candidate_ids"] = [known_candidate]
+fabricated_unavailable["dimensions"]["reporting_period"][0].update({
+    "status": "UNAVAILABLE_EXTERNAL_EVIDENCE", "candidate_ids": [known_candidate],
+    "classification_receipt_sha256": None, "blocker_code": "TEST_BLOCKER",
+})
 matrix_mutations.append(("unavailable_with_candidate", fabricated_unavailable, "fabricates or omits evidence"))
 unknown_candidate = deepcopy(matrix)
 unknown_entry = unknown_candidate["dimensions"]["document_format"][0]
@@ -173,10 +306,54 @@ unknown_entry.update({
 })
 matrix_mutations.append(("unknown_candidate", unknown_candidate, "cites an unknown candidate"))
 for mutation_name, mutation, expected_error in matrix_mutations:
-    mutation_errors = validate_corpus_matrix(mutation, candidate_ids)
+    mutation_errors = validate_corpus_matrix(mutation, receipt_candidate_ids)
     assert any(expected_error in error for error in mutation_errors), (
         mutation_name, mutation_errors
     )
+
+# The frozen receipt must reject independent hash, coverage, and redaction
+# mutations without needing access to the external source documents.
+receipt_mutations: list[tuple[str, dict, str]] = []
+changed_raw_hash = deepcopy(receipt)
+changed_raw_hash["documents"][0]["raw_sha256"] = "0" * 64
+receipt_mutations.append(("changed_raw_hash", changed_raw_hash, "candidate id is not bound"))
+changed_proof_hash = deepcopy(receipt)
+changed_proof_hash["categories"][0]["proof_sha256"] = "0" * 64
+receipt_mutations.append(("changed_proof_hash", changed_proof_hash, "coverage hash is wrong"))
+missing_receipt_category = deepcopy(receipt)
+missing_receipt_category["categories"].pop()
+missing_receipt_category["category_count"] -= 1
+missing_receipt_category["verified_category_count"] -= 1
+receipt_mutations.append(("missing_receipt_category", missing_receipt_category, "coverage is not exact"))
+changed_candidate_set = deepcopy(receipt)
+changed_candidate_set["candidate_set_sha256"] = "0" * 64
+receipt_mutations.append(("changed_candidate_set", changed_candidate_set, "candidate set hash is wrong"))
+changed_coverage = deepcopy(receipt)
+changed_coverage["coverage_sha256"] = "0" * 64
+receipt_mutations.append(("changed_coverage", changed_coverage, "coverage hash is wrong"))
+for mutation_name, mutation, expected_error in receipt_mutations:
+    mutation_errors = validate_classification_receipt(mutation)
+    assert any(expected_error in error for error in mutation_errors), (
+        mutation_name, mutation_errors
+    )
+
+redaction_mutations = []
+path_mutation = deepcopy(receipt)
+path_mutation["documents"][0]["path"] = "/forbidden/source.pdf"
+redaction_mutations.append(("path", path_mutation))
+url_mutation = deepcopy(receipt)
+url_mutation["documents"][0]["url"] = "https://forbidden.invalid/source"
+redaction_mutations.append(("url", url_mutation))
+source_text_mutation = deepcopy(receipt)
+source_text_mutation["categories"][0]["source_text"] = "forbidden witness text"
+redaction_mutations.append(("source_text", source_text_mutation))
+for mutation_name, mutation in redaction_mutations:
+    try:
+        walk(mutation)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError(f"{mutation_name} redaction mutation was accepted")
 
 raw_hashes = []
 for candidate in candidates:
@@ -237,8 +414,11 @@ print(json.dumps({
     "eligible_candidate_count": len(eligible),
     "hash_bound_custody_established": True,
     "corpus_matrix_status": matrix["matrix_status"],
+    "corpus_receipt_status": receipt["status"],
+    "verified_external_evidence_categories": receipt["verified_category_count"],
     "unavailable_external_evidence_categories": unavailable_categories,
     "matrix_mutations_rejected": len(matrix_mutations),
+    "receipt_mutations_rejected": len(receipt_mutations) + len(redaction_mutations),
     "licensed_or_public_document_bytes_in_repository": False,
     "violations": 0,
 }, sort_keys=True))

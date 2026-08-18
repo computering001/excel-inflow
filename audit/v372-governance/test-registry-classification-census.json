@@ -11,17 +11,17 @@
       "cross_layer_integration": 23,
       "independent_economic_oracle": 2,
       "installed_host": 1,
-      "real_corpus": 3,
+      "real_corpus": 4,
       "unit": 24,
       "visual_manual": 0,
       "workbook_oracle": 1
     },
     "by_profile": {
-      "custody": 7,
+      "custody": 8,
       "portable": 110
     },
     "self_confirmation_risk": {
-      "false": 7,
+      "false": 8,
       "true": 110
     }
   },
@@ -31,8 +31,8 @@
   "interpretation": "This is a classification census, not an assertion that all classes are independent. Unit, component-integration and cross-layer-integration tests are explicitly counted as carrying self-confirmation risk. Installed-host evidence remains custody-bound and may be BLOCKED in portable CI.",
   "registry": {
     "path": "assets/development-test-registry.json",
-    "sha256": "82a95a40f2b7dd823d17e0f1e5a3424d5d968ba2887ed799aeb408fd3b115e27",
-    "test_count": 117
+    "sha256": "09134ef83f16e88fbdb4ea049b9e23b31a23facc7e6db86feb41deb41b52348d",
+    "test_count": 118
   },
   "schema_version": "development-test-classification-census-summary/1.0"
 }

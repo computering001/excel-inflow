@@ -58,6 +58,7 @@ function usage() {
     "  [--raw-canary-evidence <evidence-run.json>] [--python <python>] [--soffice <path>]",
     "  [--real-filings-request <raw-annual-report-request.json>]",
     "  [--real-filings-expectations <run-scoped-expectations.json>]",
+    "  [--real-filing-corpus-manifest <external-corpus-manifest.json>]",
     "  [--out <report-directory>]",
     "  [--concurrency <1-4>] [--timeout-ms <milliseconds>]",
     "Reports contain source, registry and input hashes. Paths, commands and captured output are redacted.",
@@ -99,6 +100,9 @@ function substitutions(options) {
       : null,
     REAL_FILINGS_EXPECTATIONS: options["real-filings-expectations"]
       ? path.resolve(options["real-filings-expectations"])
+      : null,
+    REAL_FILING_CORPUS_MANIFEST: options["real-filing-corpus-manifest"]
+      ? path.resolve(options["real-filing-corpus-manifest"])
       : null,
     PYTHON: options.python ? path.resolve(options.python) : null,
     SOFFICE: options.soffice ? path.resolve(options.soffice) : null,
