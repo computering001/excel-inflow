@@ -1,22 +1,31 @@
 {
-  "schema_version": "critical-invariant-oracle-matrix/1.0",
+  "schema_version": "critical-invariant-oracle-matrix/2.0",
   "bindings": {
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-    "oracle_sha256": "a3a0271eef56aa6fe49cf4b7627f048beaaeee469956a066fde589bd8672948d",
+    "oracle_sha256": "1bf92a69ab2142427c0f61b303f58214f01e844f22a541aed02a0c09b60c32ea",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "33695b65b18bd5b94786ee9a6ace6c158054ac1f072c0c0276ad8e35320ff301"
+    "registry_sha256": "5342ace2cd34f9f3c0d6b2fd9e3e00048a3d3ba78dc472b76aeb06893ecd183d"
+  },
+  "artifact_oracle": {
+    "test_id": "emitted-candidate-independent-oracle",
+    "artifact_origin": "real_candidate_emission",
+    "required_production_imports": []
   },
   "domains": [
-    {"domain": "cash_flow_identity", "invariant_id": "cash-flow-current-period-additivity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "cash_flow_subtotal_prior_period"}]},
+    {"domain": "cash_flow_identity", "invariant_id": "cash-flow-current-period-additivity", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "cash_flow_protected_identities", "mutations": [{"mutation_id": "drop-change-in-debt-from-financing"}]},
     {"domain": "instrument_identity", "invariant_id": "instrument-id-to-balance-ownership", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "swap_instrument_rows"}]},
-    {"domain": "interest_lineage", "invariant_id": "instrument-own-rate-lineage", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "wrong_interest_rate_reference"}]},
+    {"domain": "interest_lineage", "invariant_id": "instrument-own-rate-lineage", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "instrument_interest_lineage", "mutations": [{"mutation_id": "wrong-instrument-balance-edge"}]},
     {"domain": "ebitda_basis", "invariant_id": "impairment-not-da", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "include_impairment_in_ebitda"}]},
-    {"domain": "forecast_ownership", "invariant_id": "single-parent-or-child-writer", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "parent_and_child_forecast"}]},
-    {"domain": "rcf_financing_cash", "invariant_id": "rcf-enters-financing-once", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "drop_rcf_from_financing_cash"}]},
+    {"domain": "forecast_ownership", "invariant_id": "single-parent-or-child-writer", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "forecast_ownership", "mutations": [{"mutation_id": "duplicate-forecast-writer"}]},
+    {"domain": "rcf_financing_cash", "invariant_id": "rcf-enters-financing-once", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "rcf_financing_cash", "mutations": [{"mutation_id": "drop-rcf-draw-capture"}]},
     {"domain": "broker_period", "invariant_id": "broker-demand-period-parity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "change_broker_period"}]},
-    {"domain": "broker_consensus_membership", "invariant_id": "model-consensus-sealed-compatible-membership", "independent_oracle_test_ids": ["broker-consensus-membership-oracle"], "mutations": [{"mutation_id": "rejected_house_enters_model_consensus"}]},
+    {"domain": "broker_consensus_membership", "invariant_id": "model-consensus-sealed-compatible-membership", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "broker_consensus_membership", "mutations": [{"mutation_id": "provider-enters-model-membership"}, {"mutation_id": "named-house-dropped-from-membership"}]},
     {"domain": "typed_unresolved_state", "invariant_id": "unresolved-is-not-zero", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "unresolved_to_zero"}]},
-    {"domain": "debt_classification", "invariant_id": "fixed-coupon-bond-class", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "bond_as_other_debt"}]},
-    {"domain": "workbook_error_scan", "invariant_id": "all-cell-formula-error-scan", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "remote_value_error"}]}
+    {"domain": "debt_classification", "invariant_id": "fixed-coupon-bond-class", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "debt_classification", "mutations": [{"mutation_id": "bond-reclassified-as-other-debt"}]},
+    {"domain": "workbook_error_scan", "invariant_id": "all-cell-formula-error-scan", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "remote_value_error"}]},
+    {"domain": "acquisition_cash_debt_interest", "invariant_id": "acquisition-funding-enters-cash-debt-interest-once", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "acquisition_cash_debt_interest", "mutations": [{"mutation_id": "acquisition_cash_zero"}, {"mutation_id": "acquisition_debt_zero"}, {"mutation_id": "acquisition_interest_zero"}]},
+    {"domain": "lease_roll_forward", "invariant_id": "lease-opening-movements-interest-closing", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "lease_roll_forward", "mutations": [{"mutation_id": "lease_roll_forward_zero"}]},
+    {"domain": "native_workbook_style_provenance", "invariant_id": "source-formula-link-colour-provenance", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "native_workbook_style_provenance", "mutations": [{"mutation_id": "named-source-black"}, {"mutation_id": "provider-black"}, {"mutation_id": "model-blue"}, {"mutation_id": "selected-cross-sheet-black"}]},
+    {"domain": "source_arithmetic_dimensional_compatibility", "invariant_id": "source-arithmetic-requires-compatible-dimensions", "independent_oracle_test_ids": ["emitted-candidate-independent-oracle"], "artifact_report_domain": "source_arithmetic_dimensional_compatibility", "mutations": [{"mutation_id": "linked-child-wrong-currency"}, {"mutation_id": "linked-total-does-not-foot"}]}
   ]
 }

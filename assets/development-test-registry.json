@@ -1027,6 +1027,47 @@
       "test_class": "mutation"
     },
     {
+      "id": "emitted-candidate-independent-oracle",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_emitted_candidate_independent_oracle_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "type": "literal",
+          "value": "--soffice"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "file"
+        },
+        {
+          "name": "arg_4",
+          "type": "literal",
+          "value": "--out"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
       "id": "reconciled-parent-portable-workbook",
       "phase": "proof",
       "runtime": "node",
@@ -1076,7 +1117,29 @@
       "phase": "proof",
       "runtime": "python",
       "script": "run_critical_invariant_oracle_matrix_tests.py",
-      "timeout_seconds": 300,
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "type": "literal",
+          "value": "--soffice"
+        },
+        {
+          "name": "soffice",
+          "source": "SOFFICE",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON",
+        "SOFFICE"
+      ],
+      "timeout_seconds": 900,
       "mutates_product_tree": false,
       "test_class": "independent_economic_oracle"
     },
