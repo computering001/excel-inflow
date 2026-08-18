@@ -12,6 +12,7 @@ import {
   recordComputeSegment,
 } from "./lib/run_deadline.mjs";
 import { DEFAULT_RUNTIME_BUDGETS_MS } from "./lib/runtime_budget_policy.mjs";
+import { sealEconomicStageParity } from "./lib/forecast_completion_constitution.mjs";
 import {
   applyAnswers,
   deliver,
@@ -1873,6 +1874,14 @@ async function main() {
     const runtimeTmp = path.join(runDir, ".runtime-tmp");
     await fs.mkdir(runtimeHome, { recursive: true });
     await fs.mkdir(runtimeTmp, { recursive: true });
+    // Phase-5 parity: the economic graph is sealed BEFORE Build. A refusal
+    // here is a controller sequencing defect surfaced at the cheap boundary,
+    // not a workbook failure discovered after fifty minutes of build work.
+    const stageParityReceipt = sealEconomicStageParity(answeredCase);
+    await writeJsonAtomic(
+      path.join(runDir, "stages", "build_checks", "economic-stage-parity.json"),
+      stageParityReceipt,
+    );
     const stage4AllowanceMs = await boundedOuterTimeoutMs(runDeadline, {
       stage: "workbook_build_outer",
       requestedMs: stage4OuterTimeout(answeredCase, options.timeout),
