@@ -296,6 +296,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "independent-source-economic-oracle",
+      "phase": "economics",
+      "runtime": "python",
+      "script": "verify/run_source_economic_oracle_tests.py",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
       "id": "historical-normalisation",
       "phase": "evidence",
       "runtime": "node",

@@ -36,12 +36,16 @@ SHEET_ONE = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"""
 
 
-def write_fixture(path: str, *, with_error: bool) -> None:
-    tail = '<c r="XFD1048576" t="e"><f>1/0</f><v>#REF!</v></c>' if with_error else '<c r="C3"><f>1+1</f><v>2</v></c>'
+def write_fixture(path: str, *, error_code: str | None = None) -> None:
+    tail = (
+        f'<c r="XFD1048576" t="e"><f>1/0</f><v>{error_code}</v></c>'
+        if error_code is not None
+        else '<c r="C3"><f>1+1</f><v>2</v></c>'
+    )
     sheet_two = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        f'<sheetData><row r="{1048576 if with_error else 3}">{tail}</row></sheetData></worksheet>'
+        f'<sheetData><row r="{1048576 if error_code is not None else 3}">{tail}</row></sheetData></worksheet>'
     )
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as package:
         for name, payload in {
@@ -58,18 +62,24 @@ def write_fixture(path: str, *, with_error: bool) -> None:
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="native-excel-error-scan-") as root:
         clean_path = os.path.join(root, "clean.xlsx")
-        error_path = os.path.join(root, "error.xlsx")
-        write_fixture(clean_path, with_error=False)
-        write_fixture(error_path, with_error=True)
+        ref_error_path = os.path.join(root, "ref-error.xlsx")
+        value_error_path = os.path.join(root, "value-error.xlsx")
+        write_fixture(clean_path)
+        write_fixture(ref_error_path, error_code="#REF!")
+        write_fixture(value_error_path, error_code="#VALUE!")
         clean = snapshot(clean_path)
-        corrupted = snapshot(error_path)
+        ref_corrupted = snapshot(ref_error_path)
+        value_corrupted = snapshot(value_error_path)
         assert clean.sheet_names == ["Operating Model", "Forward Curves"]
         assert clean.used_cells_scanned == 2
         assert clean.excel_error_cells == {}
-        assert corrupted.sheet_names == ["Operating Model", "Forward Curves"]
-        assert corrupted.used_cells_scanned == 2
-        assert corrupted.excel_error_cells == {"Forward Curves!XFD1048576": "#REF!"}
-    print('{"status":"PASS","checks":6,"scope":"all_serialized_cells_all_worksheets"}')
+        assert ref_corrupted.sheet_names == ["Operating Model", "Forward Curves"]
+        assert ref_corrupted.used_cells_scanned == 2
+        assert ref_corrupted.excel_error_cells == {"Forward Curves!XFD1048576": "#REF!"}
+        assert value_corrupted.sheet_names == ["Operating Model", "Forward Curves"]
+        assert value_corrupted.used_cells_scanned == 2
+        assert value_corrupted.excel_error_cells == {"Forward Curves!XFD1048576": "#VALUE!"}
+    print('{"status":"PASS","checks":9,"mutations_caught":2,"scope":"all_serialized_cells_all_worksheets"}')
     return 0
 
 
