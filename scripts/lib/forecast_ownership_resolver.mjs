@@ -234,11 +234,19 @@ function sealCaptureCertificates(parent, child) {
 
 function setParentIdentity(parent, forecastIndex) {
   parent.forecast_period_authorities ??= [null, null, null];
+  const selectedAuthority = parent.forecast_period_authorities[forecastIndex];
+  const selectedIdentity =
+    ownershipClass(selectedAuthority?.method) === "identity"
+      ? structuredClone(selectedAuthority)
+      : {};
   parent.forecast_period_authorities[forecastIndex] = {
+    ...selectedIdentity,
     method: "accounting_identity",
     source_kind: "formula",
     material: material(parent),
-    note: "The aggregate is calculated from its complete live child set.",
+    note:
+      selectedIdentity.note ??
+      "The aggregate is calculated from its complete live child set.",
   };
   parent.forecast_period_calculations ??= [null, null, null];
   parent.forecast_period_calculations[forecastIndex] = structuredClone(parent.calculation);

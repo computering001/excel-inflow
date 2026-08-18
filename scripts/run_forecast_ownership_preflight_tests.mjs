@@ -175,6 +175,15 @@ mixed.statement_structure.cash_flow[0].forecast_period_authorities = [
   authority("accounting_identity", "formula.wc.fy2", null),
   authority("accounting_identity", "formula.wc.fy3", null),
 ];
+const sealedIdentityRank = {
+  method_priority: -190,
+  definition_score: 1,
+  stable_id: "declared_formula:accounting_identity",
+};
+mixed.statement_structure.cash_flow[0].forecast_period_authorities[1]
+  .selection_rank = structuredClone(sealedIdentityRank);
+mixed.statement_structure.cash_flow[0].forecast_period_authorities[2]
+  .selection_rank = structuredClone(sealedIdentityRank);
 const mixedReceipt = resolveSelectedForecastOwnership(mixed);
 assert.deepEqual(
   mixedReceipt.resolutions.map((item) => item.selected_mode),
@@ -184,6 +193,12 @@ for (const child of mixed.statement_structure.cash_flow.slice(1)) {
   assert.equal(child.forecast_period_authorities[0].method, "not_separately_forecast");
   assert.notEqual(child.forecast_period_authorities[1].method, "not_separately_forecast");
 }
+assert.deepEqual(
+  mixed.statement_structure.cash_flow[0].forecast_period_authorities[1]
+    .selection_rank,
+  sealedIdentityRank,
+  "children-owned resolution discarded the sealed formula rank proof",
+);
 sealOwnershipCensus(mixed);
 assert.equal(assertPhysicalOwnershipPreflight(mixed, physicalPlan(mixed)).status, "PASS");
 
@@ -253,6 +268,14 @@ assert.throws(() => verifySelectedForecastOwnership(staleBroker), /captured chil
 const stalePrecision = structuredClone(blocker);
 stalePrecision.statement_structure.cash_flow[1].source_precision = "rounded_millions";
 assert.throws(() => verifySelectedForecastOwnership(stalePrecision), /topology is stale/);
+const staleRankProof = structuredClone(mixed);
+staleRankProof.statement_structure.cash_flow[0]
+  .forecast_period_authorities[1].selection_rank.method_priority = -189;
+assert.throws(
+  () => verifySelectedForecastOwnership(staleRankProof),
+  /topology is stale/,
+  "a changed sealed formula rank proof survived the ownership receipt",
+);
 const staleCensus = structuredClone(blocker);
 staleCensus.ownership_census.records.pop();
 assert.equal(compilePhysicalOwnershipPreflight(staleCensus, physicalPlan(staleCensus)).status, "BLOCK");

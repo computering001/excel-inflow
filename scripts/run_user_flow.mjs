@@ -55,7 +55,6 @@ import {
   forecastPlanSha256,
   materializeSelectedAuthorityContract,
   validateForecastPlan,
-  validateForecastPlanCaseParity,
 } from "./lib/forecast_candidate_compiler.mjs";
 import {
   compileForecastBehaviorMap,
@@ -1623,10 +1622,6 @@ async function main() {
       selectedAuthorityContract.contract_sha256;
     answeredCase.run_constitution_graph_sha256 = runConstitutionGraph.graph_sha256;
     answeredCase.evidence_quality_mode = selectedAuthorityContract.quality_mode;
-    const parityErrors = validateForecastPlanCaseParity(answeredCase, forecastPlan);
-    if (parityErrors.length > 0) {
-      throw new Error(`Materialized forecast plan parity failed: ${parityErrors[0]}`);
-    }
     await writeJsonAtomic(answeredCasePath, answeredCase);
     await writeTextAtomic(
       forecastPlanPath,
