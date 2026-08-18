@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { validateIdentityConvergence, validatePerformanceEvidence } from "./lib/release_identity_governance.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const auditRoot = path.join(root, "audit", "v373-governance");
+const auditRoot = path.join(root, "audit", "v374-governance");
 const read = (relative) => fs.readFileSync(path.join(root, relative));
 const json = (relative) => JSON.parse(read(relative));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -30,8 +30,9 @@ assert.equal(baseline.baseline.verification_claim, false);
 assert.equal(baseline.chronology_deviation.status, "IRREDUCIBLE_HISTORICAL_DEVIATION");
 assert.deepEqual(baseline.baseline_ci_runs.map((run) => run.database_id).sort(), [32073013591, 32073120387]);
 
-const identity = json("audit/v373-governance/current-identity-convergence.json");
-const performance = json("audit/v373-phase15/full-run-performance-evidence.json");
+const identity = json("audit/v373-governance/historical-v373-identity-convergence.json");
+const performance = json("audit/v373-phase15/historical-full-run-performance-evidence.json");
+const runtime = json("assets/runtime-manifest.json");
 const expected = {
   expectedVersion: "3.7.3",
   expectedSourceCommit: "13cf667dbfbf66cb7c87fd1965a1eb3768a1138e",
@@ -40,12 +41,20 @@ const expected = {
 };
 assert.deepEqual(validateIdentityConvergence(identity, expected), []);
 assert.deepEqual(validatePerformanceEvidence(performance, expected), []);
+assert.equal(runtime.skill_version, "3.7.4");
+assert.equal(runtime.status, "v2_development");
+assert.equal(runtime.deployment_status, "not_installed");
+assert(
+  validateIdentityConvergence(identity, { ...expected, expectedVersion: runtime.skill_version })
+    .some((error) => error.includes("version")),
+  "Historical v3.7.3 identity masqueraded as active v3.7.4 evidence.",
+);
 
-const census = json("audit/v373-governance/test-registry-classification-census.json");
+const census = json("audit/v374-governance/test-registry-classification-census.json");
 assert.equal(census.registry.sha256, sha256(read(census.registry.path)));
 assert(Object.values(census.completeness).every(Boolean));
 assert.equal(Object.values(census.counts.by_audit_class).reduce((sum, count) => sum + count, 0), census.registry.test_count);
-assert(fs.existsSync(path.join(auditRoot, "current-identity-convergence.json")));
+assert(fs.existsSync(path.join(auditRoot, "test-registry-classification-census.json")));
 
 console.log(JSON.stringify({
   status: "PASS",
@@ -53,5 +62,6 @@ console.log(JSON.stringify({
   immutable_historical_files: Object.keys(immutable).length,
   baseline_run_ids_in_custody: baseline.baseline_ci_runs.length,
   registry_tests_classified: census.registry.test_count,
-  active_identity_version: identity.release.skill_version,
+  historical_identity_version: identity.release.skill_version,
+  active_source_version: runtime.skill_version,
 }));

@@ -14,8 +14,9 @@ const readJson = (relative) => JSON.parse(fs.readFileSync(path.join(root, relati
 const sourceCommit = "13cf667dbfbf66cb7c87fd1965a1eb3768a1138e";
 const sourceTree = "3345b36bf4b2bd78769fc4dd3525d506148127d4";
 const mergeCommit = "1469841378bfa58e500ecc8de40119153691b049";
-const identity = readJson("audit/v373-governance/current-identity-convergence.json");
-const performance = readJson("audit/v373-phase15/full-run-performance-evidence.json");
+const identity = readJson("audit/v373-governance/historical-v373-identity-convergence.json");
+const performance = readJson("audit/v373-phase15/historical-full-run-performance-evidence.json");
+const runtime = readJson("assets/runtime-manifest.json");
 const options = {
   expectedVersion: "3.7.3",
   expectedSourceCommit: sourceCommit,
@@ -25,6 +26,14 @@ const options = {
 
 assert.deepEqual(validateIdentityConvergence(identity, options), []);
 assert.deepEqual(validatePerformanceEvidence(performance, options), []);
+assert.equal(runtime.skill_version, "3.7.4");
+assert.equal(runtime.status, "v2_development");
+assert.equal(runtime.deployment_status, "not_installed");
+assert(
+  validateIdentityConvergence(identity, { ...options, expectedVersion: runtime.skill_version })
+    .some((error) => error.includes("version")),
+  "Historical v3.7.3 identity masqueraded as the active v3.7.4 candidate.",
+);
 
 const staleVersion = structuredClone(identity);
 staleVersion.release.skill_version = "3.7.2";
@@ -70,8 +79,8 @@ assert(mergeCheckout.errors.some((error) => error.includes("synthetic merge") ||
 
 console.log(JSON.stringify({
   status: "PASS",
-  positive_checks: 3,
-  mutations_rejected: 6,
+  positive_checks: 6,
+  mutations_rejected: 7,
   historical_v372_identity_sha256: "f2980d92325614c682927d3b1eb187e109b4c078565c2a28cbeabb8d3096f26e",
   historical_v372_performance_sha256: "959c032d33c39be5ae0326d2c45c99e00e275f7da5b80d26917975db6a9c8e2f"
 }, null, 2));

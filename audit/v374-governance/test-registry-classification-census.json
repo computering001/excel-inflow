@@ -27,7 +27,7 @@
   },
   "full_record_policy": "The generator emits one owner, declared test class, canonical audit class, expected-exit contract, profile and self-confirmation classification for every registry id.",
   "generator": "scripts/compile_test_registry_census.mjs",
-  "generator_command": "node scripts/compile_test_registry_census.mjs --summary-out audit/v373-governance/test-registry-classification-census.json",
+  "generator_command": "node scripts/compile_test_registry_census.mjs --summary-out audit/v374-governance/test-registry-classification-census.json",
   "interpretation": "This is a classification census, not an assertion that all classes are independent. Unit, component-integration and cross-layer-integration tests are explicitly counted as carrying self-confirmation risk. Installed-host evidence remains custody-bound and may be BLOCKED in portable CI.",
   "registry": {
     "path": "assets/development-test-registry.json",
