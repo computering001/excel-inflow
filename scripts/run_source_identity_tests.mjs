@@ -17,8 +17,8 @@ assert.equal(identity.schema_version, "source-identity/2.0");
 assert.equal(identity.product_identity.schema_version, "product-identity/2.0");
 assert.equal(identity.package_mode, "development");
 assert.equal(identity.deployment_status, "not_installed");
-assert.equal(identity.skill_version, "3.7.0");
-assert.equal(identity.release_name, "Excel Inflow v3.7.0");
+assert.equal(identity.skill_version, "3.7.1");
+assert.equal(identity.release_name, "Excel Inflow v3.7.1");
 assert.equal(
   identity.runtime_code_closure_sha256,
   identity.product_identity.package.runtime_code_closure.sha256,
@@ -55,7 +55,7 @@ try {
     path.join(fixtureRoot, "assets", "runtime-manifest.json"),
     `${JSON.stringify({
       schema_version: 2,
-      skill_version: "3.7.0",
+      skill_version: "3.7.1",
       status: "v2_development",
       deployment_status: "not_installed",
     }, null, 2)}\n`,
@@ -85,8 +85,8 @@ try {
     skillRoot: fixtureRoot,
     overrides: { runtime_code_closure_sha256: "a".repeat(64) },
   });
-  assert.equal(fixtureIdentity.skill_version, "3.7.0");
-  assert.equal(fixtureIdentity.release_name, "Excel Inflow v3.7.0");
+  assert.equal(fixtureIdentity.skill_version, "3.7.1");
+  assert.equal(fixtureIdentity.release_name, "Excel Inflow v3.7.1");
   assert.equal(fixtureIdentity.package_mode, "development");
   assert.equal(fixtureIdentity.deployment_status, "not_installed");
   assert.notEqual(fixtureIdentity.source_commit, null);
