@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/experience-trace-v1.schema.json",
+  "title": "Excel Inflow experience trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "trace_id", "run_id", "scope", "started_at", "ended_at", "duration_ms", "spans", "summary"],
+  "properties": {
+    "schema_version": {"const": "experience-trace/1.0"},
+    "trace_id": {"type": "string", "minLength": 8},
+    "run_id": {"type": "string", "minLength": 1},
+    "scope": {"enum": ["controller_process", "attachment_transaction", "host_user_visible"]},
+    "started_at": {"type": "string"},
+    "ended_at": {"type": "string"},
+    "duration_ms": {"type": "number", "minimum": 0},
+    "spans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["span_id", "operation", "component", "category", "start_offset_ms", "end_offset_ms", "duration_ms", "status"],
+        "properties": {
+          "span_id": {"type": "string", "minLength": 1},
+          "parent_span_id": {"type": ["string", "null"]},
+          "operation": {"type": "string", "minLength": 1},
+          "component": {"type": "string", "minLength": 1},
+          "category": {"enum": ["excel_inflow_active", "known_external_wait", "unknown"]},
+          "external_wait_reason": {"type": ["string", "null"]},
+          "start_offset_ms": {"type": "number", "minimum": 0},
+          "end_offset_ms": {"type": "number", "minimum": 0},
+          "duration_ms": {"type": "number", "minimum": 0},
+          "status": {"enum": ["PASS", "FAIL", "BLOCKED", "REUSED"]},
+          "metadata": {"type": "object"}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["classified_duration_ms", "unknown_duration_ms", "classification_ratio", "longest_unknown_gap_ms", "warning_gap_count", "investigation_gap_count", "certification_block_gap_count", "initial_classification_target", "engineering_classification_target"],
+      "properties": {
+        "classified_duration_ms": {"type": "number", "minimum": 0},
+        "unknown_duration_ms": {"type": "number", "minimum": 0},
+        "classification_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+        "longest_unknown_gap_ms": {"type": "number", "minimum": 0},
+        "warning_gap_count": {"type": "integer", "minimum": 0},
+        "investigation_gap_count": {"type": "integer", "minimum": 0},
+        "certification_block_gap_count": {"type": "integer", "minimum": 0},
+        "initial_classification_target": {"const": 0.95},
+        "engineering_classification_target": {"const": 0.98}
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "canonical-model-graph/2.0",
+  "module_contract": {
+    "required_fields": [
+      "module_id",
+      "module_version",
+      "nodes",
+      "edges",
+      "read_set",
+      "write_set",
+      "iteration_state",
+      "invariants"
+    ]
+  },
+  "modules": [
+    "historical_statements",
+    "operating_forecast",
+    "tax_and_working_capital",
+    "debt_instruments",
+    "leases",
+    "cash_rcf",
+    "interest",
+    "acquisition_overlay",
+    "outputs_and_ratios"
+  ],
+  "economic_equation_graph_view": "assets/equation-graph.v1.json",
+  "invariants": [
+    "unique_node_ids",
+    "single_writer",
+    "unit_compatible_edges",
+    "declared_cross_module_reads_and_writes",
+    "cycles_only_in_declared_iteration_subgraphs",
+    "circularity_off_has_no_active_scc"
+  ],
+  "solver_hardening": {
+    "two_cycle_detection": true,
+    "damping_factors": [
+      0.5,
+      0.25
+    ],
+    "cash_rcf_boundary": "analytic_min_max_projection",
+    "future_nonanalytic_monotone_fallback": "deterministic_bisection_declared_boundaries_only"
+  }
+}
