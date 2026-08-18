@@ -1,0 +1,47 @@
+name: v3.7.1 CI diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-linux-workbook-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+
+      - name: Install focused portable dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libreoffice-calc poppler-utils fonts-crosextra-carlito
+          python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
+
+      - name: Stage 4 checkpoint diagnostic
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          node scripts/run_stage4_checkpoint_tests.mjs \
+            --cases test-fixtures/cases \
+            --python "$(command -v python3)" \
+            --soffice "$(command -v soffice)"
+
+      - name: Degraded broker delivery diagnostic
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          DEBT_OVERLAY_CASES_DIR: test-fixtures/cases
+        run: |
+          EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)" \
+          DEBT_OVERLAY_PYTHON="$(command -v python3)" \
+          SOFFICE_BIN="$(command -v soffice)" \
+          node scripts/run_degraded_broker_delivery_tests.mjs test-fixtures/cases
