@@ -396,7 +396,19 @@ def _model_owned_broker_demand(*, request: dict[str, Any], spec: dict[str, Any],
     rows_by_metric: dict[str, tuple[str, dict[str, Any]]] = {}
     for section in ("income_statement", "cash_flow"):
         for row in filings.get(section) or []:
-            candidates = [row.get("broker_metric_id"), row.get("semantic_role"), row.get("row_id")]
+            source_line_id = str(row.get("source_line_id") or "")
+            source_suffix = re.split(r"[.:/]", source_line_id)[-1]
+            label_id = re.sub(
+                r"[^a-z0-9]+", "_", str(row.get("label") or "").lower()
+            ).strip("_")
+            candidates = [
+                row.get("broker_metric_id"),
+                row.get("semantic_role"),
+                row.get("row_id"),
+                source_line_id,
+                source_suffix,
+                label_id,
+            ]
             for candidate in candidates:
                 if candidate in metric_ids and candidate not in rows_by_metric:
                     rows_by_metric[str(candidate)] = (section, row)
@@ -516,6 +528,88 @@ def broker_declaration_with_model_context(
     declaration["request_path"] = str(derived_path)
     declaration["model_demand_path"] = str(demand_path)
     return declaration
+
+
+def filings_bundle_path(filings_state: dict[str, Any] | None) -> Path:
+    raw = (filings_state or {}).get("artifacts", {}).get("filings_bundle")
+    target = Path(str(raw or "")).resolve()
+    if not target.is_file():
+        raise FileNotFoundError(
+            "PASS filings topology omitted its controller-owned filings bundle"
+        )
+    return target
+
+
+def write_pre_broker_demand_from_filings(
+    *,
+    spec: dict[str, Any],
+    output_root: Path,
+    filings_state: dict[str, Any],
+) -> Path:
+    bundle_path = filings_bundle_path(filings_state)
+    bundle = read_json(bundle_path, "filings bundle for pre-broker demand")
+    demand = _model_owned_broker_demand(
+        request={"run_id": spec.get("run_id")},
+        spec=spec,
+        filings=bundle.get("filings") or {},
+    )
+    demand_path = output_root / "internal-requests" / "pre-broker-model-demand.json"
+    atomic_json(demand_path, demand)
+    return demand_path
+
+
+def run_structural_ownership_preflight(
+    *,
+    filings_state: dict[str, Any],
+    demand_path: Path,
+    output_root: Path,
+) -> tuple[dict[str, Any], Path, int]:
+    """Compile and reopen-verify Preflight A before descendant evidence work."""
+    started = time.monotonic()
+    bundle_path = filings_bundle_path(filings_state)
+    receipt_path = output_root / "ownership" / "structural-ownership-preflight.json"
+    command = [
+        "node",
+        str(HERE / "run_structural_ownership_preflight.mjs"),
+        str(bundle_path),
+        str(demand_path),
+        "--out",
+        str(receipt_path),
+    ]
+    completed = run(command, timeout_seconds=120)
+    if completed.returncode not in {0, 2} or not receipt_path.is_file():
+        raise RuntimeError(
+            (completed.stderr or completed.stdout).strip()[-4000:]
+            or "Structural ownership preflight did not write a receipt"
+        )
+    verify_path = output_root / "ownership" / "structural-ownership-preflight.verified.json"
+    verified = run(
+        [
+            "node",
+            str(HERE / "run_structural_ownership_preflight.mjs"),
+            str(bundle_path),
+            str(demand_path),
+            "--verify",
+            str(receipt_path),
+            "--out",
+            str(verify_path),
+        ],
+        timeout_seconds=120,
+    )
+    if verified.returncode not in {0, 2} or not verify_path.is_file():
+        raise RuntimeError(
+            (verified.stderr or verified.stdout).strip()[-4000:]
+            or "Structural ownership preflight receipt did not reverify"
+        )
+    receipt = read_json(verify_path, "verified structural ownership preflight")
+    if (
+        receipt.get("checkpoint") != "A_STRUCTURAL"
+        or receipt.get("status") not in {"PASS", "BLOCK"}
+    ):
+        raise ValueError("Structural ownership preflight has an invalid sealed status")
+    if receipt_path.read_bytes() != verify_path.read_bytes():
+        raise ValueError("Structural ownership preflight changed during reopen verification")
+    return receipt, receipt_path, round((time.monotonic() - started) * 1000)
 
 def ingress_lane_declarations(lanes: dict[str, dict[str, Any]], state_paths: dict[str, Path]) -> dict[str, Any]:
     declarations: dict[str, Any] = {}
@@ -1301,17 +1395,48 @@ def main() -> int:
         return state, round((time.monotonic() - started) * 1000)
 
     # Filings is the executable model-demand producer and therefore closes
-    # first.  Once its period and row graph exists, optional broker work and
-    # mandatory debt extraction are independent.  Run those two lanes
-    # concurrently but publish their checkpoints in the visible journey order
-    # Filings -> Brokers -> Debt.  This removes optional broker wall time from
-    # the mandatory critical path without changing economic authority.
+    # first. Its topology and model-owned demand must then pass the same sealed
+    # structural ownership Preflight A used by case compilation. No broker or
+    # debt process may launch before that receipt has been reopened and
+    # verified. Once it passes, optional broker work and mandatory debt
+    # extraction are independent and may run concurrently.
     if spec.get("filings"):
         lanes["filings"], lane_duration_ms["filings"] = execute_lane(
             "filings", spec["filings"]
         )
 
+    if "filings" not in lanes:
+        raise ValueError(
+            "Broker or debt evidence cannot start before a controller-owned filings topology"
+        )
+    state_paths["filings"] = output_root / "filings" / "filings-run-state.json"
+    checkpoints.append({
+        "stage": "filings",
+        "status": lanes["filings"].get("pipeline_status"),
+        "state_sha256": sha256_file(state_paths["filings"])
+        if state_paths["filings"].is_file() else None,
+        "duration_ms": lane_duration_ms.get("filings"),
+    })
+    if lanes["filings"].get("pipeline_status") != "PASS":
+        status, blocker, user_blocking = classify(lanes)
+        write_state(
+            state_path, spec=spec, spec_hash=spec_hash, runtime_hash=runtime_hash,
+            status=status, blocker=blocker, user_blocking=user_blocking,
+            lanes=lanes, checkpoints=checkpoints, artifacts=derived_artifacts,
+            tasks=[
+                {"lane": "filings", **task}
+                for task in lanes["filings"].get("tasks", [])
+            ],
+            summary={
+                "terminal_reason": "filings_topology_not_closed",
+                "descendant_lanes_started": [],
+                "performance": {"lane_duration_ms": lane_duration_ms},
+            },
+        )
+        return 2
+
     concurrent_declarations: dict[str, dict[str, Any]] = {}
+    demand_path: Path | None = None
     if spec.get("broker"):
         broker_declaration = broker_declaration_with_model_context(
             spec=spec,
@@ -1320,10 +1445,75 @@ def main() -> int:
             filings_state=lanes.get("filings"),
         )
         if broker_declaration.get("model_demand_path"):
-            derived_artifacts["pre_broker_model_demand"] = str(
-                broker_declaration.pop("model_demand_path")
-            )
+            demand_path = Path(str(broker_declaration.pop("model_demand_path"))).resolve()
         concurrent_declarations["broker"] = broker_declaration
+    if demand_path is None:
+        demand_path = write_pre_broker_demand_from_filings(
+            spec=spec,
+            output_root=output_root,
+            filings_state=lanes["filings"],
+        )
+    derived_artifacts["pre_broker_model_demand"] = str(demand_path)
+    try:
+        structural_receipt, structural_path, structural_duration_ms = (
+            run_structural_ownership_preflight(
+                filings_state=lanes["filings"],
+                demand_path=demand_path,
+                output_root=output_root,
+            )
+        )
+    except Exception as error:
+        checkpoints.append({
+            "stage": "structural_ownership_preflight",
+            "status": "BLOCKED",
+            "state_sha256": None,
+            "duration_ms": None,
+        })
+        write_state(
+            state_path, spec=spec, spec_hash=spec_hash, runtime_hash=runtime_hash,
+            status="BLOCKED_INTERNAL", blocker="INTERNAL_WORK",
+            user_blocking=False, lanes=lanes, checkpoints=checkpoints,
+            artifacts=derived_artifacts, tasks=[],
+            summary={
+                "terminal_reason": "structural_ownership_preflight_blocked",
+                "message": str(error),
+                "descendant_lanes_started": [],
+                "controller_signal": {
+                    "action": "cancel_descendants_preserve_checkpoint",
+                    "resume_from": "structural_ownership",
+                },
+                "performance": {"lane_duration_ms": lane_duration_ms},
+            },
+        )
+        return 2
+    derived_artifacts["structural_ownership_preflight"] = str(structural_path)
+    lane_duration_ms["structural_ownership_preflight"] = structural_duration_ms
+    checkpoints.append({
+        "stage": "structural_ownership_preflight",
+        "status": structural_receipt["status"],
+        "state_sha256": sha256_file(structural_path),
+        "receipt_sha256": structural_receipt["receipt_sha256"],
+        "duration_ms": structural_duration_ms,
+    })
+    if (
+        structural_receipt.get("status") != "PASS"
+        or (structural_receipt.get("controller_signal") or {}).get("action")
+        != "continue"
+    ):
+        write_state(
+            state_path, spec=spec, spec_hash=spec_hash, runtime_hash=runtime_hash,
+            status="BLOCKED_INTERNAL", blocker="INTERNAL_WORK",
+            user_blocking=False, lanes=lanes, checkpoints=checkpoints,
+            artifacts=derived_artifacts, tasks=[],
+            summary={
+                "terminal_reason": "structural_ownership_preflight_blocked",
+                "message": "; ".join(structural_receipt.get("violations") or []),
+                "descendant_lanes_started": [],
+                "controller_signal": structural_receipt.get("controller_signal"),
+                "performance": {"lane_duration_ms": lane_duration_ms},
+            },
+        )
+        return 2
     if spec.get("dcs"):
         concurrent_declarations["dcs"] = spec["dcs"]
     if concurrent_declarations:
@@ -1336,7 +1526,7 @@ def main() -> int:
                 if kind in futures:
                     lanes[kind], lane_duration_ms[kind] = futures[kind].result()
 
-    for kind in ("filings", "broker", "dcs"):
+    for kind in ("broker", "dcs"):
         if kind not in lanes:
             continue
         if (

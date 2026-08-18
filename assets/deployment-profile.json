@@ -244,6 +244,7 @@
     "orchestrate_release.mjs",
     "run_user_flow.mjs",
     "run_excel_inflow_vnext.mjs",
+    "run_structural_ownership_preflight.mjs",
     "run_evidence_resolution_v2_tests.mjs",
     "run_filings_pipeline.mjs",
     "run_broker_intake.mjs",
@@ -271,7 +272,7 @@
     "compile_case.mjs",
     "propose_case_source.mjs"
   ],
-  "_entry_point_note": "Thirty-eight JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; v64's user-flow controller remains its workbook-stage delegate and rollback route. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. inspect_workbook_semantics.mjs and validate_local_workbook_review.mjs independently bind the portable Phase-13 workbook evidence; verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
+  "_entry_point_note": "Thirty-nine JavaScript entry points, none assumed discoverable from all the others. The vNext controller owns raw evidence through delivery and seals one model-first authority resolution; run_broker_intake.mjs owns the visible Brokers upload-or-skip checkpoint before raw-evidence compilation; run_structural_ownership_preflight.mjs is the installed pre-descendant topology gate invoked by the attachment controller before broker or debt work; v64's user-flow controller remains its workbook-stage delegate and rollback route. migrate_run_carrier.mjs is the explicit workspace-token-authorized carrier migration route. Constitution, terminal-exit, dynamic-concept, fault-injection, universal-matrix and raw-input canary entry points are release proofs rather than alternate user routes. The declared-evidence, filings and case-source entry points remain independently runnable diagnostics. inspect_workbook_semantics.mjs and validate_local_workbook_review.mjs independently bind the portable Phase-13 workbook evidence; verify/recalc_second_opinion.mjs independently binds the emitted and raw LibreOffice cache maps before terminal patching.",
   "script_allowlist": [
     "build_dynamic_model.mjs",
     "compile_case.mjs",
@@ -384,6 +385,7 @@
     "run_equation_graph_tests.mjs",
     "run_evidence_resolution_v2_tests.mjs",
     "run_excel_inflow_vnext.mjs",
+    "run_structural_ownership_preflight.mjs",
     "run_filings_pipeline.mjs",
     "run_fixed_point_constitution_tests.mjs",
     "run_forecast_behavior_tests.mjs",

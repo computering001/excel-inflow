@@ -29,7 +29,10 @@ import { validateCaseShape } from "./solver.mjs";
 import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
-import { compileStructuralOwnershipPreflight } from "./forecast_ownership_resolver.mjs";
+import {
+  compileStructuralOwnershipPreflight,
+  resolveSelectedForecastOwnership,
+} from "./forecast_ownership_resolver.mjs";
 import { isRankedTotalIdentity } from "./row_plan.mjs";
 import {
   applyTier1AnchorOwnership,
@@ -2699,6 +2702,27 @@ export function compileForecastCaptureTopology(
 
       if (!selectedPath || selectedPath.at(-1) === row.row_id) continue;
       const targetId = selectedPath.at(-1);
+      const target = rowsById.get(targetId);
+      const targetFamilyMembers = new Set([
+        ...(target?.calculation?.operator === "sum"
+          ? (target.calculation.refs ?? []).filter((rowId) => rowsById.has(rowId))
+          : []),
+        ...rows
+          .filter((candidate) => candidate.parent_row_id === targetId)
+          .map((candidate) => candidate.row_id),
+      ]);
+      if (
+        targetFamilyMembers.size >= 2 &&
+        targetFamilyMembers.has(row.row_id) &&
+        hasDirectForecastAuthority(modelCase, target)
+      ) {
+        // This is a genuine competing-authority family, not presentation-only
+        // detail. Let the candidate compiler mint the child's lawful fallback
+        // or receipted assumption; checkpoint B will then select the stronger
+        // aggregate and seal the rejected child evidence. Pre-capturing here
+        // would erase the very authority conflict that B exists to resolve.
+        continue;
+      }
       // Captured rows are intentionally blank in forecast. Their membership
       // path is certified from the statement graph, but it is not a physical
       // forecast formula path: the direct headline owns the forecast and the
@@ -3577,6 +3601,28 @@ export function compileCase(caseSource, evidence = {}) {
     );
   }
   Object.assign(modelCase, materialized);
+  // Checkpoint B is an executable ownership transformation, not a terminal
+  // ledger side effect. Run it as soon as the selected authorities exist so
+  // every later normaliser and validator sees exactly one live owner. The
+  // terminal ledger seal below remains checkpoint C and independently
+  // verifies this receipt after all compiler-owned transformations.
+  if (structuralOwnership.status === "PASS") {
+    try {
+      resolveSelectedForecastOwnership(modelCase);
+    } catch (error) {
+      report.add(
+        "forecast_ownership.preflight_b",
+        "BLOCK",
+        error.message,
+        "Persist the selected-authority receipt, resolve from its declared resume point and reuse unchanged evidence checkpoints.",
+        {
+          receipt: modelCase?.forecast_ownership_preflights?.selected ?? null,
+          controller_signal:
+            modelCase?.forecast_ownership_preflights?.selected?.controller_signal ?? null,
+        },
+      );
+    }
+  }
   if (forecastWaterfallSelected) {
     synchronizeDerivedHistoricalForecastCaches(modelCase);
   }
@@ -3764,6 +3810,12 @@ export function compileCase(caseSource, evidence = {}) {
         (row.aggregation_role === "working_child" ||
           (row.aggregation_role === "contributing_child" &&
             row.economic_class === "working_capital")) &&
+        // Checkpoint B has already transferred this child's selected
+        // authority to its parent and sealed the rejected evidence.  The
+        // presentation normaliser may clear an unowned draft forecast, but
+        // it must not erase the explicit not-separately-forecast authority
+        // that makes that transfer executable and independently auditable.
+        !row.forecast_capture_parent_id &&
         Array.isArray(row.values)
       ) {
         row.values = [...row.values.slice(0, 3), null, null, null];
@@ -3848,16 +3900,21 @@ export function compileCase(caseSource, evidence = {}) {
         ownershipReceipt?.controller_signal?.action ===
           "cancel_descendants_preserve_checkpoint"
       ) {
-        report.add(
-          "forecast_ownership.preflight",
-          "BLOCK",
-          error.message,
-          "Persist the attached ownership receipt, cancel unnecessary descendants, resolve from its declared resume point and reuse all unchanged evidence checkpoints.",
-          {
-            receipt: ownershipReceipt,
-            controller_signal: ownershipReceipt.controller_signal,
-          },
-        );
+        if (!report.findings.some((finding) =>
+          finding.id === "forecast_ownership.preflight_b" &&
+          finding.message === error.message
+        )) {
+          report.add(
+            "forecast_ownership.preflight",
+            "BLOCK",
+            error.message,
+            "Persist the attached ownership receipt, cancel unnecessary descendants, resolve from its declared resume point and reuse all unchanged evidence checkpoints.",
+            {
+              receipt: ownershipReceipt,
+              controller_signal: ownershipReceipt.controller_signal,
+            },
+          );
+        }
       } else {
         throw error;
       }

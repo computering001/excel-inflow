@@ -457,6 +457,35 @@ async function main() {
       artifacts.pre_broker_model_demand = preBrokerDemandPath;
       checkpoints.push(await checkpoint("pre_broker_demand", "PASS", preBrokerDemandPath));
     }
+    const structuralPreflightPath =
+      attachmentState.artifacts?.structural_ownership_preflight;
+    if (!structuralPreflightPath) {
+      throw new Error(
+        "PASS raw evidence omitted the pre-descendant structural ownership receipt.",
+      );
+    }
+    const structuralPreflight = await readJson(
+      structuralPreflightPath,
+      "structural ownership preflight",
+    );
+    const structuralArtifactHash = await sha256File(structuralPreflightPath);
+    if (
+      structuralPreflight.checkpoint !== "A_STRUCTURAL" ||
+      structuralPreflight.status !== "PASS" ||
+      structuralPreflight.controller_signal?.action !== "continue" ||
+      attachmentState.artifact_sha256?.structural_ownership_preflight !==
+        structuralArtifactHash
+    ) {
+      throw new Error(
+        "PASS raw evidence carries a stale, tampered or blocking structural ownership receipt.",
+      );
+    }
+    artifacts.structural_ownership_preflight = structuralPreflightPath;
+    checkpoints.push(await checkpoint(
+      "structural_ownership_preflight",
+      "PASS",
+      structuralPreflightPath,
+    ));
   } else {
     evidencePath = path.resolve(String(options["evidence-run"]));
     if (options["attachment-state"]) {

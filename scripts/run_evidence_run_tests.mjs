@@ -38,6 +38,16 @@ function merge(target, patch) {
   return next;
 }
 
+async function loadFlowFixture(fixtureId) {
+  const fixture = JSON.parse(
+    await fs.readFile(path.join(HERE, "flow-fixtures", `${fixtureId}.json`), "utf8"),
+  );
+  if (!fixture.extends) return fixture;
+  const parent = await loadFlowFixture(fixture.extends);
+  const { extends: _extends, ...patch } = fixture;
+  return merge(parent, patch);
+}
+
 function buildDraftCase(baseCase, fixture) {
   let modelCase = clone(baseCase);
   if (fixture.case_patch) modelCase = merge(modelCase, fixture.case_patch);
@@ -47,6 +57,46 @@ function buildDraftCase(baseCase, fixture) {
   }
   if (fixture.instruments_add?.length) {
     modelCase.instruments = [...modelCase.instruments, ...clone(fixture.instruments_add)];
+  }
+  for (const [section, patches] of Object.entries(fixture.statement_row_patch ?? {})) {
+    for (const [rowId, patch] of Object.entries(patches ?? {})) {
+      const rowIndex = (modelCase.statement_structure?.[section] ?? [])
+        .findIndex((row) => row.row_id === rowId);
+      if (rowIndex < 0) throw new Error(`Statement fixture patch row is absent: ${section}.${rowId}`);
+      modelCase.statement_structure[section][rowIndex] = merge(
+        modelCase.statement_structure[section][rowIndex],
+        patch,
+      );
+    }
+  }
+  for (const [section, additions] of Object.entries(fixture.statement_rows_add ?? {})) {
+    for (const addition of additions ?? []) {
+      const row = clone(addition.row ?? addition);
+      const afterRowId = addition.after_row_id ?? null;
+      const rows = modelCase.statement_structure?.[section] ?? [];
+      const insertionIndex = afterRowId
+        ? rows.findIndex((candidate) => candidate.row_id === afterRowId) + 1
+        : rows.length;
+      if (afterRowId && insertionIndex === 0) {
+        throw new Error(`Statement fixture insertion anchor is absent: ${section}.${afterRowId}`);
+      }
+      rows.splice(insertionIndex, 0, row);
+    }
+  }
+  for (const [section, additions] of Object.entries(fixture.source_coverage_add ?? {})) {
+    const disclosures = modelCase.source_coverage?.[section] ?? [];
+    for (const addition of additions ?? []) {
+      const disclosure = clone(addition.coverage ?? addition);
+      const afterSourceLineId = addition.after_source_line_id ?? null;
+      delete disclosure.after_source_line_id;
+      const insertionIndex = afterSourceLineId
+        ? disclosures.findIndex((candidate) => candidate.source_line_id === afterSourceLineId) + 1
+        : disclosures.length;
+      if (afterSourceLineId && insertionIndex === 0) {
+        throw new Error(`Source-coverage fixture insertion anchor is absent: ${section}.${afterSourceLineId}`);
+      }
+      disclosures.splice(insertionIndex, 0, disclosure);
+    }
   }
   return modelCase;
 }
@@ -857,9 +907,7 @@ function installNumericBridge(run, {
   return { decision, metric: decision.numeric_bridge.metrics[0] };
 }
 
-const fixture = JSON.parse(
-  await fs.readFile(path.join(HERE, "flow-fixtures", "no-questions.json"), "utf8"),
-);
+const fixture = await loadFlowFixture("no-questions");
 const baseCase = JSON.parse(
   await fs.readFile(path.join(casesDirectory, fixture.base_case), "utf8"),
 );
@@ -910,9 +958,7 @@ if (emitFixtureIndex >= 0) {
   const fixtureId = process.argv[emitFixtureIndex + 1];
   const target = process.argv[emitFixtureIndex + 2];
   if (!fixtureId || !target) throw new Error("--emit-fixture requires <fixture-id> <output-path>.");
-  const selected = JSON.parse(
-    await fs.readFile(path.join(HERE, "flow-fixtures", `${fixtureId}.json`), "utf8"),
-  );
+  const selected = await loadFlowFixture(fixtureId);
   const selectedBase = JSON.parse(
     await fs.readFile(path.join(casesDirectory, selected.base_case), "utf8"),
   );

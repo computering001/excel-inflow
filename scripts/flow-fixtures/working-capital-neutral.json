@@ -1,0 +1,114 @@
+{
+  "extends": "no-questions",
+  "fixture_id": "working-capital-neutral",
+  "description": "Neutral reproduction of the long-running working-capital ambiguity: a direct aggregate broker authority competes with receivables, inventory and payables fallback/user authorities.",
+  "statement_row_patch": {
+    "cash_flow": {
+      "change_in_working_capital": {
+        "row_type": "subtotal",
+        "material": true,
+        "historical_authority": "reported_total_reconciled",
+        "reported_historical_values": [-12, -14, -15],
+        "values": [-12, -14, -15, null, null, null],
+        "forecast_treatment": "broker",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "receivables_movement",
+            "inventory_movement",
+            "payables_movement"
+          ]
+        }
+      }
+    }
+  },
+  "statement_rows_add": {
+    "cash_flow": [
+      {
+        "after_row_id": "change_in_working_capital",
+        "row": {
+          "row_id": "receivables_movement",
+          "label": "Receivables movement",
+          "semantic_role": "receivables_movement",
+          "row_type": "input",
+          "material": true,
+          "parent_row_id": "change_in_working_capital",
+          "historical_authority": "source_input",
+          "values": [-4, -5, -6, null, null, null]
+        }
+      },
+      {
+        "after_row_id": "receivables_movement",
+        "row": {
+          "row_id": "inventory_movement",
+          "label": "Inventory movement",
+          "semantic_role": "inventory_movement",
+          "row_type": "input",
+          "material": true,
+          "parent_row_id": "change_in_working_capital",
+          "historical_authority": "source_input",
+          "values": [-3, -4, -4, -4, -4, -4],
+          "forecast_treatment": "hardcode",
+          "forecast_period_authorities": [
+            {"method": "user_assumption", "source_kind": "user_supplied", "source_id": "user.inventory.fy1", "value": -4, "material": true},
+            {"method": "user_assumption", "source_kind": "user_supplied", "source_id": "user.inventory.fy2", "value": -4, "material": true},
+            {"method": "user_assumption", "source_kind": "user_supplied", "source_id": "user.inventory.fy3", "value": -4, "material": true}
+          ]
+        }
+      },
+      {
+        "after_row_id": "inventory_movement",
+        "row": {
+          "row_id": "payables_movement",
+          "label": "Payables movement",
+          "semantic_role": "payables_movement",
+          "row_type": "input",
+          "material": true,
+          "parent_row_id": "change_in_working_capital",
+          "historical_authority": "source_input",
+          "values": [-5, -5, -5, null, null, null]
+        }
+      }
+    ]
+  },
+  "source_coverage_add": {
+    "cash_flow": [
+      {
+        "after_source_line_id": "cf.change_in_working_capital",
+        "source_line_id": "cf.receivables_movement",
+        "label": "Receivables movement",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic working-capital fixture",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": ["receivables_movement"],
+        "mapping_method": "exact"
+      },
+      {
+        "after_source_line_id": "cf.receivables_movement",
+        "source_line_id": "cf.inventory_movement",
+        "label": "Inventory movement",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic working-capital fixture",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": ["inventory_movement"],
+        "mapping_method": "exact"
+      },
+      {
+        "after_source_line_id": "cf.inventory_movement",
+        "source_line_id": "cf.payables_movement",
+        "label": "Payables movement",
+        "document": "Standard Net Cash Co Synthetic Case Specification v1 — STANDARDISED TEST CASE — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic working-capital fixture",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": ["payables_movement"],
+        "mapping_method": "exact"
+      }
+    ]
+  }
+}

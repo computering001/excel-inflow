@@ -197,6 +197,21 @@ export function compileStructuralOwnershipPreflight(modelCase) {
   return receipt;
 }
 
+export function verifyStructuralOwnershipPreflight(modelCase, receipt) {
+  if (
+    receipt?.schema_version !== FORECAST_OWNERSHIP_PREFLIGHT_VERSION ||
+    receipt?.checkpoint !== "A_STRUCTURAL"
+  ) {
+    throw new Error("structural forecast ownership preflight is absent or has the wrong version");
+  }
+  const copy = structuredClone(modelCase);
+  const expected = compileStructuralOwnershipPreflight(copy);
+  if (canonicalJson(expected) !== canonicalJson(receipt)) {
+    throw new Error("structural forecast ownership preflight is stale or tampered");
+  }
+  return receipt;
+}
+
 function captureAuthority(modelCase, parent, child, forecastIndex, rejectedAuthorities) {
   const rejected = child?.forecast_period_authorities?.[forecastIndex] ?? null;
   const priorCertificate = (child?.forecast_capture_certificates ?? []).find(

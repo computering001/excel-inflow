@@ -21,6 +21,7 @@
     "assets/forecast-behavior-map-v1.schema.json",
     "assets/forecast-observation-ledger-v1.schema.json",
     "assets/forecast-plan-v2.schema.json",
+    "assets/forecast-ownership-preflight-v1.schema.json",
     "assets/model-case-v2.schema.json",
     "assets/performance-policy-v1.json",
     "assets/pre-broker-model-demand-v1.schema.json",
@@ -55,6 +56,7 @@
     "scripts/lib/flow_screens.mjs",
     "scripts/lib/forecast_authority.mjs",
     "scripts/lib/forecast_authority_ledger.mjs",
+    "scripts/lib/forecast_ownership_resolver.mjs",
     "scripts/lib/forecast_behavior.mjs",
     "scripts/lib/forecast_candidate_compiler.mjs",
     "scripts/lib/forecast_observation.mjs",
@@ -80,6 +82,7 @@
     "scripts/rebind_broker_native_preflight.py",
     "scripts/run_attachment_evidence_pipeline.py",
     "scripts/run_broker_intake.mjs",
+    "scripts/run_structural_ownership_preflight.mjs",
     "scripts/workflow_state.py",
     "scripts/zero_broker_authority.py"
   ]

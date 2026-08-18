@@ -1312,6 +1312,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "prebroker-ownership-controller",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_prebroker_ownership_controller_tests.py",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "forecast-authority-ranking",
       "phase": "forecast",
       "runtime": "node",
