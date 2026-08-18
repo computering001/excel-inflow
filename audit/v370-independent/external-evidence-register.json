@@ -15,12 +15,66 @@
     "sha256": "4ad527d2cb57db6c3ae089a193daddd0b61429f80d164fe00e57c9292f541861",
     "status": "PRESENT_BUT_LEGACY_CONTRACT_FAILURE"
   },
-  "broker_corpus": {"status": "CUSTODY_DISCOVERY_PENDING"},
-  "broker_real_pack_manifest": {"status": "CUSTODY_DISCOVERY_PENDING"},
-  "raw_canary_evidence": {"status": "CUSTODY_DISCOVERY_PENDING"},
-  "real_filings_request": {"status": "CUSTODY_DISCOVERY_PENDING"},
-  "real_filings_expectations": {"status": "CUSTODY_DISCOVERY_PENDING"},
-  "installed_host_broker_receipt": {"status": "NOT_YET_PRODUCED_FOR_V73"},
+  "broker_corpus": {
+    "status": "PRESENT_INTEGRITY_VALID_CURRENT_RUN_PASS",
+    "path": "/Users/archiepreston/Documents/Codex/2026-07-24/ok/work/public-broker-layout-corpus-20260812/PUBLIC-BROKER-LAYOUT-CORPUS.json",
+    "sha256": "c6cbd2f03abdd9875e5bb15bebf8aed3788ac62aa5c5277da3b3eded371a3297",
+    "documents": 7,
+    "houses": 7,
+    "pages": 82
+  },
+  "broker_real_pack_manifest": {
+    "status": "PRESENT_INTEGRITY_VALID_NEEDS_CURRENT_RESPONSES",
+    "path": "/Users/archiepreston/Documents/Codex/2026-08-15/you-are-taking-over-excel-inflow/work/e2e-v70/real-pack-fixture/manifest.json",
+    "sha256": "6bcf661d5cd3ae90ed7b9b919af57adccdc5e7c996db06f0bb5555cf2ff5fb76",
+    "documents": 5,
+    "unresolved_surfaces": 7
+  },
+  "raw_canary_evidence": {
+    "status": "EPHEMERAL_CURRENT_SCHEMA_INGRESS_ROOT_BLOCKED",
+    "path": "/tmp/stage4-cash-fixed-full/clean-evidence-run.json",
+    "sha256": "c93815e9a26aa9b84e05c7b5362af30250f40488b242a2276626b66d293a3a1d"
+  },
+  "real_filings_request": {
+    "status": "PRESENT_INTEGRITY_VALID_COUPLED_CANARY_BLOCKED",
+    "path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/diagnostic-astra-filings-request.json",
+    "sha256": "642e1b24a45c40f79b261d73ee2b21da72f829bd81ff6fffe465114b7a9c5101"
+  },
+  "real_filings_expectations": {
+    "status": "PRESENT_INTEGRITY_VALID_COUPLED_CANARY_BLOCKED",
+    "path": "/Users/archiepreston/Documents/Codex/2026-08-15/you-are-taking-over-excel-inflow/work/e2e-v70/real-filing-canary-expectations.json",
+    "sha256": "4dc688e2f09fb060cf954512a76ab8baafba033bc88328e8ae83e521c49cb299"
+  },
+  "installed_host_broker_receipt": {
+    "status": "NO_COMPANY_RUN_RECEIPT_FOR_V73",
+    "note": "The v73 installation/activation receipt is not an installed-host broker canary."
+  },
+  "rogo_v73_installation_readback": {
+    "status": "OBSERVED_PASS_RAW_RECEIPT_IN_ROGO_CHAT_ONLY",
+    "evidence_class": "screen_transcription_not_raw_custody",
+    "active_gate": "v73",
+    "release": "Excel Inflow v3.7.0",
+    "package_mode": "development",
+    "deployment_status": "active_candidate",
+    "source_commit": "41df09473fd6f295c5d5f0e4ef51c4e054068761",
+    "source_tree": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+    "package_commit": "20ffd58e26dc99ccb0d7fec83e652c445dcec620",
+    "package_tree": "e5db70da96e2c332e13fc22798944c7372ccd593",
+    "complete_package_inventory_sha256": "798d4131483a1328c07f3fb9695828947f11209239ee97bed17126bce436bd2d",
+    "runtime_code_closure_sha256": "e1e93bc221f984ec83c2fead864e72ac728cb09d3f0e1ee2dc26e727fe9cbb7e",
+    "physical_package_files": 301,
+    "physical_package_bytes": 6235184,
+    "rollback_gate": "v72",
+    "retained_gate": "v71",
+    "installation_identity": null,
+    "installed_package_sha256": null,
+    "archive_used_sha256": null,
+    "raw_receipt_sha256": null,
+    "limitations": [
+      "Raw JSON has not yet been exported from the Rogo chat into approved private custody.",
+      "Installation/readback does not prove a company run, native Excel restoration, visual review or production promotion."
+    ]
+  },
   "native_excel_restoration": {"status": "NOT_YET_PRODUCED_FOR_V73"},
   "visual_review": {"status": "NOT_YET_PRODUCED_FOR_V73"}
 }
