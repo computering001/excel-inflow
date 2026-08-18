@@ -14,7 +14,7 @@ const runtime = read("assets/runtime-manifest.json");
 const deployment = read("assets/deployment-profile.json");
 
 assert.equal(runtime.skill_name, "excel-inflow");
-assert.equal(runtime.skill_version, "3.7.4");
+assert.equal(runtime.skill_version, "3.7.5");
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert.equal(deployment.release_name, "Excel Inflow");

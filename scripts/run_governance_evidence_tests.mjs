@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { validateIdentityConvergence, validatePerformanceEvidence } from "./lib/release_identity_governance.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const auditRoot = path.join(root, "audit", "v374-governance");
+const auditRoot = path.join(root, "audit", "v375-governance");
 const read = (relative) => fs.readFileSync(path.join(root, relative));
 const json = (relative) => JSON.parse(read(relative));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -41,16 +41,16 @@ const expected = {
 };
 assert.deepEqual(validateIdentityConvergence(identity, expected), []);
 assert.deepEqual(validatePerformanceEvidence(performance, expected), []);
-assert.equal(runtime.skill_version, "3.7.4");
+assert.equal(runtime.skill_version, "3.7.5");
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert(
   validateIdentityConvergence(identity, { ...expected, expectedVersion: runtime.skill_version })
     .some((error) => error.includes("version")),
-  "Historical v3.7.3 identity masqueraded as active v3.7.4 evidence.",
+  "Historical v3.7.3 identity masqueraded as active v3.7.5 evidence.",
 );
 
-const census = json("audit/v374-governance/test-registry-classification-census.json");
+const census = json("audit/v375-governance/test-registry-classification-census.json");
 assert.equal(census.registry.sha256, sha256(read(census.registry.path)));
 assert(Object.values(census.completeness).every(Boolean));
 assert.equal(Object.values(census.counts.by_audit_class).reduce((sum, count) => sum + count, 0), census.registry.test_count);

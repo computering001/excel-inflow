@@ -1,0 +1,38 @@
+{
+  "completeness": {
+    "every_test_has_audit_class": true,
+    "every_test_has_declared_test_class": true,
+    "every_test_has_expected_exit_contract": true,
+    "every_test_has_owner": true
+  },
+  "counts": {
+    "by_audit_class": {
+      "component_integration": 63,
+      "cross_layer_integration": 33,
+      "independent_economic_oracle": 4,
+      "installed_host": 1,
+      "real_corpus": 5,
+      "unit": 25,
+      "visual_manual": 0,
+      "workbook_oracle": 1
+    },
+    "by_profile": {
+      "custody": 9,
+      "portable": 123
+    },
+    "self_confirmation_risk": {
+      "false": 11,
+      "true": 121
+    }
+  },
+  "full_record_policy": "The generator emits one owner, declared test class, canonical audit class, expected-exit contract, profile and self-confirmation classification for every registry id.",
+  "generator": "scripts/compile_test_registry_census.mjs",
+  "generator_command": "node scripts/compile_test_registry_census.mjs --summary-out audit/v375-governance/test-registry-classification-census.json",
+  "interpretation": "This is a classification census, not an assertion that all classes are independent. Unit, component-integration and cross-layer-integration tests are explicitly counted as carrying self-confirmation risk. Installed-host evidence remains custody-bound and may be BLOCKED in portable CI.",
+  "registry": {
+    "path": "assets/development-test-registry.json",
+    "sha256": "b9bf339311722de77cd75fc2b901d3d3e0fa4772d33c6b4e03b750153eca120b",
+    "test_count": 132
+  },
+  "schema_version": "development-test-classification-census-summary/1.0"
+}

@@ -26,13 +26,13 @@ const options = {
 
 assert.deepEqual(validateIdentityConvergence(identity, options), []);
 assert.deepEqual(validatePerformanceEvidence(performance, options), []);
-assert.equal(runtime.skill_version, "3.7.4");
+assert.equal(runtime.skill_version, "3.7.5");
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert(
   validateIdentityConvergence(identity, { ...options, expectedVersion: runtime.skill_version })
     .some((error) => error.includes("version")),
-  "Historical v3.7.3 identity masqueraded as the active v3.7.4 candidate.",
+  "Historical v3.7.3 identity masqueraded as the active v3.7.5 candidate.",
 );
 
 const staleVersion = structuredClone(identity);
