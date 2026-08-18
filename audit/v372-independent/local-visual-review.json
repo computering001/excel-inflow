@@ -1,0 +1,23 @@
+{
+  "schema_version": "excel-inflow-v372-local-visual-review/1.0",
+  "recorded_at": "2026-08-18T08:07:37Z",
+  "source_commit": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+  "source_tree": "3ee6c51175417484b6e317d55355844a9191fbd7",
+  "workbook_sha256": "51a6c23c3eb0585d8a688f946294651c5b9dbead4dd24441971be2325eb94a79",
+  "status": "PASS_LOCAL_RENDER_PENDING_NATIVE_EXCEL",
+  "review_provenance": {
+    "method": "REUSED_IDENTICAL_WORKBOOK_BYTES",
+    "reviewed_v371_workbook_sha256": "51a6c23c3eb0585d8a688f946294651c5b9dbead4dd24441971be2325eb94a79",
+    "identity_match": true,
+    "pages_reviewed": 7,
+    "clipped_text": 0,
+    "overlaps": 0,
+    "broken_glyphs": 0,
+    "unexplained_raw_artifacts": 0
+  },
+  "native_excel_review": {
+    "status": "NOT_RUN_USER_HOLD",
+    "receipt": null
+  },
+  "production_claim": false
+}
