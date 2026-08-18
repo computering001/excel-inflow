@@ -33,6 +33,14 @@
       "github_run_id": 32114376128,
       "stage4_checkpoint": "PASS",
       "degraded_broker_delivery": "PASS"
+    },
+    "remote_portable_ci": {
+      "status": "PASS",
+      "github_run_id": 32114915642,
+      "source_commit": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+      "complete_portable_registry": "PASS",
+      "exact_once_coverage": "PASS",
+      "redacted_custody_retained": true
     }
   },
   "phase_status": {
