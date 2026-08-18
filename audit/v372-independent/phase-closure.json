@@ -1,0 +1,52 @@
+{
+  "schema_version": "excel-inflow-v372-phase-closure/1.0",
+  "recorded_at": "2026-08-18T08:07:37Z",
+  "source_commit": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+  "source_tree": "3ee6c51175417484b6e317d55355844a9191fbd7",
+  "registry_sha256": "b4ee07fcf2f09a87d7e88b41c2d68ddc2df0ef3ec816d16ba0f00de2ed5c4a3d",
+  "gate_evidence": {
+    "portable": {
+      "status": "PASS",
+      "passed": 99,
+      "failed": 0,
+      "blocked": 0,
+      "report_sha256": "a61b446c5fcc5fe39a6157e3a03c552250abef5b9041c34445dd6f794e573485",
+      "aggregate_sha256": "d107231422644ab9e9e18228a1c18850ac2ddf962a7bea5209d5d2b840334864"
+    },
+    "custody": {
+      "status": "PASS_AVAILABLE_WITH_USER_HELD_INSTALL_GATE",
+      "passed": 6,
+      "failed": 0,
+      "blocked": 1,
+      "blocked_test_ids": ["installed-host-usable-broker"],
+      "report_sha256": "e0d0a1f87284240458ddaed269801c7dd26f6a1019ce1752561f3085bca3ddd9",
+      "aggregate_sha256": "e7bfef4843e175d4195865bea4f5d3152b52c134bfc5f6fe9e2aead9150e8118"
+    },
+    "complete_registry": {
+      "expected": 106,
+      "observed": 106,
+      "coverage_errors": 0,
+      "aggregate_sha256": "8e33b0474e22e2a4a0795c67ad48e1edb7d44126afabe11f2576f47f689a2a4e"
+    },
+    "focused_linux_diagnostic": {
+      "status": "PASS",
+      "github_run_id": 32114376128,
+      "stage4_checkpoint": "PASS",
+      "degraded_broker_delivery": "PASS"
+    }
+  },
+  "phase_status": {
+    "phases_0_to_13": "PASS_OUTSIDE_ROGO",
+    "phase_14": "HELD_BY_USER_NO_ROGO_INSTALL",
+    "phase_15": "PASS_PORTABLE_HOST_CANARY_HELD",
+    "phase_16": "DEVELOPMENT_RELEASE_READY_INSTALL_AND_PROMOTION_HELD"
+  },
+  "remaining_user_held_work": [
+    "Install the exact immutable package as a new Rogo version.",
+    "Run installed-host broker canaries in two fresh sessions.",
+    "Run the native Excel control matrix and visual review.",
+    "Issue production certification and merge only the exact tested tree."
+  ],
+  "rogo_touched": false,
+  "production_claim": false
+}

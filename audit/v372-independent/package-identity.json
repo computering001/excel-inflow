@@ -1,0 +1,63 @@
+{
+  "schema_version": "excel-inflow-v372-development-package-identity/1.0",
+  "recorded_at": "2026-08-18T08:07:37Z",
+  "release_name": "Excel Inflow v3.7.2",
+  "skill_version": "3.7.2",
+  "package_mode": "development",
+  "deployment_status": "not_installed",
+  "production_certified": false,
+  "source": {
+    "repository": "computering001/excel-inflow",
+    "commit_sha": "bf4da1080e9d4d01c48129a2d980dbca935f6136",
+    "tree_sha": "3ee6c51175417484b6e317d55355844a9191fbd7"
+  },
+  "package_branch": {
+    "name": "packages/excel-inflow-v3.7.2-development",
+    "commit_sha": "ca0d9a3e53cb53865492a30c5bdcae88dc21d5ba",
+    "tree_sha": "cb633567ed156d31fb3bccb9ddddd22b847d38ed",
+    "file_count": 304
+  },
+  "identity": {
+    "runtime_code_closure_sha256": "bc6828cb4555ced0b66daf9153339229bbc89097d5de7a89c07ae91380f17350",
+    "runtime_code_closure_file_count": 290,
+    "complete_package_inventory_sha256": "56d8e2d3041a42b912c03cddbb1356795bb126f00617110cc322ea4d0877941d",
+    "complete_package_inventory_file_count": 304,
+    "release_manifest_sha256": "a633c468ca1af153f25fe265968ddb5562ad6a8cd977c809c75ef7219cb39073",
+    "archive_sha256": "8a3b4721d14d31a31e5c581754552df193cd5f69e43c75be7975ebfa1cd3cfcc",
+    "archive_format": "ustar",
+    "archive_bytes": 6546944
+  },
+  "determinism": {
+    "clean_build_count": 2,
+    "all_package_members_byte_identical": true,
+    "inventory_equal": true,
+    "archive_equal": true,
+    "determinism_receipt_sha256": "5b2bfe7eef5d5272f2ba25477a2483485119348c3d2e0daad2ae1f7c29d09b0a"
+  },
+  "instructions": {
+    "skill_sha256": "09047c8d375c377031d7b9e0e70400e948ca2eaafb06c3f89db3aa0b0a2b2b94",
+    "central_instructions_sha256": "ab0b9e70677d635f5831fd06a9bea64af4e8769904fc3a3083f6a95db0641017",
+    "runtime_manifest_sha256": "5ebd30f74f009482fb6a242a465ff81931153bbf420759d670160d12ad2d16ab",
+    "deployment_profile_sha256": "634418694a7c10aeaf5373f75d3ae925bf2158cf0d334cbe67cc7436c6d22c9c"
+  },
+  "smoke_workbook": {
+    "case_sha256": "b1ec6462e5873ac0e9bbf557cb989a228d7a7dfbe96239860d3560595ddcd9bd",
+    "plan_sha256": "8b43944b6785f13a6bc273c2147bdf50bcaefe9e19cd7df15dfaa79e49b32991",
+    "workbook_sha256": "51a6c23c3eb0585d8a688f946294651c5b9dbead4dd24441971be2325eb94a79",
+    "validation_status": "PASS_PENDING_MANUAL",
+    "total_violations": 0,
+    "local_visual_review": "PASS_REUSED_IDENTICAL_WORKBOOK_BYTES_FROM_V371"
+  },
+  "supersedes": {
+    "release": "Excel Inflow v3.7.1 development",
+    "reason": "The v3.7.1 GitHub workflow omitted NumPy from the declared renderer runtime. No model or workbook economic bytes changed."
+  },
+  "certification": {
+    "native_excel_receipt": null,
+    "installed_host_receipt": null,
+    "installation_identity": null,
+    "installed_package_sha256": null,
+    "certified_runtime_code_closure_sha256": null,
+    "status": "DEVELOPMENT_ONLY_PENDING_ROGO_NATIVE_EXCEL"
+  }
+}
