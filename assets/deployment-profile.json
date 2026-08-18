@@ -456,7 +456,7 @@
     "verify/workbook_semantic_oracle.py",
     "verify/verify_delivery.py"
   ],
-  "_python_entry_point_note": "Twenty-seven Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers, recovery tools and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; prepare_local_workbook_review.py creates portable exact-workbook Phase-13 evidence without claiming native or human review; render and verify entry points provide independent structural, visual and financial proof.",
+  "_python_entry_point_note": "Twenty-eight Python entry points are independently runnable. run_attachment_evidence_pipeline.py is the sole raw-evidence transaction owner; broker, DCS and filings work is performed through subordinate runtime members, with public extractors, compilers, recovery tools and proposers retained as diagnostics. emit/__main__.py is the renderer CLI; prepare_local_workbook_review.py creates portable exact-workbook Phase-13 evidence without claiming native or human review; render and verify entry points provide independent structural, visual and financial proof.",
   "_python_entry_point_notes_note": "python_entry_point_notes is the exemption map for entry points that ship without a central user command. The broker components are intentionally subordinate diagnostics invoked by run_broker_pipeline.py; naming them as alternate user routes would recreate the sequencing defect the controller removes.",
   "python_entry_point_notes": {
     "migrate_broker_run_state.py": "Fail-closed, receipted migration of a sealed broker run across an intentional runtime-closure change; re-homes receipt-verified checkpoints and preserves exhaustion history so a live run resumes without losing progress or re-uploading sources. Invoked only on controller upgrades, never in ordinary runs.",
@@ -472,7 +472,8 @@
     "broker_period_recovery.py": "Invoked by run_broker_pipeline.py after physical capture to resolve rendered period headers or quarantine only unresolved columns; retained independently runnable for diagnostics.",
     "broker_table_engine.py": "Optional provider-neutral adapter for host-installed table engines; Rogo remains the required model-host path and every result still enters dual-read reconciliation.",
     "rebind_broker_native_preflight.py": "Invoked by run_broker_pipeline.py only when an early demand-independent native preflight can be reused against the final filings-derived model-demand graph; independently runnable for diagnostics and fails closed to the ordinary full extraction path when rebinding is incompatible.",
-    "prepare_local_workbook_review.py": "Local release-evidence utility. It leaves the attested workbook unchanged, creates a deterministic non-deliverable Show Formulas derivative, renders every visible sheet in both modes, and explicitly records human and native Excel review as not performed."
+    "prepare_local_workbook_review.py": "Local release-evidence utility. It leaves the attested workbook unchanged, creates a deterministic non-deliverable Show Formulas derivative, renders every visible sheet in both modes, and explicitly records human and native Excel review as not performed.",
+    "verify/broker_consensus_membership_oracle.py": "Independent stdlib-only library/diagnostic invoked by the registered broker-consensus mutation harness. It ships as a separately smoke-tested verifier, not as an ordinary company-run command."
   },
   "python_entry_point_smoke": {
     "migrate_broker_run_state.py": {
