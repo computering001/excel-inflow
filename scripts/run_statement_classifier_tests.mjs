@@ -11,6 +11,7 @@ import { validateCaseShape } from "./lib/solver.mjs";
 import { compileRowPlan, normaliseStatementRows } from "./lib/row_plan.mjs";
 import { compileSemanticManifest } from "./lib/semantic_graph.mjs";
 import { compileStatementTopology } from "./lib/statement_topology.mjs";
+import { sealForecastAuthorityLedger } from "./lib/forecast_authority_ledger.mjs";
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function clone(value) { return structuredClone(value); }
@@ -713,6 +714,11 @@ assert(
 
 const legacyCashTaxCase = clone(fixture);
 delete legacyCashTaxCase.statement_structure_compiled_version;
+// Exercise the shipped production ownership contract.  The former regression
+// passed only on the legacy static fixture because that path still ran the
+// row-plan fallback; a production-shaped waterfall_v1 case skipped it and
+// silently lost both the formula and the disclosed decision.
+legacyCashTaxCase.forecast_authority_contract_version = "waterfall_v1";
 const legacyCashTaxRows = legacyCashTaxCase.statement_structure.cash_flow;
 const legacyCashTaxInsert = legacyCashTaxRows.findIndex(
   (row) => row.semantic_role === "cash_from_operations",
@@ -732,10 +738,53 @@ const normalisedCashTax = normaliseStatementRows(
 ).find((row) => row.row_id === "income_taxes_paid_policy_regression");
 assert(
   normalisedCashTax?.semantic_role === "cash_taxes" &&
-    normalisedCashTax.forecast_calculation?.refs?.[0] !== "tax_expense" &&
+    normalisedCashTax.forecast_calculation === undefined &&
     normalisedCashTax.forecast_decision?.method === "carry_forward" &&
-    /latest reported value/i.test(normalisedCashTax.forecast_decision.reason),
+    /latest reported value/i.test(normalisedCashTax.forecast_decision.reason) &&
+    normalisedCashTax.forecast_period_authorities?.length === 3 &&
+    normalisedCashTax.forecast_period_authorities.every(
+      (authority) =>
+        authority.method === "carry_forward" &&
+        authority.source_kind === "historical_inference" &&
+        authority.value === -8 &&
+        /P&L tax was rejected/i.test(authority.note),
+    ) &&
+    normalisedCashTax.forecast_period_calculations?.length === 3 &&
+    normalisedCashTax.forecast_period_calculations.every(
+      (rule) => rule.operator === "prior_period" && rule.refs?.[0] === normalisedCashTax.row_id,
+    ) &&
+    normalisedCashTax.values.slice(3, 6).every((value) => value === null),
   `A legacy silent cash-tax-to-P&L-tax link survived source normalization without a disclosed fallback: ${JSON.stringify(normalisedCashTax)}`,
+);
+
+const mixedCashTaxAuthorityCase = clone(legacyCashTaxCase);
+const mixedCashTax = mixedCashTaxAuthorityCase.statement_structure.cash_flow.find(
+  (row) => row.row_id === "income_taxes_paid_policy_regression",
+);
+mixedCashTax.forecast_period_authorities = [
+  { method: "user_assumption", source_kind: "user", value: -9, material: true },
+  { method: "accounting_identity", source_kind: "formula", value: -10, material: true },
+  { method: "driver_formula", source_kind: "formula", value: -11, material: true },
+];
+mixedCashTax.forecast_period_calculations = [
+  null,
+  { operator: "link", refs: ["tax_expense"] },
+  { operator: "link", refs: ["tax_expense"] },
+];
+const normalisedMixedCashTax = normaliseStatementRows(
+  mixedCashTaxAuthorityCase,
+  "cash_flow",
+).find((row) => row.row_id === "income_taxes_paid_policy_regression");
+assert(
+  normalisedMixedCashTax.forecast_period_authorities[0].method === "user_assumption" &&
+    normalisedMixedCashTax.forecast_period_authorities.slice(1).every(
+      (authority) => authority.method === "carry_forward",
+    ) &&
+    normalisedMixedCashTax.forecast_period_calculations[0] === null &&
+    normalisedMixedCashTax.forecast_period_calculations.slice(1).every(
+      (rule) => rule.operator === "prior_period" && rule.refs[0] === normalisedMixedCashTax.row_id,
+    ),
+  `Cash-tax migration overwrote stronger authority or retained the rejected P&L link: ${JSON.stringify(normalisedMixedCashTax)}`,
 );
 
 const ambiguous = clone(fixture);
@@ -947,6 +996,17 @@ function hierarchyFixture(authority) {
     parent.values = [null, null, null, null, null, null];
     parent.calculation = { operator: "sum", refs: children.map((row) => row.row_id) };
     parent.forecast_treatment = "formula";
+    parent.forecast_period_calculations = [0, 1, 2].map(() => clone(parent.calculation));
+    parent.forecast_period_authorities = [0, 1, 2].map(() => ({
+      method: "accounting_identity",
+      source_kind: "formula",
+      material: true,
+      note: "The synthetic parent is formula-owned by its disclosed children.",
+    }));
+    delete parent.forecast_capture_parent_id;
+    delete parent.forecast_capture_mode;
+    delete parent.forecast_capture_note;
+    delete parent.forecast_capture_certificates;
     delete candidate.provenance[parent.row_id];
     const parentSource = candidate.source_coverage.cash_flow.find(
       (source) => source.mapped_row_ids.includes(parent.row_id),
@@ -957,6 +1017,13 @@ function hierarchyFixture(authority) {
       parentSource.mapping_method = "split";
       parentSource.reason = "The published total is reconstructed from the disclosed children for this synthetic test.";
     }
+  }
+  // A production representative carries sealed Phase-8 ownership evidence.
+  // This test deliberately changes its statement graph, so reseal the ledger
+  // and census from the mutated graph instead of asking a stale pre-mutation
+  // receipt to verify the new candidate.
+  if (candidate.forecast_authority_ledger_version === "forecast-authority-ledger/2.0") {
+    sealForecastAuthorityLedger(candidate);
   }
   return candidate;
 }

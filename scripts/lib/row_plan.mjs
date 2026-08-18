@@ -3285,14 +3285,31 @@ function removeSilentCashTaxExpenseLink(rows) {
     const originalValues = [...(row.values ?? [])];
     delete row.forecast_calculation;
     const authorities = row.forecast_period_authorities;
+    const lastReported = row.values[2] ?? row.values[1] ?? row.values[0] ?? 0;
+    const fallbackReason =
+      `${row.row_id}: the legacy cash-tax link to P&L tax was rejected; ` +
+      `latest reported value for cash tax ${Number(lastReported)} is the disclosed ` +
+      "fallback because no stronger source, guidance, broker or driver authority resolved.";
     if (!Array.isArray(authorities) || authorities.length !== 3) {
       row.values = [...originalValues.slice(0, 3), null, null, null];
-      delete row.forecast_period_calculations;
-      delete row.forecast_period_authorities;
-      delete row.forecast_treatment;
+      row.forecast_period_calculations = [0, 1, 2].map(() => ({
+        operator: "prior_period",
+        refs: [row.row_id],
+      }));
+      row.forecast_period_authorities = [0, 1, 2].map(() => ({
+        method: "carry_forward",
+        source_kind: "historical_inference",
+        value: Number(lastReported),
+        material: true,
+        note: fallbackReason,
+      }));
+      row.forecast_treatment = "formula";
+      row.forecast_decision = {
+        method: "carry_forward",
+        reason: fallbackReason,
+      };
       continue;
     }
-    const lastReported = row.values[2] ?? row.values[1] ?? row.values[0] ?? 0;
     let migratedFormula = false;
     const calculations = [null, null, null];
     row.forecast_period_authorities = authorities.map((authority, forecastIndex) => {
@@ -3309,10 +3326,7 @@ function removeSilentCashTaxExpenseLink(rows) {
         source_kind: "historical_inference",
         value: Number(lastReported),
         material: authority.material ?? true,
-        note:
-          `${row.row_id}: the legacy cash-tax link to P&L tax was rejected; ` +
-          `latest reported cash tax ${Number(lastReported)} is the disclosed ` +
-          "fallback because no stronger source, guidance, broker or driver authority resolved.",
+        note: fallbackReason,
       };
     });
     if (migratedFormula) {
@@ -3326,6 +3340,10 @@ function removeSilentCashTaxExpenseLink(rows) {
         ),
       ];
       row.forecast_treatment = "formula";
+      row.forecast_decision = {
+        method: "carry_forward",
+        reason: fallbackReason,
+      };
     } else {
       delete row.forecast_period_calculations;
     }
