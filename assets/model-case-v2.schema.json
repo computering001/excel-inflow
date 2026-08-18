@@ -106,14 +106,44 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["instrument_id", "source_class", "canonical_class", "mapping"],
+        "required": [
+          "instrument_id",
+          "source_class",
+          "canonical_class",
+          "mapping"
+        ],
         "properties": {
-          "instrument_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
-          "source_class": { "type": ["string", "null"] },
-          "canonical_class": {
-            "enum": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "rcf", "commercial_paper", "securitisation", "lease_liability", "overdraft", "other_explicit", "unclassified"]
+          "instrument_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
           },
-          "mapping": { "enum": ["legacy_alias", "unrecognised_to_review"] }
+          "source_class": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canonical_class": {
+            "enum": [
+              "bond_fixed",
+              "bond_floating",
+              "term_loan_fixed",
+              "term_loan_floating",
+              "rcf",
+              "commercial_paper",
+              "securitisation",
+              "lease_liability",
+              "overdraft",
+              "other_explicit",
+              "unclassified"
+            ]
+          },
+          "mapping": {
+            "enum": [
+              "legacy_alias",
+              "unrecognised_to_review"
+            ]
+          }
         }
       }
     },
@@ -479,7 +509,10 @@
                 "format": "date"
               },
               "freshness_status": {
-                "enum": ["current", "stale"]
+                "enum": [
+                  "current",
+                  "stale"
+                ]
               },
               "freshness_age_days": {
                 "type": "integer",
@@ -1496,8 +1529,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "structural": { "type": "object" },
-        "selected": { "type": "object" }
+        "structural": {
+          "type": "object"
+        },
+        "selected": {
+          "type": "object"
+        }
       }
     }
   },
@@ -1942,14 +1979,34 @@
             "stable_id"
           ],
           "properties": {
-            "method_priority": { "type": "number" },
-            "definition_score": { "type": "number" },
-            "period_score": { "type": "number" },
-            "units_score": { "type": "number" },
-            "freshness_timestamp": { "type": "number" },
-            "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
-            "completeness_score": { "type": "number", "minimum": 0, "maximum": 1 },
-            "stable_id": { "type": "string" }
+            "method_priority": {
+              "type": "number"
+            },
+            "definition_score": {
+              "type": "number"
+            },
+            "period_score": {
+              "type": "number"
+            },
+            "units_score": {
+              "type": "number"
+            },
+            "freshness_timestamp": {
+              "type": "number"
+            },
+            "confidence_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "completeness_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "stable_id": {
+              "type": "string"
+            }
           },
           "description": "Canonical economic quality proof used to resolve equal-rung candidates before the stable identifier tie-break."
         },
@@ -2068,16 +2125,28 @@
           "pattern": "^[a-z0-9][a-z0-9_.-]*$"
         },
         "semantic_role": {
-          "enum": ["reported_ebitda", "adjusted_ebitda"]
+          "enum": [
+            "reported_ebitda",
+            "adjusted_ebitda"
+          ]
         },
         "label": {
-          "enum": ["EBITDA", "Adjusted EBITDA"]
+          "enum": [
+            "EBITDA",
+            "Adjusted EBITDA"
+          ]
         },
         "margin_label": {
-          "enum": ["EBITDA margin", "Adjusted EBITDA margin"]
+          "enum": [
+            "EBITDA margin",
+            "Adjusted EBITDA margin"
+          ]
         },
         "adjustment_basis": {
-          "enum": ["reported", "company_adjusted"]
+          "enum": [
+            "reported",
+            "company_adjusted"
+          ]
         },
         "derivation": {
           "enum": [
@@ -2161,7 +2230,14 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 },
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 12
+          },
           "description": "Printed decimal places for each historical source cell, in the issuer's declared reporting units. Null-valued states carry null precision."
         },
         "reported_historical_value_states": {
@@ -2184,7 +2260,14 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
-          "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 },
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 12
+          },
           "description": "Printed decimal places retained with a reconciled filed subtotal."
         },
         "semantic_role": {
@@ -2483,6 +2566,10 @@
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9_.-]*$"
           }
+        },
+        "forecast_waterfall_pending": {
+          "type": "boolean",
+          "description": "Declared broker-waterfall transition marker: the row's broker authority was stripped by a confirmed FORECAST_WATERFALL selection and the row-owned fallback is minted by the next compile, which clears this marker."
         }
       }
     },
@@ -2920,15 +3007,21 @@
       "allOf": [
         {
           "if": {
-            "required": ["provider_consensus"],
+            "required": [
+              "provider_consensus"
+            ],
             "properties": {
               "provider_consensus": {
-                "contains": {"type": "number"}
+                "contains": {
+                  "type": "number"
+                }
               }
             }
           },
           "then": {
-            "required": ["provider_consensus_source"]
+            "required": [
+              "provider_consensus_source"
+            ]
           }
         }
       ]
@@ -2969,11 +3062,20 @@
                 "minLength": 1
               },
               "status": {
-                "enum": ["included", "excluded", "rejected", "quarantined", "stale"]
+                "enum": [
+                  "included",
+                  "excluded",
+                  "rejected",
+                  "quarantined",
+                  "stale"
+                ]
               },
               "reasons": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 }
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               },
               "definition_signature": {
                 "type": "object"
@@ -2983,7 +3085,13 @@
                 "minItems": 3,
                 "maxItems": 3,
                 "items": {
-                  "enum": ["included", "rejected", "quarantined", "wrong_period", "stale"]
+                  "enum": [
+                    "included",
+                    "rejected",
+                    "quarantined",
+                    "wrong_period",
+                    "stale"
+                  ]
                 }
               },
               "period_reasons": {
@@ -2992,7 +3100,10 @@
                 "maxItems": 3,
                 "items": {
                   "type": "array",
-                  "items": { "type": "string", "minLength": 1 }
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 }
               }
             }
@@ -3424,7 +3535,11 @@
     "residualInterestAuthority": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "method", "basis_note"],
+      "required": [
+        "contract_version",
+        "method",
+        "basis_note"
+      ],
       "properties": {
         "contract_version": {
           "const": "residual-interest-authority/1.0"

@@ -313,10 +313,6 @@ function normaliseEvaluatedHistoricalValues(
 }
 
 function historicalCandidate(row, behavior, forecastIndex) {
-  // Effective tax rate has a dedicated role policy (tax_rate_policy.mjs):
-  // its history must be normalized from filed tax/PBT with loss and
-  // distortion handling, never averaged or trend-extended as a raw series.
-  if (row?.semantic_role === "effective_tax_rate") return null;
   const history = historicalValues(row);
   const observed = history.filter((value) => value !== null);
   if (observed.length === 0) return null;
@@ -1250,8 +1246,15 @@ export function compileForecastPlan(
           }
         }
         if (inferred) candidates.push(inferred);
-        const taxPolicy = taxRatePolicyCandidate(modelCase, row, forecastIndex);
-        if (taxPolicy) candidates.push(taxPolicy);
+        if (!inferred && row.semantic_role === "effective_tax_rate") {
+          // The completion obligation the ETR identity-refusal creates: when
+          // the display row's own history cannot serve the generic rung, the
+          // role policy normalizes the rate from filed tax/PBT components
+          // (loss, credit and distortion shapes classified) so an ordinary
+          // supported company can never reach Build with the rate unresolved.
+          const taxPolicy = taxRatePolicyCandidate(modelCase, row, forecastIndex);
+          if (taxPolicy) candidates.push(taxPolicy);
+        }
         const eventZero = eventZeroCandidate(modelCase, row, behavior);
         if (eventZero) candidates.push(eventZero);
         if (behavior === "not_applicable") candidates.push({ method: "not_applicable", origin: "behavior", source_kind: "none", material: false, note: "The row is outside the applicable economic scope." });
@@ -1654,6 +1657,28 @@ export function materializeForecastPlan(modelCase, plan) {
   for (const state of plan?.states ?? []) {
     const row = rowsByKey.get(`${state.section}\u0000${state.row_id}`);
     if (row) delete row.forecast_waterfall_pending;
+    if (
+      row &&
+      row.semantic_role === "effective_tax_rate" &&
+      (state?.origin === "tax_rate_policy" ||
+        candidatesById.get(state?.selected_candidate_id)?.origin === "tax_rate_policy")
+    ) {
+      // The policy value is a leaf: a null period-rule slot suppresses the
+      // row's circular historical ratio, and the cell carries the normalized
+      // rate itself. Without this, the solver's dependency walk re-enters
+      // tax -> rate -> tax and blocks the acquisition graph.
+      const forecastIndex = Number(
+        state?.forecast_index ?? String(state?.state_id ?? "").match(/fy(\d)$/)?.[1] - 1,
+      );
+      if (Number.isInteger(forecastIndex) && forecastIndex >= 0 && forecastIndex < 3) {
+        row.forecast_period_calculations ??= [null, null, null];
+        row.forecast_period_calculations[forecastIndex] = null;
+        if (Number.isFinite(Number(state?.value))) {
+          row.values ??= [null, null, null, null, null, null];
+          row.values[forecastIndex + 3] = Number(state.value);
+        }
+      }
+    }
     if (!row) throw new Error(`Forecast plan state ${state.state_id} refers to missing row ${state.row_id}.`);
     const candidate = candidatesById.get(state.selected_candidate_id);
     row.forecast_period_authorities ??= [null, null, null];
