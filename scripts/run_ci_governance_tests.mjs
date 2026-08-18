@@ -57,11 +57,12 @@ for (const name of workflowFiles) {
   assert.match(text, /compare_development_gate_reports\.mjs/, `${name} has no current-SHA serial\/parallel comparison.`);
   assert.match(text, /run_current_package_source_identity_check\.mjs/, `${name} has no package\/source identity check.`);
   assert.match(text, /package-source-identity:[\s\S]*?actions\/checkout@[a-f0-9]{40}[\s\S]*?ref:\s*\$\{\{[^\n]*pull_request\.head\.sha/, `${name} does not pin package compilation to the PR head.`);
+  assert.match(text, /merge-compatibility-identity:[\s\S]*?actions\/checkout@[a-f0-9]{40}[\s\S]*?fetch-depth:\s*2/, `${name} does not fetch enough history to identify the synthetic merge parents.`);
   assert.match(text, /run_merge_compatibility_identity_check\.mjs/, `${name} has no separately labelled merge-compatibility identity check.`);
   assert.match(text, /--merge-report/, `${name} does not bind merge compatibility separately into the complete matrix.`);
   assert.match(text, /custody-inventory\/\*\*\/\*\.json/, `${name} does not retain complete custody report trees.`);
   assert.match(text, /compile_ci_gate_matrix\.mjs/, `${name} has no complete CI matrix compilation.`);
-  checks += 23;
+  checks += 24;
 }
 
 const clean = fs.readFileSync(
@@ -99,11 +100,17 @@ assert.doesNotMatch(
 );
 const collapsedMergeRole = clean.replace(/--merge-report/g, "--package-report");
 assert.doesNotMatch(collapsedMergeRole, /--merge-report/, "Collapsed merge/package roles escaped governance mutation coverage.");
+const shallowMergeCheckout = clean.replace(/\n\s*with:\n\s*fetch-depth:\s*2/, "");
+assert.doesNotMatch(
+  shallowMergeCheckout,
+  /merge-compatibility-identity:[\s\S]*?actions\/checkout@[a-f0-9]{40}[\s\S]*?fetch-depth:\s*2/,
+  "Shallow merge-compatibility checkout escaped governance mutation coverage.",
+);
 
 console.log(JSON.stringify({
   status: "PASS",
   workflow_count: workflowFiles.length,
   checks,
-  mutations_caught: mutations.length + 4,
+  mutations_caught: mutations.length + 5,
   workflow_deletion_mutation_caught: true,
 }, null, 2));
