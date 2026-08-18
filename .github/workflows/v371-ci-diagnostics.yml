@@ -28,15 +28,20 @@ jobs:
           python3 -m pip install pymupdf openpyxl pillow jsonschema lxml
 
       - name: Stage 4 checkpoint diagnostic
+        id: stage4
+        continue-on-error: true
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           node scripts/run_stage4_checkpoint_tests.mjs \
+            --out "${{ runner.temp }}/stage4-diag" \
             --cases test-fixtures/cases \
             --python "$(command -v python3)" \
             --soffice "$(command -v soffice)"
 
       - name: Degraded broker delivery diagnostic
+        id: degraded
+        continue-on-error: true
         env:
           PYTHONDONTWRITEBYTECODE: "1"
           DEBT_OVERLAY_CASES_DIR: test-fixtures/cases
@@ -44,4 +49,23 @@ jobs:
           EXCEL_INFLOW_TEST_PYTHON="$(command -v python3)" \
           DEBT_OVERLAY_PYTHON="$(command -v python3)" \
           SOFFICE_BIN="$(command -v soffice)" \
-          node scripts/run_degraded_broker_delivery_tests.mjs test-fixtures/cases
+          node scripts/run_degraded_broker_delivery_tests.mjs \
+            test-fixtures/cases \
+            "${{ runner.temp }}/degraded-diag"
+
+      - name: Retain synthetic diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: v371-linux-workbook-diagnostics
+          path: |
+            ${{ runner.temp }}/stage4-diag
+            ${{ runner.temp }}/degraded-diag
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Preserve diagnostic result
+        if: always()
+        run: |
+          test "${{ steps.stage4.outcome }}" = success
+          test "${{ steps.degraded.outcome }}" = success
