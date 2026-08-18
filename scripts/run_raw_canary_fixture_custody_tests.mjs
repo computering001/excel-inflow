@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 
 import {
   RAW_CANARY_EVIDENCE_SHA256,
+  assertRawCanaryEvidenceDigest,
   assertProtectedCashSubtotalCloses,
   bindRawCanaryEvidence,
   prepareSyntheticRawFilingRows,
@@ -31,6 +32,14 @@ await exec(process.execPath, [
 const generatedBytes = await fs.readFile(generated);
 const bound = bindRawCanaryEvidence(generatedBytes);
 assert.equal(bound.sha256, RAW_CANARY_EVIDENCE_SHA256);
+assert.throws(
+  () => assertRawCanaryEvidenceDigest(
+    generatedBytes,
+    "c93815e9a26aa9b84e05c7b5362af30250f40488b242a2276626b66d293a3a1d",
+  ),
+  /stale or foreign/,
+  "The previous source-owned digest still accepted newly generated fixture bytes.",
+);
 
 const rows = prepareSyntheticRawFilingRows(bound.evidence);
 assertProtectedCashSubtotalCloses(rows.cash_flow, "cf.cash_generated_from_operations");
@@ -74,6 +83,6 @@ console.log(JSON.stringify({
   status: "PASS",
   source_owned_clean_evidence_sha256: bound.sha256,
   positive_checks: 4,
-  adversarial_mutations: 2,
+  adversarial_mutations: 3,
   total_violations: 0,
 }, null, 2));

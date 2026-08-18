@@ -1,0 +1,21 @@
+{
+  "schema_version": "critical-invariant-oracle-matrix/1.0",
+  "bindings": {
+    "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
+    "oracle_sha256": "62e281da941a246f5310d4f66b18b6978126aabd05220da9a50e1cd2b42503f1",
+    "registry_path": "assets/development-test-registry.json",
+    "registry_sha256": "224a28d6d666d4506c6f008b069ffd7388b25d13aeb587c7dc47333853e9419b"
+  },
+  "domains": [
+    {"domain": "cash_flow_identity", "invariant_id": "cash-flow-current-period-additivity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "cash_flow_subtotal_prior_period"}]},
+    {"domain": "instrument_identity", "invariant_id": "instrument-id-to-balance-ownership", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "swap_instrument_rows"}]},
+    {"domain": "interest_lineage", "invariant_id": "instrument-own-rate-lineage", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "wrong_interest_rate_reference"}]},
+    {"domain": "ebitda_basis", "invariant_id": "impairment-not-da", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "include_impairment_in_ebitda"}]},
+    {"domain": "forecast_ownership", "invariant_id": "single-parent-or-child-writer", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "parent_and_child_forecast"}]},
+    {"domain": "rcf_financing_cash", "invariant_id": "rcf-enters-financing-once", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "drop_rcf_from_financing_cash"}]},
+    {"domain": "broker_period", "invariant_id": "broker-demand-period-parity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "change_broker_period"}]},
+    {"domain": "typed_unresolved_state", "invariant_id": "unresolved-is-not-zero", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "unresolved_to_zero"}]},
+    {"domain": "debt_classification", "invariant_id": "fixed-coupon-bond-class", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "bond_as_other_debt"}]},
+    {"domain": "workbook_error_scan", "invariant_id": "all-cell-formula-error-scan", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "remote_value_error"}]}
+  ]
+}

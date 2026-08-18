@@ -16,10 +16,15 @@
     "record": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["row_id", "model_node_id", "section", "period_end", "period_index", "period_status", "historical_owner", "forecast_owner", "source_evidence", "formula_schedule_owner", "capture_parent", "selected_evidence", "fallback_method", "visible_mechanism", "material", "status"],
+      "required": ["cell_key", "row_id", "model_node_id", "section", "visible_region", "cell_class", "column_role", "period_end", "period_index", "period_status", "historical_owner", "forecast_owner", "source_evidence", "formula_schedule_owner", "capture_parent", "selected_evidence", "fallback_method", "visible_mechanism", "material", "status"],
       "properties": {
+        "cell_key": {"type": "string", "minLength": 1},
         "row_id": {"type": "string"}, "model_node_id": {"type": "string"},
-        "section": {"enum": ["income_statement", "cash_flow"]}, "period_end": {"type": "string"},
+        "section": {"enum": ["income_statement", "cash_flow", "debt_schedule", "rcf_waterfall", "interest_schedule", "leverage_liquidity", "adjustment_columns", "pro_forma_columns"]},
+        "visible_region": {"enum": ["income_statement", "cash_flow", "debt_schedule", "rcf_waterfall", "interest_schedule", "leverage_liquidity", "adjustment_columns", "pro_forma_columns"]},
+        "cell_class": {"enum": ["statement_amount", "instrument_balance", "schedule_amount", "ratio", "controlled_adjustment", "pro_forma_amount"]},
+        "column_role": {"enum": ["historical", "forecast", "adjustment", "pro_forma_reference", "pro_forma_forecast"]},
+        "period_end": {"type": "string"},
         "period_index": {"type": "integer", "minimum": 0, "maximum": 5},
         "period_status": {"enum": ["historical", "forecast"]},
         "historical_owner": {"enum": ["source_input", "reported_total_reconciled", "derived_formula", "schedule_link", "not_applicable", "unresolved", null]},

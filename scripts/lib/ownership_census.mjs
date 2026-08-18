@@ -61,6 +61,123 @@ function statementRows(modelCase) {
   );
 }
 
+function sourceIds(value) {
+  return [...new Set([
+    ...(value?.source_line_ids ?? []),
+    ...(value?.source_line_id ? [value.source_line_id] : []),
+    ...(value?.instrument_id ? [`instrument:${value.instrument_id}`] : []),
+  ])].sort();
+}
+
+function economicRegionDefinitions(modelCase) {
+  const definitions = [];
+  for (const instrument of modelCase?.instruments ?? []) {
+    definitions.push({
+      row_id: `instrument.${instrument.instrument_id}.ending_balance`,
+      model_node_id: `instrument:${instrument.instrument_id}:ending_balance`,
+      section: "debt_schedule",
+      visible_region: "debt_schedule",
+      cell_class: "instrument_balance",
+      historical_owner: "source_input",
+      forecast_owner: "schedule_owned",
+      formula_schedule_owner: `instrument:${instrument.instrument_id}`,
+      source_evidence: sourceIds(instrument),
+    });
+  }
+  const scheduleRows = [
+    ["gross_debt_excluding_leases", "debt_schedule"],
+    ["gross_debt_including_leases", "debt_schedule"],
+    ["lease_liability", "debt_schedule"],
+    ["acquisition_debt", "debt_schedule"],
+    ["rcf_capacity", "rcf_waterfall"],
+    ["rcf_draw", "rcf_waterfall"],
+    ["rcf_repayment", "rcf_waterfall"],
+    ["ending_rcf", "rcf_waterfall"],
+    ["liquidity_shortfall", "rcf_waterfall"],
+    ["gross_interest_expense", "interest_schedule"],
+    ["net_interest_expense", "interest_schedule"],
+    ["lease_interest", "interest_schedule"],
+    ["rcf_interest", "interest_schedule"],
+    ["rcf_commitment_fee", "interest_schedule"],
+  ];
+  for (const [row_id, section] of scheduleRows) {
+    definitions.push({
+      row_id,
+      model_node_id: row_id,
+      section,
+      visible_region: section,
+      cell_class: "schedule_amount",
+      historical_owner: ["rcf_draw", "rcf_repayment", "ending_rcf", "liquidity_shortfall", "acquisition_debt"].includes(row_id)
+        ? "not_applicable"
+        : "derived_formula",
+      forecast_owner: "schedule_owned",
+      formula_schedule_owner: section,
+      source_evidence: [],
+    });
+  }
+  for (const instrument of (modelCase?.instruments ?? []).filter((item) => item?.class !== "rcf")) {
+    definitions.push({
+      row_id: `instrument.${instrument.instrument_id}.interest_expense`,
+      model_node_id: `instrument:${instrument.instrument_id}:interest_expense`,
+      section: "interest_schedule",
+      visible_region: "interest_schedule",
+      cell_class: "schedule_amount",
+      historical_owner: "not_applicable",
+      forecast_owner: "schedule_owned",
+      formula_schedule_owner: `instrument:${instrument.instrument_id}:interest`,
+      source_evidence: sourceIds(instrument),
+    });
+  }
+  for (const row_id of [
+    "gross_debt_excluding_leases", "gross_debt_including_leases",
+    "net_debt_excluding_leases", "net_debt_including_leases",
+    "adjusted_ebitda_denominator", "net_debt_to_adjusted_ebitda",
+    "net_debt_including_leases_to_adjusted_ebitda", "total_liquidity",
+  ]) {
+    definitions.push({
+      row_id,
+      model_node_id: `leverage_liquidity:${row_id}`,
+      section: "leverage_liquidity",
+      visible_region: "leverage_liquidity",
+      cell_class: row_id.includes("_to_") ? "ratio" : "schedule_amount",
+      historical_owner: "derived_formula",
+      forecast_owner: "schedule_owned",
+      formula_schedule_owner: "leverage_liquidity",
+      source_evidence: [],
+    });
+  }
+  return definitions;
+}
+
+function recordForDefinition(definition, period, periodIndex, columnRole) {
+  const isHistorical = period.status === "historical";
+  const historicalOwner = isHistorical ? definition.historical_owner : null;
+  const forecastOwner = isHistorical ? null : definition.forecast_owner;
+  const owner = isHistorical ? historicalOwner : forecastOwner;
+  return {
+    cell_key: `${definition.visible_region}:${definition.row_id}:${columnRole}:${period.date}`,
+    row_id: definition.row_id,
+    model_node_id: definition.model_node_id ?? definition.row_id,
+    section: definition.section,
+    visible_region: definition.visible_region,
+    cell_class: definition.cell_class,
+    column_role: columnRole,
+    period_end: String(period.date),
+    period_index: periodIndex,
+    period_status: period.status,
+    historical_owner: historicalOwner,
+    forecast_owner: forecastOwner,
+    source_evidence: definition.source_evidence ?? [],
+    formula_schedule_owner: definition.formula_schedule_owner ?? null,
+    capture_parent: null,
+    selected_evidence: null,
+    fallback_method: null,
+    visible_mechanism: mechanism(owner, null),
+    material: true,
+    status: ["blocked", "unresolved"].includes(owner) ? "BLOCK" : "PASS",
+  };
+}
+
 export function buildOwnershipCensus(modelCase) {
   const periods = modelCase?.periods ?? [];
   if (periods.length !== 6 || periods.filter((period) => period.status === "historical").length !== 3 ||
@@ -81,9 +198,13 @@ export function buildOwnershipCensus(modelCase) {
       const status = ["blocked", "unresolved"].includes(owner) && material(row) ? "BLOCK" : "PASS";
       if (status === "BLOCK") violations.push(`${rowId}:${period.date} has unresolved ${period.status} ownership`);
       records.push({
+        cell_key: `${section}:${rowId}:${isHistorical ? "historical" : "forecast"}:${period.date}`,
         row_id: rowId,
         model_node_id: row?.model_node_id ?? rowId,
         section,
+        visible_region: section,
+        cell_class: "statement_amount",
+        column_role: isHistorical ? "historical" : "forecast",
         period_end: String(period.date),
         period_index: periodIndex,
         period_status: period.status,
@@ -111,6 +232,61 @@ export function buildOwnershipCensus(modelCase) {
         status,
       });
     }
+  }
+  for (const definition of economicRegionDefinitions(modelCase)) {
+    for (const [periodIndex, period] of periods.entries()) {
+      records.push(recordForDefinition(
+        definition,
+        period,
+        periodIndex,
+        period.status === "historical" ? "historical" : "forecast",
+      ));
+    }
+  }
+  const visibleStatementRows = statementRows(modelCase).filter(({ row }) => row?.row_type !== "header");
+  for (const { section, row } of visibleStatementRows) {
+    for (const [periodIndex, period] of periods.entries()) {
+      if (period.status !== "forecast") continue;
+      for (const region of ["adjustment_columns", "pro_forma_columns"]) {
+        const definition = {
+          row_id: row.row_id,
+          model_node_id: `${region}:${row.row_id}`,
+          section: region,
+          visible_region: region,
+          cell_class: region === "adjustment_columns" ? "controlled_adjustment" : "pro_forma_amount",
+          historical_owner: "not_applicable",
+          forecast_owner: "schedule_owned",
+          formula_schedule_owner: region === "adjustment_columns" ? "adjustment_control" : "standalone_plus_adjustment",
+          source_evidence: sourceIds(row),
+        };
+        records.push(recordForDefinition(
+          definition,
+          period,
+          periodIndex,
+          region === "adjustment_columns" ? "adjustment" : "pro_forma_forecast",
+        ));
+      }
+    }
+    const referencePeriod = periods[2];
+    records.push(recordForDefinition({
+      row_id: row.row_id,
+      model_node_id: `pro_forma_columns:${row.row_id}`,
+      section: "pro_forma_columns",
+      visible_region: "pro_forma_columns",
+      cell_class: "pro_forma_amount",
+      historical_owner: "derived_formula",
+      forecast_owner: "schedule_owned",
+      formula_schedule_owner: "latest_historical_reference",
+      source_evidence: sourceIds(row),
+    }, referencePeriod, 2, "pro_forma_reference"));
+  }
+  const seenCellKeys = new Set();
+  for (const record of records) {
+    if (seenCellKeys.has(record.cell_key)) {
+      violations.push(`duplicate ownership census cell ${record.cell_key}`);
+      record.status = "BLOCK";
+    }
+    seenCellKeys.add(record.cell_key);
   }
   const byKey = new Map(records.map((record) => [`${record.section}\0${record.row_id}\0${record.period_end}`, record]));
   for (const record of records) {

@@ -1,21 +1,26 @@
 import { createHash } from "node:crypto";
 
 export const RAW_CANARY_EVIDENCE_SHA256 =
-  "c93815e9a26aa9b84e05c7b5362af30250f40488b242a2276626b66d293a3a1d";
+  "40d38d82f087a41588fc4da55991cc1374d7c3e9e7fe8d563bcdf082cedfd2d2";
 
 export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function bindRawCanaryEvidence(bytes) {
+export function assertRawCanaryEvidenceDigest(bytes, expectedSha256 = RAW_CANARY_EVIDENCE_SHA256) {
   const actualSha256 = sha256Bytes(bytes);
-  if (actualSha256 !== RAW_CANARY_EVIDENCE_SHA256) {
+  if (actualSha256 !== expectedSha256) {
     throw new Error(
       "RAW_CANARY_EVIDENCE is stale or foreign. Regenerate it with " +
       "scripts/run_evidence_run_tests.mjs --emit-clean before running the registered canary: " +
-      `${actualSha256} supplied, ${RAW_CANARY_EVIDENCE_SHA256} expected.`,
+      `${actualSha256} supplied, ${expectedSha256} expected.`,
     );
   }
+  return actualSha256;
+}
+
+export function bindRawCanaryEvidence(bytes) {
+  const actualSha256 = assertRawCanaryEvidenceDigest(bytes);
   const evidence = JSON.parse(Buffer.from(bytes).toString("utf8"));
   if (
     evidence.schema_version !== "evidence-run/1.0" ||

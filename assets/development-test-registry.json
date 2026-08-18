@@ -642,6 +642,22 @@
       "test_class": "real_corpus"
     },
     {
+      "id": "real-filing-corpus-extraction-live",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_real_filing_corpus_extraction_outcomes.py",
+      "arguments": [
+        {"name": "arg_1", "value": "--manifest", "type": "literal"},
+        {"name": "real_filing_corpus_manifest", "source": "REAL_FILING_CORPUS_MANIFEST", "type": "file"},
+        {"name": "arg_3", "value": "--out", "type": "literal"},
+        {"name": "test_out", "source": "TEST_OUT", "type": "file"}
+      ],
+      "requires": ["REAL_FILING_CORPUS_MANIFEST"],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
+    },
+    {
       "id": "broker-real-pack-completion",
       "phase": "real_corpus",
       "runtime": "python",
@@ -836,6 +852,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "real-filing-corpus-extraction-outcome-contract",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_real_filing_corpus_extraction_outcomes.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "raw-input-black-box-canary",
       "phase": "proof",
       "runtime": "node",
@@ -1015,6 +1040,15 @@
       "phase": "evidence",
       "runtime": "python",
       "script": "run_source_arithmetic_topology_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "independent_economic_oracle"
+    },
+    {
+      "id": "critical-invariant-independent-oracle-matrix",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_critical_invariant_oracle_matrix_tests.py",
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "independent_economic_oracle"

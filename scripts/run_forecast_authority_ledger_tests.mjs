@@ -31,6 +31,11 @@ const auth = (value) => ({
 const modelCase = {
   case_id: "ledger",
   periods,
+  instruments: [{
+    instrument_id: "bond_a",
+    class: "bond_fixed",
+    source_line_ids: ["debt.note_1"],
+  }],
   statement_structure: {
     income_statement: [{
       row_id: "revenue",
@@ -64,15 +69,55 @@ assert.deepEqual(
   "The ledger omitted the explicit economic disposition for selected authority rows.",
 );
 verifyForecastAuthorityLedger(modelCase);
+const sealedModelCase = structuredClone(modelCase);
 const censusSchema = JSON.parse(fs.readFileSync(new URL("../assets/ownership-census-v1.schema.json", import.meta.url), "utf8"));
 assert.deepEqual(validateJsonSchema(modelCase.ownership_census, censusSchema), []);
-assert.equal(modelCase.ownership_census.records.length, 12);
+assert.ok(modelCase.ownership_census.records.length > 100);
 assert.deepEqual(
-  [...new Set(modelCase.ownership_census.records.filter((row) => row.period_status === "historical").map((row) => row.historical_owner))],
+  [...new Set(modelCase.ownership_census.records.map((row) => row.visible_region))].sort(),
+  [
+    "adjustment_columns", "cash_flow", "debt_schedule", "income_statement",
+    "interest_schedule", "leverage_liquidity", "pro_forma_columns", "rcf_waterfall",
+  ],
+  "The census omitted a visible economic region.",
+);
+assert.deepEqual(
+  [...new Set(modelCase.ownership_census.records.map((row) => row.cell_class))].sort(),
+  [
+    "controlled_adjustment", "instrument_balance", "pro_forma_amount",
+    "ratio", "schedule_amount", "statement_amount",
+  ],
+  "The census omitted a visible economic cell class.",
+);
+assert.deepEqual(
+  [...new Set(modelCase.ownership_census.records.map((row) => row.column_role))].sort(),
+  ["adjustment", "forecast", "historical", "pro_forma_forecast", "pro_forma_reference"],
+  "The census omitted a visible economic column role.",
+);
+assert.equal(
+  new Set(modelCase.ownership_census.records.map((row) => row.cell_key)).size,
+  modelCase.ownership_census.records.length,
+  "The ownership census contains duplicate visible-cell keys.",
+);
+for (const requiredRow of [
+  "gross_debt_excluding_leases", "net_debt_to_adjusted_ebitda", "total_liquidity",
+  "rcf_draw", "gross_interest_expense",
+]) {
+  assert.ok(
+    modelCase.ownership_census.records.some((row) => row.row_id === requiredRow),
+    `The ownership census omitted ${requiredRow}.`,
+  );
+}
+assert.deepEqual(
+  [...new Set(modelCase.ownership_census.records.filter((row) =>
+    ["income_statement", "cash_flow"].includes(row.visible_region) && row.period_status === "historical"
+  ).map((row) => row.historical_owner))],
   ["source_input"],
 );
 assert.deepEqual(
-  [...new Set(modelCase.ownership_census.records.filter((row) => row.row_id === "revenue" && row.period_status === "forecast").map((row) => row.forecast_owner))],
+  [...new Set(modelCase.ownership_census.records.filter((row) =>
+    row.visible_region === "income_statement" && row.row_id === "revenue" && row.period_status === "forecast"
+  ).map((row) => row.forecast_owner))],
   ["guidance_owned"],
 );
 const before = ledger.ledger_sha256;
@@ -146,4 +191,28 @@ const doubleOwnedCensus = buildOwnershipCensus(doubleOwned);
 assert.equal(doubleOwnedCensus.status, "BLOCK");
 assert.ok(doubleOwnedCensus.violations.every((finding) => finding.includes("both own forecasts")));
 
-console.log(JSON.stringify({ status: "PASS", checks: 16, sha: before }));
+for (const rowId of ["gross_debt_excluding_leases", "net_debt_to_adjusted_ebitda"]) {
+  const missingRegionCell = structuredClone(sealedModelCase);
+  missingRegionCell.ownership_census.records = missingRegionCell.ownership_census.records.filter(
+    (row) => row.row_id !== rowId,
+  );
+  assert.throws(
+    () => verifyForecastAuthorityLedger(missingRegionCell),
+    /ownership census drift/,
+    `Deleting every ${rowId} ownership cell was not detected.`,
+  );
+}
+
+const selfConfirmingLeverage = structuredClone(sealedModelCase);
+const leverageCell = selfConfirmingLeverage.ownership_census.records.find(
+  (row) => row.row_id === "net_debt_to_adjusted_ebitda" && row.period_status === "forecast",
+);
+leverageCell.forecast_owner = "user_assumption";
+leverageCell.visible_mechanism = "visible_hardcode";
+assert.throws(
+  () => verifyForecastAuthorityLedger(selfConfirmingLeverage),
+  /ownership census drift/,
+  "A formula-owned leverage cell could be relabelled as a user hardcode.",
+);
+
+console.log(JSON.stringify({ status: "PASS", checks: 27, sha: before }));

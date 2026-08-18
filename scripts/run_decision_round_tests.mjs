@@ -8,6 +8,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { planQuestions } from "./lib/flow_questions.mjs";
+import { sealForecastAuthorityLedger } from "./lib/forecast_authority_ledger.mjs";
 
 const supplied = process.argv[2] ?? process.env.DECISION_ROUND_CASE;
 let fixture;
@@ -77,6 +78,10 @@ if (supplied) {
       other_non_cash_movement: [0, 0, 0],
     })),
   );
+  // The ownership census now covers instrument schedule cells as well as
+  // statement rows, so this deliberate instrument mutation must be resealed
+  // before the decision-planning layer verifies the compiled case.
+  sealForecastAuthorityLedger(base);
   fixture = { draft_case: base, intake: structuredClone(noQuestions.intake) };
   fixture.intake.export.instruments.push(...extraMaturities);
 }
