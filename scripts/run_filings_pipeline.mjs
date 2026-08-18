@@ -2,18 +2,16 @@
 /** Own raw filing review through hash-bound, complete face-statement evidence. */
 
 import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import { filingManifestCustodyErrors } from "./lib/face_statement_manifest.mjs";
 import { acquireFilingsSources } from "./lib/filings_acquisition.mjs";
 import { validateJsonSchema } from "./lib/json_schema.mjs";
-import { resolvePythonExecutable } from "./lib/process_tree.mjs";
+import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 import { canonicalise } from "./lib/run_store.mjs";
 import {
   assertWorkflowState,
@@ -24,7 +22,6 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const ASSETS = path.join(ROOT, "assets");
 const ATTEMPT_LIMIT = 3;
-const execFileAsync = promisify(execFile);
 const REQUEST_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-extraction-request-v1.schema.json"), "utf8"));
 const RESPONSE_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-extraction-response-v1.schema.json"), "utf8"));
 const SOURCE_REGISTRY_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v1.schema.json"), "utf8"));
@@ -65,6 +62,32 @@ async function atomicJson(target, value) {
   } finally {
     await fs.rm(temporary, { force: true }).catch(() => {});
   }
+}
+
+async function acquireOnlyMain() {
+  const requestIndex = process.argv.indexOf("--acquire-only");
+  const outIndex = process.argv.indexOf("--out");
+  const requestPath = path.resolve(process.argv[requestIndex + 1] ?? "");
+  const outDir = path.resolve(process.argv[outIndex + 1] ?? "");
+  if (requestIndex < 0 || outIndex < 0 || !process.argv[outIndex + 1]) {
+    throw new Error("Acquire-only worker requires --acquire-only <request> --out <folder>.");
+  }
+  const request = await readJson(requestPath, "filings acquisition request");
+  const acquired = await acquireFilingsSources({
+    request,
+    requestPath,
+    outDir,
+    extractionRequestSchema: REQUEST_SCHEMA,
+    sourceRegistrySchema: request.schema_version === "filings-acquisition-request/2.0"
+      ? SOURCE_REGISTRY_SCHEMA_V2
+      : SOURCE_REGISTRY_SCHEMA,
+  });
+  await atomicJson(path.join(outDir, "source-acquisition-result.json"), {
+    schema_version: "filings-source-acquisition-result/1.0",
+    extraction_request_path: acquired.extractionRequestPath,
+    registry_path: acquired.registryPath,
+  });
+  return 0;
 }
 
 function resolveFrom(base, value) {
@@ -335,12 +358,35 @@ async function main() {
   const requestPath = path.resolve(process.argv[2] ?? "");
   const outIndex = process.argv.indexOf("--out");
   const responseIndex = process.argv.indexOf("--responses");
+  const sourceTimeoutIndex = process.argv.indexOf("--source-acquisition-timeout-ms");
+  const extractionTimeoutIndex = process.argv.indexOf("--filing-extraction-timeout-ms");
+  const sourceAcquisitionTimeoutMs = Number(sourceTimeoutIndex >= 0 ? process.argv[sourceTimeoutIndex + 1] : 120_000);
+  const filingExtractionTimeoutMs = Number(extractionTimeoutIndex >= 0 ? process.argv[extractionTimeoutIndex + 1] : 480_000);
+  if (!Number.isSafeInteger(sourceAcquisitionTimeoutMs) || sourceAcquisitionTimeoutMs <= 0 || sourceAcquisitionTimeoutMs > 120_000) {
+    throw new Error("Source-acquisition timeout must be a positive integer no greater than 120000ms.");
+  }
+  if (!Number.isSafeInteger(filingExtractionTimeoutMs) || filingExtractionTimeoutMs <= 0 || filingExtractionTimeoutMs > 480_000) {
+    throw new Error("Filing-extraction timeout must be a positive integer no greater than 480000ms.");
+  }
   if (!process.argv[2] || outIndex < 0 || !process.argv[outIndex + 1]) {
     throw new Error("Usage: run_filings_pipeline.mjs <acquisition-or-extraction-request.json> --out <folder> [--responses <response.json>]");
   }
   const outputRoot = path.resolve(process.argv[outIndex + 1]);
   let responsePath = responseIndex >= 0 ? path.resolve(process.argv[responseIndex + 1]) : null;
   await fs.mkdir(outputRoot, { recursive: true });
+  const runtimeReceiptPath = path.join(outputRoot, "filings-runtime-budget-receipt.json");
+  const runtimeReceipt = {
+    schema_version: "filings-runtime-budget-receipt/1.0",
+    status: "ACTIVE",
+    stages: {
+      source_acquisition: { budget_ms: sourceAcquisitionTimeoutMs, duration_ms: null, outcome: "ACTIVE" },
+      filing_extraction: { budget_ms: filingExtractionTimeoutMs, duration_ms: null, outcome: "NOT_REQUIRED" },
+    },
+  };
+  const writeRuntimeReceipt = async () => {
+    const body = { ...runtimeReceipt, receipt_sha256: sha256(canonicalBytes(runtimeReceipt)) };
+    await atomicJson(runtimeReceiptPath, body);
+  };
   const statePath = path.join(outputRoot, "filings-run-state.json");
   const inputRequest = await readJson(requestPath, "filings request");
   const runtimeHash = await runtimeClosure();
@@ -350,21 +396,38 @@ async function main() {
   const acquisitionArtifacts = {};
   if (["filings-acquisition-request/1.0", "filings-acquisition-request/2.0"].includes(inputRequest.schema_version)) {
     try {
-      const acquired = await acquireFilingsSources({
-        request: inputRequest,
-        requestPath,
-        outDir: path.join(outputRoot, "acquisition"),
-        extractionRequestSchema: REQUEST_SCHEMA,
-        sourceRegistrySchema: inputRequest.schema_version === "filings-acquisition-request/2.0"
-          ? SOURCE_REGISTRY_SCHEMA_V2
-          : SOURCE_REGISTRY_SCHEMA,
-      });
-      request = acquired.extractionRequest;
-      effectiveRequestPath = acquired.extractionRequestPath;
-      acquisitionArtifacts.filings_source_registry = acquired.registryPath;
-      acquisitionArtifacts.acquired_extraction_request = acquired.extractionRequestPath;
+      const acquisitionRoot = path.join(outputRoot, "acquisition");
+      const acquiredProcess = await runProcessTree(process.execPath, [
+        path.join(HERE, "run_filings_pipeline.mjs"),
+        "--acquire-only", requestPath,
+        "--out", acquisitionRoot,
+      ], { cwd: HERE, timeout: sourceAcquisitionTimeoutMs, maxBuffer: 8 * 1024 * 1024 });
+      if (!acquiredProcess.ok) {
+        const error = new Error(
+          acquiredProcess.timed_out
+            ? `Source acquisition timed out after ${sourceAcquisitionTimeoutMs}ms.`
+            : String(acquiredProcess.stderr || acquiredProcess.stdout || "Source acquisition worker failed."),
+        );
+        error.code = acquiredProcess.timed_out ? "SOURCE_ACQUISITION_TIMEOUT" : "SOURCE_ACQUISITION_FAILED";
+        error.termination_verified = acquiredProcess.termination_verified;
+        error.survivor_pids = acquiredProcess.survivor_pids;
+        throw error;
+      }
+      const acquired = await readJson(path.join(acquisitionRoot, "source-acquisition-result.json"), "source acquisition result");
+      effectiveRequestPath = path.resolve(acquired.extraction_request_path);
+      request = await readJson(effectiveRequestPath, "acquired filings extraction request");
+      acquisitionArtifacts.filings_source_registry = path.resolve(acquired.registry_path);
+      acquisitionArtifacts.acquired_extraction_request = effectiveRequestPath;
     } catch (error) {
       const message = String(error?.message ?? error);
+      performance.source_acquisition_ms = Number(process.hrtime.bigint() - sourceAcquisitionStarted) / 1e6;
+      runtimeReceipt.stages.source_acquisition.duration_ms = performance.source_acquisition_ms;
+      runtimeReceipt.stages.source_acquisition.outcome = error?.code === "SOURCE_ACQUISITION_TIMEOUT" ? "TIMEOUT" : "FAIL";
+      runtimeReceipt.stages.source_acquisition.process_tree_termination_verified =
+        error?.code === "SOURCE_ACQUISITION_TIMEOUT" ? error?.termination_verified === true : true;
+      runtimeReceipt.stages.source_acquisition.survivor_pids = error?.survivor_pids ?? [];
+      runtimeReceipt.status = "FAIL";
+      await writeRuntimeReceipt();
       const fatalSource = /ENOENT|expected_sha256 does not match|HTTP 4(?:00|01|03|04|10)/i.test(message);
       const requestHash = sha256(canonicalBytes({ input_request_sha256: inputRequestHash }));
       const cacheKey = sha256(canonicalBytes({ request: requestHash, sources: {}, runtime: runtimeHash }));
@@ -427,6 +490,13 @@ async function main() {
     }
   }
   performance.source_acquisition_ms = Number(process.hrtime.bigint() - sourceAcquisitionStarted) / 1e6;
+  runtimeReceipt.stages.source_acquisition.duration_ms = performance.source_acquisition_ms;
+  runtimeReceipt.stages.source_acquisition.outcome = performance.source_acquisition_ms > sourceAcquisitionTimeoutMs ? "TIMEOUT" : "PASS";
+  runtimeReceipt.status = runtimeReceipt.stages.source_acquisition.outcome === "PASS" ? "PASS" : "FAIL";
+  await writeRuntimeReceipt();
+  if (runtimeReceipt.status !== "PASS") {
+    throw new Error(`Source acquisition exceeded its independent ${sourceAcquisitionTimeoutMs}ms budget.`);
+  }
   const cacheKey = sha256(canonicalBytes({ request: requestHash, sources: sourceHashes, runtime: runtimeHash }));
   const prior = await readJson(statePath, "prior filings run state").catch(() => null);
   const attempts = priorAttempts(prior, cacheKey);
@@ -452,16 +522,21 @@ async function main() {
       ? pythonCandidate
       : await resolvePythonExecutable(pythonCandidate, { cwd: HERE, env: process.env });
     const filingExtractionStarted = process.hrtime.bigint();
-    const completed = await execFileAsync(
+    const completed = await runProcessTree(
       pythonExecutable,
       [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
-      { cwd: HERE, maxBuffer: 32 * 1024 * 1024 },
-    ).then((value) => ({ ...value, code: 0 })).catch((error) => ({
-      stdout: error.stdout ?? "",
-      stderr: error.stderr ?? error.message,
-      code: error.code ?? 1,
-    }));
+      { cwd: HERE, maxBuffer: 32 * 1024 * 1024, timeout: filingExtractionTimeoutMs },
+    );
     performance.filing_extraction_ms = Number(process.hrtime.bigint() - filingExtractionStarted) / 1e6;
+    runtimeReceipt.stages.filing_extraction = {
+      budget_ms: filingExtractionTimeoutMs,
+      duration_ms: performance.filing_extraction_ms,
+      outcome: completed.timed_out ? "TIMEOUT" : completed.ok ? "PASS" : "FAIL",
+      process_tree_termination_verified: completed.timed_out ? completed.termination_verified === true : true,
+      survivor_pids: completed.survivor_pids ?? [],
+    };
+    runtimeReceipt.status = completed.ok ? "PASS" : "FAIL";
+    await writeRuntimeReceipt();
     const nativeResponse = path.join(nativeRoot, "filings-extraction-response.json");
     const nativeReceiptPath = path.join(nativeRoot, "filings-native-extraction-receipt.json");
     const nativeReceipt = await readJson(nativeReceiptPath, "native filing extraction receipt").catch(() => null);
@@ -571,6 +646,7 @@ async function main() {
   const artifacts = {
     filings_bundle: bundlePath,
     document_extraction_registry: registryPath,
+    runtime_budget_receipt: runtimeReceiptPath,
     ...acquisitionArtifacts,
     ...nativeArtifacts,
   };
@@ -597,7 +673,7 @@ async function main() {
   return 0;
 }
 
-main()
+(process.argv.includes("--acquire-only") ? acquireOnlyMain() : main())
   .then((code) => { process.exitCode = code; })
   .catch((error) => {
     process.stderr.write(`${error.stack ?? error.message}\n`);

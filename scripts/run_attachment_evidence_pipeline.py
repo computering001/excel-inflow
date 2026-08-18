@@ -18,6 +18,7 @@ import math
 import os
 import re
 import subprocess
+import signal
 import sys
 import tempfile
 import time
@@ -211,25 +212,39 @@ def runtime_closure() -> str:
 def run(
     command: list[str], *, timeout_seconds: int | None = None
 ) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        cwd=HERE,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    )
     try:
-        return subprocess.run(
-            command,
-            cwd=HERE,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=timeout_seconds,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-        )
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
     except subprocess.TimeoutExpired as error:
-        stdout = error.stdout.decode() if isinstance(error.stdout, bytes) else error.stdout
-        stderr = error.stderr.decode() if isinstance(error.stderr, bytes) else error.stderr
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            stdout, stderr = process.communicate(timeout=1)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = process.communicate()
+        def text(value: Any) -> str:
+            return value.decode(errors="replace") if isinstance(value, bytes) else str(value or "")
         return subprocess.CompletedProcess(
             command,
             124,
-            stdout or "",
-            (stderr or "")
-            + f"\ncontroller timeout after {timeout_seconds} seconds",
+            text(stdout or error.stdout),
+            text(stderr or error.stderr)
+            + f"\ncontroller timeout after {timeout_seconds} seconds; process tree termination verified",
         )
 
 
@@ -248,10 +263,15 @@ def lane_timeout_budget(kind: str, request_path: Path) -> int:
         # circuit breaker below; it never becomes a re-upload request.
         return min(720, 180 + 120 * max(1, document_count))
     if kind == "filings":
-        # This process owns both the two-minute source-acquisition boundary and
-        # the eight-minute filing-extraction boundary.
-        return 600
+        # Outer crash watchdog only. The filings controller independently owns
+        # and receipts 120s acquisition and 480s extraction timers.
+        return 630
     return 180
+
+
+def lane_requires_execution(kind: str, reusable_mandatory_lanes: dict[str, dict[str, Any]]) -> bool:
+    """Authoritative call-order gate for a zero-broker downstream resume."""
+    return kind == "broker" or kind not in reusable_mandatory_lanes
 
 
 def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root: Path) -> list[str]:
@@ -263,6 +283,10 @@ def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root
             str(request),
             "--out",
             str(output_root / kind),
+            "--source-acquisition-timeout-ms",
+            "120000",
+            "--filing-extraction-timeout-ms",
+            "480000",
         ]
         response = resolve(base, declaration.get("responses_path"))
         if response is not None:
@@ -1337,6 +1361,34 @@ def main() -> int:
         raise ValueError("Attachment evidence controller spec declares no evidence lane")
     spec_hash = sha256_file(spec_path)
     runtime_hash = runtime_closure()
+    reusable_mandatory_lanes: dict[str, dict[str, Any]] = {}
+    prior_attachment_state: dict[str, Any] = {}
+    if args.force_zero_broker and state_path.is_file():
+        prior_attachment_state = read_json(state_path, "prior attachment evidence state")
+        if (
+            prior_attachment_state.get("controller_spec_sha256") != spec_hash
+            or prior_attachment_state.get("runtime_closure_sha256") != runtime_hash
+        ):
+            raise ValueError("Zero-broker resume cannot reuse evidence from a different spec/runtime closure")
+        prior_checkpoints = {
+            item.get("stage"): item for item in prior_attachment_state.get("checkpoints") or []
+        }
+        for kind in ("filings", "dcs"):
+            if not spec.get(kind):
+                continue
+            recorded_lane = (prior_attachment_state.get("lane_states") or {}).get(kind)
+            lane_state_path = output_root / kind / f"{kind}-run-state.json"
+            expected_state_sha = (prior_checkpoints.get(kind) or {}).get("state_sha256")
+            lane = read_json(lane_state_path, f"reusable {kind} lane state") if lane_state_path.is_file() else None
+            if (
+                not isinstance(lane, dict)
+                or lane.get("pipeline_status") not in CLOSED_LANE_STATUSES
+                or not lane_state_path.is_file()
+                or expected_state_sha != sha256_file(lane_state_path)
+                or sha256_value(recorded_lane) != sha256_value(lane)
+            ):
+                raise ValueError(f"Zero-broker resume lacks a hash-bound closed {kind} checkpoint")
+            reusable_mandatory_lanes[kind] = lane
     broker_intake_choice, broker_intake_choice_path = verify_broker_intake_choice(
         spec, spec_path
     )
@@ -1355,6 +1407,11 @@ def main() -> int:
     derived_artifacts: dict[str, str] = {
         "broker_intake_choice": str(broker_intake_choice_path),
     }
+    if reusable_mandatory_lanes:
+        for name in ("pre_broker_model_demand", "structural_ownership_preflight"):
+            target = (prior_attachment_state.get("artifacts") or {}).get(name)
+            if target and Path(target).is_file():
+                derived_artifacts[name] = str(target)
     if broker_choice_runtime_migrated:
         migration = {
             "schema_version": "broker-intake-runtime-migration/1.0",
@@ -1395,12 +1452,14 @@ def main() -> int:
         return state, round((time.monotonic() - started) * 1000)
 
     # Filings is the executable model-demand producer and therefore closes
-    # first. Its topology and model-owned demand must then pass the same sealed
-    # structural ownership Preflight A used by case compilation. No broker or
-    # debt process may launch before that receipt has been reopened and
-    # verified. Once it passes, optional broker work and mandatory debt
-    # extraction are independent and may run concurrently.
-    if spec.get("filings"):
+    # first. Its topology and model-owned demand must then pass sealed
+    # structural ownership Preflight A before any broker or debt process may
+    # launch. A zero-broker downstream resume reopens its hash-bound filings
+    # checkpoint instead of re-entering the filings controller.
+    if not lane_requires_execution("filings", reusable_mandatory_lanes):
+        lanes["filings"] = reusable_mandatory_lanes["filings"]
+        lane_duration_ms["filings"] = 0
+    elif spec.get("filings"):
         lanes["filings"], lane_duration_ms["filings"] = execute_lane(
             "filings", spec["filings"]
         )
@@ -1514,7 +1573,10 @@ def main() -> int:
             },
         )
         return 2
-    if spec.get("dcs"):
+    if not lane_requires_execution("dcs", reusable_mandatory_lanes):
+        lanes["dcs"] = reusable_mandatory_lanes["dcs"]
+        lane_duration_ms["dcs"] = 0
+    elif spec.get("dcs"):
         concurrent_declarations["dcs"] = spec["dcs"]
     if concurrent_declarations:
         with ThreadPoolExecutor(max_workers=len(concurrent_declarations)) as executor:
@@ -1633,6 +1695,7 @@ def main() -> int:
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
                     "broker_and_debt_execution": "concurrent_after_filings",
+                    "mandatory_lane_resume": "hash_bound_checkpoint_reuse" if reusable_mandatory_lanes else "fresh",
                 },
             },
         )
@@ -1752,6 +1815,7 @@ def main() -> int:
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
                     "broker_and_debt_execution": "concurrent_after_filings",
+                    "mandatory_lane_resume": "hash_bound_checkpoint_reuse" if reusable_mandatory_lanes else "fresh",
                     "filings": (lanes.get("filings", {}).get("summary") or {}).get("performance", {}),
                     "semantic_recovery_ms": semantic_recovery_ms,
                 },

@@ -49,6 +49,18 @@ assert.match(lines[2], /documents: 2\/3/);
 assert.match(lines[4], /documents: 3\/3 .* elapsed: 60s/);
 assert.deepEqual(observed.map((event) => event.kind), ["start", "heartbeat", "update", "heartbeat", "stop"]);
 
+const crossActivityGap = compileProgressEvidence({
+  controllerStartedAt: "2026-08-18T09:00:00.000Z",
+  events: [
+    { ...observed[0], activity_id: "a", controller_elapsed_ms: 0 },
+    { ...observed[4], activity_id: "a", controller_elapsed_ms: 1_000 },
+    { ...observed[0], activity_id: "b", controller_elapsed_ms: 31_001 },
+    { ...observed[4], activity_id: "b", controller_elapsed_ms: 31_002 },
+  ],
+});
+assert.equal(crossActivityGap.status, "FAIL");
+assert.ok(validateProgressEvidence(crossActivityGap).includes("heartbeat_gap"));
+
 const events = observed.map((event, index) => ({
   ...event,
   activity_id: "activity_01",
@@ -71,6 +83,17 @@ delayed.events[3].controller_elapsed_ms = 60_001;
 delayed.events[4].controller_elapsed_ms = 60_001;
 assert.ok(validateProgressEvidence(delayed).includes("heartbeat_gap"));
 
+const lateStart = structuredClone(evidence);
+lateStart.events.forEach((event) => { event.controller_elapsed_ms += 30_001; });
+lateStart.summary.max_observed_gap_ms = 30_001;
+assert.ok(validateProgressEvidence(lateStart).includes("controller_start_gap"));
+
+const unexpectedAction = structuredClone(evidence);
+unexpectedAction.events[1].action_required = true;
+unexpectedAction.events[1].line = unexpectedAction.events[1].line.replace("action required: no", "action required: yes");
+unexpectedAction.summary.action_required_event_count = 1;
+assert.ok(validateProgressEvidence(unexpectedAction).includes("unexpected_action_required"));
+
 const tamperedLine = structuredClone(evidence);
 tamperedLine.events[0].line = tamperedLine.events[0].line.replace("action required: no", "action required: yes");
 assert.ok(validateProgressEvidence(tamperedLine).includes("line_binding"));
@@ -82,4 +105,4 @@ assert.ok(validateProgressEvidence(missingStop).includes("activity_boundary"));
 
 assert.throws(() => createProgressHeartbeat({ stage: "bad", documentsTotal: 1, intervalMs: 30_001, schedule: () => 1, cancel: () => {}, write: () => {} }));
 
-console.log(JSON.stringify({ status: "PASS", checks: 19, mutations_rejected: 4, violations: 0 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 21, mutations_rejected: 6, violations: 0 }, null, 2));

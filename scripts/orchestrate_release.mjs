@@ -29,6 +29,11 @@ import {
   hashValue,
 } from "./lib/run_store.mjs";
 import { runProcessTree } from "./lib/process_tree.mjs";
+import {
+  RuntimeStageBudgetLedger,
+  stage4BudgetStage,
+  validateRuntimeBudgetPolicy,
+} from "./lib/runtime_budget_policy.mjs";
 import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
 import {
   acquireRunLease,
@@ -47,6 +52,9 @@ const ASSETS = path.join(ROOT, "assets");
 let COMMAND_CWD = process.cwd();
 let COMMAND_ENV = { ...process.env, PYTHONDONTWRITEBYTECODE: "1" };
 let ACTIVE_RUN_GUARD = null;
+let ACTIVE_STAGE4_BUDGET = null;
+let ACTIVE_STAGE4_BUDGET_TOKEN = null;
+let ACTIVE_STAGE4_BUDGET_RECEIPT_PATH = null;
 const CHECKPOINT_ORDER = Object.freeze([
   "semantic_gates",
   "plan",
@@ -104,12 +112,21 @@ async function json(target) {
 }
 
 async function command(binary, args, options = {}) {
-  return runProcessTree(binary, args, {
+  let timeout = options.timeout ?? 180000;
+  const stage = ACTIVE_STAGE4_BUDGET_TOKEN?.stage ?? null;
+  if (stage && ACTIVE_STAGE4_BUDGET) {
+    const activeElapsed = Math.max(0, Date.now() - ACTIVE_STAGE4_BUDGET_TOKEN.started);
+    const remaining = Math.max(0, ACTIVE_STAGE4_BUDGET.remaining(stage) - activeElapsed);
+    timeout = Math.max(1, Math.min(Number(timeout), remaining));
+  }
+  const result = await runProcessTree(binary, args, {
     cwd: options.cwd ?? COMMAND_CWD,
     maxBuffer: 64 * 1024 * 1024,
-    timeout: options.timeout ?? 180000,
+    timeout,
     env: options.env ?? COMMAND_ENV,
   });
+  if (stage) ACTIVE_STAGE4_BUDGET?.noteProcessResult(stage, result);
+  return result;
 }
 
 function sizeAwareTimeout(bytes, {
@@ -467,6 +484,7 @@ async function main() {
       "[--model-demand-graph <json>] [--selected-authority-contract <json>] " +
       "[--run-constitution-graph <json>] " +
       "[--case-only] [--python <python>] [--soffice <path>] " +
+      "[--runtime-budget-policy <resolved-policy.json>] " +
       "[--workspace-token <token>] [--json]",
     );
   }
@@ -475,6 +493,15 @@ async function main() {
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });
   const runDir = isolated.run_root;
   await fs.mkdir(runDir, { recursive: true });
+  if (typeof options["runtime-budget-policy"] === "string") {
+    const runtimePolicy = await json(path.resolve(options["runtime-budget-policy"]));
+    const policyErrors = validateRuntimeBudgetPolicy(runtimePolicy);
+    if (policyErrors.length > 0) {
+      throw new Error(`Stage-4 runtime budget policy is invalid: ${policyErrors.join(", ")}`);
+    }
+    ACTIVE_STAGE4_BUDGET = new RuntimeStageBudgetLedger(runtimePolicy);
+    ACTIVE_STAGE4_BUDGET_RECEIPT_PATH = path.join(runDir, "stage4-runtime-budget-receipt.json");
+  }
   const modelCase = await json(casePath);
   const authorityOptionPaths = {
     model_demand_graph: options["model-demand-graph"]
@@ -603,6 +630,9 @@ async function main() {
     };
     const inspected = await store.inspect({ checkpointId: id, recipe, inputHashes, outputs });
     if (inspected.reusable) {
+      const reusedBudgetStage = stage4BudgetStage(id);
+      const reusedBudgetToken = ACTIVE_STAGE4_BUDGET?.begin(reusedBudgetStage) ?? null;
+      ACTIVE_STAGE4_BUDGET?.end(reusedBudgetToken, { outcome: "PASS" });
       reusedCheckpoints.push(id);
       checkpointReceipts[id] = inspected.receipt.receipt_hash;
       timingsMs[id] = 0;
@@ -610,14 +640,38 @@ async function main() {
     }
 
     await store.reset(id);
+    const budgetStage = stage4BudgetStage(id);
+    let budgetToken = null;
+    try {
+      budgetToken = ACTIVE_STAGE4_BUDGET?.begin(budgetStage) ?? null;
+    } catch (error) {
+      return {
+        ok: false,
+        result: fail(`Independent ${budgetStage} runtime budget was exhausted before checkpoint ${id}.`, {
+          checkpoint: id,
+          budget_stage: budgetStage,
+          timed_out: true,
+          checkpoint_preserved: true,
+          evidence_retained: true,
+        }),
+      };
+    }
+    ACTIVE_STAGE4_BUDGET_TOKEN = budgetToken;
     const started = process.hrtime.bigint();
     let result;
     try {
       result = await action(store.workDir(id));
     } catch (error) {
       result = fail(`Checkpoint ${id} threw before its gate completed.`, { error: error.stack ?? error.message });
+    } finally {
+      ACTIVE_STAGE4_BUDGET_TOKEN = null;
     }
     timingsMs[id] = Number(process.hrtime.bigint() - started) / 1e6;
+    ACTIVE_STAGE4_BUDGET?.end(budgetToken, {
+      outcome: result?.status === "PASS" ? "PASS" : "FAIL",
+      checkpointPreserved: true,
+      evidenceRetained: true,
+    });
     executedCheckpoints.push(id);
     const passed = result?.status === "PASS";
     const receipt = await store.persist({
@@ -1263,7 +1317,29 @@ async function main() {
 
 async function guardedMain() {
   try {
-    const result = await main();
+    let result = await main();
+    if (ACTIVE_STAGE4_BUDGET && ACTIVE_STAGE4_BUDGET_RECEIPT_PATH) {
+      const receipt = ACTIVE_STAGE4_BUDGET.receipt({
+        requireAll: result?.status === "PASS_PENDING_MANUAL",
+      });
+      await writeIsolationJson(ACTIVE_STAGE4_BUDGET_RECEIPT_PATH, receipt);
+      result = {
+        ...result,
+        runtime_budget: {
+          status: receipt.status,
+          policy_sha256: receipt.policy_sha256,
+          receipt: ACTIVE_STAGE4_BUDGET_RECEIPT_PATH,
+          receipt_sha256: await hashFile(ACTIVE_STAGE4_BUDGET_RECEIPT_PATH),
+          stage_executions: receipt.stage_executions,
+          violations: receipt.violations,
+        },
+      };
+      if (result.status === "PASS_PENDING_MANUAL" && receipt.status !== "PASS") {
+        result = fail("Independent Stage-4 runtime budgets did not close.", {
+          runtime_budget: result.runtime_budget,
+        });
+      }
+    }
     if (ACTIVE_RUN_GUARD) {
       const closing = await assertRuntimeIntegrityUnchanged(ACTIVE_RUN_GUARD.integrity, ROOT);
       await writeIsolationJson(path.join(ACTIVE_RUN_GUARD.runDir, "skill-integrity.json"), {

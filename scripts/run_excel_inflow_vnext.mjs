@@ -21,7 +21,7 @@ import {
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
 import { compilePerformanceReceipt } from "./lib/performance_receipt.mjs";
-import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
+import { cancelProcessTreePids, resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 import {
   boundedStageTimeout,
   compileOwnershipPreflightControllerAction,
@@ -48,8 +48,8 @@ let ACTIVE_EXPERIENCE_ROOT_SPAN = null;
 let ACTIVE_SOURCE_IDENTITY = null;
 let ACTIVE_PROGRESS_STARTED_AT = null;
 let ACTIVE_PROGRESS_STARTED_EPOCH_MS = null;
-let ACTIVE_PROGRESS_ACTIVITY_COUNTER = 0;
 let ACTIVE_PROGRESS_EVENTS = [];
+let ACTIVE_PROGRESS_HEARTBEAT = null;
 let ACTIVE_RUNTIME_BUDGET = null;
 let ACTIVE_RUNTIME_BUDGET_EXECUTIONS = [];
 const STATE_SCHEMA = JSON.parse(
@@ -152,16 +152,7 @@ async function run(command, args, {
       nowEpochMs: started,
     })
     : Math.min(Number(timeout), remaining);
-  const activityId = progress ? `activity_${String(++ACTIVE_PROGRESS_ACTIVITY_COUNTER).padStart(2, "0")}` : null;
-  const heartbeat = progress ? createProgressHeartbeat({
-    ...progress,
-    intervalMs: ACTIVE_RUNTIME_BUDGET?.budgets_ms?.heartbeat_interval,
-    observe: (event) => ACTIVE_PROGRESS_EVENTS.push({
-      ...event,
-      activity_id: activityId,
-      controller_elapsed_ms: Date.now() - ACTIVE_PROGRESS_STARTED_EPOCH_MS,
-    }),
-  }) : null;
+  if (progress) ACTIVE_PROGRESS_HEARTBEAT?.update({ ...progress, actionRequired: false });
   const spanId = ACTIVE_EXPERIENCE_TRACE?.start(
     `subprocess:${path.basename(command)}`,
     "run_excel_inflow_vnext",
@@ -204,8 +195,9 @@ async function run(command, args, {
     if (spanId) ACTIVE_EXPERIENCE_TRACE.end(spanId, "FAIL", { error: error.message });
     throw error;
   } finally {
-    heartbeat?.stop({
-      documentsComplete: progress?.documentsTotal ?? 0,
+    if (progress) ACTIVE_PROGRESS_HEARTBEAT?.update({
+      stage: progress.stage,
+      documentsComplete: progress.documentsTotal ?? 0,
       actionRequired: false,
     });
   }
@@ -239,6 +231,8 @@ async function checkpoint(id, status, target = null) {
 }
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
+  ACTIVE_PROGRESS_HEARTBEAT?.stop({ actionRequired: false });
+  ACTIVE_PROGRESS_HEARTBEAT = null;
   if (ACTIVE_RUNTIME_BUDGET) {
     const runtimeBudgetReceipt = compileRuntimeBudgetReceipt({
       policy: ACTIVE_RUNTIME_BUDGET,
@@ -313,7 +307,6 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
 async function main() {
   ACTIVE_PROGRESS_STARTED_AT = new Date().toISOString();
   ACTIVE_PROGRESS_STARTED_EPOCH_MS = Date.now();
-  ACTIVE_PROGRESS_ACTIVITY_COUNTER = 0;
   ACTIVE_PROGRESS_EVENTS = [];
   ACTIVE_RUNTIME_BUDGET_EXECUTIONS = [];
   ACTIVE_PERFORMANCE = {
@@ -352,6 +345,16 @@ async function main() {
     throw new Error("vNext run output must be outside the immutable skill tree.");
   }
   await fs.mkdir(out, { recursive: true });
+  ACTIVE_PROGRESS_HEARTBEAT = createProgressHeartbeat({
+    stage: "controller preflight",
+    documentsTotal: 1,
+    intervalMs: ACTIVE_RUNTIME_BUDGET.budgets_ms.heartbeat_interval,
+    observe: (event) => ACTIVE_PROGRESS_EVENTS.push({
+      ...event,
+      activity_id: "controller_run",
+      controller_elapsed_ms: Date.now() - ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+    }),
+  });
   ACTIVE_EXPERIENCE_TRACE = createExperienceTrace({ runId: path.basename(out), scope: "vnext_controller" });
   ACTIVE_EXPERIENCE_ROOT_SPAN = ACTIVE_EXPERIENCE_TRACE.start(
     "vnext_controller",
@@ -368,7 +371,7 @@ async function main() {
   const pythonProbe = await run(pythonCommand, [
     "-c",
     "import os, openpyxl; print(os.path.dirname(os.path.dirname(openpyxl.__file__)))",
-  ], { timeout: 30_000, budgetStage: "source_acquisition" });
+  ], { timeout: 30_000 });
   const pythonSite = pythonProbe.code === 0 ? pythonProbe.stdout.trim() : "";
   const runtimeEnv = {
     ...process.env,
@@ -380,6 +383,9 @@ async function main() {
   };
   const checkpoints = [];
   const artifacts = {};
+  const runtimeBudgetPolicyPath = path.join(out, "runtime-budget-policy.json");
+  await writeJson(runtimeBudgetPolicyPath, ACTIVE_RUNTIME_BUDGET);
+  artifacts.runtime_budget_policy = runtimeBudgetPolicyPath;
   let evidencePath;
   let attachmentState = null;
 
@@ -517,6 +523,7 @@ async function main() {
     firstArgs.push("--broker-intake-choice", path.resolve(artifacts.broker_intake_choice));
   }
   firstArgs.push("--python", pythonCommand);
+  firstArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
   if (options.soffice) firstArgs.push("--soffice", String(options.soffice));
   const firstExecution = await run(process.execPath, firstArgs, {
     timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.case_compilation_and_ownership,
@@ -572,14 +579,31 @@ async function main() {
           "cancel_descendants_preserve_checkpoint",
     );
     if (ownershipFinding) {
+      const descendantPids = [
+        ...(ownershipFinding.context?.controller_signal?.descendant_pids ?? []),
+        ...(firstExecution.live_descendant_pids ?? []),
+      ];
+      const cancellationExecution = await cancelProcessTreePids(descendantPids);
       const checkpointSha256 = String(
         userFlowResult?.receipt?.receipt_hash ?? await sha256File(compileReportPath),
       );
       const action = compileOwnershipPreflightControllerAction({
         preflightReceipt: ownershipFinding.context.receipt,
         checkpointSha256,
-        descendantPids: firstExecution.terminated_pids ?? [],
+        descendantPids,
       });
+      action.cancellation_execution = cancellationExecution;
+      action.resume = {
+        topology_resolution: "forecast_ownership",
+        preserve_checkpoint_sha256: checkpointSha256,
+        resume_scope: "downstream_only",
+        reenter_filings: false,
+        reenter_dcs: false,
+        reenter_broker: false,
+      };
+      const unsignedAction = { ...action };
+      delete unsignedAction.action_sha256;
+      action.action_sha256 = digestBytes(canonicalJson(unsignedAction));
       const actionPath = path.join(out, "ownership-preflight-controller-action.json");
       await writeJson(actionPath, action);
       artifacts.ownership_preflight_controller_action = actionPath;
@@ -676,16 +700,16 @@ async function main() {
     "--json",
   ];
   resumeArgs.push("--python", pythonCommand);
+  resumeArgs.push("--runtime-budget-policy", runtimeBudgetPolicyPath);
   if (options.soffice) resumeArgs.push("--soffice", String(options.soffice));
   const pausedResultSha256 = await sha256File(userFlowResultPath);
   const resumeExecution = await run(process.execPath, resumeArgs, {
-    timeout: Math.min(
-      ACTIVE_RUNTIME_BUDGET.budgets_ms.end_to_end_hard_ceiling,
-      ACTIVE_RUNTIME_BUDGET.budgets_ms.solver +
-        ACTIVE_RUNTIME_BUDGET.budgets_ms.workbook_build +
-        ACTIVE_RUNTIME_BUDGET.budgets_ms.recalculation +
-        ACTIVE_RUNTIME_BUDGET.budgets_ms.validation,
-    ),
+    // This is only the controller watchdog. Stage-4 enforces solver, build,
+    // recalc and validation independently and cumulatively.
+    timeout: remainingRuntimeMs({
+      policy: ACTIVE_RUNTIME_BUDGET,
+      controllerStartedEpochMs: ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+    }),
     env: runtimeEnv,
     progress: {
       stage: "workbook build and checks",
@@ -750,6 +774,17 @@ async function main() {
   const attachmentStatePath = artifacts.attachment_state ?? null;
   const buildResultPath = path.join(userFlowOut, "stages", "build_checks", "build-result.json");
   const buildResult = await readJson(buildResultPath, "Stage-4 build result");
+  if (!buildResult.runtime_budget?.receipt) {
+    throw new Error("Stage-4 build result omitted its independent runtime-budget receipt.");
+  }
+  const stage4RuntimeReceiptPath = path.resolve(buildResult.runtime_budget.receipt);
+  const stage4RuntimeReceipt = await readJson(stage4RuntimeReceiptPath, "Stage-4 runtime budget receipt");
+  const stage4RuntimeErrors = validateRuntimeBudgetReceipt(stage4RuntimeReceipt, ACTIVE_RUNTIME_BUDGET);
+  if (stage4RuntimeErrors.length > 0) {
+    throw new Error(`Stage-4 runtime budget receipt failed closed: ${stage4RuntimeErrors.join(", ")}`);
+  }
+  ACTIVE_RUNTIME_BUDGET_EXECUTIONS.push(...stage4RuntimeReceipt.stage_executions);
+  artifacts.stage4_runtime_budget_receipt = stage4RuntimeReceiptPath;
   const performanceReceiptPath = path.join(out, "performance-receipt.json");
   const performanceReceipt = compilePerformanceReceipt({
     runId,

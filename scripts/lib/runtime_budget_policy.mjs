@@ -154,6 +154,122 @@ export function validateRuntimeBudgetReceipt(receipt, policy) {
   return [...new Set(errors)].sort();
 }
 
+export const STAGE4_RUNTIME_STAGES = Object.freeze([
+  "solver",
+  "workbook_build",
+  "recalculation",
+  "validation",
+]);
+
+export function stage4BudgetStage(checkpointId) {
+  const id = String(checkpointId ?? "");
+  if (["semantic_gates", "plan"].includes(id)) return "solver";
+  if (["emit", "terminal_patch"].includes(id)) return "workbook_build";
+  if (id === "recalculate") return "recalculation";
+  if (id.startsWith("verify_") || id === "render" || id.startsWith("render_sheet_")) {
+    return "validation";
+  }
+  return null;
+}
+
+/**
+ * Cumulative Stage-4 budget ledger. A logical budget is shared by all of its
+ * checkpoints, so splitting work into children can never reset the clock.
+ */
+export class RuntimeStageBudgetLedger {
+  constructor(policy, { now = () => Date.now() } = {}) {
+    const errors = validateRuntimeBudgetPolicy(policy);
+    if (errors.length > 0) throw new Error(`Invalid runtime budget policy: ${errors.join(", ")}`);
+    this.policy = policy;
+    this.now = now;
+    this.startedAt = new Date().toISOString();
+    this.elapsed = Object.fromEntries(STAGE4_RUNTIME_STAGES.map((stage) => [stage, 0]));
+    this.outcomes = Object.fromEntries(STAGE4_RUNTIME_STAGES.map((stage) => [stage, "PASS"]));
+    this.terminationVerified = Object.fromEntries(STAGE4_RUNTIME_STAGES.map((stage) => [stage, true]));
+    this.checkpointPreserved = Object.fromEntries(STAGE4_RUNTIME_STAGES.map((stage) => [stage, true]));
+    this.evidenceRetained = Object.fromEntries(STAGE4_RUNTIME_STAGES.map((stage) => [stage, true]));
+    this.observed = new Set();
+  }
+
+  remaining(stage) {
+    if (!STAGE4_RUNTIME_STAGES.includes(stage)) return Number.POSITIVE_INFINITY;
+    return Math.max(0, this.policy.budgets_ms[stage] - this.elapsed[stage]);
+  }
+
+  timeout(stage, requestedMs) {
+    const remaining = this.remaining(stage);
+    const requested = Number(requestedMs);
+    return Math.max(1, Math.floor(Number.isFinite(requested) && requested > 0
+      ? Math.min(remaining, requested)
+      : remaining));
+  }
+
+  begin(stage) {
+    if (!STAGE4_RUNTIME_STAGES.includes(stage)) return null;
+    if (this.remaining(stage) <= 0) {
+      const error = new Error(`Independent ${stage} runtime budget is exhausted.`);
+      error.code = "STAGE_RUNTIME_BUDGET_EXHAUSTED";
+      error.budget_stage = stage;
+      throw error;
+    }
+    this.observed.add(stage);
+    return { stage, started: this.now() };
+  }
+
+  end(token, { outcome = "PASS", terminationVerified = true, checkpointPreserved = true, evidenceRetained = true } = {}) {
+    if (!token) return;
+    const duration = Math.max(0, this.now() - token.started);
+    this.elapsed[token.stage] += duration;
+    if (outcome !== "PASS" && this.outcomes[token.stage] === "PASS") this.outcomes[token.stage] = outcome;
+    if (!terminationVerified) this.terminationVerified[token.stage] = false;
+    if (!checkpointPreserved) this.checkpointPreserved[token.stage] = false;
+    if (!evidenceRetained) this.evidenceRetained[token.stage] = false;
+    if (this.elapsed[token.stage] > this.policy.budgets_ms[token.stage] && this.outcomes[token.stage] === "PASS") {
+      this.outcomes[token.stage] = "TIMEOUT";
+    }
+  }
+
+  noteProcessResult(stage, result) {
+    if (!STAGE4_RUNTIME_STAGES.includes(stage) || !result) return;
+    if (result.timed_out) {
+      this.outcomes[stage] = "TIMEOUT";
+      this.terminationVerified[stage] = result.termination_verified === true;
+    } else if (!result.ok && this.outcomes[stage] === "PASS") {
+      this.outcomes[stage] = "FAIL";
+    }
+  }
+
+  receipt({ requireAll = false } = {}) {
+    const missing = requireAll ? STAGE4_RUNTIME_STAGES.filter((stage) => !this.observed.has(stage)) : [];
+    const receipt = compileRuntimeBudgetReceipt({
+      policy: this.policy,
+      startedAt: this.startedAt,
+      endedAt: new Date().toISOString(),
+      stageExecutions: [...this.observed].map((stage) => ({
+        stage,
+        budget_ms: this.policy.budgets_ms[stage],
+        duration_ms: this.elapsed[stage],
+        outcome: this.outcomes[stage],
+        process_tree_termination_verified: this.terminationVerified[stage],
+        checkpoint_preserved: this.checkpointPreserved[stage],
+        evidence_retained: this.evidenceRetained[stage],
+      })),
+    });
+    const nonPassing = requireAll
+      ? STAGE4_RUNTIME_STAGES.filter((stage) => this.observed.has(stage) && this.outcomes[stage] !== "PASS")
+      : [];
+    if (missing.length === 0 && nonPassing.length === 0) return receipt;
+    const { receipt_sha256: _discard, ...body } = receipt;
+    body.status = "FAIL";
+    body.violations = [...new Set([
+      ...(body.violations ?? []),
+      ...missing.map((stage) => `missing_stage:${stage}`),
+      ...nonPassing.map((stage) => `nonpassing_stage:${stage}:${this.outcomes[stage]}`),
+    ])].sort();
+    return { ...body, receipt_sha256: digest(body) };
+  }
+}
+
 export function ownershipFailureCancellationPlan({ checkpointSha256, descendantPids = [] } = {}) {
   if (!/^[a-f0-9]{64}$/.test(String(checkpointSha256 ?? ""))) {
     throw new Error("Ownership cancellation requires a sealed checkpoint SHA-256.");

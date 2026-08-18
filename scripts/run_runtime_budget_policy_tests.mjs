@@ -137,14 +137,18 @@ const python = process.env.EXCEL_INFLOW_TEST_PYTHON ?? process.env.PYTHON ?? "py
 const laneProbe = spawnSync(python, ["-c", [
   "import json, pathlib, sys, tempfile",
   `sys.path.insert(0, ${JSON.stringify(HERE)})`,
-  "from run_attachment_evidence_pipeline import lane_timeout_budget",
+  "from run_attachment_evidence_pipeline import lane_timeout_budget, lane_command",
   "root=pathlib.Path(tempfile.mkdtemp(prefix='excel-inflow-budget-'))",
   "def request(name,count):",
   " p=root/name; p.write_text(json.dumps({'documents':[{} for _ in range(count)]})); return p",
   "assert lane_timeout_budget('broker',request('broker-one.json',1)) == 300",
   "assert lane_timeout_budget('broker',request('broker-five.json',5)) == 720",
   "assert lane_timeout_budget('broker',request('broker-fifty.json',50)) == 720",
-  "assert lane_timeout_budget('filings',request('filings.json',1)) == 600",
+  "filings=request('filings.json',1)",
+  "assert lane_timeout_budget('filings',filings) == 630",
+  "command=lane_command('filings',{'request_path':str(filings)},root,root/'out')",
+  "assert command[command.index('--source-acquisition-timeout-ms')+1] == '120000'",
+  "assert command[command.index('--filing-extraction-timeout-ms')+1] == '480000'",
   "assert lane_timeout_budget('dcs',request('dcs.json',1)) == 180",
 ].join("\n")], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
 check(laneProbe.status === 0, `attachment lane budget integration failed: ${laneProbe.stderr}`);

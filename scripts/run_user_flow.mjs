@@ -1832,6 +1832,9 @@ async function main() {
     ];
     if (options.python) args.push("--python", options.python);
     if (options.soffice) args.push("--soffice", options.soffice);
+    if (options["runtime-budget-policy"]) {
+      args.push("--runtime-budget-policy", path.resolve(String(options["runtime-budget-policy"])));
+    }
     const runtimeHome = path.join(runDir, ".runtime-home");
     const runtimeTmp = path.join(runDir, ".runtime-tmp");
     await fs.mkdir(runtimeHome, { recursive: true });

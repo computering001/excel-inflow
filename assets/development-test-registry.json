@@ -1644,6 +1644,15 @@
       "timeout_seconds": 120,
       "mutates_product_tree": false,
       "test_class": "mutation"
+    },
+    {
+      "id": "phase5-operational-runtime-adversarial",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_phase5_operational_runtime_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     }
   ]
 }

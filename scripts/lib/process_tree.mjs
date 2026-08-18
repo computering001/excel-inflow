@@ -130,6 +130,36 @@ async function terminateProcessTree(child, closePromise, graceMs) {
   });
 }
 
+/** Cancel already-running descendant roots and prove that every captured PID
+ * has exited. Used when an ownership preflight invalidates speculative work. */
+export async function cancelProcessTreePids(rootPids, { graceMs = DEFAULT_TERMINATION_GRACE_MS } = {}) {
+  const roots = [...new Set((rootPids ?? []).map(Number))]
+    .filter((pid) => Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+  let targeted = [...new Set(roots.flatMap((pid) => snapshotProcessTree(pid)))];
+  for (const pid of [...targeted].reverse()) signalPid(pid, "SIGTERM");
+  const graceStarted = Date.now();
+  while (targeted.some(processExists) && Date.now() - graceStarted < graceMs) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  targeted = [...new Set([...targeted, ...roots.flatMap((pid) => snapshotProcessTree(pid))])];
+  for (const pid of [...targeted].reverse()) {
+    if (processExists(pid)) signalPid(pid, "SIGKILL");
+  }
+  for (let attempt = 0; attempt < 40 && targeted.some(processExists); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const survivors = targeted.filter(processExists);
+  if (survivors.length > 0) {
+    throw new Error(`Ownership cancellation retained live pids: ${survivors.join(", ")}.`);
+  }
+  return Object.freeze({
+    requested_root_pids: Object.freeze(roots),
+    targeted_pids: Object.freeze(targeted),
+    survivor_pids: Object.freeze([]),
+    verified: true,
+  });
+}
+
 /**
  * Execute one command in an isolated process group and return only after the
  * complete group has terminated on timeout or max-buffer failure.

@@ -30,12 +30,13 @@ export function createProgressHeartbeat({
     throw new Error(`Progress heartbeat interval must be within 1..${DEFAULT_INTERVAL_MS} ms.`);
   }
   const started = now();
+  let currentStage = String(stage ?? "working");
   let complete = documentsComplete;
   let action = actionRequired;
   let stopped = false;
   const emit = (kind = "heartbeat") => {
     const snapshot = {
-      stage: String(stage ?? "working"),
+      stage: currentStage,
       documentsComplete: Math.min(nonnegativeInteger(documentsTotal), nonnegativeInteger(complete)),
       documentsTotal: nonnegativeInteger(documentsTotal),
       elapsedMs: Math.max(0, now() - started),
@@ -48,7 +49,8 @@ export function createProgressHeartbeat({
   emit("start");
   const handle = schedule(() => emit("heartbeat"), Number(intervalMs));
   return {
-    update({ documentsComplete: nextComplete = complete, actionRequired: nextAction = action } = {}) {
+    update({ stage: nextStage = currentStage, documentsComplete: nextComplete = complete, actionRequired: nextAction = action } = {}) {
+      currentStage = String(nextStage ?? currentStage);
       complete = nextComplete;
       action = nextAction;
       emit("update");
@@ -100,14 +102,12 @@ export function compileProgressEvidence({
     if (!activityGroups.has(event.activity_id)) activityGroups.set(event.activity_id, []);
     activityGroups.get(event.activity_id).push(event);
   }
-  let maxObservedGapMs = 0;
-  for (const activity of activityGroups.values()) {
-    for (let index = 1; index < activity.length; index += 1) {
-      maxObservedGapMs = Math.max(
-        maxObservedGapMs,
-        activity[index].controller_elapsed_ms - activity[index - 1].controller_elapsed_ms,
-      );
-    }
+  let maxObservedGapMs = normalizedEvents[0]?.controller_elapsed_ms ?? 0;
+  for (let index = 1; index < normalizedEvents.length; index += 1) {
+    maxObservedGapMs = Math.max(
+      maxObservedGapMs,
+      normalizedEvents[index].controller_elapsed_ms - normalizedEvents[index - 1].controller_elapsed_ms,
+    );
   }
   const body = {
     schema_version: "excel-inflow-progress-evidence/1.0",
@@ -156,6 +156,7 @@ export function validateProgressEvidence(evidence, { verifyHash = true } = {}) {
     }
     if (!Number.isFinite(event.elapsed_ms) || event.elapsed_ms < 0) errors.push("elapsed_ms");
     if (typeof event.action_required !== "boolean") errors.push("action_required");
+    if (event.action_required === true) errors.push("unexpected_action_required");
     if (!['start', 'heartbeat', 'update', 'stop'].includes(event.kind)) errors.push("kind");
     const expectedLine = progressSnapshot({
       stage: event.stage,
@@ -168,7 +169,13 @@ export function validateProgressEvidence(evidence, { verifyHash = true } = {}) {
     if (!activities.has(event.activity_id)) activities.set(event.activity_id, []);
     activities.get(event.activity_id).push(event);
   }
-  let maxObservedGapMs = 0;
+  let maxObservedGapMs = Number(events[0]?.controller_elapsed_ms ?? 0);
+  if (maxObservedGapMs > maxIntervalMs) errors.push("controller_start_gap");
+  for (let index = 1; index < events.length; index += 1) {
+    const gap = events[index].controller_elapsed_ms - events[index - 1].controller_elapsed_ms;
+    maxObservedGapMs = Math.max(maxObservedGapMs, gap);
+    if (gap > maxIntervalMs) errors.push("heartbeat_gap");
+  }
   for (const activity of activities.values()) {
     if (activity[0]?.kind !== "start" || activity.at(-1)?.kind !== "stop") errors.push("activity_boundary");
     let priorElapsed = -1;
@@ -178,7 +185,6 @@ export function validateProgressEvidence(evidence, { verifyHash = true } = {}) {
       if (event.elapsed_ms < priorElapsed || event.documents_complete < priorComplete) errors.push("activity_monotonicity");
       if (index > 0) {
         const gap = event.controller_elapsed_ms - activity[index - 1].controller_elapsed_ms;
-        maxObservedGapMs = Math.max(maxObservedGapMs, gap);
         if (gap > maxIntervalMs) errors.push("heartbeat_gap");
       }
       priorElapsed = event.elapsed_ms;
