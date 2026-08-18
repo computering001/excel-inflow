@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { validateJsonSchema } from "./lib/json_schema.mjs";
+import { stageHashBoundTestSource } from "./lib/hash_bound_source_staging.mjs";
 import { solveCase } from "./lib/solver.mjs";
 
 const exec = promisify(execFile);
@@ -53,7 +54,12 @@ if (!process.argv[2]) {
 const clean = JSON.parse(await fs.readFile(cleanPath, "utf8"));
 const runId = `raw_black_box_${brokerState}_${dcsBalanceBasis}`.replaceAll("_reporting_currency_carrying_value", "_carrying");
 const out = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-raw-black-box-"));
-const input = path.join(out, "raw-inputs");
+const runRoot = path.join(out, "public-controller-run");
+// The attachment controller emits its resolved ingress beneath runRoot/evidence.
+// Keep every hash-bound raw input below that same controller-owned root so both
+// the original and resolved ingress files retain the narrow spec-directory
+// containment guarantee enforced by attachment_ingress.mjs.
+const input = path.join(runRoot, "evidence", "raw-inputs");
 await fs.mkdir(input, { recursive: true });
 const writeJson = (target, value) => fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`);
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -115,7 +121,17 @@ if (options["real-filings-request"]) {
   if (!Array.isArray(realRequest.documents) || realRequest.documents.length !== 1) {
     throw new Error("Real filings canary requires exactly one annual-report document.");
   }
-  annualReport = path.resolve(path.dirname(realRequestPath), realRequest.documents[0].path);
+  const sourceAnnualReport = path.resolve(
+    path.dirname(realRequestPath),
+    realRequest.documents[0].path,
+  );
+  const stagedAnnualReport = await stageHashBoundTestSource({
+    sourcePath: sourceAnnualReport,
+    destinationPath: path.join(input, "annual-report.pdf"),
+    expectedSha256: realRequest.documents[0].expected_sha256,
+    label: "Real-filings canary annual report",
+  });
+  annualReport = stagedAnnualReport.path;
   filingFacts = structuredClone(realRequest.filing_facts);
   const historicalGrossDebt = realFilingExpectations.historical_gross_debt;
   if (
@@ -743,7 +759,6 @@ await writeJson(specPath, {
   dcs: { request_path: dcsRequest },
 });
 
-const runRoot = path.join(out, "public-controller-run");
 let result;
 try {
   const executed = await exec(process.execPath, [

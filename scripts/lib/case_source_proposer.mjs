@@ -354,6 +354,15 @@ function proposeSection(caseEvidence, section, used) {
   // semantic nodes; collapsing them creates duplicate visible authority and
   // destroys the reported reconciliation surface.
   if (
+    section === "income_statement" &&
+    ![...roleBySource.values()].includes("ebit")
+  ) {
+    const operatingProfit = [...roleBySource.entries()].find(
+      ([, role]) => role === "operating_profit",
+    );
+    if (operatingProfit) roleBySource.set(operatingProfit[0], "ebit");
+  }
+  if (
     section === "cash_flow" &&
     ![...roleBySource.values()].includes("cash_flow_net_income")
   ) {
@@ -776,6 +785,10 @@ export function writeRuntimeEvidenceLanes({ evidence, caseSource }) {
       ? { prior_gross_debt_excluding_leases: historicalGrossDebt.slice(0, 2) }
       : {}),
   };
+  // The current model contract requires an explicit three-period residual
+  // interest series. A first-run with no sealed residual authority has zero
+  // residual interest; richer upstream evidence remains authoritative.
+  lanes.other_interest ??= [0, 0, 0];
   lanes.broker_pack ??= evidence.broker_pack ?? {
     source_label: "Forecast Waterfall — zero broker authority",
     forecast_periods: forecastPeriods,

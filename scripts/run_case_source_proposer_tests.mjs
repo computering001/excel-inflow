@@ -59,7 +59,7 @@ assert.equal(result.statement_map.income_statement.length, 5);
 assert.equal(result.statement_map.cash_flow.length, 10);
 assert.equal(result.statement_map.income_statement[0].role, "revenue");
 assert.equal(result.statement_map.income_statement[0].broker_metric_id, "revenue");
-assert.equal(result.statement_map.income_statement[2].role, "operating_profit");
+assert.equal(result.statement_map.income_statement[2].role, "ebit");
 assert.equal(result.statement_map.income_statement[3].role, "is_da_expense");
 assert.equal(result.statement_map.income_statement[4].role, "net_income");
 assert.equal(result.statement_map.cash_flow[0].role, "cash_flow_net_income");
@@ -73,6 +73,24 @@ assert.equal(result.statement_map.cash_flow[7].role, "lease_principal");
 assert.equal(result.statement_map.cash_flow[8].role, "net_change_in_cash");
 assert.equal(result.statement_map.cash_flow[9].role, "ending_cash");
 assert.equal(result.statement_map.income_statement[1].disposition, "keep");
+
+const dualEbitIncome = manifest("income_statement", [
+  { source_line_id: "is.revenue", ordinal: 1, raw_label: "Revenue", values: [100, 110, 120], material: true },
+  { source_line_id: "is.ebit", ordinal: 2, raw_label: "EBIT", values: [20, 21, 24], material: true },
+  { source_line_id: "is.operating_profit", ordinal: 3, raw_label: "Operating profit", values: [19, 20, 23], material: true },
+]);
+const dualEbitSource = proposeCaseSource({
+  declarations: { identity: { issuer_name: "Dual EBIT Test plc", reporting_currency: "GBP" } },
+  caseEvidence: {
+    face_statement_manifests: { income_statement: [dualEbitIncome], cash_flow: [cashFlow] },
+    lanes: {},
+  },
+});
+assert.deepEqual(
+  dualEbitSource.statement_map.income_statement.map((row) => row.role).filter(Boolean),
+  ["revenue", "ebit", "operating_profit"],
+  "A distinct printed EBIT mutation collapsed the separate operating-profit surface.",
+);
 assert.equal(result.statement_map.income_statement[1].role, undefined);
 assert.equal(result.statement_map.cash_flow[5].parent_source_line_id, "cf.cfo");
 assert.equal(result.evidence_refs.face_statement_manifests.income_statement[0].digest, income.rows_sha256);
@@ -288,6 +306,11 @@ assert.deepEqual(
 );
 assert.equal(runtimeLanes.policy_evidence.cash.opening_cash, 14);
 assert.deepEqual(runtimeLanes.debt_reconciliation.reported_opening_gross_debt, [40, 45, 50]);
+assert.deepEqual(
+  runtimeLanes.other_interest,
+  [0, 0, 0],
+  "The runtime writer did not author the required zero residual-interest series.",
+);
 assert.deepEqual(runtimeLanes.historical_supplement.prior_cash_and_cash_equivalents, [10, 12]);
 assert.equal(runtimeLanes.provenance.revenue.length, 3);
 assert.equal(runtimeLanes.provenance.revenue[0].document, income.source_id);
@@ -371,11 +394,23 @@ const sealedOperatingLane = {
   },
 };
 richerEvidence.case_evidence.lanes.operating_metrics = structuredClone(sealedOperatingLane);
+richerEvidence.case_evidence.lanes.other_interest = [1, 2, 3];
+richerEvidence.case_evidence.lanes.other_interest_authority = {
+  contract_version: "residual-interest-authority/1.0",
+  method: "explicit_forecast_assumption",
+  basis_note: "Independently sealed residual-interest mutation.",
+  source_ids: ["income_statement-filing"],
+};
 writeRuntimeEvidenceLanes({ evidence: richerEvidence, caseSource: result });
 assert.deepEqual(
   richerEvidence.case_evidence.lanes.operating_metrics,
   sealedOperatingLane,
   "The runtime writer overwrote a richer sealed upstream lane on rebuild.",
 );
+assert.deepEqual(
+  richerEvidence.case_evidence.lanes.other_interest,
+  [1, 2, 3],
+  "The runtime writer overwrote richer residual-interest evidence.",
+);
 
-console.log(JSON.stringify({ status: "PASS", checks: 51 }, null, 2));
+console.log(JSON.stringify({ status: "PASS", checks: 54 }, null, 2));

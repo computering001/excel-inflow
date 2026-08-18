@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { compileAttachmentIngress } from "./lib/attachment_ingress.mjs";
 import { acquireFilingsSources } from "./lib/filings_acquisition.mjs";
+import { stageHashBoundTestSource } from "./lib/hash_bound_source_staging.mjs";
 import {
   DEFAULT_REMOTE_INGRESS_AUTHORITY,
   addressIsPublic,
@@ -38,6 +40,65 @@ try {
   );
   checks += 1;
 
+  const stagedRoot = path.join(temporary, "controller-run", "raw-inputs");
+  const validBytes = await fs.readFile(valid);
+  const validSha256 = createHash("sha256").update(validBytes).digest("hex");
+  const staged = await stageHashBoundTestSource({
+    sourcePath: valid,
+    destinationPath: path.join(stagedRoot, "filing.pdf"),
+    expectedSha256: validSha256,
+    label: "canary filing",
+  });
+  assert.equal(staged.sha256, validSha256);
+  assert.equal(
+    await resolveApprovedRegularFile({
+      candidate: staged.path,
+      approvedRoots: [stagedRoot],
+      label: "staged canary filing",
+    }),
+    staged.path,
+  );
+  checks += 2;
+  const mismatchDestination = path.join(stagedRoot, "digest-mismatch.pdf");
+  await rejects(
+    () => stageHashBoundTestSource({
+      sourcePath: valid,
+      destinationPath: mismatchDestination,
+      expectedSha256: "0".repeat(64),
+      label: "digest mutation",
+    }),
+    /SHA-256 does not match/,
+    "hash-mismatched test source entered the controller run root",
+  );
+  await assert.rejects(() => fs.stat(mismatchDestination), /ENOENT/);
+  checks += 1;
+  const sourceSymlink = path.join(outside, "source-link.pdf");
+  await fs.symlink(valid, sourceSymlink);
+  await rejects(
+    () => stageHashBoundTestSource({
+      sourcePath: sourceSymlink,
+      destinationPath: path.join(stagedRoot, "source-link.pdf"),
+      expectedSha256: validSha256,
+      label: "source symlink mutation",
+    }),
+    /must not be a symbolic link/,
+    "symlinked test source entered the controller run root",
+  );
+  const destinationSymlink = path.join(stagedRoot, "destination-link.pdf");
+  await fs.symlink(secret, destinationSymlink);
+  await rejects(
+    () => stageHashBoundTestSource({
+      sourcePath: valid,
+      destinationPath: destinationSymlink,
+      expectedSha256: validSha256,
+      label: "destination symlink mutation",
+    }),
+    /EEXIST/,
+    "source staging overwrote a destination symlink",
+  );
+  assert.equal(await fs.readFile(secret, "utf8"), "%PDF-1.7\nsecret");
+  checks += 1;
+
   // A controller may persist a canonical artifact path while retaining an
   // alias spelling for the approved root (/private/var vs /var on macOS).
   // Prove this generically with an explicit directory alias on every host.
@@ -52,6 +113,16 @@ try {
       candidate: await fs.realpath(canonicalArtifact),
       approvedRoots: [approvedAlias],
       label: "canonical alias filing",
+    }),
+    await fs.realpath(canonicalArtifact),
+  );
+  checks += 1;
+  const aliasArtifact = path.join(approvedAlias, "canonical-filing.pdf");
+  assert.equal(
+    await resolveApprovedRegularFile({
+      candidate: aliasArtifact,
+      approvedRoots: [canonicalApproved],
+      label: "artifact alias filing",
     }),
     await fs.realpath(canonicalArtifact),
   );

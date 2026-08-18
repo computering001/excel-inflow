@@ -49,20 +49,21 @@ export async function resolveApprovedRegularFile({ candidate, approvedRoots, lab
     if (!stats.isDirectory()) throw new Error(`${label} approved root is not a directory: ${root}`);
     roots.push(root);
   }
-  // macOS exposes stable system aliases such as /var -> /private/var. A
-  // controller may record the canonical spelling for an artifact while its
-  // approved run root retains the alias spelling. Treat either spelling of
-  // the *approved root itself* as the lexical boundary; the realpath check
-  // below still proves the opened file resolves inside that canonical root.
-  const beginsInsideApprovedRoot =
-    lexicalRoots.some((root) => withinRoot(lexical, root)) ||
-    roots.some((root) => withinRoot(lexical, root));
-  if (!beginsInsideApprovedRoot) {
-    throw new Error(`${label} leaves its controller-approved local roots.`);
-  }
   const linkStats = await fs.lstat(lexical);
   if (linkStats.isSymbolicLink()) throw new Error(`${label} must not be a symbolic link.`);
   const canonical = await fs.realpath(lexical);
+  // macOS exposes stable system aliases such as /var -> /private/var. Either
+  // the artifact or approved root can retain the alias spelling. Accept that
+  // spelling difference only when the already-resolved artifact remains
+  // inside the canonical approved root. The terminal-link rejection above,
+  // canonical containment below and O_NOFOLLOW open remain fail closed.
+  const beginsInsideApprovedRoot =
+    lexicalRoots.some((root) => withinRoot(lexical, root)) ||
+    roots.some((root) => withinRoot(lexical, root)) ||
+    roots.some((root) => withinRoot(canonical, root));
+  if (!beginsInsideApprovedRoot) {
+    throw new Error(`${label} leaves its controller-approved local roots.`);
+  }
   if (!roots.some((root) => withinRoot(canonical, root))) {
     throw new Error(`${label} resolves outside its controller-approved local roots.`);
   }

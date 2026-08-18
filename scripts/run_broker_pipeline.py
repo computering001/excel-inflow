@@ -686,8 +686,15 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
             if surface.get("lane_status", {}).get("vision") != "required":
                 continue
             surface_id = str(surface.get("surface_id"))
-            pass_paths = [Path(str(responses / f"{surface_id}.pass{index}.json")) for index in (1, 2)] if responses else []
-            missing_passes = [index for index, target in enumerate(pass_paths, start=1) if not target.is_file()]
+            pass_paths = [
+                Path(str(responses / f"{surface_id}.pass{index}.json"))
+                for index in (1, 2)
+            ] if responses else [None, None]
+            missing_passes = [
+                index
+                for index, target in enumerate(pass_paths, start=1)
+                if target is None or not target.is_file()
+            ]
             image_id = next(
                 (
                     item
@@ -740,6 +747,11 @@ def vision_tasks(bundle: dict[str, Any], responses: Path | None) -> list[dict[st
                 ),
             })
     return tasks
+
+
+def pending_vision_tasks(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return only surfaces that still require an independent rendered read."""
+    return [task for task in tasks if task.get("missing_passes")]
 
 
 def resolution_tasks(bundle: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1263,8 +1275,8 @@ def main() -> int:
             write_state(
                 state_path, run_id=run_id, status="NEEDS_VISION", request_digest=request_digest,
                 sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
-                checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
-                summary={"unresolved_surface_count": len(tasks)},
+                checkpoints=checkpoints, artifacts=artifacts, tasks=pending_vision_tasks(tasks),
+                summary={"unresolved_surface_count": len(pending_vision_tasks(tasks))},
                 blocker_class="INTERNAL_WORK", attempts=attempts,
             )
             return 2
@@ -1589,7 +1601,7 @@ def main() -> int:
         # remedy; targeted cell adjudication is valid only after the vision
         # compiler has emitted a conflict manifest from those reads.
         if any(task.get("missing_passes") for task in transcription_tasks):
-            tasks = transcription_tasks
+            tasks = pending_vision_tasks(transcription_tasks)
         elif physical_status == "NEEDS_RESOLUTION":
             tasks = resolution_tasks(active_bundle) or transcription_tasks
         else:

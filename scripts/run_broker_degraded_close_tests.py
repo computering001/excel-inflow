@@ -556,6 +556,44 @@ def main() -> int:
         artifact_root = root / "artifacts"
         artifact_root.mkdir(parents=True)
 
+        # Public work state must expose only the rendered reads that remain
+        # outstanding. Exercise the same production task derivation used by
+        # the real-pack controller, including the no-response baseline.
+        custody_bundle = {
+            "documents": [{
+                "document_id": "custody-house",
+                "house_id": "custody-house",
+                "raw_sha256": "1" * 64,
+                "artifacts": [],
+                "surfaces": [{
+                    "surface_id": "custody-house.p1",
+                    "artifact_refs": [],
+                    "lane_status": {"vision": "required"},
+                }],
+            }],
+        }
+        no_response_tasks = broker.vision_tasks(custody_bundle, None)
+        check(no_response_tasks[0]["missing_passes"] == [1, 2], "absent response directory hid both required reads")
+        custody_responses = root / "custody-responses"
+        custody_responses.mkdir()
+        (custody_responses / "custody-house.p1.pass1.json").write_text("{}\n", encoding="utf-8")
+        one_missing = broker.vision_tasks(custody_bundle, custody_responses)
+        check(one_missing[0]["missing_passes"] == [2], "single-pass mutation did not preserve the remaining read")
+        check(
+            [task["surface_id"] for task in broker.pending_vision_tasks(one_missing)] == ["custody-house.p1"],
+            "pending-task filter discarded an unresolved surface",
+        )
+        (custody_responses / "custody-house.p1.pass2.json").write_text("{}\n", encoding="utf-8")
+        complete_tasks = broker.vision_tasks(custody_bundle, custody_responses)
+        check(not broker.pending_vision_tasks(complete_tasks), "completed surface remained in public pending work")
+        (custody_responses / "custody-house.p1.pass2.json").unlink()
+        mutated_tasks = broker.vision_tasks(custody_bundle, custody_responses)
+        check(
+            broker.pending_vision_tasks(mutated_tasks)[0]["missing_passes"] == [2],
+            "response-removal mutation failed to restore the pending surface",
+        )
+        checks += 5
+
         # --- five same-issuer houses: one clean native, two irreconcilable ---
         documents = [
             build_house(
