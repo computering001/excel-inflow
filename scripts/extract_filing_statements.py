@@ -1332,13 +1332,20 @@ def extract_statement(
             values, value_states, value_precisions = padded, padded_states, padded_precisions
         if not runs and re.search(r"(?:continued|unaudited|year ended|in millions|£m|\$m|€m)", label, re.I):
             continue
-        if runs and len(runs) < len(supported_periods):
+        bound_run_count = sum(1 for cell in cells if cell)
+        if runs and bound_run_count < len(runs):
+            # A printed numeric token that could not be bound to any period
+            # column is a genuine capture defect. A row printing FEWER tokens
+            # than columns is ordinary: the unprinted cells are typed
+            # reported_blank (or period_support_required) states, not
+            # partial-row failures.
             findings.append({
                 "code": "PARTIAL_STATEMENT_ROW",
                 "section": section,
                 "page": line["page"],
                 "label": label,
-                "captured_value_count": len(runs),
+                "captured_value_count": bound_run_count,
+                "printed_value_count": len(runs),
             })
         slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "line"
         section_prefix = "is" if section == "income_statement" else "cf"
