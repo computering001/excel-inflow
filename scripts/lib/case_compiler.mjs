@@ -3703,6 +3703,10 @@ export function compileCase(caseSource, evidence = {}) {
         Array.isArray(row.forecast_period_authorities) &&
         row.forecast_period_authorities.every(
           (authority) => authority?.method === "accounting_identity",
+        ) &&
+        row.forecast_period_authorities.every(
+          (authority) =>
+            (authority?.broker_rejection_reasons ?? []).length === 0,
         )
       ) {
         delete row.forecast_period_authorities;
