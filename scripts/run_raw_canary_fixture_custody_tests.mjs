@@ -35,10 +35,26 @@ assert.equal(bound.sha256, RAW_CANARY_EVIDENCE_SHA256);
 assert.throws(
   () => assertRawCanaryEvidenceDigest(
     generatedBytes,
-    "c93815e9a26aa9b84e05c7b5362af30250f40488b242a2276626b66d293a3a1d",
+    "40d38d82f087a41588fc4da55991cc1374d7c3e9e7fe8d563bcdf082cedfd2d2",
   ),
   /stale or foreign/,
   "The previous source-owned digest still accepted newly generated fixture bytes.",
+);
+assert(
+  Object.values(bound.evidence.broker_pack?.metrics ?? {}).every(
+    (metric) => !Object.hasOwn(metric, "provider_consensus"),
+  ),
+  "The clean raw canary must not relabel model-derived house consensus as provider consensus.",
+);
+
+const conflatedConsensus = structuredClone(bound.evidence);
+conflatedConsensus.broker_pack.metrics.adjusted_ebitda.provider_consensus = [1, 2, 3];
+assert.throws(
+  () => bindRawCanaryEvidence(
+    Buffer.from(`${JSON.stringify(conflatedConsensus, null, 2)}\n`, "utf8"),
+  ),
+  /stale or foreign/,
+  "A fixture that reintroduced synthetic provider consensus passed custody binding.",
 );
 
 const rows = prepareSyntheticRawFilingRows(bound.evidence);
@@ -82,7 +98,7 @@ assert.throws(
 console.log(JSON.stringify({
   status: "PASS",
   source_owned_clean_evidence_sha256: bound.sha256,
-  positive_checks: 4,
-  adversarial_mutations: 3,
+  positive_checks: 5,
+  adversarial_mutations: 4,
   total_violations: 0,
 }, null, 2));

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const RAW_CANARY_EVIDENCE_SHA256 =
-  "40d38d82f087a41588fc4da55991cc1374d7c3e9e7fe8d563bcdf082cedfd2d2";
+  "2d4057ba627a21421c2c7e587566e15c42739135a5df5e354938f2a9a3d77595";
 
 export function sha256Bytes(bytes) {
   return createHash("sha256").update(bytes).digest("hex");

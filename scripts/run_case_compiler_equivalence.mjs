@@ -26,6 +26,11 @@ import { compileCase } from "./lib/case_compiler.mjs";
 import { resolveAnchorPlanDecision } from "./lib/broker_anchor.mjs";
 import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
+import {
+  FORECAST_OWNERSHIP_PREFLIGHT_VERSION,
+  verifyForecastOwnershipReceipt,
+  verifySelectedForecastOwnership,
+} from "./lib/forecast_ownership_resolver.mjs";
 import { compileRowPlan } from "./lib/row_plan.mjs";
 import { ebitdaBasis, selectedEbitdaRow } from "./lib/semantic_roles.mjs";
 import { solveCase } from "./lib/solver.mjs";
@@ -921,6 +926,44 @@ for (const name of files) {
   }
   const { model_case: compiled, report } = compileCase(caseSource, evidence);
 
+  const ownershipReceipts = compiled.forecast_ownership_preflights ?? {};
+  let sealedOwnershipReceiptsValid = false;
+  try {
+    sealedOwnershipReceiptsValid =
+      compiled.forecast_ownership_preflight_version ===
+        FORECAST_OWNERSHIP_PREFLIGHT_VERSION &&
+      JSON.stringify(Object.keys(ownershipReceipts).sort()) ===
+        JSON.stringify(["selected", "structural"]) &&
+      ownershipReceipts.structural?.status === "PASS" &&
+      ownershipReceipts.selected?.status === "PASS" &&
+      (ownershipReceipts.structural?.violations ?? []).length === 0 &&
+      (ownershipReceipts.selected?.violations ?? []).length === 0 &&
+      ownershipReceipts.selected?.structural_receipt_sha256 ===
+        ownershipReceipts.structural?.receipt_sha256 &&
+      verifyForecastOwnershipReceipt(ownershipReceipts.structural) &&
+      verifyForecastOwnershipReceipt(ownershipReceipts.selected) &&
+      verifySelectedForecastOwnership(compiled) === ownershipReceipts.selected;
+  } catch {
+    sealedOwnershipReceiptsValid = false;
+  }
+  if (sealedOwnershipReceiptsValid) {
+    const mutatedOwnership = clone(compiled);
+    mutatedOwnership.forecast_ownership_preflights.selected.status = "BLOCK";
+    if (
+      verifyForecastOwnershipReceipt(
+        mutatedOwnership.forecast_ownership_preflights.selected,
+      )
+    ) {
+      throw new Error("Forecast-ownership receipt mutation was accepted as sealed.");
+    }
+    try {
+      verifySelectedForecastOwnership(mutatedOwnership);
+      throw new Error("Forecast-ownership topology mutation passed verification.");
+    } catch (error) {
+      if (/topology mutation passed verification/.test(String(error.message))) throw error;
+    }
+  }
+
   // The certified cohort predates the v3 stamps; ignore stamp-only deltas.
   const expected = clone(certified);
   stampLegacyCoverageReceipts(expected, evidence);
@@ -1240,6 +1283,74 @@ for (const name of files) {
           });
     return JSON.stringify(states) === JSON.stringify(expectedStates);
   };
+  const isForecastOwnershipReceiptStrengthening = (diff) => {
+    if (!sealedOwnershipReceiptsValid || diff.certifiedAbsent !== true) return false;
+    if (diff.path === "forecast_ownership_preflight_version") {
+      return diff.actual === JSON.stringify(FORECAST_OWNERSHIP_PREFLIGHT_VERSION);
+    }
+    return diff.path === "forecast_ownership_preflights";
+  };
+  const certifiedStatementRow = (rowId) => [
+    ...(expected.statement_structure?.income_statement ?? []),
+    ...(expected.statement_structure?.cash_flow ?? []),
+  ].find((row) => row?.row_id === rowId) ?? null;
+  const sealedAnchorCapture = (rowId) => {
+    if (!sealedOwnershipReceiptsValid) return false;
+    const certifiedRow = certifiedStatementRow(rowId);
+    const row = statementRowsById.get(rowId);
+    const parentId = row?.forecast_capture_parent_id;
+    const parent = statementRowsById.get(parentId);
+    if (
+      !certifiedRow?.broker_metric_id ||
+      certifiedRow.forecast_treatment !== "broker" ||
+      row?.broker_metric_id !== undefined ||
+      row?.forecast_treatment !== "uncalculated" ||
+      !parentId ||
+      row.forecast_capture_mode !== "semantic_scope" ||
+      parent?.semantic_role !== legacyAnchorDecision.selection?.headline_anchor ||
+      certifiedRow.semantic_role !== legacyAnchorDecision.selection?.derived
+    ) return false;
+    const certificates = row.forecast_capture_certificates ?? [];
+    if (
+      certificates.length !== 3 ||
+      !certificates.every((certificate, forecastIndex) =>
+        certificate?.forecast_index === forecastIndex &&
+        certificate?.parent_row_id === parentId &&
+        certificate?.mode === "semantic_scope" &&
+        JSON.stringify(certificate?.membership_path) ===
+          JSON.stringify([rowId, parentId])
+      ) ||
+      !(row.forecast_period_authorities ?? []).every(
+        (authority) => authority?.method === "not_separately_forecast",
+      )
+    ) return false;
+    return [0, 1, 2].every((forecastIndex) =>
+      (ownershipReceipts.selected?.resolutions ?? []).some(
+        (resolution) =>
+          resolution?.section === "income_statement" &&
+          resolution?.parent_row_id === parentId &&
+          resolution?.forecast_index === forecastIndex &&
+          ["parent_owned", "schedule_owned"].includes(resolution?.selected_mode) &&
+          (resolution?.child_row_ids ?? []).includes(rowId),
+      ),
+    );
+  };
+  const isSealedHeadlineOwnershipMigration = (diff) => {
+    const match = diff.path.match(
+      /^statement_structure\.income_statement\[([^\]]+)\]\.(broker_metric_id|forecast_treatment)$/,
+    );
+    if (!match || !sealedAnchorCapture(match[1])) return false;
+    const base = `statement_structure.income_statement[${match[1]}].`;
+    const paths = new Set(allDiffs.map((entry) => entry.path));
+    if (!paths.has(`${base}broker_metric_id`) || !paths.has(`${base}forecast_treatment`)) {
+      return false;
+    }
+    if (match[2] === "broker_metric_id") {
+      return diff.expected === JSON.stringify(certifiedStatementRow(match[1]).broker_metric_id) &&
+        diff.actual === "(absent)";
+    }
+    return diff.expected === '"broker"' && diff.actual === '"uncalculated"';
+  };
   const isJustifiedAll = (diff) =>
     isJustified(diff) ||
     isFixtureReceipt(diff) ||
@@ -1251,7 +1362,9 @@ for (const name of files) {
     isFilingProvenanceStrengthening(diff) ||
     isInverseBridgeResidualQuarantine(diff) ||
     isAttributionIdentityAddition(diff) ||
-    isTypedHistoricalStateStrengthening(diff);
+    isTypedHistoricalStateStrengthening(diff) ||
+    isForecastOwnershipReceiptStrengthening(diff) ||
+    isSealedHeadlineOwnershipMigration(diff);
   const justified = allDiffs.filter(isJustifiedAll);
   // Presentation is compiler-owned convention, verified post-canonicalisation
   // by the plan clause; sealed-level presentation drift in the hand-authored
