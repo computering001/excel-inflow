@@ -315,6 +315,7 @@
     "lib/forecast_candidate_compiler.mjs",
     "lib/forecast_observation.mjs",
     "lib/forecast_producer_contract.mjs",
+    "lib/ownership_census.mjs",
     "lib/formula_dsl.mjs",
     "lib/funded_acquisition_plan.mjs",
     "lib/funded_acquisition_runtime.mjs",
