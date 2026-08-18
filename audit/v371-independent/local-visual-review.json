@@ -1,0 +1,34 @@
+{
+  "schema_version": "excel-inflow-v371-local-visual-review/1.0",
+  "recorded_at": "2026-08-18T07:52:42Z",
+  "source_commit": "9bf43be06e271b44d8a86a16e191588126c0f535",
+  "workbook_sha256": "4c2a9139254d7b66c3977ac5fcb119ecdb2267e230c66c98d91264a95b40b435",
+  "automated_verification": {
+    "status": "PASS_PENDING_MANUAL",
+    "total_violations": 0,
+    "verification_summary_sha256": "1e933990789f3f5c07d14c3a4ad04019e1f404a62f1a273e311d35a2eef8fb8b",
+    "validation_report_sha256": "163107293e734005050c090563d3210c830e8cd08c1f6b06e9cd541ba671926f",
+    "finance_proof_sha256": "084237814ff69c75ed19bf21334db4b2d04008ba0567b64ba878381e20e06f4b",
+    "semantic_oracle_sha256": "4dc08dd668985ec5ddb5e2f2094d5d7906bed5696c50ac84c8edd0c059dcaf10",
+    "render_index_sha256": "a9a1e5791b61f46709e3c4c1836df8291b1ef4863750c7cdf4bda47a3f6a61f7"
+  },
+  "rendered_sheets": [
+    {"sheet": "Operating Model", "pages": 3, "pdf_sha256": "201feb982f7cec1c1d8e10c7b5964c512936f77ced02183c2714eb7bbbec74c8"},
+    {"sheet": "Brokers", "pages": 3, "pdf_sha256": "a5d766595f7dd7addfa1cb88b49ccb5f0013795e5234f64c5433efadd12b2136"},
+    {"sheet": "Forward Curves", "pages": 1, "pdf_sha256": "cf852e48135d429c53f41da44608b1872443a88f9add4ee5b69faaa8fd0550c0"}
+  ],
+  "local_review": {
+    "status": "PASS",
+    "pages_reviewed": 7,
+    "clipped_text": 0,
+    "overlaps": 0,
+    "broken_glyphs": 0,
+    "unexplained_raw_artifacts": 0,
+    "notes": "Local PDF render review only. Workbook hierarchy, control blocks, model sections, broker consensus and quality panel were visible and intelligible."
+  },
+  "native_excel_review": {
+    "status": "NOT_RUN_USER_HOLD",
+    "receipt": null
+  },
+  "production_claim": false
+}

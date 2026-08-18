@@ -1,0 +1,62 @@
+{
+  "schema_version": "excel-inflow-v371-phase-closure/1.0",
+  "recorded_at": "2026-08-18T07:52:42Z",
+  "source_commit": "9bf43be06e271b44d8a86a16e191588126c0f535",
+  "source_tree": "aab31691bd0e6e35dc074748e450c97c86457422",
+  "registry_sha256": "b4ee07fcf2f09a87d7e88b41c2d68ddc2df0ef3ec816d16ba0f00de2ed5c4a3d",
+  "gate_evidence": {
+    "portable": {
+      "status": "PASS",
+      "passed": 99,
+      "failed": 0,
+      "blocked": 0,
+      "report_sha256": "080038414fdfa6a195bfdafd7bde5ef0a3fca4e496be6163474dcbc15bfcf8f7",
+      "aggregate_sha256": "2fe2cf81ff1f77c7e23ac5604ab74a02d27a6568937075a112d106619ad546ff"
+    },
+    "custody": {
+      "status": "PASS_AVAILABLE_WITH_USER_HELD_INSTALL_GATE",
+      "passed": 6,
+      "failed": 0,
+      "blocked": 1,
+      "blocked_test_ids": [
+        "installed-host-usable-broker"
+      ],
+      "report_sha256": "b57c4d0bcb8009a55c85cdf53a9469b69130f725d432b21d859f2761555db921",
+      "aggregate_sha256": "1b36a78544cfe6644db3ae7ba7383e12d60f87673714c3ee0bbc453362853b57"
+    },
+    "complete_registry": {
+      "expected": 106,
+      "observed": 106,
+      "coverage_errors": 0,
+      "aggregate_sha256": "122c340d029a09594236ce46670466c1238e7c3fb5bca521a71288059e28c945"
+    }
+  },
+  "phases": [
+    {"phase": 0, "name": "Immutable custody and baseline freeze", "status": "PASS"},
+    {"phase": 1, "name": "Version, manifest and instruction convergence", "status": "PASS_DEVELOPMENT_IDENTITY"},
+    {"phase": 2, "name": "Full test-registry reproduction", "status": "PASS"},
+    {"phase": 3, "name": "CI completeness and governance", "status": "PASS_LOCAL_PENDING_REMOTE_PR_RUN"},
+    {"phase": 4, "name": "Test independence and oracle audit", "status": "PASS"},
+    {"phase": 5, "name": "Real source-ingress and filing corpus", "status": "PASS"},
+    {"phase": 6, "name": "Semantic classifier and alias-authority audit", "status": "PASS"},
+    {"phase": 7, "name": "Dimensional statement topology and source arithmetic", "status": "PASS"},
+    {"phase": 8, "name": "Historical and forecast ownership census", "status": "PASS"},
+    {"phase": 9, "name": "Broker end-to-end audit", "status": "PASS_NON_HOST"},
+    {"phase": 10, "name": "Cash-flow and forecast-granularity audit", "status": "PASS"},
+    {"phase": 11, "name": "Debt, interest, lease and RCF audit", "status": "PASS"},
+    {"phase": 12, "name": "Acquisition and pro forma audit", "status": "PASS_PORTABLE_PENDING_NATIVE"},
+    {"phase": 13, "name": "Final workbook semantic and presentation audit", "status": "PASS_LOCAL_RENDER_PENDING_NATIVE_VISUAL"},
+    {"phase": 14, "name": "Native Excel and cross-engine audit", "status": "HELD_BY_USER_NO_ROGO_INSTALL"},
+    {"phase": 15, "name": "Runtime, resumability, security and performance", "status": "PASS_PORTABLE_HOST_CANARY_HELD"},
+    {"phase": 16, "name": "Package, release and installed-host promotion", "status": "DEVELOPMENT_PACKAGE_READY_INSTALL_AND_PROMOTION_HELD"}
+  ],
+  "remaining_authorized_work": [],
+  "remaining_user_held_work": [
+    "Install the exact immutable package as a new Rogo version.",
+    "Run installed-host broker canaries in two fresh sessions.",
+    "Run the native Excel control matrix and visual review.",
+    "Issue production certification and merge only the exact tested tree."
+  ],
+  "rogo_touched": false,
+  "production_claim": false
+}

@@ -1,0 +1,58 @@
+{
+  "schema_version": "excel-inflow-v371-development-package-identity/1.0",
+  "recorded_at": "2026-08-18T07:52:42Z",
+  "release_name": "Excel Inflow v3.7.1",
+  "skill_version": "3.7.1",
+  "package_mode": "development",
+  "deployment_status": "not_installed",
+  "production_certified": false,
+  "source": {
+    "repository": "computering001/excel-inflow",
+    "commit_sha": "9bf43be06e271b44d8a86a16e191588126c0f535",
+    "tree_sha": "aab31691bd0e6e35dc074748e450c97c86457422"
+  },
+  "package_branch": {
+    "name": "packages/excel-inflow-v3.7.1-development",
+    "commit_sha": "b74d63b3ba76738def34d734af29fa5435bb0016",
+    "tree_sha": "1b5d237f0880ea04de8af13ee34f3fb23912e6e0",
+    "file_count": 304
+  },
+  "identity": {
+    "runtime_code_closure_sha256": "ce1f0c948a3fd35c253f0093c8f460c78be703fc3c1a28beb12c35c54931e4e6",
+    "runtime_code_closure_file_count": 290,
+    "complete_package_inventory_sha256": "3c04ef113b60db4b7e3d1426028be4dcb4c048fe0b9e079cdb6a5ac7cd83df05",
+    "complete_package_inventory_file_count": 304,
+    "release_manifest_sha256": "6e80512b51b2044530dabe19f974866207fbb6b33b94458dca35ddc94d852715",
+    "archive_sha256": "3e511ae0f33017f485fa550f6f6d89326e3d4768b79ba3462ac908b265cc660b",
+    "archive_format": "ustar",
+    "archive_bytes": 6546944
+  },
+  "determinism": {
+    "clean_build_count": 2,
+    "all_package_members_byte_identical": true,
+    "inventory_equal": true,
+    "archive_equal": true,
+    "determinism_receipt_sha256": "42eb313dabdf75d0496d2e1905236dc48de4272149a144e5eaeb63765cac9793"
+  },
+  "instructions": {
+    "skill_sha256": "09047c8d375c377031d7b9e0e70400e948ca2eaafb06c3f89db3aa0b0a2b2b94",
+    "central_instructions_sha256": "ab0b9e70677d635f5831fd06a9bea64af4e8769904fc3a3083f6a95db0641017",
+    "runtime_manifest_sha256": "6195e043385972012ed228c91da78fd738c12869b0d6d97a707f08b823d1a8c1",
+    "deployment_profile_sha256": "634418694a7c10aeaf5373f75d3ae925bf2158cf0d334cbe67cc7436c6d22c9c"
+  },
+  "smoke_workbook": {
+    "case_sha256": "b1ec6462e5873ac0e9bbf557cb989a228d7a7dfbe96239860d3560595ddcd9bd",
+    "plan_sha256": "8b43944b6785f13a6bc273c2147bdf50bcaefe9e19cd7df15dfaa79e49b32991",
+    "workbook_sha256": "51a6c23c3eb0585d8a688f946294651c5b9dbead4dd24441971be2325eb94a79",
+    "validation_status": "PASS_PENDING_MANUAL",
+    "total_violations": 0
+  },
+  "certification": {
+    "native_excel_receipt": null,
+    "installed_host_receipt": null,
+    "installation_identity": null,
+    "installed_package_sha256": null,
+    "certified_runtime_code_closure_sha256": null,
+    "status": "DEVELOPMENT_ONLY_PENDING_ROGO_NATIVE_EXCEL"
+  }
+}
