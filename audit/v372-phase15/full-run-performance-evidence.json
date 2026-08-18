@@ -1,0 +1,103 @@
+{
+  "schema_version": "excel-inflow-phase15-full-run-evidence/1.0",
+  "recorded_at": "2026-08-18T09:14:44Z",
+  "scope": "AUTOMATED_NON_ROGO_FULL_RUN_EVIDENCE",
+  "status": "PASS_PENDING_MANUAL",
+  "limitations": [
+    "Native Microsoft Excel review was not run.",
+    "Rogo and Citrix were not opened or changed.",
+    "The hash-bound raw-input test route uses generated source-owned filing and broker documents; it is product evidence, not production-company evidence."
+  ],
+  "route": {
+    "public_entrypoint": "scripts/run_excel_inflow_vnext.mjs",
+    "raw_input_harness": "scripts/run_raw_input_black_box_canary.mjs",
+    "broker_state": "usable",
+    "dcs_balance_basis": "native_principal",
+    "source_owned_clean_evidence_sha256": "c93815e9a26aa9b84e05c7b5362af30250f40488b242a2276626b66d293a3a1d",
+    "preauthored_statement_map": false,
+    "preauthored_compiler_lanes": false,
+    "preauthored_broker_pack": false,
+    "preauthored_dcs_projection": false
+  },
+  "source_identity": {
+    "commit": "fd0f674934d07752906bb5f21ebc9f4c097a8437",
+    "tree": "fb259ce6fdac524a53390a8a5cae094ff3b1586e",
+    "runtime_closure_sha256": "96f19bb5915e3bf8471425b018ae2880fb62dc4744e83ca2339fe15abd9d7d23"
+  },
+  "hash_bindings": {
+    "controller_state_sha256": "78fdcc21536e9c4a8d53912207719d03a0fea4f7e990cffeee8df6686347a134",
+    "attachment_state_sha256": "f5147e935a848c5480867cf62965a4249f720f04b7fd788519152d6cd3d3ea7c",
+    "build_result_sha256": "086bb9435a0e5afbc48030f774afaea1abf28e1ad1ed439eaba226f235de586e",
+    "performance_receipt_file_sha256": "5a2f80c45e9ee556316ed833d4aa0c3c49414a7b807aad6ca757a57fcfd75a6b",
+    "performance_receipt_internal_sha256": "cecb045b18ce74599aa73ba59b9a58d8f0a26c8640c24795a8b14a076b7e150e",
+    "progress_evidence_file_sha256": "a39ac374759e7f31ae0a51b7647301dfa420bb7e2a8369d0523e2f8c9da913f8",
+    "progress_evidence_internal_sha256": "80daeb0b65161d88e5f88563931e9fe9cd63f1dc7bff93f664ca4d34b15acd2c",
+    "delivery_workbook_sha256": "e7640b1b9cd79a27e5f94c74428afedbd083911ba9580f20dbf0aa1fbb79d7fd",
+    "live_delivery_attestation_sha256": "ece5f66a351dc5f440de7823ea0242a7e5dd96b13bd264238d6744738b2e76a6"
+  },
+  "performance": {
+    "validator_errors": [],
+    "status": "PASS",
+    "total_duration_ms": 13813,
+    "required_leaf_span_count": 10,
+    "observed_leaf_span_count": 10,
+    "root_span_substitution_allowed": false,
+    "spans": {
+      "source_acquisition": 7.37575,
+      "filing_extraction": 180.466542,
+      "broker_native_extraction": 862,
+      "semantic_recovery": 540.18,
+      "case_compilation": 305.488208,
+      "solver": 823.176375,
+      "workbook_build": 510.567042,
+      "recalculation": 1459.353958,
+      "validation": 338.903667,
+      "delivery": 42.900375
+    }
+  },
+  "progress": {
+    "validator_errors": [],
+    "status": "PASS",
+    "maximum_allowed_interval_ms": 30000,
+    "maximum_observed_interval_ms": 10501,
+    "activity_count": 3,
+    "event_count": 6,
+    "events": [
+      { "stage": "evidence review", "documents": "0/3", "elapsed_seconds": 0, "action_required": false, "kind": "start" },
+      { "stage": "evidence review", "documents": "3/3", "elapsed_seconds": 1, "action_required": false, "kind": "stop" },
+      { "stage": "model decisions", "documents": "3/3", "elapsed_seconds": 0, "action_required": false, "kind": "start" },
+      { "stage": "model decisions", "documents": "3/3", "elapsed_seconds": 1, "action_required": false, "kind": "stop" },
+      { "stage": "workbook build and checks", "documents": "3/3", "elapsed_seconds": 0, "action_required": false, "kind": "start" },
+      { "stage": "workbook build and checks", "documents": "3/3", "elapsed_seconds": 10, "action_required": false, "kind": "stop" }
+    ]
+  },
+  "delivery": {
+    "controller_status": "PASS_PENDING_MANUAL",
+    "build_status": "PASS_PENDING_MANUAL",
+    "attachment_status": "PASS",
+    "live_delivery_attestation_status": "PASS",
+    "total_violations": 0,
+    "sheet_names": [
+      "Operating Model",
+      "Brokers",
+      "B01 House A",
+      "Forward Curves"
+    ]
+  },
+  "runtime_custody": {
+    "run_lease_directory_count_after_exit": 0,
+    "lease_takeover_directory_count_after_exit": 0,
+    "matching_controller_or_office_processes_after_exit": 0,
+    "survivor_pids": [],
+    "orphan_processes": []
+  },
+  "mutation_evidence": {
+    "progress_checks": 19,
+    "progress_mutations_rejected": 4,
+    "performance_checks": 8,
+    "performance_mutations_rejected": 6,
+    "runtime_custody_checks": 23,
+    "runtime_custody_mutations_rejected": 8,
+    "total_violation_count": 0
+  }
+}
