@@ -2004,10 +2004,10 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   //
   // B was 42 wide — wider than any broker name in the suite and wider than the
   // Operating Model's own label column — and the grid was three forecast columns
-  // with nothing to their left. It is now the reference's shape: A is the
-  // sheet's left margin at width 1, the same gutter the Operating Model opens
-  // with; B is 27, which fits "BNP Paribas Exane" and "Kepler Cheuvreux" without
-  // the run of dead space after them; C is the LAST ACTUAL and D:F the three
+  // with nothing to their left. It now balances the reference's compact shape
+  // with the longer derived-row captions: A is the sheet's left margin at width
+  // 1; B is 36, which keeps "Depreciation and amortisation — Selected Forecast"
+  // visible in the physical workbook; C is the LAST ACTUAL and D:F the three
   // forecasts, at the Operating Model's own period width of 10.
   //
   // THERE IS NO DATE COLUMN, and that is a finding rather than an omission. The
@@ -2631,7 +2631,7 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   }
 
   sheet.getRange(`A1:A${row}`).format.columnWidth = 1;
-  sheet.getRange(`B1:B${row}`).format.columnWidth = 27;
+  sheet.getRange(`B1:B${row}`).format.columnWidth = 36;
   sheet.getRange(`${ACTUAL_COLUMN}1:${LAST_COLUMN}${row}`).format.columnWidth = 10;
   return {
     sheet,

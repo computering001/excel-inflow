@@ -132,11 +132,26 @@ const absentLabels = [...absent.sheet.cellAddresses()]
 assert(!absentLabels.includes("Provider Consensus"), "absent Provider Consensus still rendered");
 assert(!absentLabels.some((label) => label.startsWith("Difference — Provider")), "provider reconciliation rendered without source evidence");
 
+const longLabelCase = fixture();
+longLabelCase.broker_pack.metrics.adjusted_ebitda.label = "Depreciation and amortisation";
+const longLabel = build(longLabelCase);
+const longSelectedRow = longLabel.rows.selectedRows.adjusted_ebitda;
+assert(
+  longLabel.sheet.cellAt(`B${longSelectedRow}`)?.value ===
+    "Depreciation and amortisation — Selected Forecast",
+  "the longest selected-forecast caption was not preserved",
+);
+assert(
+  longLabel.sheet._columnWidths.get(2) >= 36,
+  "the Brokers label column is too narrow for the longest selected-forecast caption",
+);
+
 console.log(JSON.stringify({
   status: "PASS",
-  workbook_scenarios: 2,
+  workbook_scenarios: 3,
   row_order_assertions: 9,
   provenance_assertions: 3,
   selected_cross_sheet_formula_assertions: 1,
+  selected_forecast_layout_assertions: 2,
   total_violations: 0,
 }, null, 2));
