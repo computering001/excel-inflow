@@ -5346,6 +5346,7 @@ function configureOperatingModel(
     lease_principal_assumption: "Lease principal repayment assumption",
     lease_additions_assumption: "New lease additions assumption",
     lease_other_movements_assumption: "Other lease liability movements assumption",
+    lease_effective_rate_assumption: "Lease effective rate assumption",
     lease_interest_bearing_liability:
       "Interest-bearing lease liabilities",
     total_lease_liabilities: "Total lease liabilities",
@@ -5442,6 +5443,7 @@ function configureOperatingModel(
     "lease_principal_assumption",
     "lease_additions_assumption",
     "lease_other_movements_assumption",
+    "lease_effective_rate_assumption",
     // The translation line is a memo beneath the cash movement it explains,
     // not a second subtotal competing with it.
     "debt_fx_translation",
@@ -5920,10 +5922,12 @@ function configureOperatingModel(
   const leasePrincipalAssumptionRow = debtRows.lease_principal_assumption;
   const leaseAdditionsAssumptionRow = debtRows.lease_additions_assumption;
   const leaseOtherMovementsAssumptionRow = debtRows.lease_other_movements_assumption;
+  const leaseEffectiveRateAssumptionRow = debtRows.lease_effective_rate_assumption;
   if (
     Number.isInteger(leasePrincipalAssumptionRow) &&
     Number.isInteger(leaseAdditionsAssumptionRow) &&
-    Number.isInteger(leaseOtherMovementsAssumptionRow)
+    Number.isInteger(leaseOtherMovementsAssumptionRow) &&
+    Number.isInteger(leaseEffectiveRateAssumptionRow)
   ) {
     for (const row of [leasePrincipalAssumptionRow, leaseAdditionsAssumptionRow, leaseOtherMovementsAssumptionRow]) {
       setPeriodNumberFormat(sheet, row, AMOUNT);
@@ -5933,6 +5937,16 @@ function configureOperatingModel(
       }
       applyFormula(sheet, `R${row}`, `=I${row}`);
     }
+    setPeriodNumberFormat(sheet, leaseEffectiveRateAssumptionRow, COUPON);
+    for (const column of HISTORICAL_COLUMNS) {
+      setValue(sheet, `${column}${leaseEffectiveRateAssumptionRow}`, null);
+      sheet.getRange(`${column}${leaseEffectiveRateAssumptionRow}`).format.fill = COLORS.grey;
+    }
+    applyFormula(
+      sheet,
+      `R${leaseEffectiveRateAssumptionRow}`,
+      `=I${leaseEffectiveRateAssumptionRow}`,
+    );
     setRow(
       sheet,
       `J${leasePrincipalAssumptionRow}:L${leasePrincipalAssumptionRow}`,
@@ -5950,6 +5964,17 @@ function configureOperatingModel(
     styleInput(
       sheet,
       `J${leaseOtherMovementsAssumptionRow}:L${leaseOtherMovementsAssumptionRow}`,
+    );
+    setRow(
+      sheet,
+      `J${leaseEffectiveRateAssumptionRow}:L${leaseEffectiveRateAssumptionRow}`,
+      leaseInterestBasis === "none"
+        ? [0, 0, 0]
+        : asSeries3(modelCase.lease_policy.effective_rate, 0),
+    );
+    styleInput(
+      sheet,
+      `J${leaseEffectiveRateAssumptionRow}:L${leaseEffectiveRateAssumptionRow}`,
     );
     for (let index = 0; index < 3; index += 1) {
       const standaloneColumn = FORECAST_COLUMNS[index];
@@ -5990,6 +6015,7 @@ function configureOperatingModel(
         leasePrincipalAssumptionRow,
         leaseAdditionsAssumptionRow,
         leaseOtherMovementsAssumptionRow,
+        leaseEffectiveRateAssumptionRow,
       ]) {
         applyFormula(sheet, `${adjustmentColumn}${row}`, "=0");
         applyFormula(
@@ -6004,6 +6030,12 @@ function configureOperatingModel(
       sheet,
       `B${leasePrincipalAssumptionRow}`,
       "Visible forecast assumption consumed by the cash-flow statement and lease-liability roll-forward; no formula may embed this amount as a numeric literal.",
+    );
+    addCommentOnce(
+      workbook,
+      sheet,
+      `B${leaseEffectiveRateAssumptionRow}`,
+      "Single visible forecast lease-rate authority consumed by both the lease-liability roll-forward and the Interest Schedule.",
     );
   }
   for (let index = 0; index < 3; index += 1) {
@@ -6021,7 +6053,9 @@ function configureOperatingModel(
     const otherMovementsCell = Number.isInteger(leaseOtherMovementsAssumptionRow)
       ? `${column}${leaseOtherMovementsAssumptionRow}`
       : "0";
-    const leaseRateCell = `$${["C", "D", "E"][index]}$${interestRows.lease_interest}`;
+    const leaseRateCell = Number.isInteger(leaseEffectiveRateAssumptionRow)
+      ? `${column}${leaseEffectiveRateAssumptionRow}`
+      : "0";
     const preInterestClosing =
       `${prior}+${additionsCell}+${otherMovementsCell}-${principalCell}`;
     // Lease interest belongs in the accounting roll-forward, but it must not
@@ -7735,13 +7769,16 @@ function configureOperatingModel(
   // same way a margin is. It belongs on the spread rung, not the coupon rung.
   sheet.getRange(`D${interestRows.rcf_commitment_fee}`).format.numberFormat =
     BENCHMARK;
-  setRow(
-    sheet,
-    `C${interestRows.lease_interest}:E${interestRows.lease_interest}`,
-    leaseInterestBasis === "none"
-      ? [0, 0, 0]
-      : asSeries3(modelCase.lease_policy.effective_rate, 0),
-  );
+  for (const [index, rateColumn] of ["C", "D", "E"].entries()) {
+    applyFormula(
+      sheet,
+      `${rateColumn}${interestRows.lease_interest}`,
+      leaseInterestBasis === "none" ||
+        !Number.isInteger(leaseEffectiveRateAssumptionRow)
+        ? "=0"
+        : `=${FORECAST_COLUMNS[index]}${leaseEffectiveRateAssumptionRow}`,
+    );
+  }
   setRow(
     sheet,
     `C${interestRows.other_unallocated_interest}:E${interestRows.other_unallocated_interest}`,
@@ -7753,7 +7790,6 @@ function configureOperatingModel(
     asSeries3(modelCase.non_cash_interest, 0).map((value) => Math.abs(value)),
   );
   for (const row of [
-    interestRows.lease_interest,
     interestRows.other_unallocated_interest,
     interestRows.non_cash_interest,
   ]) {

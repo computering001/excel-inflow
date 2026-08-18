@@ -153,7 +153,10 @@ assert.deepEqual(
 );
 assert.equal(solved.all_checks_pass, true);
 
-const sameColumnFormulaCycles = (cells, column) => {
+// Match the shipping validator exactly: formulas are selected from one
+// forecast column, while their same-sheet precedents collapse to semantic row
+// ownership regardless of the precedent's physical column.
+const shippingRowFormulaCycles = (cells, column) => {
   const graph = new Map();
   const addresses = Object.keys(cells).filter((address) => address.startsWith(column));
   const knownRows = new Set(addresses.map((address) => Number(address.slice(column.length))));
@@ -164,7 +167,6 @@ const sameColumnFormulaCycles = (cells, column) => {
     const localFormula = formula.replace(/'(?:[^']|'')+'!\$?[A-Z]+\$?\d+/g, "");
     const refs = [];
     for (const match of localFormula.matchAll(/\$?([A-Z]+)\$?(\d+)/g)) {
-      if (match[1] !== column) continue;
       const target = Number(match[2]);
       if (target !== row && knownRows.has(target)) refs.push(target);
     }
@@ -204,12 +206,19 @@ const sameColumnFormulaCycles = (cells, column) => {
   return cycles;
 };
 
-const buildLeaseWorkbookPlan = (label, leasePolicy, circularity) => {
-  const modelCase = structuredClone(productionCase);
+const buildLeaseWorkbookPlan = (
+  label,
+  leasePolicy,
+  circularity,
+  baseModelCase = productionCase,
+) => {
+  const modelCase = structuredClone(baseModelCase);
   modelCase.case_id = `lease_full_workbook_${label}`;
   modelCase.lease_policy = leasePolicy;
   modelCase.controls.circularity = circularity;
-  sealForecastAuthorityLedger(modelCase);
+  if (modelCase.execution_profile !== "reference_parity") {
+    sealForecastAuthorityLedger(modelCase);
+  }
   const casePath = path.join(fixtureRoot, `${label}.json`);
   const workbookPath = path.join(fixtureRoot, `${label}.xlsx`);
   fs.writeFileSync(casePath, `${JSON.stringify(modelCase, null, 2)}\n`);
@@ -232,6 +241,16 @@ const buildLeaseWorkbookPlan = (label, leasePolicy, circularity) => {
 };
 
 const productionPolicy = productionCase.lease_policy;
+const maximalFixtureCase = JSON.parse(
+  fs.readFileSync(
+    fileURLToPath(
+      new URL("../test-fixtures/cases/standard-maximal-v2.json", import.meta.url),
+    ),
+    "utf8",
+  ),
+);
+migrateLegacyDebtClasses(maximalFixtureCase);
+maximalFixtureCase.execution_profile = "reference_parity";
 const leasePlanVariants = [
   [
     "flat_total",
@@ -286,12 +305,22 @@ const leasePlanVariants = [
       forecast_interest_bearing_liabilities: [5.5, 5, 4.5],
     },
   ],
+  [
+    "standard_maximal_production_fixture",
+    maximalFixtureCase.lease_policy,
+    maximalFixtureCase,
+  ],
 ];
 const workbookMutations = [];
-for (const [label, policy] of leasePlanVariants) {
+for (const [label, policy, baseModelCase] of leasePlanVariants) {
   for (const circularity of [1, 0]) {
   const stateLabel = `${label}_${circularity === 1 ? "on" : "off"}`;
-  const { modelCase, plan, rowMap } = buildLeaseWorkbookPlan(stateLabel, policy, circularity);
+  const { modelCase, plan, rowMap } = buildLeaseWorkbookPlan(
+    stateLabel,
+    policy,
+    circularity,
+    baseModelCase,
+  );
   const sheet = plan.workbook.sheets.find((candidate) => candidate.name === "Operating Model");
   const cells = sheet.cells;
   const debtRows = rowMap.debt_summary_rows;
@@ -300,6 +329,7 @@ for (const [label, policy] of leasePlanVariants) {
   const leaseRows = new Set([
     debtRows.lease_liability,
     debtRows.lease_additions_assumption,
+    debtRows.lease_effective_rate_assumption,
     debtRows.lease_interest_bearing_liability,
     interestRows.lease_interest,
   ].filter(Number.isInteger));
@@ -308,11 +338,23 @@ for (const [label, policy] of leasePlanVariants) {
     const additionsCell = cells[`${column}${debtRows.lease_additions_assumption}`];
     const principalCell = cells[`${column}${debtRows.lease_principal_assumption}`];
     const otherCell = cells[`${column}${debtRows.lease_other_movements_assumption}`];
+    const rateCell = cells[`${column}${debtRows.lease_effective_rate_assumption}`];
     const interestCell = cells[`${column}${interestRows.lease_interest}`];
     assert.equal(Number(closingCell.v), expected[index].ending_total, `${stateLabel} closing cache ${column}`);
     assert.equal(Number(additionsCell.v), expected[index].additions, `${stateLabel} additions cache ${column}`);
     assert.equal(Number(principalCell.v), expected[index].principal_repayment, `${stateLabel} principal cache ${column}`);
     assert.equal(Number(otherCell.v), expected[index].other_movements, `${stateLabel} other cache ${column}`);
+    assert.equal(
+      Number(rateCell.v),
+      policy.interest_basis === "none" ? 0 : Number(policy.effective_rate[index]),
+      `${stateLabel} visible rate authority ${column}`,
+    );
+    const termColumn = ["C", "D", "E"][index];
+    assert.equal(
+      cells[`${termColumn}${interestRows.lease_interest}`].f,
+      `${column}${debtRows.lease_effective_rate_assumption}`,
+      `${stateLabel} Interest Schedule rate lineage ${column}`,
+    );
     const expectedInterestCache = expected[index].interest === 0
       ? 0
       : -expected[index].interest;
@@ -328,7 +370,7 @@ for (const [label, policy] of leasePlanVariants) {
       ) < 1e-9,
       `${stateLabel} full visible lease identity ${column}`,
     );
-    const leaseCycles = sameColumnFormulaCycles(cells, column)
+    const leaseCycles = shippingRowFormulaCycles(cells, column)
       .filter((component) => component.some((row) => leaseRows.has(row)));
     assert.deepEqual(leaseCycles, [], `${stateLabel} must not create a lease SCC in ${column}`);
     assert.equal(Number(cells[`${adjustmentColumns[index]}${debtRows.lease_liability}`].v), 0, `${stateLabel} adjustment lease cache ${column}`);
@@ -353,7 +395,7 @@ for (const [label, policy] of leasePlanVariants) {
   }
   assert.ok(
     forecastColumns.every((column) =>
-      sameColumnFormulaCycles(mutatedCells, column)
+      shippingRowFormulaCycles(mutatedCells, column)
         .some((component) => component.some((row) => leaseRows.has(row))),
     ),
     `${stateLabel} cyclic lease-formula mutation must be detected in every forecast column`,
@@ -367,7 +409,7 @@ console.log(
   JSON.stringify(
     {
       status: "PASS",
-      checks: 134,
+      checks: 154,
       mutations: [...mutations.map(([label]) => label), ...workbookMutations],
       production_case_exercised: true,
       full_workbook_plan_variants: workbookMutations,

@@ -4244,7 +4244,12 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     "lease_header",
     "lease_liability",
     ...(leasesPresent
-      ? ["lease_principal_assumption", "lease_additions_assumption", "lease_other_movements_assumption"]
+      ? [
+          "lease_principal_assumption",
+          "lease_additions_assumption",
+          "lease_other_movements_assumption",
+          "lease_effective_rate_assumption",
+        ]
       : []),
     ...(leaseInterestBasis === "separately_supplied"
       ? ["lease_interest_bearing_liability"]
