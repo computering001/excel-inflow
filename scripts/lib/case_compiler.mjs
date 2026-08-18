@@ -147,12 +147,18 @@ function typedHistoricalPrecisions(line) {
   const declared = line?.value_precisions ??
     line?.historical_value_precisions ??
     line?.reported_historical_value_precisions;
-  if (Array.isArray(declared) && declared.length === 3) return [...declared];
-  return (line?.values ?? line?.reported_historical_values ?? []).slice(0, 3).map((value) => {
-    if (value === null || value === undefined || !Number.isFinite(Number(value))) return null;
-    const text = String(value);
-    return text.includes(".") ? text.split(".").at(-1).length : 0;
-  });
+  if (Array.isArray(declared) && declared.length === 3) {
+    return declared.map((precision) =>
+      Number.isInteger(precision) && precision >= 0 && precision <= 12
+        ? precision
+        : null,
+    );
+  }
+  // JSON numbers do not preserve the source's printed decimal places. In
+  // particular, deriving precision from String(binaryFloat) can mint 14–17
+  // fictitious decimal places. Legacy manifests without explicit precision
+  // therefore receive exact-only arithmetic and no invented custody stamp.
+  return [null, null, null];
 }
 
 function sourceTolerance(line, period) {
@@ -234,6 +240,7 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     });
     const declaredRole = entry.role ?? null;
     const inferredRole = classified?.role ?? classified?.id ?? null;
+    const historicalPrecisions = typedHistoricalPrecisions(line);
     if (declaredRole && inferredRole && declaredRole !== inferredRole && classified?.high_impact) {
       report.add(
         "statement_map.role_conflict",
@@ -264,7 +271,9 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
           ...(entry.uncalculated ? { forecast_treatment: "uncalculated" } : {}),
           values: [...(line.values ?? []).slice(0, 3), null, null, null],
           historical_value_states: typedHistoricalStates(line),
-          historical_value_precisions: typedHistoricalPrecisions(line),
+          ...(historicalPrecisions.some((precision) => precision !== null)
+            ? { historical_value_precisions: historicalPrecisions }
+            : {}),
           ...(declaredRole ? { semantic_role: declaredRole } : {}),
           ...(entry.movement_type ? { movement_type: entry.movement_type } : {}),
           ...(entry.acquisition_driver_role
@@ -496,9 +505,11 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
     parentRow.reported_historical_value_states = [
       ...(parentRow.historical_value_states ?? typedHistoricalStates(parentLine)),
     ];
-    parentRow.reported_historical_value_precisions = [
-      ...(parentRow.historical_value_precisions ?? typedHistoricalPrecisions(parentLine)),
-    ];
+    const reportedPrecisions =
+      parentRow.historical_value_precisions ?? typedHistoricalPrecisions(parentLine);
+    if (reportedPrecisions.some((precision) => precision !== null)) {
+      parentRow.reported_historical_value_precisions = [...reportedPrecisions];
+    }
     parentRow.historical_authority = "reported_total_reconciled";
     delete parentRow.values;
     delete parentRow.historical_value_states;
