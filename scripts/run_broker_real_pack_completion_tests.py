@@ -199,7 +199,150 @@ def require_owned_artifact(state: dict[str, Any], key: str) -> Path:
     return path
 
 
-def validate_checkpoint_closure(state: dict[str, Any]) -> None:
+def zero_authority_pack_errors(pack: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    eligibility = pack.get("eligibility_summary") or {}
+    if pack.get("recommended_primary_house_id") is not None:
+        errors.append("zero-authority pack recommends a primary house")
+    if int(eligibility.get("primary_eligible_house_count", -1)) != 0:
+        errors.append("zero-authority pack has primary eligible authority")
+    if int(eligibility.get("supplemental_eligible_house_count", -1)) != 0:
+        errors.append("zero-authority pack has supplemental eligible authority")
+    for house in pack.get("houses") or []:
+        for metric_id, values in (house.get("estimates") or {}).items():
+            if not isinstance(values, list) or any(value is not None for value in values):
+                errors.append(
+                    f"zero-authority pack retains {house.get('house_id')}.{metric_id} authority"
+                )
+    return errors
+
+
+def validate_zero_authority_closure(
+    state: dict[str, Any], by_stage: dict[str, dict[str, Any]]
+) -> None:
+    zero_checkpoint = by_stage["zero_broker_authority_fallback"]
+    check(
+        zero_checkpoint.get("status") == "PASS",
+        "Zero-broker-authority fallback checkpoint is not PASS.",
+    )
+    semantic_path = require_owned_artifact(state, "semantic_report")
+    check(
+        zero_checkpoint.get("output_sha256") == sha256_file(semantic_path),
+        "Zero-broker-authority checkpoint does not bind the terminal semantic output.",
+    )
+
+    terminal_path = require_owned_artifact(state, "terminal_recovery_receipt")
+    terminal = read_json(terminal_path, "zero-authority terminal recovery receipt")
+    check(
+        terminal.get("schema_version") == "broker-zero-authority-receipt/1.0"
+        and terminal.get("status") == "PASS",
+        "Terminal recovery receipt is not a sealed zero-authority receipt.",
+    )
+    check(
+        int(terminal.get("remaining_mapping_count", -1)) == 0
+        and int(terminal.get("model_consumption_added", -1)) == 0,
+        "Terminal recovery receipt retains broker model authority.",
+    )
+    terminal_inner = terminal.get("terminal_recovery") or {}
+    preserved_candidates = int(terminal.get("preserved_candidate_count", -1))
+    check(
+        terminal_inner.get("status") == "PASS"
+        and int(terminal_inner.get("selected_candidate_count", -1)) == 0
+        and int(terminal_inner.get("unresolved_selected_candidate_count", -1)) == 0,
+        "Terminal recovery receipt does not prove zero selected authority.",
+    )
+    check(
+        preserved_candidates > 0
+        and int(terminal_inner.get("quarantined_candidate_count", -1))
+        == preserved_candidates,
+        "Terminal recovery receipt does not preserve the complete candidate set.",
+    )
+
+    crosswalk_path = require_owned_artifact(state, "crosswalk")
+    crosswalk = read_json(crosswalk_path, "terminal zero-authority crosswalk")
+    check(crosswalk.get("mappings") == [], "Terminal crosswalk retains broker mappings.")
+    check(
+        terminal.get("recovered_crosswalk_sha256") == sha256_file(crosswalk_path),
+        "Terminal recovery receipt is not bound to the zero-authority crosswalk.",
+    )
+
+    receipt_path = require_owned_artifact(state, "broker_crosswalk_receipt")
+    receipt = read_json(receipt_path, "terminal broker crosswalk receipt")
+    check(
+        int(receipt.get("mapping_count", -1)) == 0
+        and receipt.get("mappings") == [],
+        "Compiled broker receipt retains nonzero authority after zero fallback.",
+    )
+    pack_path = require_owned_artifact(state, "broker_pack")
+    pack = read_json(pack_path, "terminal zero-authority broker pack")
+    pack_errors = zero_authority_pack_errors(pack)
+    check(not pack_errors, pack_errors[0] if pack_errors else "Invalid zero-authority pack.")
+
+    degraded_checkpoint = by_stage.get("degraded_delivery_close")
+    check(
+        degraded_checkpoint is not None and degraded_checkpoint.get("status") == "PASS",
+        "Zero-authority terminal state lacks the degraded delivery close checkpoint.",
+    )
+    degraded_path = require_owned_artifact(state, "degraded_close_receipt")
+    degraded = read_json(degraded_path, "degraded broker delivery receipt")
+    check(
+        degraded_checkpoint.get("output_sha256") == sha256_file(degraded_path),
+        "Degraded delivery checkpoint does not bind its preserved receipt.",
+    )
+    check(
+        degraded.get("schema_version") == "broker-degraded-close-receipt/1.0"
+        and degraded.get("status") == "PASS"
+        and int(degraded.get("model_consumption_added", -1)) == 0
+        and int(degraded.get("unresolved_selected_candidate_count", -1)) == 0,
+        "Degraded delivery receipt is not a sealed zero-consumption close.",
+    )
+    active_bundle_key = (
+        "verified_bundle"
+        if (state.get("artifacts") or {}).get("verified_bundle")
+        else "extraction_bundle"
+    )
+    active_bundle_path = require_owned_artifact(state, active_bundle_key)
+    physical_degraded = by_stage.get("physical_degraded_close")
+    check(
+        physical_degraded is not None
+        and physical_degraded.get("status") == "PASS"
+        and physical_degraded.get("output_sha256") == sha256_file(active_bundle_path),
+        "Zero-authority closure does not preserve the hash-bound physical degraded close.",
+    )
+    exact_bindings = {
+        "broker_pack_sha256": sha256_file(pack_path),
+        "crosswalk_receipt_sha256": sha256_file(receipt_path),
+        "semantic_report_sha256": sha256_file(semantic_path),
+        "bundle_sha256": sha256_file(active_bundle_path),
+    }
+    for field, expected in exact_bindings.items():
+        check(
+            degraded.get(field) == expected,
+            f"Degraded delivery receipt has a stale {field} binding.",
+        )
+    checkpoint_set = [
+        item
+        for item in state.get("checkpoints") or []
+        if item.get("stage") != "degraded_delivery_close"
+    ]
+    checkpoint_set_sha256 = hashlib.sha256(
+        (
+            json.dumps(
+                checkpoint_set,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+    ).hexdigest()
+    check(
+        degraded.get("checkpoint_set_sha256") == checkpoint_set_sha256,
+        "Degraded delivery receipt does not bind the exact prior checkpoint set.",
+    )
+
+
+def validate_checkpoint_closure(state: dict[str, Any]) -> str:
     checkpoints = state.get("checkpoints") or []
     by_stage: dict[str, dict[str, Any]] = {}
     for checkpoint in checkpoints:
@@ -217,18 +360,26 @@ def validate_checkpoint_closure(state: dict[str, Any]) -> None:
         )
     semantic = by_stage.get("semantic_verification")
     recovered = by_stage.get("terminal_materiality_recovery")
+    zero_authority = by_stage.get("zero_broker_authority_fallback")
     check(semantic is not None, "Terminal state has no semantic verification checkpoint.")
     semantic_pass = semantic.get("status") == "PASS"
     recovery_pass = recovered is not None and recovered.get("status") == "PASS"
-    check(
-        semantic_pass or recovery_pass,
-        "Neither ordinary semantic verification nor terminal materiality recovery reached PASS.",
+    zero_authority_pass = (
+        zero_authority is not None and zero_authority.get("status") == "PASS"
     )
+    check(
+        semantic_pass or recovery_pass or zero_authority_pass,
+        "No sealed semantic or zero-authority terminal route reached PASS.",
+    )
+    if zero_authority_pass and not semantic_pass:
+        validate_zero_authority_closure(state, by_stage)
+        return "zero_authority"
     authority = semantic if semantic_pass else recovered
     check(
         isinstance(authority.get("output_sha256"), str),
         "Terminal semantic authority checkpoint has no output hash.",
     )
+    return "selected_authority"
 
 
 def validate_terminal_state(state: dict[str, Any]) -> dict[str, Path]:
@@ -275,6 +426,10 @@ def validate_terminal_state(state: dict[str, Any]) -> dict[str, Path]:
         artifacts["terminal_recovery_receipt"] = require_owned_artifact(
             state, "terminal_recovery_receipt"
         )
+    if (state.get("artifacts") or {}).get("degraded_close_receipt"):
+        artifacts["degraded_close_receipt"] = require_owned_artifact(
+            state, "degraded_close_receipt"
+        )
     return artifacts
 
 
@@ -298,6 +453,95 @@ def prove_non_terminal_states_block(state: dict[str, Any]) -> list[str]:
     return caught
 
 
+def prove_zero_authority_closure_mutations(
+    state: dict[str, Any], output_root: Path
+) -> list[str]:
+    if not any(
+        item.get("stage") == "zero_broker_authority_fallback"
+        and item.get("status") == "PASS"
+        for item in state.get("checkpoints") or []
+    ):
+        return []
+
+    mutation_root = output_root / "zero-authority-closure-mutations"
+    mutation_root.mkdir(parents=True, exist_ok=True)
+    caught: list[str] = []
+
+    def expect_rejected(label: str, candidate: dict[str, Any]) -> None:
+        try:
+            validate_terminal_state(candidate)
+        except AssertionError:
+            caught.append(label)
+        else:
+            raise AssertionError(f"Zero-authority closure mutation {label!r} was accepted.")
+
+    missing_checkpoint = copy.deepcopy(state)
+    missing_checkpoint["checkpoints"] = [
+        item
+        for item in missing_checkpoint.get("checkpoints") or []
+        if item.get("stage") != "zero_broker_authority_fallback"
+    ]
+    expect_rejected("missing_zero_authority_checkpoint", missing_checkpoint)
+
+    forged_checkpoint = copy.deepcopy(state)
+    next(
+        item
+        for item in forged_checkpoint["checkpoints"]
+        if item.get("stage") == "zero_broker_authority_fallback"
+    )["output_sha256"] = "0" * 64
+    expect_rejected("forged_zero_authority_checkpoint", forged_checkpoint)
+
+    missing_receipt = copy.deepcopy(state)
+    missing_receipt["artifacts"].pop("terminal_recovery_receipt", None)
+    missing_receipt["artifact_sha256"].pop("terminal_recovery_receipt", None)
+    expect_rejected("missing_terminal_recovery_receipt", missing_receipt)
+
+    swapped_receipt = copy.deepcopy(state)
+    crosswalk_path = require_owned_artifact(state, "crosswalk")
+    swapped_receipt["artifacts"]["terminal_recovery_receipt"] = str(crosswalk_path)
+    swapped_receipt["artifact_sha256"]["terminal_recovery_receipt"] = sha256_file(
+        crosswalk_path
+    )
+    expect_rejected("swapped_terminal_recovery_receipt", swapped_receipt)
+
+    forged_receipt = copy.deepcopy(state)
+    terminal = read_json(
+        require_owned_artifact(state, "terminal_recovery_receipt"),
+        "terminal recovery receipt mutation source",
+    )
+    terminal["remaining_mapping_count"] = 1
+    forged_receipt_path = mutation_root / "forged-terminal-recovery-receipt.json"
+    forged_receipt_path.write_text(
+        json.dumps(terminal, indent=2, sort_keys=True) + "\n", "utf-8"
+    )
+    forged_receipt["artifacts"]["terminal_recovery_receipt"] = str(
+        forged_receipt_path
+    )
+    forged_receipt["artifact_sha256"]["terminal_recovery_receipt"] = sha256_file(
+        forged_receipt_path
+    )
+    expect_rejected("self_consistent_forged_terminal_receipt", forged_receipt)
+
+    nonzero_mapping = copy.deepcopy(state)
+    crosswalk = read_json(crosswalk_path, "zero-authority crosswalk mutation source")
+    crosswalk["mappings"] = [{"mutation": "forged-nonzero-authority"}]
+    nonzero_crosswalk_path = mutation_root / "nonzero-mapping-crosswalk.json"
+    nonzero_crosswalk_path.write_text(
+        json.dumps(crosswalk, indent=2, sort_keys=True) + "\n", "utf-8"
+    )
+    nonzero_mapping["artifacts"]["crosswalk"] = str(nonzero_crosswalk_path)
+    nonzero_mapping["artifact_sha256"]["crosswalk"] = sha256_file(
+        nonzero_crosswalk_path
+    )
+    expect_rejected("nonzero_mapping_after_zero_fallback", nonzero_mapping)
+
+    missing_degraded_receipt = copy.deepcopy(state)
+    missing_degraded_receipt["artifacts"].pop("degraded_close_receipt", None)
+    missing_degraded_receipt["artifact_sha256"].pop("degraded_close_receipt", None)
+    expect_rejected("missing_degraded_close_receipt", missing_degraded_receipt)
+    return caught
+
+
 def validate_pack(
     pack: dict[str, Any],
     source_tables: dict[str, Any],
@@ -315,7 +559,46 @@ def validate_pack(
     missing = sorted(REQUIRED_CORE - metric_ids)
     check(not missing, f"Pack is missing core forecast metrics: {', '.join(missing)}")
     check(metric_ids & HEADLINE_ALTERNATIVES, "Pack has neither EBIT nor adjusted EBITDA authority.")
+    check(
+        source_tables.get("schema_version") == "broker-source-tables/1.0",
+        "Broker source-table artifact has wrong version.",
+    )
+    source_houses = {
+        str(item.get("house_id")) for item in source_tables.get("houses") or []
+    }
+    check(
+        source_houses == expected_house_ids,
+        "Source-table house set differs from the compiled pack.",
+    )
     eligibility = pack.get("eligibility_summary") or {}
+    mapping_count = int(receipt.get("mapping_count", -1))
+    check(receipt.get("status") == "PASS", "Broker crosswalk receipt is not PASS.")
+    summary = receipt.get("coverage_summary") or {}
+    check(
+        int(summary.get("unresolved_candidate_count", 0)) == 0,
+        "Broker crosswalk receipt retains unresolved candidates.",
+    )
+    if mapping_count == 0:
+        zero_errors = zero_authority_pack_errors(pack)
+        check(not zero_errors, zero_errors[0] if zero_errors else "Invalid zero-authority pack.")
+        check(receipt.get("mappings") == [], "Zero-authority receipt retains mappings.")
+        check(
+            int(summary.get("terminal_quarantined_candidate_count", 0)) > 0,
+            "Zero-authority receipt does not preserve candidates in terminal quarantine.",
+        )
+        check(
+            eligibility.get("run_can_continue_without_broker_question") is True,
+            "Zero-authority pack cannot continue through the ordinary forecast waterfall.",
+        )
+        return {
+            "authority_mode": "zero_authority",
+            "house_count": len(house_ids),
+            "forecast_periods": periods,
+            "metric_count": len(metric_ids),
+            "mapping_count": 0,
+            "recommended_primary_house_id": None,
+        }
+
     check(
         int(eligibility.get("primary_eligible_house_count", 0))
         + int(eligibility.get("supplemental_eligible_house_count", 0)) >= 1,
@@ -347,24 +630,12 @@ def validate_pack(
     )
     recommended = pack.get("recommended_primary_house_id") or selected_house.get("house_id")
     check(recommended in house_ids, "Selected coherent house is absent from the pack.")
-    check(
-        source_tables.get("schema_version") == "broker-source-tables/1.0",
-        "Broker source-table artifact has wrong version.",
-    )
-    source_houses = {str(item.get("house_id")) for item in source_tables.get("houses") or []}
-    check(source_houses == expected_house_ids, "Source-table house set differs from the compiled pack.")
-    check(receipt.get("status") == "PASS", "Broker crosswalk receipt is not PASS.")
-    check(int(receipt.get("mapping_count", 0)) > 0, "Broker crosswalk receipt is vacuous.")
-    summary = receipt.get("coverage_summary") or {}
-    check(
-        int(summary.get("unresolved_candidate_count", 0)) == 0,
-        "Broker crosswalk receipt retains unresolved candidates.",
-    )
     return {
+        "authority_mode": "selected_authority",
         "house_count": len(house_ids),
         "forecast_periods": periods,
         "metric_count": len(metric_ids),
-        "mapping_count": int(receipt.get("mapping_count", 0)),
+        "mapping_count": mapping_count,
         "recommended_primary_house_id": recommended,
     }
 
@@ -659,6 +930,9 @@ def main() -> int:
     )
     artifacts = validate_terminal_state(state)
     non_terminal_mutations = prove_non_terminal_states_block(state)
+    zero_authority_mutations = prove_zero_authority_closure_mutations(
+        state, output_root
+    )
     pack = read_json(artifacts["broker_pack"], "compiled broker pack")
     source_tables = read_json(artifacts["source_tables"], "broker source tables")
     receipt = read_json(artifacts["broker_crosswalk_receipt"], "broker crosswalk receipt")
@@ -689,21 +963,32 @@ def main() -> int:
         "Broker crosswalk receipt is not bound to the pack compiler semantic report.",
     )
     pack_metrics = validate_pack(pack, source_tables, receipt, house_ids)
-    selected_errors = selected_cell_errors(source_tables, receipt)
-    check(not selected_errors, selected_errors[0] if selected_errors else "Selected-cell proof failed.")
-
-    mutated_sources = mutate_selected_cell(source_tables, receipt)
-    mutation_errors = selected_cell_errors(mutated_sources, receipt)
-    check(
-        any("quarantined" in error for error in mutation_errors),
-        "Selected-cell conflict mutation was not caught.",
-    )
-    compiler_mutation = run_selected_cell_compiler_mutation(
-        active_bundle_path,
-        artifacts["crosswalk"],
-        receipt,
-        output_root,
-    )
+    selected_cells = mapping_cells(receipt)
+    if selected_cells:
+        selected_errors = selected_cell_errors(source_tables, receipt)
+        check(
+            not selected_errors,
+            selected_errors[0] if selected_errors else "Selected-cell proof failed.",
+        )
+        mutated_sources = mutate_selected_cell(source_tables, receipt)
+        mutation_errors = selected_cell_errors(mutated_sources, receipt)
+        check(
+            any("quarantined" in error for error in mutation_errors),
+            "Selected-cell conflict mutation was not caught.",
+        )
+        compiler_mutation = run_selected_cell_compiler_mutation(
+            active_bundle_path,
+            artifacts["crosswalk"],
+            receipt,
+            output_root,
+        )
+    else:
+        mutation_errors = []
+        compiler_mutation = {
+            "status": "NOT_APPLICABLE_ZERO_AUTHORITY",
+            "mutation_executed": False,
+            "reason": "The sealed terminal crosswalk contains no selected broker cells.",
+        }
 
     report = {
         "schema_version": "broker-real-pack-completion-report/1.0",
@@ -720,12 +1005,13 @@ def main() -> int:
             key: {"path": str(path), "sha256": sha256_file(path)}
             for key, path in artifacts.items()
         },
-        "selected_cell_positive_count": len(mapping_cells(receipt)),
+        "selected_cell_positive_count": len(selected_cells),
         "selected_cell_conflict_mutation": {
             **compiler_mutation,
             "caught_findings": mutation_errors,
         },
         "non_terminal_state_mutations_caught": non_terminal_mutations,
+        "zero_authority_closure_mutations_caught": zero_authority_mutations,
         "total_violation_count": 0,
     }
     report_path = output_root / "broker-real-pack-completion-report.json"
@@ -736,7 +1022,10 @@ def main() -> int:
         "houses": pack_metrics["house_count"],
         "mappings": pack_metrics["mapping_count"],
         "selected_cells": report["selected_cell_positive_count"],
-        "conflict_mutation": "CAUGHT",
+        "conflict_mutation": (
+            "CAUGHT" if selected_cells else "NOT_APPLICABLE_ZERO_AUTHORITY"
+        ),
+        "zero_authority_mutations_caught": len(zero_authority_mutations),
         "non_terminal_states_caught": len(non_terminal_mutations),
     }, sort_keys=True))
     return 0
