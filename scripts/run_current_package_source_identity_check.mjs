@@ -24,12 +24,23 @@ if (status.trim()) throw new Error("Package/source identity check requires a cle
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-current-package-"));
 const packageRoot = path.join(temp, "package");
 try {
+  const smokeCase = path.join(temp, "smoke-case.json");
+  await exec(process.execPath, [
+    path.join(root, "scripts", "run_evidence_run_tests.mjs"),
+    path.join(root, "test-fixtures", "cases"),
+    "--emit-compiled-case", smokeCase,
+    "--production",
+  ], {
+    cwd: root,
+    timeout: 300000,
+    maxBuffer: 64 * 1024 * 1024,
+  });
   await exec(process.execPath, [
     path.join(root, "scripts", "compile_skill_release.mjs"),
     "--skill", root,
     "--out", packageRoot,
     "--development",
-    "--smoke-case", path.join(root, "test-fixtures", "cases", "standard-maximal-v2.json"),
+    "--smoke-case", smokeCase,
   ], {
     cwd: root,
     timeout: 900000,
