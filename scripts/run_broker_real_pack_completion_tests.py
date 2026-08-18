@@ -4,9 +4,10 @@
 This is deliberately stricter than ``run_broker_public_layout_tests.py``.  The
 layout cohort proves that difficult pages enter the internal work queue.  This
 gate proves that a separately reviewed, external five-to-ten-house fixture
-actually exits that queue, compiles a sealed pack, and supplies at least one
-coherent-house forecast authority which the model may consume while absent
-concept-periods retain the ordinary waterfall.
+actually exits that queue and compiles a sealed pack.  It accepts either one
+coherent-house forecast authority or the explicit fail-closed result in which
+every candidate is quarantined, model authority is zero, and the ordinary
+forecast waterfall remains available.
 
 The fixture, PDFs, model-host responses and reviewed crosswalk remain external
 test custody.  No source values or reports enter the skill package.
