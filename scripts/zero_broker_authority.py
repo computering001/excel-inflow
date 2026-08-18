@@ -59,6 +59,7 @@ def validate_zero_broker_pack(pack: dict[str, Any]) -> None:
         "reporting_currency",
         "units",
         "forecast_periods",
+        "freshness_policy",
         "metrics",
         "houses",
     }
@@ -86,6 +87,12 @@ def validate_zero_broker_pack(pack: dict[str, Any]) -> None:
         raise ValueError("Canonical zero-broker pack requires exactly three forecast dates")
     if pack.get("metrics") != {} or pack.get("houses") != []:
         raise ValueError("Canonical zero-broker pack must carry zero metrics and zero houses")
+    if pack.get("freshness_policy") != {
+        "as_of": pack.get("as_of"),
+        "max_age_days": 180,
+        "stale_house_count": 0,
+    }:
+        raise ValueError("Canonical zero-broker pack requires the exact empty freshness policy")
     summary = pack.get("eligibility_summary")
     expected_summary = {
         "primary_eligible_house_count": 0,
@@ -114,6 +121,11 @@ def build_zero_broker_pack(
         "reporting_currency": reporting_currency,
         "units": units,
         "forecast_periods": forecast_periods,
+        "freshness_policy": {
+            "as_of": as_of,
+            "max_age_days": 180,
+            "stale_house_count": 0,
+        },
         "metrics": {},
         "houses": [],
         "recommended_primary_house_id": None,
