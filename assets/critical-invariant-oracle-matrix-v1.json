@@ -4,7 +4,7 @@
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
     "oracle_sha256": "a3a0271eef56aa6fe49cf4b7627f048beaaeee469956a066fde589bd8672948d",
     "registry_path": "assets/development-test-registry.json",
-    "registry_sha256": "5b890beffb7ed6b5a581bfb1a87d70f456922d5980891af43281af5ddff9c847"
+    "registry_sha256": "33695b65b18bd5b94786ee9a6ace6c158054ac1f072c0c0276ad8e35320ff301"
   },
   "domains": [
     {"domain": "cash_flow_identity", "invariant_id": "cash-flow-current-period-additivity", "independent_oracle_test_ids": ["critical-invariant-independent-oracle-matrix"], "mutations": [{"mutation_id": "cash_flow_subtotal_prior_period"}]},
