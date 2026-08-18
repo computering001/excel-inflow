@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 
 import { compileAttachmentIngress } from "./lib/attachment_ingress.mjs";
 import { acquireFilingsSources } from "./lib/filings_acquisition.mjs";
@@ -18,6 +21,7 @@ import {
 } from "./lib/source_ingress_security.mjs";
 
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "excel-inflow-ingress-security-"));
+const exec = promisify(execFile);
 let checks = 0;
 
 async function rejects(action, pattern, label) {
@@ -169,6 +173,32 @@ try {
     /regular file/,
     "device input was accepted",
   );
+  const fifo = path.join(approved, "filing.fifo");
+  await exec("mkfifo", [fifo]);
+  await rejects(
+    () => resolveApprovedRegularFile({ candidate: fifo, approvedRoots: [approved], label: "FIFO filing" }),
+    /regular file/,
+    "FIFO input was accepted",
+  );
+  // Keep the Unix-domain path below the conservative 104-byte sockaddr_un
+  // limit used by several supported hosts; the main test root can be longer.
+  const socketRoot = await fs.mkdtemp("/tmp/excel-inflow-socket-");
+  const socketPath = path.join(socketRoot, "filing.sock");
+  const socketServer = net.createServer();
+  await new Promise((resolve, reject) => {
+    socketServer.once("error", reject);
+    socketServer.listen(socketPath, resolve);
+  });
+  try {
+    await rejects(
+      () => resolveApprovedRegularFile({ candidate: socketPath, approvedRoots: [socketRoot], label: "Unix socket filing" }),
+      /regular file/,
+      "Unix socket input was accepted",
+    );
+  } finally {
+    await new Promise((resolve, reject) => socketServer.close((error) => error ? reject(error) : resolve()));
+    await fs.rm(socketRoot, { recursive: true, force: true });
+  }
   const acquisitionBase = {
     schema_version: "filings-acquisition-request/2.0",
     source_mode: "user_supplied",
@@ -311,6 +341,22 @@ try {
     }),
     /exceeded 10ms during DNS validation/,
     "unbounded DNS lookup did not time out",
+  );
+  await rejects(
+    () => fetchOfficialFile({
+      rawUrl: "https://filings.test/report.pdf",
+      declaredMediaType: "application/pdf",
+      authority: { ...authority, timeout_ms: 10 },
+      lookupFn: publicLookup,
+      requestOnce: async () => await new Promise((resolve) => setTimeout(() => resolve({
+        statusCode: 200,
+        headers: { "content-type": "application/pdf" },
+        bytes: Buffer.from("%PDF-1.7 delayed response body"),
+        remoteAddress: "93.184.216.34",
+      }), 50)),
+    }),
+    /exceeded 10ms during response body/,
+    "slow response body escaped the controller deadline",
   );
   await rejects(
     () => fetchOfficialFile({

@@ -341,6 +341,30 @@ process.stdout.write(JSON.stringify(errors));
         return [f"production validator invocation failed: {completed.stderr.strip()}"]
     return json.loads(completed.stdout)
 
+
+def production_digest(candidate: dict) -> str:
+    """Re-seal a mutation so the field validator, not only the digest, must reject it."""
+    program = """
+import fs from 'node:fs';
+import { faceStatementManifestDigest } from './scripts/lib/face_statement_manifest.mjs';
+const manifest = JSON.parse(fs.readFileSync(0, 'utf8'));
+process.stdout.write(faceStatementManifestDigest(manifest));
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "--eval", program],
+        cwd=ROOT,
+        input=json.dumps(candidate),
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return completed.stdout.strip()
+
+
+def reseal(candidate: dict) -> dict:
+    candidate["rows_sha256"] = production_digest(candidate)
+    return candidate
+
 check(not findings, f"clean two-page statement emitted findings: {findings}")
 check(manifest is not None, "two-page statement was not selected")
 if manifest is not None:
@@ -361,6 +385,37 @@ if manifest is not None:
         "typed continuation-page zero was collapsed",
     )
     check(
+        all(len(row.get("cells", [])) == 3 for row in manifest["rows"]),
+        "one or more extracted rows omitted per-cell custody",
+    )
+    working_capital_cells = manifest["rows"][2]["cells"]
+    check(
+        [cell["raw_text"] for cell in working_capital_cells] == ["0", "-", "N/A"],
+        "raw printed zero, dash or N/A tokens were not retained per cell",
+    )
+    check(
+        [cell["typed_state"] for cell in working_capital_cells]
+        == ["reported_zero", "reported_dash", "not_applicable"],
+        "per-cell typed states diverged from printed tokens",
+    )
+    check(
+        [cell["normalized_value"] for cell in working_capital_cells] == [0, None, None],
+        "per-cell normalized values diverged from typed states",
+    )
+    check(
+        all(
+            cell["source_page"] == 1
+            and cell["currency"] == "USD"
+            and cell["units"] == "millions"
+            and cell["period"] == PERIODS[index]
+            and 0 <= cell["confidence"] <= 1
+            and cell["source_coordinates"]["x1"] >= cell["source_coordinates"]["x0"]
+            and cell["source_coordinates"]["y1"] >= cell["source_coordinates"]["y0"]
+            for index, cell in enumerate(working_capital_cells)
+        ),
+        "per-cell page, bbox, confidence, currency, units or period custody was lost",
+    )
+    check(
         all(
             not extractor._is_statement_header_line(
                 {"text": label, "words": [{"text": label}]}, PERIODS
@@ -373,7 +428,11 @@ if manifest is not None:
         all("page 3" not in row["page_or_note"] for row in manifest["rows"]),
         "the continuation window leaked into the following notes page",
     )
-    check(not production_errors(manifest), "clean manifest failed production custody validation")
+    clean_production_errors = production_errors(manifest)
+    check(
+        not clean_production_errors,
+        f"clean manifest failed production custody validation: {clean_production_errors}",
+    )
 
 
 mutations_rejected = 0
@@ -400,6 +459,28 @@ if manifest is not None:
     state_collapsed = copy.deepcopy(manifest)
     state_collapsed["rows"][2]["value_states"][1] = "reported_blank"
     mutations.append(("typed_state_change", state_collapsed, "rows_sha256 does not bind"))
+
+    cell_mutations = [
+        ("cell_raw_text", "raw_text", "", "has no raw printed token"),
+        ("cell_source_page", "source_page", 99, "cites a page outside source_pages"),
+        ("cell_confidence", "confidence", 1.1, "has invalid confidence"),
+        ("cell_typed_state", "typed_state", "reported_blank", "typed state differs"),
+        ("cell_currency", "currency", "EUR", "currency differs"),
+        ("cell_units", "units", "thousands", "units differ"),
+        ("cell_period", "period", "1999-12-31", "period differs"),
+        ("cell_normalized_value", "normalized_value", 1, "normalized value differs"),
+    ]
+    for mutation_name, field, value, expected_error in cell_mutations:
+        mutation = copy.deepcopy(manifest)
+        mutation["rows"][2]["cells"][0][field] = value
+        mutations.append((mutation_name, reseal(mutation), expected_error))
+    inverted_bbox = copy.deepcopy(manifest)
+    inverted_bbox["rows"][2]["cells"][0]["source_coordinates"]["x1"] = -1
+    mutations.append((
+        "cell_inverted_bbox",
+        reseal(inverted_bbox),
+        "invalid source coordinates/bounding box",
+    ))
     for mutation_name, mutation, expected_error in mutations:
         errors = production_errors(mutation)
         if any(expected_error in error for error in errors):
@@ -413,9 +494,9 @@ if manifest is not None:
 report = {
     "kind": "multipage-filing-extraction-tests/1.0",
     "status": "FAIL" if failures else "PASS",
-    "checks": 28,
+    "checks": 33,
     "mutations_rejected": mutations_rejected,
-    "mutations_total": 8,
+    "mutations_total": 17,
     "violations": len(failures),
     "failures": failures,
 }

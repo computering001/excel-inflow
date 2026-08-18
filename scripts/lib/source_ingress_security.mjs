@@ -51,6 +51,10 @@ export async function resolveApprovedRegularFile({ candidate, approvedRoots, lab
   }
   const linkStats = await fs.lstat(lexical);
   if (linkStats.isSymbolicLink()) throw new Error(`${label} must not be a symbolic link.`);
+  // Reject FIFOs, devices and Unix sockets before opening. Opening a FIFO for
+  // read can block indefinitely while waiting for a writer, so the regular-file
+  // check must precede the O_NOFOLLOW descriptor check rather than follow it.
+  if (!linkStats.isFile()) throw new Error(`${label} must be a regular file.`);
   const canonical = await fs.realpath(lexical);
   // macOS exposes stable system aliases such as /var -> /private/var. Either
   // the artifact or approved root can retain the alias spelling. Accept that
@@ -297,12 +301,16 @@ export async function fetchOfficialFile({
       remainingTime,
       `Declared filing fetch exceeded ${authority.timeout_ms}ms during DNS validation.`,
     );
-    const response = await requestOnce({
-      url: current,
-      addresses,
-      maxBytes: authority.max_bytes - totalBytes,
-      timeoutMs: remainingTime,
-    });
+    const response = await withinTime(
+      requestOnce({
+        url: current,
+        addresses,
+        maxBytes: authority.max_bytes - totalBytes,
+        timeoutMs: remainingTime,
+      }),
+      remainingTime,
+      `Declared filing fetch exceeded ${authority.timeout_ms}ms during response body.`,
+    );
     totalBytes += response.bytes.length;
     const peer = String(response.remoteAddress ?? "").toLowerCase();
     if (!addressIsPublic(peer) || !addresses.some((record) => record.address.toLowerCase() === peer)) {

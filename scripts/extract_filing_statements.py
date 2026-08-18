@@ -175,7 +175,20 @@ def digest(value: bytes) -> str:
 
 def hash_value(value: Any) -> str:
     # Exact equivalent of scripts/lib/run_store.mjs hashValue.
-    encoded = json.dumps(value, sort_keys=True, indent=2, ensure_ascii=False).encode("utf-8")
+    def javascript_numbers(item: Any) -> Any:
+        # JSON.stringify serialises integral finite Numbers without a decimal
+        # suffix (including -0). Python's json encoder preserves ``.0``.
+        if isinstance(item, float) and math.isfinite(item) and item.is_integer():
+            return int(item)
+        if isinstance(item, list):
+            return [javascript_numbers(child) for child in item]
+        if isinstance(item, dict):
+            return {key: javascript_numbers(child) for key, child in item.items()}
+        return item
+
+    encoded = json.dumps(
+        javascript_numbers(value), sort_keys=True, indent=2, ensure_ascii=False
+    ).encode("utf-8")
     return digest(encoded)
 
 
@@ -279,8 +292,15 @@ def _group_page_words(words: list[tuple[Any, ...]], page_number: int) -> list[di
             "x0": min(float(word[0]) for word in line_words),
             "x1": max(float(word[2]) for word in line_words),
             "y0": min(float(word[1]) for word in line_words),
+            "y1": max(float(word[3]) for word in line_words),
             "words": [
-                {"x0": float(word[0]), "x1": float(word[2]), "text": str(word[4])}
+                {
+                    "x0": float(word[0]),
+                    "y0": float(word[1]),
+                    "x1": float(word[2]),
+                    "y1": float(word[3]),
+                    "text": str(word[4]),
+                }
                 for word in line_words
             ],
             "text": " ".join(str(word[4]) for word in line_words).strip(),
@@ -311,6 +331,8 @@ def numeric_runs(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
             runs.append({
                 "x0": word["x0"],
                 "x1": word["x1"],
+                "y0": word.get("y0"),
+                "y1": word.get("y1"),
                 "text": token,
                 "value": value,
                 "value_state": value_state,
@@ -575,6 +597,66 @@ def nearest_typed_observations(
             precisions[index] = run.get("value_precision")
             distances[index] = distance
     return assigned, states, precisions
+
+
+def nearest_custodied_observations(
+    runs: list[dict[str, Any]],
+    columns: list[float],
+    *,
+    line: dict[str, Any],
+    periods: list[str],
+    reporting_currency: str,
+    units: str,
+    missing_state: str = "reported_blank",
+) -> tuple[list[float | None], list[str], list[int | None], list[dict[str, Any]]]:
+    """Bind every period cell to its exact printed token and source geometry."""
+
+    values, states, precisions = nearest_typed_observations(
+        runs,
+        columns,
+        missing_state=missing_state,
+    )
+    if len(values) != 3:
+        return values, states, precisions, []
+    assigned_runs: list[dict[str, Any] | None] = [None, None, None]
+    distances = [float("inf")] * 3
+    for run in runs:
+        centre = (run["x0"] + run["x1"]) / 2
+        index = min(range(3), key=lambda candidate: abs(columns[candidate] - centre))
+        distance = abs(columns[index] - centre)
+        if distance < distances[index]:
+            assigned_runs[index] = run
+            distances[index] = distance
+
+    page = int(line["page"])
+    line_y0 = float(line.get("y0") or 0)
+    line_y1 = float(line.get("y1") or line_y0)
+    cells = []
+    for index, run in enumerate(assigned_runs):
+        inferred = run is None
+        x0 = float(run["x0"]) if run else float(columns[index])
+        x1 = float(run["x1"]) if run else float(columns[index])
+        y0 = float(run.get("y0") if run and run.get("y0") is not None else line_y0)
+        y1 = float(run.get("y1") if run and run.get("y1") is not None else line_y1)
+        cells.append({
+            "raw_text": str(run["text"]) if run else "",
+            "source_page": page,
+            "source_coordinates": {
+                "coordinate_system": "pdf_points_top_left",
+                "x0": x0,
+                "y0": y0,
+                "x1": x1,
+                "y1": y1,
+                "inferred_blank_position": inferred,
+            },
+            "confidence": 1.0 if run is not None or states[index] == "reported_blank" else 0.0,
+            "typed_state": states[index],
+            "currency": reporting_currency,
+            "units": units,
+            "period": periods[index],
+            "normalized_value": values[index],
+        })
+    return values, states, precisions, cells
 
 
 def _merge_wrapped_caption_lines(
@@ -1124,9 +1206,13 @@ def extract_statement(
             continue
         if DECORATION_RE.search(label):
             continue
-        values, value_states, value_precisions = nearest_typed_observations(
+        values, value_states, value_precisions, cells = nearest_custodied_observations(
             runs,
             line_columns,
+            line=line,
+            periods=periods,
+            reporting_currency=reporting_currency,
+            units=units,
             missing_state="reported_blank" if runs else "unresolved",
         )
         if len(values) != 3:
@@ -1167,6 +1253,7 @@ def extract_statement(
             "values": values,
             "value_states": value_states,
             "value_precisions": value_precisions,
+            "cells": cells,
             "page_or_note": source_provenance_note(
                 int(line["page"]), provenance_tokens
             ),
@@ -1175,12 +1262,18 @@ def extract_statement(
             "is_subtotal": is_subtotal_label(label),
         })
     infer_structural_roles(rows)
+    for row in rows:
+        for index, cell in enumerate(row.get("cells") or []):
+            cell["typed_state"] = row["value_states"][index]
+            cell["normalized_value"] = row["values"][index]
+            if cell["typed_state"] == "reported_blank":
+                cell["confidence"] = 1.0
     rows = model_statement_scope(rows, section)
     if not rows:
         return None, findings + [{"code": "NO_STATEMENT_ROWS", "section": section}]
     infer_parent_links(rows)
     manifest = {
-        "schema_version": "face-statement-manifest/1.2",
+        "schema_version": "face-statement-manifest/1.3",
         "statement": section,
         "statement_order": 1,
         "source_id": source_id,
@@ -1220,6 +1313,7 @@ def extract_statement(
             "values": row["values"],
             "value_states": row["value_states"],
             "value_precisions": row["value_precisions"],
+            "cells": row["cells"],
             "structural_role": row["structural_role"],
             "page_or_note": row["page_or_note"],
             "material": row["material"],

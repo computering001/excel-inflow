@@ -41,6 +41,7 @@ export function faceStatementManifestDigest(manifest) {
       ...(Array.isArray(row?.value_precisions)
         ? { value_precisions: row.value_precisions }
         : {}),
+      ...(Array.isArray(row?.cells) ? { cells: row.cells } : {}),
       ...(row?.structural_role
         ? { structural_role: row.structural_role }
         : {}),
@@ -57,6 +58,7 @@ export const FACE_STATEMENT_MANIFEST_VERSIONS = Object.freeze([
   "face-statement-manifest/1.0",
   "face-statement-manifest/1.1",
   "face-statement-manifest/1.2",
+  "face-statement-manifest/1.3",
 ]);
 
 const TYPED_VALUE_STATES = new Set([
@@ -76,9 +78,10 @@ function valueStateMatches(value, state) {
 
 /**
  * Validate the exact manifest contract used by the production filings lane.
- * Version 1.0 remains readable for sealed legacy evidence. Version 1.1 is the
- * only manifest emitted by the current extractor and fails closed unless page
- * continuity, reporting basis, source units and typed cell states are present.
+ * Versions 1.0-1.2 remain readable for sealed legacy evidence. Version 1.3 is
+ * emitted by the current extractor and fails closed unless page continuity,
+ * reporting basis, source units, typed states, precision and exact per-cell
+ * source custody are present.
  */
 export function filingManifestCustodyErrors({
   manifest,
@@ -90,8 +93,9 @@ export function filingManifestCustodyErrors({
   const errors = [];
   const rows = manifest?.rows ?? [];
   const version = manifest?.schema_version;
-  const strictCustody = ["face-statement-manifest/1.1", "face-statement-manifest/1.2"].includes(version);
-  const precisionCustody = version === "face-statement-manifest/1.2";
+  const strictCustody = ["face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"].includes(version);
+  const precisionCustody = ["face-statement-manifest/1.2", "face-statement-manifest/1.3"].includes(version);
+  const cellCustody = version === "face-statement-manifest/1.3";
 
   if (!FACE_STATEMENT_MANIFEST_VERSIONS.includes(version)) errors.push(`${section} manifest has the wrong schema version`);
   if (manifest?.statement !== section) errors.push(`${section} manifest declares ${manifest?.statement}`);
@@ -145,6 +149,39 @@ export function filingManifestCustodyErrors({
               : precision !== null;
           })
         ) errors.push(`${section}.${row?.source_line_id ?? index} does not carry source-visible period precision`);
+      }
+      if (cellCustody) {
+        if (!Array.isArray(row?.cells) || row.cells.length !== 3) {
+          errors.push(`${section}.${row?.source_line_id ?? index} does not carry three per-cell custody records`);
+        } else {
+          for (const [periodIndex, cell] of row.cells.entries()) {
+            const prefix = `${section}.${row?.source_line_id ?? index}.cells[${periodIndex}]`;
+            const coordinates = cell?.source_coordinates;
+            const expectedState = row.value_states?.[periodIndex];
+            const expectedValue = row.values?.[periodIndex];
+            if (typeof cell?.raw_text !== "string") errors.push(`${prefix} omits exact raw printed text`);
+            if (
+              !["reported_blank", "unresolved"].includes(expectedState) &&
+              String(cell?.raw_text ?? "").length === 0
+            ) errors.push(`${prefix} has no raw printed token for ${expectedState}`);
+            if (!Number.isInteger(cell?.source_page) || cell.source_page < 1) errors.push(`${prefix} has no typed source page`);
+            if (Number.isInteger(cell?.source_page) && Array.isArray(sourcePages) && !sourcePages.includes(cell.source_page)) errors.push(`${prefix} cites a page outside source_pages`);
+            if (
+              !coordinates ||
+              coordinates.coordinate_system !== "pdf_points_top_left" ||
+              !["x0", "y0", "x1", "y1"].every((key) => Number.isFinite(coordinates[key])) ||
+              coordinates.x1 < coordinates.x0 ||
+              coordinates.y1 < coordinates.y0 ||
+              typeof coordinates.inferred_blank_position !== "boolean"
+            ) errors.push(`${prefix} has invalid source coordinates/bounding box`);
+            if (!Number.isFinite(cell?.confidence) || cell.confidence < 0 || cell.confidence > 1) errors.push(`${prefix} has invalid confidence`);
+            if (cell?.typed_state !== expectedState) errors.push(`${prefix} typed state differs from row custody`);
+            if (cell?.currency !== manifest.reporting_currency) errors.push(`${prefix} currency differs from manifest custody`);
+            if (cell?.units !== manifest.units) errors.push(`${prefix} units differ from manifest custody`);
+            if (cell?.period !== manifest.periods?.[periodIndex]) errors.push(`${prefix} period differs from manifest custody`);
+            if (!(cell?.normalized_value === expectedValue || (cell?.normalized_value === null && expectedValue === null))) errors.push(`${prefix} normalized value differs from row custody`);
+          }
+        }
       }
     }
     if (typeof row?.page_or_note !== "string" || row.page_or_note.trim() === "") errors.push(`${section}.${row?.source_line_id ?? index} has no source location`);

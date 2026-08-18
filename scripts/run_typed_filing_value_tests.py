@@ -181,12 +181,29 @@ check(
     manifest is not None and "source reference F-5" in manifest["rows"][0]["page_or_note"],
     "standalone source marker was not attached to adjacent provenance",
 )
+check(
+    manifest is not None and manifest["schema_version"] == "face-statement-manifest/1.3",
+    "current extraction did not emit the complete per-cell custody contract",
+)
+required_cell_fields = {
+    "raw_text", "source_page", "source_coordinates", "confidence",
+    "typed_state", "currency", "units", "period", "normalized_value",
+}
+check(
+    manifest is not None
+    and all(
+        len(row.get("cells", [])) == 3
+        and all(set(cell) == required_cell_fields for cell in row["cells"])
+        for row in manifest["rows"]
+    ),
+    "an extracted cell omitted exact text, bbox, confidence, typed or normalized custody",
+)
 check(not extraction_findings, "clean source-marker extraction emitted findings")
 
 report = {
     "kind": "typed-filing-value-tests/1.0",
     "status": "FAIL" if failures else "PASS",
-    "checks": 21,
+    "checks": 23,
     "violations": len(failures),
     "failures": failures,
 }

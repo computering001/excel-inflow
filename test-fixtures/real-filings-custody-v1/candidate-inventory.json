@@ -1,5 +1,5 @@
 {
-  "schema_version": "real-filing-custody-inventory/1.0",
+  "schema_version": "real-filing-custody-inventory/1.1",
   "assessment_source_commit": "7efe6fc8f726951e05dcf930aff93bf3ed0bbde2",
   "assessment_status": "HASH_BOUND_CUSTODY_ESTABLISHED_EXACT_CONTRACT_PASS",
   "candidate_set_sha256": "01cd818d2ed703e0ac583e8099ea574362ca8117fe76a52193d7511ddc5891ab",
@@ -17,6 +17,163 @@
       "native_filing_lane_pass",
       "real_raw_canary_pass"
     ]
+  },
+  "corpus_design_matrix": {
+    "schema_version": "real-filing-corpus-design-matrix/1.0",
+    "matrix_status": "INCOMPLETE_EXTERNAL_EVIDENCE",
+    "classification_contract": "A category is verified only by candidate hashes plus a hash-bound external classification receipt. Raw document bytes, locators and source text remain outside the repository.",
+    "dimensions": {
+      "accounting_framework": [
+        {
+          "category_id": "ifrs",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "IFRS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "us_gaap",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "US_GAAP_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        }
+      ],
+      "issuer_region": [
+        {
+          "category_id": "uk",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "UK_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "eu",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "EU_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "us",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "US_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "ireland",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "IRELAND_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        }
+      ],
+      "reporting_period": [
+        {
+          "category_id": "annual",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "ANNUAL_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "interim",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "INTERIM_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        }
+      ],
+      "document_format": [
+        {
+          "category_id": "html",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "HTML_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "native_pdf",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "NATIVE_PDF_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "scanned_pdf",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "SCANNED_PDF_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        }
+      ],
+      "statement_structure": [
+        {
+          "category_id": "multi_page_cash_flow",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "MULTI_PAGE_CASH_FLOW_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "repeated_headers",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "REPEATED_HEADERS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "parent_first_subtotals",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "PARENT_FIRST_SUBTOTALS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "parent_last_subtotals",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "PARENT_LAST_SUBTOTALS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "different_units",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "DIFFERENT_UNITS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "dashes_blanks_zeroes",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "DASHES_BLANKS_ZEROES_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "footnote_references",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "FOOTNOTE_REFERENCES_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "long_captions",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "LONG_CAPTIONS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        },
+        {
+          "category_id": "unfamiliar_adjusted_profit_terms",
+          "status": "UNAVAILABLE_EXTERNAL_EVIDENCE",
+          "candidate_ids": [],
+          "classification_receipt_sha256": null,
+          "blocker_code": "UNFAMILIAR_ADJUSTED_PROFIT_TERMS_HASH_BOUND_CLASSIFICATION_RECEIPT_UNAVAILABLE"
+        }
+      ]
+    }
   },
   "selected_custody_candidate_id": "bcdd76091c073f7a",
   "candidates": [

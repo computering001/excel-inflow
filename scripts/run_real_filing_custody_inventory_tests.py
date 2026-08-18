@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,23 @@ FORBIDDEN_KEYS = {
     "values",
 }
 FORBIDDEN_STRING_FRAGMENTS = ("/Users/", ".pdf", "http://", "https://")
+REQUIRED_MATRIX = {
+    "accounting_framework": {"ifrs", "us_gaap"},
+    "issuer_region": {"uk", "eu", "us", "ireland"},
+    "reporting_period": {"annual", "interim"},
+    "document_format": {"html", "native_pdf", "scanned_pdf"},
+    "statement_structure": {
+        "multi_page_cash_flow",
+        "repeated_headers",
+        "parent_first_subtotals",
+        "parent_last_subtotals",
+        "different_units",
+        "dashes_blanks_zeroes",
+        "footnote_references",
+        "long_captions",
+        "unfamiliar_adjusted_profit_terms",
+    },
+}
 
 
 def sha256(value: str) -> str:
@@ -46,13 +64,119 @@ def walk(value: Any, trail: tuple[str, ...] = ()) -> None:
             raise AssertionError(f"unredacted locator at {'.'.join(trail)}")
 
 
+def validate_corpus_matrix(matrix: dict, known_candidate_ids: set[str]) -> list[str]:
+    errors: list[str] = []
+    if set(matrix) != {
+        "schema_version", "matrix_status", "classification_contract", "dimensions",
+    }:
+        errors.append("matrix fields are not exact")
+    if matrix.get("schema_version") != "real-filing-corpus-design-matrix/1.0":
+        errors.append("wrong matrix schema version")
+    if not isinstance(matrix.get("classification_contract"), str) or not matrix["classification_contract"]:
+        errors.append("matrix omits its classification contract")
+    dimensions = matrix.get("dimensions")
+    if not isinstance(dimensions, dict) or set(dimensions) != set(REQUIRED_MATRIX):
+        return [*errors, "matrix dimensions are not exact"]
+    unavailable_count = 0
+    for dimension, required_categories in REQUIRED_MATRIX.items():
+        entries = dimensions.get(dimension)
+        if not isinstance(entries, list):
+            errors.append(f"{dimension} is not a category list")
+            continue
+        category_ids = [entry.get("category_id") for entry in entries if isinstance(entry, dict)]
+        if len(category_ids) != len(set(category_ids)) or set(category_ids) != required_categories:
+            errors.append(f"{dimension} categories are not exact")
+        for entry in entries:
+            if not isinstance(entry, dict):
+                errors.append(f"{dimension} contains a non-object category")
+                continue
+            category = f"{dimension}.{entry.get('category_id')}"
+            if set(entry) != {
+                "category_id", "status", "candidate_ids",
+                "classification_receipt_sha256", "blocker_code",
+            }:
+                errors.append(f"{category} fields are not exact")
+                continue
+            candidate_ids = entry["candidate_ids"]
+            if not isinstance(candidate_ids, list) or len(candidate_ids) != len(set(candidate_ids)):
+                errors.append(f"{category} candidate_ids are not a unique list")
+                continue
+            if any(candidate_id not in known_candidate_ids for candidate_id in candidate_ids):
+                errors.append(f"{category} cites an unknown candidate")
+            if entry["status"] == "HASH_BOUND_VERIFIED":
+                if not candidate_ids or not SHA256_RE.fullmatch(
+                    str(entry["classification_receipt_sha256"] or "")
+                ) or entry["blocker_code"] is not None:
+                    errors.append(f"{category} verified status lacks hash-bound evidence")
+            elif entry["status"] == "UNAVAILABLE_EXTERNAL_EVIDENCE":
+                unavailable_count += 1
+                if (
+                    candidate_ids
+                    or entry["classification_receipt_sha256"] is not None
+                    or not isinstance(entry["blocker_code"], str)
+                    or not entry["blocker_code"]
+                ):
+                    errors.append(f"{category} unavailable status fabricates or omits evidence")
+            else:
+                errors.append(f"{category} has an unknown status")
+    expected_status = (
+        "INCOMPLETE_EXTERNAL_EVIDENCE"
+        if unavailable_count
+        else "COMPLETE_HASH_BOUND_COVERAGE"
+    )
+    if matrix.get("matrix_status") != expected_status:
+        errors.append("matrix status does not match category evidence")
+    return errors
+
+
 inventory = json.loads(INVENTORY.read_text("utf-8"))
-assert inventory["schema_version"] == "real-filing-custody-inventory/1.0"
+assert inventory["schema_version"] == "real-filing-custody-inventory/1.1"
 walk(inventory)
 
 candidates = inventory["candidates"]
 assert len(candidates) == inventory["candidate_count"]
 assert len({candidate["candidate_id"] for candidate in candidates}) == len(candidates)
+candidate_ids = {candidate["candidate_id"] for candidate in candidates}
+
+matrix = inventory["corpus_design_matrix"]
+assert not validate_corpus_matrix(matrix, candidate_ids)
+unavailable_categories = sorted(
+    f"{dimension}.{entry['category_id']}"
+    for dimension, entries in matrix["dimensions"].items()
+    for entry in entries
+    if entry["status"] == "UNAVAILABLE_EXTERNAL_EVIDENCE"
+)
+assert len(unavailable_categories) == 20
+
+# Each fail-closed rule must reject independently after the surrounding matrix
+# remains structurally valid; none may rely on the production inventory being
+# incomplete for a different reason.
+matrix_mutations: list[tuple[str, dict, str]] = []
+known_candidate = sorted(candidate_ids)[0]
+missing_category = deepcopy(matrix)
+missing_category["dimensions"]["document_format"].pop()
+matrix_mutations.append(("missing_category", missing_category, "categories are not exact"))
+fake_verified = deepcopy(matrix)
+fake_verified["dimensions"]["accounting_framework"][0].update({
+    "status": "HASH_BOUND_VERIFIED", "candidate_ids": [known_candidate],
+    "classification_receipt_sha256": None, "blocker_code": None,
+})
+matrix_mutations.append(("verified_without_receipt", fake_verified, "lacks hash-bound evidence"))
+fabricated_unavailable = deepcopy(matrix)
+fabricated_unavailable["dimensions"]["reporting_period"][0]["candidate_ids"] = [known_candidate]
+matrix_mutations.append(("unavailable_with_candidate", fabricated_unavailable, "fabricates or omits evidence"))
+unknown_candidate = deepcopy(matrix)
+unknown_entry = unknown_candidate["dimensions"]["document_format"][0]
+unknown_entry.update({
+    "status": "HASH_BOUND_VERIFIED", "candidate_ids": ["unknown-candidate"],
+    "classification_receipt_sha256": "a" * 64, "blocker_code": None,
+})
+matrix_mutations.append(("unknown_candidate", unknown_candidate, "cites an unknown candidate"))
+for mutation_name, mutation, expected_error in matrix_mutations:
+    mutation_errors = validate_corpus_matrix(mutation, candidate_ids)
+    assert any(expected_error in error for error in mutation_errors), (
+        mutation_name, mutation_errors
+    )
 
 raw_hashes = []
 for candidate in candidates:
@@ -112,6 +236,9 @@ print(json.dumps({
     "candidate_count": len(candidates),
     "eligible_candidate_count": len(eligible),
     "hash_bound_custody_established": True,
+    "corpus_matrix_status": matrix["matrix_status"],
+    "unavailable_external_evidence_categories": unavailable_categories,
+    "matrix_mutations_rejected": len(matrix_mutations),
     "licensed_or_public_document_bytes_in_repository": False,
     "violations": 0,
 }, sort_keys=True))

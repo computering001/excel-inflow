@@ -154,7 +154,31 @@ assert(
   nativeBundle.filings.cash_flow.length === clean.filings.cash_flow.length,
   "native extraction selected a prose mention or shortened the cash-flow statement",
 );
-checks += 2;
+const nativeManifests = [
+  ...nativeBundle.filings.face_statement_manifests.income_statement,
+  ...nativeBundle.filings.face_statement_manifests.cash_flow,
+];
+assert(
+  nativeManifests.every((manifest) => manifest.schema_version === "face-statement-manifest/1.3"),
+  "native extraction did not emit the current per-cell custody contract",
+);
+assert(
+  nativeManifests.every((manifest) => manifest.rows.every((row) =>
+    row.cells?.length === 3 && row.cells.every((cell, period) =>
+      typeof cell.raw_text === "string" &&
+      Number.isInteger(cell.source_page) &&
+      cell.source_coordinates?.coordinate_system === "pdf_points_top_left" &&
+      Number.isFinite(cell.confidence) &&
+      cell.currency === manifest.reporting_currency &&
+      cell.units === manifest.units &&
+      cell.typed_state === row.value_states[period] &&
+      cell.period === manifest.periods[period] &&
+      Object.hasOwn(cell, "normalized_value")
+    )
+  )),
+  "native extraction lost exact text, bbox, confidence, typed or normalized per-cell custody",
+);
+checks += 4;
 
 // Exercise the top controller's raw-filings handoff before supplying any
 // caller-authored response: raw registry -> resolved evidence -> proposer ->

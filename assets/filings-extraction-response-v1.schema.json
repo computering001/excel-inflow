@@ -26,8 +26,8 @@
             "additionalProperties": false,
             "required": ["income_statement", "cash_flow"],
             "properties": {
-              "income_statement": { "type": "array", "items": { "type": "object" } },
-              "cash_flow": { "type": "array", "items": { "type": "object" } }
+              "income_statement": { "type": "array", "items": { "$ref": "#/$defs/faceStatementManifest" } },
+              "cash_flow": { "type": "array", "items": { "$ref": "#/$defs/faceStatementManifest" } }
             }
           }
         }
@@ -36,6 +36,93 @@
     "filing_facts": { "$ref": "#/$defs/filingFacts" }
   },
   "$defs": {
+    "faceStatementCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_text", "source_page", "source_coordinates", "confidence", "typed_state", "currency", "units", "period", "normalized_value"],
+      "properties": {
+        "raw_text": { "type": "string" },
+        "source_page": { "type": "integer", "minimum": 1 },
+        "source_coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coordinate_system", "x0", "y0", "x1", "y1", "inferred_blank_position"],
+          "properties": {
+            "coordinate_system": { "const": "pdf_points_top_left" },
+            "x0": { "type": "number" },
+            "y0": { "type": "number" },
+            "x1": { "type": "number" },
+            "y1": { "type": "number" },
+            "inferred_blank_position": { "type": "boolean" }
+          }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "typed_state": { "enum": ["reported_number", "reported_zero", "reported_dash", "reported_blank", "not_applicable", "unresolved"] },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions"] },
+        "period": { "type": "string", "format": "date" },
+        "normalized_value": { "type": ["number", "null"] }
+      }
+    },
+    "faceStatementRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_line_id", "ordinal", "raw_label", "values", "page_or_note", "material"],
+      "properties": {
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "values": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": ["number", "null"] } },
+        "value_states": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "enum": ["reported_number", "reported_zero", "reported_dash", "reported_blank", "not_applicable", "unresolved"] } },
+        "value_precisions": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 12 } },
+        "cells": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/faceStatementCell" } },
+        "structural_role": { "enum": ["body", "header"] },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "material": { "type": "boolean" },
+        "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "hierarchy_level": { "type": "integer", "minimum": 0, "maximum": 8 },
+        "is_subtotal": { "type": "boolean" }
+      }
+    },
+    "faceStatementManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "statement", "statement_order", "source_id", "document_sha256", "page_or_note", "periods", "complete_face_statement", "row_count", "rows_sha256", "rows"],
+      "properties": {
+        "schema_version": { "enum": ["face-statement-manifest/1.0", "face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"] },
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "statement_order": { "type": "integer", "minimum": 1 },
+        "source_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "page_or_note": { "type": "string", "minLength": 1 },
+        "periods": { "$ref": "#/$defs/periods3" },
+        "complete_face_statement": { "const": true },
+        "source_pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "units": { "enum": ["units", "thousands", "millions"] },
+        "source_unit_labels": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "row_count": { "type": "integer", "minimum": 1 },
+        "rows_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "rows": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/faceStatementRow" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "schema_version": { "enum": ["face-statement-manifest/1.1", "face-statement-manifest/1.2", "face-statement-manifest/1.3"] } } },
+          "then": {
+            "required": ["source_pages", "reporting_currency", "units", "source_unit_labels"],
+            "properties": { "rows": { "items": { "required": ["value_states", "structural_role", "hierarchy_level", "is_subtotal"] } } }
+          }
+        },
+        {
+          "if": { "properties": { "schema_version": { "enum": ["face-statement-manifest/1.2", "face-statement-manifest/1.3"] } } },
+          "then": { "properties": { "rows": { "items": { "required": ["value_precisions"] } } } }
+        },
+        {
+          "if": { "properties": { "schema_version": { "const": "face-statement-manifest/1.3" } } },
+          "then": { "properties": { "rows": { "items": { "required": ["cells"] } } } }
+        }
+      ]
+    },
     "filingFacts": {
       "type": "object",
       "additionalProperties": false,
