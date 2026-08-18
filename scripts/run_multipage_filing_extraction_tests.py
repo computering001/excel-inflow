@@ -100,6 +100,79 @@ def check(condition: bool, message: str) -> None:
         failures.append(message)
 
 
+check(
+    extractor.STRICT_HEADINGS["income_statement"].fullmatch(
+        "CONSOLIDATED STATEMENTS OF OPERATIONS"
+    ) is not None,
+    "canonical plural US-GAAP income-statement heading was rejected",
+)
+check(
+    extractor.STRICT_HEADINGS["cash_flow"].fullmatch(
+        "CONSOLIDATED STATEMENTS OF CASH FLOWS"
+    ) is not None,
+    "canonical plural US-GAAP cash-flow heading was rejected",
+)
+
+misaligned_subtotal_rows = [
+    {
+        "source_line_id": "is.component_a",
+        "hierarchy_level": 1,
+        "is_subtotal": False,
+        "values": [2, 3, 4],
+        "value_states": ["reported_number"] * 3,
+    },
+    {
+        "source_line_id": "is.component_b",
+        "hierarchy_level": 1,
+        "is_subtotal": False,
+        "values": [3, 4, 5],
+        "value_states": ["reported_number"] * 3,
+    },
+    {
+        "source_line_id": "is.nearer_total",
+        "hierarchy_level": 3,
+        "is_subtotal": True,
+        "values": [5, 7, 9],
+        "value_states": ["reported_number"] * 3,
+    },
+    {
+        "source_line_id": "is.later_outer_total",
+        "hierarchy_level": 0,
+        "is_subtotal": True,
+        "values": [20, 21, 22],
+        "value_states": ["reported_number"] * 3,
+    },
+]
+extractor.infer_parent_links(misaligned_subtotal_rows)
+check(
+    all(not row.get("parent_source_line_id") for row in misaligned_subtotal_rows[:2]),
+    "a later outer subtotal reached across a nearer misaligned subtotal boundary",
+)
+
+other_income_surface = [
+    text_line(2, 10.0, "Consolidated statements of comprehensive income"),
+    text_line(2, 20.0, "USD millions"),
+    year_line(2, 30.0, page_two_columns),
+    value_line(2, 40.0, "Net income", ["10", "11", "12"], page_two_columns),
+    value_line(2, 50.0, "Comprehensive income", ["9", "10", "11"], page_two_columns),
+]
+continued, _ = extractor._continuation_page(
+    [
+        text_line(1, 10.0, "Consolidated statements of operations"),
+        text_line(1, 20.0, "USD millions"),
+        year_line(1, 30.0, page_one_columns),
+    ],
+    other_income_surface,
+    "income_statement",
+    PERIODS,
+    page_one_columns,
+)
+check(
+    continued is False,
+    "a distinct comprehensive-income statement was joined to the operations face",
+)
+
+
 expected_labels = [
     "Profit before tax",
     "Depreciation",
@@ -219,7 +292,7 @@ if manifest is not None:
 report = {
     "kind": "multipage-filing-extraction-tests/1.0",
     "status": "FAIL" if failures else "PASS",
-    "checks": 14,
+    "checks": 18,
     "mutations_rejected": mutations_rejected,
     "mutations_total": 8,
     "violations": len(failures),

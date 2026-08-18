@@ -54,6 +54,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "real-filing-custody-inventory",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_real_filing_custody_inventory_tests.py",
+      "timeout_seconds": 60,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "multipage-filing-extraction",
       "phase": "evidence",
       "runtime": "python",

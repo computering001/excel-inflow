@@ -6,7 +6,7 @@ const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
 
 const CORE_ROLE_ALIASES = Object.freeze({
   income_statement: Object.freeze({
-    revenue: ["revenue", "revenues", "turnover", "net sales", "total revenue"],
+    revenue: ["revenue", "revenues", "turnover", "net sales", "total net sales", "total revenue"],
     gross_profit: ["gross profit"],
     ebit: ["ebit", "earnings before interest and tax", "earnings before interest and taxes"],
     operating_profit: ["operating profit", "operating income"],
@@ -114,12 +114,14 @@ const CORE_ROLE_ALIASES = Object.freeze({
       "cash and cash equivalents at beginning of period",
       "cash and cash equivalents at the beginning of the period",
       "cash and cash equivalents at start of year",
+      "cash cash equivalents and restricted cash and cash equivalents beginning balances",
     ],
     ending_cash: [
       "cash and cash equivalents at end of year",
       "cash and cash equivalents at end of period",
       "cash and cash equivalents at the end of the period",
       "cash and cash equivalents at year end",
+      "cash cash equivalents and restricted cash and cash equivalents ending balances",
       "ending cash",
     ],
     cash_flow_da: [

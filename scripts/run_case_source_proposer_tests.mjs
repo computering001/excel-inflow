@@ -25,7 +25,7 @@ function manifest(statement, rows) {
 }
 
 const income = manifest("income_statement", [
-  { source_line_id: "is.rev", ordinal: 1, raw_label: "Revenue", values: [100, 110, 120], material: true },
+  { source_line_id: "is.rev", ordinal: 1, raw_label: "Total net sales", values: [100, 110, 120], material: true },
   { source_line_id: "is.weird", ordinal: 2, raw_label: "BioVenture milestone remeasurement", values: [1, -2, 4], material: true },
   { source_line_id: "is.op", ordinal: 3, raw_label: "Operating profit", values: [20, 21, 24], material: true },
   { source_line_id: "is.da", ordinal: 4, raw_label: "Depreciation and amortisation", values: [-4, -5, -6], material: true },
@@ -120,6 +120,37 @@ assert.equal(
   fxSource.statement_map.cash_flow[0].role,
   "fx_effect_on_cash",
   "A filed FX effect line lost the semantic role required by the cash identity.",
+);
+
+const restrictedCashFlow = manifest("cash_flow", [
+  {
+    source_line_id: "cf.opening_restricted_cash",
+    ordinal: 1,
+    raw_label: "Cash, cash equivalents, and restricted cash and cash equivalents, beginning balances",
+    values: [8, 9, 10],
+    material: true,
+  },
+  {
+    source_line_id: "cf.ending_restricted_cash",
+    ordinal: 2,
+    raw_label: "Cash, cash equivalents, and restricted cash and cash equivalents, ending balances",
+    values: [9, 10, 11],
+    material: true,
+  },
+]);
+const restrictedCashSource = proposeCaseSource({
+  declarations: {
+    identity: { issuer_name: "Restricted Cash Test plc", reporting_currency: "USD" },
+  },
+  caseEvidence: {
+    face_statement_manifests: { income_statement: [income], cash_flow: [restrictedCashFlow] },
+    lanes: {},
+  },
+});
+assert.deepEqual(
+  restrictedCashSource.statement_map.cash_flow.map((row) => row.role),
+  ["opening_cash", "ending_cash"],
+  "Canonical restricted-cash balance captions were not mapped to the cash bridge.",
 );
 
 const typedIncome = manifest("income_statement", [

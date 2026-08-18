@@ -14,20 +14,20 @@ from typing import Any
 
 HEADINGS = {
     "income_statement": re.compile(
-        r"(?:income statement|statement of (?:comprehensive income|income|operations|profit or loss)|"
+        r"(?:income statements?|statements? of (?:comprehensive income|income|operations|profit or loss)|"
         r"statement of profit or loss|consolidated results)", re.I,
     ),
-    "cash_flow": re.compile(r"(?:cash flow statement|statement of cash flows|cash flows)", re.I),
+    "cash_flow": re.compile(r"(?:cash flow statements?|statements? of cash flows|cash flows)", re.I),
 }
 STRICT_HEADINGS = {
     "income_statement": re.compile(
-        r"^\s*(?:consolidated\s+)?(?:income statement|statement of\s+"
+        r"^\s*(?:consolidated\s+)?(?:income statements?|statements? of\s+"
         r"(?:comprehensive income|income|operations|profit or loss(?: and other comprehensive income)?))\s*"
         r"(?:\(continued\)|continued)?\s*$",
         re.I,
     ),
     "cash_flow": re.compile(
-        r"^\s*(?:consolidated\s+)?(?:cash flow statement|statement of cash flows?)\s*"
+        r"^\s*(?:consolidated\s+)?(?:cash flow statements?|statements? of cash flows?)\s*"
         r"(?:\(continued\)|continued)?\s*$",
         re.I,
     ),
@@ -145,6 +145,7 @@ def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict
         if in_oci or past_profit_attribution:
             continue
         if re.match(
+            r"^earnings per share\b|^shares used in computing earnings per share\b|"
             r"^(?:basic|diluted) earnings per\b|^weighted average number of\b|"
             r"^diluted weighted average number of\b|^dividends? declared\b",
             normalised,
@@ -382,6 +383,31 @@ def _continuation_page(
         for candidate_section, pattern in STRICT_HEADINGS.items():
             if candidate_section != section and pattern.fullmatch(text):
                 return False, []
+
+    def canonical_heading(text: str) -> str:
+        return re.sub(
+            r"\s+", " ", CONTINUED_RE.sub("", text).replace("(", " ").replace(")", " ")
+        ).strip().lower()
+
+    previous_headings = [
+        str(line.get("text") or "").strip()
+        for line in previous_lines
+        if STRICT_HEADINGS[section].fullmatch(str(line.get("text") or "").strip())
+    ]
+    current_headings = [
+        str(line.get("text") or "").strip()
+        for line in top
+        if STRICT_HEADINGS[section].fullmatch(str(line.get("text") or "").strip())
+    ]
+    if current_headings and previous_headings and not any(
+        canonical_heading(current) == canonical_heading(previous)
+        for current in current_headings
+        for previous in previous_headings
+    ):
+        # A new face statement in the same broad section (for example a
+        # statement of comprehensive income after a statement of operations)
+        # is not a continuation of the selected surface.
+        return False, []
 
     same_heading = any(
         STRICT_HEADINGS[section].fullmatch(str(line.get("text") or "").strip())
@@ -769,6 +795,15 @@ def infer_parent_links(rows: list[dict[str, Any]]) -> None:
         # A row only becomes a hierarchy owner when the source surface says it
         # is a total.  Unknown labels are preserved but do not invent families.
         if row.get("is_subtotal"):
+            # A nearer printed subtotal is a source-visible boundary even when
+            # PDF geometry places its caption at an unexpectedly deeper x
+            # coordinate. Do not let an older shallower subtotal reach back
+            # across that boundary and claim the preceding components. Exact
+            # three-period arithmetic may still establish the nearer family;
+            # otherwise the relationship remains deliberately unowned.
+            for candidate_level in list(next_subtotal_by_level):
+                if candidate_level < level:
+                    next_subtotal_by_level.pop(candidate_level, None)
             next_subtotal_by_level[level] = row["source_line_id"]
             for candidate_level in list(next_subtotal_by_level):
                 if candidate_level > level:

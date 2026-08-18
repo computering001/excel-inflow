@@ -1,0 +1,221 @@
+{
+  "schema_version": "real-filing-custody-inventory/1.0",
+  "assessment_source_commit": "5e407436c4e83bb11fced8878905f513b5c6dc05",
+  "assessment_status": "HASH_BOUND_CUSTODY_ESTABLISHED_NO_EXACT_CONTRACT_PASS",
+  "candidate_set_sha256": "1c7c092b3cf42e30bcdb578e66b6b837199a4cacd718321f58564d284dc4bb3d",
+  "candidate_count": 5,
+  "eligible_candidate_count": 0,
+  "eligibility_contract": {
+    "required_boolean_fields": [
+      "lawful_local_or_official_public",
+      "raw_sha256_bound",
+      "request_expectations_pair",
+      "three_period_face_statements_selected",
+      "selected_authority_has_pure_da_or_ebitda",
+      "separate_interest_authorities_available",
+      "explicit_fx_or_source_proven_zero_available",
+      "native_filing_lane_pass",
+      "real_raw_canary_pass"
+    ]
+  },
+  "selected_custody_candidate_id": "ff6bb04a0be2b5d6",
+  "candidates": [
+    {
+      "candidate_id": "027438039c266b49",
+      "custody_class": "approved_local_fixture",
+      "raw_sha256": "2cd5225776f69af80af5d7e51a13ad380596ae30b7c42bdc0aba927708712440",
+      "source_spec_sha256": "8a91222dcf4e32d69bc037589dd1f0e94a4a2c460c3ce403a040cfa79362036b",
+      "qualifications": {
+        "lawful_local_or_official_public": true,
+        "raw_sha256_bound": true,
+        "request_expectations_pair": false,
+        "three_period_face_statements_selected": false,
+        "selected_authority_has_pure_da_or_ebitda": false,
+        "separate_interest_authorities_available": false,
+        "explicit_fx_or_source_proven_zero_available": false,
+        "native_filing_lane_pass": false,
+        "real_raw_canary_pass": false
+      },
+      "document_metric_witnesses": [],
+      "blocker_codes": [
+        "REQUEST_EXPECTATIONS_PAIR_ABSENT",
+        "THREE_PERIOD_FACE_STATEMENT_UNAVAILABLE",
+        "NATIVE_STATEMENT_AUTHORITY_UNRESOLVED"
+      ],
+      "proof": {
+        "native_pipeline_state_sha256": "df6e6256e12f6cedda3ec16c6cf8475dd34be0387d448104e47be8b2f6d4ffb7",
+        "native_pipeline_status": "NEEDS_EXTRACTION_REVIEW"
+      }
+    },
+    {
+      "candidate_id": "109dac45c3098a78",
+      "custody_class": "lawful_local_corpus",
+      "raw_sha256": "1e61214bcda8d5c85fa49612ad69e342f03470715fb65135b43f38a471b21b80",
+      "qualifications": {
+        "lawful_local_or_official_public": true,
+        "raw_sha256_bound": true,
+        "request_expectations_pair": false,
+        "three_period_face_statements_selected": false,
+        "selected_authority_has_pure_da_or_ebitda": false,
+        "separate_interest_authorities_available": false,
+        "explicit_fx_or_source_proven_zero_available": false,
+        "native_filing_lane_pass": false,
+        "real_raw_canary_pass": false
+      },
+      "document_metric_witnesses": [
+        {
+          "metric_kind": "pure_da",
+          "page_ordinal": 246,
+          "line_sha256": "eae8fd8b6e40a482764d23c68dd4510373b46c3cd53731762f925e81adc3f532"
+        },
+        {
+          "metric_kind": "ebitda_definition",
+          "page_ordinal": 265,
+          "line_sha256": "0571e02ddb06c02ed2f20097c44ea21ccffc5ffc17326b17a84634de950b755a"
+        }
+      ],
+      "blocker_codes": [
+        "REQUEST_EXPECTATIONS_PAIR_ABSENT",
+        "THREE_PERIOD_FACE_STATEMENT_UNAVAILABLE",
+        "PRINTED_METRIC_OUTSIDE_SELECTED_AUTHORITY"
+      ],
+      "proof": {
+        "native_probe_receipt_sha256": "b1d7b7d4647fda36e4ee99ed176df3562e413c4e4ed948c91408f1bc638a7a2f",
+        "native_pipeline_status": "NEEDS_REVIEW"
+      }
+    },
+    {
+      "candidate_id": "88df86df7154a2f9",
+      "custody_class": "approved_local_fixture",
+      "raw_sha256": "e7077a0c259fa175e68ecad8c1367803d617c5dc3222c72a092d19a0cb257808",
+      "source_spec_sha256": "0ea8a1d1a76ae33a50265205b0a69c3a6b7cfd3ddc36eb09dc8d2134580d2c15",
+      "qualifications": {
+        "lawful_local_or_official_public": true,
+        "raw_sha256_bound": true,
+        "request_expectations_pair": false,
+        "three_period_face_statements_selected": false,
+        "selected_authority_has_pure_da_or_ebitda": false,
+        "separate_interest_authorities_available": false,
+        "explicit_fx_or_source_proven_zero_available": false,
+        "native_filing_lane_pass": false,
+        "real_raw_canary_pass": false
+      },
+      "document_metric_witnesses": [
+        {
+          "metric_kind": "pure_da",
+          "page_ordinal": 33,
+          "line_sha256": "d4bbbfec9675cb7d3f5aae979fd97cf0c7dc3907f70798845f3b041d8326f665"
+        },
+        {
+          "metric_kind": "ebitda",
+          "page_ordinal": 34,
+          "line_sha256": "d55ba37eed4ec6116f37fe05a7606d44cd616a19c662585ec4fa99af7c99460b"
+        }
+      ],
+      "blocker_codes": [
+        "REQUEST_EXPECTATIONS_PAIR_ABSENT",
+        "THREE_PERIOD_FACE_STATEMENT_UNAVAILABLE",
+        "NATIVE_STATEMENT_AUTHORITY_UNRESOLVED"
+      ],
+      "proof": {
+        "native_pipeline_state_sha256": "7cff71d98fd144d1973eb21ce12798990e1809db12cf8247c79feef5021a9a12",
+        "native_pipeline_status": "NEEDS_EXTRACTION_REVIEW"
+      }
+    },
+    {
+      "candidate_id": "b776178ad7088076",
+      "custody_class": "approved_local_fixture",
+      "raw_sha256": "5a381c1c5df1ca277e95985a6b1b6b3ad371914a4b18a824e22ba541fbf44097",
+      "source_spec_sha256": "7cc4aeb484aeba0ddd7c92fde7b1c2a788d27cd3a3722d8211d9cdd90305694d",
+      "qualifications": {
+        "lawful_local_or_official_public": true,
+        "raw_sha256_bound": true,
+        "request_expectations_pair": true,
+        "three_period_face_statements_selected": true,
+        "selected_authority_has_pure_da_or_ebitda": false,
+        "separate_interest_authorities_available": false,
+        "explicit_fx_or_source_proven_zero_available": false,
+        "native_filing_lane_pass": true,
+        "real_raw_canary_pass": false
+      },
+      "document_metric_witnesses": [
+        {
+          "metric_kind": "pure_da",
+          "page_ordinal": 54,
+          "line_sha256": "a1ab33b12c8bf97418ab93441ebc4290842928694bb3404fde4baebfa7b65bd7"
+        },
+        {
+          "metric_kind": "ebitda",
+          "page_ordinal": 54,
+          "line_sha256": "5d68934692a6ffb944825502bf1744f735141325b55ffb941978a88f442d3b99"
+        }
+      ],
+      "blocker_codes": [
+        "PRINTED_METRIC_OUTSIDE_SELECTED_AUTHORITY",
+        "REQUIRED_SOURCE_ROLES_ABSENT",
+        "CASE_COMPILE_CONTRACT_BLOCK"
+      ],
+      "proof": {
+        "request_sha256": "642e1b24a45c40f79b261d73ee2b21da72f829bd81ff6fffe465114b7a9c5101",
+        "expectations_sha256": "4dc688e2f09fb060cf954512a76ab8baafba033bc88328e8ae83e521c49cb299",
+        "filings_state_sha256": "9a9844b2139729d157e53c97e1ddb2db6a38762d26f2f7378e0bfdbf5119ec0e",
+        "compiled_validation_sha256": "a3c543f6b6b7bd25535ed498e85db1978519b1f2c5c7c2d486e0636e9cde1249",
+        "attachment_state_sha256": "7afed1da9b17093e659c832f8a06c1619534383354b08b9ede9f21d0369a676f",
+        "native_pipeline_status": "PASS",
+        "real_raw_canary_status": "BLOCKED_INTERNAL"
+      }
+    },
+    {
+      "candidate_id": "ff6bb04a0be2b5d6",
+      "custody_class": "official_public_external",
+      "raw_sha256": "108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab",
+      "official_locator_sha256": "6cb13d8c3c955e170451e38905e5968b51c58c98a0b400b3ee9775899240fabf",
+      "qualifications": {
+        "lawful_local_or_official_public": true,
+        "raw_sha256_bound": true,
+        "request_expectations_pair": true,
+        "three_period_face_statements_selected": true,
+        "selected_authority_has_pure_da_or_ebitda": true,
+        "separate_interest_authorities_available": false,
+        "explicit_fx_or_source_proven_zero_available": false,
+        "native_filing_lane_pass": true,
+        "real_raw_canary_pass": false
+      },
+      "document_metric_witnesses": [
+        {
+          "metric_kind": "pure_da",
+          "page_ordinal": 36,
+          "line_sha256": "6faa6122c01270cbd1cb93b2b1ea041dfd65552ee5d1ac5d3ea54fdd01d926e7"
+        }
+      ],
+      "statement_heading_witnesses": [
+        {
+          "statement_kind": "income_statement",
+          "page_ordinal": 32,
+          "line_sha256": "f379cc9ae2d44697fd847512d5e42a6f88ad24efb0d8f8df431f475de3b68a4f"
+        },
+        {
+          "statement_kind": "cash_flow",
+          "page_ordinal": 36,
+          "line_sha256": "76355f56d27ab370d7cdbc458d843e8230c493eea240b14fd2ae5eee473a5325"
+        }
+      ],
+      "blocker_codes": [
+        "SEPARATE_INTEREST_AUTHORITIES_ABSENT",
+        "EXPLICIT_FX_OR_SOURCE_PROVEN_ZERO_ABSENT",
+        "REAL_RAW_CANARY_COMPILE_BLOCK"
+      ],
+      "proof": {
+        "request_sha256": "f93cb8a4f1ea16c7577111ba13e63ae6fb7a4e2b38a821ece7a3e9f3cdc78183",
+        "expectations_sha256": "0403f05ec21e672ce83d610636a76b900e5a046f41f3c02393e6a2b40c20d731",
+        "filings_state_sha256": "a2cc998c2b8cd27eba15ae4d55f0beaa4504045f8e818b24faac90cb72ac859f",
+        "filings_bundle_sha256": "28d087f9f4620c83e547836928b599a81ca074ab67ecfcf7cd3e1f51047477ef",
+        "raw_canary_filings_state_sha256": "3037630ea2edee939380624cbc0afaef1f5ba7d3ff653945961ce640f4aa002e",
+        "compiled_validation_sha256": "d82ce8ee3bf8d17ebe394cf5769f0c2c4354ac547938cad1b5084f4eb74734f4",
+        "attachment_state_sha256": "eecb40e9bf4f98bf3fe803efcd14ad9c0fb5eb9a3da52805d7da24616e6f59aa",
+        "native_pipeline_status": "PASS",
+        "real_raw_canary_status": "BLOCKED_INTERNAL"
+      }
+    }
+  ]
+}
