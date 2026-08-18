@@ -672,6 +672,8 @@ node scripts/build_dynamic_model.mjs <case.json> --plan-only --out <workbook.xls
 python3 scripts/emit/__main__.py validate <workbook.xlsx>.plan.json
 python3 scripts/emit/__main__.py build <workbook.xlsx>.plan.json --out <workbook.xlsx>
 node scripts/inspect_workbook_semantics.mjs <workbook.xlsx> --out <inventory.json>
+python3 scripts/prepare_local_workbook_review.py <workbook.xlsx> --out <review-folder> [--soffice <path>]
+node scripts/validate_local_workbook_review.mjs <review-folder>/local-workbook-review-evidence.json
 ```
 
 The plan must report zero unresolved caches. Recalculate in an isolated LibreOffice profile, then apply only the declared terminal patch. Do not treat LibreOffice as the authority for circularity restoration or Excel rendering.
