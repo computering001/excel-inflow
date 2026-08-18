@@ -29,6 +29,7 @@ import {
   hashValue,
 } from "./lib/run_store.mjs";
 import { runProcessTree } from "./lib/process_tree.mjs";
+import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
 import {
   acquireRunLease,
   assertRunRootOutsideSkill,
@@ -312,37 +313,36 @@ async function exactEnvironmentProbe({ python, soffice, integrity, runDir }) {
   const releaseManifestPath = path.join(ROOT, "release-manifest.json");
   let releaseManifest = null;
   let releaseManifestSha256 = null;
+  const sourceCheckout = await fs.stat(path.join(ROOT, ".git"))
+    .then(() => true)
+    .catch(() => false);
   try {
     releaseManifest = await json(releaseManifestPath);
     releaseManifestSha256 = await hashFile(releaseManifestPath);
   } catch {
-    violations.push({ code: "RELEASE_MANIFEST_MISSING" });
+    if (!sourceCheckout) violations.push({ code: "RELEASE_MANIFEST_MISSING" });
+  }
+  let activeSourceIdentity = null;
+  try {
+    activeSourceIdentity = await resolveActiveSourceIdentity({ skillRoot: ROOT });
+  } catch (error) {
+    violations.push({ code: "ACTIVE_SOURCE_IDENTITY_INVALID", detail: error.message });
   }
   const body = {
     schema_version: "stage4-environment-probe/1.0",
     status: violations.length ? "BLOCKED" : "PASS",
     runtime_snapshot_sha256: integrity.digest,
     release_manifest_sha256: releaseManifestSha256,
-    release_identity: releaseManifest ? {
-      name: releaseManifest.releaseName ?? null,
-      skill_version: releaseManifest.skillVersion ?? null,
-      package_mode: releaseManifest.identity?.package?.mode ?? releaseManifest.packageMode ?? null,
-      deployment_status:
-        releaseManifest.identity?.deployment?.status ??
-        releaseManifest.deploymentStatus ??
-        null,
-      runtime_code_closure_sha256:
-        releaseManifest.identity?.package?.runtime_code_closure?.sha256 ??
-        releaseManifest.certification?.runtimeCodeClosureSha256 ??
-        releaseManifest.certification?.currentClosureSha256 ??
-        null,
+    release_identity: activeSourceIdentity ? {
+      name: activeSourceIdentity.release_name,
+      skill_version: activeSourceIdentity.skill_version,
+      package_mode: activeSourceIdentity.package_mode,
+      deployment_status: activeSourceIdentity.deployment_status,
+      runtime_code_closure_sha256: activeSourceIdentity.runtime_code_closure_sha256,
       certified_runtime_code_closure_sha256:
-        releaseManifest.identity?.package?.runtime_code_closure?.certified_sha256 ??
-        releaseManifest.certification?.certifiedRuntimeCodeClosureSha256 ??
-        releaseManifest.certification?.certifiedClosureSha256 ??
-        null,
+        activeSourceIdentity.certified_runtime_code_closure_sha256,
       complete_package_inventory_sha256:
-        releaseManifest.identity?.package?.complete_package_inventory?.sha256 ?? null,
+        activeSourceIdentity.product_identity?.package?.complete_package_inventory?.sha256 ?? null,
     } : null,
     node: process.version,
     python: python.runtime,
