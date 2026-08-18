@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "forecast-behavior-map-v1.schema.json",
+  "title": "Forecast behavior map v1",
+  "description": "Strict row-semantic forecast-behavior artifact. It is an upstream classification prior, not a per-period forecast-authority selection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "classifier_version",
+    "case_id",
+    "status",
+    "confidence_threshold",
+    "rows",
+    "violations"
+  ],
+  "properties": {
+    "schema_version": { "const": "forecast-behavior-map/1.0" },
+    "classifier_version": { "const": "forecast-behavior/v1" },
+    "case_id": { "type": ["string", "null"] },
+    "status": { "enum": ["PASS", "BLOCK"] },
+    "confidence_threshold": { "const": 0.75 },
+    "rows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/classification" }
+    },
+    "violations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/violation" }
+    }
+  },
+  "$defs": {
+    "behavior": {
+      "enum": [
+        "accounting_identity",
+        "schedule_owned",
+        "recurring_flow",
+        "driver_linked_flow",
+        "seasonal_flow",
+        "contractual_flow",
+        "lumpy_discretionary_flow",
+        "non_recurring_event",
+        "captured_detail",
+        "not_applicable"
+      ]
+    },
+    "method": {
+      "enum": [
+        "schedule_link",
+        "accounting_identity",
+        "actual_plus_remainder",
+        "contractual_commitment",
+        "company_guidance",
+        "company_indication",
+        "broker_consensus",
+        "user_assumption",
+        "driver_formula",
+        "roll_forward",
+        "seasonal_run_rate",
+        "historical_average",
+        "historical_trend",
+        "carry_forward",
+        "explicit_zero",
+        "not_separately_forecast",
+        "not_applicable"
+      ]
+    },
+    "evidenceFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "feature", "supports", "weight"],
+      "properties": {
+        "channel": {
+          "enum": [
+            "row_semantics",
+            "calculation_topology",
+            "movement_type",
+            "source_evidence",
+            "statement_context",
+            "materiality"
+          ]
+        },
+        "feature": { "type": "string", "minLength": 1 },
+        "supports": { "$ref": "#/$defs/behavior" },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row_id",
+        "section",
+        "behavior",
+        "confidence",
+        "rationale",
+        "allowed_methods",
+        "evidence_features",
+        "material",
+        "materiality_known",
+        "ambiguous",
+        "blocking"
+      ],
+      "properties": {
+        "row_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "section": { "type": "string", "minLength": 1 },
+        "behavior": { "$ref": "#/$defs/behavior" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "allowed_methods": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/method" }
+        },
+        "evidence_features": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidenceFeature" }
+        },
+        "material": { "type": "boolean" },
+        "materiality_known": { "type": "boolean" },
+        "ambiguous": { "type": "boolean" },
+        "blocking": { "type": "boolean" }
+      }
+    },
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "row_id", "section", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "LOW_CONFIDENCE_MATERIAL_BEHAVIOR",
+            "AMBIGUOUS_MATERIAL_BEHAVIOR",
+            "MATERIALITY_UNRESOLVED"
+          ]
+        },
+        "row_id": { "type": "string", "minLength": 1 },
+        "section": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

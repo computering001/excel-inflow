@@ -1,0 +1,280 @@
+{
+  "schema_version": 2,
+  "status": "RUNTIME_PROJECTION_OF_MEASURED_AUTHORITIES",
+  "source_contract_sha256": "4a1e1000aa7539c21996463eb68e597e1b985c125e55f2ebcdafcb417e9199e3",
+  "authority_rule": "Production may expand company-specific semantic rows only inside the selected standardised profile's named zones. It may not alter the shared A:U grammar, section order, controls, provenance channels or profile identity.",
+  "production_controls": {
+    "broker_choice": "semantic source selector",
+    "circularity": "numeric 0/1 input displayed as On/Off",
+    "debt_maturity_roll": "numeric 0/1 input displayed as On/Off",
+    "adjustment": "numeric 0/1 input displayed as On/Off",
+    "minimum_cash": "absolute currency input",
+    "acquisition": {
+      "enterprise_value": "absolute enterprise value",
+      "entry_ev_to_ebitda": "multiple",
+      "target_ebitda": "derived as enterprise value divided by entry multiple",
+      "acquisition_debt_amount": "absolute supplied debt amount",
+      "rate": "incremental acquisition-debt rate",
+      "close_year": "forecast close year",
+      "close_month": "calendar close month",
+      "prohibited": "debt percentage of enterprise value, consideration/equity residual funding and EV-minus-debt RCF sweep"
+    }
+  },
+  "production_print_contract": {
+    "fit_to_page": true,
+    "fit_width": 1,
+    "fit_height": 0,
+    "orientation": "landscape",
+    "explicit_scale": null,
+    "print_area": "compiled used range"
+  },
+  "shared_horizontal_grammar": {
+    "sheet_order": [
+      "Operating Model",
+      "Brokers",
+      "Forward Curves"
+    ],
+    "operating_model_columns": {
+      "labels": "B",
+      "terms": [
+        "C",
+        "D",
+        "E"
+      ],
+      "historical": [
+        "G",
+        "H",
+        "I"
+      ],
+      "forecast": [
+        "J",
+        "K",
+        "L"
+      ],
+      "adjustment": [
+        "N",
+        "O",
+        "P"
+      ],
+      "pro_forma_reference": "R",
+      "pro_forma": [
+        "S",
+        "T",
+        "U"
+      ]
+    },
+    "column_dimensions_are_identical": true,
+    "column_dimensions": [
+      {
+        "min": 1,
+        "max": 1,
+        "width": 1
+      },
+      {
+        "min": 2,
+        "max": 2,
+        "width": 46
+      },
+      {
+        "min": 3,
+        "max": 3,
+        "width": 10
+      },
+      {
+        "min": 4,
+        "max": 4,
+        "width": 10
+      },
+      {
+        "min": 5,
+        "max": 5,
+        "width": 12
+      },
+      {
+        "min": 6,
+        "max": 6,
+        "width": 2
+      },
+      {
+        "min": 7,
+        "max": 7,
+        "width": 10
+      },
+      {
+        "min": 8,
+        "max": 8,
+        "width": 10
+      },
+      {
+        "min": 9,
+        "max": 9,
+        "width": 10
+      },
+      {
+        "min": 10,
+        "max": 10,
+        "width": 10
+      },
+      {
+        "min": 11,
+        "max": 11,
+        "width": 10
+      },
+      {
+        "min": 12,
+        "max": 12,
+        "width": 10
+      },
+      {
+        "min": 13,
+        "max": 13,
+        "width": 2
+      },
+      {
+        "min": 14,
+        "max": 14,
+        "width": 10
+      },
+      {
+        "min": 15,
+        "max": 15,
+        "width": 10
+      },
+      {
+        "min": 16,
+        "max": 16,
+        "width": 10
+      },
+      {
+        "min": 17,
+        "max": 17,
+        "width": 2
+      },
+      {
+        "min": 18,
+        "max": 18,
+        "width": 10
+      },
+      {
+        "min": 19,
+        "max": 19,
+        "width": 10
+      },
+      {
+        "min": 20,
+        "max": 20,
+        "width": 10
+      },
+      {
+        "min": 21,
+        "max": 21,
+        "width": 10
+      }
+    ],
+    "freeze_pane": {
+      "top_left_cell": "G16",
+      "x_split": 6,
+      "y_split": 15,
+      "active_pane": "bottomRight",
+      "state": "frozen"
+    },
+    "show_gridlines": false,
+    "section_order": [
+      "controls",
+      "acquisition_case",
+      "income_statement",
+      "cash_flow",
+      "debt_schedule",
+      "rcf_cash_sweep",
+      "interest_schedule"
+    ]
+  },
+  "profiles": {
+    "maximal": {
+      "profile": "maximal",
+      "immutable_authority_sha256": "877f7c2a9d5feebe3ee45798643d73adac2b3bea22e91e1287189a518a90894f",
+      "exact_replay_fingerprint_sha256": "978c6b7820a468fe22c8fb35b0aa5c37294c484a0fdd5da885be3a02a71fb5ef",
+      "selection": {
+        "fallback_profile": true,
+        "max_instruments": null
+      },
+      "authority_rows": {
+        "period_group": 14,
+        "period": 15,
+        "visible_end": 180
+      },
+      "named_zones": {
+        "income_statement": {
+          "first": 17,
+          "last": 37
+        },
+        "cash_flow": {
+          "first": 38,
+          "last": 73
+        },
+        "debt_schedule": {
+          "first": 74,
+          "last": 131
+        },
+        "rcf_cash_sweep": {
+          "first": 132,
+          "last": 143
+        },
+        "interest_schedule": {
+          "first": 144,
+          "last": 180
+        }
+      },
+      "style_identity": {
+        "cell_styles": 289,
+        "differential_styles": 93,
+        "cell_style_sha256": "98de4cc0d82c3246eba1c294293470f38acb02cd5b2fd762f1c2b9e3950c80c7",
+        "differential_style_sha256": "45983d35adad0d58e6115a89ba1a9d5a33ce230b36c28fe428e76aae4d47e71e"
+      }
+    },
+    "net_cash": {
+      "profile": "net_cash",
+      "immutable_authority_sha256": "0db8b4ede5ca47c218e28321fd2aa1ac6b8e88ba17f91b758f2e8cbe5731bb76",
+      "exact_replay_fingerprint_sha256": "84600546250738012fd9f66e1a0bf3091a20f4ec6824dee8717dc8217cdeab2a",
+      "selection": {
+        "opening_net_cash_required": true,
+        "max_instruments": 2,
+        "acquisition_must_be_off": true
+      },
+      "authority_rows": {
+        "period_group": 14,
+        "period": 15,
+        "visible_end": 140
+      },
+      "named_zones": {
+        "income_statement": {
+          "first": 17,
+          "last": 37
+        },
+        "cash_flow": {
+          "first": 38,
+          "last": 73
+        },
+        "debt_schedule": {
+          "first": 74,
+          "last": 106
+        },
+        "rcf_cash_sweep": {
+          "first": 107,
+          "last": 118
+        },
+        "interest_schedule": {
+          "first": 119,
+          "last": 140
+        }
+      },
+      "style_identity": {
+        "cell_styles": 272,
+        "differential_styles": 71,
+        "cell_style_sha256": "ecf15e0f035d728f0e258998c21bf92aa208f7d46ae4ca71a00ef4f0a0ae6f18",
+        "differential_style_sha256": "d0484fe69940794eb3117e9a1c895af4dfed8d6f6933ef82b70caaa068611a9b"
+      }
+    }
+  },
+  "presentation_epoch": 3
+}

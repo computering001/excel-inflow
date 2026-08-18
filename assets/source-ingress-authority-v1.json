@@ -1,0 +1,29 @@
+{
+  "schema_version": "source-ingress-authority/1.0",
+  "authority_id": "excel-inflow-official-filings-v1",
+  "local_sources": {
+    "root_owner": "controller",
+    "canonical_containment_required": true,
+    "regular_files_only": true,
+    "symlinks_allowed": false
+  },
+  "remote_sources": {
+    "allowed_domains": [
+      "companieshouse.gov.uk",
+      "data.fca.org.uk",
+      "fca.org.uk",
+      "live.euronext.com",
+      "londonstockexchange.com",
+      "rns-pdf.londonstockexchange.com",
+      "sec.gov"
+    ],
+    "https_only": true,
+    "default_port_only": true,
+    "max_redirects": 5,
+    "max_bytes": 33554432,
+    "timeout_ms": 15000,
+    "dns_revalidation_per_hop": true,
+    "private_link_local_metadata_and_non_routable_addresses_rejected": true,
+    "content_type_and_magic_required": true
+  }
+}

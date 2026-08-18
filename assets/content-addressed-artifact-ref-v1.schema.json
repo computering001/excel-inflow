@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/content-addressed-artifact-ref-v1.schema.json",
+  "title": "Portable reference to one immutable run-store artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "sha256", "byte_length"],
+  "properties": {
+    "schema_version": { "const": "content-addressed-artifact-ref/1.0" },
+    "kind": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "byte_length": { "type": "integer", "minimum": 1 }
+  }
+}

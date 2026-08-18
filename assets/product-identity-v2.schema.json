@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Excel Inflow product identity vocabulary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source", "package", "deployment"],
+  "properties": {
+    "schema_version": { "const": "product-identity/2.0" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_kind", "repository", "commit_sha", "tree_sha"],
+      "properties": {
+        "identity_kind": { "const": "source_tree" },
+        "repository": { "type": ["string", "null"] },
+        "commit_sha": { "type": ["string", "null"] },
+        "tree_sha": { "type": ["string", "null"] }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "runtime_code_closure", "complete_package_inventory", "archive"],
+      "properties": {
+        "mode": { "enum": ["development", "certified"] },
+        "runtime_code_closure": { "$ref": "#/$defs/runtime_code_closure" },
+        "complete_package_inventory": { "$ref": "#/$defs/complete_package_inventory" },
+        "archive": { "$ref": "#/$defs/archive" }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "installation_identity", "installed_package"],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_installed",
+            "installed_candidate",
+            "active_candidate",
+            "production_promoted",
+            "rollback"
+          ]
+        },
+        "installation_identity": { "type": ["string", "null"] },
+        "installed_package": { "$ref": "#/$defs/installed_package" }
+      }
+    }
+  },
+  "$defs": {
+    "nullable_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "runtime_code_closure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_kind", "sha256", "certified_sha256"],
+      "properties": {
+        "identity_kind": { "const": "runtime_code_closure" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "certified_sha256": { "$ref": "#/$defs/nullable_sha256" }
+      }
+    },
+    "complete_package_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_kind", "sha256"],
+      "properties": {
+        "identity_kind": { "const": "complete_package_inventory" },
+        "sha256": { "$ref": "#/$defs/nullable_sha256" }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_kind", "sha256"],
+      "properties": {
+        "identity_kind": { "const": "archive" },
+        "sha256": { "$ref": "#/$defs/nullable_sha256" }
+      }
+    },
+    "installed_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_kind", "sha256"],
+      "properties": {
+        "identity_kind": { "const": "installed_package" },
+        "sha256": { "$ref": "#/$defs/nullable_sha256" }
+      }
+    }
+  }
+}

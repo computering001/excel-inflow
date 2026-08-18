@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "broker-consensus-membership-v1.schema.json",
+  "title": "Broker model-consensus membership",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "metric_id", "contributors", "membership_sha256"],
+  "properties": {
+    "schema_version": { "const": "broker-consensus-membership/1.0" },
+    "metric_id": { "type": "string", "minLength": 1 },
+    "contributors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "house_name",
+          "status",
+          "reasons",
+          "definition_signature",
+          "period_status",
+          "period_reasons"
+        ],
+        "properties": {
+          "house_name": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["included", "excluded", "rejected", "quarantined", "stale"]
+          },
+          "reasons": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "definition_signature": { "type": "object" },
+          "period_status": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "enum": ["included", "rejected", "quarantined", "wrong_period", "stale"]
+            }
+          },
+          "period_reasons": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "membership_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
