@@ -176,6 +176,13 @@ checkpoint re-executes when the rebuilt bytes are identical, and then proves an
 identical replay reuses all five user stages. The report must state zero total
 violations.
 
+The product-level timeout claim additionally requires
+`scripts/run_runtime_budget_policy_tests.mjs`. It pins every stage budget, the
+fifteen-minute target, the twenty-five-minute hard ceiling, the 20–30 second
+heartbeat contract, optional-broker degradation custody and the under-two-minute
+ownership-resolution path. Mutations that remove process-tree verification,
+checkpoint/evidence retention or exact policy binding must fail.
+
 The `economics` scope also runs the permanent forecast-authority cohort. It
 must prove, from one representative v2 source case, all five non-standard paths:
 PBT-to-EBIT reverse bridge, net-income/tax reverse bridge, segment-profit

@@ -75,8 +75,31 @@ The ordinary candidate command is:
 node scripts/run_excel_inflow_vnext.mjs \
   --attachment-spec <attachment-evidence-controller.json> \
   --out <run-folder> [--answers <answers.json>] \
-  [--python <python>] [--soffice <soffice>]
+  [--python <python>] [--soffice <soffice>] \
+  [--runtime-budget <budget-overrides.json>]
 ```
+
+The controller enforces a versioned runtime-budget policy rather than one
+hour-long catch-all timeout. Defaults are two minutes for source acquisition,
+eight minutes for filing extraction, two minutes per broker document, three
+minutes per bounded broker semantic frontier, twelve minutes for all optional
+broker work, ninety seconds for case compilation and ownership, two minutes
+for the solver, three minutes for workbook construction, four minutes for
+recalculation and three minutes for validation. The ordinary end-to-end target
+is fifteen minutes and the hard ceiling is twenty-five minutes. A JSON object
+of millisecond overrides may be supplied with `--runtime-budget`, but it must
+retain a 20–30 second heartbeat, a target no greater than the hard ceiling and
+an ownership-resolution bound no greater than two minutes.
+
+An optional broker timeout preserves all captured evidence and checkpoints,
+terminates the complete descendant process tree, and continues through the
+declared partial/zero-broker authority waterfall without restarting or asking
+for a re-upload. An ownership-preflight failure cancels unnecessary descendants,
+preserves the sealed checkpoint, resolves the topology and resumes downstream;
+it never reruns optional broker work whose target has disappeared. Every
+long-running activity reports stage, documents complete/total, elapsed time and
+`Action required: No` at least every thirty seconds. The controller emits a
+hash-bound runtime-budget receipt beside its progress and performance receipts.
 
 For a read-only inspection or fixture that already has a sealed evidence run,
 compile the same cross-lane resolution artifact directly with:

@@ -242,10 +242,16 @@ def lane_timeout_budget(kind: str, request_path: Path) -> int:
         pass
     document_count = len(request.get("documents") or [])
     if kind == "broker":
-        return min(3600, 300 + 180 * max(1, document_count))
+        # Two minutes of native extraction per document plus one bounded
+        # three-minute semantic frontier, capped by the twelve-minute optional
+        # broker envelope.  A timeout is contained by the zero/partial-authority
+        # circuit breaker below; it never becomes a re-upload request.
+        return min(720, 180 + 120 * max(1, document_count))
     if kind == "filings":
-        return min(2400, 300 + 120 * max(1, document_count))
-    return min(1200, 180 + 30 * max(1, document_count))
+        # This process owns both the two-minute source-acquisition boundary and
+        # the eight-minute filing-extraction boundary.
+        return 600
+    return 180
 
 
 def lane_command(kind: str, declaration: dict[str, Any], base: Path, output_root: Path) -> list[str]:
@@ -347,7 +353,7 @@ def run_lane(kind: str, declaration: dict[str, Any], base: Path, output_root: Pa
             # an internal task packet from becoming a terminal chat response.
             closed = run(
                 [*command, "--close-optional"],
-                timeout_seconds=min(900, lane_timeout_budget(kind, request_path)),
+                timeout_seconds=min(180, lane_timeout_budget(kind, request_path)),
             )
             if closed.returncode in {0, 2} and state_path.is_file():
                 state = read_json(state_path, "broker optional-close state")

@@ -339,6 +339,7 @@
     "lib/pre_broker_demand.mjs",
     "lib/process_tree.mjs",
     "lib/progress_heartbeat.mjs",
+    "lib/runtime_budget_policy.mjs",
     "lib/public_test_run.mjs",
     "lib/raw_canary_fixture.mjs",
     "lib/rcf_policy.mjs",

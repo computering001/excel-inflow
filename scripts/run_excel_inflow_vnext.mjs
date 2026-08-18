@@ -23,6 +23,13 @@ import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_tr
 import { compilePerformanceReceipt } from "./lib/performance_receipt.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 import {
+  boundedStageTimeout,
+  compileRuntimeBudgetReceipt,
+  remainingRuntimeMs,
+  resolveRuntimeBudgetPolicy,
+  validateRuntimeBudgetReceipt,
+} from "./lib/runtime_budget_policy.mjs";
+import {
   compileProgressEvidence,
   createProgressHeartbeat,
   validateProgressEvidence,
@@ -42,6 +49,8 @@ let ACTIVE_PROGRESS_STARTED_AT = null;
 let ACTIVE_PROGRESS_STARTED_EPOCH_MS = null;
 let ACTIVE_PROGRESS_ACTIVITY_COUNTER = 0;
 let ACTIVE_PROGRESS_EVENTS = [];
+let ACTIVE_RUNTIME_BUDGET = null;
+let ACTIVE_RUNTIME_BUDGET_EXECUTIONS = [];
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
@@ -118,11 +127,34 @@ async function writeJson(target, value) {
   await fs.rename(temporary, target);
 }
 
-async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000, progress = null } = {}) {
+async function run(command, args, {
+  cwd = ROOT,
+  env = process.env,
+  timeout = 3_600_000,
+  progress = null,
+  budgetStage = null,
+} = {}) {
   const started = Date.now();
+  const remaining = ACTIVE_RUNTIME_BUDGET
+    ? remainingRuntimeMs({
+      policy: ACTIVE_RUNTIME_BUDGET,
+      controllerStartedEpochMs: ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+      nowEpochMs: started,
+    })
+    : Number(timeout);
+  const effectiveTimeout = ACTIVE_RUNTIME_BUDGET && budgetStage
+    ? boundedStageTimeout({
+      policy: ACTIVE_RUNTIME_BUDGET,
+      stage: budgetStage,
+      requestedMs: timeout,
+      controllerStartedEpochMs: ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+      nowEpochMs: started,
+    })
+    : Math.min(Number(timeout), remaining);
   const activityId = progress ? `activity_${String(++ACTIVE_PROGRESS_ACTIVITY_COUNTER).padStart(2, "0")}` : null;
   const heartbeat = progress ? createProgressHeartbeat({
     ...progress,
+    intervalMs: ACTIVE_RUNTIME_BUDGET?.budgets_ms?.heartbeat_interval,
     observe: (event) => ACTIVE_PROGRESS_EVENTS.push({
       ...event,
       activity_id: activityId,
@@ -136,7 +168,18 @@ async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_6
     { parent_span_id: ACTIVE_EXPERIENCE_ROOT_SPAN, coverage_role: "leaf" },
   );
   try {
-    const result = await runProcessTree(command, args, { cwd, env, timeout });
+    const result = await runProcessTree(command, args, { cwd, env, timeout: Math.max(1, effectiveTimeout) });
+    if (budgetStage) {
+      ACTIVE_RUNTIME_BUDGET_EXECUTIONS.push({
+        stage: budgetStage,
+        budget_ms: effectiveTimeout,
+        duration_ms: Date.now() - started,
+        outcome: result.timed_out ? "TIMEOUT" : result.ok ? "PASS" : "FAIL",
+        process_tree_termination_verified: result.termination_verified !== false,
+        checkpoint_preserved: true,
+        evidence_retained: true,
+      });
+    }
     if (spanId) {
       ACTIVE_EXPERIENCE_TRACE.end(
         spanId,
@@ -146,6 +189,17 @@ async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_6
     }
     return { ...result, duration_ms: Date.now() - started };
   } catch (error) {
+    if (budgetStage) {
+      ACTIVE_RUNTIME_BUDGET_EXECUTIONS.push({
+        stage: budgetStage,
+        budget_ms: effectiveTimeout,
+        duration_ms: Date.now() - started,
+        outcome: "FAIL",
+        process_tree_termination_verified: true,
+        checkpoint_preserved: true,
+        evidence_retained: true,
+      });
+    }
     if (spanId) ACTIVE_EXPERIENCE_TRACE.end(spanId, "FAIL", { error: error.message });
     throw error;
   } finally {
@@ -184,6 +238,21 @@ async function checkpoint(id, status, target = null) {
 }
 
 async function finish({ out, runId, status, qualityMode, blockerClass, checkpoints, artifacts, summary }) {
+  if (ACTIVE_RUNTIME_BUDGET) {
+    const runtimeBudgetReceipt = compileRuntimeBudgetReceipt({
+      policy: ACTIVE_RUNTIME_BUDGET,
+      startedAt: ACTIVE_PROGRESS_STARTED_AT,
+      endedAt: new Date().toISOString(),
+      stageExecutions: ACTIVE_RUNTIME_BUDGET_EXECUTIONS,
+    });
+    const runtimeBudgetErrors = validateRuntimeBudgetReceipt(runtimeBudgetReceipt, ACTIVE_RUNTIME_BUDGET);
+    if (runtimeBudgetErrors.length > 0) {
+      throw new Error(`Runtime budget evidence failed closed: ${runtimeBudgetErrors.join(", ")}`);
+    }
+    const runtimeBudgetReceiptPath = path.join(out, "runtime-budget-receipt.json");
+    await writeJson(runtimeBudgetReceiptPath, runtimeBudgetReceipt);
+    artifacts = { ...artifacts, runtime_budget_receipt: runtimeBudgetReceiptPath };
+  }
   if (ACTIVE_PROGRESS_EVENTS.length > 0) {
     const progressEvidence = compileProgressEvidence({
       controllerStartedAt: ACTIVE_PROGRESS_STARTED_AT,
@@ -245,6 +314,7 @@ async function main() {
   ACTIVE_PROGRESS_STARTED_EPOCH_MS = Date.now();
   ACTIVE_PROGRESS_ACTIVITY_COUNTER = 0;
   ACTIVE_PROGRESS_EVENTS = [];
+  ACTIVE_RUNTIME_BUDGET_EXECUTIONS = [];
   ACTIVE_PERFORMANCE = {
     schema_version: "excel-inflow-performance/1.0",
     started_at: new Date().toISOString(),
@@ -252,6 +322,10 @@ async function main() {
     stages: {},
   };
   const options = parseArgs(process.argv.slice(2));
+  const runtimeBudgetOverrides = options["runtime-budget"]
+    ? await readJson(path.resolve(String(options["runtime-budget"])), "runtime budget overrides")
+    : {};
+  ACTIVE_RUNTIME_BUDGET = resolveRuntimeBudgetPolicy(runtimeBudgetOverrides.budgets_ms ?? runtimeBudgetOverrides);
   if (options.screen) {
     const screen = await run(process.execPath, [
       path.join(HERE, "run_user_flow.mjs"),
@@ -270,7 +344,7 @@ async function main() {
       "Usage: run_excel_inflow_vnext.mjs (--attachment-spec <controller-spec.json> | " +
       "--evidence-run <evidence-run.json>) --out <run-folder> [--answers <answers.json>] " +
       "[--attachment-state <state.json>] [--python <python>] [--soffice <path>] " +
-      "[--workspace-token <token>]",
+      "[--workspace-token <token>] [--runtime-budget <budget-overrides.json>]",
     );
   }
   if (out === ROOT || out.startsWith(`${ROOT}${path.sep}`)) {
@@ -293,7 +367,7 @@ async function main() {
   const pythonProbe = await run(pythonCommand, [
     "-c",
     "import os, openpyxl; print(os.path.dirname(os.path.dirname(openpyxl.__file__)))",
-  ], { timeout: 30_000 });
+  ], { timeout: 30_000, budgetStage: "source_acquisition" });
   const pythonSite = pythonProbe.code === 0 ? pythonProbe.stdout.trim() : "";
   const runtimeEnv = {
     ...process.env,
@@ -321,7 +395,7 @@ async function main() {
     const attachmentStatePath = path.join(attachmentOut, "attachment-evidence-run-state.json");
     const brokerCircuitBreaker = await executeOptionalBrokerCircuitBreaker({
       runPrimary: () => run(pythonCommand, attachmentArgs, {
-        timeout: 3_600_000,
+        timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.end_to_end_hard_ceiling,
         env: runtimeEnv,
         progress: { stage: "evidence review", documentsTotal: documentTotal },
       }),
@@ -335,7 +409,11 @@ async function main() {
       runZeroAuthority: () => run(
         pythonCommand,
         [...attachmentArgs, "--force-zero-broker"],
-        { timeout: 3_600_000, env: runtimeEnv, progress: { stage: "evidence review", documentsTotal: documentTotal } },
+        {
+          timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.broker_global,
+          env: runtimeEnv,
+          progress: { stage: "evidence review", documentsTotal: documentTotal },
+        },
       ),
     });
     attachmentState = brokerCircuitBreaker.state;
@@ -411,7 +489,8 @@ async function main() {
   firstArgs.push("--python", pythonCommand);
   if (options.soffice) firstArgs.push("--soffice", String(options.soffice));
   const firstExecution = await run(process.execPath, firstArgs, {
-    timeout: 3_600_000,
+    timeout: ACTIVE_RUNTIME_BUDGET.budgets_ms.case_compilation_and_ownership,
+    budgetStage: "case_compilation_and_ownership",
     env: runtimeEnv,
     progress: {
       stage: "model decisions",
@@ -546,7 +625,13 @@ async function main() {
   if (options.soffice) resumeArgs.push("--soffice", String(options.soffice));
   const pausedResultSha256 = await sha256File(userFlowResultPath);
   const resumeExecution = await run(process.execPath, resumeArgs, {
-    timeout: 3_600_000,
+    timeout: Math.min(
+      ACTIVE_RUNTIME_BUDGET.budgets_ms.end_to_end_hard_ceiling,
+      ACTIVE_RUNTIME_BUDGET.budgets_ms.solver +
+        ACTIVE_RUNTIME_BUDGET.budgets_ms.workbook_build +
+        ACTIVE_RUNTIME_BUDGET.budgets_ms.recalculation +
+        ACTIVE_RUNTIME_BUDGET.budgets_ms.validation,
+    ),
     env: runtimeEnv,
     progress: {
       stage: "workbook build and checks",

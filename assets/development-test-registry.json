@@ -1511,6 +1511,15 @@
       "test_class": "unit"
     },
     {
+      "id": "runtime-budget-and-cancellation-policy",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_budget_policy_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "phase15-portable-fault-injection",
       "phase": "performance",
       "runtime": "node",
