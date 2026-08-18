@@ -164,13 +164,14 @@ export function leaseForecast(modelCase) {
       endingInterestBearing = basis === "none" ? 0 : basis === "separately_supplied" ? separateForecast[index] : endingTotal;
       interest = basis === "none" || !interestEnabled ? 0 : ((openingInterestBearing + endingInterestBearing) / 2) * rates[index];
       periodAdditions = periodPrincipal - interest - otherMovements[index];
-    } else if (basis === "total_liability" && interestEnabled) {
+    } else if (basis === "total_liability") {
       const preInterestClosing = openingTotal + additions[index] + otherMovements[index] - periodPrincipal;
-      const denominator = 1 - rates[index] / 2;
+      const activeRate = interestEnabled ? rates[index] : 0;
+      const denominator = 1 - activeRate / 2;
       if (!(denominator > 0)) throw new Error("lease effective rate must remain below 200%");
-      endingTotal = Math.max(0, (preInterestClosing + openingInterestBearing * rates[index] / 2) / denominator);
+      endingTotal = Math.max(0, (preInterestClosing + openingInterestBearing * activeRate / 2) / denominator);
       endingInterestBearing = endingTotal;
-      interest = ((openingInterestBearing + endingInterestBearing) / 2) * rates[index];
+      interest = ((openingInterestBearing + endingInterestBearing) / 2) * activeRate;
       periodAdditions = additions[index];
     } else {
       endingInterestBearing = basis === "none" ? 0 : separateForecast[index];

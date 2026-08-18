@@ -6008,10 +6008,33 @@ function configureOperatingModel(
     const otherMovementsCell = Number.isInteger(leaseOtherMovementsAssumptionRow)
       ? `${column}${leaseOtherMovementsAssumptionRow}`
       : "0";
+    const leaseRateCell = `$${["C", "D", "E"][index]}$${interestRows.lease_interest}`;
+    const preInterestClosing =
+      `${prior}+${additionsCell}+${otherMovementsCell}-${principalCell}`;
+    // Lease interest belongs in the accounting roll-forward, but it must not
+    // create a second workbook fixed point.  The only sanctioned formula SCC
+    // is the declared cash/RCF/interest loop.  For a total-liability
+    // simple-roll-forward, solve
+    //
+    //   closing = pre-interest closing + rate * (opening + closing) / 2
+    //
+    // algebraically at the earliest owning row.  The visible interest line
+    // still prices the average opening/closing liability and therefore retains
+    // the exact economic lineage.  Other bases are already acyclic because
+    // the interest-bearing closing balance is separately supplied (or the
+    // interest basis is none).  Flat replacement carries the liability and
+    // lets the visible additions bridge reconcile principal, interest and
+    // other movements; sourced balance remains a visible input below.
     const formula =
       modelCase.lease_policy.mode === "exclude"
         ? "=0"
-        : `=MAX(0,${prior}+${additionsCell}+${otherMovementsCell}-${principalCell}-${column}${interestRows.lease_interest})`;
+        : modelCase.lease_policy.mode === "flat_replacement"
+          ? `=MAX(0,${prior})`
+          : modelCase.lease_policy.mode === "simple_roll_forward" &&
+              leaseInterestBasis === "total_liability"
+            ? `=MAX(0,IF($C$${c.circularity}=0,${preInterestClosing},` +
+              `(${preInterestClosing}+${prior}*${leaseRateCell}/2)/(1-${leaseRateCell}/2)))`
+            : `=MAX(0,${preInterestClosing}-${column}${interestRows.lease_interest})`;
     if (modelCase.lease_policy.mode === "sourced_balance") {
       setValue(
         sheet,
