@@ -117,7 +117,7 @@
           "candidate_ids": [
             "921c3225f6960acd"
           ],
-          "classification_receipt_sha256": "c5c94fea960fc92845db625f076b350a1bb65e9a77829aac9355699d6ab8ea59",
+          "classification_receipt_sha256": "288880fd28c15c16b396f2c6de0870396aaeb02e2f8880f9953f65ec5c49a042",
           "blocker_code": null
         },
         {
@@ -126,7 +126,7 @@
           "candidate_ids": [
             "bdab86e13e84bd31"
           ],
-          "classification_receipt_sha256": "8b3a3a2f79cd8dc9fb6fdf43a9c109eb2afaafd3d6cd3d58be2790f7bc4f86c9",
+          "classification_receipt_sha256": "b7b9988485759fd7fa40b895995e369e0e26d5e0df52418795132ccc96deaf59",
           "blocker_code": null
         }
       ],

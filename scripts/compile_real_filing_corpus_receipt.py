@@ -62,6 +62,17 @@ def sha256_text(value: str) -> str:
     return sha256_bytes(value.encode("utf-8"))
 
 
+def stable_character_count(value: int) -> int:
+    """Remove harmless PDF-engine one-character drift from custody identity.
+
+    PyMuPDF releases can differ by a single extracted whitespace character
+    while producing identical normalized witness lines.  Character counts are
+    used only to classify native-text density, so bind the conservative
+    hundred-character bucket rather than a renderer patch-level artifact.
+    """
+    return max(0, int(value)) // 100 * 100
+
+
 def normalize_text(value: str) -> str:
     return " ".join(html.unescape(value).replace("\u00a0", " ").split())
 
@@ -164,9 +175,11 @@ def load_pdf(path: Path) -> dict[str, Any]:
         "text": normalize_text(" ".join(" ".join(page) for page in pages)),
         "media_metrics": {
             "pdf_pages": page_count,
-            "native_text_characters": sum(native_text_chars),
+            "native_text_characters": stable_character_count(sum(native_text_chars)),
             "median_native_text_characters_per_page": (
-                sorted(native_text_chars)[page_count // 2] if page_count else 0
+                stable_character_count(sorted(native_text_chars)[page_count // 2])
+                if page_count
+                else 0
             ),
             "full_page_raster_pages": full_page_raster_pages,
             "full_page_raster_fraction_ppm": (

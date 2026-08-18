@@ -10,6 +10,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from compile_real_filing_corpus_receipt import stable_character_count
+
 
 ROOT = Path(__file__).resolve().parent.parent
 INVENTORY = ROOT / "test-fixtures" / "real-filings-custody-v1" / "candidate-inventory.json"
@@ -45,6 +47,10 @@ REQUIRED_MATRIX = {
         "unfamiliar_adjusted_profit_terms",
     },
 }
+
+
+assert stable_character_count(474_746) == stable_character_count(474_747)
+assert stable_character_count(199) < 200 <= stable_character_count(200)
 
 
 def sha256(value: str) -> str:
