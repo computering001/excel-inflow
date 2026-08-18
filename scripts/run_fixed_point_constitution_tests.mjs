@@ -8,6 +8,10 @@ import {
   validateCircularityPair,
   validateFixedPointSolution,
 } from "./lib/fixed_point_constitution.mjs";
+import {
+  brokerMetricDefinitionSignature,
+  sealBrokerConsensusMembership,
+} from "./lib/broker_consensus.mjs";
 import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
 import { validateForecastAuthorities } from "./lib/forecast_authority.mjs";
 import { validateResidualInterestAuthority } from "./lib/residual_interest_authority.mjs";
@@ -52,6 +56,49 @@ export function adaptLegacyFixedPointCase(modelCase) {
     kind: "debt_class_alias",
     ...migration,
   }));
+
+  // Frozen synthetic fixed-point fixtures pre-date the sealed broker-consensus
+  // custody contract. Project only their already-visible houses and already-
+  // supplied provider values; never infer a house, value, period or definition.
+  for (const [metricId, metric] of Object.entries(modelCase.broker_pack?.metrics ?? {})) {
+    const houseNames = Object.keys(metric?.brokers ?? {}).sort();
+    if (!metric.consensus_membership) {
+      const definitionSignature = brokerMetricDefinitionSignature(modelCase, metricId);
+      metric.consensus_membership = sealBrokerConsensusMembership({
+        schema_version: "broker-consensus-membership/1.0",
+        metric_id: metricId,
+        contributors: houseNames.map((houseName) => ({
+          house_name: houseName,
+          status: "included",
+          reasons: [],
+          definition_signature: definitionSignature,
+          period_status: ["included", "included", "included"],
+          period_reasons: [[], [], []],
+        })),
+      });
+      migrations.push({ kind: "sealed_broker_consensus_membership", metric_id: metricId });
+    }
+    if (!metric.provider_consensus_source) {
+      if (
+        !Array.isArray(metric.provider_consensus) ||
+        metric.provider_consensus.length !== 3 ||
+        metric.provider_consensus.some((value) => value !== null && !Number.isFinite(Number(value)))
+      ) {
+        throw new Error(
+          `Archived fixed-point broker metric ${metricId} lacks a valid explicit provider-consensus series.`,
+        );
+      }
+      metric.provider_consensus_source = {
+        source_note:
+          `Frozen synthetic fixed-point fixture explicitly supplied ${metricId} provider-consensus values; compatibility projection preserves them without re-estimation.`,
+        period_lineage: [0, 1, 2].map(
+          (periodIndex) =>
+            `Frozen synthetic fixed-point fixture | provider_consensus[${periodIndex}]`,
+        ),
+      };
+      migrations.push({ kind: "provider_consensus_source_custody", metric_id: metricId });
+    }
+  }
 
   // The archived compiler wrote schedule_link on protected cash-flow totals,
   // even though the row itself already carries the exact same-period formula.
