@@ -160,6 +160,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "independent-forecast-ownership",
+      "phase": "forecast",
+      "runtime": "python",
+      "script": "run_independent_forecast_ownership_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "forecast-behavior",
       "phase": "forecast",
       "runtime": "node",
@@ -839,6 +848,15 @@
       "timeout_seconds": 300,
       "mutates_product_tree": false,
       "test_class": "unit"
+    },
+    {
+      "id": "independent-physical-workbook-binding",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_independent_physical_workbook_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
     },
     {
       "id": "reconciled-parent-portable-workbook",
