@@ -1,7 +1,11 @@
 import { canonicalJson, hashValue } from "./run_store.mjs";
 import { verifyOwnershipCensus } from "./ownership_census.mjs";
 import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
-import { forecastRowMateriality } from "./forecast_authority.mjs";
+import {
+  compareForecastAuthorityCandidates,
+  forecastAuthorityDecidingDimension,
+  forecastRowMateriality,
+} from "./forecast_authority.mjs";
 
 export const FORECAST_OWNERSHIP_PREFLIGHT_VERSION =
   "forecast-ownership-preflight/1.0";
@@ -71,6 +75,7 @@ function ownershipClass(method) {
 function familyRows(rows) {
   const byId = new Map(rows.filter((row) => row?.row_id).map((row) => [row.row_id, row]));
   const childrenByParent = new Map();
+  const formulaParentsByChild = new Map();
   for (const row of rows) {
     if (!row?.parent_row_id || !byId.has(row.parent_row_id)) continue;
     const children = childrenByParent.get(row.parent_row_id) ?? new Set();
@@ -87,7 +92,12 @@ function familyRows(rows) {
     if (row?.calculation?.operator !== "sum") continue;
     const children = childrenByParent.get(row.row_id) ?? new Set();
     for (const reference of row.calculation.refs ?? []) {
-      if (reference !== row.row_id && byId.has(reference)) children.add(reference);
+      if (reference !== row.row_id && byId.has(reference)) {
+        children.add(reference);
+        const parents = formulaParentsByChild.get(reference) ?? new Set();
+        parents.add(row.row_id);
+        formulaParentsByChild.set(reference, parents);
+      }
     }
     childrenByParent.set(row.row_id, children);
   }
@@ -106,8 +116,31 @@ function familyRows(rows) {
           ? (parent.calculation.refs ?? []).filter((rowId) => byId.has(rowId))
           : childIds,
       ),
+      shared_formula_child_ids: new Set(
+        childIds.filter(
+          (rowId) => (formulaParentsByChild.get(rowId)?.size ?? 0) > 1,
+        ),
+      ),
     }];
   });
+}
+
+function authorityAt(row, forecastIndex) {
+  const declared = row?.forecast_period_authorities?.[forecastIndex];
+  if (declared?.method) return declared;
+  return {
+    method: methodAt(row, forecastIndex),
+    stable_id: `inferred:${row?.row_id ?? "unknown"}:fy${forecastIndex + 1}`,
+  };
+}
+
+function strongestDirectChild(childStates, forecastIndex) {
+  return childStates
+    .filter(({ owner_class }) => owner_class === "direct")
+    .map(({ row }) => ({ row, authority: authorityAt(row, forecastIndex) }))
+    .sort((left, right) =>
+      compareForecastAuthorityCandidates(left.authority, right.authority)
+    )[0] ?? null;
 }
 
 function topologyProjection(modelCase) {
@@ -318,7 +351,14 @@ export function resolveSelectedForecastOwnership(modelCase) {
   const rejectedAuthorities = [];
   const violations = [];
   for (const { section, rows } of rowsBySection(modelCase)) {
-    for (const { parent, children, structural_child_ids } of familyRows(rows)) {
+    for (
+      const {
+        parent,
+        children,
+        structural_child_ids,
+        shared_formula_child_ids,
+      } of familyRows(rows)
+    ) {
       for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
         const parentMethod = methodAt(parent, forecastIndex);
         const parentClass = ownershipClass(parentMethod);
@@ -326,19 +366,52 @@ export function resolveSelectedForecastOwnership(modelCase) {
           row,
           owner_class: ownershipClass(methodAt(row, forecastIndex)),
         }));
+        const materialChildStates = childStates.filter(({ row }) =>
+          sourceOwnedMateriality(modelCase, row)
+        );
+        const completeMaterialChildren = materialChildStates.every(
+          ({ owner_class }) => owner_class !== "absent",
+        );
+        const strongestChild = strongestDirectChild(
+          materialChildStates,
+          forecastIndex,
+        );
+        const parentAuthority = authorityAt(parent, forecastIndex);
+        const parentHasCompilableIdentity =
+          parent?.calculation?.operator === "sum" &&
+          Array.isArray(parent.calculation.refs) &&
+          parent.calculation.refs.length > 0;
+        const childRankDimension = strongestChild
+          ? forecastAuthorityDecidingDimension(
+            strongestChild.authority,
+            parentAuthority,
+          )
+          : null;
+        const strongerDirectChild = Boolean(
+          completeMaterialChildren &&
+          parentHasCompilableIdentity &&
+          strongestChild &&
+          !["stable_id", "exact_tie"].includes(childRankDimension) &&
+          compareForecastAuthorityCandidates(
+            strongestChild.authority,
+            parentAuthority,
+          ) < 0,
+        );
         let selectedMode = null;
         if (parentClass === "schedule") selectedMode = "schedule_owned";
-        else if (parentClass === "direct") selectedMode = "parent_owned";
+        else if (parentClass === "direct") {
+          selectedMode = strongerDirectChild ? "children_owned" : "parent_owned";
+        }
         else if (
           ["not_separately_forecast", "not_applicable"].includes(parentMethod) &&
-          childStates.filter(({ row }) => sourceOwnedMateriality(modelCase, row)).every(({ owner_class }) => owner_class === "absent")
+          materialChildStates.every(({ owner_class }) => owner_class === "absent")
         ) selectedMode = "captured_by_ancestor";
         else if (
           parentClass === "identity" &&
-          childStates.filter(({ row }) => sourceOwnedMateriality(modelCase, row)).every(({ owner_class }) => owner_class !== "absent")
+          completeMaterialChildren
         ) selectedMode = "children_owned";
         else if (
-          childStates.filter(({ row }) => sourceOwnedMateriality(modelCase, row)).every(({ owner_class }) => owner_class !== "absent")
+          completeMaterialChildren
         ) selectedMode = "children_owned";
 
         if (!selectedMode) {
@@ -365,19 +438,39 @@ export function resolveSelectedForecastOwnership(modelCase) {
             // and D&A) must remain live for their other accounting identities.
             // Only the declared structural children belong to this parent's
             // capture scope.
-            const formulaDependencyOnly =
-              !structural_child_ids.has(child.row_id);
-            if (!permittedSchedule && !formulaDependencyOnly) {
+            const formulaDependencyOnly = !structural_child_ids.has(child.row_id);
+            const childAuthority = authorityAt(child, forecastIndex);
+            const parentRankDimension = forecastAuthorityDecidingDimension(
+              parentAuthority,
+              childAuthority,
+            );
+            const parentSubstantivelyStronger =
+              !["stable_id", "exact_tie"].includes(parentRankDimension) &&
+              compareForecastAuthorityCandidates(
+                parentAuthority,
+                childAuthority,
+              ) < 0;
+            const reusableFormulaDependency = formulaDependencyOnly &&
+              (
+                childClass !== "direct" ||
+                shared_formula_child_ids.has(child.row_id) ||
+                !parentSubstantivelyStronger
+              );
+            if (!permittedSchedule && !reusableFormulaDependency) {
               captureAuthority(modelCase, parent, child, forecastIndex, rejectedAuthorities);
             }
           }
         } else if (selectedMode === "children_owned") {
           if (parentClass === "direct") {
+            const decidingDimension = childRankDimension ??
+              "complete_child_identity";
             rejectedAuthorities.push({
               row_id: parent.row_id,
               forecast_index: forecastIndex,
               authority: structuredClone(parent.forecast_period_authorities?.[forecastIndex]),
-              rejection_reason: "Complete compatible children own the aggregate identity.",
+              rejection_reason:
+                `Complete compatible children own the aggregate identity; ` +
+                `the strongest child authority wins on ${decidingDimension}.`,
             });
           }
           setParentIdentity(modelCase, parent, forecastIndex);

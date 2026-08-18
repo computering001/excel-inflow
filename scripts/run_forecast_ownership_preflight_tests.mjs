@@ -212,6 +212,56 @@ assert.equal(
 sealOwnershipCensus(mixed);
 assert.equal(assertPhysicalOwnershipPreflight(mixed, physicalPlan(mixed)).status, "PASS");
 
+// Canonical authority rank is resolved per period, not once for the family.
+// Strong company evidence in FY1 owns the complete child set, while the same
+// aggregate retakes FY2/FY3 from weaker child inference.
+const rankedMixed = workingCapitalFixture();
+rankedMixed.statement_structure.cash_flow[2].forecast_period_authorities[0] =
+  authority("company_guidance", "guidance.inventory.fy1", -4);
+const rankedMixedReceipt = resolveSelectedForecastOwnership(rankedMixed);
+assert.deepEqual(
+  rankedMixedReceipt.resolutions.map((item) => item.selected_mode),
+  ["children_owned", "parent_owned", "parent_owned"],
+);
+assert.equal(
+  rankedMixed.statement_structure.cash_flow[2]
+    .forecast_period_authorities[0].method,
+  "company_guidance",
+  "stronger child guidance was discarded instead of retaining FY1 ownership",
+);
+assert.ok(
+  rankedMixed.statement_structure.cash_flow[2]
+    .forecast_period_authorities.slice(1)
+    .every((item) => item.method === "not_separately_forecast"),
+  "weaker later-period child evidence was not captured by the aggregate",
+);
+assert.ok(
+  rankedMixedReceipt.rejected_authorities.some(
+    (item) => item.row_id === "working_capital_total" &&
+      item.forecast_index === 0 &&
+      item.rejection_reason.includes("method_priority"),
+  ),
+  "rejected aggregate evidence did not preserve the canonical rank reason",
+);
+
+const downgradedChild = workingCapitalFixture();
+downgradedChild.statement_structure.cash_flow[2].forecast_period_authorities[0] =
+  authority("historical_average", "fallback.inventory.fy1", -4);
+const downgradedReceipt = resolveSelectedForecastOwnership(downgradedChild);
+assert.ok(
+  downgradedReceipt.resolutions.every((item) => item.selected_mode === "parent_owned"),
+  "a weaker child mutation incorrectly displaced broker aggregate ownership",
+);
+const equalRungChild = workingCapitalFixture();
+equalRungChild.statement_structure.cash_flow[2].forecast_period_authorities[0] =
+  authority("broker_consensus", "aaa-child-stable-id", -4);
+const equalRungReceipt = resolveSelectedForecastOwnership(equalRungChild);
+assert.equal(
+  equalRungReceipt.resolutions[0].selected_mode,
+  "parent_owned",
+  "an equal-rung child displaced the aggregate only on stable identifier order",
+);
+
 // Formula dependencies are reusable calculation inputs, not owned detail.
 // A direct parent cannot globally capture them away from a second identity.
 const sharedFormulaDependency = workingCapitalFixture();
@@ -415,7 +465,7 @@ assert.equal(compilePhysicalOwnershipPreflight(blocker, missingDestination).stat
 
 console.log(JSON.stringify({
   status: "PASS",
-  checks: 40,
+  checks: 48,
   blocker_fixture: "working_capital_parent_broker_children_fallback",
   user_intervention_required: false,
   topology_elapsed_ms: Number(elapsedMs.toFixed(3)),

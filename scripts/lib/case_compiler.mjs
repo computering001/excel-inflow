@@ -2716,12 +2716,21 @@ export function compileForecastCaptureTopology(
         targetFamilyMembers.has(row.row_id) &&
         hasDirectForecastAuthority(modelCase, target)
       ) {
-        // This is a genuine competing-authority family, not presentation-only
-        // detail. Let the candidate compiler mint the child's lawful fallback
-        // or receipted assumption; checkpoint B will then select the stronger
-        // aggregate and seal the rejected child evidence. Pre-capturing here
-        // would erase the very authority conflict that B exists to resolve.
-        continue;
+        const uniqueFormulaMember =
+          !row.parent_row_id &&
+          (parentsByChild.get(row.row_id) ?? []).filter(
+            (membership) => membership.parent_row_id === targetId,
+          ).length === 1 &&
+          (parentsByChild.get(row.row_id) ?? []).length === 1;
+        if (!uniqueFormulaMember) {
+          // A declared hierarchy child must reach checkpoint B with its full
+          // lawful fallback/assumption set so aggregate and child evidence can
+          // be ranked against each other. A unique formula member is different:
+          // the certified parent is its fallback, while stronger period-specific
+          // evidence remains eligible under captured_detail and can own that
+          // period without reviving weaker historical inference in later years.
+          continue;
+        }
       }
       // Captured rows are intentionally blank in forecast. Their membership
       // path is certified from the statement graph, but it is not a physical
