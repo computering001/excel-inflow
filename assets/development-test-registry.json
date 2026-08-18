@@ -703,6 +703,19 @@
       "test_class": "real_corpus"
     },
     {
+      "id": "inline-xbrl-structured-lane",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_inline_xbrl_extraction_tests.py",
+      "arguments": [
+        "--manifest",
+        "$REAL_FILING_CORPUS_MANIFEST"
+      ],
+      "requires": [
+        "REAL_FILING_CORPUS_MANIFEST"
+      ]
+    },
+    {
       "id": "broker-real-pack-completion",
       "phase": "real_corpus",
       "runtime": "python",
