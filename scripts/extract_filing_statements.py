@@ -612,15 +612,16 @@ def nearest_typed_observations(
     *,
     missing_state: str = "reported_blank",
 ) -> tuple[list[float | None], list[str], list[int | None]]:
-    if len(columns) != 3:
+    if not columns:
         return [], [], []
-    assigned: list[float | None] = [None, None, None]
-    states = [missing_state, missing_state, missing_state]
-    precisions: list[int | None] = [None, None, None]
-    distances: list[float] = [float("inf")] * 3
+    column_count = len(columns)
+    assigned: list[float | None] = [None] * column_count
+    states = [missing_state] * column_count
+    precisions: list[int | None] = [None] * column_count
+    distances: list[float] = [float("inf")] * column_count
     for run in runs:
         centre = (run["x0"] + run["x1"]) / 2
-        index = min(range(3), key=lambda candidate: abs(columns[candidate] - centre))
+        index = min(range(column_count), key=lambda candidate: abs(columns[candidate] - centre))
         distance = abs(columns[index] - centre)
         if distance < distances[index]:
             assigned[index] = run["value"]
@@ -647,13 +648,14 @@ def nearest_custodied_observations(
         columns,
         missing_state=missing_state,
     )
-    if len(values) != 3:
+    column_count = len(columns)
+    if len(values) != column_count:
         return values, states, precisions, []
-    assigned_runs: list[dict[str, Any] | None] = [None, None, None]
-    distances = [float("inf")] * 3
+    assigned_runs: list[dict[str, Any] | None] = [None] * column_count
+    distances = [float("inf")] * column_count
     for run in runs:
         centre = (run["x0"] + run["x1"]) / 2
-        index = min(range(3), key=lambda candidate: abs(columns[candidate] - centre))
+        index = min(range(column_count), key=lambda candidate: abs(columns[candidate] - centre))
         distance = abs(columns[index] - centre)
         if distance < distances[index]:
             assigned_runs[index] = run
@@ -1208,9 +1210,26 @@ def extract_statement(
         return None, [{"code": "HEADING_NOT_FOUND", "section": section}]
     start, end = bounds
     window = lines[start:end]
-    columns = year_columns(window, periods)
+    # Statement Authority v2, stage 2: the face owns the periods it prints.
+    # Extraction proceeds against the SUPPORTED period columns; each absent
+    # older period stays a declared support requirement whose values are
+    # null in this filing and stitched from the prior filing downstream.
+    observed_heading_years = {
+        year
+        for line in window[:20]
+        for word in line["words"]
+        for year in years_in_token(word["text"])
+    }
+    supported_periods = [
+        period for period in periods if str(period)[:4] in observed_heading_years
+    ] or list(periods)
+    period_support_required = [
+        period for period in periods if period not in supported_periods
+    ]
+    period_slot = {period: index for index, period in enumerate(periods)}
+    columns = year_columns(window, supported_periods)
     findings: list[dict[str, Any]] = []
-    if len(columns) != 3:
+    if len(columns) != len(supported_periods):
         return None, [{"code": "PERIOD_COLUMNS_UNRESOLVED", "section": section, "page": window[0]["page"]}]
     source_pages = list(dict.fromkeys(int(line["page"]) for line in window))
     page_lines = {
@@ -1220,8 +1239,8 @@ def extract_statement(
     columns_by_page: dict[int, list[float]] = {}
     inherited_columns = columns
     for page in source_pages:
-        local_columns = year_columns(page_lines[page], periods)
-        if len(local_columns) == 3:
+        local_columns = year_columns(page_lines[page], supported_periods)
+        if len(local_columns) == len(supported_periods):
             inherited_columns = local_columns
         columns_by_page[page] = inherited_columns
     window = _merge_wrapped_caption_lines(window, columns_by_page)
@@ -1291,17 +1310,29 @@ def extract_statement(
             runs,
             line_columns,
             line=line,
-            periods=periods,
+            periods=supported_periods,
             reporting_currency=reporting_currency,
             units=units,
             missing_state="reported_blank" if runs else "unresolved",
         )
-        if len(values) != 3:
+        if len(values) != len(supported_periods):
             findings.append({"code": "ROW_VALUES_UNRESOLVED", "section": section, "page": line["page"], "label": label})
             continue
+        if period_support_required:
+            # Pad extracted values into the full period slots: unsupported
+            # periods are DECLARED nulls, never partial-row defects.
+            padded = [None] * len(periods)
+            padded_states = ["period_support_required"] * len(periods)
+            padded_precisions = [None] * len(periods)
+            for index, period in enumerate(supported_periods):
+                slot = period_slot[period]
+                padded[slot] = values[index]
+                padded_states[slot] = value_states[index]
+                padded_precisions[slot] = value_precisions[index]
+            values, value_states, value_precisions = padded, padded_states, padded_precisions
         if not runs and re.search(r"(?:continued|unaudited|year ended|in millions|£m|\$m|€m)", label, re.I):
             continue
-        if runs and len(runs) < 3:
+        if runs and len(runs) < len(supported_periods):
             findings.append({
                 "code": "PARTIAL_STATEMENT_ROW",
                 "section": section,
@@ -1364,6 +1395,7 @@ def extract_statement(
             if len(source_pages) > 1 else f"page {source_pages[0]}"
         ),
         "periods": periods,
+        **({"period_support_required": period_support_required} if period_support_required else {}),
         "complete_face_statement": True,
         "source_pages": source_pages,
         **({"reporting_currency": reporting_currency} if reporting_currency else {}),
