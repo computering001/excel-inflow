@@ -1,0 +1,18 @@
+{
+  "schema_version": "excel-inflow-independent-package-build/1.0",
+  "source_commit": "200c3a4ab073ef614b529978a31092a882d56261",
+  "source_tree": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+  "build_mode": "development",
+  "package_path": "/tmp/excel-inflow-v370-independent.2FpXqf/build-b",
+  "release_manifest_sha256": "e4a512256c8612fc4cd8f8e5feb8d7d6a1d77126fad15f101adb98e15d5d0c18",
+  "runtime_code_closure_sha256": "e1e93bc221f984ec83c2fead864e72ac728cb09d3f0e1ee2dc26e727fe9cbb7e",
+  "runtime_code_closure_file_count": 287,
+  "complete_package_inventory_sha256": "ae4cd942ad266bb36e3ccc7c71cc38d245dc351959f3cd73b7b6ea1ded398327",
+  "complete_package_file_count": 301,
+  "archive_sha256": "38e740ec73b7f15ba3ef13597a20dd5d8b1909673cb09f9a3bc3f053403361d0",
+  "archive_bytes": 6463488,
+  "smoke_case_sha256": "45f67fe5a6c2c833481f361d39b92e84afe96f60455e716d96bf80818219f76d",
+  "smoke_status": "PASS_PENDING_MANUAL",
+  "smoke_total_violations": 0,
+  "smoke_workbook_sha256": "a1aa5b4517abe1e3ac743b2c13ed4740bfbe95ee750a9307fe9046cc7f7b6edc"
+}

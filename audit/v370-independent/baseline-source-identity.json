@@ -1,0 +1,55 @@
+{
+  "schema_version": "excel-inflow-independent-baseline-source-identity/1.0",
+  "recorded_at": "2026-08-18T05:27:49Z",
+  "repository": "computering001/excel-inflow",
+  "branch": "origin/main",
+  "commit_sha": "200c3a4ab073ef614b529978a31092a882d56261",
+  "tree_sha": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+  "parents": [
+    "456ca1fa5006dc8ecd586b1149f8865b8769ab52",
+    "41df09473fd6f295c5d5f0e4ef51c4e054068761"
+  ],
+  "tracked_file_count": 426,
+  "tracked_file_sha256_listing": "tracked-files.sha256",
+  "tracked_file_sha256_listing_sha256": "1fdf45affdc3e74f1b39e1f1eaf785b8f469c99c6560ac56b4276e71515ae26d",
+  "identity_files": {
+    "assets/runtime-manifest.json": "67476e6628ad29dd4d8035291558858e533cbff94af37360e5cbca667de6fc05",
+    "release-manifest.json": "1cc48cd692ef856d43fcadb9be767b938e05c2b780e89b22e79e00752df1438f",
+    "assets/development-test-registry.json": "e1d14a2fc9e10d171add528c75f13b25315d012a0b957dfb90223377b3024cc2",
+    "SKILL.md": "e76681ef86d4714ab1b30f96ae12ee7e234e423597bf6b183786b495ee53a232",
+    "central-instructions.md": "9e4b98ce8cfad2a092139b006e156b369b090e7dc0f1d243abeed6aed73eaba0",
+    "references/runtime-core.md": "823f0ad0c2e9cbd37e9237d3623cf1daceef485656c839a5804d22d18ebf2567",
+    "references/model-intent.md": "fc108a2ec0292f754799a176ccae37f2f5d2f36b5404432e464b241e3c3fdc63",
+    "references/development-and-release-loop.md": "1237dd0b0e653e0980a659e498d64fe15f503f4013f288d158a0a9a0889872be",
+    "references/validation.md": "6a743cfda4437bab64c035db2004f0913277a567a7a0371acfbc360b5988dd91",
+    "assets/deployment-profile.json": "b6c9fe7021318d1587dad56a97de62441ab71b506bf5247cfa95bee927c03a69"
+  },
+  "runtime_manifest": {
+    "skill_version": "3.7.0",
+    "status": "v2_development",
+    "deployment_status": "not_installed",
+    "production_certified": false
+  },
+  "github_release": {
+    "tag": "excel-inflow-v3.7.0-development",
+    "target_commit": "41df09473fd6f295c5d5f0e4ef51c4e054068761",
+    "target_tree": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+    "is_prerelease": true,
+    "url": "https://github.com/computering001/excel-inflow/releases/tag/excel-inflow-v3.7.0-development",
+    "archive_sha256": "a98d8891ddb91a6ccd30c190835cc03c852af8e1a874d699781d5a1c775b1f7e",
+    "identity_receipt_sha256": "e13f64efad6240788c363367d4959f5db1dc13fc9cf5dbc2727d460893788534"
+  },
+  "installed_baseline": {
+    "route": "v73",
+    "release": "Excel Inflow v3.7.0",
+    "source_commit": "41df09473fd6f295c5d5f0e4ef51c4e054068761",
+    "source_tree": "2b030c06517cdbdedc71709df9c4620ddc0a4a56",
+    "package_commit": "20ffd58e26dc99ccb0d7fec83e652c445dcec620",
+    "package_tree": "e5db70da96e2c332e13fc22798944c7372ccd593",
+    "complete_package_inventory_sha256": "798d4131483a1328c07f3fb9695828947f11209239ee97bed17126bce436bd2d",
+    "runtime_code_closure_sha256": "e1e93bc221f984ec83c2fead864e72ac728cb09d3f0e1ee2dc26e727fe9cbb7e",
+    "readback_status": "PASS",
+    "rollback": ["v72", "v71"],
+    "evidence_limit": "Installation and identity readback only; no installed-host company run or native Excel workbook test was performed."
+  }
+}

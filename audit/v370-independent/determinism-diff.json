@@ -1,0 +1,12 @@
+{
+  "schema_version": "excel-inflow-independent-determinism-diff/1.0",
+  "source_commit": "200c3a4ab073ef614b529978a31092a882d56261",
+  "status": "PASS",
+  "build_a_file_count": 301,
+  "build_b_file_count": 301,
+  "different_members": [],
+  "release_manifest_equal": true,
+  "complete_package_inventory_equal": true,
+  "archive_bytes_equal": true,
+  "archive_sha256": "38e740ec73b7f15ba3ef13597a20dd5d8b1909673cb09f9a3bc3f053403361d0"
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": "excel-inflow-independent-external-evidence-register/1.0",
+  "recorded_at": "2026-08-18T05:27:49Z",
+  "source_commit": "200c3a4ab073ef614b529978a31092a882d56261",
+  "source_gate": {
+    "serial_report": "/tmp/excel-inflow-v370-gate-concurrency1.9P80rW/development-gate-report.json",
+    "serial_report_sha256": "18f4e49b3a56fe8d8bb7345d23a9292dec3d1bba824461fb3053f2e9047b4cb5",
+    "parallel_report": "/tmp/excel-inflow-v370-gate-concurrency4.VV0Lji/development-gate-report.json",
+    "parallel_report_sha256": "e3da287dc04eb7c845ec8c1f882cd43d607bf5d7c09be6d94194c44637c375ae",
+    "outcome_matrix_sha256": "ff69c0dfe5244a0be8b1d4b97b2e5673addbaf5087c7b6deddab02508c396773",
+    "counts": {"PASS": 85, "FAIL": 2, "BLOCKED": 6}
+  },
+  "fixed_point_cases_manifest": {
+    "path": "/Users/archiepreston/Documents/Codex/excel-inflow-clean-final/work/e2e-v70/fixed-point-cases.json",
+    "sha256": "4ad527d2cb57db6c3ae089a193daddd0b61429f80d164fe00e57c9292f541861",
+    "status": "PRESENT_BUT_LEGACY_CONTRACT_FAILURE"
+  },
+  "broker_corpus": {"status": "CUSTODY_DISCOVERY_PENDING"},
+  "broker_real_pack_manifest": {"status": "CUSTODY_DISCOVERY_PENDING"},
+  "raw_canary_evidence": {"status": "CUSTODY_DISCOVERY_PENDING"},
+  "real_filings_request": {"status": "CUSTODY_DISCOVERY_PENDING"},
+  "real_filings_expectations": {"status": "CUSTODY_DISCOVERY_PENDING"},
+  "installed_host_broker_receipt": {"status": "NOT_YET_PRODUCED_FOR_V73"},
+  "native_excel_restoration": {"status": "NOT_YET_PRODUCED_FOR_V73"},
+  "visual_review": {"status": "NOT_YET_PRODUCED_FOR_V73"}
+}
