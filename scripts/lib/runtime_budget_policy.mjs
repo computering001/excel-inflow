@@ -170,3 +170,26 @@ export function ownershipFailureCancellationPlan({ checkpointSha256, descendantP
   };
   return { ...body, plan_sha256: digest(body) };
 }
+
+export function compileOwnershipPreflightControllerAction({
+  preflightReceipt,
+  checkpointSha256,
+  descendantPids = [],
+} = {}) {
+  const { receipt_sha256: declaredReceiptSha, ...receiptBody } = preflightReceipt ?? {};
+  if (
+    preflightReceipt?.schema_version !== "forecast-ownership-preflight/1.0" ||
+    preflightReceipt?.status !== "BLOCK" ||
+    preflightReceipt?.controller_signal?.action !== "cancel_descendants_preserve_checkpoint" ||
+    declaredReceiptSha !== digest(receiptBody)
+  ) {
+    throw new Error("Ownership controller action requires one sealed BLOCK preflight receipt.");
+  }
+  const body = {
+    schema_version: "ownership-preflight-controller-action/1.0",
+    preflight_receipt: preflightReceipt,
+    controller_signal: preflightReceipt.controller_signal,
+    cancellation: ownershipFailureCancellationPlan({ checkpointSha256, descendantPids }),
+  };
+  return { ...body, action_sha256: digest(body) };
+}

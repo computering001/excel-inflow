@@ -24,6 +24,7 @@ import { compilePerformanceReceipt } from "./lib/performance_receipt.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 import {
   boundedStageTimeout,
+  compileOwnershipPreflightControllerAction,
   compileRuntimeBudgetReceipt,
   remainingRuntimeMs,
   resolveRuntimeBudgetPolicy,
@@ -533,6 +534,30 @@ async function main() {
   let userFlowResult = await readJson(userFlowResultPath, "user-flow decision result");
   artifacts.user_flow_result = userFlowResultPath;
   checkpoints.push(await checkpoint("model_decisions", userFlowResult.status, userFlowResultPath));
+  if (userFlowResult.status === "BLOCKED" && userFlowResult.stage === "inputs") {
+    const compileReportPath = path.join(userFlowOut, "stages", "inputs", "case-compile-report.json");
+    const compileReport = await readJson(compileReportPath, "case compile report").catch(() => null);
+    const ownershipFinding = (compileReport?.findings ?? []).find(
+      (finding) => finding?.id === "forecast_ownership.preflight" &&
+        finding?.context?.controller_signal?.action ===
+          "cancel_descendants_preserve_checkpoint",
+    );
+    if (ownershipFinding) {
+      const checkpointSha256 = String(
+        userFlowResult?.receipt?.receipt_hash ?? await sha256File(compileReportPath),
+      );
+      const action = compileOwnershipPreflightControllerAction({
+        preflightReceipt: ownershipFinding.context.receipt,
+        checkpointSha256,
+        descendantPids: firstExecution.terminated_pids ?? [],
+      });
+      const actionPath = path.join(out, "ownership-preflight-controller-action.json");
+      await writeJson(actionPath, action);
+      artifacts.ownership_preflight_controller_action = actionPath;
+      artifacts.case_compile_report = compileReportPath;
+      checkpoints.push(await checkpoint("ownership_preflight", "BLOCKED_RESUMABLE", actionPath));
+    }
+  }
   if (userFlowResult.status === "ACTION_REQUIRED") {
     return finish({
       out,

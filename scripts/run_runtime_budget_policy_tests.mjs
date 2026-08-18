@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
   boundedStageTimeout,
+  compileOwnershipPreflightControllerAction,
   compileRuntimeBudgetReceipt,
   DEFAULT_RUNTIME_BUDGETS_MS,
   ownershipFailureCancellationPlan,
@@ -51,6 +53,38 @@ const cancellation = ownershipFailureCancellationPlan({ checkpointSha256: "a".re
 check(cancellation.preserve_checkpoint && cancellation.broker_restart_allowed === false, "ownership failure would restart or discard custody");
 check(cancellation.cancel_descendant_pids.join(",") === "3,9", "descendant cancellation is not deterministic");
 check(cancellation.user_reupload_required === false, "ownership failure asks for a re-upload");
+
+const blockedPreflightBody = {
+  schema_version: "forecast-ownership-preflight/1.0",
+  checkpoint: "B_SELECTED_AUTHORITY",
+  status: "BLOCK",
+  violations: ["unresolved material ownership"],
+  controller_signal: {
+    action: "cancel_descendants_preserve_checkpoint",
+    reason: "unresolved material ownership",
+    resume_from: "selected_forecast_ownership",
+  },
+};
+const blockedPreflight = {
+  ...blockedPreflightBody,
+  receipt_sha256: createHash("sha256")
+    .update(`${JSON.stringify(Object.fromEntries(Object.keys(blockedPreflightBody).sort().map((key) => [key, blockedPreflightBody[key]])))}\n`)
+    .digest("hex"),
+};
+const controllerAction = compileOwnershipPreflightControllerAction({
+  preflightReceipt: blockedPreflight,
+  checkpointSha256: "c".repeat(64),
+  descendantPids: [12, 11],
+});
+check(controllerAction.controller_signal.resume_from === "selected_forecast_ownership", "controller action lost the preflight resume point");
+check(controllerAction.cancellation.broker_restart_allowed === false, "controller action would replay optional broker work");
+const forgedPreflight = structuredClone(blockedPreflight);
+forgedPreflight.violations.push("forged after sealing");
+assert.throws(() => compileOwnershipPreflightControllerAction({
+  preflightReceipt: forgedPreflight,
+  checkpointSha256: "c".repeat(64),
+}));
+mutations += 1;
 
 const receipt = compileRuntimeBudgetReceipt({
   policy,
