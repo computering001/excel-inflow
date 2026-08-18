@@ -474,6 +474,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "broker-period-independent-oracle",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_broker_period_oracle_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "broker-house-exclusion",
       "phase": "evidence",
       "runtime": "python",
@@ -1095,6 +1104,36 @@
       "runtime": "python",
       "script": "run_excel_number_format_compatibility_tests.py",
       "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "portable-finance-workbook-semantic-mutations",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_portable_finance_workbook_mutation_tests.mjs",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "python",
+          "source": "PYTHON",
+          "type": "file"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON"
+      ],
+      "timeout_seconds": 600,
       "mutates_product_tree": false,
       "test_class": "mutation"
     },

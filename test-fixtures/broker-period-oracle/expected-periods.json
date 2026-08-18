@@ -1,0 +1,22 @@
+{
+  "schema_version": "broker-period-expectation/1.0",
+  "run_id": "period_oracle",
+  "expectations": [
+    {
+      "document_id": "document-1",
+      "surface_id": "document-1.p1",
+      "table_id": "period-table-1",
+      "rendered_evidence": [
+        {
+          "artifact_id": "period-grid-crop",
+          "sha256": "f284aa079a46c43becb10026503764a1c901ed4670d8079d12c824e0b26877c3"
+        }
+      ],
+      "headers": [
+        { "column": 2, "period_label": "2027E" },
+        { "column": 3, "period_label": "2028E" }
+      ]
+    }
+  ],
+  "expectations_sha256": "09fc53f26ed0d6fff0c212db4c5c3756f067cf887598ce788b44477f2251e807"
+}

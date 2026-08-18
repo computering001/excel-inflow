@@ -27,6 +27,11 @@ for (const test of registry.tests) {
   assert(fs.existsSync(path.join(root, "scripts", test.script)), `Registry script is absent for ${test.id}.`);
 }
 assert.equal(registry.tests.find((test) => test.id === "acquisition-valuation-contract")?.script, "run_acquisition_valuation_contract_tests.mjs");
+assert.equal(registry.tests.find((test) => test.id === "broker-period-independent-oracle")?.test_class, "mutation");
+assert.deepEqual(
+  registry.tests.find((test) => test.id === "portable-finance-workbook-semantic-mutations")?.requires,
+  ["REPRESENTATIVE", "PYTHON"],
+);
 assert.equal(testProfile(registry.tests.find((test) => test.id === "installed-host-usable-broker")), "custody");
 assert.equal(testProfile(registry.tests.find((test) => test.id === "installed-host-broker-receipt-contract")), "portable");
 const portable = selectRegistryTests(registry, { profile: "portable" });
@@ -61,9 +66,17 @@ const dirtyMutation = structuredClone(portableReport);
 dirtyMutation.source.worktree_dirty = true;
 assert.equal(aggregateGateReports({ registry, registrySha256, profile: "portable", reports: [dirtyMutation] }).status, "FAIL");
 
+const gateRunner = fs.readFileSync(path.join(root, "scripts/run_development_gate.mjs"), "utf8");
+assert.match(gateRunner, /output_custody: await describeInput\(testOut\)/);
+assert.match(gateRunner, /detail_policy: "protected_details_redacted"/);
+assert.doesNotMatch(
+  gateRunner.slice(gateRunner.indexOf("function redactedExecutionResult"), gateRunner.indexOf("function resolveArgument")),
+  /command:/,
+);
+
 console.log(JSON.stringify({
   status: "PASS",
-  checks: 15 + registry.tests.length,
+  checks: 20 + registry.tests.length,
   registry_tests: registry.tests.length,
   portable_tests: portable.length,
   custody_tests: custody.length,

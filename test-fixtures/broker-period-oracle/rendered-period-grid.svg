@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="180" viewBox="0 0 640 180">
+  <rect width="640" height="180" fill="white"/>
+  <g font-family="Arial, sans-serif" font-size="24" fill="#111">
+    <text x="36" y="48">Forecasts</text>
+    <text x="292" y="48">2027E</text>
+    <text x="452" y="48">2028E</text>
+    <text x="36" y="102">Revenue</text>
+    <text x="304" y="102">100</text>
+    <text x="464" y="102">110</text>
+    <text x="36" y="150">EBIT</text>
+    <text x="304" y="150">20</text>
+    <text x="464" y="150">22</text>
+  </g>
+  <path d="M24 60H616M260 18V164M420 18V164" stroke="#555" stroke-width="2"/>
+</svg>

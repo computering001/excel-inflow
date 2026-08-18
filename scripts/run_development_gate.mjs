@@ -176,6 +176,11 @@ function redactedExecutionResult(result) {
     stdout_sha256: sha256Bytes(stdout),
     stderr_bytes: Buffer.byteLength(stderr),
     stderr_sha256: sha256Bytes(stderr),
+    output_custody: result.output_custody ?? {
+      status: "missing",
+      kind: null,
+      sha256: null,
+    },
     detail_policy: "protected_details_redacted",
   });
 }
@@ -201,6 +206,7 @@ function phases(raw, known) {
 }
 
 async function runTest(test, { inputs, python, timeoutMs, out }) {
+  const testOut = path.join(out, test.id);
   const missing = [];
   for (const requirement of test.requires ?? []) {
     if (!(await exists(inputs[requirement]))) missing.push(requirement);
@@ -217,12 +223,14 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       missing,
       stdout: "",
       stderr: `Missing required test custody input(s): ${missing.join(", ")}`,
+      output_custody: { status: "missing", kind: null, sha256: null },
     };
   }
   const command = test.runtime === "python" ? python : process.execPath;
-  const testInputs = { ...inputs, TEST_OUT: path.join(out, test.id) };
+  const testInputs = { ...inputs, TEST_OUT: testOut };
   const args = [scriptPath, ...(test.arguments ?? []).map((item) => resolveArgument(item, testInputs))];
   const started = process.hrtime.bigint();
+  let execution;
   try {
     const result = await exec(command, args, {
       cwd: ROOT,
@@ -241,7 +249,7 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
         ...(inputs.SOFFICE ? { SOFFICE_BIN: inputs.SOFFICE } : {}),
       },
     });
-    return {
+    execution = {
       id: test.id,
       phase: test.phase,
       status: "PASS",
@@ -252,7 +260,7 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       stderr: result.stderr,
     };
   } catch (error) {
-    return {
+    execution = {
       id: test.id,
       phase: test.phase,
       status: error.killed || error.signal ? "BLOCKED" : "FAIL",
@@ -262,6 +270,16 @@ async function runTest(test, { inputs, python, timeoutMs, out }) {
       command: [command, ...args],
       stdout: error.stdout ?? "",
       stderr: error.stderr ?? error.message,
+    };
+  }
+  try {
+    return { ...execution, output_custody: await describeInput(testOut) };
+  } catch (error) {
+    return {
+      ...execution,
+      status: "FAIL",
+      output_custody: { status: "invalid", kind: null, sha256: null },
+      stderr: `${execution.stderr}\nTest output custody failed: ${error.message}`,
     };
   }
 }
