@@ -24,9 +24,12 @@ import { fileURLToPath } from "node:url";
 
 import { compileCase } from "./lib/case_compiler.mjs";
 import { resolveAnchorPlanDecision } from "./lib/broker_anchor.mjs";
+import { migrateLegacyDebtClasses } from "./lib/debt_class.mjs";
 import { faceStatementManifestDigest } from "./lib/face_statement_manifest.mjs";
 import { compileRowPlan } from "./lib/row_plan.mjs";
+import { ebitdaBasis, selectedEbitdaRow } from "./lib/semantic_roles.mjs";
 import { solveCase } from "./lib/solver.mjs";
+import { classifyStatementLine } from "./lib/statement_classifier.mjs";
 import { hashValue } from "./lib/run_store.mjs";
 
 const casesDirectory = path.resolve(
@@ -35,6 +38,211 @@ const casesDirectory = path.resolve(
 const onlyCase = process.argv[3] ?? null;
 const clone = (value) => structuredClone(value);
 const hash = (character) => character.repeat(64);
+
+/**
+ * Project a frozen pre-contract model-case into the current declaration
+ * vocabulary before exercising the inverse compiler. Economic values,
+ * calculations and mapped row identities remain immutable.
+ */
+export function adaptLegacyCertifiedCase(modelCase) {
+  const migrations = [];
+  const debtMigrations = migrateLegacyDebtClasses(modelCase);
+  if (debtMigrations.some((migration) => migration.mapping !== "legacy_alias")) {
+    throw new Error("Frozen case contains an unrecognised debt class requiring review.");
+  }
+  if (debtMigrations.length > 0) migrations.push("debt_classes");
+  // This in-memory projection has already performed the migration. A legacy
+  // migration receipt is not part of the current canonical case projection.
+  delete modelCase.debt_class_migrations;
+
+  for (const section of ["income_statement", "cash_flow"]) {
+    const rows = new Map(
+      (modelCase.statement_structure?.[section] ?? []).map((row) => [row.row_id, row]),
+    );
+    for (const entry of modelCase.source_coverage?.[section] ?? []) {
+      const classification = classifyStatementLine({
+        ...entry,
+        raw_label: entry.label,
+        section,
+        numeric_type: entry.numeric_type ?? "currency",
+      });
+      if (classification.status !== "accepted") continue;
+      // The finance add-back already has a separately proved compiler-owned
+      // role migration below; leaving it untyped preserves that paired proof.
+      if (classification.classified_role !== "net_finance_addback") {
+        for (const rowId of entry.mapped_row_ids ?? []) {
+          const row = rows.get(rowId);
+          if (!row) continue;
+          row.source_line_ids = [
+            ...new Set([...(row.source_line_ids ?? []), entry.source_line_id]),
+          ];
+          if (row.semantic_role || row.row_type === "header") continue;
+          // The reviewed map owns destination identity. Classification proves
+          // that the destination must be typed; it cannot rename that row.
+          row.semantic_role = row.row_id;
+          migrations.push(`typed_destination:${section}:${row.row_id}`);
+        }
+      }
+    }
+  }
+
+  const selected = selectedEbitdaRow(
+    modelCase.statement_structure?.income_statement ?? [],
+  );
+  if (selected && !modelCase.selected_ebitda_basis) {
+    selected.ebitda_basis ??= {
+      ...ebitdaBasis(selected),
+      derivation: selected.calculation ? "declared_formula" : "company_reported",
+      source_row_ids: selected.calculation?.refs ?? [selected.row_id],
+      impairment_included: false,
+    };
+    modelCase.selected_ebitda_basis = {
+      row_id: selected.row_id,
+      ...selected.ebitda_basis,
+    };
+    migrations.push(`selected_ebitda_basis:${selected.row_id}`);
+  }
+  return migrations;
+}
+
+function assertLegacyCertifiedCaseAdapter() {
+  const fixture = {
+    instruments: [{ instrument_id: "old_bond", class: "fixed_bond" }],
+    statement_structure: {
+      income_statement: [
+        {
+          row_id: "operating_profit",
+          label: "Operating profit",
+          row_type: "input",
+          values: [10, 11, 12, null, null, null],
+        },
+        {
+          row_id: "adjusted_ebitda",
+          label: "Adjusted EBITDA",
+          row_type: "calculation",
+          semantic_role: "adjusted_ebitda",
+          calculation: { operator: "sum", refs: ["operating_profit"] },
+        },
+        {
+          row_id: "issuer_specific_line",
+          label: "Issuer-specific line",
+          row_type: "input",
+          values: [1, 2, 3, null, null, null],
+        },
+      ],
+      cash_flow: [],
+    },
+    source_coverage: {
+      income_statement: [
+        {
+          source_line_id: "is.operating_profit",
+          label: "Core operating profit",
+          mapped_row_ids: ["operating_profit"],
+        },
+        {
+          source_line_id: "is.issuer_specific",
+          label: "Issuer-specific line",
+          mapped_row_ids: ["issuer_specific_line"],
+        },
+      ],
+      cash_flow: [],
+    },
+  };
+  const economicBefore = JSON.stringify(
+    fixture.statement_structure.income_statement.map((row) => ({
+      row_id: row.row_id,
+      values: row.values,
+      calculation: row.calculation,
+    })),
+  );
+  const migrations = adaptLegacyCertifiedCase(fixture);
+  const rows = new Map(
+    fixture.statement_structure.income_statement.map((row) => [row.row_id, row]),
+  );
+  if (
+    fixture.instruments[0].class !== "bond_fixed" ||
+    rows.get("operating_profit")?.semantic_role !== "operating_profit" ||
+    rows.get("issuer_specific_line")?.semantic_role !== undefined ||
+    fixture.selected_ebitda_basis?.row_id !== "adjusted_ebitda"
+  ) {
+    throw new Error("Legacy certified-case adapter violated its closed migration contract.");
+  }
+  const economicAfter = JSON.stringify(
+    fixture.statement_structure.income_statement.map((row) => ({
+      row_id: row.row_id,
+      values: row.values,
+      calculation: row.calculation,
+    })),
+  );
+  if (
+    migrations.length === 0 ||
+    economicBefore !== economicAfter ||
+    adaptLegacyCertifiedCase(fixture).length !== 0
+  ) {
+    throw new Error("Legacy certified-case adapter is vacuous, economic or non-idempotent.");
+  }
+
+  const planProjection = materializeLegacyPlanHistory(clone(fixture));
+  const projectedEbitda = planProjection.statement_structure.income_statement
+    .find((row) => row.row_id === "adjusted_ebitda");
+  if (JSON.stringify(projectedEbitda?.values) !== JSON.stringify([10, 11, 12, null, null, null])) {
+    throw new Error("Legacy plan projection did not prove formula history independently.");
+  }
+  const brokenProjection = clone(fixture);
+  brokenProjection.statement_structure.income_statement
+    .find((row) => row.row_id === "adjusted_ebitda").calculation.refs = ["missing_row"];
+  materializeLegacyPlanHistory(brokenProjection);
+  if (brokenProjection.statement_structure.income_statement
+    .find((row) => row.row_id === "adjusted_ebitda").values !== undefined) {
+    throw new Error("Legacy plan projection accepted an unresolved formula mutation.");
+  }
+}
+
+function materializeLegacyPlanHistory(modelCase) {
+  const rows = [
+    ...(modelCase.statement_structure?.income_statement ?? []),
+    ...(modelCase.statement_structure?.cash_flow ?? []),
+  ];
+  const byId = new Map(rows.map((row) => [row.row_id, row]));
+  const valueOf = (rowId, period, visiting = new Set()) => {
+    const row = byId.get(rowId);
+    if (!row || visiting.has(rowId)) return null;
+    const direct = row.values?.[period];
+    if (direct !== null && direct !== undefined && Number.isFinite(Number(direct))) {
+      return Number(direct);
+    }
+    const rule = row.calculation;
+    if (!rule?.operator || !Array.isArray(rule.refs)) return null;
+    const next = new Set(visiting).add(rowId);
+    const values = rule.refs.map((ref) => valueOf(ref, period, next));
+    if (values.some((value) => value === null || !Number.isFinite(value))) return null;
+    switch (rule.operator) {
+      case "sum": return values.reduce((total, value) => total + value, 0);
+      case "link": return values[0] ?? null;
+      case "negate": return -(values[0] ?? 0);
+      case "negate_sum": return -values.reduce((total, value) => total + value, 0);
+      case "subtract": return values.slice(1).reduce((value, item) => value - item, values[0] ?? 0);
+      case "ratio": return Math.abs(values[1] ?? 0) > 1e-12 ? values[0] / values[1] : null;
+      case "negated_ratio": return Math.abs(values[1] ?? 0) > 1e-12 ? -values[0] / values[1] : null;
+      default: return null;
+    }
+  };
+  for (const row of rows) {
+    if (
+      !row.calculation ||
+      (row.values ?? []).slice(0, 3).some(
+        (value) => value !== null && value !== undefined && Number.isFinite(Number(value)),
+      )
+    ) {
+      continue;
+    }
+    const historical = [0, 1, 2].map((period) => valueOf(row.row_id, period));
+    if (historical.every((value) => value !== null && Number.isFinite(value))) {
+      row.values = [...historical, null, null, null];
+    }
+  }
+  return modelCase;
+}
 
 /** filed lines for one section, with hierarchy recovered from subtotal refs */
 function deriveFiledLines(modelCase, section) {
@@ -543,13 +751,59 @@ export function deriveCaseSourceAndEvidence(modelCase) {
     "periods", "modules", "controls", "coverage_policy", "operating_metrics",
     "forecast_assumptions", "instruments", "instrument_term_authorities",
     "debt_reconciliation", "historical_interest_reconciliation",
-    "historical_supplement", "other_interest", "non_cash_interest",
+    "historical_supplement", "other_interest", "other_interest_authority", "non_cash_interest",
     "acquisition", "fx", "historical_entities", "broker_pack", "provenance",
     "stage_three_answers",
   ]) {
     if (modelCase[lane] !== undefined) lanes[lane] = clone(modelCase[lane]);
   }
   return { caseSource, evidence: { face_statement_manifests: manifests, lanes } };
+}
+
+function stampLegacyCoverageReceipts(modelCase, evidence) {
+  for (const section of ["income_statement", "cash_flow"]) {
+    const rows = new Map(
+      (modelCase.statement_structure?.[section] ?? []).map((row) => [row.row_id, row]),
+    );
+    const lines = new Map(
+      (evidence.face_statement_manifests?.[section] ?? [])
+        .flatMap((manifest) => manifest.rows ?? [])
+        .map((line) => [line.source_line_id, line]),
+    );
+    for (const entry of modelCase.source_coverage?.[section] ?? []) {
+      const line = lines.get(entry.source_line_id);
+      const numericType = /(?:margin|rate|percent|percentage)/i.test(line?.raw_label ?? "")
+        ? "percentage"
+        : (line?.values ?? []).some(
+            (value) => value !== null && value !== "" && Number.isFinite(Number(value)),
+          )
+          ? "currency"
+          : "text";
+      const classification = classifyStatementLine({
+        source_line_id: entry.source_line_id,
+        label: line?.raw_label ?? entry.label,
+        section,
+        numeric_type: numericType,
+      });
+      const declaredRole = rows.get(entry.mapped_row_ids?.[0])?.semantic_role ?? null;
+      if (
+        classification.status === "accepted" &&
+        (!declaredRole || declaredRole === classification.classified_role)
+      ) {
+        entry.classification_status = "accepted";
+        entry.classification_review_status = "auto_accepted";
+        entry.classified_role = classification.classified_role;
+        delete entry.reason;
+      } else {
+        entry.classification_status = "manual_reviewed";
+        entry.classification_review_status = "reviewed";
+        entry.classified_role = declaredRole ?? classification.classified_role ?? null;
+        entry.reason = declaredRole
+          ? "Role confirmed by statement_map declaration."
+          : "The disclosed line is represented through the identified visible model rows.";
+      }
+    }
+  }
 }
 
 /**
@@ -642,6 +896,7 @@ function summarize(value) {
 }
 
 async function main() {
+assertLegacyCertifiedCaseAdapter();
 const files = (await fs.readdir(casesDirectory))
   .filter((name) => name.endsWith(".json"))
   .filter((name) => !onlyCase || name.includes(onlyCase))
@@ -654,6 +909,7 @@ let hardPlanDiffCount = 0;
 let failedPlanCompileCount = 0;
 for (const name of files) {
   const certified = JSON.parse(await fs.readFile(path.join(casesDirectory, name), "utf8"));
+  adaptLegacyCertifiedCase(certified);
   const { caseSource, evidence } = deriveCaseSourceAndEvidence(certified);
   if (process.env.KEEL_WRITE_SOURCE) {
     await fs.writeFile(
@@ -665,6 +921,7 @@ for (const name of files) {
 
   // The certified cohort predates the v3 stamps; ignore stamp-only deltas.
   const expected = clone(certified);
+  stampLegacyCoverageReceipts(expected, evidence);
   if (!expected.issuer.accounting_basis && caseSource.identity.accounting_framework) {
     expected.issuer.accounting_basis =
       caseSource.identity.accounting_framework === "us_gaap" ? "US_GAAP" : "IFRS";
@@ -1313,7 +1570,12 @@ for (const name of files) {
         }
         return copy;
       });
-      const certPlan = compileRowPlan(certified).statement_rows;
+      // The compiler materialises provable historical formula values before
+      // planning. Do the same independently on a clone of the frozen case so
+      // equivalent-row collapse has the same evidence on both sides.
+      const certPlan = compileRowPlan(
+        materializeLegacyPlanHistory(clone(certified)),
+      ).statement_rows;
       const compPlan = compileRowPlan(compiled).statement_rows;
       const compiledPlanRows = new Map(
         ["income_statement", "cash_flow"].flatMap((section) =>
