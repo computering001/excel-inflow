@@ -1508,9 +1508,9 @@ export function validateCaseShape(modelCase) {
     );
   }
   if (modelCase.acquisition?.enabled) {
-    if (!(acquisitionDebt(modelCase.acquisition) > 0)) {
+    if (!(acquisitionDebt(modelCase.acquisition) >= 0)) {
       errors.push(
-        "Enabled acquisition needs acquisition_debt_amount greater than zero.",
+        "Enabled acquisition needs acquisition_debt_amount greater than or equal to zero.",
       );
     }
     if (

@@ -179,8 +179,10 @@
     "positive_input_fields": [
       "transaction_enterprise_value",
       "entry_ev_to_ebitda",
-      "acquisition_debt_amount",
       "incremental_rate"
+    ],
+    "non_negative_input_fields": [
+      "acquisition_debt_amount"
     ],
     "close_year_must_be_forecast": true,
     "enterprise_value_purpose": "infer_target_operating_economics_only",

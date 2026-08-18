@@ -2172,6 +2172,17 @@ function acquisitionChecks(modelCase) {
       );
     }
   }
+  for (const key of PRODUCTION_CONTRACT.acquisition.non_negative_input_fields ?? []) {
+    if (!finite(acquisition[key]) || number(acquisition[key]) < 0) {
+      checks.push(
+        result(
+          `acquisition.${key}.illustrative_value`,
+          "BLOCK",
+          `Acquisition input ${key} must contain a non-negative illustrative value.`,
+        ),
+      );
+    }
+  }
   const closeDate = new Date(
     Date.UTC(
       Number(acquisition.close_year),

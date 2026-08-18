@@ -1081,6 +1081,94 @@
       "test_class": "mutation"
     },
     {
+      "id": "acquisition-funding-integration",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_acquisition_funding_integration_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "acquisition-solver-scenarios",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_acquisition_solver_case_tests.mjs",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "acquisition-portable-workbook-restoration",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_acquisition_portable_workbook_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "acquisition-workbook-scenarios",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_acquisition_workbook_tests.py",
+      "arguments": [
+        {
+          "name": "representative_case",
+          "source": "REPRESENTATIVE",
+          "type": "file"
+        },
+        {
+          "name": "arg_2",
+          "value": "--out",
+          "type": "literal"
+        },
+        {
+          "name": "test_out",
+          "source": "TEST_OUT",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REPRESENTATIVE",
+        "PYTHON"
+      ],
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "carrier-product-identity",
       "phase": "workflow",
       "runtime": "node",
