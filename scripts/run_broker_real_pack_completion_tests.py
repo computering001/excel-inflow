@@ -89,21 +89,26 @@ def resolve(base: Path, value: Any, label: str) -> Path:
 def invoke_controller(
     request_path: Path,
     output_root: Path,
-    responses: Path,
-    crosswalk: Path,
+    responses: Path | None,
+    crosswalk: Path | None,
+    *,
+    close_optional: bool = False,
 ) -> tuple[int, dict[str, Any], str]:
+    command = [
+        sys.executable,
+        str(HERE / "run_broker_pipeline.py"),
+        str(request_path),
+        "--out",
+        str(output_root),
+    ]
+    if responses is not None:
+        command.extend(["--responses", str(responses)])
+    if crosswalk is not None:
+        command.extend(["--crosswalk", str(crosswalk)])
+    if close_optional:
+        command.append("--close-optional")
     completed = subprocess.run(
-        [
-            sys.executable,
-            str(HERE / "run_broker_pipeline.py"),
-            str(request_path),
-            "--out",
-            str(output_root),
-            "--responses",
-            str(responses),
-            "--crosswalk",
-            str(crosswalk),
-        ],
+        command,
         cwd=HERE,
         text=True,
         capture_output=True,
@@ -113,6 +118,94 @@ def invoke_controller(
     check(state_path.is_file(), "Broker controller emitted no broker-run-state.json.")
     state = read_json(state_path, "broker run state")
     return completed.returncode, state, (completed.stderr or completed.stdout).strip()
+
+
+def quarantine_stale_bounded_responses(
+    state: dict[str, Any], responses: Path, output_root: Path
+) -> dict[str, Any]:
+    """Preserve stale model-host decisions without claiming they bind new tasks."""
+    tasks = [
+        item for item in state.get("tasks") or []
+        if item.get("task_kind") == "bounded_capture_adjudication"
+    ]
+    check(tasks, "Non-terminal real pack exposes no bounded-capture task universe.")
+    current_by_surface = {str(item.get("surface_id")): item for item in tasks}
+    check(len(current_by_surface) == len(tasks), "Current bounded task surfaces are not unique.")
+    response_paths = sorted(responses.glob("*.bounded-capture-decision.json"))
+    check(len(response_paths) == len(tasks), "Stale response count differs from current bounded task count.")
+    quarantined: list[dict[str, Any]] = []
+    mutations_caught: list[str] = []
+
+    def non_task_binding_errors(task: dict[str, Any], response: dict[str, Any]) -> list[str]:
+        current_image = str((task.get("prior_task") or {}).get("image_sha256") or "")
+        errors: list[str] = []
+        if response.get("document_id") != task.get("document_id"):
+            errors.append("document")
+        if response.get("surface_id") != task.get("surface_id"):
+            errors.append("surface")
+        if response.get("source_image_sha256") != current_image:
+            errors.append("source_image")
+        if response.get("decision") != "quarantine_remaining_regions":
+            errors.append("decision")
+        return errors
+
+    for path in response_paths:
+        response = read_json(path, f"bounded response {path.name}")
+        surface_id = str(response.get("surface_id") or "")
+        task = current_by_surface.get(surface_id)
+        check(task is not None, f"Stale response {path.name} has no current task surface.")
+        current_input = str((task.get("progress_measure") or {}).get("task_input_sha256") or "")
+        current_image = str((task.get("prior_task") or {}).get("image_sha256") or "")
+        check(response.get("schema_version") == "broker-bounded-capture-decision/1.0", "Wrong stale response schema.")
+        check(not non_task_binding_errors(task, response), "Stale response changed outside task identity.")
+        check(int(response.get("round_index", -1)) == 1, "Stale response round changed.")
+        check(response.get("task_id") != task.get("task_id"), "Response unexpectedly binds current task id.")
+        check(response.get("task_input_sha256") != current_input, "Response unexpectedly binds current task input.")
+        quarantined.append({
+            "response_file": path.name,
+            "response_sha256": sha256_file(path),
+            "document_id": task.get("document_id"),
+            "surface_id": surface_id,
+            "source_image_sha256": current_image,
+            "stale_task_id": response.get("task_id"),
+            "stale_task_input_sha256": response.get("task_input_sha256"),
+            "current_task_id": task.get("task_id"),
+            "current_task_input_sha256": current_input,
+            "disposition": "QUARANTINED_NOT_REBOUND",
+        })
+        if not mutations_caught:
+            swapped_image = copy.deepcopy(response)
+            swapped_image["source_image_sha256"] = "0" * 64
+            check(non_task_binding_errors(task, swapped_image) == ["source_image"], "Source-image mutation escaped quarantine validation.")
+            mutations_caught.append("swapped_source_image")
+            swapped_document = copy.deepcopy(response)
+            swapped_document["document_id"] = "mutation-other-document"
+            check(non_task_binding_errors(task, swapped_document) == ["document"], "Document mutation escaped quarantine validation.")
+            mutations_caught.append("swapped_document")
+    errors = state.get("summary", {}).get("bounded_capture_response_errors") or []
+    expected_errors = sorted(
+        error
+        for item in tasks
+        for error in (
+            f"{item['task_id']}: task_id does not bind the open bounded-capture task",
+            f"{item['task_id']}: task_input_sha256 does not bind the open task input",
+        )
+    )
+    check(sorted(errors) == expected_errors, "Stale response rejection set is not exactly the two hash bindings.")
+    receipt = {
+        "schema_version": "broker-stale-response-quarantine/1.0",
+        "status": "PASS",
+        "reason": "Current task and task-input hashes differ; old full task authority is unavailable, so no semantic-identity claim or rebind is permitted.",
+        "probe_state_sha256": sha256_file(output_root / "broker-run-state.json"),
+        "current_task_count": len(tasks),
+        "stale_response_count": len(quarantined),
+        "all_current_tasks_accounted_for": True,
+        "identity_mutations_caught": mutations_caught,
+        "responses": sorted(quarantined, key=lambda item: item["surface_id"]),
+    }
+    receipt_path = output_root.parent / "stale-response-quarantine-receipt.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", "utf-8")
+    return {"path": str(receipt_path), "sha256": sha256_file(receipt_path), **receipt}
 
 
 def invoke_controller_to_terminal(
@@ -922,12 +1015,73 @@ def main() -> int:
     request_path.write_text(json.dumps(request, indent=2, sort_keys=True) + "\n", "utf-8")
 
     controller_root = output_root / "controller"
-    state, controller_attempts = invoke_controller_to_terminal(
-        request_path,
-        controller_root,
-        responses,
-        crosswalk,
-    )
+    controller_attempts: list[dict[str, Any]] = []
+    first_code = 2
+    first_state: dict[str, Any] = {}
+    first_diagnostic = ""
+    for _ in range(MAX_CONTROLLER_ATTEMPTS):
+        first_code, first_state, first_diagnostic = invoke_controller(
+            request_path, controller_root, responses, crosswalk
+        )
+        controller_attempts.append({
+            "attempt": len(controller_attempts) + 1,
+            "exit_code": first_code,
+            "pipeline_status": first_state.get("pipeline_status"),
+            "state_sha256": sha256_file(controller_root / "broker-run-state.json"),
+            "remaining_task_count": len(first_state.get("tasks") or []),
+            "mode": "external_responses",
+        })
+        if first_code == 0 or (
+            first_state.get("summary", {}).get("bounded_capture_response_errors")
+            and all(
+                item.get("task_kind") == "bounded_capture_adjudication"
+                for item in first_state.get("tasks") or []
+            )
+        ):
+            break
+    stale_quarantine: dict[str, Any] | None = None
+    if first_code == 0 and first_state.get("pipeline_status") in {"PASS", "PASS_DEGRADED"}:
+        state = first_state
+    else:
+        check(
+            first_code in {1, 2}
+            and first_state.get("pipeline_status") in INTERNAL_PROGRESS_STATES,
+            "External responses reached neither terminal nor internal-progress state: "
+            f"{first_diagnostic or first_state.get('pipeline_status')}",
+        )
+        stale_quarantine = quarantine_stale_bounded_responses(
+            first_state, responses, controller_root
+        )
+        probe_path = output_root / "stale-response-probe-state.json"
+        probe_path.write_text(
+            json.dumps(first_state, indent=2, sort_keys=True) + "\n", "utf-8"
+        )
+        close_code = 2
+        state = first_state
+        close_diagnostic = ""
+        for _ in range(MAX_CONTROLLER_ATTEMPTS):
+            close_code, state, close_diagnostic = invoke_controller(
+                request_path,
+                controller_root,
+                responses,
+                crosswalk,
+                close_optional=True,
+            )
+            controller_attempts.append({
+                "attempt": len(controller_attempts) + 1,
+                "exit_code": close_code,
+                "pipeline_status": state.get("pipeline_status"),
+                "state_sha256": sha256_file(controller_root / "broker-run-state.json"),
+                "remaining_task_count": len(state.get("tasks") or []),
+                "mode": "fail_closed_optional_close",
+            })
+            if close_code == 0:
+                break
+        check(
+            close_code == 0 and state.get("pipeline_status") == "PASS_DEGRADED",
+            "Fail-closed real-pack route did not reach PASS_DEGRADED: "
+            f"{close_diagnostic or state.get('pipeline_status')}",
+        )
     artifacts = validate_terminal_state(state)
     non_terminal_mutations = prove_non_terminal_states_block(state)
     zero_authority_mutations = prove_zero_authority_closure_mutations(
@@ -998,6 +1152,7 @@ def main() -> int:
         "controller_state_sha256": sha256_file(controller_root / "broker-run-state.json"),
         "controller_status": state["pipeline_status"],
         "controller_attempts": controller_attempts,
+        "stale_response_quarantine": stale_quarantine,
         "fixed_point_status": state["fixed_point"]["status"],
         "source_documents": source_evidence,
         "pack": pack_metrics,

@@ -1488,9 +1488,14 @@ def main() -> int:
         return 2
 
     responses = Path(args.responses).resolve() if args.responses else None
-    if args.close_optional and (responses is None or not responses.is_dir()):
-        responses = output_root / "optional-close-empty-responses"
-        responses.mkdir(parents=True, exist_ok=True)
+    if args.close_optional:
+        # The operator has explicitly selected the fail-closed route.  Keep any
+        # valid pass files available for physical reconciliation, but exhaust
+        # the optional retry budget even when that response directory exists.
+        # Stale task-bound decisions remain rejected by the normal validator.
+        if responses is None or not responses.is_dir():
+            responses = output_root / "optional-close-empty-responses"
+            responses.mkdir(parents=True, exist_ok=True)
         attempts["vision_attempt_count"] = attempts["vision_attempt_limit"]
     bounded_decisions, bounded_response_errors = bounded_capture_responses(
         prior_state, responses
@@ -1594,7 +1599,8 @@ def main() -> int:
                 or capture_adjudication_required
             )
             fully_exhausted = exhausted and (
-                bounded_quarantine_requested
+                args.close_optional
+                or bounded_quarantine_requested
                 or bounded_recovery_exhausted(prior_state, attempts)
             )
             if not fully_exhausted:
@@ -1782,7 +1788,8 @@ def main() -> int:
     if (
         physical_status in {"NEEDS_VISION", "NEEDS_RESOLUTION"}
         and (
-            bounded_quarantine_requested
+            args.close_optional
+            or bounded_quarantine_requested
             or bounded_recovery_exhausted(prior_state, attempts)
         )
     ):
