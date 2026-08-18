@@ -11,6 +11,8 @@ import {
 export const COMPLETE_PACKAGE_INVENTORY_SCHEMA =
   "complete-package-inventory/1.0";
 export const RELEASE_PACKAGE_ATTESTATION_SCHEMA =
+  "release-package-attestation/2.0";
+export const LEGACY_RELEASE_PACKAGE_ATTESTATION_SCHEMA =
   "release-package-attestation/1.0";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -152,19 +154,26 @@ function attestationBody({
   if (releaseManifest?.identity?.schema_version !== "product-identity/2.0") {
     throw new Error("Release manifest does not contain product-identity/2.0.");
   }
-  if (releaseManifest.identity.package.mode !== "certified") {
-    throw new Error("Only a certified package can receive a release-package attestation.");
+  const packageMode = releaseManifest.identity.package.mode;
+  if (!['certified', 'development'].includes(packageMode)) {
+    throw new Error(`Unsupported package mode for external attestation: ${packageMode}.`);
   }
-  if (
-    !SHA256.test(String(runtimeCodeClosure?.sha256 ?? "")) ||
-    runtimeCodeClosure.sha256 !== runtimeCodeClosure.certified_sha256
-  ) {
-    throw new Error("Release manifest runtime-code closure is not exactly certified.");
+  if (!SHA256.test(String(runtimeCodeClosure?.sha256 ?? ""))) {
+    throw new Error("Release manifest runtime-code closure is absent or invalid.");
   }
   const evidenceReceipt =
     certificationEvidenceReceipt ?? releaseManifest?.certification?.evidenceReceipt ?? null;
-  if (evidenceReceipt?.status !== "PASS") {
+  if (packageMode === "certified" && runtimeCodeClosure.sha256 !== runtimeCodeClosure.certified_sha256) {
+    throw new Error("Certified release manifest runtime-code closure is not exactly certified.");
+  }
+  if (packageMode === "certified" && evidenceReceipt?.status !== "PASS") {
     throw new Error("External attestation requires a passing certification evidence receipt.");
+  }
+  if (packageMode === "development" && runtimeCodeClosure.certified_sha256 !== null) {
+    throw new Error("Development package must not claim a certified runtime-code closure.");
+  }
+  if (packageMode === "development" && evidenceReceipt !== null) {
+    throw new Error("Development package attestation must not reinterpret certification evidence.");
   }
   const sealedProductIdentity = productIdentity({
     repository: releaseManifest.identity.source.repository,
@@ -184,6 +193,9 @@ function attestationBody({
   return {
     schema_version: RELEASE_PACKAGE_ATTESTATION_SCHEMA,
     status: "PASS",
+    release_gate_status: packageMode === "certified"
+      ? "CERTIFIED_PACKAGE_NOT_INSTALLED"
+      : "DEVELOPMENT_PACKAGE_NOT_CERTIFIED_OR_INSTALLED",
     issued_at: issuedAt,
     package: {
       release_name: releaseManifest.releaseName,
@@ -244,7 +256,7 @@ export async function verifyReleasePackageAttestation({
   const findings = [];
   const body = { ...attestation };
   delete body.attestation_sha256;
-  if (attestation?.schema_version !== RELEASE_PACKAGE_ATTESTATION_SCHEMA) {
+  if (![RELEASE_PACKAGE_ATTESTATION_SCHEMA, LEGACY_RELEASE_PACKAGE_ATTESTATION_SCHEMA].includes(attestation?.schema_version)) {
     findings.push("attestation schema does not match");
   }
   if (attestation?.status !== "PASS") findings.push("attestation status is not PASS");

@@ -1508,10 +1508,14 @@ def main() -> int:
         if not declarations_path or not declarations_path.is_file():
             raise FileNotFoundError("The internal case-source declarations file is absent")
         compiled_root = output_root / "compiled-evidence"
+        semantic_recovery_started = time.monotonic()
         completed = run([
             "node", str(HERE / "compile_declared_evidence_run.mjs"), str(resolved_path),
             "--declarations", str(declarations_path), "--out", str(compiled_root),
         ])
+        semantic_recovery_ms = max(
+            0.001, round((time.monotonic() - semantic_recovery_started) * 1000, 3)
+        )
         if completed.returncode != 0:
             raise RuntimeError((completed.stderr or completed.stdout).strip()[-4000:])
         artifacts = {
@@ -1552,6 +1556,8 @@ def main() -> int:
                 "performance": {
                     "lane_duration_ms": lane_duration_ms,
                     "broker_and_debt_execution": "concurrent_after_filings",
+                    "filings": (lanes.get("filings", {}).get("summary") or {}).get("performance", {}),
+                    "semantic_recovery_ms": semantic_recovery_ms,
                 },
             },
         )

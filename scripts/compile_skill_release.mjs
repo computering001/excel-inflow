@@ -161,6 +161,7 @@ const skillDir = options.skill;
 const outputDir = options.out;
 const certifyNow = options.certify === true;
 const developmentNow = options.development === true;
+const attestNow = certifyNow || developmentNow;
 const skipSmoke = options["skip-smoke"] === true;
 const certificationEvidencePath = options["certification-evidence"] ?? null;
 const smokeCasePath = options["smoke-case"] ?? null;
@@ -190,13 +191,13 @@ if (!skillDir || !outputDir) {
   process.exit(2);
 }
 
-const attestationOutputPath = certifyNow
+const attestationOutputPath = attestNow
   ? path.resolve(options["attestation-out"] ?? `${path.resolve(outputDir)}.attestation.json`)
   : null;
-const archiveOutputPath = certifyNow
+const archiveOutputPath = attestNow
   ? path.resolve(options["archive-out"] ?? `${path.resolve(outputDir)}.tar`)
   : null;
-if (certifyNow) {
+if (attestNow) {
   assertExternalArtifactPath(outputDir, attestationOutputPath, "Release-package attestation");
   assertExternalArtifactPath(outputDir, archiveOutputPath, "Package archive");
   if (attestationOutputPath === archiveOutputPath) {
@@ -1932,8 +1933,8 @@ const manifest = {
     // Evidence is deliberately external to the immutable package. Legacy
     // readers may still encounter this field in older packages.
     evidenceReceipt: null,
-    externalAttestationSchema: certifyNow
-      ? "release-package-attestation/1.0"
+    externalAttestationSchema: attestNow
+      ? "release-package-attestation/2.0"
       : null,
   },
   closure: {
@@ -2019,10 +2020,10 @@ const manifest = {
 const manifestBuffer = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 await fs.writeFile(path.join(outputDir, "release-manifest.json"), manifestBuffer);
 
-if (certifyNow) {
-  // RELEASE-039: package construction ends at release-manifest.json. From this
-  // point on, certification is read-only over packageRoot and every output is
-  // forced outside it.
+if (attestNow) {
+  // Package construction ends at release-manifest.json. From this point on,
+  // development or certification attestation is read-only over packageRoot
+  // and every output is forced outside it.
   const sealedInventory = await completePackageInventoryIdentity(outputDir);
   const archive = await createDeterministicPackageArchive({
     packageRoot: outputDir,

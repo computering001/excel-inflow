@@ -20,7 +20,10 @@ import {
 } from "./lib/run_constitution_graph.mjs";
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
+import { compilePerformanceReceipt } from "./lib/performance_receipt.mjs";
 import { resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
+import { createProgressHeartbeat } from "./lib/progress_heartbeat.mjs";
+import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
 
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -30,6 +33,7 @@ let ACTIVE_RUNTIME_CLOSURE = null;
 let ACTIVE_PERFORMANCE = null;
 let ACTIVE_EXPERIENCE_TRACE = null;
 let ACTIVE_EXPERIENCE_ROOT_SPAN = null;
+let ACTIVE_SOURCE_IDENTITY = null;
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
@@ -106,8 +110,9 @@ async function writeJson(target, value) {
   await fs.rename(temporary, target);
 }
 
-async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000 } = {}) {
+async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_600_000, progress = null } = {}) {
   const started = Date.now();
+  const heartbeat = progress ? createProgressHeartbeat(progress) : null;
   const spanId = ACTIVE_EXPERIENCE_TRACE?.start(
     `subprocess:${path.basename(command)}`,
     "run_excel_inflow_vnext",
@@ -127,7 +132,29 @@ async function run(command, args, { cwd = ROOT, env = process.env, timeout = 3_6
   } catch (error) {
     if (spanId) ACTIVE_EXPERIENCE_TRACE.end(spanId, "FAIL", { error: error.message });
     throw error;
+  } finally {
+    heartbeat?.stop({
+      documentsComplete: progress?.documentsTotal ?? 0,
+      actionRequired: false,
+    });
   }
+}
+
+async function attachmentDocumentCount(specTarget) {
+  const specPath = path.resolve(String(specTarget));
+  const spec = await readJson(specPath, "attachment controller spec");
+  let total = 0;
+  for (const lane of ["filings", "broker", "dcs"]) {
+    const requestValue = spec?.[lane]?.request_path;
+    if (!requestValue) continue;
+    const requestPath = path.resolve(path.dirname(specPath), String(requestValue));
+    const request = await readJson(requestPath, `${lane} request`).catch(() => null);
+    const candidates = [request?.documents, request?.sources, request?.pdfs, request?.houses]
+      .filter(Array.isArray)
+      .map((items) => items.length);
+    total += Math.max(1, ...candidates);
+  }
+  return Math.max(1, total);
 }
 
 async function checkpoint(id, status, target = null) {
@@ -225,6 +252,7 @@ async function main() {
     { coverage_role: "root" },
   );
   ACTIVE_RUNTIME_CLOSURE = await runtimeClosure();
+  ACTIVE_SOURCE_IDENTITY = await resolveActiveSourceIdentity({ skillRoot: ROOT });
   const pythonCommand = await resolvePythonExecutable(
     String(options.python ?? process.env.PYTHON ?? "python3"),
     { cwd: ROOT, env: process.env, timeout: 30_000 },
@@ -249,6 +277,7 @@ async function main() {
 
   if (options["attachment-spec"]) {
     const attachmentStarted = Date.now();
+    const documentTotal = await attachmentDocumentCount(options["attachment-spec"]);
     const attachmentOut = path.join(out, "evidence");
     const attachmentArgs = [
       path.join(HERE, "run_attachment_evidence_pipeline.py"),
@@ -261,6 +290,7 @@ async function main() {
       runPrimary: () => run(pythonCommand, attachmentArgs, {
         timeout: 3_600_000,
         env: runtimeEnv,
+        progress: { stage: "evidence review", documentsTotal: documentTotal },
       }),
       readState: () => readJson(
         attachmentStatePath,
@@ -272,7 +302,7 @@ async function main() {
       runZeroAuthority: () => run(
         pythonCommand,
         [...attachmentArgs, "--force-zero-broker"],
-        { timeout: 3_600_000, env: runtimeEnv },
+        { timeout: 3_600_000, env: runtimeEnv, progress: { stage: "evidence review", documentsTotal: documentTotal } },
       ),
     });
     attachmentState = brokerCircuitBreaker.state;
@@ -350,6 +380,13 @@ async function main() {
   const firstExecution = await run(process.execPath, firstArgs, {
     timeout: 3_600_000,
     env: runtimeEnv,
+    progress: {
+      stage: "model decisions",
+      documentsTotal: attachmentState?.summary?.performance
+        ? Object.values(attachmentState.summary.performance.lane_duration_ms ?? {}).filter((value) => Number(value) >= 0).length
+        : 1,
+      documentsComplete: attachmentState ? Object.keys(attachmentState.lane_states ?? {}).length : 1,
+    },
   });
   ACTIVE_PERFORMANCE.stages.model_decisions_ms =
     (ACTIVE_PERFORMANCE.stages.model_decisions_ms ?? 0) +
@@ -478,6 +515,11 @@ async function main() {
   const resumeExecution = await run(process.execPath, resumeArgs, {
     timeout: 3_600_000,
     env: runtimeEnv,
+    progress: {
+      stage: "workbook build and checks",
+      documentsTotal: Math.max(1, Object.keys(attachmentState?.lane_states ?? {}).length),
+      documentsComplete: Math.max(1, Object.keys(attachmentState?.lane_states ?? {}).length),
+    },
   });
   ACTIVE_PERFORMANCE.stages.build_and_delivery_ms = resumeExecution.duration_ms;
   const resumedResultSha256 = await fs.stat(userFlowResultPath)
@@ -533,6 +575,24 @@ async function main() {
   }
   artifacts.delivery_file = userFlowResult.delivery_file;
   artifacts.live_delivery_attestation = userFlowResult.live_delivery_attestation;
+  const attachmentStatePath = artifacts.attachment_state ?? null;
+  const buildResultPath = path.join(userFlowOut, "stages", "build_checks", "build-result.json");
+  const buildResult = await readJson(buildResultPath, "Stage-4 build result");
+  const performanceReceiptPath = path.join(out, "performance-receipt.json");
+  const performanceReceipt = compilePerformanceReceipt({
+    runId,
+    sourceCommit: ACTIVE_SOURCE_IDENTITY?.source_commit,
+    sourceTree: ACTIVE_SOURCE_IDENTITY?.source_tree,
+    runtimeClosureSha256: ACTIVE_SOURCE_IDENTITY?.runtime_code_closure_sha256,
+    attachmentStateSha256: attachmentStatePath ? await sha256File(attachmentStatePath) : null,
+    buildResultSha256: await sha256File(buildResultPath),
+    attachmentPerformance: attachmentState?.summary?.performance ?? {},
+    checkpointTimings: buildResult?.checkpointing?.timings_ms ?? {},
+    totalDurationMs: Date.now() - ACTIVE_PERFORMANCE.started_epoch_ms,
+  });
+  await writeJson(performanceReceiptPath, performanceReceipt);
+  artifacts.performance_receipt = performanceReceiptPath;
+  artifacts.build_result = buildResultPath;
   return finish({
     out,
     runId,

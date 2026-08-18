@@ -28,7 +28,7 @@ const EVIDENCE_RECEIPT = Object.freeze({
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "release-package-attestation-test-"));
 const schema = JSON.parse(
   await fs.readFile(
-    new URL("../assets/release-package-attestation-v1.schema.json", import.meta.url),
+    new URL("../assets/release-package-attestation-v2.schema.json", import.meta.url),
     "utf8",
   ),
 );
@@ -56,7 +56,7 @@ check(
   "compiler inventories package before its final manifest exists",
 );
 
-async function fixture(name, content = "export const value = 1;\n") {
+async function fixture(name, content = "export const value = 1;\n", packageMode = "certified") {
   const packageRoot = path.join(root, name);
   await fs.mkdir(path.join(packageRoot, "scripts"), { recursive: true });
   await fs.writeFile(path.join(packageRoot, "scripts", "runtime.mjs"), content);
@@ -66,20 +66,20 @@ async function fixture(name, content = "export const value = 1;\n") {
   const releaseManifest = {
     releaseName: "Excel Inflow test",
     skillVersion: "3.7.0",
-    packageMode: "certified",
+    packageMode,
     deploymentStatus: "not_installed",
     identity: productIdentity({
       repository: "owner/repository",
       sourceCommit: "1".repeat(40),
       sourceTree: "2".repeat(40),
-      packageMode: "certified",
+      packageMode,
       deploymentStatus: "not_installed",
       runtimeCodeClosureSha256: runtime.sha256,
-      certifiedRuntimeCodeClosureSha256: runtime.sha256,
+      certifiedRuntimeCodeClosureSha256: packageMode === "certified" ? runtime.sha256 : null,
     }),
     certification: {
       evidenceReceipt: null,
-      externalAttestationSchema: "release-package-attestation/1.0",
+      externalAttestationSchema: "release-package-attestation/2.0",
     },
   };
   await fs.writeFile(
@@ -122,6 +122,46 @@ try {
     "external attestation leaked into package identity",
   );
   check(archiveA.format === "ustar", "archive format is not deterministic ustar");
+
+  const developmentPackage = await fixture(
+    "package-development",
+    "export const value = 'development';\n",
+    "development",
+  );
+  const developmentArchivePath = path.join(root, "package-development.tar");
+  const developmentArchive = await createDeterministicPackageArchive({
+    packageRoot: developmentPackage,
+    archivePath: developmentArchivePath,
+  });
+  const developmentAttestation = await buildReleasePackageAttestation({
+    packageRoot: developmentPackage,
+    archive: developmentArchive,
+    issuedAt: FIXED_TIME,
+  });
+  check(validateJsonSchema(developmentAttestation, schema).length === 0, "development attestation schema failed");
+  check(developmentAttestation.certification_evidence === null, "development attestation invented certification evidence");
+  check(
+    developmentAttestation.release_gate_status === "DEVELOPMENT_PACKAGE_NOT_CERTIFIED_OR_INSTALLED",
+    "development attestation overstates its release gate",
+  );
+  check(
+    (await verifyReleasePackageAttestation({
+      packageRoot: developmentPackage,
+      attestation: developmentAttestation,
+      archivePath: developmentArchivePath,
+    })).status === "PASS",
+    "clean development package attestation did not verify",
+  );
+  await assert.rejects(
+    () => buildReleasePackageAttestation({
+      packageRoot: developmentPackage,
+      archive: developmentArchive,
+      certificationEvidenceReceipt: EVIDENCE_RECEIPT,
+      issuedAt: FIXED_TIME,
+    }),
+    /must not reinterpret certification evidence/,
+  );
+  checks += 1;
 
   const attestationPath = path.join(root, "package-a.attestation.json");
   await writeExternalReleasePackageAttestation({

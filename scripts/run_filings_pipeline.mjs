@@ -326,6 +326,12 @@ function compileResponse({ response, request, sourceHashes }) {
 }
 
 async function main() {
+  const performance = {
+    source_acquisition_ms: null,
+    filing_extraction_ms: null,
+    semantic_recovery_ms: null,
+  };
+  const sourceAcquisitionStarted = process.hrtime.bigint();
   const requestPath = path.resolve(process.argv[2] ?? "");
   const outIndex = process.argv.indexOf("--out");
   const responseIndex = process.argv.indexOf("--responses");
@@ -420,6 +426,7 @@ async function main() {
       sourceFailures.push(`${document.document_id} raw filing is absent`);
     }
   }
+  performance.source_acquisition_ms = Number(process.hrtime.bigint() - sourceAcquisitionStarted) / 1e6;
   const cacheKey = sha256(canonicalBytes({ request: requestHash, sources: sourceHashes, runtime: runtimeHash }));
   const prior = await readJson(statePath, "prior filings run state").catch(() => null);
   const attempts = priorAttempts(prior, cacheKey);
@@ -444,6 +451,7 @@ async function main() {
     const pythonExecutable = process.env.EXCEL_INFLOW_PYTHON
       ? pythonCandidate
       : await resolvePythonExecutable(pythonCandidate, { cwd: HERE, env: process.env });
+    const filingExtractionStarted = process.hrtime.bigint();
     const completed = await execFileAsync(
       pythonExecutable,
       [path.join(HERE, "extract_filing_statements.py"), effectiveRequestPath, "--out", nativeRoot],
@@ -453,6 +461,7 @@ async function main() {
       stderr: error.stderr ?? error.message,
       code: error.code ?? 1,
     }));
+    performance.filing_extraction_ms = Number(process.hrtime.bigint() - filingExtractionStarted) / 1e6;
     const nativeResponse = path.join(nativeRoot, "filings-extraction-response.json");
     const nativeReceiptPath = path.join(nativeRoot, "filings-native-extraction-receipt.json");
     const nativeReceipt = await readJson(nativeReceiptPath, "native filing extraction receipt").catch(() => null);
@@ -490,6 +499,7 @@ async function main() {
   let compiled;
   let responseHash = null;
   const responseErrors = [];
+  const semanticRecoveryStarted = process.hrtime.bigint();
   try {
     responseHash = await sha256File(responsePath);
     response = await readJson(responsePath, "filings extraction response");
@@ -503,6 +513,7 @@ async function main() {
   } catch (error) {
     responseErrors.push(error.message);
   }
+  performance.semantic_recovery_ms = Number(process.hrtime.bigint() - semanticRecoveryStarted) / 1e6;
   attempts.count += 1;
   if (responseHash && !attempts.response_sha256.includes(responseHash)) attempts.response_sha256.push(responseHash);
   if (responseErrors.length > 0) {
@@ -580,6 +591,7 @@ async function main() {
       income_statement_row_count: compiled.filings.income_statement.length,
       cash_flow_row_count: compiled.filings.cash_flow.length,
       violation_count: 0,
+      performance,
     },
   });
   return 0;
