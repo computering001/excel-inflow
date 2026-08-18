@@ -757,6 +757,7 @@ node scripts/orchestrate_release.mjs <case.json> --out <run-folder> [--dcs-expor
 node scripts/run_statement_classifier_tests.mjs <representative-v2-case.json>
 node scripts/run_forecast_observation_tests.mjs
 node scripts/run_forecast_behavior_tests.mjs
+node scripts/run_structural_ownership_preflight.mjs <filings-bundle.json> <pre-broker-demand.json> --out <receipt.json> [--verify <receipt.json>]
 node scripts/run_product_constitution_tests.mjs
 node scripts/run_run_constitution_graph_tests.mjs
 node scripts/run_delivery_constitution_tests.mjs
