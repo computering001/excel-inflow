@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-intake-choice-v1.schema.json",
+  "title": "Sealed user choice at the visible Brokers milestone",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "issuer_identity",
+    "issuer_identity_sha256",
+    "intake_state",
+    "processing_state",
+    "authority_state",
+    "choice",
+    "attachments",
+    "filings_receipt_sha256",
+    "runtime_closure_sha256",
+    "recorded_at",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "broker-intake-choice/1.0" },
+    "run_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+    "issuer_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "lei": { "type": ["string", "null"] },
+        "ticker": { "type": ["string", "null"] }
+      }
+    },
+    "issuer_identity_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "intake_state": { "enum": ["supplied", "explicitly_skipped"] },
+    "processing_state": { "enum": ["not_started"] },
+    "authority_state": { "enum": ["not_resolved", "zero"] },
+    "choice": { "enum": ["use_supplied_brokers", "continue_without_brokers"] },
+    "choice_phrase": { "type": ["string", "null"], "enum": ["continue without brokers", null] },
+    "attachments": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attachment_id", "file_name", "media_type", "byte_length", "sha256"],
+        "properties": {
+          "attachment_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+          "file_name": { "type": "string", "minLength": 1 },
+          "media_type": { "type": "string", "minLength": 1 },
+          "byte_length": { "type": "integer", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    "filings_receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "recorded_at": { "type": "string", "format": "date-time" },
+    "receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "intake_state": { "const": "supplied" } } },
+      "then": {
+        "properties": {
+          "choice": { "const": "use_supplied_brokers" },
+          "choice_phrase": { "type": "null" },
+          "attachments": { "minItems": 1, "maxItems": 10 },
+          "authority_state": { "const": "not_resolved" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "intake_state": { "const": "explicitly_skipped" } } },
+      "then": {
+        "properties": {
+          "choice": { "const": "continue_without_brokers" },
+          "choice_phrase": { "const": "continue without brokers" },
+          "attachments": { "maxItems": 0 },
+          "authority_state": { "const": "zero" }
+        }
+      }
+    }
+  ]
+}

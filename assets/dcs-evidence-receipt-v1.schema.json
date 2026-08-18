@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-evidence-receipt-v1.schema.json",
+  "title": "Lossless DCS compiler receipt",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "status", "source_sha256", "source_tables_sha256", "candidate_manifest_sha256", "crosswalk_sha256", "projection_sha256", "counts", "violations"],
+  "properties": {
+    "schema_version": {"const": "dcs-evidence-receipt/1.0"},
+    "status": {"enum": ["PASS", "BLOCKED"]},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_tables_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidate_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "crosswalk_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "projection_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_rows", "source_cells", "model_instruments", "term_authorities", "unowned_cells", "double_owned_cells", "violations"],
+      "properties": {
+        "source_rows": {"type": "integer", "minimum": 0},
+        "source_cells": {"type": "integer", "minimum": 0},
+        "model_instruments": {"type": "integer", "minimum": 0},
+        "term_authorities": {"type": "integer", "minimum": 0},
+        "unowned_cells": {"type": "integer", "minimum": 0},
+        "double_owned_cells": {"type": "integer", "minimum": 0},
+        "violations": {"type": "integer", "minimum": 0}
+      }
+    },
+    "violations": {"type": "array", "items": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "path": {"type": "string"}}}}
+  }
+}

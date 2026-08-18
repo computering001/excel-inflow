@@ -1,0 +1,336 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "case-source-v1",
+  "description": "The complete authorship surface of Stage 3 under the v3 constitution. A case-source carries declarations only: identity, evidence references by hash, a statement map over filed line ids, consumption elections, policy selections where evidence offers a choice, and verbatim question-round answers. It contains no economic values, no formula text, and no rows the sealed evidence cannot justify. The model case is compiled from this file plus the sealed lanes; anything this schema cannot express, the author cannot do.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "identity",
+    "evidence_refs",
+    "statement_map",
+    "consumption",
+    "policies",
+    "answers"
+  ],
+  "properties": {
+    "schema_version": { "const": "case-source-v1" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issuer_name", "reporting_currency"],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "issuer_name": { "type": "string", "minLength": 1 },
+        "ticker": { "type": ["string", "null"] },
+        "identifiers": { "$ref": "#/$defs/entityIdentifiers" },
+        "aliases": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "consolidation_level": { "enum": ["group", "issuer", "opco", "unknown"] },
+        "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
+        "units": { "enum": ["millions", "thousands", "billions"] },
+        "fiscal_year_end": { "type": "string", "pattern": "^[0-9]{2}-[0-9]{2}$" },
+        "presentation_profile": { "type": "string", "minLength": 1 },
+        "execution_profile": {
+          "description": "reference_parity marks a fixture compiled to mirror a reference artifact; production cases omit this and compile as production_model.",
+          "enum": ["production_model", "reference_parity"]
+        }
+      }
+    },
+    "evidence_refs": {
+      "description": "Every sealed artifact this case is built from, referenced by content hash. The compiler refuses evidence whose hash disagrees with the seal; a case-source without evidence references compiles nothing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["face_statement_manifests"],
+      "properties": {
+        "evidence_run_sha256": { "type": ["string", "null"] },
+        "filings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_id"],
+            "properties": {
+              "source_id": { "type": "string", "minLength": 1 },
+              "document_sha256": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "face_statement_manifests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["income_statement", "cash_flow"],
+          "properties": {
+            "income_statement": { "$ref": "#/$defs/manifestRefList" },
+            "cash_flow": { "$ref": "#/$defs/manifestRefList" }
+          }
+        },
+        "broker_pack_sha256": { "type": ["string", "null"] },
+        "dcs_projection_sha256": { "type": ["string", "null"] },
+        "curve_evidence_sha256": { "type": ["string", "null"] }
+      }
+    },
+    "statement_map": {
+      "description": "Role assignment, parentage and absorption over the filed line ids carried by the face-statement manifests. The skeleton itself is derived from the manifests; this map never introduces a line the filings did not print. Totals are declared reported_parent by reference to the filed line, never by formula text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["income_statement", "cash_flow"],
+      "properties": {
+        "income_statement": { "$ref": "#/$defs/statementMapEntryList" },
+        "cash_flow": { "$ref": "#/$defs/statementMapEntryList" },
+        "structural_rows": {
+          "description": "The only rows that may exist without a filed line behind them, each drawn from a closed whitelist of structural roles the model requires.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "section"],
+            "properties": {
+              "role": { "enum": ["balancing_cash"] },
+              "section": { "enum": ["income_statement", "cash_flow"] }
+            }
+          }
+        }
+      }
+    },
+    "consumption": {
+      "description": "Broker-consumption elections: which anchor family is preferred and which flex metrics enter the model, each carrying its confirmation provenance.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "anchor_preference": { "type": ["string", "null"] },
+        "flex_elections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric_id", "mode"],
+            "properties": {
+              "metric_id": { "type": "string", "minLength": 1 },
+              "mode": { "enum": ["consensus", "attributed"] },
+              "confirmed_by_user": { "type": "boolean" },
+              "question_id": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "single_house_inclusions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric_id", "house"],
+            "properties": {
+              "metric_id": { "type": "string", "minLength": 1 },
+              "house": { "type": "string", "minLength": 1 },
+              "question_id": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "policies": {
+      "description": "Policy SELECTIONS only, and only where evidence offers a choice. Evidence-determined terms (capacities, fee values, opening balances, historical series, rates read from filings or the DCS projection) are not declarable here and are projected by the compiler from the sealed lanes. Numeric selections carry no numerals inline; each points at the receipted answer that supplied it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rcf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "commitment_fee_convention": {
+              "enum": ["bps_on_undrawn", "bps_on_committed", "none"]
+            },
+            "commitment_fee_question_id": { "type": ["string", "null"] }
+          }
+        },
+        "cash": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "interest_income_cash_flow_classification": {
+              "enum": ["operating", "investing"]
+            },
+            "minimum_cash_question_id": { "type": ["string", "null"] },
+            "eligible_cash_question_id": { "type": ["string", "null"] },
+            "cash_yield_question_id": { "type": ["string", "null"] }
+          }
+        },
+        "lease": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["flat_replacement", "simple_roll_forward", "exclude"]
+            },
+            "include_in_gross_debt": { "type": "boolean" },
+            "include_in_net_debt": { "type": "boolean" },
+            "include_in_leverage": { "type": "boolean" },
+            "forecast_basis_question_id": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "derived_rows": {
+      "description": "Receipted modeling decisions that mint derived rows the doctrine cannot infer: aggregates over declared members, restatements, memo identities and presentation headers. Members are row names; the operator vocabulary is closed and there is no numeric or formula-text surface — FR-1 stays unwritable here too.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_id", "section", "operator"],
+        "properties": {
+          "row_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "section": { "enum": ["income_statement", "cash_flow"] },
+          "label": { "type": ["string", "null"] },
+          "operator": {
+            "enum": ["sum", "negate_sum", "negate", "subtract", "link", "ratio", "negated_ratio", "growth", "header"]
+          },
+          "refs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "role": {
+            "description": "Optional semantic role for the minted row, so the doctrine's role-driven recipes and schedules recognise it.",
+            "type": ["string", "null"]
+          },
+          "add_to_parent": {
+            "description": "Row name of a calculating parent whose identity this row joins, at its printed position. Membership is a declaration; the parent's formula stays compiler-owned.",
+            "type": ["string", "null"]
+          },
+          "insert_after": { "type": ["string", "null"] },
+          "replace_in_parent": { "type": "boolean" },
+          "member_indent": { "type": "boolean" },
+          "members_declare_parent": { "type": "boolean" },
+          "indent": { "type": "boolean" },
+          "question_id": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "answers": {
+      "description": "Question-round answers, verbatim, with stable question ids. This is the only section that may carry economic numerals, and every numeral here is a receipted user decision, never a transcription of evidence.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question_id", "answer"],
+        "properties": {
+          "question_id": { "type": "string", "minLength": 1 },
+          "round": { "enum": ["A", "B", "derived"] },
+          "question": { "type": ["string", "null"] },
+          "answer": {},
+          "answered_at": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "entityIdentifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lei": { "type": ["string", "null"] },
+        "isin": { "type": ["string", "null"] },
+        "cusip": { "type": ["string", "null"] },
+        "ticker": { "type": ["string", "null"] },
+        "factset_entity_id": { "type": ["string", "null"] },
+        "company_number": { "type": ["string", "null"] }
+      }
+    },
+    "manifestRefList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "digest"],
+        "properties": {
+          "source_id": { "type": "string", "minLength": 1 },
+          "digest": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "statementMapEntryList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_line_id", "disposition"],
+        "properties": {
+          "source_line_id": { "type": "string", "minLength": 1 },
+          "row_id": {
+            "description": "Optional stable row name for the minted row. Naming is a declaration; values and formulas are not.",
+            "type": ["string", "null"],
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "disposition": { "enum": ["keep", "absorb", "alias", "expand"] },
+          "label_override": {
+            "description": "Optional presentation label for the minted row. Naming is a declaration; the filed label is preserved on the coverage record either way.",
+            "type": ["string", "null"]
+          },
+          "role": { "type": ["string", "null"] },
+          "parent_source_line_id": { "type": ["string", "null"] },
+          "reported_parent": { "type": "boolean" },
+          "header": {
+            "description": "The filed line is a presentation header (prints no values).",
+            "type": "boolean"
+          },
+          "uncalculated": {
+            "description": "The filed line prints its history and is deliberately never modeled — kept visible, no forecast, no formula.",
+            "type": "boolean"
+          },
+          "reported_form": {
+            "description": "How a reported parent is represented: derived (formula owns the row, filed values retire) or reconciled (filed values stay as the reconciliation target).",
+            "enum": ["derived", "reconciled"]
+          },
+          "aggregation": {
+            "description": "reported_parent: the filed total keeps its filed values and forecasts as one block; its filed children stay informational working children. Absent: filed parents mint reconciling subtotals.",
+            "enum": ["reported_parent", null]
+          },
+          "member_class": {
+            "description": "Economic class stamped on this parent's member rows (e.g. working_capital, investing). Declares scope; never values.",
+            "type": ["string", "null"]
+          },
+          "derive_as": {
+            "description": "The filed line is represented as a derivation of other declared rows (an inverted identity, e.g. cost of goods derived from gross profit). Closed operator vocabulary; refs by row name; no values, no formula text.",
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["operator", "refs"],
+            "properties": {
+              "operator": { "enum": ["sum", "subtract", "negate", "negate_sum", "link", "ratio", "negated_ratio", "growth", "prior_period", "prior_period_scaled_by", "average", "tax"] },
+              "refs": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+            }
+          },
+          "absorb_into": { "type": ["string", "null"] },
+          "alias_role": { "type": ["string", "null"] },
+          "broker_metric_id": { "type": ["string", "null"] },
+          "movement_type": { "type": ["string", "null"] },
+          "acquisition_driver_role": { "type": ["string", "null"] },
+          "forecast_period_derive_as": {
+            "description": "Per-period authored forecast wiring (three entries, one per forecast year). Closed vocabulary, refs by row name.",
+            "type": ["array", "null"],
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": ["operator", "refs"],
+              "properties": {
+                "operator": { "enum": ["sum", "subtract", "negate", "negate_sum", "link", "tax", "prior_period", "prior_period_scaled_by"] },
+                "refs": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+              }
+            }
+          },
+          "forecast_derive_as": {
+            "description": "Authored forecast wiring for the row: its forecast is a derivation of other declared rows. Closed vocabulary, refs by row name.",
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["operator", "refs"],
+            "properties": {
+              "operator": { "enum": ["sum", "subtract", "negate", "negate_sum", "link", "tax", "prior_period", "prior_period_scaled_by"] },
+              "refs": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+            }
+          },
+          "cash_flow_classification": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

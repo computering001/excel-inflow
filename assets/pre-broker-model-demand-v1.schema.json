@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/pre-broker-model-demand-v1.schema.json",
+  "title": "Filings-derived model demand compiled before broker extraction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "as_of", "reporting_currency", "units",
+    "forecast_periods", "nodes", "counts", "graph_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "pre-broker-model-demand/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "as_of": { "type": "string", "format": "date" },
+    "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "units": { "enum": ["units", "thousands", "millions", "billions"] },
+    "forecast_periods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "type": "string", "format": "date" }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id", "section", "source_line_id", "label", "parent_label",
+          "period_end", "material", "has_historical_value",
+          "allowed_authorities", "definition_signature_sha256"
+        ],
+        "properties": {
+          "node_id": { "type": "string", "minLength": 1 },
+          "section": { "enum": ["income_statement", "cash_flow"] },
+          "source_line_id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "parent_label": { "type": ["string", "null"] },
+          "period_end": { "type": "string", "format": "date" },
+          "material": { "type": "boolean" },
+          "has_historical_value": { "const": true },
+          "allowed_authorities": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "company_guidance", "selected_broker", "historical_inference",
+                "parent_capture", "user_assumption", "explicit_zero"
+              ]
+            }
+          },
+          "definition_signature_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_rows", "forecast_nodes", "material_nodes"],
+      "properties": {
+        "source_rows": { "type": "integer", "minimum": 0 },
+        "forecast_nodes": { "type": "integer", "minimum": 0 },
+        "material_nodes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

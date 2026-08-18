@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excel-inflow.local/model-ir-v3.schema.json",
+  "title": "Excel Inflow proof-carrying model IR",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "case_sha256",
+    "evidence_epoch",
+    "planes",
+    "proof"
+  ],
+  "properties": {
+    "schema_version": { "const": 3 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "case_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "evidence_epoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["epoch_sha256", "sealed", "source_line_count"],
+      "properties": {
+        "epoch_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sealed": { "type": "boolean" },
+        "source_line_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "planes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence", "statement", "authority", "calculation", "presentation"],
+      "properties": {
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceLine" } },
+        "statement": { "type": "array", "items": { "$ref": "#/$defs/statementNode" } },
+        "authority": { "type": "array", "items": { "$ref": "#/$defs/authorityNode" } },
+        "calculation": { "$ref": "#/$defs/calculationPlane" },
+        "presentation": { "type": "array", "items": { "$ref": "#/$defs/presentationNode" } }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blocking_findings", "warnings", "metrics"],
+      "properties": {
+        "status": { "enum": ["PASS", "BLOCK"] },
+        "blocking_findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "metrics": { "type": "object" }
+      }
+    }
+  },
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "evidenceLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_line_id", "section", "material", "disposition", "mapped_display_ids", "resolution"],
+      "properties": {
+        "source_line_id": { "type": "string", "minLength": 1 },
+        "section": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "document": { "$ref": "#/$defs/nullableString" },
+        "page_or_note": { "$ref": "#/$defs/nullableString" },
+        "material": { "type": "boolean" },
+        "disposition": { "enum": ["mapped", "aggregated", "not_applicable", "unresolved"] },
+        "mapped_display_ids": { "type": "array", "items": { "type": "string" } },
+        "resolution": { "enum": ["resolved", "documented_exclusion", "unresolved"] },
+        "reason": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "statementNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_id", "economic_concept_id", "label", "section", "definition_signature", "source_line_ids"],
+      "properties": {
+        "display_id": { "type": "string", "minLength": 1 },
+        "economic_concept_id": { "type": "string", "minLength": 1 },
+        "semantic_role": { "$ref": "#/$defs/nullableString" },
+        "label": { "type": "string" },
+        "section": { "type": "string" },
+        "projection_status": { "type": "string" },
+        "definition_signature": { "type": "object" },
+        "source_line_ids": { "type": "array", "items": { "type": "string" } },
+        "forecast_capture_parent_id": { "$ref": "#/$defs/nullableString" },
+        "forecast_capture_mode": {
+          "type": ["string", "null"],
+          "enum": ["formula_membership", "semantic_scope", null]
+        }
+      }
+    },
+    "authorityNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_id", "forecast_index", "producer_type", "status"],
+      "properties": {
+        "display_id": { "type": "string" },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "producer_type": { "enum": ["FiledInput", "BrokerInput", "UserInput", "Derived", "ScheduleLink", "ExplicitZero", "CapturedBy", "NotApplicable", "Unresolved"] },
+        "status": { "enum": ["resolved", "unresolved"] },
+        "method": { "type": "string" },
+        "source_kind": { "$ref": "#/$defs/nullableString" },
+        "source_id": { "$ref": "#/$defs/nullableString" },
+        "capture_parent_display_id": { "$ref": "#/$defs/nullableString" },
+        "reason": { "$ref": "#/$defs/nullableString" },
+        "material": { "type": ["boolean", "null"] },
+        "candidates": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "capture_certificate": {
+          "type": ["object", "null"]
+        },
+        "formula_operator": { "$ref": "#/$defs/nullableString" },
+        "formula_refs": { "type": "array", "items": { "type": "string" } },
+        "period_relation": { "enum": ["same_period", "prior_period"] }
+      }
+    },
+    "calculationPlane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": { "type": "array", "items": { "type": "string" } },
+        "edges": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "presentationNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_id", "section", "order", "depth", "display_role"],
+      "properties": {
+        "display_id": { "type": "string" },
+        "section": { "type": "string" },
+        "order": { "type": "integer", "minimum": 0 },
+        "physical_row": { "type": ["integer", "null"] },
+        "parent_display_id": { "$ref": "#/$defs/nullableString" },
+        "depth": { "type": "integer", "minimum": 0 },
+        "display_role": { "enum": ["answer", "subtotal", "component", "consumer", "memo", "control", "header"] },
+        "style_role": { "$ref": "#/$defs/nullableString" },
+        "presentation_rank": { "$ref": "#/$defs/nullableString" },
+        "section_conclusion_owner": { "type": "boolean" },
+        "section_conclusion_id": { "$ref": "#/$defs/nullableString" },
+        "in_section_conclusion_closure": { "type": "boolean" },
+        "indent": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "display_ids": { "type": "array", "items": { "type": "string" } },
+        "source_line_ids": { "type": "array", "items": { "type": "string" } },
+        "forecast_index": { "type": "integer", "minimum": 0, "maximum": 2 }
+      }
+    }
+  }
+}
