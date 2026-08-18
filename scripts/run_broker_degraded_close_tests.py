@@ -1048,6 +1048,29 @@ def main() -> int:
                 + json.dumps(final_state.get("summary", {}))[:400]
             ))
             check(final_state["user_blocking"] is False, f"{status} leaked as a user ask")
+            for task in final_state.get("tasks", []):
+                if task.get("task_kind") != "bounded_capture_adjudication":
+                    continue
+                surface_id = task["surface_id"]
+                write_json(
+                    responses / f"{surface_id}.bounded-capture-decision.json",
+                    {
+                        "schema_version": "broker-bounded-capture-decision/1.0",
+                        "task_id": task["task_id"],
+                        "task_input_sha256": task["progress_measure"]["task_input_sha256"],
+                        "round_index": task["bounded_capture_round"]["round_index"],
+                        "document_id": task["document_id"],
+                        "surface_id": surface_id,
+                        "source_image_sha256": task["prior_task"]["image_sha256"],
+                        "producer_id": "degraded-close-test-model-host",
+                        "producer_fingerprint": f"bounded-quarantine-{surface_id}-{attempt}",
+                        "decision": "quarantine_remaining_regions",
+                        "rationale": (
+                            "The bounded fixture remains physically irreconcilable; preserve the source "
+                            "and prohibit the unresolved surface from model use."
+                        ),
+                    },
+                )
             if status == "NEEDS_CROSSWALK":
                 verified = json.loads(Path(final_state["artifacts"]["verified_bundle"]).read_text("utf-8"))
                 crosswalk_path = root / "crosswalk.json"

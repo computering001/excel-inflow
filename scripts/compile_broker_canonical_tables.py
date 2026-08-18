@@ -1000,7 +1000,20 @@ def canonicalise_bundle(bundle: dict[str, Any]) -> tuple[dict[str, Any], list[di
     all_findings: list[dict[str, Any]] = []
     canonical_documents = []
     for document in output.get("documents", []):
-        tables, findings = canonicalise_tables(document.get("tables", []))
+        quarantined_surface_ids = {
+            str(surface.get("surface_id") or "")
+            for surface in document.get("surfaces", [])
+            if surface.get("vision_disposition") == "quarantined_evidence_only"
+            and (surface.get("quarantine") or {}).get("model_use") == "prohibited"
+        }
+        # The source tables stay preserved on the document/run input, but a
+        # task-bound terminal quarantine removes their surface from the
+        # canonical model-authority projection. Otherwise the same overlapping
+        # tables would immediately recreate the finding that was just closed.
+        tables, findings = canonicalise_tables([
+            table for table in document.get("tables", [])
+            if str(table.get("surface_id") or "") not in quarantined_surface_ids
+        ])
         for finding in findings:
             finding["document_id"] = document.get("document_id")
         all_findings.extend(findings)

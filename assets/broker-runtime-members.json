@@ -21,6 +21,7 @@
     "assets/broker-extraction-bundle.schema.json",
     "assets/broker-surface-census.schema.json",
     "assets/broker-vision-result.schema.json",
+    "assets/broker-bounded-capture-decision.schema.json",
     "assets/broker-candidate-manifest.schema.json",
     "assets/broker-canonical-tables.schema.json",
     "assets/broker-crosswalk.schema.json",

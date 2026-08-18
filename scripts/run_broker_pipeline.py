@@ -68,6 +68,27 @@ def bounded_recovery_exhausted(state: dict[str, Any], attempts: dict[str, Any]) 
     (degraded, evidence preserved, quarantine receipts) rather than loop or
     terminate the run.
     """
+    # Once the controller has opened the dedicated bounded-capture family, its
+    # own two accepted, task-bound decisions supersede the coarser full-surface
+    # counter. Merely reaching the earlier vision limit must not make the newly
+    # advertised two-round task impossible to execute.
+    bounded_family_present = any(
+        task.get("task_kind") == "bounded_capture_adjudication"
+        for task in state.get("tasks", [])
+    ) or any(
+        node.get("node_kind") == "task"
+        and node.get("task_kind") == "bounded_capture_adjudication"
+        for node in (state.get("work_graph") or {}).get("nodes", [])
+    )
+    if bounded_family_present:
+        limit = int(
+            model_host_boundary()["tasks"]["bounded_capture_adjudication"][
+                "attempt_limit"
+            ]
+        )
+        return task_family_execution_count(
+            attempts, state, {"bounded_capture_adjudication"}
+        ) >= limit
     if int(attempts.get("vision_attempt_count", 0)) >= int(
         attempts.get("vision_attempt_limit", VISION_ATTEMPT_LIMIT)
     ):
@@ -182,8 +203,10 @@ def task_response_files(task: dict[str, Any]) -> list[str]:
     kind = str(task.get("task_kind") or "")
     if kind == "independent_table_transcription" and surface_id:
         return [f"{surface_id}.pass1.json", f"{surface_id}.pass2.json"]
-    if kind in {"targeted_cell_adjudication", "bounded_capture_adjudication"} and surface_id:
+    if kind == "targeted_cell_adjudication" and surface_id:
         return [f"{surface_id}.resolution.json"]
+    if kind == "bounded_capture_adjudication" and surface_id:
+        return [f"{surface_id}.bounded-capture-decision.json"]
     if kind == "period_header_adjudication":
         return ["broker-period-header-review.json"]
     if kind in {
@@ -197,6 +220,145 @@ def task_response_files(task: dict[str, Any]) -> list[str]:
     return []
 
 
+def bounded_capture_pass_sha256s(
+    responses: Path | None, surface_id: str
+) -> dict[str, str] | None:
+    if responses is None:
+        return None
+    paths = {
+        "pass1": responses / f"{surface_id}.pass1.json",
+        "pass2": responses / f"{surface_id}.pass2.json",
+    }
+    if not all(path.is_file() for path in paths.values()):
+        return None
+    return {name: sha256_file(path) for name, path in paths.items()}
+
+
+def bounded_capture_tasks(
+    tasks: list[dict[str, Any]], responses: Path | None
+) -> list[dict[str, Any]]:
+    """Promote exhausted full-surface work into one stable decision family."""
+    output: list[dict[str, Any]] = []
+    for task in tasks:
+        surface_id = str(task.get("surface_id") or "")
+        pass_sha256s = bounded_capture_pass_sha256s(responses, surface_id)
+        if not pass_sha256s:
+            raise ValueError(
+                f"Bounded capture for {surface_id!r} requires both prior pass files."
+            )
+        output.append({
+            "task_kind": "bounded_capture_adjudication",
+            "document_id": task.get("document_id"),
+            "surface_id": surface_id,
+            "prior_task": copy.deepcopy(task),
+            "prior_response_sha256s": pass_sha256s,
+            "instruction": (
+                "The bounded full-surface reads are exhausted. Read only the remaining "
+                "physical regions. Supply genuinely replacement pass files for at most one "
+                "further round, or prohibit every still-unresolved region from model use. "
+                "Do not invent conflict IDs, cells or values."
+            ),
+        })
+    return output
+
+
+def validate_bounded_capture_response(
+    task: dict[str, Any], response: dict[str, Any], responses: Path
+) -> list[str]:
+    """Validate the narrow decision without importing the vision-result schema."""
+    allowed = {
+        "schema_version", "task_id", "task_input_sha256", "round_index",
+        "document_id", "surface_id", "source_image_sha256", "producer_id",
+        "producer_fingerprint", "decision", "replacement_pass_sha256s",
+        "rationale",
+    }
+    required = allowed - {"replacement_pass_sha256s"}
+    errors: list[str] = []
+    unknown = sorted(set(response) - allowed)
+    missing = sorted(required - set(response))
+    if unknown:
+        errors.append(f"undeclared fields: {', '.join(unknown)}")
+    if missing:
+        errors.append(f"missing fields: {', '.join(missing)}")
+    if response.get("schema_version") != "broker-bounded-capture-decision/1.0":
+        errors.append("schema_version is not broker-bounded-capture-decision/1.0")
+    if response.get("task_id") != task.get("task_id"):
+        errors.append("task_id does not bind the open bounded-capture task")
+    if response.get("task_input_sha256") != (
+        task.get("progress_measure") or {}
+    ).get("task_input_sha256"):
+        errors.append("task_input_sha256 does not bind the open task input")
+    expected_round = int((task.get("attempt_budget") or {}).get("attempts_used", 0)) + 1
+    if response.get("round_index") != expected_round or expected_round not in {1, 2}:
+        errors.append("round_index is not the next finite bounded-capture round")
+    if response.get("document_id") != task.get("document_id"):
+        errors.append("document_id does not bind the open task")
+    if response.get("surface_id") != task.get("surface_id"):
+        errors.append("surface_id does not bind the open task")
+    prior_task = task.get("prior_task") or {}
+    expected_image = prior_task.get("image_sha256") or task.get("image_sha256")
+    if not expected_image or response.get("source_image_sha256") != expected_image:
+        errors.append("source_image_sha256 does not bind the task's rendered source")
+    for field in ("producer_id", "producer_fingerprint", "rationale"):
+        if not isinstance(response.get(field), str) or not response[field].strip():
+            errors.append(f"{field} must be a non-empty string")
+
+    decision = response.get("decision")
+    if decision not in {
+        "retry_with_replacement_reads", "quarantine_remaining_regions"
+    }:
+        errors.append("decision is not a registered bounded-capture disposition")
+    elif decision == "retry_with_replacement_reads":
+        replacement = response.get("replacement_pass_sha256s")
+        current = bounded_capture_pass_sha256s(
+            responses, str(task.get("surface_id") or "")
+        )
+        prior = task.get("prior_response_sha256s")
+        if not isinstance(replacement, dict) or set(replacement) != {"pass1", "pass2"}:
+            errors.append("replacement_pass_sha256s must bind pass1 and pass2 exactly")
+        elif replacement != current:
+            errors.append("replacement pass hashes do not match the supplied pass files")
+        elif not isinstance(prior, dict) or any(
+            replacement[name] == prior.get(name) for name in ("pass1", "pass2")
+        ):
+            errors.append("both replacement reads must differ from the prior round")
+    elif "replacement_pass_sha256s" in response:
+        errors.append("a quarantine decision cannot claim replacement pass hashes")
+    return errors
+
+
+def bounded_capture_responses(
+    prior_state: dict[str, Any], responses: Path | None
+) -> tuple[list[dict[str, Any]], list[str]]:
+    accepted: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for task in prior_state.get("tasks", []):
+        if task.get("task_kind") != "bounded_capture_adjudication":
+            continue
+        names = task_response_files(task)
+        target = responses / names[0] if responses is not None and names else None
+        if target is None or not target.is_file():
+            errors.append(f"{task.get('task_id')}: bounded-capture decision is missing")
+            continue
+        try:
+            response = read_json(target, "bounded-capture decision")
+        except ValueError as error:
+            errors.append(f"{task.get('task_id')}: {error}")
+            continue
+        response_errors = validate_bounded_capture_response(task, response, responses)
+        if response_errors:
+            errors.extend(
+                f"{task.get('task_id')}: {error}" for error in response_errors
+            )
+            continue
+        accepted.append({
+            "task": task,
+            "response": response,
+            "sha256": sha256_file(target),
+        })
+    return accepted, errors
+
+
 def task_identity(task: dict[str, Any], cache_key: str) -> tuple[str, str]:
     raw = {
         key: value
@@ -204,6 +366,7 @@ def task_identity(task: dict[str, Any], cache_key: str) -> tuple[str, str]:
         if key not in {
             "task_id", "user_blocking", "remedy", "attempt_budget",
             "progress_measure", "model_host_response_boundary",
+            "prior_response_sha256s", "bounded_capture_round",
         }
     }
     input_sha = sha256_bytes(canonical_bytes({"cache_key": cache_key, "task": raw}))
@@ -299,6 +462,15 @@ def seal_internal_work(
                 "python_may_not_author_response": True,
             },
         })
+        if task_kind == "bounded_capture_adjudication":
+            if attempts_used >= int(declaration["attempt_limit"]):
+                raise ValueError("An exhausted bounded-capture task cannot be reopened.")
+            packet["bounded_capture_round"] = {
+                "round_index": attempts_used + 1,
+                "prior_response_sha256s": copy.deepcopy(
+                    packet.get("prior_response_sha256s")
+                ),
+            }
         sealed.append(packet)
 
     work_graph = build_work_graph(
@@ -476,7 +648,6 @@ def record_vision_attempt(
         {
             "independent_table_transcription",
             "targeted_cell_adjudication",
-            "bounded_capture_adjudication",
             "period_header_adjudication",
         },
     )
@@ -1263,6 +1434,21 @@ def main() -> int:
         responses = output_root / "optional-close-empty-responses"
         responses.mkdir(parents=True, exist_ok=True)
         attempts["vision_attempt_count"] = attempts["vision_attempt_limit"]
+    bounded_decisions, bounded_response_errors = bounded_capture_responses(
+        prior_state, responses
+    )
+    for accepted_decision in bounded_decisions:
+        record_task_execution_attempt(
+            attempts,
+            prior_state,
+            accepted_decision["sha256"],
+            {"bounded_capture_adjudication"},
+        )
+    bounded_capture_executed = bool(bounded_decisions)
+    bounded_quarantine_requested = any(
+        item["response"].get("decision") == "quarantine_remaining_regions"
+        for item in bounded_decisions
+    )
     active_bundle_path = bundle_path
     active_bundle = bundle
     if bundle.get("gate_status") == "NEEDS_VISION":
@@ -1315,16 +1501,23 @@ def main() -> int:
         active_bundle = read_json(verified_path, "verified broker bundle")
         artifacts["verified_bundle"] = str(verified_path)
         checkpoint(checkpoints, stage="vision", status="PASS" if active_bundle.get("gate_status") == "PASS" else "NEEDS_WORK", input_digest=vision_input, output=verified_path, reused=vision_reused)
+        capture_adjudication_required = False
         if active_bundle.get("gate_status") == "NEEDS_RESOLUTION":
             tasks = resolution_tasks(active_bundle)
-            write_state(
-                state_path, run_id=run_id, status="NEEDS_RESOLUTION", request_digest=request_digest,
-                sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
-                checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
-                summary={"targeted_conflict_count": sum(len(task.get("conflicts", [])) for task in tasks)},
-                blocker_class="INTERNAL_WORK", attempts=attempts,
-            )
-            return 2
+            if tasks:
+                write_state(
+                    state_path, run_id=run_id, status="NEEDS_RESOLUTION", request_digest=request_digest,
+                    sources=sources, runtime_digest=runtime_digest, cache_key=cache_key,
+                    checkpoints=checkpoints, artifacts=artifacts, tasks=tasks,
+                    summary={"targeted_conflict_count": sum(len(task.get("conflicts", [])) for task in tasks)},
+                    blocker_class="INTERNAL_WORK", attempts=attempts,
+                )
+                return 2
+            # Canonical physical-overlap findings are task-bound surface work,
+            # not cell-conflict manifests. They enter the dedicated bounded
+            # decision contract and must never be forced into a fabricated
+            # bvc-* conflict identity.
+            capture_adjudication_required = True
         if active_bundle.get("gate_status") != "PASS":
             tasks = vision_tasks(active_bundle, responses)
             for task in tasks:
@@ -1336,21 +1529,19 @@ def main() -> int:
             # Replaying the same already-evaluated full-surface read is not a
             # new attempt. It is evidence that this remedy tier is exhausted,
             # so move to targeted adjudication rather than polling forever.
-            exhausted = attempt_exhausted or response_seen_before
-            fully_exhausted = exhausted and bounded_recovery_exhausted(prior_state, attempts)
+            exhausted = (
+                attempt_exhausted
+                or response_seen_before
+                or bounded_capture_executed
+                or capture_adjudication_required
+            )
+            fully_exhausted = exhausted and (
+                bounded_quarantine_requested
+                or bounded_recovery_exhausted(prior_state, attempts)
+            )
             if not fully_exhausted:
                 if exhausted:
-                    tasks = [{
-                        "task_kind": "bounded_capture_adjudication",
-                        "document_id": task.get("document_id"),
-                        "surface_id": task.get("surface_id"),
-                        "prior_task": task,
-                        "instruction": (
-                            "The bounded full-surface reads are exhausted. Adjudicate only the remaining physical "
-                            "regions/cells, or certify verified_non_tabular where independently supported. This is "
-                            "internal work and is not a request for replacement readable research."
-                        ),
-                    } for task in tasks]
+                    tasks = bounded_capture_tasks(tasks, responses)
                 write_state(
                     state_path, run_id=run_id,
                     status="NEEDS_RESOLUTION" if exhausted else "NEEDS_VISION",
@@ -1365,6 +1556,7 @@ def main() -> int:
                             if exhausted else None
                         ),
                         "findings": active_bundle.get("findings", []),
+                        "bounded_capture_response_errors": bounded_response_errors,
                     },
                     blocker_class="INTERNAL_WORK", attempts=attempts,
                 )
@@ -1522,14 +1714,19 @@ def main() -> int:
                 active_bundle.get("physical_capture_receipt") or {}
             ).get("status")
             if physical_status != "PASS" and (
-                attempt_exhausted or response_seen_before
+                attempt_exhausted
+                or response_seen_before
+                or bounded_capture_executed
             ):
                 physical_status = "NEEDS_RESOLUTION"
 
     lane_degraded = bool((active_bundle.get("summary") or {}).get("degraded"))
     if (
         physical_status in {"NEEDS_VISION", "NEEDS_RESOLUTION"}
-        and bounded_recovery_exhausted(prior_state, attempts)
+        and (
+            bounded_quarantine_requested
+            or bounded_recovery_exhausted(prior_state, attempts)
+        )
     ):
         # The bounded budget is spent on ORDINARY evidence ambiguity. The
         # delivery constitution forbids terminating here: close the physical
@@ -1600,10 +1797,21 @@ def main() -> int:
         # independent rendered reads exist. Transcription is still the first
         # remedy; targeted cell adjudication is valid only after the vision
         # compiler has emitted a conflict manifest from those reads.
-        if any(task.get("missing_passes") for task in transcription_tasks):
+        if (
+            bounded_capture_executed
+            and not bounded_quarantine_requested
+            and not bounded_recovery_exhausted(prior_state, attempts)
+        ):
+            tasks = bounded_capture_tasks(transcription_tasks, responses)
+        elif any(task.get("missing_passes") for task in transcription_tasks):
             tasks = pending_vision_tasks(transcription_tasks)
         elif physical_status == "NEEDS_RESOLUTION":
-            tasks = resolution_tasks(active_bundle) or transcription_tasks
+            conflict_tasks = resolution_tasks(active_bundle)
+            tasks = conflict_tasks or (
+                bounded_capture_tasks(transcription_tasks, responses)
+                if transcription_tasks
+                else physical_reconciliation_tasks(active_bundle)
+            )
         else:
             tasks = transcription_tasks
         if not tasks:
@@ -1622,6 +1830,7 @@ def main() -> int:
             summary={
                 **(active_bundle.get("physical_capture_receipt") or {}),
                 "terminal_reason": None,
+                "bounded_capture_response_errors": bounded_response_errors,
             },
             blocker_class="INTERNAL_WORK",
             attempts=attempts,

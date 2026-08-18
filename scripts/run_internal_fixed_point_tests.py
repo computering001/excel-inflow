@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import copy
 import tempfile
 from pathlib import Path
 
 import run_attachment_evidence_pipeline as attachment
 import run_broker_pipeline as broker
 from compile_broker_candidate_manifest import compile_manifest
+from compile_broker_canonical_tables import canonicalise_bundle
 from compile_broker_pack import validate_coverage
 from broker_terminal_recovery import (
     analyse_terminal_recovery,
@@ -76,6 +78,255 @@ def main() -> int:
         if declaration.get("response_schema_path"):
             check(len(declaration.get("response_schema_sha256", "")) == 64, f"{task_kind} schema is not hash-bound")
     checks += 1
+
+    # Canonical physical-overlap work has no conflict manifest and therefore
+    # must not advertise broker-vision-result/resolution as its response. The
+    # dedicated decision binds the stable task, image, round and genuinely new
+    # pass bytes; two accepted rounds exhaust to quarantine.
+    with tempfile.TemporaryDirectory(prefix="bounded-capture-contract-") as temp:
+        response_root = Path(temp)
+        (response_root / "page-1.pass1.json").write_text('{"round":0,"pass":1}\n')
+        (response_root / "page-1.pass2.json").write_text('{"round":0,"pass":2}\n')
+        bounded_source_task = {
+            **vision_task,
+            "image_sha256": "d" * 64,
+            "missing_passes": [1, 2],
+        }
+        bounded_raw = broker.bounded_capture_tasks(
+            [bounded_source_task], response_root
+        )
+        attempts = {
+            "execution_response_sha256": [],
+            "vision_response_sha256": [],
+            "vision_attempt_count": 3,
+            "vision_attempt_limit": 3,
+            "task_execution_receipts": {},
+        }
+        bounded_status, bounded_packets, bounded_fixed, _ = broker.seal_internal_work(
+            prior={}, cache_key=cache_key, status="NEEDS_RESOLUTION",
+            tasks=bounded_raw, checkpoints=checkpoints, summary={}, attempts=attempts,
+        )
+        bounded_packet = bounded_packets[0]
+        bounded_state = {
+            "tasks": bounded_packets,
+            "work_graph": bounded_fixed["work_graph"],
+        }
+        check(bounded_status == "NEEDS_RESOLUTION", "bounded capture did not remain internal")
+        check(
+            bounded_packet["model_host_response_boundary"]["response_schema_path"]
+            == "assets/broker-bounded-capture-decision.schema.json",
+            "bounded capture still advertises the conflict-manifest schema",
+        )
+        check(
+            bounded_packet["model_host_response_boundary"]["expected_response_files"]
+            == ["page-1.bounded-capture-decision.json"],
+            "bounded capture response filename is not deterministic",
+        )
+        check(
+            bounded_packet["bounded_capture_round"]["round_index"] == 1
+            and bounded_packet["attempt_budget"]["attempts_remaining"] == 2,
+            "bounded capture did not open at round one of two",
+        )
+        check(
+            not broker.bounded_recovery_exhausted(bounded_state, attempts),
+            "full-surface exhaustion unlawfully pre-exhausted bounded capture",
+        )
+
+        (response_root / "page-1.pass1.json").write_text('{"round":1,"pass":1}\n')
+        (response_root / "page-1.pass2.json").write_text('{"round":1,"pass":2}\n')
+        replacement = broker.bounded_capture_pass_sha256s(response_root, "page-1")
+        response = {
+            "schema_version": "broker-bounded-capture-decision/1.0",
+            "task_id": bounded_packet["task_id"],
+            "task_input_sha256": bounded_packet["progress_measure"]["task_input_sha256"],
+            "round_index": 1,
+            "document_id": "broker-a",
+            "surface_id": "page-1",
+            "source_image_sha256": "d" * 64,
+            "producer_id": "model-host-bounded-capture-test",
+            "producer_fingerprint": "bounded-capture-round-1",
+            "decision": "retry_with_replacement_reads",
+            "replacement_pass_sha256s": replacement,
+            "rationale": "Both bounded replacement reads were performed against the named surface.",
+        }
+        decision_path = response_root / "page-1.bounded-capture-decision.json"
+        decision_path.write_text(json.dumps(response, sort_keys=True) + "\n")
+        check(
+            broker.validate_bounded_capture_response(
+                bounded_packet, response, response_root
+            ) == [],
+            "valid round-one bounded-capture response was rejected",
+        )
+
+        mutation = copy.deepcopy(response)
+        mutation["task_input_sha256"] = "e" * 64
+        check(
+            broker.validate_bounded_capture_response(
+                bounded_packet, mutation, response_root
+            ),
+            "forged task binding was accepted",
+        )
+        mutation = copy.deepcopy(response)
+        mutation["source_image_sha256"] = "e" * 64
+        check(
+            broker.validate_bounded_capture_response(
+                bounded_packet, mutation, response_root
+            ),
+            "forged source-image binding was accepted",
+        )
+        mutation = copy.deepcopy(response)
+        mutation["round_index"] = 2
+        check(
+            broker.validate_bounded_capture_response(
+                bounded_packet, mutation, response_root
+            ),
+            "out-of-order bounded round was accepted",
+        )
+        mutation = copy.deepcopy(response)
+        mutation["unexpected_value_authority"] = 123
+        check(
+            broker.validate_bounded_capture_response(
+                bounded_packet, mutation, response_root
+            ),
+            "undeclared value-authority field was accepted",
+        )
+
+        first_digest = broker.sha256_file(decision_path)
+        broker.record_task_execution_attempt(
+            attempts, bounded_state, first_digest,
+            {"bounded_capture_adjudication"},
+        )
+        check(
+            not broker.bounded_recovery_exhausted(bounded_state, attempts),
+            "one accepted bounded round exhausted a two-round task",
+        )
+        second_raw = broker.bounded_capture_tasks(
+            [bounded_source_task], response_root
+        )
+        _, second_packets, second_fixed, _ = broker.seal_internal_work(
+            prior=bounded_state, cache_key=cache_key, status="NEEDS_RESOLUTION",
+            tasks=second_raw, checkpoints=checkpoints, summary={}, attempts=attempts,
+        )
+        second_packet = second_packets[0]
+        second_state = {
+            "tasks": second_packets,
+            "work_graph": second_fixed["work_graph"],
+        }
+        check(
+            second_packet["task_id"] == bounded_packet["task_id"]
+            and second_packet["bounded_capture_round"]["round_index"] == 2
+            and second_packet["attempt_budget"]["attempts_remaining"] == 1,
+            "bounded capture did not preserve its stable id into round two",
+        )
+        (response_root / "page-1.pass1.json").write_text('{"round":2,"pass":1}\n')
+        (response_root / "page-1.pass2.json").write_text('{"round":2,"pass":2}\n')
+        second_replacement = broker.bounded_capture_pass_sha256s(
+            response_root, "page-1"
+        )
+        second_response = {
+            **response,
+            "round_index": 2,
+            "producer_fingerprint": "bounded-capture-round-2",
+            "replacement_pass_sha256s": second_replacement,
+        }
+        check(
+            broker.validate_bounded_capture_response(
+                second_packet, second_response, response_root
+            ) == [],
+            "valid round-two bounded-capture response was rejected",
+        )
+        second_path = response_root / "page-1.bounded-capture-decision.json"
+        second_path.write_text(json.dumps(second_response, sort_keys=True) + "\n")
+        broker.record_task_execution_attempt(
+            attempts, second_state, broker.sha256_file(second_path),
+            {"bounded_capture_adjudication"},
+        )
+        check(
+            broker.bounded_recovery_exhausted(second_state, attempts),
+            "two accepted bounded rounds did not close to quarantine",
+        )
+
+        stale_reads = copy.deepcopy(second_response)
+        stale_reads["replacement_pass_sha256s"] = second_packet[
+            "prior_response_sha256s"
+        ]
+        check(
+            broker.validate_bounded_capture_response(
+                second_packet, stale_reads, response_root
+            ),
+            "a self-asserted retry with unchanged pass hashes was accepted",
+        )
+        quarantine = copy.deepcopy(second_response)
+        quarantine["decision"] = "quarantine_remaining_regions"
+        quarantine.pop("replacement_pass_sha256s")
+        check(
+            broker.validate_bounded_capture_response(
+                second_packet, quarantine, response_root
+            ) == [],
+            "lawful task-bound quarantine decision was rejected",
+        )
+        checks += 14
+
+    overlap_tables = [
+        {
+            "table_id": "rendered-overlap-a",
+            "surface_id": "page-overlap",
+            "source_location": "page-overlap",
+            "bbox": [0, 0, 100, 100],
+            "extraction_method": "vision_pass_consensus",
+            "authority_role": "rendered_authority",
+            "rows": [[
+                {"row": 1, "column": 1, "raw_text": "Revenue", "value": "Revenue", "source_ref": "a1"},
+                {"row": 1, "column": 2, "raw_text": "100", "value": 100, "source_ref": "a2"},
+            ]],
+        },
+        {
+            "table_id": "rendered-overlap-b",
+            "surface_id": "page-overlap",
+            "source_location": "page-overlap",
+            "bbox": [0, 0, 100, 100],
+            "extraction_method": "vision_pass_consensus",
+            "authority_role": "rendered_authority",
+            "rows": [[
+                {"row": 1, "column": 1, "raw_text": "Revenue", "value": "Revenue", "source_ref": "b1"},
+                {"row": 1, "column": 2, "raw_text": "200", "value": 200, "source_ref": "b2"},
+            ]],
+        },
+    ]
+    overlap_bundle = {
+        "documents": [{
+            "document_id": "overlap-doc",
+            "tables": overlap_tables,
+            "surfaces": [{
+                "surface_id": "page-overlap",
+                "lane_status": {"vision": "complete"},
+                "source_table_numeric_tokens": ["100", "200"],
+            }],
+        }],
+    }
+    unresolved_overlap, unresolved_findings = canonicalise_bundle(overlap_bundle)
+    check(
+        unresolved_overlap["physical_capture_receipt"]["status"] == "NEEDS_RESOLUTION"
+        and any(item.get("id") == "broker_canonical.overlap_conflict" for item in unresolved_findings),
+        "overlap fixture did not reproduce the no-conflict-id physical task",
+    )
+    quarantined_overlap = copy.deepcopy(overlap_bundle)
+    quarantined_overlap["documents"][0]["surfaces"][0].update({
+        "vision_disposition": "quarantined_evidence_only",
+        "quarantine": {
+            "model_use": "prohibited",
+            "reason_id": "bounded_physical_overlap_after_exhaustion",
+            "scope": "surface",
+        },
+    })
+    closed_overlap, closed_findings = canonicalise_bundle(quarantined_overlap)
+    check(
+        closed_overlap["physical_capture_receipt"]["status"] == "PASS"
+        and closed_overlap["documents"][0]["canonical_tables"] == []
+        and not any(item.get("severity") in {"needs_vision", "needs_resolution"} for item in closed_findings),
+        "task-bound overlap quarantine remained model-eligible or reopened work",
+    )
+    checks += 2
 
     terminal_status, terminal_packets, terminal_fixed, _ = broker.seal_internal_work(
         prior={}, cache_key=cache_key, status="NEEDS_CROSSWALK_REVIEW",
@@ -541,8 +792,8 @@ def main() -> int:
     print(json.dumps({
         "status": "PASS",
         "checks": checks,
-        "positive_checks": checks - 10,
-        "mutation_checks": 10,
+        "positive_checks": checks - 16,
+        "mutation_checks": 16,
         "total_violation_count": 0,
     }, sort_keys=True))
     return 0

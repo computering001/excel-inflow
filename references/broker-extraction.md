@@ -462,6 +462,16 @@ judgment or semantic crosswalk. The model host writes those artifacts; the
 controller re-enters them only after their source, image, manifest and schema
 bindings pass.
 
+`bounded_capture_adjudication` is not cell-conflict adjudication. Canonical
+physical-overlap work may have no conflict manifest and must never invent
+`bvc-*` IDs to satisfy the vision-resolution schema. Its exact response is
+`<surface>.bounded-capture-decision.json` under
+`broker-bounded-capture-decision/1.0`. The decision binds the stable task,
+task input, rendered source image and round. It can only bind two genuinely
+changed replacement pass files or prohibit the remaining regions from model
+use; it cannot carry cells or values. Two accepted rounds exhaust the task and
+close unresolved physical overlap through evidence-preserving quarantine.
+
 Progress is monotonic on one source/runtime cache key: full-surface reads may
 advance to targeted resolution, then to initial crosswalk, verified crosswalk
 and pack. A return to an earlier stage, loss of a passed checkpoint, an

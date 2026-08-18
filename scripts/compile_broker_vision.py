@@ -1377,6 +1377,79 @@ def main() -> int:
         document["extraction_status"] = "complete" if "required" not in states and "error" not in states else "needs_vision"
 
     bundle, canonical_findings = canonicalise_bundle(bundle)
+    if args.degrade_exhausted:
+        pending_by_surface: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        for finding in canonical_findings:
+            if (
+                finding.get("scope") == "physical_capture"
+                and finding.get("severity") in {"needs_vision", "needs_resolution"}
+                and finding.get("model_linked") is False
+            ):
+                key = (
+                    str(finding.get("document_id") or ""),
+                    str(finding.get("surface_id") or ""),
+                )
+                pending_by_surface.setdefault(key, []).append(finding)
+        quarantined_keys: set[tuple[str, str]] = set()
+        for (document_id, surface_id), pending in sorted(pending_by_surface.items()):
+            document = next(
+                (
+                    item for item in bundle.get("documents", [])
+                    if str(item.get("document_id") or "") == document_id
+                ),
+                None,
+            )
+            surface = next(
+                (
+                    item for item in (document or {}).get("surfaces", [])
+                    if str(item.get("surface_id") or "") == surface_id
+                ),
+                None,
+            )
+            if document is None or surface is None:
+                continue
+            response_paths = [
+                response_root / f"{surface_id}.pass1.json",
+                response_root / f"{surface_id}.pass2.json",
+                response_root / f"{surface_id}.bounded-capture-decision.json",
+            ]
+            quarantine_surface_evidence_only(
+                bundle=bundle,
+                document=document,
+                surface=surface,
+                findings=findings,
+                reason_id="bounded_physical_overlap_after_exhaustion",
+                message=(
+                    "The finite physical-overlap recovery budget closed without "
+                    "one defensible canonical table projection."
+                ),
+                receipt_binding={
+                    "closure_basis": "bounded_capture_decision_or_attempt_exhaustion",
+                    "canonical_finding_sha256": canonical_hash(pending),
+                    "response_sha256s": [
+                        sha256_file(path) for path in response_paths if path.is_file()
+                    ],
+                },
+            )
+            quarantined_keys.add((document_id, surface_id))
+        if quarantined_keys:
+            for finding in findings:
+                key = (
+                    str(finding.get("document_id") or ""),
+                    str(finding.get("surface_id") or ""),
+                )
+                if (
+                    key in quarantined_keys
+                    and finding.get("scope") == "physical_capture"
+                    and finding.get("severity") in {"blocker", "needs_vision", "needs_resolution"}
+                    and finding.get("model_linked") is False
+                ):
+                    finding["severity"] = "warning"
+                    finding["message"] = (
+                        f"{str(finding.get('message') or '').rstrip()} "
+                        "Closed by the finite task-bound physical-overlap quarantine."
+                    ).strip()
+            bundle, canonical_findings = canonicalise_bundle(bundle)
     ensure_late_promotion_tasks(
         bundle,
         canonical_findings,

@@ -30,11 +30,13 @@
     "bounded_capture_adjudication": {
       "remedy_id": "bounded_remaining_region_adjudication",
       "attempt_limit": 2,
-      "response_schema_path": "assets/broker-vision-result.schema.json",
+      "response_schema_path": "assets/broker-bounded-capture-decision.schema.json",
       "producer_kind": "model_host",
       "steps": [
         "Read only the remaining unresolved regions after the full-surface attempt budget is exhausted.",
-        "Preserve resolved cells and either resolve or quarantine each remaining cell.",
+        "Either supply two genuinely replacement hash-bound reads for one more bounded round, or prohibit every still-unresolved region from model use.",
+        "Never author cells, values or conflict IDs in this decision: physical authority remains in the independently bound pass files.",
+        "After two accepted decision rounds the controller quarantines the remaining regions automatically and continues with surviving authority.",
         "Write the exact hash-bound response artifact named by the task packet.",
         "Resume the same broker controller transaction."
       ]
