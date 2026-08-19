@@ -1598,6 +1598,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "plan-reconstruction",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_plan_reconstruction_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "release-rollback-policy",
       "phase": "proof",
       "runtime": "node",
