@@ -596,6 +596,33 @@ def _continuation_page(
     return certified, resolved_columns if certified else []
 
 
+def heading_text(line: dict[str, Any]) -> str:
+    """Line text for TITLE matching, with letter-spaced banners removed.
+
+    Vintage reports print a running company banner as individually spaced
+    letters ("T H E  C O C A - C O L A ..."); OCR grouping can glue it onto
+    the true statement title on the same visual band. A maximal run of eight
+    or more single-character words is such a banner, never a title word.
+    """
+    words = line.get("words") or []
+    if not words:
+        return str(line.get("text") or "").strip()
+    kept: list[str] = []
+    run: list[str] = []
+    for word in words:
+        token = str(word.get("text") or "")
+        if len(token) == 1:
+            run.append(token)
+            continue
+        if len(run) < 8:
+            kept.extend(run)
+        run = []
+        kept.append(token)
+    if len(run) < 8:
+        kept.extend(run)
+    return " ".join(kept).strip()
+
+
 def same_pane_window(window: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Restrict a face window to its heading's pane on a two-pane page.
 
@@ -633,7 +660,10 @@ def statement_window(
     candidates: list[tuple[int, int, int]] = []
     requested_years = {str(period)[:4] for period in periods}
     for heading_index, line in enumerate(lines):
-        if not STRICT_HEADINGS[section].fullmatch(line["text"]):
+        if not (
+            STRICT_HEADINGS[section].fullmatch(line["text"]) or
+            STRICT_HEADINGS[section].fullmatch(heading_text(line))
+        ):
             continue
         page = int(line["page"])
         page_start, page_end = page_ranges[page]
@@ -715,6 +745,19 @@ def year_columns(window: list[dict[str, Any]], periods: list[str]) -> list[float
             token_years = years_in_token(word["text"])
             for year in years:
                 if year in token_years:
+                    observed[year].append((word["x0"] + word["x1"]) / 2)
+    # OCR of vintage scans can split the year header across lines ("Ended
+    # 1989 1988" / "Year December 31, 1990"). A year still unplaced after the
+    # header pass may be filled from a SHORT header fragment — never from a
+    # prose sentence, whose length gives it away.
+    for year in years:
+        if observed[year]:
+            continue
+        for line in candidate_lines:
+            if len(line["words"]) > 6:
+                continue
+            for word in line["words"]:
+                if year in years_in_token(word["text"]):
                     observed[year].append((word["x0"] + word["x1"]) / 2)
     columns = [sum(observed[year]) / len(observed[year]) if observed[year] else math.nan for year in years]
     if all(math.isfinite(value) for value in columns):

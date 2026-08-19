@@ -212,8 +212,17 @@ def main() -> int:
         return 0
     receipt = json.loads(FROZEN.read_text("utf-8"))
     validate(receipt, classification)
+    # The launder mutation must stay adversarial at ANY honest frontier:
+    # demote one genuinely passing document while leaving the aggregate
+    # claiming its old counts — a receipt that keeps summing to PASS while a
+    # member no longer passes is exactly the laundering validate() must catch.
     classificationLaunder = json.loads(json.dumps(receipt))
-    classificationLaunder["status"] = "PASS"
+    demoted = next(
+        item for item in classificationLaunder["documents"]
+        if item["terminal_status"] == "EXTRACTION_PASS"
+    )
+    demoted["terminal_status"] = "NEEDS_EXTRACTION_REVIEW"
+    demoted["reason"] = "mutation: demoted without recount"
     try:
         validate(classificationLaunder, classification)
     except AssertionError:
