@@ -8,8 +8,18 @@
       "version": "1.0.0",
       "outputs": {
         "assets/generated/support-envelope.generated.schema.json": "1c3f5a8eb0f3d281de8668046e69d4945530925783a5ff486b0ca262a0f08aa1",
-        "scripts/lib/generated/support_envelope_contract.mjs": "f6caf903177e8f7241019ab18b4fa1b25edac9738783c46f5e985e6fd6270b3f",
-        "scripts/generated/support_envelope_contract.py": "60469f6d50e8338658199cabbb13420f998a1f778d72c0e053c45fb8096e54b5"
+        "scripts/lib/generated/support_envelope_contract.mjs": "98662d7d20d70ea7389576bfa560a8def2cd6c12150e9192b35f5effeb68c67e",
+        "scripts/generated/support_envelope_contract.py": "68f20a5e3ade682369292519745518481596b9bae03b7f59e45cdf16c90e6727"
+      }
+    },
+    "typed_financial_value": {
+      "definition": "assets/contracts/typed-financial-value.contract.json",
+      "definition_sha256": "c1534fbc13c901603462e835b398e0b2d049a8ff9b68491cb73dddef56aa8e43",
+      "version": "1.0.0",
+      "outputs": {
+        "assets/generated/typed-financial-value.generated.schema.json": "f311d3efc00306cb7a068090fb8d989c662cf48574445c2b42851cef9cba83bf",
+        "scripts/lib/generated/typed_financial_value_contract.mjs": "dd0e66bdf52b6c2d85fbb4a16b5525c029b2cc87d1d1fb069c6db04e033f4a0a",
+        "scripts/generated/typed_financial_value_contract.py": "6e449f3e7987da487059e51dba83e91df48aadec60a63fe09e7d2763e17fccd9"
       }
     }
   }

@@ -1,0 +1,141 @@
+{
+  "schema_version": "excel-inflow-contract-definition/1.0",
+  "contract": "typed_financial_value",
+  "version": "1.0.0",
+  "description": "The discriminated financial value model (pack section 4.2). Value-bearing states carry a decimal-safe value; absence states structurally CANNOT carry one, so blank, nil, missing and parse failure can never coerce to zero. The twelve minimum states are all present.",
+  "supported_versions": ["1.0.0"],
+  "field_taxonomy": {
+    "source_facts": ["raw_text", "source_location", "currency", "unit_scale", "precision"],
+    "derived_facts": ["value", "derivation"],
+    "receipts": ["provenance"],
+    "references": ["capture_parent_id", "period"],
+    "presentation_only": []
+  },
+  "enums": {
+    "ValueState": ["reported_number", "reported_zero", "reported_blank", "nil", "missing", "parse_failure", "period_support_required", "prior_filing_support", "derived_number", "captured", "not_applicable", "unresolved"]
+  },
+  "types": {
+    "SourceLocation": {
+      "kind": "object",
+      "fields": {
+        "document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$", "required": true },
+        "page_or_note": { "type": "string", "required": false },
+        "source_line_id": { "type": "string", "required": false }
+      }
+    },
+    "Derivation": {
+      "kind": "object",
+      "fields": {
+        "operator": { "type": "string", "required": true },
+        "refs": { "type": "array", "items": { "type": "string" }, "required": true }
+      }
+    },
+    "PriorFilingProvenance": {
+      "kind": "object",
+      "fields": {
+        "prior_document_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$", "required": true },
+        "prior_source_line_id": { "type": "string", "required": true },
+        "prior_period_index": { "type": "number", "required": true }
+      }
+    }
+  },
+  "root": {
+    "kind": "discriminated_union",
+    "discriminator": "state",
+    "variants": {
+      "reported_number": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "reported_number", "required": true },
+          "value": { "type": "number", "required": true },
+          "raw_text": { "type": "string", "required": true },
+          "currency": { "type": "string", "required": false },
+          "unit_scale": { "type": "number", "required": false },
+          "precision": { "type": "number", "required": false },
+          "source_location": { "type": "ref", "ref": "SourceLocation", "required": false }
+        }
+      },
+      "reported_zero": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "reported_zero", "required": true },
+          "value": { "type": "const", "const": 0, "required": true },
+          "raw_text": { "type": "string", "required": true },
+          "source_location": { "type": "ref", "ref": "SourceLocation", "required": false }
+        }
+      },
+      "reported_blank": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "reported_blank", "required": true },
+          "source_location": { "type": "ref", "ref": "SourceLocation", "required": false }
+        }
+      },
+      "nil": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "nil", "required": true },
+          "raw_text": { "type": "string", "required": true },
+          "source_location": { "type": "ref", "ref": "SourceLocation", "required": false }
+        }
+      },
+      "missing": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "missing", "required": true }
+        }
+      },
+      "parse_failure": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "parse_failure", "required": true },
+          "raw_text": { "type": "string", "required": true },
+          "failure_reason": { "type": "string", "required": true },
+          "source_location": { "type": "ref", "ref": "SourceLocation", "required": false }
+        }
+      },
+      "period_support_required": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "period_support_required", "required": true },
+          "period": { "type": "string", "required": true }
+        }
+      },
+      "prior_filing_support": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "prior_filing_support", "required": true },
+          "value": { "type": "number", "required": true },
+          "provenance": { "type": "ref", "ref": "PriorFilingProvenance", "required": true }
+        }
+      },
+      "derived_number": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "derived_number", "required": true },
+          "value": { "type": "number", "required": true },
+          "derivation": { "type": "ref", "ref": "Derivation", "required": true }
+        }
+      },
+      "captured": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "captured", "required": true },
+          "capture_parent_id": { "type": "string", "required": true }
+        }
+      },
+      "not_applicable": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "not_applicable", "required": true }
+        }
+      },
+      "unresolved": {
+        "fields": {
+          "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+          "state": { "type": "const", "const": "unresolved", "required": true }
+        }
+      }
+    }
+  }
+}

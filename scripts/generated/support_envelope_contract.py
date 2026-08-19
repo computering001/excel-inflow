@@ -94,5 +94,5 @@ def validate(candidate):
             % (candidate.get("contract_version"), ", ".join(SUPPORTED_VERSIONS))
         ]
     errors = []
-    _check_object(ROOT["fields"], candidate, "$", errors)
+    _check_definition(ROOT, candidate, "$", errors)
     return errors

@@ -181,7 +181,7 @@ export function validate(candidate) {
     ];
   }
   const errors = [];
-  checkObject(ROOT.fields, candidate, "$", errors);
+  checkDefinition(ROOT, candidate, "$", errors);
   return errors;
 }
 `;
@@ -284,7 +284,7 @@ def validate(candidate):
             % (candidate.get("contract_version"), ", ".join(SUPPORTED_VERSIONS))
         ]
     errors = []
-    _check_object(ROOT["fields"], candidate, "$", errors)
+    _check_definition(ROOT, candidate, "$", errors)
     return errors
 `;
 }

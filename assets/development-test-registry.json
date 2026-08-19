@@ -198,6 +198,24 @@
       "test_class": "unit"
     },
     {
+      "id": "typed-financial-value",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_typed_financial_value_tests.mjs",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "typed-arithmetic",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_typed_arithmetic_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "multipage-filing-extraction",
       "phase": "evidence",
       "runtime": "python",

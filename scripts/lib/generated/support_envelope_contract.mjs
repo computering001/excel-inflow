@@ -95,6 +95,6 @@ export function validate(candidate) {
     ];
   }
   const errors = [];
-  checkObject(ROOT.fields, candidate, "$", errors);
+  checkDefinition(ROOT, candidate, "$", errors);
   return errors;
 }
