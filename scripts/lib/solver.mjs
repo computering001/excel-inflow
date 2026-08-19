@@ -28,6 +28,10 @@ import {
   OPENING_DEBT_BRIDGE_REFUSAL_REASON_CODE,
   compileOpeningDebtBridge,
 } from "./opening_debt_bridge.mjs";
+import {
+  compileScheduleTypedStates,
+  forecastPeriodsOf,
+} from "./schedule_typed_states.mjs";
 import { selectedEbitdaRow } from "./semantic_roles.mjs";
 import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
 import {
@@ -1752,8 +1756,15 @@ export function solveCase(
   // year's standalone EBITDA has to survive into the next pass.
   let priorStandaloneEbitda = metricValue(modelCase, "adjusted_ebitda", 2, 0);
 
-  for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
-    const periodIndex = forecastIndex + 3;
+  // P4.3: the forecast period count derives from the case's own forecast
+  // periods (shape validation pins today's contract to three), never from a
+  // hard-wired literal at the schedule sites.
+  const forecastPeriods = forecastPeriodsOf(modelCase);
+  const firstForecastPeriodIndex = modelCase.periods.findIndex(
+    (item) => item.status === "forecast",
+  );
+  for (let forecastIndex = 0; forecastIndex < forecastPeriods.length; forecastIndex += 1) {
+    const periodIndex = firstForecastPeriodIndex + forecastIndex;
     const period = modelCase.periods[periodIndex];
     const acquisitionBaseValues = resolvedAcquisitionBaseSolution
       ? new Map(
@@ -2970,7 +2981,7 @@ export function solveCase(
       modelCase.historical_supplement?.reported_net_debt_adjustment ?? []
     ).reduce(
       (total, component) =>
-        total + Number(component.values?.[forecastIndex + 3] ?? 0),
+        total + Number(component.values?.[periodIndex] ?? 0),
       0,
     );
     const definitionBasis = compiledInstrumentPeriodState
@@ -3036,6 +3047,46 @@ export function solveCase(
       .filter((item) => commercialPaperIds.has(item.instrument_id))
       .reduce((total, item) => total + Number(item.ending_reporting ?? 0), 0);
 
+    // P4.3: typed schedule states — RCF draw/repayment/ending, acquisition
+    // debt/cash amounts and every cash-bucket balance travel with TYPED
+    // financial values (P1.2 vocabulary) ALONGSIDE the numeric fields, so
+    // absence, zero and unresolved stay distinguishable. Additive shadow
+    // only: no solved number moves (P1.8 dual-read pattern).
+    const scheduleTypedStates = compileScheduleTypedStates({
+      period_id: period.date,
+      period_index: forecastIndex,
+      period_count: forecastPeriods.length,
+      rcf: {
+        enabled: balancingRcfEnabled,
+        instrument_id: rcfInstrument?.instrument_id ?? null,
+        opening_balance: openingRcf,
+        draw: lastComputation.rcf_draw,
+        repayment: lastComputation.rcf_repayment,
+        ending_balance: lastComputation.ending_rcf,
+      },
+      acquisition: {
+        enabled: Number(modelCase.acquisition?.enabled ?? 0) === 1,
+        active: Boolean(acquisitionActive),
+        closes_this_period: Boolean(acquisitionCloses),
+        debt_addition: lastComputation.acquisition_debt_addition,
+        debt_proceeds: lastComputation.acquisition_debt_proceeds,
+        cash_consideration: lastComputation.acquisition_cash_consideration,
+        debt_repayment: lastComputation.acquisition_debt_repayment,
+        debt_ending_balance: lastComputation.acquisition_debt,
+      },
+      cash: {
+        ending_cash: endingCash,
+        buckets: finalCashBucketSnapshot.detail,
+        aggregates: {
+          reported_cash: finalCashBucketSnapshot.reported_cash,
+          cash_flow_cash: finalCashBucketSnapshot.cash_flow_cash,
+          liquidity_cash: finalCashBucketSnapshot.liquidity_cash,
+          net_debt_eligible_cash: finalCashBucketSnapshot.net_debt_eligible_cash,
+          interest_eligible_cash: finalCashBucketSnapshot.interest_eligible_cash,
+        },
+      },
+    });
+
     const result = {
       period: period.date,
       ...lastComputation,
@@ -3069,6 +3120,7 @@ export function solveCase(
       iterations: iteration,
       converged,
       residual,
+      typed_states: scheduleTypedStates,
       checks: {
         rcf_within_bounds:
           endingRcfNative >= -tolerance &&
@@ -3136,7 +3188,9 @@ export function solveCase(
       compiledInstrumentPeriodState?.definition_basis_graph ?? null,
     opening_debt_bridge: openingDebtBridge,
     forecast: results,
-    converged: results.length === 3 && results.every((result) => result.converged === true),
+    converged:
+      results.length === forecastPeriods.length &&
+      results.every((result) => result.converged === true),
     iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),
     residual: Math.max(0, ...results.map((result) => Number(result.residual ?? Number.POSITIVE_INFINITY))),
     convergence_tolerance: tolerance,
