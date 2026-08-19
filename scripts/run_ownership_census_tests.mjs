@@ -102,6 +102,8 @@ const FILE_OWNERSHIP = {
   "lib/typed_value_dual_read.mjs": { role: "derived_reader", concern: "P1.8 legacy-to-typed projection (reads legacy state, mints typed views; never mutates the case)", target_owner: "Typed value parser (Phase 1, migration adapter)" },
   "lib/classification_resolution_ledger.mjs": { role: "canonical_writer", concern: "P2.3 classification-resolution ledger (records who resolved every non-accepted classification; questions on genuine ambiguity)", target_owner: "Statement Authority compiler (Phase 2)" },
   "lib/opening_debt_bridge.mjs": { role: "canonical_writer", concern: "P4.2 opening-debt reconciliation bridge (typed taxonomy lines; refusal on unexplained residual)", target_owner: "Schedule/solver layer (Phase 4)" },
+  "lib/schedule_typed_states.mjs": { role: "canonical_writer", concern: "P4.3 typed shadows for RCF/acquisition/cash period quantities (additive; numbers untouched)", target_owner: "Schedule/solver layer (Phase 4)" },
+  "lib/policy_registry.mjs": { role: "canonical_writer", concern: "P2.7 versioned policy-binding stamps (throws on unregistered family; never defaults)", target_owner: "Policy registry (Phase 2)" },
 };
 
 const SCAN_DIRS = ["scripts/lib", "scripts"];

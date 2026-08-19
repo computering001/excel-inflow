@@ -92,6 +92,26 @@
       "commit": "8ce43a3",
       "invariant": "opening-debt residuals decompose into a schema-validated bridge; unexplained residual refuses typed",
       "note": "coverage.mjs migration to consume the bridge on the work order"
+    },
+    "P3.6a": {
+      "commit": "d73c5e5",
+      "invariant": "group joins bind on keys not labels (typed violation on absent nodes); rows_by_id mints guarded with explicit collision allowlist",
+      "note": "pre-P3.6 defect slice; full crosswalk remains P3.6"
+    },
+    "P4.3": {
+      "commit": "5c89526",
+      "invariant": "every RCF/acquisition/cash period quantity carries a typed state; period count derives from the case",
+      "note": "typed shadows additive; downstream dual-read is P4.4/P4.7"
+    },
+    "P2.7": {
+      "commit": "7b51c3e",
+      "invariant": "every policy family binds to a versioned registry entry; rcf/cash/lease bound end to end",
+      "note": "13 families declared_only pending binding in forbidden-file modules"
+    },
+    "P2.1": {
+      "commit": "1219436",
+      "invariant": "every scope-dropped row/statement is recorded typed; printed unit labels reconcile fail-closed",
+      "note": "consumer-side wiring + P2.2 XBRL crosswalk follow on"
     }
   },
   "evidence_baseline": {

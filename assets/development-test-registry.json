@@ -1571,6 +1571,42 @@
       "test_class": "mutation"
     },
     {
+      "id": "row-identity-defects",
+      "phase": "graph",
+      "runtime": "node",
+      "script": "run_row_identity_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "schedule-typed-states",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_schedule_typed_state_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "policy-registry",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_policy_registry_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "statement-scope-inventory",
+      "phase": "evidence",
+      "runtime": "python",
+      "script": "run_statement_scope_inventory_tests.py",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "forecast-ownership-preflight",
       "phase": "forecast",
       "runtime": "node",

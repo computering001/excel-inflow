@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 327,
-  "source_commit": "30a6d50a337803a5abb9f19b296872b69ca2af36",
-  "source_tree": "42cf1d3f297aaf646495fedb645cee3f20649213",
+  "checks": 335,
+  "source_commit": "121943637d47577be8ec4dd2fa403802c3513711",
+  "source_tree": "b3b42c06462ef6a9f395c1125644a6988ef9c53b",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 156
+    "test_count": 160
   },
   "scripts": [
     {
@@ -490,6 +490,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_policy_registry_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_portability_contract_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -566,6 +570,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_row_identity_defect_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_run_constitution_graph_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -583,6 +591,10 @@
     },
     {
       "script": "run_runtime_version_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_schedule_typed_state_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -635,6 +647,10 @@
     },
     {
       "script": "run_statement_family_residual_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_statement_scope_inventory_tests.py",
       "disposition": "REGISTERED"
     },
     {
