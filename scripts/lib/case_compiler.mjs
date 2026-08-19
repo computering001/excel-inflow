@@ -31,6 +31,10 @@ import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
 import {
+  resolveClassificationEntry,
+  sealClassificationResolutionLedger,
+} from "./classification_resolution_ledger.mjs";
+import {
   compileStructuralOwnershipPreflight,
   resolveSelectedForecastOwnership,
 } from "./forecast_ownership_resolver.mjs";
@@ -720,11 +724,17 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
 /**
  * Mint the section's source_coverage from the same crosswalk that minted the
  * rows, including the FULL classification receipt the evidence_v1 contract
- * demands: the classifier's verdict, candidates and evidence, accepted when
- * it reproduces cleanly, manual-reviewed with a recorded rationale when the
- * map's declaration is what settles the role.
+ * demands: the classifier's verdict, candidates and evidence.  Every
+ * non-accepted classification is settled by the independent resolver in
+ * classification_resolution_ledger.mjs — the ledger row records WHO resolved
+ * it (the classifier, an authored role declaration, or an authored mapping),
+ * the evidence basis and a grounded rationale, and the disclosure carries the
+ * evidence_v1 projection of that resolution.  Genuine ambiguity (no accepted
+ * classification, no declared role, no visible model-row representation) is
+ * never stamped manual_reviewed: it stays open on the ledger and surfaces as
+ * a BLOCK question.
  */
-function compileSourceCoverage({ section, lines, entriesById, rowsBySourceLine, expansionRowsByLine = new Map() }) {
+function compileSourceCoverage({ section, lines, entriesById, rowsBySourceLine, expansionRowsByLine = new Map(), report, resolutions }) {
   return lines.map(({ manifest, row: line }) => {
     const entry = entriesById.get(line.source_line_id);
     const target = entry?.disposition === "absorb"
@@ -758,20 +768,29 @@ function compileSourceCoverage({ section, lines, entriesById, rowsBySourceLine, 
       ? classification.evidence
       : [{ channel: "label", detail: "no taxonomy candidate cleared zero", score: 0 }];
     disclosure.classification_confidence = classification.confidence;
-    if (
-      classification.status === "accepted" &&
-      (!declaredRole || declaredRole === classification.classified_role)
-    ) {
-      disclosure.classification_status = "accepted";
-      disclosure.classification_review_status = "auto_accepted";
-      disclosure.classified_role = classification.classified_role;
-    } else {
-      disclosure.classification_status = "manual_reviewed";
-      disclosure.classification_review_status = "reviewed";
-      disclosure.classified_role = declaredRole ?? classification.classified_role ?? null;
-      disclosure.reason = declaredRole
-        ? "Role confirmed by statement_map declaration."
-        : "The disclosed line is represented through the identified visible model rows.";
+    const { entry: resolutionEntry, projection } = resolveClassificationEntry({
+      section,
+      disclosure,
+      classification,
+      declaredRole,
+    });
+    resolutions?.push(resolutionEntry);
+    disclosure.classification_status = projection.classification_status;
+    disclosure.classification_review_status = projection.classification_review_status;
+    disclosure.classified_role = projection.classified_role;
+    if (projection.reason !== undefined) disclosure.reason = projection.reason;
+    if (resolutionEntry.status === "QUESTION") {
+      report?.add(
+        "source_coverage.classification_unresolved",
+        "BLOCK",
+        `${section}.${line.source_line_id} (“${line.raw_label}”) has no accepted classification, no declared role, and no visible model-row representation; the ambiguity is a question, not a review stamp.`,
+        "Answer the classification question: declare the line's role in the statement_map entry, or map the line into visible model rows.",
+        {
+          section,
+          source_line_id: line.source_line_id,
+          question: resolutionEntry.question,
+        },
+      );
     }
     return disclosure;
   });
@@ -3596,6 +3615,7 @@ export function compileCase(caseSource, evidence = {}) {
   // Phase C — statement skeleton (filings symmetry).
   const statementStructure = {};
   const sourceCoverage = {};
+  const classificationResolutions = [];
   for (const section of FACE_STATEMENT_SECTIONS) {
     const compiled = compileStatementSection({
       section,
@@ -3605,7 +3625,27 @@ export function compileCase(caseSource, evidence = {}) {
       expansions: lanes.statement_expansions ?? [],
     });
     statementStructure[section] = compiled.rows;
-    sourceCoverage[section] = compileSourceCoverage({ section, ...compiled });
+    sourceCoverage[section] = compileSourceCoverage({
+      section,
+      ...compiled,
+      report,
+      resolutions: classificationResolutions,
+    });
+  }
+  // Seal the classification-resolution ledger over every coverage entry. The
+  // ledger travels on the compile report (the resolution audit surface); the
+  // model case keeps its certified evidence_v1 projection.
+  const classificationResolutionLedger = sealClassificationResolutionLedger(
+    classificationResolutions,
+    { case_id: caseSource.identity?.case_id ?? null },
+  );
+  for (const violation of classificationResolutionLedger.violations) {
+    report.add(
+      "source_coverage.classification_resolution_ledger",
+      "BLOCK",
+      violation,
+      "Report this as a compiler defect: every classification resolution must carry its resolver, evidence basis and rationale.",
+    );
   }
   applyRoleRecipes(statementStructure);
 
@@ -4142,6 +4182,7 @@ export function compileCase(caseSource, evidence = {}) {
       warn: report.findings.length - blocks.length,
     },
     findings: report.findings,
+    classification_resolution_ledger: classificationResolutionLedger,
   };
   return { model_case: finalCase, report: compileReport };
 }
