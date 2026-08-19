@@ -1634,6 +1634,24 @@
       "test_class": "mutation"
     },
     {
+      "id": "package-ab",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_package_ab_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "solver-fixed-point-oracle",
+      "phase": "proof",
+      "runtime": "python",
+      "script": "run_solver_fixed_point_oracle_tests.py",
+      "timeout_seconds": 900,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "behavioural-goldens",
       "phase": "cohort",
       "runtime": "node",

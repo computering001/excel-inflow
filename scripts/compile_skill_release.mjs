@@ -54,9 +54,17 @@
  *                            [--development --smoke-case <case.json>]
  *                            [--skip-smoke]
  *
- *   --certify     Build and smoke an immutable certified package, create its
- *                 deterministic archive, then emit a separate hash-bound
- *                 attestation. The package is never mutated after sealing.
+ *   --certify     Build and smoke an immutable NATIVELY certified package,
+ *                 create its deterministic archive, then emit a separate
+ *                 hash-bound attestation. The package is never mutated after
+ *                 sealing. Claims every evidence class, native-Excel
+ *                 restoration and native visual review included.
+ *   --portable-certify
+ *                 The same, at the PORTABLE tier minted by P8.0: gated by the
+ *                 five evidence classes a portable host can produce, with
+ *                 native-Excel and visual-review carried as PERMANENT DECLARED
+ *                 EXCLUSIONS. A strictly weaker claim than --certify, with its
+ *                 own package mode so it can never be read as the native one.
  *   --development Build an explicitly uncertified candidate from a
  *                 v2_development source tree. A real clean-root workbook smoke
  *                 is still mandatory; this mode never records or claims
@@ -77,10 +85,23 @@ import {
   validateReleaseCertificationEvidence,
 } from "./lib/release_certification.mjs";
 import {
+  DEVELOPMENT_PACKAGE_MODE,
+  NATIVE_CERTIFIED_PACKAGE_MODE,
+  PHYSICAL_LANE_TERMINAL_DECLARATION,
+  PORTABLE_CERTIFIED_PACKAGE_MODE,
   assertPackageMode,
+  certificationTierContractFor,
   productIdentity,
   runtimeCodeClosureIdentity,
 } from "./lib/identity_vocabulary.mjs";
+// P8.1 — the build-input bindings and the recorded-provenance guard. The
+// compiler produces the bindings; the validator that refuses an unbound package
+// lives beside them so one definition serves both.
+import {
+  assertRecordedCertificationProvenance,
+  buildPackageInputBindings,
+  validatePackageInputBindings,
+} from "./lib/package_ab_comparison.mjs";
 import {
   assertExternalArtifactPath,
   buildReleasePackageAttestation,
@@ -168,7 +189,11 @@ const skillDir = options.skill;
 const outputDir = options.out;
 const certifyNow = options.certify === true;
 const developmentNow = options.development === true;
-const attestNow = certifyNow || developmentNow;
+// P8.0 minted `portable_certified`; this is the flag that builds it. It is a
+// SEPARATE flag from --certify on purpose: the two tiers make different claims
+// and a portable build must never be reachable by relaxing the native one.
+const portableCertifyNow = options["portable-certify"] === true;
+const attestNow = certifyNow || developmentNow || portableCertifyNow;
 const skipSmoke = options["skip-smoke"] === true;
 const certificationEvidencePath = options["certification-evidence"] ?? null;
 const smokeCasePath = options["smoke-case"] ?? null;
@@ -179,12 +204,22 @@ if (certifyNow && skipSmoke) {
 if (developmentNow && skipSmoke) {
   throw new Error("--development cannot be combined with --skip-smoke.");
 }
-if (certifyNow && developmentNow) {
-  throw new Error("Choose exactly one package mode: --certify or --development.");
+if (portableCertifyNow && skipSmoke) {
+  throw new Error("--portable-certify cannot be combined with --skip-smoke.");
+}
+if ([certifyNow, developmentNow, portableCertifyNow].filter(Boolean).length > 1) {
+  throw new Error(
+    "Choose exactly one package mode: --certify, --portable-certify or --development.",
+  );
 }
 if (certifyNow && (!certificationEvidencePath || !smokeCasePath)) {
   throw new Error(
     "--certify requires both --certification-evidence <manifest.json> and --smoke-case <case.json>.",
+  );
+}
+if (portableCertifyNow && (!certificationEvidencePath || !smokeCasePath)) {
+  throw new Error(
+    "--portable-certify requires both --certification-evidence <manifest.json> and --smoke-case <case.json>. The portable tier is a certification, not a development build: it is gated by the five portable evidence classes with the two native classes declared as permanent exclusions.",
   );
 }
 if (developmentNow && !smokeCasePath) {
@@ -193,7 +228,7 @@ if (developmentNow && !smokeCasePath) {
 
 if (!skillDir || !outputDir) {
   console.error(
-    "Usage: compile_skill_release.mjs --skill <skill-folder> --out <release-folder> [--certify --certification-evidence <manifest.json> --smoke-case <case.json>] [--development --smoke-case <case.json>] [--skip-smoke]",
+    "Usage: compile_skill_release.mjs --skill <skill-folder> --out <release-folder> [--certify --certification-evidence <manifest.json> --smoke-case <case.json>] [--portable-certify --certification-evidence <manifest.json> --smoke-case <case.json>] [--development --smoke-case <case.json>] [--skip-smoke]",
   );
   process.exit(2);
 }
@@ -274,7 +309,37 @@ const pythonEntryPointNotes = deploymentProfile.python_entry_point_notes ?? {};
 const pythonEntrySmoke = deploymentProfile.python_entry_point_smoke ?? {};
 const pythonRuntime = deploymentProfile.python_runtime ?? {};
 const readerDecision = deploymentProfile.xlsx_reader_consolidation_decision ?? null;
-const packageMode = assertPackageMode(developmentNow ? "development" : "certified");
+// Three modes, three named values. `portable_certified` is its own third
+// branch rather than a flag on `certified`, so every `=== "certified"`
+// comparison downstream keeps meaning "natively certified".
+const packageMode = assertPackageMode(
+  developmentNow
+    ? DEVELOPMENT_PACKAGE_MODE
+    : portableCertifyNow
+      ? PORTABLE_CERTIFIED_PACKAGE_MODE
+      : NATIVE_CERTIFIED_PACKAGE_MODE,
+);
+const certificationTierContract = developmentNow
+  ? null
+  : certificationTierContractFor(packageMode);
+
+// P8.1 — the recorded-provenance guard, at the EARLIEST responsible layer: the
+// moment the package mode is minted, before a single byte of closure work.
+// A plain build (no mode flag) mints the NATIVE tier; once the runtime manifest
+// records that its certified closure was recorded by a portable build, that
+// plain build is refused rather than silently re-presenting a portable
+// certification as a native one.
+if (!developmentNow) {
+  assertRecordedCertificationProvenance({
+    recordedPackageMode: runtimeManifest.certified_package_mode ?? null,
+    requestedPackageMode: packageMode,
+    recordedDigest:
+      runtimeManifest.certified_runtime_code_closure_sha256 ??
+      runtimeManifest.certified_closure_sha256 ??
+      null,
+    computedDigest: null,
+  });
+}
 
 function gitIdentity(args, environmentName) {
   const override = process.env[environmentName];
@@ -1074,9 +1139,25 @@ declaredResources.sort();
  * Certification — hashed over the resolved closure
  * ------------------------------------------------------------------ */
 
-if (!certifyNow && !developmentNow && runtimeManifest.status !== "local_production_certified") {
+if (
+  !certifyNow &&
+  !developmentNow &&
+  !portableCertifyNow &&
+  runtimeManifest.status !== "local_production_certified"
+) {
   throw new Error(
-    `Packaging is blocked until a mode is chosen; current status is ${runtimeManifest.status}. Use --development for an explicitly uncertified candidate or --certify with fresh evidence.`,
+    `Packaging is blocked until a mode is chosen; current status is ${runtimeManifest.status}. Use --development for an explicitly uncertified candidate, --portable-certify for the portable tier, or --certify with fresh native evidence.`,
+  );
+}
+// The portable tier's admissible source statuses, declared here rather than
+// inferred. A portable certification is a claim about EVIDENCE, not about the
+// source-status string, and the status it was built from is recorded in the
+// manifest as `sourceStatus` either way — so both of this repository's real
+// statuses are admissible and anything else is refused by name.
+const PORTABLE_CERTIFY_SOURCE_STATUSES = ["v2_development", "local_production_certified"];
+if (portableCertifyNow && !PORTABLE_CERTIFY_SOURCE_STATUSES.includes(runtimeManifest.status)) {
+  throw new Error(
+    `--portable-certify admits source status ${PORTABLE_CERTIFY_SOURCE_STATUSES.join(" or ")}; current status is ${runtimeManifest.status}.`,
   );
 }
 if (developmentNow && runtimeManifest.status !== "v2_development") {
@@ -1117,24 +1198,33 @@ const runtimeCodeClosure = runtimeCodeClosureIdentity(closureFileHashes);
 const closureDigest = runtimeCodeClosure.sha256;
 
 let certificationReceipt = null;
-if (certifyNow) {
+if (certifyNow || portableCertifyNow) {
   certificationReceipt = await validateReleaseCertificationEvidence({
     manifestPath: certificationEvidencePath,
     runtimeCodeClosureSha256: closureDigest,
+    // The tier the package is being built AS gates the evidence set it is held
+    // to. `--certify` passes the native mode, which is the validator's default,
+    // so the native gate is byte-for-byte the path it always was.
+    certificationTier: packageMode,
   });
   if (certificationReceipt.status !== "PASS") {
     throw new Error(
       [
-        "Certification evidence does not prove this exact runtime-code closure.",
+        `Certification evidence does not prove this exact runtime-code closure at the ${certificationTierContract.tier} tier.`,
         ...certificationReceipt.findings.map(
           (item) => `  ${item.id}: ${item.message}`,
         ),
       ].join("\n"),
     );
   }
+  if (certificationReceipt.package_mode !== packageMode) {
+    throw new Error(
+      `Certification receipt certifies package mode ${certificationReceipt.package_mode}; this build mints ${packageMode}.`,
+    );
+  }
 }
 
-if (!certifyNow && !developmentNow) {
+if (!certifyNow && !developmentNow && !portableCertifyNow) {
   const recordedDigest =
     runtimeManifest.certified_runtime_code_closure_sha256 ??
     runtimeManifest.certified_closure_sha256;
@@ -1143,7 +1233,7 @@ if (!certifyNow && !developmentNow) {
       [
         "assets/runtime-manifest.json reads local_production_certified but records no certified_runtime_code_closure_sha256.",
         "  A hand-set status string is not evidence that these sources are the certified ones.",
-        "  Re-run local certification, then compile once with --certify to record the runtime-code closure identity.",
+        "  Re-run local certification, then compile once with --certify (native tier) or --portable-certify (portable tier) to record the runtime-code closure identity and the certified_package_mode that recorded it.",
       ].join("\n"),
     );
   }
@@ -1170,13 +1260,40 @@ if (!certifyNow && !developmentNow) {
         changed.length > 0 ? `  changed since certification: ${changed.sort().join(", ")}` : null,
         added.length > 0 ? `  added since certification: ${added.sort().join(", ")}` : null,
         removed.length > 0 ? `  removed since certification: ${removed.sort().join(", ")}` : null,
-        "  Re-run local certification against this runtime-code closure, then compile with --certify.",
+        "  Re-run local certification against this runtime-code closure, then compile with --certify or --portable-certify.",
       ]
         .filter(Boolean)
         .join("\n"),
     );
   }
 }
+
+/**
+ * P8.1 / freeze criterion 11 — the recording a certifying build MUST leave
+ * behind so that a later mutation of the sealed tree invalidates certification.
+ *
+ * `assets/runtime-manifest.json` carries no `certified_runtime_code_closure_sha256`
+ * today, which is exactly why the non-development gate above can only ever
+ * throw and why post-tag mutation invalidation has nothing to compare against.
+ * A certifying run therefore emits the four fields the manifest must record, as
+ * a first-class part of its output, so whoever seals the release applies a
+ * transcribed value rather than a remembered one.
+ *
+ * This compiler does not write the asset. It states the recording; recording it
+ * is the sealer's act.
+ */
+const certificationRecording =
+  certifyNow || portableCertifyNow
+    ? {
+      target: "assets/runtime-manifest.json",
+      certified_runtime_code_closure_sha256: closureDigest,
+      certified_runtime_code_closure_recorded_at: generatedAt,
+      certified_package_mode: packageMode,
+      certified_certification_tier: certificationTierContract.tier,
+      certified_runtime_code_closure_file_count: closureMembers.length,
+      certified_runtime_code_closure_files: closureFileHashes,
+    }
+    : null;
 
 /* ------------------------------------------------------------------ *
  * Central instructions
@@ -1815,6 +1932,16 @@ async function runSmokeTest() {
         total_violations: Number(validation.total_violations),
       };
       results.push({ target: "real clean-root workbook build", ...workbookBuild });
+      // P8.1 — the two tokens above are DELIBERATELY unchanged: `status`,
+      // `release_gate_status` and the exit-0 contract are pinned by other
+      // suites and by the orchestrator. What was missing was any statement of
+      // what they MEAN. The declaration is attached here, ONCE, after the
+      // results row, so the permanence travels with the evidence without a
+      // pinned token being touched or duplicated.
+      workbookBuild = {
+        ...workbookBuild,
+        physical_lane_terminal_declaration: PHYSICAL_LANE_TERMINAL_DECLARATION,
+      };
     }
 
     return {
@@ -1835,7 +1962,7 @@ const smokeTest = skipSmoke
   : await runSmokeTest();
 
 if (
-  certifyNow &&
+  (certifyNow || portableCertifyNow) &&
   !["PASS", "PASS_PENDING_MANUAL"].includes(smokeTest.workbookBuild?.status)
 ) {
   throw new Error(
@@ -1865,6 +1992,50 @@ const externalCertificationEvidenceReceipt = certificationReceipt
     }
   : null;
 
+/* ------------------------------------------------------------------ *
+ * P8.1 — build-input bindings
+ *
+ * The manifest already bound the source commit, the source tree and the
+ * runtime-code closure. It bound the production contract and the support
+ * envelope only ANONYMOUSLY, as two rows among hundreds in `files`, and bound
+ * the goldens and the real build toolchain nowhere at all: a python BASENAME
+ * inside smokeTest was the whole toolchain record. A package that cannot state
+ * which contract, envelope, goldens and toolchain produced it can claim
+ * provenance it does not have.
+ * ------------------------------------------------------------------ */
+
+const shippedFileHashes = Object.fromEntries(files.map((file) => [file.path, file.sha256]));
+const selectedInterpreterProbe =
+  interpreterProbes.find((probe) => probe.usable && probe.executable === pythonExecutable) ?? null;
+const inputBindings = await buildPackageInputBindings({
+  skillDir,
+  shippedFileHashes,
+  nodeExecutable: path.basename(process.execPath),
+  nodeVersion: process.version,
+  nodeVersions: process.versions,
+  pythonProbe: selectedInterpreterProbe
+    ? {
+      // Basenames only. A host path in the manifest would make two builds of
+      // the same commit differ for a reason that has nothing to do with the
+      // package.
+      executable_basename: path.basename(selectedInterpreterProbe.executable),
+      candidate: path.basename(selectedInterpreterProbe.candidate),
+      version: selectedInterpreterProbe.version,
+      packages: selectedInterpreterProbe.packages,
+    }
+    : null,
+  externalBinaries: pythonRuntime.external_binaries ?? [],
+});
+const inputBindingReceipt = validatePackageInputBindings({ inputBindings });
+if (inputBindingReceipt.status !== "PASS") {
+  throw new Error(
+    [
+      "This package does not bind every input that can change what it does; it must not ship claiming provenance it cannot prove.",
+      ...inputBindingReceipt.findings.map((item) => `  ${item.id}: ${item.message}`),
+    ].join("\n"),
+  );
+}
+
 const manifest = {
   releaseName: `${deploymentProfile.release_name} v${runtimeManifest.skill_version}`,
   schemaVersion: 2,
@@ -1892,7 +2063,37 @@ const manifest = {
     installedPackageSha256: null,
     installationIdentity: null,
   }),
+  inputBindings,
   certification: {
+    // Which tier this package claims, stated rather than inferred from which
+    // evidence files happen to be present, plus the permanent exclusions the
+    // portable receipt carries — so a portable package read out of context can
+    // never be mistaken for a natively certified one.
+    certificationTier: certificationTierContract?.tier ?? null,
+    certificationPackageMode: developmentNow ? null : packageMode,
+    claimsNativeHostEvidence: certificationTierContract?.claims_native_host_evidence ?? false,
+    declaredExclusions: certificationReceipt?.declared_exclusions ?? null,
+    physicalLaneTerminalDeclaration: certificationReceipt?.physical_lane_terminal_declaration ?? null,
+    // What assets/runtime-manifest.json must record for this closure. Absent
+    // for a development build, which certifies nothing.
+    recordingRequired: certificationRecording
+      ? {
+        target: certificationRecording.target,
+        certified_runtime_code_closure_sha256:
+          certificationRecording.certified_runtime_code_closure_sha256,
+        certified_runtime_code_closure_recorded_at:
+          certificationRecording.certified_runtime_code_closure_recorded_at,
+        certified_package_mode: certificationRecording.certified_package_mode,
+        certified_certification_tier: certificationRecording.certified_certification_tier,
+        certified_runtime_code_closure_file_count:
+          certificationRecording.certified_runtime_code_closure_file_count,
+        // The per-file map the gate's "changed / added / removed since
+        // certification" diagnostic reads. Without it a moved closure can only
+        // report a digest mismatch, not which file moved.
+        certified_runtime_code_closure_files:
+          certificationRecording.certified_runtime_code_closure_files,
+      }
+      : null,
     certifiedRuntimeCodeClosureSha256: developmentNow ? null : closureDigest,
     runtimeCodeClosureSha256: closureDigest,
     certifiedClosureSha256: developmentNow ? null : closureDigest,
@@ -2043,6 +2244,24 @@ if (attestNow) {
       complete_package_inventory_sha256: sealedInventory.sha256,
       archive: archiveOutputPath,
       archive_sha256: archive.sha256,
+      package_mode: packageMode,
+      certification_tier: certificationTierContract?.tier ?? null,
+      input_bindings_sha256: inputBindings.sha256,
+      // Freeze criterion 11: the exact fields assets/runtime-manifest.json must
+      // record so a post-seal mutation of the tree invalidates certification.
+      runtime_manifest_recording_required: certificationRecording
+        ? {
+          target: certificationRecording.target,
+          certified_runtime_code_closure_sha256:
+            certificationRecording.certified_runtime_code_closure_sha256,
+          certified_runtime_code_closure_recorded_at:
+            certificationRecording.certified_runtime_code_closure_recorded_at,
+          certified_package_mode: certificationRecording.certified_package_mode,
+          certified_certification_tier: certificationRecording.certified_certification_tier,
+          certified_runtime_code_closure_file_count:
+            certificationRecording.certified_runtime_code_closure_file_count,
+        }
+        : null,
     }),
   );
 }
