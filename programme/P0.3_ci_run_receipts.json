@@ -1,0 +1,22 @@
+{
+  "schema_version": "excel-inflow-p03-ci-receipts/1.0",
+  "failing_canary": {
+    "branch": "tmp/p03-failing-canary",
+    "commit": "14a0914",
+    "run_id": 32270208703,
+    "url": "https://github.com/computering001/excel-inflow/actions/runs/32270208703",
+    "run_conclusion": "cancelled (matrix fail-fast after lane failures) - NOT success",
+    "failed_lane_jobs": [
+      "Merge compatibility phase gate (runtime)",
+      "Merge compatibility phase gate (semantic-authority)",
+      "Merge compatibility phase gate (broker)",
+      "Merge compatibility phase gate (package)"
+    ],
+    "authoritative_aggregate": "skipped (needs-chain broken by failures) - the required gate did not and cannot pass",
+    "proof": "a deliberately failing registered test made lane verdicts fail and prevented the authoritative aggregate from passing; the gate cannot present a failing head as green"
+  },
+  "closure_head_green": {
+    "branch": "agent/excel-inflow-v377-behavioural-closure",
+    "status": "pending - recorded on conclusion of the df91663 run"
+  }
+}

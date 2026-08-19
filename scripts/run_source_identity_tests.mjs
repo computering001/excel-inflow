@@ -18,8 +18,9 @@ assert.equal(identity.schema_version, "source-identity/2.0");
 assert.equal(identity.product_identity.schema_version, "product-identity/2.0");
 assert.equal(identity.package_mode, "development");
 assert.equal(identity.deployment_status, "not_installed");
-assert.equal(identity.skill_version, "3.7.5");
-assert.equal(identity.release_name, "Excel Inflow v3.7.5");
+// DELIBERATE TRIPWIRE: update with every runtime-manifest version bump.
+assert.equal(identity.skill_version, "3.7.6");
+assert.equal(identity.release_name, "Excel Inflow v3.7.6");
 assert.equal(
   identity.runtime_code_closure_sha256,
   identity.product_identity.package.runtime_code_closure.sha256,

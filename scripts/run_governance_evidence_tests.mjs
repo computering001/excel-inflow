@@ -41,7 +41,9 @@ const expected = {
 };
 assert.deepEqual(validateIdentityConvergence(identity, expected), []);
 assert.deepEqual(validatePerformanceEvidence(performance, expected), []);
-assert.equal(runtime.skill_version, "3.7.5");
+// DELIBERATE TRIPWIRE (see run_release_identity_governance_tests.mjs):
+// update this literal IN THE SAME COMMIT as any runtime-manifest bump.
+assert.equal(runtime.skill_version, "3.7.6");
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert(
