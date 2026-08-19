@@ -921,6 +921,7 @@ async function main() {
       quarantined_evidence_count: qualitySummary.quarantined_evidence_count,
       fallback_count: qualitySummary.fallback_count,
       total_violations: userFlowResult.total_violations,
+      active_runtime_code_closure_check: ACTIVE_SOURCE_IDENTITY?.active_runtime_code_closure_check ?? null,
     },
   });
 }

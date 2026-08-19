@@ -7,6 +7,9 @@ import {
   DECLARED_RUNTIME_INTEGRITY_SCHEMA,
   runtimeCodeClosureIdentity,
 } from "./identity_vocabulary.mjs";
+// The ONE runtime-code-closure membership definition. This module must not
+// carry its own rule for which declared files are the executable closure.
+import { runtimeCodeClosureMembers } from "./source_identity.mjs";
 
 const RUN_IDENTITY_SCHEMA = "debt-runtime-identity/1.0";
 const RUN_LEASE_SCHEMA = "debt-runtime-lease/1.1";
@@ -786,9 +789,13 @@ export async function computeDeclaredRuntimeIntegrity(skillRoot) {
     ...stringList(profile, "script_allowlist").map((item) => path.join(canonicalSkillRoot, "scripts", item)),
     ...stringList(profile, "python_module_allowlist").map((item) => path.join(canonicalSkillRoot, "scripts", item)),
   ]);
+  const resourceFiles = [];
   for (const item of stringList(profile, "resource_directory_allowlist")) {
     const directory = await assertDeclaredPath(canonicalSkillRoot, path.join(canonicalSkillRoot, item));
-    for (const file of await walkFiles(directory)) declared.add(file);
+    for (const file of await walkFiles(directory)) {
+      declared.add(file);
+      resourceFiles.push(path.relative(canonicalSkillRoot, file).split(path.sep).join("/"));
+    }
   }
 
   const files = {};
@@ -801,11 +808,27 @@ export async function computeDeclaredRuntimeIntegrity(skillRoot) {
   }
   await addVendoredRuntimeFiles({ canonicalSkillRoot, profile, files });
   const ordered = canonicalise(files);
-  const runtimeCodeFiles = Object.fromEntries(
-    Object.entries(ordered).filter(
-      ([name]) => name !== "SKILL.md" && !name.startsWith("references/"),
-    ),
-  );
+  // Select the executable closure's bytes using the single membership
+  // definition; this validator only proves the members exist and hashes them.
+  const members = runtimeCodeClosureMembers({
+    scripts: stringList(profile, "script_allowlist"),
+    pythonModules: stringList(profile, "python_module_allowlist"),
+    assets: stringList(profile, "asset_allowlist"),
+    resources: resourceFiles,
+    vendoredDependencies: Array.isArray(profile.vendored_dependencies)
+      ? profile.vendored_dependencies
+      : [],
+  });
+  const runtimeCodeFiles = {};
+  for (const member of members) {
+    const digest = ordered[member.key];
+    if (!digest) {
+      throw new Error(
+        `Runtime code closure member is missing from the declared runtime inventory: ${member.key}`,
+      );
+    }
+    runtimeCodeFiles[member.key] = digest;
+  }
   const runtimeCodeClosure = runtimeCodeClosureIdentity(runtimeCodeFiles);
   return Object.freeze({
     schema_version: DECLARED_RUNTIME_INTEGRITY_SCHEMA,

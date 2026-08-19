@@ -93,6 +93,9 @@ import {
   hasNonLiteralDynamicImport,
   specifiersOf,
 } from "./lib/release_js_import_scanner.mjs";
+// The ONE runtime-code-closure membership definition, shared with the
+// runtime-isolation validator. This compiler must not carry its own rule.
+import { runtimeCodeClosureMembers } from "./lib/source_identity.mjs";
 
 const BUILTINS = new Set(builtinModules);
 
@@ -1091,38 +1094,24 @@ if (certifyNow && runtimeManifest.status !== "local_production_certified") {
 // verify/xlsx.py must invalidate certification exactly the way a change to
 // lib/solver.mjs does; a closure hash that covered only one language would
 // certify a package it had only half looked at.
-const closureFileList = [
-  ...[...computedScripts, ...computedPythonModules].sort().map((name) => ({
-    key: `scripts/${name}`,
-    absolute: path.join(scriptsDir, name),
+const closureMembers = runtimeCodeClosureMembers({
+  scripts: computedScripts,
+  pythonModules: computedPythonModules,
+  assets: declaredAssets,
+  resources: declaredResources,
+  vendoredDependencies: vendoredDependencies.map((dependency) => ({
+    install_path: posix(dependency.install_path),
+    source: posix(dependency.source),
+    license_install_path: posix(dependency.license_install_path),
+    license_source: posix(dependency.license_source),
   })),
-  ...[...declaredAssets].sort().map((name) => ({
-    key: `assets/${name}`,
-    absolute: path.join(assetsDir, name),
-  })),
-  ...[...declaredResources].sort().map((name) => ({
-    key: name,
-    absolute: path.join(skillDir, name),
-  })),
-  ...vendoredDependencies.flatMap((dependency) => [
-    {
-      key: posix(dependency.install_path),
-      absolute: path.join(skillDir, dependency.source),
-    },
-    {
-      key: posix(path.join(path.dirname(dependency.install_path), "package.json")),
-      absolute: path.join(skillDir, path.dirname(dependency.source), "package.json"),
-    },
-    {
-      key: posix(dependency.license_install_path),
-      absolute: path.join(skillDir, dependency.license_source),
-    },
-  ]),
-].sort((a, b) => (a.key < b.key ? -1 : 1));
+});
 
 const closureFileHashes = {};
-for (const item of closureFileList) {
-  closureFileHashes[item.key] = sha256(await fs.readFile(item.absolute));
+for (const member of closureMembers) {
+  closureFileHashes[member.key] = sha256(
+    await fs.readFile(path.join(skillDir, ...member.source.split("/"))),
+  );
 }
 const runtimeCodeClosure = runtimeCodeClosureIdentity(closureFileHashes);
 const closureDigest = runtimeCodeClosure.sha256;
@@ -1908,7 +1897,7 @@ const manifest = {
     runtimeCodeClosureSha256: closureDigest,
     certifiedClosureSha256: developmentNow ? null : closureDigest,
     currentClosureSha256: closureDigest,
-    closureFileCount: closureFileList.length,
+    closureFileCount: closureMembers.length,
     recordedAt: developmentNow
       ? null
       : (certifyNow
