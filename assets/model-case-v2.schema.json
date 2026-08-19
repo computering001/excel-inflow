@@ -447,6 +447,13 @@
         }
       }
     },
+    "tax_rate_normalization_receipt": {
+      "type": "object",
+      "required": ["schema_version", "receipt_sha256", "periods"],
+      "properties": {
+        "receipt_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
     "provenance": {
       "type": "object",
       "additionalProperties": {
@@ -1933,6 +1940,11 @@
         "source_id": {
           "type": "string",
           "minLength": 1
+        },
+        "tax_rate_normalization_ref": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of the case-level tax_rate_normalization_receipt this authority's policy value derives from. The ledger is sealed once on the case; authorities reference, never duplicate."
         },
         "source_page_cell": {
           "type": "string",

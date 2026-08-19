@@ -1,0 +1,4003 @@
+{
+  "schema_version": "excel-inflow-coercion-inventory/1.0",
+  "invariant": "blank/nil/missing/parse-failure never become zero",
+  "generated_by": "node scripts/run_coercion_ban_tests.mjs --write",
+  "classification_legend": {
+    "lawful_counter_or_length": "counter, length, index, layout, or duration default — safe",
+    "suspect_value_coercion": "financial/value context — migration candidate",
+    "unreviewed": "not yet read in context; treat as suspect until reviewed"
+  },
+  "entry_count": 399,
+  "entries": [
+    {
+      "file": "scripts/broker_terminal_recovery.py",
+      "content": "\"row\": int(candidate.get(\"row\") or 0),",
+      "fingerprint": "f348a77483cbae8f8009",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/broker_terminal_recovery.py",
+      "content": "{\"row\": int(cell.get(\"row\") or 0), \"column\": int(cell.get(\"column\") or 0)}",
+      "fingerprint": "4ddff626c0818a8810e9",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/broker_terminal_recovery.py",
+      "content": "column = int(item.get(\"column\") or 0)",
+      "fingerprint": "7a241a6f1f5067627965",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/broker_terminal_recovery.py",
+      "content": "period_index: _cell_numeric(table, int(candidate.get(\"row\") or 0), column)",
+      "fingerprint": "c873b6c1d9d476b3ec6f",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": Number(instrument.coupon_or_all_in_rate?.[0] ?? 0),",
+      "fingerprint": "32ac17b6d031c2e045af",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": Number(modelCase.historical_supplement?.interest_income?.[index] ?? 0);",
+      "fingerprint": "de0fee006acbc53713dc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": Number(proFormaItem?.ending_reporting ?? 0);",
+      "fingerprint": "5ea00a62380c7c9fed6e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": Number(rcfInstrument.coupon_or_all_in_rate?.[0] ?? 0),",
+      "fingerprint": "78a8f73480b7ae1ee873",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": Number(standaloneItem?.ending_reporting ?? 0);",
+      "fingerprint": "ed02847d376e8bf90a6a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": proFormaValues.get(definition.row_id) ?? 0;",
+      "fingerprint": "a3bb1b5a3e362fcdef4d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": String(Number(instrument.coupon_or_all_in_rate?.[forecastIndex] ?? 0));",
+      "fingerprint": "fa8d894dbb1ed9c6788b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": String(Number(instrument.spread_bps ?? 0) / 10000);",
+      "fingerprint": "a54bdc92fc613ba5ef13",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": String(Number(modelCase.rcf_policy?.capacity ?? 0));",
+      "fingerprint": "a7aa2e94b7b98cb2ffc3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": ": total + Number(item.fx_non_cash_movement ?? 0);",
+      "fingerprint": "3e76b8cab93a86f7afe7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "? (caches.get(`${column}${plan.pik_interest_row}`) ?? 0)",
+      "fingerprint": "7af949fb46f322eb740c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "? Number(bucket.historical_year_end[2] ?? 0)",
+      "fingerprint": "4600af07b267953bc869",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "? Number(instrument.spread_bps ?? 0) / 10000",
+      "fingerprint": "8606617e9b8b9d61fbe9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "? Number(modelCase.rcf_policy.commitment_fee_value ?? 0) / 10000",
+      "fingerprint": "98bf10b18ffa54d5593d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "? Number(rcfInstrument.spread_bps ?? 0) / 10000",
+      "fingerprint": "2d1aebfdae0bce6abefa",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "? Number(standaloneValues.get(ratio.row_id) ?? 0)",
+      "fingerprint": "33af13c07ed6a4580044",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "(calculation.refs?.length ?? 0) === 1 &&",
+      "fingerprint": "757847e3c6b7eb715e2e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "(definition.calculation?.refs?.length ?? 0) === 0;",
+      "fingerprint": "0add0b21fc2c76b54ddb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "(Number(acquisition.enabled ?? 0) === 0",
+      "fingerprint": "0bc16adfa1fefe069ecc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "(proFormaDebtValues[key] ?? 0) - standaloneDebtValues[key],",
+      "fingerprint": "31e1fcfa9e7bab9cafa8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "].filter((rule) => rule?.operator === \"sum\" && (rule.refs?.length ?? 0) > 0);",
+      "fingerprint": "c00ec549f67230813faf",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "}, 0) + Number(result.rcf_fx_non_cash_movement ?? 0);",
+      "fingerprint": "80b58ab36838d7f8cf66",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "acquisition.enabled ?? 0,",
+      "fingerprint": "9c360211aec231f25c78",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "caches.set(`${proFormaColumn}${row}`, proFormaDebtValues[id] ?? 0);",
+      "fingerprint": "1d0c92b4532f3ac2f4a7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const acquisitionEnabled = Number(modelCase.acquisition?.enabled ?? 0) !== 0;",
+      "fingerprint": "4011436dc2583b71d0fe",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const baseIndex = Number(attrs.match(/\\bs=\"(\\d+)\"/)?.[1] ?? 0);",
+      "fingerprint": "c2e3ac27b4a1b0f5af54",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const constant = Number(mapping.constant ?? 0);",
+      "fingerprint": "7d75ab230a310a469ceb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const current = values[0] ?? 0;",
+      "fingerprint": "64a28732806c1fb51b81",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const currentDriver = Number(valuesById.get(calculation.refs[1]) ?? 0);",
+      "fingerprint": "c442cb86c490b89a54fa",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const proFormaPik = Number(proFormaItem?.pik_interest_native ?? 0);",
+      "fingerprint": "746e7cdcd761798ec68e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const quarantinedCellCount = Number(brokerEvidence?.quarantinedCellCount ?? 0);",
+      "fingerprint": "ee8afac834d36f88a628",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const raw = Number(pair?.period_end_rates?.[2] ?? 0);",
+      "fingerprint": "61554682aa1019671cc7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const standalonePik = Number(standaloneItem?.pik_interest_native ?? 0);",
+      "fingerprint": "777984a496328cca1523",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const standaloneValue = standaloneValues.get(definition.row_id) ?? 0;",
+      "fingerprint": "2b9612ccfc7eb14d5fe7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "const values = calculation.refs.map((id) => Number(valuesById.get(id) ?? 0));",
+      "fingerprint": "a5184c65fe1f5fc41aa1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "drawn_commercial_paper: -Number(result.drawn_commercial_paper ?? 0),",
+      "fingerprint": "416c902b159ca27db28a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "historicalInterestAuthority.filed_finance_expense[index] ?? 0,",
+      "fingerprint": "e8ae7fc9bde1cab3d6a6",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "historicalNonCashInterest.map((value) => -Math.abs(Number(value ?? 0))),",
+      "fingerprint": "f56cd2eb12cdd98b14bf",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "historicalRcfCommitmentFee.map((value) => -Math.abs(Number(value ?? 0))),",
+      "fingerprint": "71187c24255c7d61b614",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "if (!growth && Number(modelCase.acquisition?.enabled ?? 0) === 1) {",
+      "fingerprint": "cfd40ff85c7dabb6ba55",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "if (calculation.operator === \"link\") return values[0] ?? 0;",
+      "fingerprint": "34a73016c167641b1b3e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "if (calculation.operator === \"negate\") return -(values[0] ?? 0);",
+      "fingerprint": "fe45da08e7c1c401cdae",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "indents.set(target, Math.max(indents.get(target) ?? 0, Math.min(depth, 15)));",
+      "fingerprint": "05de916f6e08034be6b3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "levels.set(target, Math.max(levels.get(target) ?? 0, Math.min(depth, 15)));",
+      "fingerprint": "898f42938cc91ec82fdb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "levels.set(target, Math.max(levels.get(target) ?? 0, Math.min(depth, 7)));",
+      "fingerprint": "063487521e0e3f2f9a90",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "liquidity_cash: Number(result.liquidity_cash ?? 0),",
+      "fingerprint": "34bac44b87e4b837e708",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "mandatory_debt_repayments: Number(result.non_rcf_repayment ?? 0),",
+      "fingerprint": "fb1092c2966115a1e798",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Math.abs(Number(historicalNonCashInterest[index] ?? 0));",
+      "fingerprint": "4e3c5b821b3dc8149301",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Math.abs(Number(historicalRcfCommitmentFee[index] ?? 0)) +",
+      "fingerprint": "a3a2adcb9eb91a95ed58",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Math.max(outlineLevels.get(target) ?? 0, Math.min(depth, 7)),",
+      "fingerprint": "88fa136dd343b4576036",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "maxWidths.set(2, Math.max(maxWidths.get(2) ?? 0, String(entry.display_label ?? \"\").length + 2));",
+      "fingerprint": "8f6f43a4b2d5e9cee801",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "maxWidths.set(3, Math.max(maxWidths.get(3) ?? 0, Math.min(42, ((entry.verbatim_labels ?? []).join(\" / \")).length + 2)));",
+      "fingerprint": "1a7a40d4c1dc3ba7691c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "maxWidths.set(sourceColumn + 2, Math.max(maxWidths.get(sourceColumn + 2) ?? 0, width));",
+      "fingerprint": "83313bcc71a8c924136b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "modelCase.rcf_policy?.capacity ?? instrument.facility_capacity ?? 0,",
+      "fingerprint": "dd643e074fe469052591",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "note(definition.row, definition.outline_level ?? 0);",
+      "fingerprint": "69b67ba7cdeca64c6e19",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "noteOutline(definition.row, definition.outline_level ?? 0);",
+      "fingerprint": "1ee42e97bc6d3e1ada68",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(block.rcf_commitment_fee ?? 0) + Number(block.rcf_interest ?? 0);",
+      "fingerprint": "24e6f5be2c11e9d26690",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(bucket.ending_balance ?? 0) -",
+      "fingerprint": "8f1adf1d60e760e92cde",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(bucket.ending_balance ?? 0),",
+      "fingerprint": "0539b929ed23e293614e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(bucket.forecast_values?.[index] ?? 0),",
+      "fingerprint": "2e3e752fb3791b5d021d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(bucket.interest_income ?? 0),",
+      "fingerprint": "d0dc2515dac1200ad4d8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(bucket.opening_balance ?? 0),",
+      "fingerprint": "db17d0f7b0851309f089",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(caches.get(`${column}${plan.interest_row}`) ?? 0) +",
+      "fingerprint": "9aa71776484af2e7642d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(component.values[3 + index] ?? 0),",
+      "fingerprint": "299e494b866e6f80db5c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(modelCase.acquisition?.enabled ?? 0) === 1",
+      "fingerprint": "cb63910cdcef56f67760",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(modelCase.lease_policy.additions?.[index] ?? 0),",
+      "fingerprint": "d8ca19d276da9c8d5e87",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(proForma.rcf_opening_native ?? 0) *",
+      "fingerprint": "0a343b7e34ba2b47af1b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(proFormaValues.get(rowId) ?? 0) -",
+      "fingerprint": "419655f1b478d2149cd5",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.acquisition_debt_proceeds ?? 0) +",
+      "fingerprint": "324dfa7c378e47b2cbb7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.acquisition_debt_proceeds ?? 0),",
+      "fingerprint": "a265ac8b3a7d6a45888e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.non_rcf_issuance ?? 0) -",
+      "fingerprint": "c77ac63cdcf03e55a330",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.non_rcf_issuance ?? 0) +",
+      "fingerprint": "1642ad2d6436f5d9f210",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.non_rcf_repayment ?? 0) +",
+      "fingerprint": "bc2d2fc5393f392ac9d0",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.other_cash_debt_movement ?? 0),",
+      "fingerprint": "8cd6673ce8831ee36a98",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.rcf_draw ?? 0) -",
+      "fingerprint": "c8f8be19e69908beed98",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.rcf_opening_native ?? 0) *",
+      "fingerprint": "1b465906612082095254",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(result.rcf_repayment ?? 0),",
+      "fingerprint": "d7581d59979d6e215a73",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(standalone.rcf_opening_native ?? 0) *",
+      "fingerprint": "3f53bb5af5ba37a055a1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "Number(standaloneValues.get(rowId) ?? 0);",
+      "fingerprint": "32967db830c95ed1e980",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "priorValuesById?.get(calculation.refs[0]) ?? 0,",
+      "fingerprint": "a4939ba201309c1b0df5",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "priorValuesById?.get(calculation.refs[1]) ?? 0,",
+      "fingerprint": "4d8553f95b95ed2a1666",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "proFormaBucketInterest.get(bucket.bucket_id) ?? 0,",
+      "fingerprint": "c2f2552d02e5efc17bca",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "proFormaItem?.pik_interest_reporting ?? 0,",
+      "fingerprint": "b3cddf9bdc589b086645",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "reported_cash: Number(result.reported_cash ?? 0),",
+      "fingerprint": "328074fa525913bb8c07",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "result.interest_eligible_cash ?? 0,",
+      "fingerprint": "b3d5d8bbab8bf3bf6ee8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "return Number(priorValuesById?.get(calculation.refs[0]) ?? 0);",
+      "fingerprint": "f97596e83ec26f5d40c6",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "return values.slice(1).reduce((value, item) => value - item, values[0] ?? 0);",
+      "fingerprint": "802823d1e96f5adfca6e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "rowPlan.label_indents[row] = Math.max(rowPlan.label_indents[row] ?? 0, depth);",
+      "fingerprint": "ec62e0845d44213d0561",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "setValue(sheet, `${standaloneColumn}${row}`, Number(floor.rates[index] ?? 0));",
+      "fingerprint": "278c460a00a32a5afae9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "setValue(sheet, `${standaloneColumn}${row}`, Number(pik.rates[index] ?? 0));",
+      "fingerprint": "6182f19ec66780a91356",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "sheet.getRange(`B${row}`).format.indentLevel = Number(definition.indent ?? 0);",
+      "fingerprint": "2e5c1ba642f4b6b26585",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "standaloneBucketInterest.get(bucket.bucket_id) ?? 0,",
+      "fingerprint": "48b52846474f469b8fe2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "standaloneItem?.pik_interest_reporting ?? 0,",
+      "fingerprint": "2e1797aaf4b0bb85ec19",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "String(Number(instrument.benchmark_floor?.[forecastIndex] ?? 0));",
+      "fingerprint": "7a9494b6538f8809f044",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "total + Number(caches.get(`${column}${plan.debt_row}`) ?? 0),",
+      "fingerprint": "353e83ca5c8cae608590",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/build_dynamic_model.mjs",
+      "content": "valuesById.set(rowId, Number(value ?? 0));",
+      "fingerprint": "a1a84f1e29dac33aff14",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/compile_broker_candidate_manifest.py",
+      "content": "if any(float(cell.get(\"indent\") or 0) > 0 for cell in row):",
+      "fingerprint": "3021cb1d8bca34bedf8b",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/compile_broker_candidate_manifest.py",
+      "content": "label_indent = float(owner_cell.get(\"indent\") or 0)",
+      "fingerprint": "20b0cec74a98fa6eba3f",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/compile_broker_surface_census.py",
+      "content": "\"whole_surface_numeric_token_count\": sum(int(item[\"whole_surface_numeric_token_count\"] or 0) for item in surfaces),",
+      "fingerprint": "661d9c70a2c08bc77717",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_broker_evidence.py",
+      "content": "\"indent\": float(formula_cell.alignment.indent or 0),",
+      "fingerprint": "9829553f71a8023c2977",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_broker_evidence.py",
+      "content": "\"xref\": int(info.get(\"xref\") or 0),",
+      "fingerprint": "3fa9bdb6246e9ea66932",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_broker_evidence.py",
+      "content": "record[\"indent\"] = float(formula_cell.alignment.indent or 0)",
+      "fingerprint": "c2981f8b82d3e554ef59",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_broker_evidence.py",
+      "content": "xref = int(info.get(\"xref\") or 0)",
+      "fingerprint": "8370294d3b42815cbdb9",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "and abs(float(current.get(\"x0\") or 0) - float(following.get(\"x0\") or 0)) <= 12",
+      "fingerprint": "69ed2ce1d4311914c2cc",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "and int(rows[index].get(\"hierarchy_level\") or 0) == member_level",
+      "fingerprint": "5a69c6fd0c3b9669350a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "candidate_level = int(candidate.get(\"hierarchy_level\") or 0)",
+      "fingerprint": "30615355e42c89288ff1",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "level = int(candidate.get(\"hierarchy_level\") or 0)",
+      "fingerprint": "c0e19db271e7065870a3",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "level = int(row.get(\"hierarchy_level\") or 0)",
+      "fingerprint": "20691e4293361fa65ce1",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "line_y0 = float(line.get(\"y0\") or 0)",
+      "fingerprint": "95181906f0c48430f213",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "page = int(current.get(\"page\") or 0)",
+      "fingerprint": "899f44d8f8da1350a852",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "parent_level = int(parent_row.get(\"hierarchy_level\") or 0)",
+      "fingerprint": "57817a130ed38618af19",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "vertical_gap = float(following.get(\"y0\") or 0) - float(current.get(\"y0\") or 0)",
+      "fingerprint": "2d771580553070282fdb",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/acquisition_policy.mjs",
+      "content": "if (Number(acquisition.enabled ?? 0) === 1) {",
+      "fingerprint": "0091a3fa14c634e9f872",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "? Number(projected.facility_limit ?? 0)",
+      "fingerprint": "7ca13290167cec43f536",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "capacity: Number(projectedRcf.facility_limit ?? 0),",
+      "fingerprint": "f6df7357dadbdcea5247",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "commitment_fee_value: Number(authorityByField.get(\"commitment_fee_value\") ?? 0),",
+      "fingerprint": "86ede78c92962bf51cfc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "const coefficient = Number(component.coefficient ?? 0);",
+      "fingerprint": "9bb60d7326847cac9b46",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "constant: Number(mapping.constant ?? 0),",
+      "fingerprint": "adca1ba6a60e7e8387e3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "derived_mapping_count: crosswalk.derived_mappings?.length ?? 0,",
+      "fingerprint": "72f536cf08b2528a8564",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "instrument.spread_bps = Number(projected.margin_bps ?? 0);",
+      "fingerprint": "1fa7212bef7dab1e63a4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "let total = Number(mapping.constant ?? 0);",
+      "fingerprint": "2ea4b8ab53cd4810bb1e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "Number(periodReceipt.remaining_target_count ?? 0) !== 0 ||",
+      "fingerprint": "9522c43e9b337812707b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "Number(periodReceipt.resolved_header_count ?? 0) + Number(periodReceipt.quarantined_column_count ?? 0) < 1 ||",
+      "fingerprint": "1448f96a995a70251f75",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "Number(periodReceipt.target_count ?? 0) < 1 ||",
+      "fingerprint": "7b16504c03c0052976c8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "opening_draw: Number(projectedRcf.drawn_amount ?? projectedRcf.outstanding_amount ?? 0),",
+      "fingerprint": "c7b43bcc9d72a872ba34",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "projected.outstanding_amount ?? projected.drawn_amount ?? 0,",
+      "fingerprint": "44fbec793e61a4e70900",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "semantic_quality_violation_count: Number(semanticReport?.total_violation_count ?? 0),",
+      "fingerprint": "8d2545613f2da6fcdacb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/attachment_ingress.mjs",
+      "content": "table_review_count: crosswalk.table_reviews?.length ?? 0,",
+      "fingerprint": "516224f1742771a85d5e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/broker_anchor.mjs",
+      "content": ".reduce((total, part) => total - part, parts[0] ?? 0);",
+      "fingerprint": "5fdfd2883c5ecca91ec1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/broker_preview.mjs",
+      "content": "crosswalkReceipt?.coverage_summary?.unresolved_candidate_count ?? 0,",
+      "fingerprint": "7ce876bbe4c36c73bdbb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/broker_preview.mjs",
+      "content": "crosswalkReceipt?.coverage_summary?.unresolved_selected_candidate_count ?? 0,",
+      "fingerprint": "786d1409944194a894d4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/broker_preview.mjs",
+      "content": "Number(preview?.evidence_only_quarantine?.unresolved_selected_candidate_count ?? 0) !== 0",
+      "fingerprint": "1f9deaffe9eed3fb1d67",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/broker_preview.mjs",
+      "content": "selected_value_count: finalRecommended?.selected_value_count ?? 0,",
+      "fingerprint": "220bad06b79f1ee314bb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/case_compiler.mjs",
+      "content": "child.indent = Math.max(1, Number(child.indent ?? 0));",
+      "fingerprint": "f5b0dba927be294d1b97",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 3,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/case_compiler.mjs",
+      "content": "if (member) member.indent = Math.max(1, Number(member.indent ?? 0));",
+      "fingerprint": "d7e1230e708c92d4775d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/case_compiler.mjs",
+      "content": "if (row) row.indent = Math.max(1, Number(row.indent ?? 0));",
+      "fingerprint": "69964f7aeaf27d8e482e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/case_source_proposer.mjs",
+      "content": "opening_liability: Number(filings.reported_lease_liability ?? 0),",
+      "fingerprint": "bcb12ea84c34435cae11",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/case_source_proposer.mjs",
+      "content": "reported_opening_gross_debt: historicalGrossDebt ?? Number(filings.reported_gross_debt ?? 0),",
+      "fingerprint": "e021528e9893ec88a85d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/coverage.mjs",
+      "content": ".reduce((sum, bucket) => sum + Number(bucket.historical_year_end?.[index] ?? 0), 0),",
+      "fingerprint": "e57a7f6c74c356dc3830",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/coverage.mjs",
+      "content": "(row.calculation?.refs?.length ?? 0) === 0);",
+      "fingerprint": "7dd912f4907a2d47b996",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/coverage.mjs",
+      "content": "buckets.reduce((sum, bucket) => sum + Number(bucket.historical_year_end?.[index] ?? 0), 0),",
+      "fingerprint": "cba888fa91a1e4aabdc7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/design_contract.mjs",
+      "content": "(total, item) => total + Number(item.opening_balance_reporting ?? item.opening_balance ?? 0),",
+      "fingerprint": "635b564cc87f4bbd1cd4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/design_contract.mjs",
+      "content": "const openingCash = Number(modelCase.cash_policy?.opening_cash ?? 0);",
+      "fingerprint": "082c59383ecfaf3ed447",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/design_contract.mjs",
+      "content": "modelCase.lease_policy?.historical_liabilities?.[2] ?? 0,",
+      "fingerprint": "5943f1523f46858c682d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/design_contract.mjs",
+      "content": "Number(modelCase.acquisition?.enabled ?? 0) === 0;",
+      "fingerprint": "2b8a27e402b1fed64ae8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "acquisition_interest: Number(period.acquisition_interest ?? 0),",
+      "fingerprint": "faeb98e42e0cb5b77f31",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "cash_interest_income: Number(period.interest_income ?? 0),",
+      "fingerprint": "0bea0ffac39ef4770eca",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "const capacityNative = Number(period.rcf_capacity_native ?? 0);",
+      "fingerprint": "27d45e8f53ba203a0549",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "const cashAfterMandatory = Number(period.cash_after_mandatory_repayment ?? 0);",
+      "fingerprint": "76eb4c54a9d6861f7ee8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "const minimumCash = Number(period.minimum_cash ?? 0);",
+      "fingerprint": "d94fe56745c7a29f4a38",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "const openingNative = Number(period.rcf_opening_native ?? 0);",
+      "fingerprint": "61e406779e73cadc1ed1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "debt_issuance: Number(period.non_rcf_debt_issuance ?? 0),",
+      "fingerprint": "0257fd748ceceb9f1230",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "ending_cash: Number(period.ending_cash ?? 0),",
+      "fingerprint": "31254a4410b73b452247",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "ending_rcf: Number(period.ending_rcf ?? 0),",
+      "fingerprint": "bbca216d76d8fd6971d9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "gross_interest_expense: Number(period.gross_interest ?? 0),",
+      "fingerprint": "87b01ab0fd5ee8a36ed1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "interest_income: Number(period.interest_income ?? 0),",
+      "fingerprint": "9f0205c77df5240bf444",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "lease_interest: Number(period.lease_interest ?? 0),",
+      "fingerprint": "2b7551ce785ae73352e7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "lease_principal: Number(period.lease_principal ?? 0),",
+      "fingerprint": "f3dbe11914a838cbe14e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "liquidity_shortfall: Number(period.liquidity_shortfall ?? 0),",
+      "fingerprint": "503deef01574234fe75c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "mandatory_repayment: Number(period.mandatory_repayment ?? 0),",
+      "fingerprint": "74f26f9af0a7ad1674dc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "minimum_cash: Number(period.minimum_cash ?? 0),",
+      "fingerprint": "7bd2f37e2addc0b93f42",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "net_interest_expense: Number(period.net_interest ?? 0),",
+      "fingerprint": "ec2814c296ded13a0afc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "noncash_interest: Number(period.non_cash_interest ?? 0),",
+      "fingerprint": "996e307f5f6468279afe",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "Number(item.amortisation_native ?? 0)),",
+      "fingerprint": "cfd0bcf6a6d7d67acd38",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "Number(item.maturity_repayment_native ?? 0)),",
+      "fingerprint": "7cc755e8908bdf8fcacd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "Number(period.non_cash_instrument_interest ?? 0),",
+      "fingerprint": "8772c81fa69efec0a8f5",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "Number(period.non_cash_interest ?? 0) +",
+      "fingerprint": "af6493dc491285e9020e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "other_interest: Number(period.other_interest ?? 0),",
+      "fingerprint": "e96ab55dab39b675ac52",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "rcf_capacity: Number(period.rcf_capacity_native ?? 0),",
+      "fingerprint": "73f1072226db4d3adc6b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "rcf_commitment_fee: Number(period.rcf_commitment_fee ?? 0),",
+      "fingerprint": "0065160c13f67a8247d1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "rcf_draw: Number(period.rcf_draw ?? 0),",
+      "fingerprint": "6b53270c851e2365f096",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "rcf_interest: Number(period.rcf_interest ?? 0),",
+      "fingerprint": "72dd4b3ec00fef04cf8a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "rcf_repayment: Number(period.rcf_repayment ?? 0),",
+      "fingerprint": "56d4ba40e3d9a620f8c5",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "return Number(period.statement_values[role] ?? 0);",
+      "fingerprint": "87942a6594681789f888",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/fixed_point_constitution.mjs",
+      "content": "return values.reduce((total, value) => total + Number(value ?? 0), 0);",
+      "fingerprint": "9bf61ada63cd7563d509",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/flow_questions.mjs",
+      "content": ": Number(draftCase.lease_policy?.opening_liability ?? 0);",
+      "fingerprint": "575bc41d5573e81610db",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_questions.mjs",
+      "content": "const openingCash = Number(draftCase.cash_policy?.opening_cash ?? 0);",
+      "fingerprint": "a6a3fff2427f310177bd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_questions.mjs",
+      "content": "const spot = Number(row.benchmark_curve?.spot ?? 0);",
+      "fingerprint": "29e34d95d89995b2c077",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_questions.mjs",
+      "content": "Number(row.margin_bps ?? 0) > 0 &&",
+      "fingerprint": "35ee377aa1d34309cfcb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_questions.mjs",
+      "content": "return Number(row?.facility_limit ?? 0);",
+      "fingerprint": "325ea8f930c24e4fabe6",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "const amount = Number(instrument.opening_balance ?? 0);",
+      "fingerprint": "8c9d3486fb957bded000",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "const capacity = Number(modelCase.rcf_policy?.capacity ?? 0);",
+      "fingerprint": "bd54c3aeb53a69cddfaf",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "const cash = Number(modelCase.cash_policy?.opening_cash ?? 0);",
+      "fingerprint": "08fe292ec8fa29c993e4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "const draws = years.map((year) => Number(year.ending_rcf ?? 0));",
+      "fingerprint": "51db9a52814d5cb27339",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "if (Number(year.liquidity_shortfall ?? 0) > 1e-6) {",
+      "fingerprint": "c218ce495589b6fb6856",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "if (rule.operator === \"link\") return parts[0] ?? 0;",
+      "fingerprint": "9ab17c3a897e46281398",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "if (rule.operator === \"negate\") return -(parts[0] ?? 0);",
+      "fingerprint": "a0104ee8fe2f435db234",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_read.mjs",
+      "content": "return parts.slice(1).reduce((total, part) => total - part, parts[0] ?? 0);",
+      "fingerprint": "b55aadf13260433c0687",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_reconcile.mjs",
+      "content": "const reported = Number(intake?.filings?.reported_gross_debt ?? 0);",
+      "fingerprint": "900aae33997570304966",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_reconcile.mjs",
+      "content": "return Number(instrument?.outstanding_amount ?? 0);",
+      "fingerprint": "2dd2c953dbd156511802",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_reconcile.mjs",
+      "content": "return Number(instrument.drawn_amount ?? instrument.outstanding_amount ?? 0);",
+      "fingerprint": "01422734f9a237a430f1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/flow_screens.mjs",
+      "content": "`   Evidence-only tables .... ${preview?.evidence_inventory?.evidence_only_table_count ?? 0}`,",
+      "fingerprint": "f1a1704fb8f817f3dbcc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/flow_screens.mjs",
+      "content": "`   Quarantined cells ....... ${preview?.evidence_inventory?.quarantined_cell_count ?? 0}`,",
+      "fingerprint": "9b3bcda7795e91a5621a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/flow_screens.mjs",
+      "content": "`   Raw houses preserved .... ${preview?.evidence_inventory?.raw_house_count ?? 0}`,",
+      "fingerprint": "89cb7644addc96abaf45",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/flow_screens.mjs",
+      "content": "`   Raw tables preserved .... ${preview?.evidence_inventory?.raw_table_count ?? 0}`,",
+      "fingerprint": "f7a5116818f7f81f45d7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/flow_screens.mjs",
+      "content": "const brokerHouseCount = evidenceRun?.broker_pack?.houses?.length ?? 0;",
+      "fingerprint": "f39469677b1545b51768",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/forecast_behavior.mjs",
+      "content": "const secondScore = ranked[1]?.[1] ?? 0;",
+      "fingerprint": "82866b032efeb4347ebb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/forecast_behavior.mjs",
+      "content": "scores.set(signal.supports, Math.max(scores.get(signal.supports) ?? 0, signal.weight));",
+      "fingerprint": "90c9cba5096185e7e593",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/forecast_candidate_compiler.mjs",
+      "content": "expense.values[index] = -Math.abs(Number(interest.reported_interest[index] ?? 0));",
+      "fingerprint": "eff375685c9ca18d5a17",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/forecast_candidate_compiler.mjs",
+      "content": "if (operator === \"negate\") return -(operands[0] ?? 0);",
+      "fingerprint": "5a902d93435b34579622",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/forecast_ownership_resolver.mjs",
+      "content": "(rowId) => (formulaParentsByChild.get(rowId)?.size ?? 0) > 1,",
+      "fingerprint": "633d8de9f89ae654edfb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/formula_dsl.mjs",
+      "content": "(rule?.refs?.length ?? 0) <=",
+      "fingerprint": "0824aa9987fb084bb088",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/formula_dsl.mjs",
+      "content": "const forecastIndex = Number(rule.forecast_index ?? 0);",
+      "fingerprint": "7926a79bae129f392ca8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/formula_dsl.mjs",
+      "content": "semantic_references: rule?.refs?.length ?? 0,",
+      "fingerprint": "046adfcb30da64484a3b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/hash_bound_source_staging.mjs",
+      "content": "(fsConstants.O_NOFOLLOW ?? 0),",
+      "fingerprint": "0e3c470dee178c7e0c17",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/hash_bound_source_staging.mjs",
+      "content": "fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),",
+      "fingerprint": "a4fc1caf719e3da46acd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/historical_normalisation.mjs",
+      "content": "(row.calculation?.refs?.length ?? 0) === 0",
+      "fingerprint": "ecef1156a9f36e9ea4ae",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/instrument_display.mjs",
+      "content": "const spread = Number(instrument?.spread_bps ?? instrument?.margin_bps ?? 0);",
+      "fingerprint": "76c0629f9e02a685fc65",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "? Math.max(benchmark, floor) + Number(marginBps ?? 0) / 10_000",
+      "fingerprint": "91b4b1feee580c88586b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "if (Math.abs(rollForward - Number(state.ending_pre_repayment?.basis_amount ?? 0)) > EPSILON) errors.push(`${state.state_id} pre-repayment roll-forward does not close.`);",
+      "fingerprint": "ac3e5175b52f128b426e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "if (Math.abs(rollForward - Number(state.maturity_repayment?.basis_amount ?? 0) - Number(state.ending_post_repayment?.basis_amount ?? 0)) > EPSILON) errors.push(`${state.state_id} post-repayment roll-forward does not close.`);",
+      "fingerprint": "cd14bcf85b7542d1ab62",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "if (Math.abs(state.maturity_repayment?.basis_amount ?? 0) > EPSILON) errors.push(`${state.state_id} RCF has a maturity repayment.`);",
+      "fingerprint": "31baeb62dd91139f011e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "Number(state.fair_value_movement?.basis_amount ?? 0) +",
+      "fingerprint": "9fb7a93acaec1c70dc6e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "Number(state.issuance?.basis_amount ?? 0) +",
+      "fingerprint": "d19d73576a09dbc746aa",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "Number(state.opening?.basis_amount ?? 0) +",
+      "fingerprint": "ccd16f89afdfa046bda4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "Number(state.other_non_cash_movement?.basis_amount ?? 0) +",
+      "fingerprint": "2f539ed05f12e5cf541f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "Number(state.pik_accretion?.basis_amount ?? 0) -",
+      "fingerprint": "427e662c5e25c2305e03",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/instrument_period_state.mjs",
+      "content": "Number(state.scheduled_amortisation?.basis_amount ?? 0);",
+      "fingerprint": "5be7cf14381e51902d21",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/intake.mjs",
+      "content": "contributors: contributorCount[metricId] ?? 0,",
+      "fingerprint": "6c289c9391bde1ecf6df",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/intake.mjs",
+      "content": "house_count: broker?.houses?.length ?? 0,",
+      "fingerprint": "a4c28289d6160275905f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/json_schema.mjs",
+      "content": "const prefixCount = schema.prefixItems?.length ?? 0;",
+      "fingerprint": "a9de424491481c09857f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/layered_graph_constitution.mjs",
+      "content": "{ section, row_id: row.row_id, reference, matches: resolved.matches ?? 0 },",
+      "fingerprint": "1fb6cd4013676c6724d9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/layered_graph_constitution.mjs",
+      "content": "const ordinal = occurrences.get(key) ?? 0;",
+      "fingerprint": "0e4701a7a165929892b2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/layered_graph_constitution.mjs",
+      "content": "const ordinal = projectionOccurrences.get(projectionKey) ?? 0;",
+      "fingerprint": "98c0d3470ec26d864da1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/lease_policy.mjs",
+      "content": ": [0, 0, Number(policy.opening_liability ?? 0)];",
+      "fingerprint": "b437d6c3de853ae668af",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/live_delivery_attestation.mjs",
+      "content": "broker_source_sheet_count: brokerEvidence?.source_sheets?.length ?? 0,",
+      "fingerprint": "0254ba91fbecff5dcdb6",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/live_delivery_attestation.mjs",
+      "content": "invariant(Number(recalcReceipt.formula_cells ?? 0) > 0, \"publication.recalc_coverage\", \"LibreOffice receipt visited no formula cells.\", violations);",
+      "fingerprint": "a6cd5ccae95c85b0cccd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/local_workbook_review.mjs",
+      "content": "checklist_items_checked: evidence.checklist?.length ?? 0,",
+      "fingerprint": "9d2aff6455eb46a73cae",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/model_ir_v3.mjs",
+      "content": ": Number(rowPlan.section_headers?.debt_schedule ?? 0) - 2,",
+      "fingerprint": "af2505f9b80845b50910",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/model_ir_v3.mjs",
+      "content": "? Number(rowPlan.section_headers?.cash_flow ?? 0) - 2",
+      "fingerprint": "0da80e20a7ccba30f880",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/performance_receipt.mjs",
+      "content": "[\"validation\", [\"verify_dynamic\", \"verify_style\", \"verify_cache\", \"verify_finance\", \"verify_semantic\", \"verify_aggregate\", \"render\"].reduce((sum, key) => sum + Number(timings[key] ?? 0), 0), \"stage4_validation\"],",
+      "fingerprint": "e1f86c0e271e92b1f1b8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/performance_receipt.mjs",
+      "content": "[\"workbook_build\", Number(timings.emit ?? 0) + Number(timings.terminal_patch ?? 0), \"stage4_emit_and_patch\"],",
+      "fingerprint": "8f5131f26d59eaa32644",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/plan_builder.mjs",
+      "content": "const columns = sheet._freeze?.columns ?? 0;",
+      "fingerprint": "62cd8148be31fe6a7d26",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/plan_builder.mjs",
+      "content": "const rows = sheet._freeze?.rows ?? 0;",
+      "fingerprint": "60be2b45cfb07376d4fd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/plan_builder.mjs",
+      "content": "Math.max(this._rowOutlineLevels.get(target) ?? 0, Math.min(depth, 7)),",
+      "fingerprint": "3f7bb5cd22626bc5b577",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/plan_values.mjs",
+      "content": "const factor = 10 ** (digits ?? 0);",
+      "fingerprint": "bcc62f7b8cbe39a19523",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/plausibility_acknowledgements.mjs",
+      "content": "const endingRcf = Number(period?.ending_rcf ?? 0);",
+      "fingerprint": "5c670f9e99c82d3cf14f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/plausibility_acknowledgements.mjs",
+      "content": "const shortfall = Number(period?.liquidity_shortfall ?? 0);",
+      "fingerprint": "296c7d054a3119e80d73",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/plausibility_acknowledgements.mjs",
+      "content": "const undrawnRcf = Number(period?.undrawn_rcf ?? 0);",
+      "fingerprint": "3746b36420926ff5c42e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/process_tree.mjs",
+      "content": "const timeout = Number(options.timeout ?? 0);",
+      "fingerprint": "b5d44197e10bdd4dee3b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/progress_heartbeat.mjs",
+      "content": "const elapsedSeconds = Math.max(0, Math.floor(Number(elapsedMs ?? 0) / 1000));",
+      "fingerprint": "cf5da6dc35408cfa1164",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/progress_heartbeat.mjs",
+      "content": "controller_elapsed_ms: Math.max(0, Number(event.controller_elapsed_ms ?? 0)),",
+      "fingerprint": "93c762643a0880970036",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/progress_heartbeat.mjs",
+      "content": "elapsed_ms: Math.max(0, Number(event.elapsedMs ?? event.elapsed_ms ?? 0)),",
+      "fingerprint": "88294a96dd78ff848f57",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/progress_heartbeat.mjs",
+      "content": "let maxObservedGapMs = normalizedEvents[0]?.controller_elapsed_ms ?? 0;",
+      "fingerprint": "4aa0a752b72cdacc97c5",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/progress_heartbeat.mjs",
+      "content": "let maxObservedGapMs = Number(events[0]?.controller_elapsed_ms ?? 0);",
+      "fingerprint": "561d06313ee2e14eae7e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/rcf_policy.mjs",
+      "content": "if (Number(policy[key] ?? 0) !== 0) {",
+      "fingerprint": "0804d8a74434cd7732b7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/release_certification.mjs",
+      "content": "Number(report.summary?.failed ?? 0) !== 0 ||",
+      "fingerprint": "48152e753925bf631115",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/release_js_import_scanner.mjs",
+      "content": "const leading = match[0].match(/^[ \\t]*/)?.[0].length ?? 0;",
+      "fingerprint": "16553a78c767d95bf9b2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/release_nodes.mjs",
+      "content": "(questionPlan.blocked?.length ?? 0) === 0 && questionCount === 0;",
+      "fingerprint": "d357a9a1158143280586",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/release_nodes.mjs",
+      "content": "const questionCount = questionPlan.questions?.length ?? questionPlan.survivors?.length ?? 0;",
+      "fingerprint": "b56c6fa6e595f52e252b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": ": (instrument.benchmark_rate ?? 0),",
+      "fingerprint": "9b27fb17f65ef70afe8d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "? (instrument.benchmark_rate[index] ?? 0)",
+      "fingerprint": "09d4272ef055edac9764",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "(value) => Math.abs(Number(value || 0)) > 0,",
+      "fingerprint": "2cc582313c83fcee0301",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 6,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "component.values.some((value) => Math.abs(Number(value ?? 0)) > 1e-9),",
+      "fingerprint": "8e6c50550c54df90f580",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "const lastReported = row.values[2] ?? row.values[1] ?? row.values[0] ?? 0;",
+      "fingerprint": "39f9414f709475abc0b2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "const periodEnd = new Date(modelCase.periods?.[index + 3]?.date ?? 0);",
+      "fingerprint": "38f144462079ec0d9cc6",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "for (const row of rows) row.indent = levels.get(row.row_id) ?? 0;",
+      "fingerprint": "e9e8be2af889f656d062",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "historical.every((value) => Number(value ?? 0) === 0)",
+      "fingerprint": "65a419649fee334a2c82",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "if ((instrument.new_issuance ?? []).some((value) => Math.abs(Number(value || 0)) > 0)) {",
+      "fingerprint": "fcabe986777952ba6957",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "Math.abs(Number(instrument.scheduled_amortisation?.[index] ?? 0)) > 0;",
+      "fingerprint": "b9c1cca0eec7e32b101e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "Math.abs(Number(last ?? 0)) <= 1e-12",
+      "fingerprint": "ece8417dce986da99a7c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "modelCase.periods?.[index + 2]?.date ?? 0,",
+      "fingerprint": "22cd998abb181215814f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "Number(component.values[index] ?? 0),",
+      "fingerprint": "e7f9ecdfe2d79339b6c7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "Number(left.display_order ?? 0) - Number(right.display_order ?? 0) ||",
+      "fingerprint": "f843d84d1330e44da564",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "row.indent = Math.max(1, Number(row.indent ?? 0));",
+      "fingerprint": "f25940f5a8b540696446",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 3,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/row_plan.mjs",
+      "content": "row.outline_level = Math.max(1, Number(row.outline_level ?? 0));",
+      "fingerprint": "1190fc5240934a2c6183",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/run_deadline.mjs",
+      "content": "const duration = Math.max(0, Math.floor(Number(durationMs) || 0));",
+      "fingerprint": "4f0fbce8a01578818bf4",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/runtime_budget_policy.mjs",
+      "content": "duration_ms: Math.max(0, Number(execution.duration_ms ?? 0)),",
+      "fingerprint": "728d55d6fbd0bfdec43a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/semantic_graph.mjs",
+      "content": "presentation_depth: row.presentation_depth ?? 0,",
+      "fingerprint": "5972226a67eac90cf42a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": ": instrumentBalances.get(instrument.instrument_id) ?? 0;",
+      "fingerprint": "52ecc2106153b8c9ca86",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": ": Number(cash.historical_year_end_cash?.[index] ?? 0);",
+      "fingerprint": "473a05810d665ba692f9",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": ": Number(nonCashComponents.fair_value ?? 0);",
+      "fingerprint": "f040799d7b15695d4c18",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": ": Number(nonCashComponents.other ?? 0);",
+      "fingerprint": "a68d87c106143c3ed394",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "? -(values[0] ?? 0) * (values[1] ?? 0)",
+      "fingerprint": "307b145a0787d504d243",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "? Math.max(0, openingNative * Number(pikRate ?? 0) / 2)",
+      "fingerprint": "1a5302f618a59a8a4784",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "? modelCase.rcf_policy?.opening_draw ?? rcfInstrument?.opening_balance ?? 0",
+      "fingerprint": "898b14759ed5f8e8f4f4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "? Number(bucket.forecast_values?.[forecastIndex] ?? 0)",
+      "fingerprint": "14a94d70754517bb387f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "? Number(modelCase.rcf_policy.commitment_fee_value ?? 0) / 10000",
+      "fingerprint": "5580cdb2dad94dcab5a8",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "? Number(openingBucketBalances.get(bucket.bucket_id) ?? 0)",
+      "fingerprint": "4628fd62e78c17dbf765",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": ".reduce((total, item) => total + Number(item.ending_reporting ?? 0), 0);",
+      "fingerprint": "4705a2573aa0612891d5",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "(Number(fairValue ?? 0) + Number(otherNonCash ?? 0)) *",
+      "fingerprint": "9fba226208c48f2de522",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "(rule.refs?.length ?? 0) === 1 &&",
+      "fingerprint": "8dbcb8e84434c2067f86",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "(total, row) => total + Number(cashFlowGraph.resolve(row.row_id) ?? 0),",
+      "fingerprint": "83fad58c91092545854e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "bucket.interest_eligible_percentage ?? 0,",
+      "fingerprint": "6c1d10aa035af3c30175",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "bucket.net_debt_eligible_percentage ?? 0,",
+      "fingerprint": "4dbe81aa51261a2d557d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "bucket.opening_balance ?? bucket.historical_year_end?.[2] ?? 0,",
+      "fingerprint": "caa23ad7ccc8d6683912",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "cashBucketBalances.get(balancingBucket.bucket_id) ?? 0,",
+      "fingerprint": "5b3b59c3eedfe8557ac3",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const bridgeAddbacks = anchorPlan?.addbackTotals?.[forecastIndex] ?? 0;",
+      "fingerprint": "1ec36ffa46c137a822ea",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const currentDriver = Number(resolve(refs[1]) ?? 0);",
+      "fingerprint": "2993b2abd2db4e449263",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const denominator = 1 - (rate * Number(activeFraction ?? 0)) / 2;",
+      "fingerprint": "9a41812247763a90e929",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const ending = Number(balances.get(bucket.bucket_id) ?? 0);",
+      "fingerprint": "b1278f4d4f000ebdea5f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const instrumentOpening = Number(rcf.opening_balance ?? 0);",
+      "fingerprint": "be0a01f8af36c3e85750",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const latestHistorical = Number(bucket.historical_year_end?.[2] ?? 0);",
+      "fingerprint": "2f92c59f61a83da43d8a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const opening = Number(openingBucketBalances.get(bucket.bucket_id) ?? 0);",
+      "fingerprint": "6fabfe4eb5047838b53b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const policyOpening = Number(modelCase.rcf_policy?.opening_draw ?? 0);",
+      "fingerprint": "d26f07d9b69f1568759a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const prior = Number(previousValues.get(refs[0]) ?? 0);",
+      "fingerprint": "67918319a472540115b7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const priorDriver = Number(previousValues.get(refs[1]) ?? 0);",
+      "fingerprint": "4b85109dd365a6e0febd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const priorValue = Number(previousValues.get(refs[0]) ?? 0);",
+      "fingerprint": "657ebc02b61ca76737a0",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const rate = Number(pikRate ?? 0);",
+      "fingerprint": "fa2956250638c90bfb26",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const spread = Number(instrument.spread_bps ?? 0) / 10000;",
+      "fingerprint": "927cefa6ecab3ed07895",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const values = refs.map((rowId) => Number(resolve(rowId) ?? 0));",
+      "fingerprint": "cbdcdf9517dd9a810f2a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "const yieldRate = Number(bucket.cash_yield?.[forecastIndex] ?? 0);",
+      "fingerprint": "9177e5785417cf5c21de",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),",
+      "fingerprint": "3ee7f6d9d24f1779dbfe",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(amortisation ?? 0) * amortisationFraction;",
+      "fingerprint": "8b402c3b17a3981a77d0",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(definition.values?.[2] ?? 0),",
+      "fingerprint": "83ab95fa248af193ce1b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(fixedEndingBucketBalances.get(bucket.bucket_id) ?? 0) -",
+      "fingerprint": "3297538856861f682ffb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(instrument.opening_balance ?? 0) *",
+      "fingerprint": "ef5731e4e4ff5fc3b21f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(issuance ?? 0) * issuanceFraction +",
+      "fingerprint": "b13ed771623e024dd786",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(item.opening_balance ?? 0),",
+      "fingerprint": "6d50581240a90f346547",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(modelCase.acquisition?.enabled ?? 0) === 1 &&",
+      "fingerprint": "3ef0a62ef29f7da52c4a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(modelCase.acquisition?.incremental_rate ?? 0);",
+      "fingerprint": "433a6cb14185a7cc0c14",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(opening ?? 0) * activeFraction +",
+      "fingerprint": "fdab9d8eaf62df4a623c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "Number(openingBucketBalances.get(bucket.bucket_id) ?? 0),",
+      "fingerprint": "f42204c505d740fa2633",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "priorStandaloneEbitda = Number(lastComputation.adjusted_ebitda ?? 0) -",
+      "fingerprint": "9299bc76967a1d59933f",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return -(values[0] ?? 0);",
+      "fingerprint": "41cfeef12c9c870dcfc4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return (values[0] ?? 0) > 0",
+      "fingerprint": "67a30fbc6aa6fa72a17e",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return Math.max(0, (Number(weightedBase ?? 0) * rate) / denominator);",
+      "fingerprint": "98ed329e1deb9f4b3b0d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return Number(acquisition.acquisition_debt_amount ?? 0);",
+      "fingerprint": "38242c56869ecb4cc132",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return Number(dividends ?? 0) + Number(buybacks ?? 0);",
+      "fingerprint": "b8dfc155b165e75a1cf7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return Number(modelCase?.lease_policy?.opening_liability ?? 0);",
+      "fingerprint": "99fc59fae661aa689bfb",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return Number(previousValues.get(refs[0]) ?? 0);",
+      "fingerprint": "fe626291de97fefb0be2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return prior === 0 ? 0 : (values[0] ?? 0) / prior - 1;",
+      "fingerprint": "973f5149d2ac4eff5a7b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "return values[0] ?? 0;",
+      "fingerprint": "5111ad4b9185aca70429",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "sum + Number(instrumentResultById.get(instrumentId)?.ending_reporting ?? 0),",
+      "fingerprint": "5405839141b26e873371",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "total + Number(component.values?.[forecastIndex + 3] ?? 0),",
+      "fingerprint": "0b7ddf6f4aea623df7ee",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "values.set(rowId, Number(value ?? 0));",
+      "fingerprint": "cdd33c9685a5f79ae269",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
+      "content": "values[0] ?? 0,",
+      "fingerprint": "47bacbc39187c3f3a1cf",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/source_ingress_security.mjs",
+      "content": "const handle = await fs.open(canonical, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));",
+      "fingerprint": "e549cb0ee9919522405a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/statement_classifier.mjs",
+      "content": "margin: best ? Number((best.score - (next?.score ?? 0)).toFixed(2)) : 0,",
+      "fingerprint": "4f667b7c80974404e69d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/statement_topology.mjs",
+      "content": ": (depths.get(row.row_id) ?? 0);",
+      "fingerprint": "331ec4c79d0ef78c6669",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/statement_topology.mjs",
+      "content": "const actual = Number(row.indent ?? 0);",
+      "fingerprint": "ca702348819d6cea69f7",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/statement_topology.mjs",
+      "content": "const expected = expectedIndents.get(row.row_id) ?? 0;",
+      "fingerprint": "1dc48832464386be3fcd",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/tax_rate_policy.mjs",
+      "content": "const numbers = parts.map((value) => Number(value ?? 0));",
+      "fingerprint": "14fbe695b8155b966823",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/typed_arithmetic.mjs",
+      "content": "const magnitude = Math.max(...readings.map((reading) => Math.abs(reading.numeric ?? 0)), 1);",
+      "fingerprint": "c83a7b3c418dba83721a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "(node.dependencies?.length ?? 0) === 0",
+      "fingerprint": "5107ebb01ec323477971",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "if (Number(policy[key] ?? 0) !== 0) {",
+      "fingerprint": "f47284948fba9e66d528",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Math.abs(Number(instrument.ending_native ?? 0) - expectedEnding) >",
+      "fingerprint": "4b50060b1449786654c2",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Math.abs(Number(result.acquisition_cash_consideration ?? 0)) > tolerance ||",
+      "fingerprint": "978b79bcc807ee75fbbc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Math.abs(Number(result.acquisition_debt_proceeds ?? 0)) > tolerance ||",
+      "fingerprint": "2cc95c12d7299b8f07ad",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Math.abs(Number(result.acquisition_debt_repayment ?? 0)) > tolerance",
+      "fingerprint": "b19b9f1a0630d46ffa9c",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.amortisation_native ?? 0) -",
+      "fingerprint": "abfbb3739274a00cad61",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.issuance_native ?? 0) +",
+      "fingerprint": "f750026c93a3e6fd6cf4",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.maturity_repayment_native ?? 0);",
+      "fingerprint": "b52158f24a1352248546",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.opening_native ?? 0) +",
+      "fingerprint": "214a7f11084f62d4383b",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(instrument.other_non_cash_movement_native ?? 0) -",
+      "fingerprint": "4c1f403648b32fde16ef",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(result.liquidity_shortfall ?? 0) - expectedShortfall,",
+      "fingerprint": "3f50bbf1e09c65941812",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(result.liquidity_shortfall ?? 0) > tolerance &&",
+      "fingerprint": "5ca5fe1aa331d7bcd498",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(result.minimum_cash ?? 0) - Number(result.ending_cash ?? 0),",
+      "fingerprint": "3434b2f9b5276a62db56",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(result.rcf_draw ?? 0) > tolerance &&",
+      "fingerprint": "84b5c2f73840700e53a0",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(result.rcf_repayment ?? 0) > tolerance",
+      "fingerprint": "0a68bea5bd535aefa0b1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/validation_invariants.mjs",
+      "content": "Number(result.undrawn_rcf ?? 0) > tolerance",
+      "fingerprint": "fe0e6b8f03738ffc8752",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "border_id: Number(attr(xf, \"borderId\") || 0),",
+      "fingerprint": "a9cfae00073437ad2103",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "const fillId = Number(attr(xf, \"fillId\") || 0);",
+      "fingerprint": "48a7893eabdb4ad096f7",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "const fontId = Number(attr(xf, \"fontId\") || 0);",
+      "fingerprint": "d7290ab43ec0c0932347",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "const styleId = Number(attr(opening, \"s\") || 0);",
+      "fingerprint": "404df7e1346f9faf72fb",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "indentation: Number(attr(alignment, \"indent\") || 0),",
+      "fingerprint": "6147d6195722ac2b2b84",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "level: Number(attr(column, \"outlineLevel\") || 0),",
+      "fingerprint": "70f0e85a52fbaa273729",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "number_format_id: Number(attr(xf, \"numFmtId\") || 0),",
+      "fingerprint": "f1e0c8ee935c4d7db36a",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/workbook_semantic_inventory.mjs",
+      "content": "return { row: Number(attr(opening, \"r\")), level: Number(attr(opening, \"outlineLevel\") || 0) };",
+      "fingerprint": "b7d05a36ce45611cb2e4",
+      "patterns": [
+        "js_logical_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_acquisition_workbook_tests.py",
+      "content": "acquisition_debt = float(cells[f\"{column}{acquisition_debt_row}\"].get(\"v\") or 0)",
+      "fingerprint": "32770f284624a41bcb75",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/run_acquisition_workbook_tests.py",
+      "content": "cells[f\"{close_column}{acquisition_interest_row}\"].get(\"v\") or 0",
+      "fingerprint": "eb2b98c388918319a6f7",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/run_acquisition_workbook_tests.py",
+      "content": "consideration = float(cells[f\"{column}{consideration_row}\"].get(\"v\") or 0)",
+      "fingerprint": "95a18c9696d7c1b73f4b",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/run_acquisition_workbook_tests.py",
+      "content": "debt_proceeds = float(cells[f\"{column}{waterfall_proceeds_row}\"].get(\"v\") or 0)",
+      "fingerprint": "be4e85bede7111423e1a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "if limit and int(fixed.get(\"unchanged_retry_count\") or 0) + 1 >= limit:",
+      "fingerprint": "6e58e6fe745bceaa4d41",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "int(exclusion_summary.get(\"preserved_candidate_count\") or 0),",
+      "fingerprint": "622e42f0f7efdff42158",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "int(summary.get(\"quarantined_conflict_count\") or 0),",
+      "fingerprint": "2ab31c36f6f46d878ea1",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "limit = int(fixed.get(\"unchanged_retry_limit\") or 0)",
+      "fingerprint": "00c27d6ae99beb89e6bf",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "quarantined_conflicts = int(summary.get(\"quarantined_conflict_count\") or 0)",
+      "fingerprint": "633d539dd1fd4ee11617",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "quarantined_surfaces = int(summary.get(\"quarantined_surface_count\") or 0)",
+      "fingerprint": "220232fa249141245e36",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "terminal_quarantined = int(coverage.get(\"terminal_quarantined_candidate_count\") or 0)",
+      "fingerprint": "5d05b0634f02fb58556a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_pipeline.py",
+      "content": "unresolved_selected = int(coverage.get(\"unresolved_selected_candidate_count\") or 0)",
+      "fingerprint": "3defdd411254da884293",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_broker_public_layout_tests.py",
+      "content": "and int(surface.get(\"native_text_chars\") or 0) > 0",
+      "fingerprint": "0281daacc82471683481",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_excel_inflow_vnext.mjs",
+      "content": "(ACTIVE_PERFORMANCE.stages.model_decisions_ms ?? 0) +",
+      "fingerprint": "b4152aca80e13526c9ef",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_excel_inflow_vnext.mjs",
+      "content": "documentsComplete: progress.documentsTotal ?? 0,",
+      "fingerprint": "ad4f87135565f4f72bf1",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/run_excel_inflow_vnext.mjs",
+      "content": "Number(firstExecution.duration_ms ?? 0),",
+      "fingerprint": "2f862f9cac94990dae0a",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_excel_inflow_vnext.mjs",
+      "content": "Number(firstExecution.duration_ms ?? 0);",
+      "fingerprint": "5a3837a87dd7e60199e6",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_prebroker_ownership_controller_tests.py",
+      "content": "and int(physical.get(\"checked_writer_bindings\") or 0) > 0,",
+      "fingerprint": "d523dc5f8d2c1293f73d",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/run_user_flow.mjs",
+      "content": "remaining_question_count: replayedIntake.plan.remaining_question_count ?? 0,",
+      "fingerprint": "8f20dca1c6430fbca083",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 2,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify_broker_semantics.py",
+      "content": "indent = max((float(cell.get(\"indent\") or 0) for cell in row), default=0.0)",
+      "fingerprint": "5ac7c503ede85449d7f6",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/interest_lineage.py",
+      "content": "circularity = \"C%d\" % int(controls.get(\"circularity\") or 0)",
+      "fingerprint": "1a402062f4e2aaa89809",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/interest_lineage.py",
+      "content": "period_row = int(row_plan.get(\"period_row\") or 0)",
+      "fingerprint": "4c3993a650815d66e70d",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/interest_lineage.py",
+      "content": "roll_reference = \"C%d\" % int(controls.get(\"debt_maturities_roll\") or 0)",
+      "fingerprint": "e78e1b5e160e46ff3456",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/invariants.py",
+      "content": "if int(manifest.get(\"contract_version\") or 0) == 2 and not instrument_period_state:",
+      "fingerprint": "8701f972ec436b6137cb",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/invariants.py",
+      "content": "or abs(float((state.get(\"maturity_repayment\") or {}).get(\"basis_amount\") or 0)) > 1e-9",
+      "fingerprint": "432ca2bd0a286a09408e",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/invariants.py",
+      "content": "or any(abs(float(translation.get(key) or 0) - 1) > 1e-9 for key in (\"opening_rate\", \"flow_rate\", \"closing_rate\"))",
+      "fingerprint": "f6acfdab28cfc554b8d8",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/run_finance_proof_mutations.py",
+      "content": "value = float(match.group(2) or 0.0)",
+      "fingerprint": "ddf75c4d9d314825368a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/source_topology_oracle.py",
+      "content": "level = int(rows[cursor].get(\"hierarchy_level\") or 0)",
+      "fingerprint": "7011d07e075639c545d3",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/source_topology_oracle.py",
+      "content": "parent_level = int(parent.get(\"hierarchy_level\") or 0)",
+      "fingerprint": "c0e395b05c88c15260bc",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/verify/tolerances.py",
+      "content": "result = float(str(value).strip() or 0)",
+      "fingerprint": "fa316fab634ec4604e8f",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/validate_dynamic_model.py",
+      "content": "ending_rcf_value = float(period.get(\"ending_rcf\") or 0.0)",
+      "fingerprint": "1637deb411e935d81bff",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/validate_dynamic_model.py",
+      "content": "if not equal(parent_value or 0.0, total, additivity_class):",
+      "fingerprint": "39a6c190e9350c00f41e",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "unreviewed"
+    },
+    {
+      "file": "scripts/verify/validate_dynamic_model.py",
+      "content": "policy_value = float(rcf_contract.get(key) or 0.0)",
+      "fingerprint": "0bdaf50c918836c5040a",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/validate_dynamic_model.py",
+      "content": "shortfall = float(period.get(\"liquidity_shortfall\") or 0.0)",
+      "fingerprint": "761622e07227abae869e",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/validate_dynamic_model.py",
+      "content": "undrawn_rcf_value = float(period.get(\"undrawn_rcf\") or 0.0)",
+      "fingerprint": "4e4245795541b14fa416",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "suspect_value_coercion"
+    },
+    {
+      "file": "scripts/verify/workbook_semantic_oracle.py",
+      "content": "expected_row = int(rule.get(\"row\") or 0)",
+      "fingerprint": "b7e15b19a7bbcea728ab",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    }
+  ]
+}

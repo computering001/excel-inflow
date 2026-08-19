@@ -225,6 +225,24 @@
       "test_class": "unit"
     },
     {
+      "id": "etr-receipt-boundary",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_etr_receipt_boundary_tests.mjs",
+      "timeout_seconds": 180,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "entity-identifier-strength",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_entity_identifier_strength_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "multipage-filing-extraction",
       "phase": "evidence",
       "runtime": "python",

@@ -1819,6 +1819,34 @@ export function materializeForecastPlan(modelCase, plan) {
     // authorities and (for captured rows) the per-period certificates.
     delete row.formula_authority;
   }
+  // P1.5 — the ETR normalisation RECEIPT boundary. The tax-rate policy
+  // embeds its full normalisation ledger on every selected authority; before
+  // this pass the embed was stripped by later normalisation and the audit
+  // provenance silently vanished from the sealed case. The ledger is sealed
+  // ONCE at case level (hash-bound) and each authority carries only the
+  // reference; two distinct ledgers in one case is a defect, never a merge.
+  {
+    let receipt = null;
+    for (const section of ["income_statement", "cash_flow"]) {
+      for (const row of next.statement_structure?.[section] ?? []) {
+        for (const authority of row.forecast_period_authorities ?? []) {
+          if (!authority?.tax_rate_normalization) continue;
+          const body = canonical(authority.tax_rate_normalization);
+          const sha = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
+          if (receipt === null) {
+            receipt = { ...authority.tax_rate_normalization, receipt_sha256: sha };
+          } else if (receipt.receipt_sha256 !== sha) {
+            throw new Error(
+              "Two distinct tax-rate normalisation ledgers appeared in one case; the receipt boundary refuses to merge them.",
+            );
+          }
+          delete authority.tax_rate_normalization;
+          authority.tax_rate_normalization_ref = sha;
+        }
+      }
+    }
+    if (receipt) next.tax_rate_normalization_receipt = receipt;
+  }
   return next;
 }
 

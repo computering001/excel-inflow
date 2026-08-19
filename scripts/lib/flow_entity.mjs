@@ -59,6 +59,33 @@ const STABLE_IDENTIFIER_KEYS = Object.freeze([
   "ticker",
 ]);
 
+// P1.6 — identifier STRENGTH tiers. A registry-grade agreement (LEI,
+// FactSet entity, company number) identifies the LEGAL ENTITY and outranks
+// any security- or listing-grade disagreement: the same company listed on
+// two venues must not mismatch because its ticker carries a market suffix.
+// A registry-grade CONFLICT is equally decisive in the other direction.
+const IDENTIFIER_TIERS = Object.freeze([
+  { grade: "registry", keys: ["lei", "factset_entity_id", "company_number"] },
+  { grade: "security", keys: ["isin", "cusip"] },
+  { grade: "listing", keys: ["ticker"] },
+]);
+
+// A listing ticker's market suffix ("AZN.L", "AAPL US", "BMW-DE") is venue
+// notation, not identity. Two tickers are compatible when their normalised
+// forms are equal, or when one side is exactly the other's leading symbol
+// before the venue separator. Two DIFFERENT suffixed forms (share classes:
+// "BRK.A" vs "BRK.B") remain a conflict.
+function tickerCompatible(leftRaw, rightRaw) {
+  const lead = (value) =>
+    String(value ?? "").trim().toUpperCase().split(/[.\s\-:/]+/)[0].replace(/[^A-Z0-9]/g, "");
+  const left = normaliseIdentifier(leftRaw);
+  const right = normaliseIdentifier(rightRaw);
+  if (left === right) return true;
+  const leftLead = lead(leftRaw);
+  const rightLead = lead(rightRaw);
+  return leftLead === rightLead && (left === leftLead || right === rightLead);
+}
+
 function normaliseIdentifier(value) {
   const cleaned = String(value ?? "")
     .trim()
@@ -78,6 +105,13 @@ function entityDescriptor(value) {
         STABLE_IDENTIFIER_KEYS
           .map((key) => [key, normaliseIdentifier(identifiers[key] ?? value[key])])
           .filter(([, identifier]) => identifier !== null),
+      ),
+      // Raw forms survive for venue-aware comparisons (ticker suffixes are
+      // meaning-bearing separators that normalisation erases).
+      raw_identifiers: Object.fromEntries(
+        STABLE_IDENTIFIER_KEYS
+          .map((key) => [key, identifiers[key] ?? value[key] ?? null])
+          .filter(([, identifier]) => identifier !== null && identifier !== undefined),
       ),
       aliases: Array.isArray(value.aliases)
         ? value.aliases.map(String).filter(Boolean)
@@ -136,28 +170,65 @@ function tokenMatch(leftName, rightName) {
 export function matchEntities(exportEntity, filingEntity) {
   const left = entityDescriptor(exportEntity);
   const right = entityDescriptor(filingEntity);
-  const sharedIdentifierKeys = STABLE_IDENTIFIER_KEYS.filter(
-    (key) => left.identifiers[key] && right.identifiers[key],
-  );
-  const conflicts = sharedIdentifierKeys.filter(
-    (key) => left.identifiers[key] !== right.identifiers[key],
-  );
-  if (conflicts.length > 0) {
+  // P1.6: an explicitly declared perimeter difference is decisive before any
+  // identifier — the same legal group at consolidated vs company level is
+  // NOT one model entity. Silence on either side gates nothing.
+  if (
+    left.consolidation_level &&
+    right.consolidation_level &&
+    String(left.consolidation_level) !== String(right.consolidation_level)
+  ) {
     return {
       verdict: "mismatch",
-      kind: "stable_identifier_conflict",
-      stable_identifiers_compared: sharedIdentifierKeys,
-      conflicting_identifiers: conflicts,
-      left_identifiers: left.identifiers,
-      right_identifiers: right.identifiers,
+      kind: "consolidation_perimeter_mismatch",
+      left_consolidation_level: left.consolidation_level,
+      right_consolidation_level: right.consolidation_level,
       shared: [], onlyExport: [], onlyFiling: [],
     };
   }
-  if (sharedIdentifierKeys.length > 0) {
+  // Tiered identifier resolution: the STRONGEST tier with any shared key
+  // decides. A lower-tier disagreement never vetoes a higher-tier agreement;
+  // it is recorded as an overridden conflict instead.
+  const overridden = [];
+  for (const tier of IDENTIFIER_TIERS) {
+    const sharedKeys = tier.keys.filter(
+      (key) => left.identifiers[key] && right.identifiers[key],
+    );
+    if (sharedKeys.length === 0) continue;
+    const conflicts = sharedKeys.filter((key) =>
+      key === "ticker"
+        ? !tickerCompatible(left.raw_identifiers?.ticker, right.raw_identifiers?.ticker)
+        : left.identifiers[key] !== right.identifiers[key],
+    );
+    if (conflicts.length > 0) {
+      return {
+        verdict: "mismatch",
+        kind: "stable_identifier_conflict",
+        identifier_grade: tier.grade,
+        stable_identifiers_compared: sharedKeys,
+        conflicting_identifiers: conflicts,
+        left_identifiers: left.identifiers,
+        right_identifiers: right.identifiers,
+        shared: [], onlyExport: [], onlyFiling: [],
+      };
+    }
+    // Agreement at this tier settles the entity; note weaker-tier conflicts
+    // for the audit trail without letting them veto.
+    for (const lowerTier of IDENTIFIER_TIERS.slice(IDENTIFIER_TIERS.indexOf(tier) + 1)) {
+      for (const key of lowerTier.keys) {
+        if (!left.identifiers[key] || !right.identifiers[key]) continue;
+        const agrees = key === "ticker"
+          ? tickerCompatible(left.raw_identifiers?.ticker, right.raw_identifiers?.ticker)
+          : left.identifiers[key] === right.identifiers[key];
+        if (!agrees) overridden.push({ key, grade: lowerTier.grade });
+      }
+    }
     return {
       verdict: "match",
       kind: "stable_identifier_match",
-      stable_identifiers_compared: sharedIdentifierKeys,
+      identifier_grade: tier.grade,
+      stable_identifiers_compared: sharedKeys,
+      ...(overridden.length > 0 ? { overridden_weaker_conflicts: overridden } : {}),
       left_identifiers: left.identifiers,
       right_identifiers: right.identifiers,
       shared: [], onlyExport: [], onlyFiling: [],

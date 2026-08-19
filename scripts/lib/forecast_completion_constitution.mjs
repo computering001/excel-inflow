@@ -57,7 +57,11 @@ function dispositionFor(row, forecastIndex) {
   if (method === "accounting_identity") return "accounting_identity";
   if (method === "not_separately_forecast") return "captured_by_parent";
   if (method === "not_applicable") return "not_applicable";
-  if (authority?.tax_rate_normalization || authority?.formula_spec?.operator?.startsWith?.("tax_rate_policy")) {
+  if (
+    authority?.tax_rate_normalization ||
+    authority?.tax_rate_normalization_ref ||
+    authority?.formula_spec?.operator?.startsWith?.("tax_rate_policy")
+  ) {
     return "role_policy_owned";
   }
   if (DIRECT_EVIDENCE_METHODS.has(method)) return "direct_evidence_owned";
@@ -74,6 +78,27 @@ function dispositionFor(row, forecastIndex) {
 export function compileForecastCompletionCensus(modelCase) {
   const cells = [];
   const escalations = [];
+  // P1.5: every tax-rate normalisation reference must resolve to the sealed
+  // case receipt BEFORE completion may pass — a dangling or mismatched ref is
+  // an internal defect, never a deliverable state.
+  const receiptSha = modelCase?.tax_rate_normalization_receipt?.receipt_sha256 ?? null;
+  for (const section of ["income_statement", "cash_flow"]) {
+    for (const row of modelCase?.statement_structure?.[section] ?? []) {
+      for (const [index, authority] of (row?.forecast_period_authorities ?? []).entries()) {
+        const ref = authority?.tax_rate_normalization_ref;
+        if (ref && ref !== receiptSha) {
+          escalations.push({
+            section,
+            row_id: row.row_id,
+            forecast_index: index,
+            reason: receiptSha === null
+              ? "tax_rate_normalization_ref does not resolve: the case carries no sealed receipt"
+              : "tax_rate_normalization_ref does not match the sealed case receipt hash",
+          });
+        }
+      }
+    }
+  }
   for (const section of ["income_statement", "cash_flow"]) {
     for (const row of modelCase?.statement_structure?.[section] ?? []) {
       if (row?.row_type === "header") continue;
