@@ -1,0 +1,139 @@
+{
+  "schema_version": "excel-inflow-blocker-corpus/1.0",
+  "work_package": "P0.2",
+  "invariant": "Every known blocker reproduces deterministically or is explicitly classified as non-reproducible with missing evidence named.",
+  "baseline_commit": "433bd237b73e15bc844d5cd64175f0758ebe1d9f",
+  "hash_algorithm": "sha256",
+  "custody_root_expected": "/Users/archiepreston/Documents/Codex/private-test-custody",
+  "cases": [
+    {
+      "case_id": "astrazeneca-tax-schema-blocker",
+      "entity": "AstraZeneca PLC",
+      "accounting_basis": "IFRS",
+      "expected_support_class": "CERTIFIED",
+      "expected_terminal_result": "clean_compile",
+      "observed_failure_stage": "live Rogo run 2026-08-11 (corrupted delivery: tax schema, identity, statement-role, policy-totality and debt-bridge defects)",
+      "known_reason_code": "historical: pre-v3.7.x compiler defect family; root cause recorded in the v3 constitution notes",
+      "privacy_classification": "public-issuer, sealed derived case only",
+      "replayable": "MINIMISED_ONLY",
+      "evidence_gap": "Raw 2026-08-11 live-run bytes (broker documents, user selections, logs, delivered workbook) existed only inside the Rogo host and were never exported; they are NOT locally retained. The sealed astrazeneca-v2.json certification case is the minimised reproducer; the original live failure is not fully replayable and is classified accordingly.",
+      "fixtures": [
+        {
+          "path": "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases/astrazeneca-v2.json",
+          "location": "repo_external_symlink",
+          "sha256": "877724f8840643a9489d2a472e2e23926795854a34513fa7574770cf78dddf39"
+        }
+      ],
+      "replay_command": "node scripts/run_case_compiler_equivalence.mjs fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases astrazeneca",
+      "replay_assertion": "the sealed AstraZeneca case compiles clean under the current compiler (regression direction: the historical defect family must stay fixed)"
+    },
+    {
+      "case_id": "apple-us-gaap-raw-canary",
+      "entity": "Apple Inc.",
+      "accounting_basis": "US_GAAP",
+      "expected_support_class": "CERTIFIED",
+      "expected_terminal_result": "DELIVERED (portable validation PASS_PENDING_MANUAL, semantic oracle PASS, 0 violations)",
+      "observed_failure_stage": "historical progression canary1-canary28 (role blindness -> evidence findings -> N10/N11/N12 -> N13 fiscal/provenance/semantic-oracle/fixed-point failures), all resolved at e745176; at this baseline the canary DELIVERS",
+      "known_reason_code": "historical signatures: OOXML_DUPLICATE_ANSWER_OWNER, OOXML_SCOPE_CAPTURE_PARENT_NOT_AUTHORITATIVE, OOXML_FIXED_POINT_SCC_SPLIT, statement-cycle-containment, fiscal-year-period-contract, historical-provenance-comments",
+      "privacy_classification": "public filing (SEC Form 10-K)",
+      "replayable": "FULL",
+      "evidence_gap": null,
+      "fixtures": [
+        {
+          "path": "real-filings/public-form-10k-2025.pdf",
+          "location": "custody",
+          "sha256": "108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab"
+        },
+        {
+          "path": "real-filings/public-form-10k-2025-request.json",
+          "location": "custody",
+          "sha256": "f93cb8a4f1ea16c7577111ba13e63ae6fb7a4e2b38a821ece7a3e9f3cdc78183"
+        },
+        {
+          "path": "real-filings/public-form-10k-2025-expectations.json",
+          "location": "custody",
+          "sha256": "0403f05ec21e672ce83d610636a76b900e5a046f41f3c02393e6a2b40c20d731"
+        }
+      ],
+      "replay_command": "node scripts/run_raw_input_black_box_canary.mjs <regenerated-donor-evidence> <python> <soffice> --real-filings-request <custody>/real-filings/public-form-10k-2025-request.json --real-filings-expectations <custody>/real-filings/public-form-10k-2025-expectations.json",
+      "replay_assertion": "raw PDF bytes deliver a workbook: build PASS_PENDING_MANUAL, workbook-semantic-oracle PASS with zero findings, portable validator zero violations"
+    },
+    {
+      "case_id": "working-capital-capture-blocker",
+      "entity": "Apple Inc. (probe); defect class is general",
+      "accounting_basis": "US_GAAP",
+      "expected_support_class": "CERTIFIED",
+      "expected_terminal_result": "clean decisions-stage compile with the WC family children-owned",
+      "observed_failure_stage": "N13 verify_semantic (canary22-canary27): OOXML_SCOPE_CAPTURE_PARENT_NOT_AUTHORITATIVE J57:L57, then statement-cycle-containment rows 57-59",
+      "known_reason_code": "ownership resolver classified a parent identity-formula-over-own-children as direct evidence and captured the children; consolidation ref-rewrite converted a self prior-period carry into a parent link",
+      "privacy_classification": "public filing (SEC Form 10-K)",
+      "replayable": "FULL",
+      "evidence_gap": null,
+      "fixtures": [
+        {
+          "path": "real-filings/public-form-10k-2025.pdf",
+          "location": "custody",
+          "sha256": "108590052c3ba5400c63660d787fe7ed4e43868292946d7a7facebe9ab7d1aab"
+        }
+      ],
+      "replay_command": "node scripts/run_user_flow.mjs <apple-evidence-run.json> --out <tmp> --stop-after decisions --json --python <python>",
+      "replay_assertion": "change_in_working_capital carries accounting_identity authorities with an executable sum over LIVE children; vendor_non_trade_receivables and inventory_movement carry self-referential prior_period carries and no forecast_capture_mode"
+    },
+    {
+      "case_id": "etr-recursion-normalisation",
+      "entity": "synthetic (standard v2 cases)",
+      "accounting_basis": "IFRS",
+      "expected_support_class": "CERTIFIED",
+      "expected_terminal_result": "24/24 tax-rate policy checks pass",
+      "observed_failure_stage": "historical v3.7.x development: ETR recursion/normalisation receipt duplication and schema failures",
+      "known_reason_code": "historical: tax_rate_normalization receipt duplication; fixed and pinned by run_tax_rate_policy_tests.mjs",
+      "privacy_classification": "synthetic",
+      "replayable": "FULL",
+      "evidence_gap": "The original live ETR failure bytes (v57-era Rogo runs) were not exported; the policy suite is the deterministic reproducer of the defect class.",
+      "fixtures": [
+        {
+          "path": "test-fixtures/cases/standard-maximal-v2.json",
+          "location": "repo",
+          "sha256": "8b941b4e7bd4ee217ffa44d0cbeb9c2db9cb74fa642f80e7f7e7a6b5ae597e48"
+        },
+        {
+          "path": "test-fixtures/cases/standard-net-cash-v2.json",
+          "location": "repo",
+          "sha256": "c57166116bd8b92b7adfaacf8fea8801336dbdace7155e5d4f86f3bcc9f312ff"
+        }
+      ],
+      "replay_command": "node scripts/run_tax_rate_policy_tests.mjs",
+      "replay_assertion": "{\"checks\":24,\"status\":\"PASS\"}"
+    },
+    {
+      "case_id": "package-identity-discrepancy",
+      "entity": "n/a (release package)",
+      "accounting_basis": "n/a",
+      "expected_support_class": "n/a",
+      "expected_terminal_result": "KNOWN_FAILING at baseline 433bd237: run_release_identity_governance_tests.mjs pins skill_version '3.7.5' and fails ERR_ASSERTION \"'3.7.6' !== '3.7.5'\" at line 29 against the 3.7.6 runtime manifest; the registered CI gate is therefore untruthful at exact head. Repair is owned by P0.3, after which this case's expectation flips to PASS.",
+      "observed_failure_stage": "release packaging: v3.7.6 dependency scanning defect repaired at 433bd237 (the baseline commit itself); the identity-governance suite carries a stale version literal missed by the 3.7.6 bump; install discrepancies between local and Rogo package identity",
+      "known_reason_code": "stale test version pin (ERR_ASSERTION '3.7.6' !== '3.7.5'); release dependency scanning missed shipped-script command dependencies; typed refusal 'Package/source identity check requires a clean worktree.'",
+      "privacy_classification": "internal",
+      "replayable": "FULL",
+      "evidence_gap": null,
+      "fixtures": [],
+      "replay_command": "node scripts/run_release_identity_governance_tests.mjs",
+      "replay_assertion": "CURRENT signature: exit non-zero with ERR_ASSERTION \"'3.7.6' !== '3.7.5'\" (documented open defect, P0.3 repairs it and flips this assertion to PASS)"
+    },
+    {
+      "case_id": "runtime-deadline-overrun",
+      "entity": "synthetic",
+      "accounting_basis": "n/a",
+      "expected_support_class": "n/a",
+      "expected_terminal_result": "17/17 deadline checks pass (overruns degrade or checkpoint; never silent hang)",
+      "observed_failure_stage": "historical: live runs stalling at BROKERS stage and mid-flight deadline overruns (2026-08-12 era)",
+      "known_reason_code": "runtime budget overrun; recovery = resume from Stage-3 artifacts; never resume across a version change",
+      "privacy_classification": "synthetic",
+      "replayable": "FULL",
+      "evidence_gap": "Original stalled-run logs lived in Rogo; the deadline suite deterministically reproduces the overrun/checkpoint behaviour class.",
+      "fixtures": [],
+      "replay_command": "node scripts/run_run_deadline_tests.mjs",
+      "replay_assertion": "{\"checks\":17,\"status\":\"PASS\"}"
+    }
+  ]
+}
