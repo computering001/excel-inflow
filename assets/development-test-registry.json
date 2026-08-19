@@ -1598,6 +1598,42 @@
       "test_class": "mutation"
     },
     {
+      "id": "formula-ast",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_formula_ast_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "performance-receipt-honesty",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_performance_receipt_honesty_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "generated-case-cohort",
+      "phase": "cohort",
+      "runtime": "node",
+      "script": "run_generated_cohort_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
+      "id": "archetype-economics",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_archetype_economics_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "archetype-presentation",
       "phase": "evidence",
       "runtime": "node",

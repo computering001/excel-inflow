@@ -1,0 +1,463 @@
+{
+  "contract_version": 2,
+  "execution_profile": "reference_parity",
+  "case_id": "discontinued_operations_disclosed",
+  "issuer": {
+    "name": "Disposal Group Co (P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY)",
+    "reporting_currency": "USD",
+    "units": "millions",
+    "fiscal_year_end": "12-31"
+  },
+  "periods": [
+    {
+      "date": "2023-12-31",
+      "status": "historical"
+    },
+    {
+      "date": "2024-12-31",
+      "status": "historical"
+    },
+    {
+      "date": "2025-12-31",
+      "status": "historical"
+    },
+    {
+      "date": "2026-12-31",
+      "status": "forecast"
+    },
+    {
+      "date": "2027-12-31",
+      "status": "forecast"
+    },
+    {
+      "date": "2028-12-31",
+      "status": "forecast"
+    }
+  ],
+  "modules": {
+    "multi_currency": false,
+    "historical_normalisation": false,
+    "acquisition": false
+  },
+  "controls": {
+    "broker_case": "Consensus",
+    "circularity": 1,
+    "debt_maturities_roll": 1
+  },
+  "operating_metrics": {
+    "revenue": {
+      "values": [
+        1000,
+        1050,
+        1100,
+        1150,
+        1200,
+        1250
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "adjusted_ebitda": {
+      "values": [
+        200,
+        210,
+        220,
+        230,
+        240,
+        250
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "depreciation_and_amortisation": {
+      "values": [
+        50,
+        52,
+        54,
+        56,
+        58,
+        60
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "change_in_working_capital": {
+      "values": [
+        -10,
+        -10,
+        -10,
+        -10,
+        -10,
+        -10
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "capex": {
+      "values": [
+        40,
+        42,
+        44,
+        46,
+        48,
+        50
+      ],
+      "forecast_method": "supplied_exact",
+      "source_kind": "user_supplied"
+    },
+    "tax": {
+      "values": [
+        30,
+        31,
+        32,
+        null,
+        null,
+        null
+      ],
+      "forecast_method": "not_applicable",
+      "source_kind": "user_supplied"
+    }
+  },
+  "statement_structure": {
+    "income_statement": [
+      {
+        "row_id": "revenue",
+        "label": "Revenue",
+        "row_type": "input",
+        "values": [
+          1000,
+          1050,
+          1100,
+          1150,
+          1200,
+          1250
+        ],
+        "forecast_treatment": "hardcode",
+        "semantic_role": "revenue",
+        "operation_scope": "continuing"
+      },
+      {
+        "row_id": "adjusted_ebitda",
+        "label": "Adjusted EBITDA",
+        "row_type": "input",
+        "values": [
+          200,
+          210,
+          220,
+          230,
+          240,
+          250
+        ],
+        "forecast_treatment": "hardcode",
+        "semantic_role": "adjusted_ebitda",
+        "operation_scope": "continuing"
+      },
+      {
+        "row_id": "is_da_expense",
+        "label": "Depreciation and amortisation",
+        "row_type": "input",
+        "values": [
+          -50,
+          -52,
+          -54,
+          -56,
+          -58,
+          -60
+        ],
+        "forecast_treatment": "hardcode"
+      },
+      {
+        "row_id": "ebit",
+        "label": "Operating profit",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "adjusted_ebitda",
+            "is_da_expense"
+          ]
+        },
+        "semantic_role": "ebit",
+        "operation_scope": "continuing"
+      },
+      {
+        "row_id": "interest_income",
+        "label": "Finance income",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "interest_income"
+      },
+      {
+        "row_id": "interest_expense",
+        "label": "Finance costs",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": []
+        },
+        "semantic_role": "interest_expense"
+      },
+      {
+        "row_id": "discontinued_result",
+        "label": "Result from discontinued operations",
+        "row_type": "input",
+        "values": [
+          -25,
+          -30,
+          -35,
+          -20,
+          0,
+          0
+        ],
+        "forecast_treatment": "hardcode",
+        "semantic_role": "discontinued_operation",
+        "operation_scope": "discontinued"
+      },
+      {
+        "row_id": "pre_tax_income",
+        "label": "Profit before taxation",
+        "row_type": "calculation",
+        "calculation": {
+          "operator": "sum",
+          "refs": [
+            "ebit",
+            "interest_income",
+            "interest_expense",
+            "discontinued_result"
+          ]
+        },
+        "semantic_role": "pre_tax_income"
+      }
+    ],
+    "cash_flow": [
+      {
+        "row_id": "capex",
+        "label": "Purchase of property, plant and equipment",
+        "row_type": "input",
+        "values": [
+          -40,
+          -42,
+          -44,
+          -46,
+          -48,
+          -50
+        ],
+        "forecast_treatment": "hardcode",
+        "semantic_role": "capex"
+      }
+    ]
+  },
+  "source_coverage": {
+    "status": "complete",
+    "reviewed_at": "2026-08-19",
+    "review_evidence": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY. Every figure in this case is generated by that specification: there is no issuer, no filing, no broker note and no third-party research behind any number. The inventory is complete against the specification because the specification IS the source.",
+    "income_statement": [
+      {
+        "source_line_id": "is.revenue",
+        "label": "Revenue",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Revenue\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "revenue"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.adjusted_ebitda",
+        "label": "Adjusted EBITDA",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Adjusted EBITDA\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "adjusted_ebitda"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.is_da_expense",
+        "label": "Depreciation and amortisation",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Depreciation and amortisation\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "is_da_expense"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.ebit",
+        "label": "Operating profit",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Operating profit\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "ebit"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.interest_income",
+        "label": "Finance income",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Finance income\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "interest_income"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.interest_expense",
+        "label": "Finance costs",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Finance costs\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "interest_expense"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.discontinued_result",
+        "label": "Result from discontinued operations",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Result from discontinued operations\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "discontinued_result"
+        ],
+        "mapping_method": "exact"
+      },
+      {
+        "source_line_id": "is.pre_tax_income",
+        "label": "Profit before taxation",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Profit before taxation\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "pre_tax_income"
+        ],
+        "mapping_method": "exact"
+      }
+    ],
+    "cash_flow": [
+      {
+        "source_line_id": "cf.capex",
+        "label": "Purchase of property, plant and equipment",
+        "document": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+        "page_or_note": "Synthetic archetype specification, line \"Purchase of property, plant and equipment\"",
+        "face_statement": true,
+        "material": true,
+        "disposition": "mapped",
+        "mapped_row_ids": [
+          "capex"
+        ],
+        "mapping_method": "exact"
+      }
+    ]
+  },
+  "provenance": {},
+  "broker_pack": {
+    "source_label": "P7.1b synthetic archetype specification v1 — NOT A REAL COMPANY",
+    "forecast_periods": [
+      "2026-12-31",
+      "2027-12-31",
+      "2028-12-31"
+    ],
+    "metrics": {}
+  },
+  "instruments": [
+    {
+      "instrument_id": "senior_notes",
+      "display_order": 0,
+      "name": "Senior notes",
+      "class": "bond_fixed",
+      "currency": "USD",
+      "balance_basis": "native_principal",
+      "opening_balance": 500,
+      "rate_type": "fixed",
+      "coupon_or_all_in_rate": [
+        0.05,
+        0.05,
+        0.05
+      ],
+      "maturity_date": "2032-06-30",
+      "include_in_gross_debt": true,
+      "include_in_net_debt": true,
+      "cash_interest": true
+    }
+  ],
+  "debt_reconciliation": {
+    "reported_opening_gross_debt": 500,
+    "maximum_residual_percentage": 0.05
+  },
+  "rcf_policy": {
+    "mode": "none",
+    "capacity": 0,
+    "opening_draw": 0,
+    "commitment_fee_convention": "none",
+    "commitment_fee_value": 0
+  },
+  "cash_policy": {
+    "opening_cash": 100,
+    "historical_year_end_cash": [
+      80,
+      90,
+      100
+    ],
+    "minimum_cash_override": null,
+    "eligible_cash_percentage": 1,
+    "cash_yield": [
+      0.01,
+      0.01,
+      0.01
+    ]
+  },
+  "lease_policy": {
+    "mode": "exclude",
+    "principal_repayment": [
+      0,
+      0,
+      0
+    ],
+    "additions": [
+      0,
+      0,
+      0
+    ],
+    "effective_rate": [
+      0,
+      0,
+      0
+    ],
+    "include_in_gross_debt": false,
+    "include_in_net_debt": false,
+    "include_in_leverage": false,
+    "opening_liability": 0
+  },
+  "other_interest": [
+    0,
+    0,
+    0
+  ]
+}

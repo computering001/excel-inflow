@@ -1,0 +1,711 @@
+{
+  "schema_version": "excel-inflow-archetype-case-catalogue/1.0",
+  "catalogue_group": "economics",
+  "invariant": "Each entry binds ONE named economics, period, tax or schedule shape that a naive implementation gets wrong to a minimal synthetic v2 case and to TYPED expectations the runner asserts against compiled artifacts. A case that merely compiles proves nothing: every entry carries at least one expectation that is not compiles_clean, and scripts/run_archetype_economics_tests.mjs fails if any declared expectation has no implemented check or if a check asserts nothing.",
+  "entries": [
+    {
+      "archetype_id": "fiscal_53_week_year",
+      "case_path": "test-fixtures/archetypes/economics/fiscal_53_week_year.json",
+      "accounting_shape": "52/53-week fiscal calendar: year ends move to the Saturday nearest 31 December and one year in the series is 53 weeks long, carrying an extra trading week of revenue.",
+      "why_it_breaks_models": "A naive implementation compares each period end against a literal MM-DD year end and hard-fails a retailer that can never satisfy it, or accepts the dates and treats the 53-week year as if it were 52 weeks, so the extra week's revenue is read as organic growth and the following 52-week year as a slowdown.",
+      "proves_envelope_values": [
+        { "dimension": "fiscal_calendar", "value": "week_52_53" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "week_series_validates",
+          "kind": "period_arithmetic",
+          "statement": "With issuer.fiscal_calendar = 52_53_week, validateFiscalPeriods returns zero errors, every consecutive span is a whole number of weeks, exactly one span is 53 weeks and the rest are 52, and every end falls on one weekday within a week of the 12-31 anchor. Recorded with it: the case contract spells the calendar 52_53_week while the support envelope's fiscal_calendar dimension spells the same calendar week_52_53, so no string join relates the two vocabularies."
+        },
+        {
+          "expectation_id": "fixed_date_declaration_bites",
+          "kind": "period_arithmetic",
+          "statement": "The SAME six dates declared as fiscal_calendar = fixed_date produce six typed periods.fiscal_year_end_mismatch errors, and a one-day transcription slip inside the 52/53-week series produces periods.52_53_week_weekday_drift plus periods.52_53_week_span. The calendar declaration is a real check, not a waiver."
+        },
+        {
+          "expectation_id": "extra_week_is_unnormalised",
+          "kind": "value_state",
+          "statement": "The 53-week year's extra week is invisible to the economics: the case contract carries no period-length or week-count field, the solved revenue series is the filed nominal series unchanged, and nothing in the compiled artifact states that one historical column covers 371 days rather than 364."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "stub_short_first_period",
+      "case_path": "test-fixtures/archetypes/economics/stub_short_first_period.json",
+      "accounting_shape": "Stub (short) first reporting period: the oldest historical column covers nine months to 31 March, the other two cover full years.",
+      "why_it_breaks_models": "A naive implementation treats all three historical columns as comparable years, so the growth rate off a nine-month base overstates growth by about a third, and every ratio built on the stub column (margin trend, capex intensity, working-capital days) is computed against a partial year.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "stub_period_is_typed",
+          "kind": "period_arithmetic",
+          "statement": "validateFiscalPeriods reports exactly one error, periods.fiscal_year_end_mismatch on period index 0, naming the stub date and the expected 12-31: the shape is detected and named per period rather than silently accepted."
+        },
+        {
+          "expectation_id": "stub_span_is_not_annualised",
+          "kind": "period_arithmetic",
+          "statement": "The period-0 to period-1 span is 275 days while every later span is 365 or 366, and the compiled case exposes no period-length, days-in-period or annualisation field: the nine-month revenue is carried into growth arithmetic as if it were a year."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "changed_fiscal_year_end",
+      "case_path": "test-fixtures/archetypes/economics/changed_fiscal_year_end.json",
+      "accounting_shape": "Fiscal year end changed mid-history: two June year ends followed by December year ends, with the transition period spanning eighteen months of trading.",
+      "why_it_breaks_models": "A naive implementation holds one year end for the whole series, so either the pre-change or the post-change columns are rejected as mis-dated, and no column carries the disclosure that the periods are not comparable.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "new_anchor_flags_old_periods",
+          "kind": "period_arithmetic",
+          "statement": "Declared against the post-change 12-31 anchor, validateFiscalPeriods reports exactly two periods.fiscal_year_end_mismatch errors, on period indices 0 and 1."
+        },
+        {
+          "expectation_id": "no_single_anchor_describes_the_series",
+          "kind": "period_arithmetic",
+          "statement": "Declared against the pre-change 06-30 anchor the mismatch moves to the other four periods, and declared as 52_53_week the series fails the whole-week span test. No value of issuer.fiscal_year_end or issuer.fiscal_calendar describes a changed year end: the contract cannot represent this shape."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "loss_making_no_nol_stock",
+      "case_path": "test-fixtures/archetypes/economics/loss_making_no_nol_stock.json",
+      "accounting_shape": "Loss-making issuer with a declared 25% effective tax rate: two forecast years of negative pre-tax income followed by a return to profit.",
+      "why_it_breaks_models": "A naive implementation writes tax = rate x pre-tax income in every column, so a loss year fabricates a tax CREDIT that adds cash the company never receives; and when profit returns it charges full tax with no recognition of the losses just incurred.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "loss_year_tax_is_exactly_zero",
+          "kind": "value_state",
+          "statement": "In both loss years the solved tax charge is exactly 0 while the declared rate is 25% and pre-tax income is negative: the clamp is max(0, PBT) x rate, so no tax credit is fabricated."
+        },
+        {
+          "expectation_id": "loss_year_net_income_equals_pbt",
+          "kind": "identity_or_footing",
+          "statement": "In both loss years net income equals pre-tax income to within 1e-9 — no tax line moves the loss in either direction."
+        },
+        {
+          "expectation_id": "recovery_year_carries_no_nol_shield",
+          "kind": "value_state",
+          "statement": "In the recovery year tax equals exactly 25% of positive pre-tax income even though the two immediately preceding forecast years lost over 180 in aggregate. The model carries no NOL stock, no carryforward state and no field to declare one, so the recovered profit is taxed in full."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "all_loss_history_tax_policy",
+      "case_path": "test-fixtures/archetypes/economics/all_loss_history_tax_policy.json",
+      "accounting_shape": "Every filed period is a loss with nil tax: there is no historical effective tax rate to infer at all.",
+      "why_it_breaks_models": "A naive implementation divides tax by a negative pre-tax income and carries the resulting sign-flipped percentage forward as a rate, or silently writes 0% and lets a reader believe zero tax was observed rather than that no rate exists.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "loss_periods_excluded_from_rate_inference",
+          "kind": "value_state",
+          "statement": "normaliseHistoricalEffectiveTaxRates classifies all three filed periods as a loss shape (loss_with_tax_charge or loss_tax_benefit) with the loss-policy exclusion reason recorded, usable_rates is empty, and no negative rate is ever produced."
+        },
+        {
+          "expectation_id": "loss_case_policy_is_declared_not_silent",
+          "kind": "authority_selection",
+          "statement": "taxRatePolicyCandidate returns the documented loss rung: method explicit_zero with formula_spec.operator tax_rate_policy_loss_case, source_kind historical_inference, value 0, and a note stating that the loss rule owns the forecast — a declared policy state, never a silently invented percentage."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "negative_effective_tax_rate",
+      "case_path": "test-fixtures/archetypes/economics/negative_effective_tax_rate.json",
+      "accounting_shape": "Negative effective tax rate in one year: a released provision produces a net tax CREDIT against positive pre-tax income, between two ordinary rate years.",
+      "why_it_breaks_models": "A naive implementation averages the three filed ratios, so a single credit year drags the forecast rate below the statutory rate (or negative), and the forecast then books tax income forever.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "credit_year_is_classified_and_excluded",
+          "kind": "authority_selection",
+          "statement": "The credit year is classified tax_credit_on_profit with the exclusion reason recorded on the normalization ledger and is not usable; the two ordinary years are classified normal_rate and are usable."
+        },
+        {
+          "expectation_id": "selected_rate_is_positive_median",
+          "kind": "value_state",
+          "statement": "taxRatePolicyCandidate returns method historical_average with operator tax_rate_policy_median and value equal to the median of the two usable rates (0.264583...), strictly positive and strictly between them: no negative rate reaches the forecast."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "tax_holiday_zero_rate",
+      "case_path": "test-fixtures/archetypes/economics/tax_holiday_zero_rate.json",
+      "accounting_shape": "Tax holiday / zero-rate jurisdiction: profitable in all three filed years with nil tax expense filed in each.",
+      "why_it_breaks_models": "A naive implementation infers a 0% forecast rate from the filed zeros and books untaxed profit forever, or treats the zeros as missing data and substitutes a statutory rate the issuer does not pay.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "no_rate_is_invented",
+          "kind": "authority_selection",
+          "statement": "taxRatePolicyCandidate returns null: with no usable rate and no loss shape the policy has nothing defensible to say, so the effective-tax-rate row escalates to a decision instead of a silently invented percentage."
+        },
+        {
+          "expectation_id": "reported_zero_is_misclassified_as_a_credit",
+          "kind": "value_state",
+          "statement": "DEFECT: all three profitable nil-tax periods are classified tax_credit_on_profit with the reason 'a tax credit against positive pre-tax income is not a recurring rate'. A genuine reported zero rate is indistinguishable from a tax credit on the ledger — the policy has no reported_zero classification even though the row-level value-state vocabulary carries one."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "etr_above_usable_ceiling",
+      "case_path": "test-fixtures/archetypes/economics/etr_above_usable_ceiling.json",
+      "accounting_shape": "Distorted effective tax rate: two years carry a valuation-allowance charge at roughly 80% of pre-tax income, one year is an ordinary rate year.",
+      "why_it_breaks_models": "A naive implementation averages all three ratios and forecasts a 60-plus per cent tax rate driven by one-off allowance charges, understating post-tax cash flow for the whole forecast.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "distorted_years_excluded_by_ceiling",
+          "kind": "authority_selection",
+          "statement": "The two allowance years are classified distorted_rate with an exclusion reason naming the 0.6 usable ceiling and the observed rate; only the ordinary year is usable."
+        },
+        {
+          "expectation_id": "single_observation_is_carried_forward",
+          "kind": "value_state",
+          "statement": "With exactly one usable observation the policy returns method carry_forward with operator tax_rate_policy_latest and value equal to that single normalized rate (0.247058...), not a mean that includes the distorted years."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "pik_only_debt",
+      "case_path": "test-fixtures/archetypes/economics/pik_only_debt.json",
+      "accounting_shape": "PIK-only note: no cash coupon, 8% capitalised into principal each year, no maturity inside the forecast.",
+      "why_it_breaks_models": "A naive implementation pays the PIK coupon in cash, so it understates ending debt (which never compounds), overstates interest paid and double-counts the charge in the cash flow; or it omits the accretion entirely and leaves the balance flat.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "pik_accretes_the_principal",
+          "kind": "schedule_behaviour",
+          "statement": "Each forecast year the instrument's ending native balance equals its opening balance plus the PIK accretion, the first year's accretion is the closed-form average-balance fixed point 300 x 0.08 / (1 - 0.08/2) = 25.0, and each year's opening balance equals the prior year's ending balance."
+        },
+        {
+          "expectation_id": "pik_is_non_cash_interest",
+          "kind": "value_state",
+          "statement": "Cash coupon interest and cash repayment are both exactly 0 while the whole charge appears in non_cash_instrument_interest and in gross interest, and cash from operations is unreduced by it (the charge is added back), so no cash leaves for a coupon nobody paid."
+        },
+        {
+          "expectation_id": "roll_forward_invariant_omits_pik",
+          "kind": "identity_or_footing",
+          "statement": "DEFECT: validateSolutionInvariants reports debt.instrument_roll_forward for this instrument in all three forecast years. Its expected ending balance is opening + issuance + other_non_cash - amortisation - maturity_repayment, which omits pik_interest_native (and fair_value_movement_native), so the release-grade solution invariant contradicts the solver's own correct PIK roll-forward. Neither certified fixture carries a PIK instrument, so the gap is unexercised there."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "zero_coupon_accreting_to_par",
+      "case_path": "test-fixtures/archetypes/economics/zero_coupon_accreting_to_par.json",
+      "accounting_shape": "Zero-coupon accreting note redeemed at par inside the forecast: 200 accretes at 6% and matures in forecast year two.",
+      "why_it_breaks_models": "A naive implementation repays the original face value at maturity rather than the accreted carrying amount, leaving a residual balance or a phantom gain, and keeps accruing interest in the year after redemption.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "maturity_repays_the_accreted_balance",
+          "kind": "schedule_behaviour",
+          "statement": "In the maturity year the repayment equals the accreted balance (opening plus that year's accretion, 225.507...), not the 200 face; the ending balance is exactly 0; and in the following year accretion, interest and balance are all exactly 0."
+        },
+        {
+          "expectation_id": "accretion_roll_forward_invariant_omits_pik",
+          "kind": "identity_or_footing",
+          "statement": "DEFECT (same omission as the PIK archetype): validateSolutionInvariants reports debt.instrument_roll_forward in the two years that carry accretion, because the invariant's expected ending balance excludes pik_interest_native."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "revolver_fully_drawn_at_open",
+      "case_path": "test-fixtures/archetypes/economics/revolver_fully_drawn_at_open.json",
+      "accounting_shape": "Revolver fully drawn at the opening date (draw equals capacity) in front of a loss-making forecast that needs more liquidity.",
+      "why_it_breaks_models": "A naive implementation treats the balancing revolver as unlimited and draws whatever the cash flow needs, inventing liquidity that does not exist and hiding the funding gap; or it charges a commitment fee on an undrawn amount of zero.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "no_draw_beyond_capacity",
+          "kind": "schedule_behaviour",
+          "statement": "Undrawn capacity is exactly 0 in every forecast year, the draw is exactly 0 despite a cash deficit, the ending revolver balance stays at the 250 capacity, and a positive liquidity shortfall is reported instead of a manufactured draw."
+        },
+        {
+          "expectation_id": "shortfall_identity_and_gates",
+          "kind": "identity_or_footing",
+          "statement": "In every year the shortfall equals minimum cash minus ending cash exactly, and the solved checks rcf_within_bounds, minimum_cash_or_shortfall, liquidity_shortfall_visible, rcf_draw_repayment_mutually_exclusive and shortfall_only_when_capacity_exhausted are all true, with validateSolutionInvariants clean."
+        },
+        {
+          "expectation_id": "commitment_fee_on_zero_undrawn",
+          "kind": "value_state",
+          "statement": "The 35bp commitment-fee convention produces a fee of exactly 0 because nothing is undrawn: the fee follows the undrawn balance, not the facility size."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "revolver_undrawn_commitment_fee_only",
+      "case_path": "test-fixtures/archetypes/economics/revolver_undrawn_commitment_fee_only.json",
+      "accounting_shape": "Committed revolver that is never drawn: a 400 facility with a 35bp commitment fee on the undrawn balance and no other debt.",
+      "why_it_breaks_models": "A naive implementation reports zero finance cost because no debt is outstanding, so an issuer whose only borrowing cost is a facility fee shows no interest line at all; or it charges the drawn margin on the whole facility.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "fee_is_bps_on_undrawn_only",
+          "kind": "value_state",
+          "statement": "Undrawn capacity is 400 in each forecast year, the commitment fee is exactly 1.4 (35bp x 400), revolver interest is exactly 0, and gross interest equals the fee alone — a facility that costs money while unused."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "floating_benchmark_floor_binding",
+      "case_path": "test-fixtures/archetypes/economics/floating_benchmark_floor_binding.json",
+      "accounting_shape": "Floating term loan with a contractual benchmark floor above the market benchmark: 2.0% floor, 0.5% benchmark, 250bp spread.",
+      "why_it_breaks_models": "A naive implementation prices the loan at benchmark plus spread (3.0%) and understates interest by a third, because a floor is a term in the credit agreement and never appears in the rate curve.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "floor_replaces_the_reference_leg",
+          "kind": "value_state",
+          "statement": "The all-in rate implied by the solved interest is exactly 4.5% = max(floor, benchmark) + spread, giving 18.0 of interest on the 400 balance in every forecast year, not the 12.0 that benchmark plus spread would produce. The floor is applied to the reference leg BEFORE the spread."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "multi_tranche_mixed_balance_basis",
+      "case_path": "test-fixtures/archetypes/economics/multi_tranche_mixed_balance_basis.json",
+      "accounting_shape": "Two euro tranches on DIFFERENT balance bases: one stated as native principal, one already stated as a reporting-currency carrying value, with a strengthening euro.",
+      "why_it_breaks_models": "A naive implementation reads the currency label as the basis and translates both tranches, so the tranche already carried in reporting currency is translated a second time and gross debt inflates by a currency movement that was already in the number.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "only_native_principal_is_translated",
+          "kind": "value_state",
+          "statement": "The native-principal tranche's reporting balance tracks the period-end curve (120, 130, 140 on a constant 100 of native principal) with a non-zero FX non-cash movement each year, while the reporting-currency carrying-value tranche stays at exactly 110 with an FX non-cash movement of exactly 0 in every year. Denomination never implies basis."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "fx_debt_translation_non_cash",
+      "case_path": "test-fixtures/archetypes/economics/fx_debt_translation_non_cash.json",
+      "accounting_shape": "Foreign-currency bond with the euro strengthening then weakening: 200 of EUR principal, unchanged in native terms, translated at moving period-end rates.",
+      "why_it_breaks_models": "A naive implementation books the change in translated debt as a repayment or an issuance, so financing cash flow moves with the exchange rate and the cash statement stops footing; or it reports an FX gain in interest.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "translation_never_enters_financing_cash",
+          "kind": "identity_or_footing",
+          "statement": "The FX non-cash movement is non-zero in the years the curve moves (+30 and -40) and zero in the year it does not, while cash repayment on the instrument and total non-revolver debt repayment are exactly 0 in all three years: translation moves the balance without any financing cash flow."
+        },
+        {
+          "expectation_id": "native_principal_is_unchanged",
+          "kind": "value_state",
+          "statement": "Native principal stays at exactly 200 in every forecast year while the reporting-currency balance moves to 250, 250 and 210: the two bases are held separately and the movement is derived from the declared currency curve, not from a restated principal."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "debt_maturing_mid_forecast",
+      "case_path": "test-fixtures/archetypes/economics/debt_maturing_mid_forecast.json",
+      "accounting_shape": "Bond maturing part-way through a forecast year (30 June 2027) with no refinancing declared.",
+      "why_it_breaks_models": "A naive implementation charges a full year of interest in the maturity year and keeps charging interest afterwards on a bond that no longer exists, or repays it at the start of the year and understates interest.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "interest_is_day_weighted_then_ceases",
+          "kind": "schedule_behaviour",
+          "statement": "Year one carries a full 25.0 of interest on the 500 balance; the maturity year carries 12.397... which is 500 x 5% x 181/365 to the maturity date; the year after carries exactly 0 interest on an ending balance of exactly 0."
+        },
+        {
+          "expectation_id": "repayment_appears_once_in_financing",
+          "kind": "identity_or_footing",
+          "statement": "The maturity repayment of exactly 500 appears in the maturity year only, once, as non-revolver debt repayment, and the instrument's ending balance is 0 from that year onward."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "minimum_cash_floor_binding",
+      "case_path": "test-fixtures/archetypes/economics/minimum_cash_floor_binding.json",
+      "accounting_shape": "Cash sweep against a binding minimum-cash floor: the floor binds in the first forecast year (revolver drawn), reverses in the second (revolver repaid) and stops binding in the third.",
+      "why_it_breaks_models": "A naive implementation sweeps all cash to debt or none of it, draws and repays in the same period, or lets cash fall below a contractual minimum without drawing, so the liquidity picture is either impossible or silently breached.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "floor_binds_only_when_cash_is_short",
+          "kind": "schedule_behaviour",
+          "statement": "Year one: pre-floor cash 78.09 is below the 150 floor, so the revolver draws 71.907... and ending cash is exactly 150. Year three: pre-floor cash 326.10 is above the floor, the draw is exactly 0 and ending cash is 289.43 — above the floor, not pinned to it. The floor binds exactly when pre-floor cash is short."
+        },
+        {
+          "expectation_id": "draw_and_repayment_never_coexist",
+          "kind": "identity_or_footing",
+          "statement": "In every forecast year at most one of draw and repayment is non-zero, the revolver balance rolls forward from the prior year's ending balance, and validateSolutionInvariants is clean."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "finance_lease_in_debt_and_leverage",
+      "case_path": "test-fixtures/archetypes/economics/finance_lease_in_debt_and_leverage.json",
+      "accounting_shape": "Capitalised lease liabilities inside gross debt, net debt and the leverage denominator, rolling forward with additions, cash payments and interest accretion.",
+      "why_it_breaks_models": "A naive implementation either omits the lease liability from debt (understating leverage) or includes it while treating the whole lease payment as principal, so the liability amortises too fast and the interest accretion disappears from finance costs.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "lease_roll_forward_identity",
+          "kind": "schedule_behaviour",
+          "statement": "For each forecast year the ending lease liability equals opening + additions - cash principal payment + lease interest accretion to within 1e-9, with the first year opening at the last filed historical liability of 320, and lease interest is strictly positive in every year."
+        },
+        {
+          "expectation_id": "lease_basis_separation_in_definition_graph",
+          "kind": "identity_or_footing",
+          "statement": "In the definition-basis graph model_gross_debt_including_leases minus model_gross_debt_excluding_leases equals the ending lease liability exactly, the excluding basis stays at the 500 of funded debt, and the leverage denominator uses the including basis."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "sale_and_leaseback",
+      "case_path": "test-fixtures/archetypes/economics/sale_and_leaseback.json",
+      "accounting_shape": "Sale and leaseback in the first forecast year: 200 of disposal proceeds in investing cash flow and a 200 lease addition recognised on the same asset.",
+      "why_it_breaks_models": "A naive implementation books the proceeds as free cash flow and forgets the lease liability created at the same moment, so net debt appears to improve by the full proceeds when the obligation merely changed form.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "proceeds_land_in_investing",
+          "kind": "identity_or_footing",
+          "statement": "In the leaseback year investing cash flow equals capex plus the 200 proceeds exactly (154 = -46 + 200), and in the other two years it equals capex alone: the proceeds are an investing inflow, never operating cash."
+        },
+        {
+          "expectation_id": "liability_offsets_the_cash",
+          "kind": "value_state",
+          "statement": "The same 200 enters the lease liability in that year: the lease addition equals the proceeds, the liability rises by additions - principal + interest (185.64) against a 200 cash inflow, and the roll-forward identity holds — the cash does not arrive free of an obligation."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "lease_only_no_funded_debt",
+      "case_path": "test-fixtures/archetypes/economics/lease_only_no_funded_debt.json",
+      "accounting_shape": "Lease-heavy operator (airline/retail shape) whose only debt-like obligation is a large lease portfolio: no funded borrowings, an undrawn uncommitted overdraft, and net cash before leases.",
+      "why_it_breaks_models": "A naive implementation reports the issuer as debt-free and net cash because gross debt excluding leases is zero, missing a leverage of over four times; the reverse error puts the leases in debt but leaves the leverage denominator on the excluding basis.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "none_disclosed" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "no_funded_debt_is_a_declared_degradation",
+          "kind": "authority_selection",
+          "statement": "classifySupport on the matching intake descriptor returns SUPPORTED_DEGRADED with debt_instruments carrying the none_disclosed verdict and named in degraded_dimensions, and the envelope's terminal mapping for that class requires the degradation to be disclosed in the workbook quality panel."
+        },
+        {
+          "expectation_id": "ex_lease_net_cash_versus_lease_leverage",
+          "kind": "identity_or_footing",
+          "statement": "In every forecast year gross debt excluding leases is exactly 0 while the including basis exceeds 1000, net debt excluding leases is negative (net cash) while net debt including leases is strongly positive, and net leverage on the declared basis is above 4x. The two bases give opposite credit conclusions and both are stated."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "lease_liability_instrument_class_refused",
+      "case_path": "test-fixtures/archetypes/economics/lease_liability_instrument_class_refused.json",
+      "accounting_shape": "Lease liability declared as an INSTRUMENT in the debt register (class lease_liability) rather than through the lease policy — the shape a filing's debt note produces when leases sit inside the borrowings table.",
+      "why_it_breaks_models": "The lease liability is owned by the lease policy, so a register entry for it would double-count the obligation. The product is right to refuse it — but the refusal must be typed, and here it is not.",
+      "proves_envelope_values": [],
+      "shape_expectations": [
+        {
+          "expectation_id": "valid_case_dies_on_an_untyped_throw",
+          "kind": "schedule_behaviour",
+          "statement": "DEFECT: validateCaseShape returns ZERO errors for this case (the class is in the model-case schema enum and in the support envelope's declared debt matrix), yet compiling it throws a bare Error 'Unsupported debt class lease_liability' from the instrument-period-state compiler, with no error.code, no typed_internal_outcome and no registered reason code. A schema-valid, envelope-declared shape is refused by an untyped exception, so the validator and the compiler disagree and the refusal cannot reach a terminal state lawfully."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "opening_debt_unreconciled_refusal",
+      "case_path": "test-fixtures/archetypes/economics/opening_debt_unreconciled_refusal.json",
+      "accounting_shape": "Reported opening gross debt of 620 against an instrument register carrying 500: a 120 residual, 24% of reported debt, far outside the declared 5% ceiling.",
+      "why_it_breaks_models": "A naive implementation plugs the difference into an 'other debt' pool row, or silently anchors on the register and reports a gross debt that contradicts the filing, so every leverage number is wrong by an amount nobody can see.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "typed_source_refusal",
+          "kind": "typed_refusal",
+          "statement": "The compile refuses with the registered reason code SOURCE.opening_debt_unresolved: the thrown error carries code OPENING_DEBT_UNRESOLVED and a typed_internal_outcome naming that reason code with earliest_responsible_layer debt_reconciliation, and the registry allows exactly the SOURCE_REQUIRED terminal for it.",
+          "expected_terminal_reason": "SOURCE.opening_debt_unresolved"
+        },
+        {
+          "expectation_id": "residual_is_stated_not_absorbed",
+          "kind": "value_state",
+          "statement": "The opening-debt bridge artifact reaches verdict REFUSE_UNEXPLAINED_RESIDUAL with an unexplained_residual of exactly 120 stated as its own line: the residual is visible evidence, never absorbed into a pool instrument."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "impairment_excluded_from_ebitda",
+      "case_path": "test-fixtures/archetypes/economics/impairment_excluded_from_ebitda.json",
+      "accounting_shape": "Goodwill impairment inside operating profit but outside adjusted EBITDA, with a non-cash add-back in the cash flow.",
+      "why_it_breaks_models": "A naive implementation either subtracts the impairment from EBITDA (destroying the credit denominator and every leverage multiple) or treats it as a cash cost, so operating cash flow falls by a charge that moved no cash.",
+      "proves_envelope_values": [],
+      "shape_expectations": [
+        {
+          "expectation_id": "ebitda_excludes_ebit_includes",
+          "kind": "identity_or_footing",
+          "statement": "In the impairment year adjusted EBITDA is unchanged at 230 while operating profit equals EBITDA minus depreciation minus the impairment (144 = 230 - 56 - 30) to within 1e-9, and in the clean years operating profit equals EBITDA minus depreciation exactly."
+        },
+        {
+          "expectation_id": "impairment_is_reversed_in_cash_flow",
+          "kind": "value_state",
+          "statement": "Operating cash flow equals net income + depreciation + the impairment add-back + the working-capital movement to within 1e-9, so the charge is reversed exactly once and cash is unaffected by it."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "discontinued_operations_disclosed",
+      "case_path": "test-fixtures/archetypes/economics/discontinued_operations_disclosed.json",
+      "accounting_shape": "Discontinued operation disclosed separately: a loss-making disposal group reported below the operating line, with continuing-operations rows scoped as continuing.",
+      "why_it_breaks_models": "A naive implementation folds the discontinued result into EBITDA or EBIT, so the continuing-operations margin and every multiple built on it describe a perimeter the issuer no longer owns; the mirror error drops the result entirely and the profit line stops footing.",
+      "proves_envelope_values": [
+        { "dimension": "restructuring_complexity", "value": "discontinued_operations_disclosed" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "perimeter_change_is_a_declared_degradation",
+          "kind": "authority_selection",
+          "statement": "classifySupport on the matching descriptor returns SUPPORTED_DEGRADED with restructuring_complexity carrying the discontinued_operations_disclosed verdict and named in degraded_dimensions, whose declared disclosure obligation names the degraded dimension in the workbook quality panel."
+        },
+        {
+          "expectation_id": "continuing_metrics_exclude_the_disposal_group",
+          "kind": "value_state",
+          "statement": "In the year the disposal group is still reported, adjusted EBITDA (230) and operating profit (174 = 230 - 56) both exclude the -20 discontinued result, which instead enters below the operating line as other non-operating income and reaches pre-tax income; and the case scopes the continuing rows explicitly with operation_scope continuing against the discontinued row."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "non_controlling_interests",
+      "case_path": "test-fixtures/archetypes/economics/non_controlling_interests.json",
+      "accounting_shape": "Partly owned subsidiaries: group profit split between owners of the parent and non-controlling interests.",
+      "why_it_breaks_models": "A naive implementation starts the cash flow from parent-only profit while consolidating 100% of the cash, so operating cash flow is short by the NCI share; or it treats the NCI line as an expense inside operating profit.",
+      "proves_envelope_values": [],
+      "shape_expectations": [
+        {
+          "expectation_id": "parent_plus_nci_equals_group_profit",
+          "kind": "identity_or_footing",
+          "statement": "In every forecast year the owners-of-parent row equals group profit plus the (negative) non-controlling-interests row to within 1e-9, and the NCI attribution sits BELOW group profit rather than inside it."
+        },
+        {
+          "expectation_id": "cash_flow_starts_from_group_profit",
+          "kind": "value_state",
+          "statement": "Operating cash flow equals GROUP profit + depreciation + the working-capital movement to within 1e-9 (176 = 130 + 56 - 10). Starting from the owners-of-parent figure would understate it by the NCI share (26) in the first forecast year."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "equity_method_associates",
+      "case_path": "test-fixtures/archetypes/economics/equity_method_associates.json",
+      "accounting_shape": "Equity-accounted associates: share of associate profit recognised below the operating line and reversed as non-cash in the cash flow.",
+      "why_it_breaks_models": "A naive implementation lifts associate income into EBITDA (a profit share that carries no revenue, no cash and no debt capacity) and then forgets to reverse it in the cash flow, counting the same non-cash profit twice.",
+      "proves_envelope_values": [],
+      "shape_expectations": [
+        {
+          "expectation_id": "associate_income_is_below_ebitda",
+          "kind": "value_state",
+          "statement": "Adjusted EBITDA is unchanged at 230/240/250 while the associate share (18/19/20) reaches pre-tax income through the below-the-line channel: pre-tax income equals operating profit minus net interest plus the associate share to within 1e-9."
+        },
+        {
+          "expectation_id": "associate_income_is_reversed_in_cash_flow",
+          "kind": "identity_or_footing",
+          "statement": "Operating cash flow equals net income + depreciation - the associate share + the working-capital movement to within 1e-9, so the non-cash profit share is removed exactly once and never inflates cash."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "deferred_revenue_ratable",
+      "case_path": "test-fixtures/archetypes/economics/deferred_revenue_ratable.json",
+      "accounting_shape": "Subscription issuer with ratable recognition: billings are collected ahead of revenue, so deferred revenue grows and the working-capital movement is a persistent cash INFLOW.",
+      "why_it_breaks_models": "A naive implementation assumes working capital is always an outflow that scales with revenue growth, so it inverts the sign of a subscription model's largest cash source; or it treats billings as revenue and recognises the whole contract on signature.",
+      "proves_envelope_values": [
+        { "dimension": "cash_flow_method", "value": "indirect" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "working_capital_is_a_positive_inflow",
+          "kind": "value_state",
+          "statement": "The working-capital movement is positive and rising in every forecast year (75, 80, 85) and operating cash flow (282.18) exceeds accrual adjusted EBITDA (230) as a result: cash collected ahead of recognition, not an outflow scaling with growth."
+        },
+        {
+          "expectation_id": "deferred_inflow_counted_once",
+          "kind": "identity_or_footing",
+          "statement": "Operating cash flow equals net income + depreciation + the working-capital movement to within 1e-9 in every forecast year: the deferred-revenue inflow reaches cash exactly once, with no second recognition through revenue."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "capitalised_interest_into_asset",
+      "case_path": "test-fixtures/archetypes/economics/capitalised_interest_into_asset.json",
+      "accounting_shape": "Large construction programme whose borrowing cost is capitalised into the asset under IAS 23: 800 of 6% debt against 260 of annual capex.",
+      "why_it_breaks_models": "A naive implementation charges the whole coupon to the income statement and reports capex net of the capitalised portion, so finance costs are overstated, EBIT is understated and capex no longer ties to the cash-flow statement the filing shows.",
+      "proves_envelope_values": [
+        { "dimension": "debt_instruments", "value": "within_declared_matrix" }
+      ],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "whole_coupon_hits_finance_costs",
+          "kind": "value_state",
+          "statement": "Gross interest equals exactly 48.0 (6% x 800) in every forecast year, with none of it removed from finance costs, and capex is exactly the declared 260/280/300 with none of the interest added to it: 100% of the borrowing cost is expensed."
+        },
+        {
+          "expectation_id": "no_declarable_capitalisation_state",
+          "kind": "value_state",
+          "statement": "GAP: the model-case v2 contract exposes no field for IAS 23 capitalised borrowing cost. The only capitalisation vocabulary on an instrument is pik_rate, documented as accreting into PRINCIPAL and included in interest expense — the opposite of capitalising into an asset — so the shape cannot be declared, only mis-stated."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "net_cash_interest_income_dominant",
+      "case_path": "test-fixtures/archetypes/economics/net_cash_interest_income_dominant.json",
+      "accounting_shape": "Negative net debt with interest income dominant: 1200 of cash at 4% against 50 of 3% debt, so net finance result is income.",
+      "why_it_breaks_models": "A naive implementation nets a positive finance cost regardless of the balance, or clamps net debt at zero, so a net-cash issuer shows leverage it does not have and its interest income disappears from earnings.",
+      "proves_envelope_values": [],
+      "shape_expectations": [
+        {
+          "expectation_id": "net_finance_result_is_income",
+          "kind": "value_state",
+          "statement": "In every forecast year interest income exceeds gross interest, the net finance result is negative (income-dominant: -51.0 in year one) and net debt is strongly negative (-1375 in year one): the model states net cash rather than clamping it to zero."
+        },
+        {
+          "expectation_id": "negative_leverage_is_stated_not_clamped",
+          "kind": "identity_or_footing",
+          "statement": "Net leverage is negative in every forecast year and equals net debt divided by adjusted EBITDA to within 1e-9 on positive EBITDA: the ratio is a signed quantity that a naive reader can mistake for low leverage, and the model does not floor it at zero or suppress it."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "negative_ebitda_leverage_not_meaningful",
+      "case_path": "test-fixtures/archetypes/economics/negative_ebitda_leverage_not_meaningful.json",
+      "accounting_shape": "Cash-burning issuer with NEGATIVE EBITDA and positive net debt, and no facility to draw on.",
+      "why_it_breaks_models": "A naive implementation divides positive net debt by negative EBITDA and prints a negative leverage multiple that reads exactly like net cash, and it either crashes on the sign or invents a revolver to keep cash non-negative.",
+      "proves_envelope_values": [],
+      "shape_expectations": [
+        {
+          "expectation_id": "negative_denominator_produces_negative_multiple",
+          "kind": "value_state",
+          "statement": "Net debt is positive (540.7 rising) while adjusted EBITDA is negative, so net leverage is negative (-9.01) even though the issuer is levered and burning cash: the sign of the multiple carries no information and is not a net-cash signal. The quotient identity net debt / EBITDA holds to within 1e-9."
+        },
+        {
+          "expectation_id": "shortfall_rather_than_an_invented_facility",
+          "kind": "schedule_behaviour",
+          "statement": "With no revolver declared the model reports a positive liquidity shortfall in every forecast year against a minimum cash of 80 derived from the filed history, lets ending cash go negative, and never manufactures a draw: the funding gap is stated, and the shortfall equals minimum cash minus ending cash exactly."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "hyperinflationary_reporting",
+      "case_path": "test-fixtures/archetypes/economics/hyperinflationary_reporting.json",
+      "accounting_shape": "Hyperinflationary economy reporting (IAS 29 shape): nominal revenue rises 130x across six periods on flat volumes while historical-cost depreciation rises 1.6x.",
+      "why_it_breaks_models": "A naive implementation reads nominal growth as real growth and an expanding margin as operating leverage, because unrestated historical-cost depreciation shrinks to nothing against restated revenue.",
+      "proves_envelope_values": [
+        { "dimension": "accounting_framework", "value": "other_or_unknown" }
+      ],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "unsupported_class_without_an_early_stop",
+          "kind": "authority_selection",
+          "statement": "DEFECT: classifySupport on a descriptor whose accounting_framework is other_or_unknown returns support_class UNSUPPORTED, whose only legal terminal is UNSUPPORTED_PROFILE, yet early_stop.stopped is false and early_stop.reason_code is null — no predicate covers a dimension-level UNSUPPORTED verdict, so the run is classified unsupported without being stopped and without a registered reason code. The envelope also declares no IAS 29 / hyperinflation dimension at all."
+        },
+        {
+          "expectation_id": "no_restatement_plane_in_the_economics",
+          "kind": "value_state",
+          "statement": "The case compiles and carries the nominal series through unchanged: depreciation as a share of revenue collapses from about 0.0035 to about 0.0006 across the forecast while operating profit margin rises toward EBITDA margin, and no compiled artifact carries a price-index, restatement or purchasing-power field."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "depletion_unit_of_production",
+      "case_path": "test-fixtures/archetypes/economics/depletion_unit_of_production.json",
+      "accounting_shape": "Unit-of-production depletion for a natural-resource producer: depreciation follows tonnes extracted, so it moves non-monotonically and is unrelated to revenue.",
+      "why_it_breaks_models": "A naive implementation forecasts depreciation as a fixed percentage of revenue, which for a depleting asset is economically meaningless: it smooths a charge that should track production and mis-states EBIT in every year.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "company_assumption_authority_is_honoured",
+          "kind": "authority_selection",
+          "statement": "The declared company_assumption depletion series is carried into the forecast exactly (210, 132, 168), the ratio of depreciation to revenue varies materially across the three forecast years (0.183, 0.110, 0.134) rather than sitting at a constant, and operating profit reflects the declared charge — no revenue-ratio default overwrote a company-stated authority."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "regulated_asset_base_depreciation",
+      "case_path": "test-fixtures/archetypes/economics/regulated_asset_base_depreciation.json",
+      "accounting_shape": "Regulated utility investing ahead of depreciation: capex is roughly three times the depreciation charge on a growing regulated asset base.",
+      "why_it_breaks_models": "A naive implementation assumes steady-state capex approximates depreciation, so it understates capex by two thirds, reports positive free cash flow for a company that is structurally cash-absorbing, and misses that the investment is the earnings driver.",
+      "proves_envelope_values": [
+        { "dimension": "entity_type", "value": "utility" }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "utility_entity_type_is_certified",
+          "kind": "authority_selection",
+          "statement": "classifySupport on the matching descriptor gives the entity_type dimension a CERTIFIED verdict for the value utility and does not name it in degraded_dimensions: a regulated utility is inside the certified envelope and is not treated as a financial or exotic entity."
+        },
+        {
+          "expectation_id": "capex_exceeds_depreciation_and_fcf_is_negative",
+          "kind": "value_state",
+          "statement": "In every forecast year capex (360, 380, 400) exceeds the depreciation charge (119, 126, 133) by more than 2.5x and free cash flow — operating cash flow plus capex — is negative (about -165, -177, -188) while EBITDA grows: the steady-state capex-equals-depreciation assumption is wrong by construction here."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    }
+  ]
+}
