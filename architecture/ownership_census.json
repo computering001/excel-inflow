@@ -271,10 +271,10 @@
       "target_owner": "validators stay validators"
     },
     "lib/model_ir_v3.mjs": {
-      "count": 4,
+      "count": 7,
       "families": {
         "capture_ownership": 2,
-        "row_topology": 2
+        "row_topology": 5
       },
       "classification": "canonical_writer",
       "concern": "model IR projection",

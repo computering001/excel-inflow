@@ -77,6 +77,21 @@
       "commit": "9c007eb",
       "invariant": "internal forecast/solve failures carry registered reason codes and the five payload fields",
       "note": "typed-outcome slice; resume recipes stay on the work order"
+    },
+    "P2.3": {
+      "commit": "649fcb8",
+      "invariant": "every non-accepted classification reaches terminal resolution through the ledger; ambiguity surfaces as a question",
+      "note": "auto-stamp path dead; answer-round closure of QUESTION rows on the work order"
+    },
+    "P2.5": {
+      "commit": "4d4e17c",
+      "invariant": "unfooted material statement-family totals refuse typed; empty member-sets recorded; protected roles declared",
+      "note": "residual-line minting (compiler layer) on the work order"
+    },
+    "P4.2": {
+      "commit": "8ce43a3",
+      "invariant": "opening-debt residuals decompose into a schema-validated bridge; unexplained residual refuses typed",
+      "note": "coverage.mjs migration to consume the bridge on the work order"
     }
   },
   "evidence_baseline": {

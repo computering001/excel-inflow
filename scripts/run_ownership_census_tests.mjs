@@ -100,6 +100,8 @@ const FILE_OWNERSHIP = {
   "lib/source_identity.mjs": { role: "canonical_writer", concern: "active source identity", target_owner: "Release/package compiler (Phase 8)" },
   "lib/statement_topology.mjs": { role: "canonical_writer", concern: "statement topology records", target_owner: "Statement Authority compiler (Phase 2)" },
   "lib/typed_value_dual_read.mjs": { role: "derived_reader", concern: "P1.8 legacy-to-typed projection (reads legacy state, mints typed views; never mutates the case)", target_owner: "Typed value parser (Phase 1, migration adapter)" },
+  "lib/classification_resolution_ledger.mjs": { role: "canonical_writer", concern: "P2.3 classification-resolution ledger (records who resolved every non-accepted classification; questions on genuine ambiguity)", target_owner: "Statement Authority compiler (Phase 2)" },
+  "lib/opening_debt_bridge.mjs": { role: "canonical_writer", concern: "P4.2 opening-debt reconciliation bridge (typed taxonomy lines; refusal on unexplained residual)", target_owner: "Schedule/solver layer (Phase 4)" },
 };
 
 const SCAN_DIRS = ["scripts/lib", "scripts"];

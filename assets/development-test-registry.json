@@ -1544,6 +1544,33 @@
       "test_class": "unit"
     },
     {
+      "id": "classification-resolution",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_classification_resolution_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "opening-debt-bridge",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_debt_bridge_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "statement-family-residual",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_statement_family_residual_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "forecast-ownership-preflight",
       "phase": "forecast",
       "runtime": "node",

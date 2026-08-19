@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 321,
-  "source_commit": "81b1e54b85d9c18ca978766bbe717773e3bd9186",
-  "source_tree": "c2981bc7fbdf7c21da7aa2e83a1a1c0584c7cec0",
+  "checks": 327,
+  "source_commit": "30a6d50a337803a5abb9f19b296872b69ca2af36",
+  "source_tree": "42cf1d3f297aaf646495fedb645cee3f20649213",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 153
+    "test_count": 156
   },
   "scripts": [
     {
@@ -195,6 +195,10 @@
     },
     {
       "script": "run_ci_governance_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_classification_resolution_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -454,6 +458,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_opening_debt_bridge_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_opening_debt_reconciliation_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -623,6 +631,10 @@
     },
     {
       "script": "run_statement_classifier_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_statement_family_residual_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
