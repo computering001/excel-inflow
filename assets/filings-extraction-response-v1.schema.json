@@ -95,7 +95,11 @@
         "material": { "type": "boolean" },
         "parent_source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
         "hierarchy_level": { "type": "integer", "minimum": 0, "maximum": 8 },
-        "is_subtotal": { "type": "boolean" }
+        "is_subtotal": { "type": "boolean" },
+        "xbrl_provenance": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/xbrlFactProvenance" }
+        }
       }
     },
     "faceStatementManifest": {
@@ -221,6 +225,20 @@
         "raw_label": { "type": "string", "minLength": 1 },
         "reason_code": { "const": "statement_out_of_model_scope" },
         "pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true }
+      }
+    },
+    "xbrlFactProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concept", "context_ref", "unit_ref", "decimals"],
+      "properties": {
+        "concept": { "type": "string", "minLength": 1 },
+        "context_ref": { "type": "string", "minLength": 1 },
+        "unit_ref": { "type": "string" },
+        "decimals": { "type": ["string", "null"] },
+        "xbrl_value": { "type": "number" },
+        "sign_alignment": { "enum": ["direct", "inverted"] },
+        "status": { "enum": ["reconciled", "material_mismatch", "value_mismatch"] }
       }
     },
     "unitLabelReconciliation": {

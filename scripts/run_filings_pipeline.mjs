@@ -28,6 +28,10 @@ const SOURCE_REGISTRY_SCHEMA = JSON.parse(readFileSync(path.join(ASSETS, "filing
 const SOURCE_REGISTRY_SCHEMA_V2 = JSON.parse(readFileSync(path.join(ASSETS, "filings-source-registry-v2.schema.json"), "utf8"));
 const RUNTIME_MANIFEST = JSON.parse(readFileSync(path.join(ASSETS, "filings-runtime-members.json"), "utf8"));
 const SECTIONS = Object.freeze(["income_statement", "cash_flow"]);
+const XBRL_CROSSWALK_PATH = path.join(ASSETS, "xbrl-concept-role-crosswalk-v1.json");
+const SEMANTIC_TAXONOMY_PATH = path.join(ASSETS, "statement-semantic-taxonomy.v1.json");
+const XBRL_MARKER = /ix:nonfraction|xbrl\.org\/2013\/inlinexbrl/i;
+const XBRL_RECONCILIATION_TIMEOUT_MS = 120_000;
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -163,6 +167,16 @@ function stateBase({ runId, requestHash, sourceHashes, runtimeHash, cacheKey, at
     attempts,
     summary: {},
   };
+}
+
+async function resolveFilingsPython() {
+  const pythonCandidate = process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3";
+  if (process.env.EXCEL_INFLOW_PYTHON && !path.isAbsolute(pythonCandidate)) {
+    throw new Error("EXCEL_INFLOW_PYTHON must be the top-level resolved absolute executable.");
+  }
+  return process.env.EXCEL_INFLOW_PYTHON
+    ? pythonCandidate
+    : await resolvePythonExecutable(pythonCandidate, { cwd: HERE, env: process.env });
 }
 
 function deriveLines(manifests) {
@@ -514,13 +528,7 @@ async function main() {
   const nativeArtifacts = {};
   if (!responsePath) {
     const nativeRoot = path.join(outputRoot, `native-${cacheKey.slice(0, 16)}`);
-    const pythonCandidate = process.env.EXCEL_INFLOW_PYTHON ?? process.env.PYTHON ?? "python3";
-    if (process.env.EXCEL_INFLOW_PYTHON && !path.isAbsolute(pythonCandidate)) {
-      throw new Error("EXCEL_INFLOW_PYTHON must be the top-level resolved absolute executable.");
-    }
-    const pythonExecutable = process.env.EXCEL_INFLOW_PYTHON
-      ? pythonCandidate
-      : await resolvePythonExecutable(pythonCandidate, { cwd: HERE, env: process.env });
+    const pythonExecutable = await resolveFilingsPython();
     const filingExtractionStarted = process.hrtime.bigint();
     const completed = await runProcessTree(
       pythonExecutable,
@@ -615,6 +623,148 @@ async function main() {
   }
   const extractionRoot = path.join(outputRoot, `compiled-${cacheKey.slice(0, 16)}-${responseHash.slice(0, 12)}`);
   await fs.mkdir(extractionRoot, { recursive: true });
+
+  // Structured-fact <-> visible-row reconciliation (P2.2). When a filing
+  // carries inline XBRL its tagged facts are reconciled against the selected
+  // face-statement rows through the declared concept->role crosswalk; a
+  // material disagreement is a typed fail-closed finding, and rows/filings
+  // without XBRL are recorded as typed-unreconciled, never silently skipped.
+  const xbrlArtifactPath = path.join(extractionRoot, "xbrl-reconciliation.json");
+  let xbrlReconciliation;
+  const inlineXbrlDocumentIds = [];
+  for (const document of request.documents) {
+    const raw = await fs.readFile(resolveFrom(requestBase, document.path), "latin1");
+    if (XBRL_MARKER.test(raw)) inlineXbrlDocumentIds.push(document.document_id);
+  }
+  if (inlineXbrlDocumentIds.length === 0) {
+    const documentsWithoutXbrl = (response.documents ?? []).map((document) => ({
+      document_id: document.document_id,
+      inline_xbrl: false,
+      reason: "document_not_inline_xbrl",
+      row_count: SECTIONS.reduce((count, section) => count +
+        (document.face_statement_manifests?.[section] ?? [])
+          .reduce((rows, manifest) => rows + (manifest.rows?.length ?? 0), 0), 0),
+    }));
+    xbrlReconciliation = {
+      schema_version: "xbrl-reconciliation/1.0",
+      run_id: request.run_id,
+      crosswalk_sha256: await sha256File(XBRL_CROSSWALK_PATH),
+      documents: documentsWithoutXbrl,
+      findings: [],
+      summary: {
+        inline_xbrl_document_count: 0,
+        reconciled_row_count: 0,
+        material_mismatch_row_count: 0,
+        informational_mismatch_row_count: 0,
+        unreconciled_row_count: documentsWithoutXbrl.reduce((count, entry) => count + entry.row_count, 0),
+        fact_count_total: 0,
+      },
+      status: "PASS",
+    };
+    await atomicJson(xbrlArtifactPath, xbrlReconciliation);
+  } else {
+    const reconcileErrors = [];
+    try {
+      const pythonExecutable = await resolveFilingsPython();
+      const completed = await runProcessTree(pythonExecutable, [
+        path.join(HERE, "extract_inline_xbrl.py"),
+        "--reconcile",
+        "--request", effectiveRequestPath,
+        "--response", responsePath,
+        "--crosswalk", XBRL_CROSSWALK_PATH,
+        "--taxonomy", SEMANTIC_TAXONOMY_PATH,
+        "--out", xbrlArtifactPath,
+      ], { cwd: HERE, timeout: XBRL_RECONCILIATION_TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 });
+      xbrlReconciliation = await readJson(xbrlArtifactPath, "xbrl reconciliation artifact").catch(() => null);
+      if (!xbrlReconciliation || (!completed.ok && completed.code !== 3)) {
+        reconcileErrors.push(
+          `XBRL_RECONCILIATION_FAILED: inline XBRL filings [${inlineXbrlDocumentIds.join(", ")}] could not be reconciled: ` +
+          String(completed.stderr || completed.stdout || "reconciler produced no artifact").slice(-2000),
+        );
+      }
+    } catch (error) {
+      reconcileErrors.push(`XBRL_RECONCILIATION_FAILED: ${String(error?.message ?? error)}`);
+    }
+    const materialFindings = (xbrlReconciliation?.findings ?? []).filter((finding) => finding.severity === "material");
+    if (xbrlReconciliation?.status === "FAIL" || materialFindings.length > 0) {
+      reconcileErrors.push(...materialFindings.map((finding) =>
+        `${finding.code}: ${finding.statement}.${finding.source_line_id} ${finding.period} printed ` +
+        `${finding.printed_value} disagrees with ${finding.concept} (context ${finding.context_ref}) value ${finding.xbrl_value}`,
+      ));
+    }
+    if (reconcileErrors.length > 0) {
+      const exhausted = attempts.count >= attempts.limit;
+      await writeState(statePath, {
+        ...base,
+        attempts,
+        pipeline_status: exhausted ? "BLOCKED_INTERNAL" : "NEEDS_EXTRACTION_REVIEW",
+        user_blocking: false,
+        blocker_class: "INTERNAL_WORK",
+        artifacts: xbrlReconciliation ? { xbrl_reconciliation: xbrlArtifactPath } : {},
+        artifact_sha256: xbrlReconciliation
+          ? { xbrl_reconciliation: await sha256File(xbrlArtifactPath) }
+          : {},
+        tasks: [{
+          task_kind: "xbrl_face_reconciliation_review",
+          response_path: responsePath,
+          reconciliation_path: xbrlReconciliation ? xbrlArtifactPath : null,
+          findings: materialFindings,
+          violations: reconcileErrors,
+          instruction: "Adjudicate only the named structured-fact/visible-row disagreements against the raw filing bytes. Do not weaken the reconciler, do not re-author unaffected rows, and do not ask for unchanged readable filings to be re-uploaded.",
+        }],
+        summary: {
+          terminal_reason: exhausted ? "bounded_extraction_retry_exhausted" : null,
+          violation_count: reconcileErrors.length,
+          violations: reconcileErrors,
+        },
+      });
+      return 2;
+    }
+  }
+  const xbrlRowsByLineId = new Map();
+  const xbrlDocumentReasonById = new Map();
+  for (const documentRecord of xbrlReconciliation.documents ?? []) {
+    if (documentRecord.inline_xbrl === false) {
+      xbrlDocumentReasonById.set(documentRecord.document_id, documentRecord.reason ?? "document_not_inline_xbrl");
+    }
+    for (const section of SECTIONS) {
+      for (const row of documentRecord.sections?.[section] ?? []) {
+        xbrlRowsByLineId.set(row.source_line_id, row);
+      }
+    }
+  }
+  const documentIdBySourceId = new Map(
+    (response.documents ?? []).map((document) => [document.source_id, document.document_id]),
+  );
+  for (const section of SECTIONS) {
+    for (const line of compiled.filings[section]) {
+      const row = xbrlRowsByLineId.get(line.source_line_id);
+      line.xbrl = row
+        ? {
+          status: row.status,
+          ...(row.semantic_role ? { semantic_role: row.semantic_role } : {}),
+          ...(row.reason ? { reason: row.reason } : {}),
+          periods: row.periods,
+        }
+        : {
+          status: "unreconciled",
+          reason: xbrlDocumentReasonById.get(documentIdBySourceId.get(line.source_id)) ??
+            "document_not_inline_xbrl",
+        };
+    }
+  }
+  compiled.filings.xbrl_reconciliation = {
+    status: xbrlReconciliation.status,
+    crosswalk_sha256: xbrlReconciliation.crosswalk_sha256,
+    summary: xbrlReconciliation.summary,
+    documents: (xbrlReconciliation.documents ?? []).map((entry) => ({
+      document_id: entry.document_id,
+      inline_xbrl: entry.inline_xbrl,
+      ...(entry.reason ? { reason: entry.reason } : {}),
+      ...(Number.isInteger(entry.fact_count) ? { fact_count: entry.fact_count } : {}),
+    })),
+  };
+
   const registry = {};
   for (const extraction of compiled.documentExtractions) {
     const target = path.join(extractionRoot, `${extraction.attachment_id}.document-extraction.json`);
@@ -647,6 +797,7 @@ async function main() {
     filings_bundle: bundlePath,
     document_extraction_registry: registryPath,
     runtime_budget_receipt: runtimeReceiptPath,
+    xbrl_reconciliation: xbrlArtifactPath,
     ...acquisitionArtifacts,
     ...nativeArtifacts,
   };
@@ -666,6 +817,10 @@ async function main() {
       cash_flow_manifest_count: compiled.filings.face_statement_manifests.cash_flow.length,
       income_statement_row_count: compiled.filings.income_statement.length,
       cash_flow_row_count: compiled.filings.cash_flow.length,
+      xbrl_reconciliation: {
+        status: xbrlReconciliation.status,
+        ...xbrlReconciliation.summary,
+      },
       violation_count: 0,
       performance,
     },
