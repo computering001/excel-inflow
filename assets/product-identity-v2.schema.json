@@ -22,7 +22,7 @@
       "additionalProperties": false,
       "required": ["mode", "runtime_code_closure", "complete_package_inventory", "archive"],
       "properties": {
-        "mode": { "enum": ["development", "certified"] },
+        "mode": { "enum": ["development", "certified", "portable_certified"] },
         "runtime_code_closure": { "$ref": "#/$defs/runtime_code_closure" },
         "complete_package_inventory": { "$ref": "#/$defs/complete_package_inventory" },
         "archive": { "$ref": "#/$defs/archive" }

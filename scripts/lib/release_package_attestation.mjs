@@ -155,7 +155,7 @@ function attestationBody({
     throw new Error("Release manifest does not contain product-identity/2.0.");
   }
   const packageMode = releaseManifest.identity.package.mode;
-  if (!['certified', 'development'].includes(packageMode)) {
+  if (!['certified', 'portable_certified', 'development'].includes(packageMode)) {
     throw new Error(`Unsupported package mode for external attestation: ${packageMode}.`);
   }
   if (!SHA256.test(String(runtimeCodeClosure?.sha256 ?? ""))) {

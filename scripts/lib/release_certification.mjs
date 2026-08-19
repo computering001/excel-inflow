@@ -4,6 +4,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { ECONOMIC_SOLVE_POLICY } from "./economic_solve_policy.mjs";
+import {
+  CERTIFICATION_TIER_CONTRACT,
+  EXCLUDED_NATIVE_HOST,
+  NATIVE_CERTIFIED_PACKAGE_MODE,
+  PERMANENT_DECLARED_EXCLUSION,
+  PHYSICAL_LANE_TERMINAL_DECLARATION,
+  PORTABLE_CERTIFIED_PACKAGE_MODE,
+  assertCertifiedPackageMode,
+} from "./identity_vocabulary.mjs";
 import { validateJsonSchema } from "./json_schema.mjs";
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -16,6 +25,75 @@ const TOLERANCE_POLICY = {
   relative: 1e-12,
 };
 const DRIFT_CLASSES = ["currency", "ratio", "percentage", "control", "default"];
+
+/**
+ * P8.0 — the certification evidence set, split by what a host can produce.
+ *
+ * NATIVE tier (`certified`): REQUIRED_EVIDENCE, unchanged in membership and in
+ * order. Every class is required, every existing check on every class is
+ * applied exactly as before. Nothing below relaxes it.
+ *
+ * PORTABLE tier (`portable_certified`): PORTABLE_REQUIRED_EVIDENCE — the five
+ * classes a portable host can actually produce — plus a MANDATORY declared
+ * exclusion for each of PERMANENTLY_EXCLUDED_EVIDENCE. The excluded classes are
+ * not omitted, not waived and not queued: the portable dossier must name them,
+ * with a reason, as permanent. A portable dossier that stays silent about them
+ * is refused just as firmly as one that claims them.
+ */
+export const PORTABLE_REQUIRED_EVIDENCE = Object.freeze([
+  "exact_maximal",
+  "exact_net_cash",
+  "frozen_cohort",
+  "finance_proof_mutations",
+  "source_parity",
+]);
+
+/**
+ * The exclusion register. Machine-readable and reason-carrying, in the same
+ * idiom as release_journal.mjs's EXCLUDED_INSTALLED_HOST clauses and
+ * assets/release-rollback-policy-v1.json: `satisfiability`,
+ * `exclusion_reason`, `excluded_from_portable_gate: true`.
+ *
+ * Three fields exist purely so this can never be read as an unfinished task:
+ * `exclusion_disposition` is PERMANENT_DECLARED_EXCLUSION rather than any
+ * pending spelling, `is_pending` is literally false, and `revisit_condition` is
+ * null — there is no condition under which the class becomes satisfiable here.
+ * `portable_substitute` records what the portable tier proves INSTEAD, so the
+ * weaker claim is legible rather than merely smaller.
+ */
+export const PERMANENTLY_EXCLUDED_EVIDENCE = Object.freeze({
+  native_excel: Object.freeze({
+    evidence_class: "native_excel",
+    satisfiability: EXCLUDED_NATIVE_HOST,
+    exclusion_disposition: PERMANENT_DECLARED_EXCLUSION,
+    excluded_from_portable_gate: true,
+    is_pending: false,
+    is_waiver: false,
+    revisit_condition: null,
+    required_host_capability:
+      "A licensed native Microsoft Excel installation able to open, recalculate and re-serialise the release workbooks.",
+    exclusion_reason:
+      "Native-Excel restoration evidence requires opening the candidate workbooks in a licensed native Microsoft Excel installation and reading back its own recalculated bytes. This programme has no such host, by standing directive, and native recalculation cannot be simulated by any portable renderer without the evidence ceasing to be native. The class is therefore unsatisfiable here by construction rather than merely unfinished.",
+    portable_substitute:
+      "The portable tier proves exact authority replay of the immutable V4 workbooks through the render-evidence/2 producer, the frozen 32-case cohort, the independent finance-proof mutation set and source-intent parity — all bound to the same runtime-code closure. That is a different and strictly weaker claim than native recalculation and is reported as such.",
+  }),
+  visual_review: Object.freeze({
+    evidence_class: "visual_review",
+    satisfiability: EXCLUDED_NATIVE_HOST,
+    exclusion_disposition: PERMANENT_DECLARED_EXCLUSION,
+    excluded_from_portable_gate: true,
+    is_pending: false,
+    is_waiver: false,
+    revisit_condition: null,
+    required_host_capability:
+      "A human reviewer inspecting every visible sheet of every release profile inside native Microsoft Excel.",
+    exclusion_reason:
+      "Native visual review is a human judgement made in front of a native Microsoft Excel window: openability, layout geometry, formatting consistency, formula visibility, provenance colours, print setup and screenshot legibility as that application renders them. There is no reviewer and no native host in this programme, and an automated portable check of the same properties would be a different assertion wearing the same name.",
+    portable_substitute:
+      "The portable tier compares immutable rendered-page baselines for all three visible sheets through scripts/render/check_render.py in comparison-only mode, never writing or removing a baseline. That detects rendered-geometry drift; it does not constitute a human review in native Excel.",
+  }),
+});
+
 const REQUIRED_EVIDENCE = [
   "exact_maximal",
   "exact_net_cash",
@@ -25,6 +103,49 @@ const REQUIRED_EVIDENCE = [
   "finance_proof_mutations",
   "source_parity",
 ];
+
+export const NATIVE_REQUIRED_EVIDENCE = Object.freeze([...REQUIRED_EVIDENCE]);
+export const PORTABLE_CERTIFICATION_EVIDENCE_SCHEMA_VERSION =
+  "release-certification-evidence-portable/1.0";
+const EXCLUSION_RECORD_FIELDS = Object.freeze([
+  "evidence_class",
+  "satisfiability",
+  "exclusion_disposition",
+  "excluded_from_portable_gate",
+  "is_pending",
+  "is_waiver",
+  "revisit_condition",
+  "required_host_capability",
+  "exclusion_reason",
+]);
+
+// The split must exhaust the native set and never overlap it: a class is either
+// producible on a portable host or permanently excluded, never both and never
+// neither. Checked at load so the two lists cannot drift apart silently.
+{
+  const excluded = Object.keys(PERMANENTLY_EXCLUDED_EVIDENCE);
+  const union = [...PORTABLE_REQUIRED_EVIDENCE, ...excluded].sort();
+  if (JSON.stringify(union) !== JSON.stringify([...REQUIRED_EVIDENCE].sort())) {
+    throw new Error(
+      "Certification evidence split has drifted: portable-required plus permanently-excluded must be exactly the native required-evidence set.",
+    );
+  }
+  for (const [name, record] of Object.entries(PERMANENTLY_EXCLUDED_EVIDENCE)) {
+    if (record.evidence_class !== name || record.satisfiability !== EXCLUDED_NATIVE_HOST ||
+        record.exclusion_disposition !== PERMANENT_DECLARED_EXCLUSION ||
+        record.excluded_from_portable_gate !== true || record.is_pending !== false ||
+        record.is_waiver !== false || record.revisit_condition !== null ||
+        typeof record.exclusion_reason !== "string" || record.exclusion_reason.trim().length < 40) {
+      throw new Error(`Permanent exclusion register entry ${name} is not a well-formed permanent declared exclusion.`);
+    }
+  }
+  const declared = [...PHYSICAL_LANE_TERMINAL_DECLARATION.excluded_evidence_classes].sort();
+  if (JSON.stringify(declared) !== JSON.stringify([...excluded].sort())) {
+    throw new Error(
+      "The physical-lane terminal declaration and the certification exclusion register name different evidence classes.",
+    );
+  }
+}
 const REQUIRED_PROFILES = ["standard_maximal", "standard_net_cash", "acquisition", "stressed_liquidity"];
 const REQUIRED_SHEETS = ["Operating Model", "Brokers", "Forward Curves"];
 const AUTHORITY = Object.freeze({
@@ -382,9 +503,149 @@ function frozenCohort(report, closureHash, findings) {
   }
 }
 
+/**
+ * The PORTABLE dossier manifest contract, declared in CODE.
+ *
+ * assets/release-certification-evidence-v1.schema.json is the NATIVE manifest
+ * shape: it requires all seven evidence classes and forbids extra keys, so it
+ * can neither describe a portable dossier nor be widened without weakening the
+ * native gate. Rather than relax that asset, the portable shape is declared
+ * here — the same discipline release_journal.mjs uses for its clause contract —
+ * and enforced with the same refuse-never-repair posture. P8.7 should mint the
+ * matching JSON schema asset; until then this function IS the schema.
+ */
+function portableManifestFindings(manifest, findings) {
+  if (manifest.schema_version !== PORTABLE_CERTIFICATION_EVIDENCE_SCHEMA_VERSION) {
+    findings.push(finding("manifest.portable.schema_version",
+      `A portable dossier must declare schema_version ${PORTABLE_CERTIFICATION_EVIDENCE_SCHEMA_VERSION}.`,
+      { actual: manifest.schema_version ?? null }));
+  }
+  // A portable dossier must announce its own tier, and must never announce the
+  // native one. This is the dossier-level half of the rule that a portable
+  // certification is never presentable as a native certification.
+  if (manifest.certification_tier !== PORTABLE_CERTIFIED_PACKAGE_MODE) {
+    findings.push(finding("manifest.portable.certification_tier",
+      `A portable dossier must declare certification_tier ${PORTABLE_CERTIFIED_PACKAGE_MODE}.`,
+      { actual: manifest.certification_tier ?? null }));
+  }
+  if (manifest.package_mode !== PORTABLE_CERTIFIED_PACKAGE_MODE) {
+    findings.push(finding("manifest.portable.native_claim",
+      `A portable dossier must declare package_mode ${PORTABLE_CERTIFIED_PACKAGE_MODE}; a portable-certified package may never claim the ${NATIVE_CERTIFIED_PACKAGE_MODE} mode, whose evidence set it does not hold.`,
+      { actual: manifest.package_mode ?? null }));
+  } else {
+    try {
+      assertCertifiedPackageMode(manifest.package_mode, "portable dossier package_mode");
+    } catch (error) {
+      findings.push(finding("manifest.portable.package_mode", error.message));
+    }
+  }
+  for (const key of Object.keys(manifest)) {
+    if (![
+      "schema_version", "certification_tier", "package_mode", "evidence",
+      "declared_exclusions", "certified_runtime_code_closure_sha256", "certified_closure_sha256",
+    ].includes(key)) {
+      findings.push(finding("manifest.portable.unknown_key", `Portable dossier key ${JSON.stringify(key)} is not part of the declared contract.`));
+    }
+  }
+
+  const evidence = manifest.evidence;
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+    findings.push(finding("manifest.portable.evidence", "A portable dossier requires an evidence object."));
+  } else {
+    for (const name of Object.keys(PERMANENTLY_EXCLUDED_EVIDENCE)) {
+      if (name in evidence) {
+        findings.push(finding(`manifest.portable.excluded_presented_as_satisfied.${name}`,
+          `Evidence class ${name} is a permanent declared exclusion and must never appear as satisfied evidence in a portable dossier.`,
+          { satisfiability: EXCLUDED_NATIVE_HOST }));
+      }
+    }
+    for (const name of PORTABLE_REQUIRED_EVIDENCE) {
+      if (!(name in evidence)) {
+        findings.push(finding(`manifest.portable.required_missing.${name}`,
+          `Portable-required evidence class ${name} is absent; the portable gate set is not optional.`));
+      }
+    }
+    for (const name of Object.keys(evidence)) {
+      if (!PORTABLE_REQUIRED_EVIDENCE.includes(name) && !(name in PERMANENTLY_EXCLUDED_EVIDENCE)) {
+        findings.push(finding(`manifest.portable.unknown_evidence.${name}`,
+          `Evidence class ${JSON.stringify(name)} is not a declared certification evidence class.`));
+      }
+    }
+  }
+
+  const exclusions = manifest.declared_exclusions;
+  if (!exclusions || typeof exclusions !== "object" || Array.isArray(exclusions)) {
+    findings.push(finding("manifest.portable.declared_exclusions",
+      "A portable dossier must DECLARE its permanent exclusions; silence about an excluded evidence class is refused."));
+    return;
+  }
+  for (const name of Object.keys(exclusions)) {
+    if (!(name in PERMANENTLY_EXCLUDED_EVIDENCE)) {
+      findings.push(finding(`manifest.portable.undeclared_exclusion.${name}`,
+        `Evidence class ${JSON.stringify(name)} is not a permanently excluded class and may not be declared as one.`));
+    }
+  }
+  for (const [name, expected] of Object.entries(PERMANENTLY_EXCLUDED_EVIDENCE)) {
+    const record = exclusions[name];
+    const prefix = `exclusion.${name}`;
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      findings.push(finding(prefix, `Evidence class ${name} is permanently excluded and the dossier must declare it, with a reason.`));
+      continue;
+    }
+    for (const key of Object.keys(record)) {
+      if (!EXCLUSION_RECORD_FIELDS.includes(key)) {
+        findings.push(finding(`${prefix}.unknown_field`, `Exclusion record field ${JSON.stringify(key)} is not part of the declared contract.`));
+      }
+    }
+    for (const key of ["evidence_class", "satisfiability", "required_host_capability"]) {
+      if (record[key] !== expected[key]) {
+        findings.push(finding(`${prefix}.${key}`, `Exclusion ${key} must equal the code-declared register value.`,
+          { expected: expected[key], actual: record[key] ?? null }));
+      }
+    }
+    // An exclusion is PERMANENT. Every spelling of "still to do" is refused
+    // here: a pending disposition, is_pending true, a revisit condition, or a
+    // waiver. This is the check that makes a declared exclusion impossible to
+    // mistake for an unfinished task.
+    if (record.exclusion_disposition !== PERMANENT_DECLARED_EXCLUSION) {
+      findings.push(finding(`${prefix}.disposition`,
+        `Excluded evidence class ${name} must be declared ${PERMANENT_DECLARED_EXCLUSION}; it is a permanent exclusion, not a pending item and not a deferral.`,
+        { expected: PERMANENT_DECLARED_EXCLUSION, actual: record.exclusion_disposition ?? null }));
+    }
+    if (record.is_pending !== false) {
+      findings.push(finding(`${prefix}.is_pending`,
+        `Excluded evidence class ${name} must carry is_pending: false; nothing is queued to produce it.`,
+        { actual: record.is_pending ?? null }));
+    }
+    if (record.revisit_condition !== null) {
+      findings.push(finding(`${prefix}.revisit_condition`,
+        `Excluded evidence class ${name} must carry revisit_condition: null; there is no condition under which this host becomes able to produce it.`,
+        { actual: record.revisit_condition }));
+    }
+    if (record.is_waiver !== false) {
+      findings.push(finding(`${prefix}.is_waiver`,
+        `Excluded evidence class ${name} must carry is_waiver: false; a declared exclusion is a statement about host capability, never permission to skip a reachable check.`,
+        { actual: record.is_waiver ?? null }));
+    }
+    if (record.excluded_from_portable_gate !== true) {
+      findings.push(finding(`${prefix}.excluded_from_portable_gate`,
+        `Excluded evidence class ${name} must carry excluded_from_portable_gate: true; an excluded class is never counted as a portable-gate pass.`,
+        { actual: record.excluded_from_portable_gate ?? null }));
+    }
+    if (typeof record.exclusion_reason !== "string" || record.exclusion_reason.trim().length < 40) {
+      findings.push(finding(`${prefix}.exclusion_reason`,
+        `Excluded evidence class ${name} must state which host capability is missing in exclusion_reason.`));
+    }
+  }
+}
+
 export async function validateReleaseCertificationEvidence({
   manifestPath,
   runtimeCodeClosureSha256 = null,
+  // P8.0 — which certification tier this dossier is being validated AS.
+  // Defaults to the NATIVE tier so every existing caller keeps exactly its
+  // current, unrelaxed behaviour.
+  certificationTier = NATIVE_CERTIFIED_PACKAGE_MODE,
   // Compatibility input for evidence schema v1. New callers must use the
   // identity-specific name so this proof cannot be mistaken for complete
   // package, archive or installed-package certification.
@@ -392,6 +653,11 @@ export async function validateReleaseCertificationEvidence({
   authorityHashes = AUTHORITY,
 }) {
   const findings = [];
+  const tierContract = CERTIFICATION_TIER_CONTRACT[
+    assertCertifiedPackageMode(certificationTier, "certification tier")
+  ];
+  const portable = certificationTier === PORTABLE_CERTIFIED_PACKAGE_MODE;
+  const requiredEvidence = portable ? PORTABLE_REQUIRED_EVIDENCE : REQUIRED_EVIDENCE;
   const runtimeCodeClosureHash = runtimeCodeClosureSha256 ?? closureHash;
   const testOverrideRequested = authorityHashes !== AUTHORITY;
   if (testOverrideRequested && process.env.EXCEL_INFLOW_RELEASE_CERT_TEST_MODE !== "1") {
@@ -399,7 +665,7 @@ export async function validateReleaseCertificationEvidence({
     authorityHashes = AUTHORITY;
   }
   if (!SHA256.test(String(runtimeCodeClosureHash ?? ""))) {
-    return { status: "FAIL", total_violations: 1, findings: [finding("runtime_code_closure", "A lowercase SHA-256 runtime-code closure identity is required.")] };
+    return { status: "FAIL", total_violations: 1, certification_tier: tierContract.tier, findings: [finding("runtime_code_closure", "A lowercase SHA-256 runtime-code closure identity is required.")] };
   }
   const absoluteManifest = path.resolve(manifestPath);
   const root = path.dirname(absoluteManifest);
@@ -411,6 +677,8 @@ export async function validateReleaseCertificationEvidence({
       schema_version: "release-certification-evidence-receipt/1.0",
       status: "FAIL",
       total_violations: 1,
+      certification_tier: tierContract.tier,
+      package_mode: tierContract.package_mode,
       certified_runtime_code_closure_sha256: runtimeCodeClosureHash,
       certified_closure_sha256: runtimeCodeClosureHash,
       manifest: { path: absoluteManifest, sha256: null },
@@ -418,14 +686,35 @@ export async function validateReleaseCertificationEvidence({
       findings: [finding("manifest.read", "Certification-evidence manifest could not be read as JSON.", { error: error.message })],
     };
   }
-  schemaFindings(MANIFEST_SCHEMA, manifest, "manifest", findings);
+  if (portable) {
+    portableManifestFindings(manifest, findings);
+  } else {
+    schemaFindings(MANIFEST_SCHEMA, manifest, "manifest", findings);
+    // A portable dossier fed to the NATIVE gate is refused by name, in addition
+    // to the schema refusal it already earns. The native tier claims the
+    // native-host evidence classes outright; a manifest that declares
+    // exclusions or a portable tier is asserting the opposite.
+    if (manifest.declared_exclusions !== undefined ||
+        manifest.certification_tier !== undefined ||
+        manifest.package_mode !== undefined) {
+      findings.push(finding("manifest.native.portable_dossier",
+        `A dossier that declares a certification tier, a package mode or permanent exclusions is a portable dossier and can never satisfy ${NATIVE_CERTIFIED_PACKAGE_MODE} certification, which requires the native-Excel and visual-review evidence classes as satisfied evidence.`,
+        {
+          certification_tier: manifest.certification_tier ?? null,
+          package_mode: manifest.package_mode ?? null,
+          declared_exclusions: manifest.declared_exclusions === undefined
+            ? null
+            : Object.keys(manifest.declared_exclusions ?? {}),
+        }));
+    }
+  }
   const manifestRuntimeCodeClosure =
     manifest.certified_runtime_code_closure_sha256 ?? manifest.certified_closure_sha256;
   if (manifestRuntimeCodeClosure !== runtimeCodeClosureHash) {
     findings.push(finding("manifest.closure", "Evidence manifest is not bound to the computed runtime-code closure."));
   }
   const entries = {};
-  for (const name of REQUIRED_EVIDENCE) {
+  for (const name of requiredEvidence) {
     entries[name] = await boundJson(root, manifest.evidence?.[name], `evidence.${name}`, findings);
   }
   if (entries.exact_maximal) await exactAuthority(entries.exact_maximal.value, entries.exact_maximal.filename, "standard-maximal", runtimeCodeClosureHash, "authority.maximal", findings, authorityHashes);
@@ -439,6 +728,25 @@ export async function validateReleaseCertificationEvidence({
     schema_version: "release-certification-evidence-receipt/1.0",
     status: findings.length === 0 ? "PASS" : "FAIL",
     total_violations: findings.length,
+    // The receipt says which tier it certifies and, for the portable tier, which
+    // classes were never in scope — so a portable receipt read out of context
+    // cannot be mistaken for a native one.
+    certification_tier: tierContract.tier,
+    package_mode: tierContract.package_mode,
+    claims_native_host_evidence: tierContract.claims_native_host_evidence,
+    required_evidence: [...requiredEvidence],
+    declared_exclusions: portable
+      ? Object.fromEntries(Object.entries(PERMANENTLY_EXCLUDED_EVIDENCE).map(([name, record]) => [name, {
+        satisfiability: record.satisfiability,
+        exclusion_disposition: record.exclusion_disposition,
+        excluded_from_portable_gate: record.excluded_from_portable_gate,
+        is_pending: record.is_pending,
+        is_waiver: record.is_waiver,
+        revisit_condition: record.revisit_condition,
+        exclusion_reason: record.exclusion_reason,
+      }]))
+      : null,
+    physical_lane_terminal_declaration: portable ? PHYSICAL_LANE_TERMINAL_DECLARATION : null,
     certified_runtime_code_closure_sha256: runtimeCodeClosureHash,
     certified_closure_sha256: runtimeCodeClosureHash,
     manifest: { path: absoluteManifest, sha256: await sha256File(absoluteManifest) },
