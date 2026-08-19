@@ -327,6 +327,62 @@ def _group_page_words(words: list[tuple[Any, ...]], page_number: int) -> list[di
     return lines
 
 
+PANE_TITLE_RE = re.compile(
+    r"(?:consolidated\s+|group\s+)?(?:income statements?|cash flow statements?|"
+    r"statements? of\s+(?:comprehensive income|other comprehensive income|income|"
+    r"operations|profit or loss|cash flows?|changes in equity|financial position))\s*"
+    r"(?:\(unaudited\))?\s*(?:\(continued\)|continued)?",
+    re.I,
+)
+
+
+def _pane_boundary(page_lines: list[dict[str, Any]]) -> float | None:
+    """Detect a two-pane statement page from a side-by-side title line.
+
+    UK statutory accounts print two face statements in parallel columns —
+    "Income statement" on the left and "Statement of other comprehensive
+    income" on the right of the SAME text line. Joined into one line, neither
+    title matches and both panes' year tokens corrupt one column geometry.
+    The split point is declared by the page itself: the x position where the
+    second title begins.
+    """
+    for line in page_lines[:12]:
+        words = line["words"]
+        for index in range(1, len(words)):
+            left = " ".join(word["text"] for word in words[:index]).strip()
+            right = " ".join(word["text"] for word in words[index:]).strip()
+            if PANE_TITLE_RE.fullmatch(left) and PANE_TITLE_RE.fullmatch(right):
+                return float(words[index]["x0"]) - 6.0
+    return None
+
+
+def _split_two_pane_lines(page_lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    boundary = _pane_boundary(page_lines)
+    if boundary is None:
+        return page_lines
+    split: list[dict[str, Any]] = []
+    for line in page_lines:
+        panes: dict[str, list[dict[str, Any]]] = {"left": [], "right": []}
+        for word in line["words"]:
+            side = "left" if (word["x0"] + word["x1"]) / 2 < boundary else "right"
+            panes[side].append(word)
+        for side in ("left", "right"):
+            words = panes[side]
+            if not words:
+                continue
+            split.append({
+                "pane": side,
+                "page": line["page"],
+                "x0": min(word["x0"] for word in words),
+                "x1": max(word["x1"] for word in words),
+                "y0": min(word["y0"] for word in words),
+                "y1": max(word["y1"] for word in words),
+                "words": words,
+                "text": " ".join(word["text"] for word in words).strip(),
+            })
+    return split
+
+
 def pdf_lines(target: Path) -> list[dict[str, Any]]:
     try:
         import fitz  # type: ignore
@@ -335,7 +391,8 @@ def pdf_lines(target: Path) -> list[dict[str, Any]]:
     document = fitz.open(target)
     lines: list[dict[str, Any]] = []
     for page_index, page in enumerate(document):
-        lines.extend(_group_page_words(page.get_text("words", sort=True), page_index + 1))
+        page_lines = _group_page_words(page.get_text("words", sort=True), page_index + 1)
+        lines.extend(_split_two_pane_lines(page_lines))
     document.close()
     return sorted(lines, key=lambda line: (line["page"], line["y0"], line["x0"]))
 
@@ -462,14 +519,22 @@ def _is_statement_header_line(
 def _resolved_row_count(
     page_lines: list[dict[str, Any]], columns: list[float], periods: list[str], section: str,
 ) -> int:
-    if len(columns) != 3:
+    # A fully populated row prints one value per SUPPORTED period column. A
+    # two-comparative face's rows print two values; requiring three here was
+    # the last hard-coded three-period assumption and starved every
+    # two-column candidate below the row floor.
+    finite = [column for column in columns if isinstance(column, float) and math.isfinite(column)]
+    if len(finite) < 2:
         return 0
     count = 0
     for line in page_lines:
         if _is_statement_header_line(line, periods) or DECORATION_RE.search(str(line.get("text") or "")):
             continue
         runs = numeric_runs(line.get("words", []))
-        if len(runs) >= 3 and len(nearest_values(runs, columns)) == 3:
+        if len(runs) < len(finite):
+            continue
+        values = nearest_values(runs, finite)
+        if len(values) == len(finite) and all(value is not None for value in values):
             count += 1
     return count
 
@@ -531,6 +596,26 @@ def _continuation_page(
     return certified, resolved_columns if certified else []
 
 
+def same_pane_window(window: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Restrict a face window to its heading's pane on a two-pane page.
+
+    After a side-by-side page is split, both panes' lines interleave by y
+    within the same page span; without this filter the neighbouring face's
+    values sit inside the window and bind across the page at unlimited
+    distance.
+    """
+    if not window:
+        return window
+    heading_pane = window[0].get("pane")
+    if not heading_pane:
+        return window
+    heading_page = window[0]["page"]
+    return [
+        line for line in window
+        if line["page"] != heading_page or line.get("pane") in (None, heading_pane)
+    ]
+
+
 def statement_window(
     lines: list[dict[str, Any]], section: str, periods: list[str],
 ) -> tuple[int, int] | None:
@@ -552,7 +637,7 @@ def statement_window(
             continue
         page = int(line["page"])
         page_start, page_end = page_ranges[page]
-        local = lines[heading_index:page_end]
+        local = same_pane_window(lines[heading_index:page_end])
         observed_years = {
             year
             for candidate in local[:20]
@@ -1266,7 +1351,7 @@ def extract_statement(
     if not bounds:
         return None, [{"code": "HEADING_NOT_FOUND", "section": section}]
     start, end = bounds
-    window = lines[start:end]
+    window = same_pane_window(lines[start:end])
     # Statement Authority v2, stage 2: the face owns the periods it prints.
     # Extraction proceeds against the SUPPORTED period columns; each absent
     # older period stays a declared support requirement whose values are
