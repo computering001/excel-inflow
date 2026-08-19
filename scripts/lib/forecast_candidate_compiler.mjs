@@ -586,6 +586,21 @@ function formulaCandidate(row, behavior, forecastIndex, rows = []) {
     ? row.forecast_period_calculations[forecastIndex] ?? null
     : row.forecast_calculation ?? row.calculation;
   if (!calculation) return null;
+  // The capture PARENT's declared identity over its own captured children is
+  // the same non-executable evidence the captured_detail guard below refuses:
+  // the children stand deliberately blank in forecast, so the sum would
+  // materialise zero and present it as a driver. The scope is owned by
+  // independent evidence instead — brokers, guidance, or historical
+  // inference over the parent's own derived history.
+  if (
+    (calculation.refs ?? []).some(
+      (reference) =>
+        rows.find((candidate) => candidate.row_id === reference)
+          ?.forecast_capture_parent_id === row.row_id,
+    )
+  ) {
+    return null;
+  }
   if (
     behavior === "captured_detail" &&
     (calculation.refs ?? []).some((reference) => {

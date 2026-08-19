@@ -2046,7 +2046,13 @@ function consolidateConstituents(rows, spec) {
       }
       const rewired = [];
       for (const ref of rule.refs) {
-        const next = constituentIdSet.has(ref) ? consolidated.row_id : ref;
+        // A row's reference to ITSELF is temporal (a prior-period carry),
+        // not a membership sum; rewiring it to the consolidated parent turns
+        // a self-carry into a parent link and mints a formula cycle.
+        const next =
+          constituentIdSet.has(ref) && ref !== row.row_id
+            ? consolidated.row_id
+            : ref;
         if (!rewired.includes(next)) rewired.push(next);
       }
       rule.refs = rewired;
@@ -3159,6 +3165,71 @@ function applyDefaultForecastWaterfall(modelCase, rows) {
   }
 }
 
+/**
+ * A capture PARENT whose materialised forecast formula sums its own captured
+ * children forecasts nothing: the children stand deliberately blank, so the
+ * sum presents zero as a driver. The waterfall ran before capture marking and
+ * could not see this, so it is repaired here, after captures are certified:
+ * the parent's formula evidence over its captives is replaced by the same
+ * last-reported-level carry the legacy fallback uses, computed from the
+ * parent's OWN derived history — independent of the children, exactly what
+ * the semantic-scope proof demands of it.
+ */
+function restoreCaptureParentForecastIndependence(rows) {
+  const capturedByParent = new Map();
+  for (const row of rows) {
+    if (!row.forecast_capture_parent_id) continue;
+    let set = capturedByParent.get(row.forecast_capture_parent_id);
+    if (!set) {
+      set = new Set();
+      capturedByParent.set(row.forecast_capture_parent_id, set);
+    }
+    set.add(row.row_id);
+  }
+  for (const row of rows) {
+    const captives = capturedByParent.get(row.row_id);
+    if (!captives || captives.size === 0) continue;
+    const consumesCaptive = (calculation) =>
+      (calculation?.refs ?? []).some((reference) => captives.has(reference));
+    const materialised = [
+      row.forecast_calculation,
+      ...(row.forecast_period_calculations ?? []),
+    ].filter(Boolean);
+    if (materialised.length === 0 || !materialised.every(consumesCaptive)) {
+      continue;
+    }
+    const history = (row.values ?? []).slice(0, 3).map((value) =>
+      value === null || value === undefined || !Number.isFinite(Number(value))
+        ? null
+        : Number(value),
+    );
+    if (!history.some((value) => value !== null)) continue;
+    const last = history[2] ?? history[1] ?? history[0];
+    delete row.forecast_calculation;
+    delete row.forecast_period_calculations;
+    row.forecast_period_authorities = [0, 1, 2].map(() => ({
+      method: "carry_forward",
+      source_kind: "derived",
+      material: true,
+      note:
+        "The captured detail stands down, so the scope carries its own last reported level; " +
+        "a sum over intentionally blank children is not forecast evidence.",
+    }));
+    row.forecast_treatment = "formula";
+    row.forecast_calculation = {
+      operator: "prior_period",
+      refs: [row.row_id],
+    };
+    row.forecast_decision = {
+      method: "carry_forward",
+      reason:
+        Math.abs(Number(last ?? 0)) <= 1e-12
+          ? "Capture-parent carry at the last supported level; zero is not evidence of non-recurrence."
+          : "Capture-parent carry from the scope's latest reported value.",
+    };
+  }
+}
+
 function captureChildrenOfDirectForecastParents(modelCase, rows) {
   const byId = new Map(rows.map((row) => [row.row_id, row]));
   const accountingIdentityParents = new Set([
@@ -3578,6 +3649,7 @@ export function normaliseStatementRows(
   }
   if (forecastDecisionMode === "compile") {
     captureChildrenOfDirectForecastParents(modelCase, rows);
+    restoreCaptureParentForecastIndependence(rows);
     applyDefaultForecastWaterfall(modelCase, rows);
   } else if (forecastDecisionMode !== "defer") {
     throw new Error(`Unknown forecastDecisionMode ${forecastDecisionMode}.`);

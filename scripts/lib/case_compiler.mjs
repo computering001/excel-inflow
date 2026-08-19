@@ -1087,6 +1087,75 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   }
   const taxExpense = role("tax_expense");
   const preTax = role("pre_tax_income");
+  // A filed bottom line with no linked family severs the workbook's fixed
+  // point: interest feeds pre-tax income, but a net income that ignores
+  // pre-tax income never carries it to the cash flow, and the cash/RCF/
+  // interest cycle cannot close. US faces print the tax charge as a positive
+  // deduction, so the extractor's additive suffix-sum cannot bind the family
+  // there; the canonical identity is minted HERE instead — and only when the
+  // filed history ties exactly, under whichever sign convention the filing
+  // used. A bottom line the identity cannot reproduce (NCI attribution,
+  // discontinued operations between the lines) is left exactly as filed.
+  const netIncomeRow = role("net_income");
+  if (
+    netIncomeRow &&
+    !netIncomeRow.calculation &&
+    ["input", "uncalculated"].includes(netIncomeRow.row_type ?? "input") &&
+    taxExpense &&
+    preTax
+  ) {
+    const rowsById = new Map(isRows.map((row) => [row.row_id, row]));
+    const preTaxHistory = [0, 1, 2].map((periodIndex) => {
+      const filed = Number(preTax.values?.[periodIndex]);
+      if (Number.isFinite(filed)) return filed;
+      if (preTax.calculation?.operator !== "sum") return NaN;
+      const refs = preTax.calculation?.refs ?? [];
+      if (refs.length === 0) return NaN;
+      let total = 0;
+      for (const ref of refs) {
+        const value = Number(rowsById.get(ref)?.values?.[periodIndex]);
+        // A structurally empty canonical shell (minted interest interface)
+        // contributes zero by declaration.
+        if (Number.isFinite(value)) total += value;
+      }
+      return total;
+    });
+    const identityTies = (operator) =>
+      [0, 1, 2].every((periodIndex) => {
+        const bottom = Number(netIncomeRow.values?.[periodIndex]);
+        const tax = Number(taxExpense.values?.[periodIndex]);
+        const preTaxValue = preTaxHistory[periodIndex];
+        if (![bottom, tax, preTaxValue].every(Number.isFinite)) return false;
+        const derived =
+          operator === "subtract" ? preTaxValue - tax : preTaxValue + tax;
+        return Math.abs(derived - bottom) <= Math.max(1, Math.abs(bottom)) * 1e-6;
+      });
+    const identityOperator = identityTies("subtract")
+      ? "subtract"
+      : identityTies("sum")
+        ? "sum"
+        : null;
+    if (identityOperator) {
+      netIncomeRow.row_type = "calculation";
+      netIncomeRow.calculation = {
+        operator: identityOperator,
+        refs: [preTax.row_id, taxExpense.row_id],
+      };
+      // The filed series becomes the reconciliation TARGET the identity must
+      // tie to; the emitted historical cells are formulas, so the three
+      // totals move out of `values` into the sealed reconciliation channel.
+      netIncomeRow.historical_authority = "reported_total_reconciled";
+      netIncomeRow.reported_historical_values = [0, 1, 2].map((periodIndex) =>
+        Number(netIncomeRow.values[periodIndex]),
+      );
+      netIncomeRow.values = [
+        null,
+        null,
+        null,
+        ...(netIncomeRow.values ?? []).slice(3, 6),
+      ];
+    }
+  }
   if (taxExpense && preTax && !role("effective_tax_rate")) {
     insertAfter(isRows, preTax.row_id, [{
       row_id: "effective_tax_rate",
@@ -2779,6 +2848,41 @@ export function compileForecastCaptureTopology(
       if (!selectedPath || selectedPath.at(-1) === row.row_id) continue;
       const targetId = selectedPath.at(-1);
       const target = rowsById.get(targetId);
+      // A target whose OWN forecast formula consumes this row cannot capture
+      // it into blankness: standing the child down would zero the very
+      // formula that claims to own the scope. The child keeps its lawful
+      // fallback path to checkpoint B and the target aggregates live
+      // children instead (formula membership, not semantic scope). A target
+      // whose only direct forecast evidence is its declared formula will
+      // forecast BY that formula, so its structural refs are forecast refs;
+      // schedule-, broker-, hardcode- or explicit-value-owned targets
+      // forecast independently of their members and may still capture.
+      const targetIndependentForecast =
+        SCHEDULE_ROLES.has(target?.semantic_role) ||
+        target?.broker_metric_id ||
+        ["hardcode", "zero", "broker"].includes(target?.forecast_treatment) ||
+        (target?.values ?? [])
+          .slice(3, 6)
+          .some(
+            (value) =>
+              value !== null &&
+              value !== undefined &&
+              Number.isFinite(Number(value)),
+          ) ||
+        (target?.forecast_period_authorities ?? []).some(
+          (authority) =>
+            authority &&
+            DIRECT_FORECAST_METHODS.has(authority.method) &&
+            authority.source_kind !== "formula",
+        );
+      const targetForecastRefs = new Set([
+        ...(target?.forecast_calculation?.refs ?? []),
+        ...(target?.forecast_period_calculations ?? []).flatMap(
+          (calc) => calc?.refs ?? [],
+        ),
+        ...(targetIndependentForecast ? [] : (target?.calculation?.refs ?? [])),
+      ]);
+      if (targetForecastRefs.has(row.row_id)) continue;
       const targetFamilyMembers = new Set([
         ...(target?.calculation?.operator === "sum"
           ? (target.calculation.refs ?? []).filter((rowId) => rowsById.has(rowId))

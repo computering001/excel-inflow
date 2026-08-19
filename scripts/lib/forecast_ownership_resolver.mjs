@@ -254,7 +254,35 @@ export function resolveSelectedForecastOwnership(modelCase) {
     ) {
       for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
         const parentMethod = methodAt(parent, forecastIndex);
-        const parentClass = ownershipClass(parentMethod);
+        // A parent authority whose formula is spelled over this family's own
+        // structural children is the family IDENTITY dressed as a driver:
+        // selecting it as "direct" evidence would capture the very children
+        // the formula consumes and materialise a sum over blanks. Ownership
+        // classes decide who stands down, so the class must reflect the
+        // evidence's true independence, not the method label the waterfall
+        // stamped on it.
+        const parentAuthorityForClass = authorityAt(parent, forecastIndex);
+        // The sealed authority entry drops the candidate's formula_spec, so a
+        // formula-kind authority is resolved against the formula the row will
+        // actually execute for this period.
+        const parentFormulaRefs =
+          parentAuthorityForClass?.formula_spec?.refs ??
+          (parentAuthorityForClass?.source_kind === "formula"
+            ? (parent?.forecast_period_calculations?.[forecastIndex] ??
+                parent?.forecast_calculation ??
+                parent?.calculation)?.refs
+            : null) ??
+          [];
+        const parentFormulaIsFamilyIdentity =
+          parentFormulaRefs.length > 0 &&
+          parentFormulaRefs.every((reference) =>
+            structural_child_ids.has(reference),
+          );
+        const parentClass =
+          ownershipClass(parentMethod) === "direct" &&
+          parentFormulaIsFamilyIdentity
+            ? "identity"
+            : ownershipClass(parentMethod);
         let childStates = children.map((row) => ({
           row,
           owner_class: ownershipClass(methodAt(row, forecastIndex)),

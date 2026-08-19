@@ -623,13 +623,24 @@ export function workbookSemanticProofContract(
   );
   const physicalRow = (displayId) =>
     presentation.get(displayId)?.physical_row ?? null;
+  // Uniqueness must be judged with the SAME normalisation the oracle uses to
+  // resolve labels (verify/workbook_semantic_oracle.py normalise_label), or a
+  // punctuation-differing pair — "Net income $" on the income statement and
+  // "Net income" opening a US indirect cash flow — counts as two unique names
+  // here while resolving to one name there, minting a rule no workbook can
+  // satisfy.
+  const normalisedLabel = (node) =>
+    String(node?.label ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   const labelCounts = new Map();
   for (const node of modelIr.planes.statement) {
-    const key = String(node.label ?? "").trim().toLowerCase();
+    const key = normalisedLabel(node);
     if (key) labelCounts.set(key, (labelCounts.get(key) ?? 0) + 1);
   }
   const uniquelyNamed = (node) =>
-    node && labelCounts.get(String(node.label ?? "").trim().toLowerCase()) === 1;
+    node && labelCounts.get(normalisedLabel(node)) === 1;
 
   const uniqueAnswers = [];
   for (const node of modelIr.planes.statement) {
