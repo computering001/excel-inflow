@@ -2,7 +2,7 @@
   "schema_version": "excel-inflow-programme-index/1.0",
   "programme": "v3.7.7 behavioural closure -> v3.8.0 structural simplification",
   "current_phase": "Phase 0 - Freeze, evidence custody and programme control",
-  "active_package": "P0.8",
+  "active_package": "P0.8 (blocked on green CI receipt) / P1.2 shadow",
   "sealed_packages": {
     "P0.1": {
       "commit": "6a64f74",
@@ -30,8 +30,13 @@
       "invariant": "no engineering task begins without a work-package issue card and rollback point"
     },
     "P0.7": {
-      "commit": "(this commit)",
+      "commit": "df91663",
       "invariant": "every writer, reader and mutator of the named state families is identified and classified"
+    },
+    "P1.1": {
+      "commit": "(this commit)",
+      "invariant": "every producer emits an object that validates immediately against the same canonical contract used by consumers",
+      "status": "SEALED_SHADOW pending P0.8"
     }
   },
   "evidence_baseline": {
@@ -39,7 +44,7 @@
     "tag": "excel-inflow-v376-evidence-baseline",
     "tree": "d9c9fa56d3b146251e5dc89625bffee0c9675795"
   },
-  "last_green_commit": "dfb17e7",
+  "last_green_commit": "6a96ecf",
   "open_blockers": [
     "P0.3 live CI receipts pending (two Actions runs in progress)",
     "Rogo-dependent items excluded by user directive: installed-host proof, native Excel certification, human visual review"

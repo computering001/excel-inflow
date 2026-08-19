@@ -1,0 +1,61 @@
+{
+  "schema_version": "excel-inflow-contract-definition/1.0",
+  "contract": "support_envelope_classification",
+  "version": "1.0.0",
+  "description": "The classification result the support-envelope preflight produces for every case. First contract migrated end-to-end under P1.1; the canonical definition generates the JSON Schema, the JavaScript binding and the Python binding.",
+  "supported_versions": ["1.0.0"],
+  "field_taxonomy": {
+    "source_facts": [],
+    "derived_facts": ["support_class", "dimension_verdicts", "early_stop", "degraded_dimensions", "legal_terminals"],
+    "receipts": ["envelope_version", "envelope_sha256"],
+    "references": [],
+    "presentation_only": []
+  },
+  "enums": {
+    "SupportClass": ["CERTIFIED", "SUPPORTED_DEGRADED", "EXPERIMENTAL", "UNSUPPORTED"],
+    "TerminalState": ["DELIVERED_VERIFIED", "DELIVERED_DEGRADED", "ACTION_REQUIRED", "SOURCE_REQUIRED", "UNSUPPORTED_PROFILE", "INTERNAL_FAILURE", "CANCELLED"]
+  },
+  "types": {
+    "DimensionVerdict": {
+      "kind": "object",
+      "fields": {
+        "value": { "type": "string", "required": true },
+        "class": { "type": "enum", "enum": "SupportClass", "required": true },
+        "declared": { "type": "boolean", "required": true }
+      }
+    },
+    "EarlyStop": {
+      "kind": "discriminated_union",
+      "discriminator": "stopped",
+      "variants": {
+        "true": {
+          "fields": {
+            "stopped": { "type": "const", "const": true, "required": true },
+            "reason_code": { "type": "string", "pattern": "^UNSUPPORTED_PROFILE\\.[a-z_]+$", "required": true },
+            "terminal_state": { "type": "const", "const": "UNSUPPORTED_PROFILE", "required": true }
+          }
+        },
+        "false": {
+          "fields": {
+            "stopped": { "type": "const", "const": false, "required": true },
+            "reason_code": { "type": "null", "required": true },
+            "terminal_state": { "type": "null", "required": true }
+          }
+        }
+      }
+    }
+  },
+  "root": {
+    "kind": "object",
+    "fields": {
+      "contract_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "required": true },
+      "envelope_version": { "type": "string", "required": true },
+      "envelope_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$", "required": true },
+      "support_class": { "type": "enum", "enum": "SupportClass", "required": true },
+      "dimension_verdicts": { "type": "map", "values": { "type": "ref", "ref": "DimensionVerdict" }, "required": true },
+      "early_stop": { "type": "ref", "ref": "EarlyStop", "required": true },
+      "degraded_dimensions": { "type": "array", "items": { "type": "string" }, "required": true },
+      "legal_terminals": { "type": "array", "items": { "type": "enum", "enum": "TerminalState" }, "required": true }
+    }
+  }
+}

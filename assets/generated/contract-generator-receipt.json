@@ -1,0 +1,16 @@
+{
+  "schema_version": "excel-inflow-contract-generator-receipt/1.0",
+  "generator": "compile_canonical_contracts.mjs",
+  "contracts": {
+    "support_envelope_classification": {
+      "definition": "assets/contracts/support-envelope.contract.json",
+      "definition_sha256": "0f6d270462e1be983c11ddb9088fa1bbb134e42c4edd70c0fd75fe2748ebb9f0",
+      "version": "1.0.0",
+      "outputs": {
+        "assets/generated/support-envelope.generated.schema.json": "1c3f5a8eb0f3d281de8668046e69d4945530925783a5ff486b0ca262a0f08aa1",
+        "scripts/lib/generated/support_envelope_contract.mjs": "f6caf903177e8f7241019ab18b4fa1b25edac9738783c46f5e985e6fd6270b3f",
+        "scripts/generated/support_envelope_contract.py": "60469f6d50e8338658199cabbb13420f998a1f778d72c0e053c45fb8096e54b5"
+      }
+    }
+  }
+}
