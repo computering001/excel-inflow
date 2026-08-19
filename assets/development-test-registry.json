@@ -162,6 +162,15 @@
       "test_class": "unit"
     },
     {
+      "id": "terminal-reason-registry",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_terminal_reason_registry_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "multipage-filing-extraction",
       "phase": "evidence",
       "runtime": "python",
