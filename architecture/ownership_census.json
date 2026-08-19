@@ -1,0 +1,500 @@
+{
+  "schema_version": "excel-inflow-ownership-census/1.0",
+  "work_package": "P0.7",
+  "invariant": "every writer, reader and mutator of the named state families is identified and classified",
+  "generated_from": "static scan of scripts/lib/*.mjs plus the five named entry modules",
+  "families": [
+    "forecast_authority",
+    "forecast_formula",
+    "capture_ownership",
+    "row_topology",
+    "economic_values",
+    "workbook_state",
+    "terminal_status",
+    "release_identity"
+  ],
+  "files": {
+    "build_dynamic_model.mjs": {
+      "count": 27,
+      "families": {
+        "row_topology": 19,
+        "economic_values": 2,
+        "workbook_state": 6
+      },
+      "classification": "late_repair_candidate",
+      "concern": "physical projection that still REWRITES formulas post-emission (patchWorkbookProperties: N/O/P gate wrap, R-column rewrite) and sweeps provenance comments - economically passive but physically late",
+      "target_owner": "Workbook planner + emitter (Phase 5); late rewrites become plan-time facts"
+    },
+    "compile_skill_release.mjs": {
+      "count": 5,
+      "families": {
+        "terminal_status": 1,
+        "release_identity": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "package closure + release identity",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
+    "lib/attachment_ingress.mjs": {
+      "count": 2,
+      "families": {
+        "release_identity": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "attachment evidence",
+      "target_owner": "Evidence IR (Phase 1)"
+    },
+    "lib/broker_intake_choice.mjs": {
+      "count": 4,
+      "families": {
+        "terminal_status": 3,
+        "release_identity": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "broker intake decision state",
+      "target_owner": "Evidence IR (Phase 1)"
+    },
+    "lib/broker_preview.mjs": {
+      "count": 6,
+      "families": {
+        "forecast_authority": 1,
+        "economic_values": 1,
+        "terminal_status": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "broker preview state",
+      "target_owner": "Evidence IR (Phase 1)"
+    },
+    "lib/capture_transition.mjs": {
+      "count": 13,
+      "families": {
+        "forecast_authority": 4,
+        "forecast_formula": 2,
+        "capture_ownership": 5,
+        "economic_values": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "the single legal capture writer",
+      "target_owner": "Family ownership compiler (Phase 3)"
+    },
+    "lib/case_compiler.mjs": {
+      "count": 116,
+      "families": {
+        "forecast_authority": 4,
+        "forecast_formula": 6,
+        "capture_ownership": 6,
+        "row_topology": 87,
+        "economic_values": 13
+      },
+      "classification": "canonical_writer",
+      "concern": "statement topology + compile-time economics",
+      "target_owner": "Statement Authority compiler (Phase 2)"
+    },
+    "lib/case_source_proposer.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "statement map proposal",
+      "target_owner": "Statement Authority compiler (Phase 2)"
+    },
+    "lib/coverage.mjs": {
+      "count": 9,
+      "families": {
+        "capture_ownership": 1,
+        "row_topology": 8
+      },
+      "classification": "validator",
+      "concern": "coverage checks (must not mutate)",
+      "target_owner": "validators stay validators"
+    },
+    "lib/evidence_resolution_v2.mjs": {
+      "count": 6,
+      "families": {
+        "terminal_status": 6
+      },
+      "classification": "canonical_writer",
+      "concern": "evidence resolution",
+      "target_owner": "Authority IR (Phase 2)"
+    },
+    "lib/evidence_run.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "evidence transaction",
+      "target_owner": "Evidence IR (Phase 1)"
+    },
+    "lib/flow.mjs": {
+      "count": 2,
+      "families": {
+        "terminal_status": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "user-flow stage state",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    },
+    "lib/flow_questions.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "user question state",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    },
+    "lib/flow_screens.mjs": {
+      "count": 2,
+      "families": {
+        "row_topology": 1,
+        "economic_values": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "user-flow presentation state",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    },
+    "lib/forecast_authority.mjs": {
+      "count": 9,
+      "families": {
+        "row_topology": 9
+      },
+      "classification": "canonical_writer",
+      "concern": "forecast authority helpers",
+      "target_owner": "Authority selector (Phase 3)"
+    },
+    "lib/forecast_authority_ledger.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "derived_reader",
+      "concern": "authority ledger (a derived view per the target architecture)",
+      "target_owner": "derived view of Authority IR (Phase 3)"
+    },
+    "lib/forecast_behavior.mjs": {
+      "count": 2,
+      "families": {
+        "row_topology": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "forecast behaviour classification",
+      "target_owner": "Authority selector (Phase 3)"
+    },
+    "lib/forecast_candidate_compiler.mjs": {
+      "count": 28,
+      "families": {
+        "forecast_authority": 2,
+        "forecast_formula": 3,
+        "capture_ownership": 7,
+        "row_topology": 7,
+        "economic_values": 9
+      },
+      "classification": "canonical_writer",
+      "concern": "forecast candidates + authority selection",
+      "target_owner": "Authority selector (Phase 3)"
+    },
+    "lib/forecast_completeness.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "validator",
+      "concern": "forecast completeness checks",
+      "target_owner": "validators stay validators"
+    },
+    "lib/forecast_completion_constitution.mjs": {
+      "count": 2,
+      "families": {
+        "row_topology": 1,
+        "terminal_status": 1
+      },
+      "classification": "validator",
+      "concern": "completion constitution checks",
+      "target_owner": "validators stay validators"
+    },
+    "lib/forecast_ownership_resolver.mjs": {
+      "count": 3,
+      "families": {
+        "forecast_authority": 2,
+        "capture_ownership": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "family/capture ownership",
+      "target_owner": "Family ownership compiler (Phase 3)"
+    },
+    "lib/funded_acquisition_plan.mjs": {
+      "count": 2,
+      "families": {
+        "workbook_state": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "acquisition plan economics",
+      "target_owner": "Policy registry (Phase 2)"
+    },
+    "lib/historical_normalisation.mjs": {
+      "count": 11,
+      "families": {
+        "row_topology": 7,
+        "economic_values": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "historical evidence normalisation",
+      "target_owner": "Evidence IR (Phase 1)"
+    },
+    "lib/instrument_period_state.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "instrument/period schedule state",
+      "target_owner": "Schedule/solver layer (Phase 4)"
+    },
+    "lib/layered_graph_constitution.mjs": {
+      "count": 4,
+      "families": {
+        "row_topology": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "layered graph constitution records",
+      "target_owner": "Canonical graph compiler (Phase 3)"
+    },
+    "lib/local_workbook_review.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "validator",
+      "concern": "local workbook review",
+      "target_owner": "validators stay validators"
+    },
+    "lib/model_ir_v3.mjs": {
+      "count": 4,
+      "families": {
+        "capture_ownership": 2,
+        "row_topology": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "model IR projection",
+      "target_owner": "Economic IR (Phase 3)"
+    },
+    "lib/optional_broker_circuit_breaker.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "broker fault containment status",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    },
+    "lib/ownership_census.mjs": {
+      "count": 4,
+      "families": {
+        "row_topology": 4
+      },
+      "classification": "derived_reader",
+      "concern": "ownership census view (derived, never a writer)",
+      "target_owner": "derived view of the canonical graph (Phase 3)"
+    },
+    "lib/performance_receipt.mjs": {
+      "count": 1,
+      "families": {
+        "release_identity": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "performance receipts",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
+    "lib/plan_builder.mjs": {
+      "count": 5,
+      "families": {
+        "workbook_state": 5
+      },
+      "classification": "canonical_writer",
+      "concern": "workbook plan recording (physical)",
+      "target_owner": "Workbook planner (Phase 5)"
+    },
+    "lib/progress_heartbeat.mjs": {
+      "count": 1,
+      "families": {
+        "terminal_status": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "progress heartbeat state",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
+    "lib/raw_canary_fixture.mjs": {
+      "count": 1,
+      "families": {
+        "economic_values": 1
+      },
+      "classification": "validator",
+      "concern": "canary evidence custody pin",
+      "target_owner": "test custody stays test custody"
+    },
+    "lib/release_certification.mjs": {
+      "count": 2,
+      "families": {
+        "terminal_status": 2
+      },
+      "classification": "validator",
+      "concern": "release certification checks",
+      "target_owner": "validators stay validators"
+    },
+    "lib/release_identity_governance.mjs": {
+      "count": 1,
+      "families": {
+        "release_identity": 1
+      },
+      "classification": "validator",
+      "concern": "release identity governance checks",
+      "target_owner": "validators stay validators"
+    },
+    "lib/release_nodes.mjs": {
+      "count": 3,
+      "families": {
+        "terminal_status": 3
+      },
+      "classification": "canonical_writer",
+      "concern": "release node state",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
+    "lib/release_package_attestation.mjs": {
+      "count": 6,
+      "families": {
+        "terminal_status": 1,
+        "release_identity": 5
+      },
+      "classification": "validator",
+      "concern": "package attestation checks",
+      "target_owner": "validators stay validators"
+    },
+    "lib/row_plan.mjs": {
+      "count": 90,
+      "families": {
+        "forecast_authority": 10,
+        "forecast_formula": 12,
+        "capture_ownership": 20,
+        "row_topology": 38,
+        "economic_values": 10
+      },
+      "classification": "mixed_legacy_writer",
+      "concern": "presentation compiler that ALSO mutates forecast state (waterfall, consolidation rewires, capture marks) - a second writer over forecast concerns",
+      "target_owner": "split: Workbook planner (Phase 5) + Authority selector (Phase 3); duplicate forecast writes deleted in Phase 9"
+    },
+    "lib/run_constitution_graph.mjs": {
+      "count": 3,
+      "families": {
+        "row_topology": 3
+      },
+      "classification": "canonical_writer",
+      "concern": "run constitution graph",
+      "target_owner": "Canonical graph compiler (Phase 3)"
+    },
+    "lib/run_scoped_broker_concepts.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "run-scoped broker concept elections",
+      "target_owner": "Authority selector (Phase 3)"
+    },
+    "lib/semantic_graph.mjs": {
+      "count": 3,
+      "families": {
+        "row_topology": 3
+      },
+      "classification": "canonical_writer",
+      "concern": "semantic manifest",
+      "target_owner": "Canonical graph compiler (Phase 3)"
+    },
+    "lib/solver.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "economic solution",
+      "target_owner": "Schedule/solver layer (Phase 4)"
+    },
+    "lib/source_identity.mjs": {
+      "count": 4,
+      "families": {
+        "release_identity": 4
+      },
+      "classification": "canonical_writer",
+      "concern": "active source identity",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
+    "lib/statement_topology.mjs": {
+      "count": 6,
+      "families": {
+        "row_topology": 6
+      },
+      "classification": "canonical_writer",
+      "concern": "statement topology records",
+      "target_owner": "Statement Authority compiler (Phase 2)"
+    },
+    "lib/validation_invariants.mjs": {
+      "count": 2,
+      "families": {
+        "capture_ownership": 1,
+        "row_topology": 1
+      },
+      "classification": "validator",
+      "concern": "invariant checks",
+      "target_owner": "validators stay validators"
+    },
+    "lib/workflow_state.mjs": {
+      "count": 5,
+      "families": {
+        "terminal_status": 5
+      },
+      "classification": "canonical_writer",
+      "concern": "terminal workflow state",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    },
+    "orchestrate_release.mjs": {
+      "count": 23,
+      "families": {
+        "terminal_status": 21,
+        "release_identity": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "stage4 release orchestration",
+      "target_owner": "Release/package compiler (Phase 8)"
+    },
+    "run_excel_inflow_vnext.mjs": {
+      "count": 12,
+      "families": {
+        "terminal_status": 10,
+        "release_identity": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "vnext terminal state + release identity stamps",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    },
+    "run_user_flow.mjs": {
+      "count": 30,
+      "families": {
+        "terminal_status": 30
+      },
+      "classification": "canonical_writer",
+      "concern": "stage choreography status",
+      "target_owner": "Terminal outcome compiler (Phase 6)"
+    }
+  },
+  "duplicate_writer_findings": [
+    "forecast_authority and forecast_formula have MULTIPLE writers: forecast_candidate_compiler (waterfall selection), row_plan (legacy waterfall, consolidation rewires, capture-parent restore) and capture_transition (capture rewrites). The same economic fact can be selected in the candidate compiler and re-mutated in row planning - the v3.8 deletion target.",
+    "capture_ownership has three writers (capture_transition as the declared single legal writer, plus row_plan markForecastCapturedBy and case_compiler markCompilerCapture) - convergence to capture_transition is the Phase 3 seam.",
+    "workbook formula text is written at plan time (plan_builder) AND rewritten post-emission (build_dynamic_model patch passes) - the Phase 5 passivity seam."
+  ],
+  "unknown_writer_gate": {
+    "rule": "every high-risk mutation must be classified before Phase 1 closes",
+    "unclassified_files": []
+  },
+  "runtime_mutation_receipts_status": "static census only in P0.7; runtime receipts around the named late-repair points land with the Phase 3/5 shadow migration that consumes them - declared, not silent"
+}

@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 299,
-  "source_commit": "e937a18de78db5cef9f95b271201839eca1d0e00",
-  "source_tree": "114d1ed17fb472e37ad31104d0a28812307ee049",
+  "checks": 301,
+  "source_commit": "dfb17e7b1c57612cc7e1c9a5306c720dc5d02e3b",
+  "source_tree": "8aa3c95555f96ee90aef05f61de23276bea9fadc",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 142
+    "test_count": 143
   },
   "scripts": [
     {
@@ -431,6 +431,10 @@
     },
     {
       "script": "run_opening_debt_reconciliation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_ownership_census_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
