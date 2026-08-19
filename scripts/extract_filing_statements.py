@@ -340,6 +340,47 @@ def pdf_lines(target: Path) -> list[dict[str, Any]]:
     return sorted(lines, key=lambda line: (line["page"], line["y0"], line["x0"]))
 
 
+NOTE_HEADER_RE = re.compile(r"^notes?$", re.I)
+NOTE_REFERENCE_RE = re.compile(r"^\d{1,3}(?:\([a-z]\))?[a-z]?$")
+
+
+def note_reference_column(window: list[dict[str, Any]], columns: list[float]) -> float | None:
+    """Locate a DECLARED note-reference column left of the period columns.
+
+    Hong Kong and IFRS annual reports print a Notes column between the row
+    captions and the period values; its small-integer note references are
+    provenance, not financial values, and must never contend for period
+    binding. The column exists only when the face itself declares the header.
+    """
+    finite = [column for column in columns if isinstance(column, float) and math.isfinite(column)]
+    if not finite:
+        return None
+    leftmost = min(finite)
+    for line in window[:20]:
+        for word in line.get("words", []):
+            if NOTE_HEADER_RE.fullmatch(str(word.get("text") or "").strip()):
+                centre = (word["x0"] + word["x1"]) / 2
+                if centre < leftmost - 15:
+                    return centre
+    return None
+
+
+def excluding_note_references(
+    runs: list[dict[str, Any]], note_centre: float | None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    if note_centre is None:
+        return runs, []
+    kept: list[dict[str, Any]] = []
+    references: list[str] = []
+    for run in runs:
+        centre = (run["x0"] + run["x1"]) / 2
+        if abs(centre - note_centre) <= 18 and NOTE_REFERENCE_RE.fullmatch(run["text"].strip()):
+            references.append(run["text"].strip())
+        else:
+            kept.append(run)
+    return kept, references
+
+
 def numeric_runs(words: list[dict[str, Any]]) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     for word in words:
@@ -568,7 +609,23 @@ def statement_window(
 def year_columns(window: list[dict[str, Any]], periods: list[str]) -> list[float]:
     years = [str(period)[:4] for period in periods]
     observed: dict[str, list[float]] = {year: [] for year in years}
-    for line in window[:20]:
+    # Column positions come from HEADER lines — lines carrying at least two
+    # distinct requested-year tokens side by side. Prose mentions ("Year
+    # ended 31 December 2025") repeat a single year inside a sentence and
+    # must never be averaged into the column geometry: one prose token can
+    # drag a column centre into the caption region, which corrupts value
+    # binding, the note-column detector and the data boundary together.
+    candidate_lines = window[:20]
+    header_lines = [
+        line for line in candidate_lines
+        if len({
+            year
+            for word in line["words"]
+            for year in years_in_token(word["text"])
+            if year in years
+        }) >= 2
+    ]
+    for line in header_lines or candidate_lines:
         for word in line["words"]:
             token_years = years_in_token(word["text"])
             for year in years:
@@ -1244,6 +1301,7 @@ def extract_statement(
             inherited_columns = local_columns
         columns_by_page[page] = inherited_columns
     window = _merge_wrapped_caption_lines(window, columns_by_page)
+    note_centre = note_reference_column(window, columns)
     source_unit_labels = list(dict.fromkeys(
         unit_label
         for line in window
@@ -1273,6 +1331,7 @@ def extract_statement(
         line_columns = columns_by_page[line_page]
         data_left = min(line_columns) - 20
         runs = [run for run in numeric_runs(line["words"]) if run["x1"] >= data_left]
+        runs, note_references = excluding_note_references(runs, note_centre)
         label_words = [
             word["text"]
             for word in line["words"]
