@@ -86,3 +86,69 @@ directly on a fixture file is wrong.
 The envelope emits `UNSUPPORTED_PROFILE.<suffix>`; the registry registers
 `PROFILE.<suffix>`. The terminal-registry suite mirrors this deliberately; the
 archetype catalogue names the REGISTERED code and resolves the mirror explicitly.
+
+# Wave 2 defects — economics archetypes (P7.1b) + generated cohort (P7.3)
+
+## D10 — release-grade roll-forward invariant omits PIK and fair-value movements (SEVERITY: HIGH)
+`validateSolutionInvariants` / `debt.instrument_roll_forward` computes expected ending as
+opening + issuance + other_non_cash - amortisation - maturity, EXCLUDING
+`pik_interest_native` and `fair_value_movement_native`. Every PIK or accreting instrument
+therefore fails a release-grade invariant while the solver's own roll-forward is correct —
+the discrepancy equals the accretion exactly. Unexercised because neither certified fixture
+has a PIK instrument (standard-maximal has 12 instruments, 0 with pik_rate>0).
+
+## D11 — never-zero coercions in opening-instrument provenance (SEVERITY: HIGH)
+Found by generated seeds 7730022 / 7730012 / 7730034 / 7730000 against
+`scripts/lib/opening_instrument_provenance.mjs` `typedDeclaredAmount`:
+`" "` -> reported_zero, `false` -> reported_zero, `[]` -> reported_zero, `true` ->
+reported_number 1. Worse: all four are then SELECTED into the opening register with a
+numeric balance and contribute to `reporting_total` (4 further signatures).
+`instrument_period_state.mjs:381-386` carries a NEVER-ZERO comment naming `Number(false)`
+as a defended coercion, but the guard only tests the nil / reported_blank states.
+NOTE: this is in code sealed as P4.1 earlier in this programme — the seal was premature.
+The generator caught what P4.1's own suite did not.
+
+## D12 — instrument class `lease_liability` dies on an untyped throw (SEVERITY: HIGH)
+`validateCaseShape` returns ZERO errors (the class is in the model-case schema enum AND the
+envelope's declared_matrix), yet compiling throws a bare
+`Error: Unsupported debt class lease_liability` with no code, no typed_internal_outcome and
+no registered reason. Validator and compiler disagree, and the refusal cannot reach a lawful
+terminal.
+
+## D13 — classifySupport returns UNSUPPORTED without stopping (FOUND INDEPENDENTLY TWICE)
+A dimension-level UNSUPPORTED verdict yields `support_class: "UNSUPPORTED"` — whose only
+legal terminal is UNSUPPORTED_PROFILE — while `early_stop.stopped === false` and
+`reason_code === null`. No predicate covers it, so the only legal terminal is UNREACHABLE.
+Confirmed cases: `accounting_framework=other_or_unknown`, `accounting_framework` unstated,
+`historical_periods` unstated, `filing_language_format=non_english` with a declared adapter.
+Corroboration: found separately by the P7.1b archetype agent and the P7.3 generator.
+
+## D14 — EXPERIMENTAL has no lawful terminal for three real outcomes
+EXPERIMENTAL's legal terminals exclude SOURCE_REQUIRED and ACTION_REQUIRED, so an
+experimental-ring case with unresolvable identity, unreconcilable opening debt, or a genuine
+material economic choice has NO lawful terminal at all.
+
+## D15..D18 — contract vocabulary absences (each blocks a real archetype)
+D15: no NOL / tax-loss-stock vocabulary — after two forecast loss years totalling >180, the
+recovery year is taxed at the full 25%.
+D16: no IAS 23 capitalised-borrowing-cost field — the only capitalisation vocabulary is
+`pik_rate` (into principal, inside interest expense), so 100% of the coupon is expensed and
+capex is understated.
+D17: no period-length / stub / changed-year-end vocabulary — both shapes surface only as a
+per-period `periods.fiscal_year_end_mismatch` mapped to NO terminal reason code; a period
+object can state only `date` and `status`.
+D18: a genuine reported zero tax rate is classified as `tax_credit_on_profit`, so a tax
+holiday is indistinguishable from a credit in the tax ledger (the row-level vocabulary does
+carry reported_zero, so the loss is ledger-local).
+
+## D19 — cross-contract vocabulary split
+The case contract says `52_53_week`; the envelope dimension says `week_52_53`. Separately the
+envelope emits `UNSUPPORTED_PROFILE.*` while the registry keys are `PROFILE.*`. Both archetype
+runners normalise rather than repair, and say so.
+
+## Sampling finding (not a defect, but a test-design lesson worth keeping)
+Uniform sampling over the declared space reached **CERTIFIED zero times in 2,500 draws** — the
+headline release promise was entirely unsampled — and SUPPORTED_DEGRADED once in 300. 80% of
+the budget went to preflight-stopped cases because 5 of 11 entity types are financial
+institutions. P7.3 now declares four strata drawn from the seed, so determinism is preserved.
+Value coverage alone hid this; LANE coverage is what exposed it.
