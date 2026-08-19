@@ -417,19 +417,19 @@
           "statement": "\"Revenue\" is accepted as revenue at confidence 0.90 — the rename does not change the awarded role."
         },
         {
-          "expectation_id": "ifrs15_revenue_caption_is_unmapped_and_tied_against_cost_of_sales",
+          "expectation_id": "ifrs15_revenue_caption_accepts_as_revenue",
           "kind": "authority_selection",
-          "statement": "DEFECT: \"Revenue from contracts with customers\", the standard IFRS 15 face caption, is UNMAPPED with a ZERO separation margin and its top candidates tied at cost_of_sales and revenue — no amount of structural evidence can separate a tie, so the most common modern revenue caption always requires a clarification stop."
+          "statement": "D1 REPAIRED (package P2.9): \"Revenue from contracts with customers\", the standard IFRS 15 face caption, is accepted as revenue at confidence 0.90 with a 0.51 separation margin. It is read as the declared alias \"revenue\" plus the restrictive qualifier \"from contracts with customers\", so cost_of_sales no longer draws equal label evidence from the shared \"revenue\" token — the 0.00-margin tie is broken on the issuer's own declared vocabulary, not by lowering the 0.15 margin rule."
         },
         {
-          "expectation_id": "group_revenue_caption_is_unmapped_and_tied_against_cost_of_sales",
+          "expectation_id": "group_revenue_caption_accepts_as_revenue",
           "kind": "authority_selection",
-          "statement": "DEFECT: \"Group revenue\" fails the same way — UNMAPPED, zero margin, tied against cost_of_sales."
+          "statement": "D1 REPAIRED (package P2.9): \"Group revenue\" is accepted as revenue at confidence 0.90, margin 0.51 — an entity-scope modifier in front of a declared alias does not change the disclosed concept."
         },
         {
-          "expectation_id": "net_revenues_caption_leads_with_net_income",
+          "expectation_id": "net_revenues_caption_accepts_as_revenue",
           "kind": "authority_selection",
-          "statement": "DEFECT: \"Net revenues\" is UNMAPPED with net_income as its single leading candidate — the \"net\" token pulls the top line toward the bottom line."
+          "statement": "D2 REPAIRED (package P2.9): \"Net revenues\" is accepted as revenue at confidence 0.90, margin 0.46, with net_income demoted to second candidate. \"net\" is part of revenue's OWN declared vocabulary (it declares the alias \"net sales\"), so the top line no longer leaks to the bottom line."
         },
         {
           "expectation_id": "one_revenue_authority_survives_the_label_change",

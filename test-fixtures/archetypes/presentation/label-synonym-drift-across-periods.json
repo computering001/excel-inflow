@@ -79,12 +79,12 @@
         "is_subtotal": true
       },
       "asserts": {
-        "ifrs15_revenue_caption_is_unmapped_and_tied_against_cost_of_sales": {
-          "status": "unmapped",
-          "classified_role": null,
-          "margin": 0,
+        "ifrs15_revenue_caption_accepts_as_revenue": {
+          "status": "accepted",
+          "classified_role": "revenue",
+          "confidence": 0.9,
+          "margin": 0.51,
           "tied_top_roles": [
-            "cost_of_sales",
             "revenue"
           ]
         }
@@ -99,12 +99,12 @@
         "numeric_type": "currency"
       },
       "asserts": {
-        "group_revenue_caption_is_unmapped_and_tied_against_cost_of_sales": {
-          "status": "unmapped",
-          "classified_role": null,
-          "margin": 0,
+        "group_revenue_caption_accepts_as_revenue": {
+          "status": "accepted",
+          "classified_role": "revenue",
+          "confidence": 0.9,
+          "margin": 0.51,
           "tied_top_roles": [
-            "cost_of_sales",
             "revenue"
           ]
         }
@@ -119,11 +119,18 @@
         "numeric_type": "currency"
       },
       "asserts": {
-        "net_revenues_caption_leads_with_net_income": {
-          "status": "unmapped",
-          "classified_role": null,
+        "net_revenues_caption_accepts_as_revenue": {
+          "status": "accepted",
+          "classified_role": "revenue",
+          "confidence": 0.9,
+          "margin": 0.46,
           "tied_top_roles": [
-            "net_income"
+            "revenue"
+          ],
+          "top_candidates": [
+            "revenue",
+            "net_income",
+            "other_non_operating"
           ]
         }
       }
