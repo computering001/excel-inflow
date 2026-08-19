@@ -1,0 +1,23 @@
+# Phase Checkpoint
+
+- Phase:
+- Release:
+- Seal status: PASS / FAIL
+- Exact branch/commit/tag:
+- Working tree clean: YES / NO
+- Source tree hash:
+- Contract/support/golden versions:
+- Completed work-package IDs:
+- Mandatory cases executed:
+- Focused tests and results:
+- Integration/release gates and results:
+- Difference register path/hash:
+- Evidence manifest path/hash:
+- Known defects and severity:
+- Waivers, owner and expiry:
+- Rollback commit/package:
+- Next phase prerequisites:
+- Fresh-model handover path/hash:
+- Engineering approval:
+- Product approval:
+- Runtime/release approval:

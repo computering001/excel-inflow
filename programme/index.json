@@ -1,0 +1,54 @@
+{
+  "schema_version": "excel-inflow-programme-index/1.0",
+  "programme": "v3.7.7 behavioural closure -> v3.8.0 structural simplification",
+  "current_phase": "Phase 0 - Freeze, evidence custody and programme control",
+  "active_package": "P0.7",
+  "sealed_packages": {
+    "P0.1": {
+      "commit": "6a64f74",
+      "invariant": "every result ties to one exact source commit, package identity and raw-input hash set"
+    },
+    "P0.2": {
+      "commit": "af51edc+431ef3e",
+      "invariant": "every known blocker reproduces deterministically or is classified non-reproducible with missing evidence named"
+    },
+    "P0.3": {
+      "commit": "9b8b646+7743229",
+      "invariant": "a failed critical test makes the authoritative CI gate fail",
+      "pending_live_receipt": "failing-canary and closure-head Actions runs (programme/P0.3_ci_run_receipts.json when concluded)"
+    },
+    "P0.4": {
+      "commit": "ecccef5",
+      "invariant": "every case is classified against the versioned support envelope from intake facts alone"
+    },
+    "P0.5": {
+      "commit": "e937a18",
+      "invariant": "every possible terminal reason has an owner and a legal terminal-state mapping"
+    },
+    "P0.6": {
+      "commit": "(this commit)",
+      "invariant": "no engineering task begins without a work-package issue card and rollback point"
+    }
+  },
+  "evidence_baseline": {
+    "commit": "433bd237b73e15bc844d5cd64175f0758ebe1d9f",
+    "tag": "excel-inflow-v376-evidence-baseline",
+    "tree": "d9c9fa56d3b146251e5dc89625bffee0c9675795"
+  },
+  "last_green_commit": "e937a18",
+  "open_blockers": [
+    "P0.3 live CI receipts pending (two Actions runs in progress)",
+    "Rogo-dependent items excluded by user directive: installed-host proof, native Excel certification, human visual review"
+  ],
+  "next_gate": "P0.8 phase seal after P0.6 (this package) and P0.7 (architecture census)",
+  "owner": "principal engineering model (session-based); user owns merges and Rogo installs",
+  "naming_conventions": {
+    "issue_cards": "programme/P<phase>.<package>_issue_card.md",
+    "micro_checkpoints": "programme/P<phase>.<package>_micro_checkpoint.md",
+    "phase_checkpoints": "programme/PHASE<phase>_checkpoint.md",
+    "handovers": "programme/HANDOVER_<utc-date>.md",
+    "three_strike": "programme/THREE_STRIKE_<package>.md",
+    "commit_reference_rule": "engineering commits name the work-package ID and the invariant; regression IDs where applicable"
+  },
+  "restricted_evidence_policy": "Confidential bytes never enter the repository. Restricted artifacts live under /Users/archiepreston/Documents/Codex/private-test-custody (or the host's declared custody root) and are referenced by path + SHA-256 in manifests; the blocker-corpus runner types their absence as CUSTODY_ABSENT."
+}
