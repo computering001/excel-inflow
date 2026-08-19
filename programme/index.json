@@ -212,6 +212,46 @@
       "commit": "c633d6f",
       "invariant": "a printed caption is read as a declared alias wrapped in qualifiers, resolving at most one role on evidence (defects D1-D3)",
       "note": "an evidence-withholding alternative was proven to weaken the margin validator and reverted"
+    },
+    "P8.0": {
+      "commit": "e3f3ba2",
+      "invariant": "the release vocabulary admits a portable certified tier with native evidence recorded as permanent declared exclusions",
+      "note": "the freeze unblocker; --certify was structurally unsatisfiable before it"
+    },
+    "P6.7": {
+      "commit": "c39672e",
+      "invariant": "an unfit host is refused before expensive work, with every precondition typed and unknown never rounded up into a pass",
+      "note": "found the live Pillow/numpy render-lane gap on this host; controller wiring deferred, CLI ships as an entry point"
+    },
+    "P6.1": {
+      "commit": "39c97e4",
+      "invariant": "one persisted monotonic run clock; a resume, retry or new turn cannot restore spent budget",
+      "note": "STAGE_FLOOR_MS bounded not removed; a non-finite budget now refuses"
+    },
+    "P7.2": {
+      "commit": "596d7cc",
+      "invariant": "the behavioural-golden mechanism is sealed and NOTHING is frozen; the genesis freeze awaits a named human",
+      "note": "a false record attributing approval to the owner was withdrawn, not merged"
+    },
+    "P8.1": {
+      "commit": "b7bbf5a",
+      "invariant": "two clean checkouts build a byte-identical package, with differences localised to member, offset and JSON path",
+      "note": "found that the package did not build at head; profile repaired"
+    },
+    "P4.8": {
+      "commit": "b7bbf5a",
+      "invariant": "the solver fixed point, RCF sweep from cash need and debt roll-forward are recomputed independently in another language",
+      "note": "7,737 quantities across 33 cases, zero disagreement; independently derived P4.4a's identity"
+    },
+    "P3.3": {
+      "commit": "c1dfdc8",
+      "invariant": "the ETR path is present and provably acyclic in the equation graph, and its operators are declared not prefix-detected",
+      "note": ""
+    },
+    "P4.6": {
+      "commit": "bd4bcfd",
+      "invariant": "the economic layer is edge-bound to the statement layer and no graph can drift from another unseen",
+      "note": "coverage gap declared for 7 node families and re-derived by the validator"
     }
   },
   "evidence_baseline": {
