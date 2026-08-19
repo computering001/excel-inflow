@@ -352,10 +352,27 @@ export function validateSolutionInvariants(solution, tolerance = 1e-8) {
       });
     }
     for (const instrument of result.instrument_results ?? []) {
+      // The COMPLETE set of movements that lawfully change an instrument's
+      // native balance, mirroring the solver's own balance construction
+      // (solver.mjs `ending_native`, self-checked as `debt_roll_forward`):
+      //
+      //   ending = opening + issuance + fair_value + other_non_cash + pik
+      //                    - amortisation - maturity_repayment
+      //
+      // pik_interest_native and fair_value_movement_native were previously
+      // ABSENT (defect D10), so every PIK or accreting instrument failed this
+      // release-grade invariant by exactly its accretion while the solver was
+      // correct. Adding them makes the check EXACT, not looser: it now also
+      // catches a wrong PIK or fair-value amount, which it could not see at all
+      // before. Any future movement term must be added here as well — every
+      // term is proved load-bearing by scripts/run_roll_forward_invariant_tests.mjs,
+      // which fails if the identity drops one.
       const expectedEnding =
         Number(instrument.opening_native ?? 0) +
         Number(instrument.issuance_native ?? 0) +
-        Number(instrument.other_non_cash_movement_native ?? 0) -
+        Number(instrument.fair_value_movement_native ?? 0) +
+        Number(instrument.other_non_cash_movement_native ?? 0) +
+        Number(instrument.pik_interest_native ?? 0) -
         Number(instrument.amortisation_native ?? 0) -
         Number(instrument.maturity_repayment_native ?? 0);
       if (

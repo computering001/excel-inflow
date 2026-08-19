@@ -202,9 +202,9 @@
           "statement": "Cash coupon interest and cash repayment are both exactly 0 while the whole charge appears in non_cash_instrument_interest and in gross interest, and cash from operations is unreduced by it (the charge is added back), so no cash leaves for a coupon nobody paid."
         },
         {
-          "expectation_id": "roll_forward_invariant_omits_pik",
+          "expectation_id": "roll_forward_invariant_accounts_for_pik",
           "kind": "identity_or_footing",
-          "statement": "DEFECT: validateSolutionInvariants reports debt.instrument_roll_forward for this instrument in all three forecast years. Its expected ending balance is opening + issuance + other_non_cash - amortisation - maturity_repayment, which omits pik_interest_native (and fair_value_movement_native), so the release-grade solution invariant contradicts the solver's own correct PIK roll-forward. Neither certified fixture carries a PIK instrument, so the gap is unexercised there."
+          "statement": "validateSolutionInvariants raises NO debt.instrument_roll_forward violation for this instrument in any forecast year. Its expected ending balance is opening + issuance + fair_value_movement + other_non_cash + pik_interest - amortisation - maturity_repayment, the complete set of movements that lawfully change an instrument's balance, so the release-grade solution invariant agrees with the solver's own PIK roll-forward. Repaired by P4.4a (defect D10); the invariant previously omitted pik_interest_native and fair_value_movement_native and failed by exactly the accretion."
         }
       ],
       "extraction_evidence_still_required": true
@@ -224,9 +224,9 @@
           "statement": "In the maturity year the repayment equals the accreted balance (opening plus that year's accretion, 225.507...), not the 200 face; the ending balance is exactly 0; and in the following year accretion, interest and balance are all exactly 0."
         },
         {
-          "expectation_id": "accretion_roll_forward_invariant_omits_pik",
+          "expectation_id": "accretion_roll_forward_invariant_accounts_for_pik",
           "kind": "identity_or_footing",
-          "statement": "DEFECT (same omission as the PIK archetype): validateSolutionInvariants reports debt.instrument_roll_forward in the two years that carry accretion, because the invariant's expected ending balance excludes pik_interest_native."
+          "statement": "validateSolutionInvariants raises NO debt.instrument_roll_forward violation in the two accreting years, including the maturity year where accretion and the repayment of the accreted balance fall in the same period. Repaired by P4.4a (defect D10)."
         }
       ],
       "extraction_evidence_still_required": true

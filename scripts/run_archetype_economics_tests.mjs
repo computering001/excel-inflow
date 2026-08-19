@@ -415,20 +415,28 @@ const CHECKS = {
           `${period.period}: operating cash flow must add the non-cash charge back`);
       }
     },
-    roll_forward_invariant_omits_pik(context) {
+    roll_forward_invariant_accounts_for_pik(context) {
       const violations = context.compiled.solutionInvariants;
       const rollForward = violations.filter((item) => item.id === "debt.instrument_roll_forward");
-      check(rollForward.length === 3, `DEFECT: the release invariant must be seen to fail in all three years, got ${rollForward.length}`);
-      for (const violation of rollForward) {
-        const period = forecast(context).find((item) => item.period === violation.period);
+      check(rollForward.length === 0,
+        `the release invariant must agree with the solver's PIK roll-forward, got ${rollForward.length} violation(s)`);
+      for (const period of forecast(context)) {
         const result = instrument(period, "pik_note");
-        check(near(violation.actual - violation.expected, result.pik_interest_native),
-          `${violation.period}: the whole discrepancy is the omitted PIK accretion (${result.pik_interest_native})`);
+        check(near(
+          result.ending_native,
+          result.opening_native
+            + (result.issuance_native ?? 0)
+            + (result.fair_value_movement_native ?? 0)
+            + (result.other_non_cash_movement_native ?? 0)
+            + (result.pik_interest_native ?? 0)
+            - (result.amortisation_native ?? 0)
+            - (result.maturity_repayment_native ?? 0),
+        ), `${period.period}: the seven-term identity must reconcile the solver's ending balance`);
       }
       const source = fs.readFileSync(path.join(REPO, "scripts/lib/validation_invariants.mjs"), "utf8");
       const identity = source.slice(source.indexOf("const expectedEnding ="), source.indexOf("debt.instrument_roll_forward"));
-      check(!identity.includes("pik_interest_native"), "the invariant's expected-ending identity omits pik_interest_native");
-      check(!identity.includes("fair_value_movement_native"), "and omits fair_value_movement_native");
+      check(identity.includes("pik_interest_native"), "the invariant's expected-ending identity includes pik_interest_native");
+      check(identity.includes("fair_value_movement_native"), "and includes fair_value_movement_native");
     },
   },
   zero_coupon_accreting_to_par: {
@@ -445,10 +453,17 @@ const CHECKS = {
       check(near(after.pik_interest_native, 0) && near(after.interest_reporting, 0) && near(after.ending_native, 0),
         "no accretion, interest or balance may survive redemption");
     },
-    accretion_roll_forward_invariant_omits_pik(context) {
+    accretion_roll_forward_invariant_accounts_for_pik(context) {
       const rollForward = context.compiled.solutionInvariants.filter((item) => item.id === "debt.instrument_roll_forward");
-      check(rollForward.length === 2, `DEFECT: the invariant must fail in the two accreting years, got ${rollForward.length}`);
-      check(rollForward.every((violation) => violation.actual !== violation.expected), "each violation states a real discrepancy");
+      check(rollForward.length === 0,
+        `the invariant must agree through both accreting years, got ${rollForward.length} violation(s)`);
+      const periods = forecast(context);
+      const maturityIndex = periods.findIndex((period) => instrument(period, "zero_note").maturity_repayment_native > 0);
+      const maturing = instrument(periods[maturityIndex], "zero_note");
+      check(near(
+        maturing.ending_native,
+        maturing.opening_native + (maturing.pik_interest_native ?? 0) - (maturing.maturity_repayment_native ?? 0),
+      ), "accretion and repayment of the accreted balance reconcile within the maturity period");
     },
   },
   revolver_fully_drawn_at_open: {
