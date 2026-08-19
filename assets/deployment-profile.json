@@ -372,6 +372,7 @@
     "lib/source_identity.mjs",
     "lib/statement_classifier.mjs",
     "lib/statement_topology.mjs",
+    "lib/support_envelope.mjs",
     "lib/tax_rate_policy.mjs",
     "lib/user_flow_controller.mjs",
     "lib/validation_invariants.mjs",

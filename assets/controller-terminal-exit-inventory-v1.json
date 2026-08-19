@@ -5,7 +5,7 @@
   "internal_delegate": "scripts/run_user_flow.mjs",
   "constitution": "assets/delivery-constitution-v1.json",
   "source_exit_counts": {
-    "scripts/run_excel_inflow_vnext.mjs": 8,
+    "scripts/run_excel_inflow_vnext.mjs": 9,
     "scripts/run_user_flow.mjs": 18
   },
   "phase_0_source_exit_counts": {
@@ -14,6 +14,7 @@
   },
   "exits": [
     { "id": "vnext.raw_evidence_not_closed", "controller": "vnext", "signature": "A fatal raw-source boundary remains.", "owner": "BLOCK_OR_LOG", "broker_safe": true },
+    { "id": "vnext.support_envelope_unsupported", "controller": "vnext", "signature": "The case is outside the versioned support envelope: ", "owner": "BLOCK_OR_LOG", "broker_safe": true },
     { "id": "vnext.delegate_failed_before_result", "controller": "vnext", "signature": "The model decision delegate failed before writing a sealed result", "owner": "LOG", "broker_safe": true },
     { "id": "vnext.user_decision", "controller": "vnext", "signature": "One consolidated set of genuine model decisions remains.", "owner": "ASK", "broker_safe": true },
     { "id": "vnext.delegate_boundary_not_reached", "controller": "vnext", "signature": "The existing model controller did not reach the build boundary.", "owner": "LOG", "broker_safe": true },
