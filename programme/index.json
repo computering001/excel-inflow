@@ -112,6 +112,31 @@
       "commit": "1219436",
       "invariant": "every scope-dropped row/statement is recorded typed; printed unit labels reconcile fail-closed",
       "note": "consumer-side wiring + P2.2 XBRL crosswalk follow on"
+    },
+    "P6.0a": {
+      "commit": "e0618e2",
+      "invariant": "no controller path ends in an uncaught throw or an unlawful category crossing",
+      "note": "TOC.D crossings 2/3 and the P6.7 rewiring remain on the work order"
+    },
+    "P8.2a": {
+      "commit": "3a94bf2",
+      "invariant": "one runtime-closure definition; active closure asserted at run start and recorded at delivery",
+      "note": "freeze criterion 6 run-start half; A/B package proof is P8.1"
+    },
+    "P5.1a": {
+      "commit": "4bed9ed",
+      "invariant": "acquisition overlay economics enter only through recorded plan operations",
+      "note": "builder capabilities (images/page_setup/defined_names) and plan-y diff remain"
+    },
+    "P2.2": {
+      "commit": "02889fb",
+      "invariant": "inline-XBRL facts reconcile against visible face rows with per-period provenance; material disagreement fails closed",
+      "note": "runtime-members closure entry + ESEF/HTML-native lanes follow on"
+    },
+    "P7.6a": {
+      "commit": "3f529eb",
+      "invariant": "every verify oracle is census-visible and AST-proven production-import-free; detection rates are computed, not claimed",
+      "note": "five synthetic domains now honestly marked NOT_INDEPENDENTLY_PROVEN"
     }
   },
   "evidence_baseline": {

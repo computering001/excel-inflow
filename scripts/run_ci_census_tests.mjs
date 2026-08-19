@@ -71,7 +71,6 @@ const DISPOSITIONS = {
   // P6.0a suite committed at e0618e2 with neither registration nor
   // disposition; bare-runnable and green, no caller. Flagged by P7.6a as
   // deserving real registration in the development test registry.
-  "run_terminal_crash_path_tests.mjs": "ORPHANED_BARE_RUNNABLE",
   // Production library modules under scripts/lib whose filenames begin with
   // run_ because they model the "run" domain object (store, carrier,
   // deadline, constitution graph, scoped concepts); imported by the

@@ -487,9 +487,9 @@
       "target_owner": "Terminal outcome compiler (Phase 6)"
     },
     "run_user_flow.mjs": {
-      "count": 30,
+      "count": 32,
       "families": {
-        "terminal_status": 30
+        "terminal_status": 32
       },
       "classification": "canonical_writer",
       "concern": "stage choreography status",

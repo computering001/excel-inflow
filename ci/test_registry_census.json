@@ -1,20 +1,44 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 335,
-  "source_commit": "121943637d47577be8ec4dd2fa403802c3513711",
-  "source_tree": "b3b42c06462ef6a9f395c1125644a6988ef9c53b",
+  "checks": 343,
+  "source_commit": "3f529eb8901d8602e9c203a6f154e7c06658e8f4",
+  "source_tree": "48868979a15fa1ec348bf6c0799119b1d73327f7",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 160
+    "test_count": 164
   },
   "scripts": [
     {
+      "script": "lib/run_carrier.mjs",
+      "disposition": "PRODUCTION_LIBRARY_MODULE"
+    },
+    {
+      "script": "lib/run_constitution_graph.mjs",
+      "disposition": "PRODUCTION_LIBRARY_MODULE"
+    },
+    {
+      "script": "lib/run_deadline.mjs",
+      "disposition": "PRODUCTION_LIBRARY_MODULE"
+    },
+    {
+      "script": "lib/run_scoped_broker_concepts.mjs",
+      "disposition": "PRODUCTION_LIBRARY_MODULE"
+    },
+    {
+      "script": "lib/run_store.mjs",
+      "disposition": "PRODUCTION_LIBRARY_MODULE"
+    },
+    {
       "script": "run_acquisition_funding_integration_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_acquisition_plan_purity_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
@@ -586,6 +610,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_runtime_closure_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_runtime_custody_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -670,6 +698,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_terminal_crash_path_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_terminal_reason_registry_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -712,6 +744,42 @@
     {
       "script": "run_workflow_state_tests.mjs",
       "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_xbrl_reconciliation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "verify/run_deterministic_tests.py",
+      "disposition": "SUBORDINATE_ORACLE"
+    },
+    {
+      "script": "verify/run_finance_proof_mutations.py",
+      "disposition": "ORACLE_MUTATION_HARNESS"
+    },
+    {
+      "script": "verify/run_forecast_ownership_physical_mutations.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "verify/run_layered_graph_python_tests.py",
+      "disposition": "ORACLE_MUTATION_HARNESS"
+    },
+    {
+      "script": "verify/run_linked_debt_addback_proof_test.mjs",
+      "disposition": "ORACLE_MUTATION_HARNESS"
+    },
+    {
+      "script": "verify/run_protected_identity_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "verify/run_source_economic_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "verify/run_workbook_semantic_oracle_mutations.py",
+      "disposition": "ORACLE_MUTATION_HARNESS"
     }
   ],
   "critical_requirements": [

@@ -1571,6 +1571,42 @@
       "test_class": "mutation"
     },
     {
+      "id": "terminal-crash-paths",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_terminal_crash_path_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "runtime-closure",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_runtime_closure_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "acquisition-plan-purity",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_acquisition_plan_purity_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "xbrl-reconciliation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_xbrl_reconciliation_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "row-identity-defects",
       "phase": "graph",
       "runtime": "node",
