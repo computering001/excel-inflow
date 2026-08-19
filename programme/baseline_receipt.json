@@ -1,0 +1,45 @@
+{
+  "schema_version": "excel-inflow-programme-baseline-receipt/1.0",
+  "work_package": "P0.1",
+  "invariant": "Every result can be tied to one exact source commit, package identity and raw-input hash set.",
+  "baseline_commit": "433bd237b73e15bc844d5cd64175f0758ebe1d9f",
+  "baseline_tree": "d9c9fa56d3b146251e5dc89625bffee0c9675795",
+  "baseline_branch": "agent/excel-inflow-v376-package-repair",
+  "baseline_tag": "excel-inflow-v376-evidence-baseline",
+  "closure_branch": "agent/excel-inflow-v377-behavioural-closure",
+  "closure_branch_head_equals_baseline": true,
+  "author_date": "2026-08-19T11:08:52+01:00",
+  "commit_date": "2026-08-19T11:08:52+01:00",
+  "remote_url": "https://github.com/computering001/excel-inflow.git",
+  "git_status_porcelain_at_freeze": "",
+  "skill_version_at_baseline": "3.7.6",
+  "submodules": "none",
+  "baseline_archive": {
+    "path": "/Users/archiepreston/Documents/Codex/private-test-custody/excel-inflow-baselines/excel-inflow-v376-evidence-baseline-433bd23.tar.gz",
+    "sha256": "422fea6b6222514a94f71b2fd639608340d56fc4bb80583b75c5e15edc61cf38",
+    "generator": "git archive --format=tar <commit> | gzip -n",
+    "read_only": true
+  },
+  "verification": {
+    "fresh_checkout_tree_equality": {
+      "status": "PASS",
+      "fresh_tree": "d9c9fa56d3b146251e5dc89625bffee0c9675795",
+      "fresh_archive_sha256": "422fea6b6222514a94f71b2fd639608340d56fc4bb80583b75c5e15edc61cf38"
+    },
+    "dirty_worktree_release_compilation_negative_test": {
+      "status": "PASS",
+      "guard": "scripts/run_current_package_source_identity_check.mjs",
+      "typed_refusal": "Package/source identity check requires a clean worktree.",
+      "exit_code": 1
+    },
+    "branch_origin": {
+      "status": "PASS",
+      "closure_branch_head": "433bd237b73e15bc844d5cd64175f0758ebe1d9f"
+    }
+  },
+  "rollback": {
+    "tag": "excel-inflow-v376-evidence-baseline",
+    "instruction": "git checkout excel-inflow-v376-evidence-baseline reproduces tree d9c9fa56d3b146251e5dc89625bffee0c9675795 byte-for-byte."
+  },
+  "recorded_at": "2026-08-19T15:10:00+01:00"
+}
