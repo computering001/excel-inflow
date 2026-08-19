@@ -734,6 +734,11 @@ def parse_csv(text: Optional[str]) -> List[Dict[str, str]]:
 
 
 def validate_fiscal_periods(model_case: Dict[str, Any]) -> List[Dict[str, Any]]:
+    # Port of DEFECT 0.6 in lib/validation_invariants.mjs: a 52/53-week filer's
+    # year end MOVES, so the literal MM-DD comparison only applies under the
+    # fixed_date calendar. Under 52_53_week what must hold is one closing
+    # weekday, 52/53 whole weeks between consecutive ends, and every end within
+    # a week of the declared anchor.
     errors: List[Dict[str, Any]] = []
     fiscal_year_end = str((model_case.get("issuer") or {}).get("fiscal_year_end") or "")
     match = re.match(r"^(\d{2})-(\d{2})$", fiscal_year_end)
@@ -744,8 +749,80 @@ def validate_fiscal_periods(model_case: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "message": "issuer.fiscal_year_end must use MM-DD.",
             }
         ]
+    calendar = (model_case.get("issuer") or {}).get("fiscal_calendar") or "fixed_date"
+    periods = model_case.get("periods") or []
+    if calendar == "52_53_week":
+        import datetime
+
+        dates: List[Any] = []
+        for index, period in enumerate(periods):
+            try:
+                dates.append(
+                    datetime.date.fromisoformat(str(period.get("date") or ""))
+                )
+            except ValueError:
+                errors.append(
+                    {
+                        "id": "periods.invalid_period_date",
+                        "period_index": index,
+                        "period_date": period.get("date"),
+                    }
+                )
+        if errors:
+            return errors
+        weekdays = {date.weekday() for date in dates}
+        if len(weekdays) > 1:
+            errors.append(
+                {
+                    "id": "periods.52_53_week_weekday_drift",
+                    "message": (
+                        "A 52/53-week filer closes on ONE weekday. "
+                        "These period ends fall on more than one."
+                    ),
+                    "weekdays": sorted(weekdays),
+                    "period_dates": [str(period.get("date")) for period in periods],
+                }
+            )
+        for index in range(1, len(dates)):
+            span_days = (dates[index] - dates[index - 1]).days
+            weeks = span_days / 7
+            if span_days % 7 != 0 or weeks not in (52, 53):
+                errors.append(
+                    {
+                        "id": "periods.52_53_week_span",
+                        "period_index": index,
+                        "period_date": periods[index].get("date"),
+                        "previous_period_date": periods[index - 1].get("date"),
+                        "weeks": weeks,
+                    }
+                )
+        anchor_month = int(match.group(1))
+        anchor_day = int(match.group(2))
+        for index, date in enumerate(dates):
+            candidates = []
+            for year in (date.year - 1, date.year, date.year + 1):
+                try:
+                    candidates.append(datetime.date(year, anchor_month, anchor_day))
+                except ValueError:
+                    continue
+            nearest = min(candidates, key=lambda c: abs((c - date).days))
+            if abs((nearest - date).days) > 7:
+                errors.append(
+                    {
+                        "id": "periods.52_53_week_anchor_drift",
+                        "period_index": index,
+                        "period_date": periods[index].get("date"),
+                        "anchor_month_day": "%s-%s" % (match.group(1), match.group(2)),
+                        "message": (
+                            "A 52/53-week year end is the chosen weekday NEAREST "
+                            "the anchor, so it cannot sit more than a week away "
+                            "from it."
+                        ),
+                    }
+                )
+        return errors
     expected = "%s-%s" % (match.group(1), match.group(2))
-    for index, period in enumerate(model_case.get("periods") or []):
+    for index, period in enumerate(periods):
         if str(period.get("date") or "")[5:] != expected:
             errors.append(
                 {

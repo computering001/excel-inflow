@@ -30,6 +30,7 @@
         "accounting_framework": { "enum": ["ifrs", "us_gaap"] },
         "units": { "enum": ["millions", "thousands", "billions"] },
         "fiscal_year_end": { "type": "string", "pattern": "^[0-9]{2}-[0-9]{2}$" },
+        "fiscal_calendar": { "enum": ["fixed_date", "52_53_week"] },
         "presentation_profile": { "type": "string", "minLength": 1 },
         "execution_profile": {
           "description": "reference_parity marks a fixture compiled to mirror a reference artifact; production cases omit this and compile as production_model.",

@@ -752,7 +752,10 @@ def main(argv: List[str]) -> int:
 
     fiscal_period_errors = validate_fiscal_periods(
         {
-            "issuer": {"fiscal_year_end": semantic_manifest.get("fiscal_year_end")},
+            "issuer": {
+                "fiscal_year_end": semantic_manifest.get("fiscal_year_end"),
+                "fiscal_calendar": semantic_manifest.get("fiscal_calendar"),
+            },
             "periods": semantic_manifest.get("periods"),
         }
     )

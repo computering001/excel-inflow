@@ -242,7 +242,9 @@ await writeJson(dcsRequest, {
   source_path: dcsCsv,
   expected_sha256: dcsHash,
   adapter_metadata: {
-    as_of: "2025-12-31",
+    // The export strike must match the filing's own last reported period —
+    // a fixed calendar date breaks any non-December fiscal year.
+    as_of: (filingFacts.historical_periods ?? []).at(-1) ?? "2025-12-31",
     entity_name: companyName,
     reporting_currency: clean.filings.reporting_currency,
     units: clean.filings.units,
@@ -624,7 +626,12 @@ const declarations = {
     issuer_name: companyName,
     reporting_currency: filingFacts.reporting_currency,
     units: "millions",
-    fiscal_year_end: "12-31",
+    // The declared year end is the issuer's own: the month-day of the last
+    // reported period. For a 52/53-week filer this is the ANCHOR the moving
+    // year end sits nearest (the calendar kind itself flows from the sealed
+    // filings evidence, never from this declaration).
+    fiscal_year_end:
+      (filingFacts.historical_periods ?? []).at(-1)?.slice(5) ?? "12-31",
     presentation_profile: "crh_dynamic",
     execution_profile: "production_model",
   },

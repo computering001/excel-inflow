@@ -1021,7 +1021,19 @@ export function statementAuthorityChecks(modelCase) {
           ),
         );
       }
-      if (authority === "not_applicable" && row.row_type !== "uncalculated") {
+      const anyNonZeroFiledValue = (row.values ?? [])
+        .slice(0, 3)
+        .some((value) => value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) !== 0);
+      if (
+        authority === "not_applicable" &&
+        row.row_type !== "uncalculated" &&
+        anyNonZeroFiledValue
+      ) {
+        // not_applicable over ACTUAL filed values is authority laundering
+        // and stays blocked. A structurally empty history (the filing prints
+        // no such line — e.g. a USD reporter with no fx-on-cash effect) is
+        // the declared absence the vocabulary exists to name, whatever
+        // row_type the canonical normalisation assigned.
         checks.push(
           result(
             `${id}.not_applicable`,
@@ -1092,6 +1104,15 @@ function historicalProvenanceChecks(modelCase) {
       (["calculation", "subtotal"].includes(row.row_type) &&
         (row.calculation?.refs?.length ?? 0) === 0);
     if (!literalHistorical) continue;
+    // A declared-absence row (not_applicable authority whose history is all
+    // zeros) reports that the filing prints NO such line; there is no page
+    // to cite by definition. Any non-zero value still demands provenance.
+    const declaredAbsence =
+      row.historical_authority === "not_applicable" &&
+      (row.values ?? []).slice(0, 3).every(
+        (value) => value === null || value === undefined || Number(value) === 0,
+      );
+    if (declaredAbsence) continue;
     const historical = (row.values ?? []).slice(0, 3);
     historical.forEach((value, periodIndex) => {
       if (value === null || value === undefined) return;

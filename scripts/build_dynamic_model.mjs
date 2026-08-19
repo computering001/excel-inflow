@@ -1321,6 +1321,13 @@ function addCommentOnce(workbook, sheet, address, text) {
 }
 
 function provenanceComment(entry) {
+  if (entry.declared_absence) {
+    return [
+      `Declared absence: the filing prints no "${entry.label}" line.`,
+      "The compiler minted this canonical row with zero history so the",
+      "statement identity stays complete; there is no page to cite.",
+    ].join("\n");
+  }
   const parts = [
     `Source: ${entry.document}`,
     `Published: ${entry.publication_date}`,
@@ -9854,6 +9861,12 @@ function attachInputProvenance(sheet, rowPlan, modelCase, workbook) {
     ...(rowPlan.statement_rows?.income_statement ?? []),
     ...(rowPlan.statement_rows?.cash_flow ?? []),
   ];
+  const caseRowsById = new Map(
+    [
+      ...(modelCase.statement_structure?.income_statement ?? []),
+      ...(modelCase.statement_structure?.cash_flow ?? []),
+    ].map((row) => [row.row_id, row]),
+  );
   let attached = 0;
   for (const definition of rows) {
     // DEFECT 0.11. A row the COMPILER injected has no entry in the case's
@@ -9862,7 +9875,7 @@ function attachInputProvenance(sheet, rowPlan, modelCase, workbook) {
     // the row exists and why it is nil is attached in the same channel, on
     // every historical cell, so the reader gets an answer where they look for
     // one instead of an unsourced hardcode.
-    const entries =
+    let entries =
       modelCase.provenance?.[definition.row_id] ??
       (definition.compiler_provenance
         ? [0, 1, 2].map((period_index) => ({
@@ -9870,6 +9883,28 @@ function attachInputProvenance(sheet, rowPlan, modelCase, workbook) {
             period_index,
           }))
         : null);
+    if (!entries?.length) {
+      // A declared-absence row (not_applicable authority, all-zero history)
+      // states that the filing prints NO such line; there is no page to cite,
+      // but the reader still deserves the statement of absence where they
+      // look for a source — not an unexplained blue zero.
+      const caseRow = caseRowsById.get(definition.row_id);
+      const declaredAbsence =
+        caseRow?.historical_authority === "not_applicable" &&
+        (caseRow.values ?? [])
+          .slice(0, 3)
+          .every(
+            (value) =>
+              value === null || value === undefined || Number(value) === 0,
+          );
+      if (declaredAbsence) {
+        entries = [0, 1, 2].map((period_index) => ({
+          period_index,
+          declared_absence: true,
+          label: caseRow.label ?? definition.row_id,
+        }));
+      }
+    }
     if (!entries?.length) continue;
     for (const [column, periodIndex] of Object.entries(COLUMN_PERIOD_INDEX)) {
       const provenance = entries.find(
@@ -9877,9 +9912,21 @@ function attachInputProvenance(sheet, rowPlan, modelCase, workbook) {
       );
       if (!provenance) continue;
       const address = `${column}${definition.row}`;
-      const range = sheet.getRange(address);
-      const formula = range.formulas?.[0]?.[0] ?? "";
-      const value = range.values?.[0]?.[0];
+      // The plan recorder exposes reads through `cellAt` only — its ranges are
+      // write-only, so `range.values` is undefined there and this sweep was a
+      // silent no-op on the plan path. The recorded cell is the same state the
+      // legacy range getters expose.
+      const cellState =
+        typeof sheet.cellAt === "function" ? sheet.cellAt(address) : null;
+      const range = cellState ? null : sheet.getRange(address);
+      const formula = cellState
+        ? cellState.formula !== undefined
+          ? `=${cellState.formula}`
+          : ""
+        : (range.formulas?.[0]?.[0] ?? "");
+      const value = cellState
+        ? (cellState.value ?? cellState.cachedValue ?? null)
+        : range.values?.[0]?.[0];
       if (String(formula).startsWith("=")) continue; // derived, self-explaining
       if (value === null || value === undefined || value === "") continue;
       // A cell may already carry a comment from an emission branch; that is the

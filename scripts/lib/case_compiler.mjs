@@ -993,10 +993,15 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       // shell for a second hardcoded model authority.
       row.historical_authority = "schedule_link";
       if (shellRole === "opening_cash") row.style_role ??= "subsection";
-      const usableHistory = (row.values ?? [])
+      // Filed history survives even when a period prints blank: a blank
+      // cash-flow movement cell IS the reported fact "no activity that
+      // year". Deleting a partially populated series let the empty schedule
+      // shell evaluate the whole history to zeros — an invented 0 replacing
+      // a filed 5,228. Only a series with NO filed value at all is removed.
+      const anyFiledHistory = (row.values ?? [])
         .slice(0, 3)
-        .every((value) => value !== null && Number.isFinite(Number(value)));
-      if (!usableHistory) {
+        .some((value) => value !== null && Number.isFinite(Number(value)));
+      if (!anyFiledHistory) {
         delete row.values;
       }
     }
@@ -1034,6 +1039,37 @@ function applyDerivedStratum(modelCase, evidence = {}) {
       netInterest.calculation = { operator: "sum", refs: ["interest_expense", "interest_income"] };
       netInterest.historical_authority = "derived_formula";
       delete netInterest.values;
+    } else if (!netInterest && !role("interest_expense") && !role("interest_income")) {
+      // US-GAAP faces may fold ALL finance results into a broader line
+      // ("Other income/(expense), net") with no dedicated interest rows at
+      // all. The workbook's fixed-point contract still needs the two
+      // canonical interface rows — the Interest Schedule owns them in
+      // history and forecast, and the filed other-income line stays its own
+      // preserved row. History on the shells is structurally empty: nothing
+      // filed is moved or invented.
+      const anchor =
+        role("pre_tax_income") ?? role("net_income") ?? isRows.at(-1);
+      const shells = [
+        {
+          row_id: "interest_income",
+          label: "Interest income",
+          row_type: "calculation",
+          calculation: { operator: "sum", refs: [] },
+          semantic_role: "interest_income",
+          historical_authority: "schedule_link",
+          indent: 1,
+        },
+        {
+          row_id: "interest_expense",
+          label: "Interest expense",
+          row_type: "calculation",
+          calculation: { operator: "sum", refs: [] },
+          semantic_role: "interest_expense",
+          historical_authority: "schedule_link",
+          indent: 1,
+        },
+      ];
+      if (anchor) insertBefore(isRows, anchor.row_id, shells);
     }
   }
 
@@ -1817,6 +1853,46 @@ function applyDerivedStratum(modelCase, evidence = {}) {
   // Module-conditional rows: with the acquisition module disabled, the
   // acquisitions line is a declared zero with its investing classification.
   {
+    let mintedAcquisitions = rowIdIndex.get("acquisitions_net_of_cash");
+    if (!mintedAcquisitions && Number(modelCase.contract_version) === 2) {
+      // The v2 acquisition module is force-enabled downstream for EVERY case
+      // (ensureIllustrativeAcquisitionCase), which creates the workbook
+      // invariant of exactly one canonical consideration row. A filing that
+      // reports no acquisitions prints no such line — so the row is minted
+      // HERE, at compile time, where the policy decorator below can give it
+      // its receipted zero authorities and investing classification.
+      // A filing with no acquisitions line reports the absence itself; the
+      // active acquisition module still needs its single canonical
+      // consideration row, whose forecast the module owns and whose history
+      // is structurally empty. Nothing filed is moved or invented.
+      mintedAcquisitions = {
+        row_id: "acquisitions_net_of_cash",
+        label: "Acquisitions, net of cash acquired",
+        row_type: "input",
+        semantic_role: "acquisitions_net_of_cash",
+        // Zero history: the filing reports no acquisitions line, so the
+        // declared no-activity zeros keep every filed identity reconciling
+        // exactly; the module's policy decorator below owns the forecast.
+        values: [0, 0, 0, null, null, null],
+        historical_authority: "not_applicable",
+      };
+      const investingAnchor = cfRows.find(
+        (row) => (row.semantic_role ?? row.row_id) === "cash_from_investing",
+      );
+      if (investingAnchor) insertBefore(cfRows, investingAnchor.row_id, [mintedAcquisitions]);
+      else cfRows.push(mintedAcquisitions);
+      rowIdIndex.set("acquisitions_net_of_cash", mintedAcquisitions);
+      // The investing activity total is a protected same-period identity;
+      // its member set must carry the minted row. A zero-history member
+      // keeps every filed sum reconciling exactly.
+      if (
+        investingAnchor?.calculation?.operator === "sum" &&
+        Array.isArray(investingAnchor.calculation.refs) &&
+        !investingAnchor.calculation.refs.includes("acquisitions_net_of_cash")
+      ) {
+        investingAnchor.calculation.refs.push("acquisitions_net_of_cash");
+      }
+    }
     const acquisitions = rowIdIndex.get("acquisitions_net_of_cash");
     if (acquisitions && !acquisitions.calculation) {
       acquisitions.movement_type ??= "investing_cash_flow";
@@ -3023,7 +3099,27 @@ function applyConsumptionDoctrine(modelCase, report, derivedRowIds = new Set(), 
     delete financeAddback.forecast_calculation;
     delete financeAddback.forecast_period_calculations;
   }
-  const fx = byRole.get("fx_effect_on_cash");
+  let fx = byRole.get("fx_effect_on_cash");
+  if (!fx && byRole.get("net_change_in_cash")) {
+    // A reporter with no translation exposure prints NO fx line at all —
+    // the absence IS the fact. The canonical row is minted intentionally
+    // uncalculated for history (not_applicable authority), and the standing
+    // zero convention below owns the forecast periods.
+    fx = {
+      row_id: "fx_effect_on_cash",
+      label: "Effect of exchange rate changes on cash",
+      row_type: "uncalculated",
+      semantic_role: "fx_effect_on_cash",
+      historical_authority: "not_applicable",
+    };
+    const cashFlowRows = modelCase.statement_structure.cash_flow;
+    const anchorIndex = cashFlowRows.findIndex(
+      (row) => (row.semantic_role ?? row.row_id) === "net_change_in_cash",
+    );
+    if (anchorIndex >= 0) cashFlowRows.splice(anchorIndex, 0, fx);
+    else cashFlowRows.push(fx);
+    byRole.set("fx_effect_on_cash", fx);
+  }
   if (
     fx &&
     !(fx.values ?? [])
@@ -3435,6 +3531,9 @@ export function compileCase(caseSource, evidence = {}) {
       ...(caseSource.identity?.units ? { units: caseSource.identity.units } : {}),
       ...(caseSource.identity?.fiscal_year_end
         ? { fiscal_year_end: caseSource.identity.fiscal_year_end }
+        : {}),
+      ...(caseSource.identity?.fiscal_calendar
+        ? { fiscal_calendar: caseSource.identity.fiscal_calendar }
         : {}),
     },
     ...(caseSource.identity?.presentation_profile

@@ -295,7 +295,11 @@ export async function runProcessTree(binary, args, options = {}) {
 export async function resolvePythonExecutable(candidate = "python3", options = {}) {
   const probe = await runProcessTree(String(candidate), [
     "-c",
-    "import os,sys; print(os.path.realpath(sys.executable))",
+    // A virtual environment's python is a symlink to its base interpreter;
+    // realpath() resolves THROUGH it and silently discards the venv's
+    // site-packages. Inside a venv the un-resolved executable path IS the
+    // identity; only a bare interpreter is canonicalised.
+    "import os,sys; venv = sys.prefix != getattr(sys, 'base_prefix', sys.prefix); print(sys.executable if venv else os.path.realpath(sys.executable))",
   ], {
     cwd: options.cwd,
     env: options.env,
@@ -311,9 +315,8 @@ export async function resolvePythonExecutable(candidate = "python3", options = {
   if (!path.isAbsolute(printed)) {
     throw new Error("The selected Python interpreter did not report an absolute executable path.");
   }
-  const resolved = await fs.realpath(printed);
-  await fs.access(resolved, fsConstants.X_OK);
-  return resolved;
+  await fs.access(printed, fsConstants.X_OK);
+  return printed;
 }
 
 export const PROCESS_TREE_DEFAULTS = Object.freeze({

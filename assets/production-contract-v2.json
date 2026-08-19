@@ -2,24 +2,24 @@
   "schema_version": 1,
   "contract_id": "excel-inflow-production-v2",
   "tolerances": {
-    "description": "ONE ABSOLUTE TOLERANCE CANNOT SERVE MONEY AND MULTIPLES. validate_dynamic_model.mjs used a single 0.05 for every numeric comparison it made, and applied it to net leverage by plain absolute difference — 0.05 is 1.7% of a 3.0x headline metric, and that was recorded as agreement. It was equally wrong at the other end: 0.05 on a 26,971m gross-debt figure is 1.9e-6 relative, so a currency comparison that should have been exact was allowed two parts per million of drift. Tolerances are keyed by METRIC CLASS, and the currency floor is stated in reporting-currency units and scaled by issuer.units, so a model in millions and a model in units are held to the same economic precision rather than the same printed digits.",
+    "description": "ONE ABSOLUTE TOLERANCE CANNOT SERVE MONEY AND MULTIPLES. validate_dynamic_model.mjs used a single 0.05 for every numeric comparison it made, and applied it to net leverage by plain absolute difference \u2014 0.05 is 1.7% of a 3.0x headline metric, and that was recorded as agreement. It was equally wrong at the other end: 0.05 on a 26,971m gross-debt figure is 1.9e-6 relative, so a currency comparison that should have been exact was allowed two parts per million of drift. Tolerances are keyed by METRIC CLASS, and the currency floor is stated in reporting-currency units and scaled by issuer.units, so a model in millions and a model in units are held to the same economic precision rather than the same printed digits.",
     "unit_scale": {
       "units": 1,
       "thousands": 0.001,
-      "millions": 0.000001
+      "millions": 1e-06
     },
     "metric_classes": {
       "currency": {
-        "relative": 0.000001,
+        "relative": 1e-06,
         "absolute_floor_currency_units": 1,
-        "note": "A money figure is tested relatively, because the precision that matters scales with the figure. The floor is one currency unit — one euro, one dollar — expressed in the issuer's units through unit_scale, so it is what governs comparisons at or near zero."
+        "note": "A money figure is tested relatively, because the precision that matters scales with the figure. The floor is one currency unit \u2014 one euro, one dollar \u2014 expressed in the issuer's units through unit_scale, so it is what governs comparisons at or near zero."
       },
       "ratio": {
         "absolute": 0.0001,
         "note": "Leverage and coverage multiples. A multiple has no natural scale to be relative to and is read to two decimals, so it is tested absolutely, two orders of magnitude tighter than the printed precision."
       },
       "rate": {
-        "absolute": 0.000001,
+        "absolute": 1e-06,
         "note": "Rates, margins, growth and conversion percentages: fractions of one, printed to a tenth of a point."
       }
     },
@@ -39,7 +39,7 @@
         "currency": "currency",
         "ratio": "ratio",
         "rate": "rate",
-        "note": "Two cells that must state the same number — the income statement's interest expense against the interest schedule's gross interest, the cash flow's ending cash against the sweep, the pro-forma actual column against the latest standalone actual. Same number, so the only tolerance is arithmetic noise."
+        "note": "Two cells that must state the same number \u2014 the income statement's interest expense against the interest schedule's gross interest, the cash flow's ending cash against the sweep, the pro-forma actual column against the latest standalone actual. Same number, so the only tolerance is arithmetic noise."
       },
       "independent-solver-parity": {
         "currency": "currency",
@@ -78,15 +78,22 @@
     "required_income_statement_roles": [
       "revenue",
       "ebit",
-      "interest_income",
-      "interest_expense",
       "pre_tax_income",
       "tax_expense",
       "net_income",
       "depreciation_and_amortisation"
     ],
     "required_income_statement_role_groups": [
-      ["adjusted_ebitda", "reported_ebitda"]
+      [
+        "adjusted_ebitda",
+        "reported_ebitda"
+      ],
+      [
+        "interest_income",
+        "interest_expense",
+        "net_interest_expense",
+        "other_non_operating"
+      ]
     ],
     "required_cash_flow_roles": [
       "cash_flow_net_income",
@@ -248,7 +255,13 @@
     "mutation_detection_required": true,
     "native_excel_restoration_required": true,
     "native_excel_evidence_schema": "native-excel-restoration-evidence/3.2",
-    "native_excel_required_control_sequence": [1, 0, 1, 0, 1],
+    "native_excel_required_control_sequence": [
+      1,
+      0,
+      1,
+      0,
+      1
+    ],
     "native_excel_evidence_bindings": [
       "case_id",
       "case_sha256",
