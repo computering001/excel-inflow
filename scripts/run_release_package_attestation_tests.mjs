@@ -19,6 +19,10 @@ import {
   verifyReleasePackageAttestation,
   writeExternalReleasePackageAttestation,
 } from "./lib/release_package_attestation.mjs";
+import {
+  hasNonLiteralDynamicImport,
+  specifiersOf,
+} from "./lib/release_js_import_scanner.mjs";
 
 const FIXED_TIME = "2026-08-17T00:00:00.000Z";
 const EVIDENCE_RECEIPT = Object.freeze({
@@ -54,6 +58,57 @@ check(
   compilerSource.indexOf('path.join(outputDir, "release-manifest.json")') <
     compilerSource.indexOf("const sealedInventory = await completePackageInventoryIdentity"),
   "compiler inventories package before its final manifest exists",
+);
+
+const validSpecifierFixture = `
+import defaultExport from "./default.mjs";
+import defaultExport2, { one, two as three } from "./named.mjs";
+import * as namespace from "package-name";
+import "./side-effect.mjs";
+export { value } from "./reexport.mjs";
+export * from "./star.mjs";
+export * as nested from "./namespace.mjs";
+const lazy = import("./lazy.mjs");
+const common = require("./common.cjs");
+`;
+assert.deepEqual(
+  specifiersOf(validSpecifierFixture).sort(),
+  [
+    "./common.cjs",
+    "./default.mjs",
+    "./lazy.mjs",
+    "./named.mjs",
+    "./namespace.mjs",
+    "./reexport.mjs",
+    "./side-effect.mjs",
+    "./star.mjs",
+    "package-name",
+  ].sort(),
+  "grammar-bounded scanner omitted a valid dependency form",
+);
+checks += 1;
+
+const proseFixture = `
+export const POLICY = { supported_zero: 0 };
+// Writing 0% keeps "not meaningful" visibly different from "zero".
+export function explain() { return "from \\\"imaginary-package\\\""; }
+const quoted = 'import("quoted-ghost")';
+const templated = \`require("template-ghost")\`;
+/* export { ghost } from "comment-ghost"; */
+`;
+assert.deepEqual(
+  specifiersOf(proseFixture),
+  [],
+  "prose, comments, strings, or exported declarations invented a dependency",
+);
+checks += 1;
+check(
+  hasNonLiteralDynamicImport("const load = import(target);") === true,
+  "non-literal dynamic import was not rejected",
+);
+check(
+  hasNonLiteralDynamicImport('// import(target)\nconst text = "import(other)";') === false,
+  "comment or string invented a non-literal dynamic import",
 );
 
 async function fixture(name, content = "export const value = 1;\n", packageMode = "certified") {

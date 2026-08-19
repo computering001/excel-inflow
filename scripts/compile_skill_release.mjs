@@ -89,6 +89,10 @@ import {
   verifyReleasePackageAttestation,
   writeExternalReleasePackageAttestation,
 } from "./lib/release_package_attestation.mjs";
+import {
+  hasNonLiteralDynamicImport,
+  specifiersOf,
+} from "./lib/release_js_import_scanner.mjs";
 
 const BUILTINS = new Set(builtinModules);
 
@@ -347,23 +351,6 @@ for (const entry of pythonEntryPoints) {
  * Transitive import closure
  * ------------------------------------------------------------------ */
 
-const STATEMENT_IMPORT = /^import\s+(?:[\s\S]*?\s+from\s+)?(["'])([^"']+)\1/gm;
-const STATEMENT_EXPORT_FROM = /^export\s[\s\S]*?\sfrom\s*(["'])([^"']+)\1/gm;
-const DYNAMIC_IMPORT = /\bimport\s*\(\s*(["'])([^"']+)\1\s*\)/g;
-const REQUIRE_CALL = /\brequire\s*\(\s*(["'])([^"']+)\1\s*\)/g;
-const NON_LITERAL_DYNAMIC_IMPORT = /\bimport\s*\(\s*(?!["'])[^)\s]/;
-
-function specifiersOf(source) {
-  const found = [];
-  for (const pattern of [STATEMENT_IMPORT, STATEMENT_EXPORT_FROM, DYNAMIC_IMPORT, REQUIRE_CALL]) {
-    pattern.lastIndex = 0;
-    for (const match of source.matchAll(pattern)) {
-      found.push(match[2]);
-    }
-  }
-  return [...new Set(found)];
-}
-
 const closureScripts = new Set();
 const importEdges = [];
 const bareImports = new Map();
@@ -385,7 +372,7 @@ async function walkScript(relative, importedBy) {
   }
   closureScripts.add(normalised);
 
-  if (NON_LITERAL_DYNAMIC_IMPORT.test(source)) {
+  if (hasNonLiteralDynamicImport(source)) {
     throw new Error(
       `${normalised} contains a dynamic import with a non-literal specifier; the closure cannot be computed statically.`,
     );
