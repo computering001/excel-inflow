@@ -1,0 +1,831 @@
+{
+  "schema_version": "excel-inflow-archetype-case-catalogue/1.0",
+  "catalogue_group": "presentation",
+  "invariant": "Every entry isolates ONE statement-structure, classification, currency, unit or provenance PRESENTATION shape that a naive implementation gets wrong, and binds it to typed expectations the runner asserts against shipped product code (support_envelope.classifySupport, statement_classifier.classifyStatementLine, statement_topology.compileStatementTopology, typed_financial_value.typedValue/numericValueOf, typed_arithmetic, case_compiler.sourceHistoricalSumMatches, model_ir_v3.compileModelIrV3, solver.validateCaseShape, validation_invariants.validateFiscalPeriods). No entry may rest on compiles_clean alone; a declared typed refusal is a PASS. Kind mapping used here: unsupported_profile_early_stop = a preflight stop carrying a registered reason; authority_selection = which role, class or currency authority governs a line or a run (including support-envelope class verdicts); value_state = a typed-value or arithmetic-receipt state; identity_or_footing = a printed total judged against its printed members; presentation_topology = the compiled visible statement graph; period_arithmetic = the period series itself.",
+  "entries": [
+    {
+      "archetype_id": "direct_method_cash_flow",
+      "case_path": "test-fixtures/archetypes/presentation/direct-method-cash-flow.json",
+      "accounting_shape": "A cash-flow statement presented by the DIRECT method: gross operating receipts and payments on the face, with no indirect profit-to-cash reconciliation printed anywhere.",
+      "why_it_breaks_models": "A naive implementation anchors operating cash flow on the indirect bridge (profit, add back D&A, working-capital movement). With no reconciliation printed it either invents one from the income statement or silently maps the first gross receipts line onto cash_from_operations, so the operating total is built from a line that is not the total.",
+      "proves_envelope_values": [
+        {
+          "dimension": "cash_flow_method",
+          "value": "direct"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "direct_method_is_experimental_not_stopped",
+          "kind": "authority_selection",
+          "statement": "The direct method classifies EXPERIMENTAL, is not early-stopped, and its legal terminal set excludes DELIVERED_VERIFIED — the run may proceed only in a controlled ring."
+        },
+        {
+          "expectation_id": "direct_method_receipts_line_abstains",
+          "kind": "authority_selection",
+          "statement": "\"Cash receipts from customers\" is UNMAPPED with no awarded role: the taxonomy carries no direct-method operating role, so the line abstains rather than being awarded cash_from_operations."
+        },
+        {
+          "expectation_id": "direct_method_payments_line_abstains",
+          "kind": "authority_selection",
+          "statement": "\"Cash paid to suppliers and employees\" is likewise UNMAPPED with no awarded role."
+        },
+        {
+          "expectation_id": "direct_method_operating_section_topology_clean",
+          "kind": "presentation_topology",
+          "statement": "The direct-method face still compiles a single ending_cash conclusion owner with zero topology errors — the shape is readable; only the role vocabulary is missing."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "cash_flow_absent_income_statement_only",
+      "case_path": "test-fixtures/archetypes/presentation/cash-flow-absent-income-statement-only.json",
+      "accounting_shape": "A filing supplying only an income statement and a balance sheet: no statement of cash flows is published at all.",
+      "why_it_breaks_models": "A naive implementation reconstructs cash flow from balance-sheet movements and presents the result as reported history, so every cash, debt and interest figure downstream is a model output wearing a filing's provenance.",
+      "proves_envelope_values": [
+        {
+          "dimension": "statement_topology",
+          "value": "cash_flow_absent"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "cash_flow_absent_early_stop",
+          "kind": "unsupported_profile_early_stop",
+          "expected_terminal_reason": "PROFILE.cash_flow_absent",
+          "statement": "The absent cash-flow statement stops the run at preflight with UNSUPPORTED_PROFILE and the registered cash_flow_absent reason, before any document byte is read."
+        },
+        {
+          "expectation_id": "income_statement_alone_still_compiles_its_own_conclusion",
+          "kind": "presentation_topology",
+          "statement": "The supplied income statement compiles a single net_income conclusion owner with zero topology errors — the refusal is a product-contract decision about completeness, not an extraction failure."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "single_statement_comprehensive_income",
+      "case_path": "test-fixtures/archetypes/presentation/single-statement-comprehensive-income.json",
+      "accounting_shape": "A single statement of profit or loss and other comprehensive income: profit for the year, then OCI items, then total comprehensive income, all on one face.",
+      "why_it_breaks_models": "A naive implementation takes the LAST bold total on the face as the bottom line, so total comprehensive income becomes net income. Every downstream cash-flow reconciliation, EPS and retained-earnings roll then starts from a figure that includes non-cash remeasurements.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "sci_profit_line_owns_net_income",
+          "kind": "authority_selection",
+          "statement": "\"Profit for the year\" is accepted as net_income with confidence 0.95."
+        },
+        {
+          "expectation_id": "sci_total_comprehensive_income_abstains",
+          "kind": "authority_selection",
+          "statement": "\"Total comprehensive income for the year\" is UNMAPPED with no awarded role, and its top candidates tie at zero margin — the classifier abstains instead of promoting it to net_income."
+        },
+        {
+          "expectation_id": "sci_conclusion_stays_on_profit_for_the_year",
+          "kind": "presentation_topology",
+          "statement": "With TCI declared as a derived display of net_income, the compiled section conclusion owner is net_income and there are zero topology errors."
+        },
+        {
+          "expectation_id": "sci_second_conclusion_owner_refused",
+          "kind": "presentation_topology",
+          "statement": "MUTATION: tagging total comprehensive income with the net_income role is refused with MULTIPLE_SECTION_CONCLUSION_OWNERS and DUPLICATE_VISIBLE_AUTHORITY."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "two_statement_income_and_oci",
+      "case_path": "test-fixtures/archetypes/presentation/two-statement-income-and-oci.json",
+      "accounting_shape": "The two-statement presentation: a statement of profit or loss ending at profit for the year, followed by a SEPARATE statement of other comprehensive income.",
+      "why_it_breaks_models": "A naive extractor concatenates the two faces into one table, so OCI components become income-statement lines below net income and either break the section conclusion or get summed into operating profit.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "two_statement_oci_line_is_out_of_model_scope",
+          "kind": "authority_selection",
+          "statement": "\"Other comprehensive income\" is UNMAPPED with no awarded role: it is out of the modelled statement scope, not a mislabelled profit line."
+        },
+        {
+          "expectation_id": "two_statement_oci_component_does_not_become_operating_profit",
+          "kind": "authority_selection",
+          "statement": "\"Items that will not be reclassified to profit or loss\" is UNMAPPED and is NOT awarded operating_profit even though operating_profit is its leading candidate."
+        },
+        {
+          "expectation_id": "two_statement_income_statement_conclusion_unaffected",
+          "kind": "presentation_topology",
+          "statement": "The profit-or-loss face alone compiles with net_income as sole conclusion owner and zero topology errors when the OCI statement is kept out of the section."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "restated_prior_period_comparatives",
+      "case_path": "test-fixtures/archetypes/presentation/restated-prior-period-comparatives.json",
+      "accounting_shape": "The current filing RESTATES a prior period: its comparative column differs from the figure the prior filing published for the same period.",
+      "why_it_breaks_models": "A naive implementation treats \"the FY24 figure\" as one number and takes whichever filing it read first, silently mixing restated and original history in one series — and it records no provenance saying which filing each comparative came from.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "restated_prior_filing_reading_is_value_bearing",
+          "kind": "value_state",
+          "statement": "A prior-filing comparative is the value-bearing state prior_filing_support: it reads its number, and is not a fallback that decays to null."
+        },
+        {
+          "expectation_id": "prior_filing_figure_cannot_be_recorded_without_naming_the_prior_filing",
+          "kind": "value_state",
+          "statement": "Constructing prior_filing_support WITHOUT provenance (prior document digest, prior source line, prior period index) is REFUSED — the typed contract makes an unattributed prior-filing figure unrepresentable."
+        },
+        {
+          "expectation_id": "restatement_delta_is_computed_from_two_distinct_typed_readings",
+          "kind": "authority_selection",
+          "statement": "The restated current-filing reading and the original prior-filing reading are two distinct typed values; subtracting them yields the restatement delta as a derived_number, so the two can never be silently interchanged."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "reclassified_comparatives_without_restatement",
+      "case_path": "test-fixtures/archetypes/presentation/reclassified-comparatives-without-restatement.json",
+      "accounting_shape": "Comparatives RECLASSIFIED without restatement: the same total is re-cut across different line items, so member composition changes while the printed total does not.",
+      "why_it_breaks_models": "A naive implementation matches history line-by-line on label, carries the prior composition forward under the new captions, and produces a total that no longer foots — while reporting the filing's own total as unchanged.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "reclassified_total_foots_under_the_prior_composition",
+          "kind": "identity_or_footing",
+          "statement": "The prior filing's member composition foots the printed total at source precision."
+        },
+        {
+          "expectation_id": "reclassified_total_foots_under_the_new_composition",
+          "kind": "identity_or_footing",
+          "statement": "The current filing's re-cut member composition foots the SAME printed total at source precision."
+        },
+        {
+          "expectation_id": "label_wise_carry_forward_across_the_reclassification_breaks_the_total",
+          "kind": "identity_or_footing",
+          "statement": "MUTATION: mixing one member from each composition (what label-wise carry-forward produces) does NOT foot the printed total — the failure the naive implementation ships."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "interim_half_year_filing",
+      "case_path": "test-fixtures/archetypes/presentation/interim-half-year-filing.json",
+      "accounting_shape": "A condensed half-year interim filing: six-month durations, condensed face statements, comparative interim period rather than a full year.",
+      "why_it_breaks_models": "A naive implementation treats every reported column as an annual period, so a six-month revenue becomes a full-year run-rate and every margin, growth rate and leverage multiple is computed on mismatched period lengths.",
+      "proves_envelope_values": [
+        {
+          "dimension": "statement_topology",
+          "value": "condensed_or_interim"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "interim_condensed_profile_is_experimental_not_stopped",
+          "kind": "authority_selection",
+          "statement": "The condensed/interim topology classifies EXPERIMENTAL, is not early-stopped, and its legal terminals exclude DELIVERED_VERIFIED."
+        },
+        {
+          "expectation_id": "interim_period_series_is_not_representable_as_annual_fiscal_periods",
+          "kind": "period_arithmetic",
+          "statement": "A half-year period series against a 12-31 fiscal year end is refused by the fiscal-period validator with periods.fiscal_year_end_mismatch on every interim column — the period length is checked, not assumed."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "fewer_than_two_historical_periods",
+      "case_path": "test-fixtures/archetypes/presentation/fewer-than-two-historical-periods.json",
+      "accounting_shape": "A newly listed issuer with ONE reported period and no prior filing available for period support.",
+      "why_it_breaks_models": "A naive implementation pads the missing comparatives with zeros or repeats the single period, so every growth rate reads 0% or 100% and the working-capital and debt movements are fabricated.",
+      "proves_envelope_values": [
+        {
+          "dimension": "historical_periods",
+          "value": "fewer_than_two"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "insufficient_history_early_stop",
+          "kind": "unsupported_profile_early_stop",
+          "expected_terminal_reason": "PROFILE.insufficient_history",
+          "statement": "Fewer than two historical periods stops the run at preflight with UNSUPPORTED_PROFILE and the registered insufficient_history reason."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "two_periods_with_prior_filing_support",
+      "case_path": "test-fixtures/archetypes/presentation/two-periods-with-prior-filing-support.json",
+      "accounting_shape": "TWO reported comparatives in the current filing, with a prior filing available to support the third period — the boundary case that must degrade rather than stop.",
+      "why_it_breaks_models": "A naive implementation either rejects the issuer outright (over-refusal, the mirror of the one-period case) or stitches the third period in silently, presenting a prior filing's figure as if the current filing published it.",
+      "proves_envelope_values": [
+        {
+          "dimension": "historical_periods",
+          "value": "two_with_prior_filing_support"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "two_period_history_degrades_and_names_the_dimension",
+          "kind": "authority_selection",
+          "statement": "Two comparatives with prior-filing support classify SUPPORTED_DEGRADED without an early stop, and historical_periods is NAMED in degraded_dimensions so the workbook can disclose it."
+        },
+        {
+          "expectation_id": "stitched_period_is_typed_not_zero_filled",
+          "kind": "value_state",
+          "statement": "A period awaiting prior-filing support is the typed state period_support_required: it reads null, is not value-bearing, and is never zero."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "more_than_three_historical_periods",
+      "case_path": "test-fixtures/archetypes/presentation/more-than-three-historical-periods.json",
+      "accounting_shape": "A filing publishing FOUR or more historical comparatives (a five-year selected-financial-data set, or a fourth restated comparative column).",
+      "why_it_breaks_models": "A naive implementation silently truncates to the three periods its arrays expect, dropping the earliest comparative with no disclosure — the user sees three years of history and never learns a fourth was published and discarded.",
+      "proves_envelope_values": [
+        {
+          "dimension": "historical_periods",
+          "value": "three_or_more"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "envelope_certifies_three_or_more_history",
+          "kind": "authority_selection",
+          "statement": "The support envelope classifies historical_periods=three_or_more as CERTIFIED with no early stop — the release claim covers four-comparative filings."
+        },
+        {
+          "expectation_id": "fourth_comparative_is_refused_by_the_case_contract_not_absorbed",
+          "kind": "period_arithmetic",
+          "statement": "A four-historical (seven-period) case is REFUSED by the case contract with the typed period-count errors, so the fourth comparative cannot be silently absorbed. DEFECT: the refusal is an internal schema message, not a registered terminal reason, and the envelope still certifies the shape it cannot represent."
+        },
+        {
+          "expectation_id": "three_period_history_control_is_accepted",
+          "kind": "compiles_clean",
+          "statement": "CONTROL: the same case with three historical periods raises no period errors."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "eps_per_share_supplement_rows",
+      "case_path": "test-fixtures/archetypes/presentation/eps-per-share-supplement-rows.json",
+      "accounting_shape": "Per-share supplement rows (basic and diluted earnings per share) printed on the face BELOW the statement conclusion, in currency-per-share rather than statement units.",
+      "why_it_breaks_models": "A naive implementation reads every numeric face row as a statement line in statement units, so a 0.48 pence-per-share figure joins a millions-scaled column, and a row below the bottom line silently becomes part of the statement it merely annotates.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "basic_eps_is_never_awarded_the_net_income_role",
+          "kind": "authority_selection",
+          "statement": "\"Basic earnings per share\" is UNMAPPED with confidence 0 and is never awarded net_income — the taxonomy carries no per-share role, so the line abstains."
+        },
+        {
+          "expectation_id": "diluted_eps_is_never_awarded_the_net_income_role",
+          "kind": "authority_selection",
+          "statement": "\"Diluted earnings per share\" likewise abstains with no awarded role."
+        },
+        {
+          "expectation_id": "undeclared_post_conclusion_per_share_rows_are_refused",
+          "kind": "presentation_topology",
+          "statement": "An EPS row visible after net_income WITHOUT a declared projection reason is refused with PROJECTION_NECESSITY_UNDECLARED."
+        },
+        {
+          "expectation_id": "declared_per_share_supplement_compiles_as_a_derived_display",
+          "kind": "presentation_topology",
+          "statement": "The same row declared as a derived_display of net_income compiles with zero topology errors and leaves net_income the sole conclusion owner."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "dividends_per_share_declaration_rows",
+      "case_path": "test-fixtures/archetypes/presentation/dividends-per-share-declaration-rows.json",
+      "accounting_shape": "Dividend-per-share DECLARATION rows (interim and final, pence per ordinary share) printed on the income-statement face or in the dividends note, alongside the cash dividends paid line in the cash-flow statement.",
+      "why_it_breaks_models": "A naive implementation maps any \"dividend\" caption onto the dividends cash-flow role, so a declared 12.5p per share is added to a financing cash flow measured in millions — and a declaration (a per-share commitment) is confused with a payment (a cash movement).",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "dividend_per_share_is_never_awarded_the_cash_dividends_role",
+          "kind": "authority_selection",
+          "statement": "\"Dividend per share\" in the income statement is UNMAPPED and is never awarded the cash-flow dividends role."
+        },
+        {
+          "expectation_id": "interim_dividend_per_share_also_abstains",
+          "kind": "authority_selection",
+          "statement": "\"Interim dividend per ordinary share\" likewise abstains with no awarded role."
+        },
+        {
+          "expectation_id": "cash_dividends_paid_still_classifies",
+          "kind": "authority_selection",
+          "statement": "CONTROL: \"Dividends paid\" in the cash-flow statement is still accepted as dividends — the abstention above is about the per-share declaration, not about dividends generally."
+        },
+        {
+          "expectation_id": "per_share_declaration_cannot_be_added_to_a_cash_flow_line",
+          "kind": "value_state",
+          "statement": "Adding a per-share declaration (unit scale 1) to a cash dividends paid line (unit scale 1e6) is REFUSED for mixed unit scales — the scale mismatch is caught, not silently absorbed."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "note_column_captions_interleaved",
+      "case_path": "test-fixtures/archetypes/presentation/note-column-captions-interleaved.json",
+      "accounting_shape": "Note-reference captions and section captions interleaved among the face rows (a \"Notes\" column heading, \"Continuing operations\", \"Note 7\"), carrying no figures of their own.",
+      "why_it_breaks_models": "A naive extractor treats every table row as a data row: caption rows acquire the note NUMBER as their value (a 7 becomes £7m), and a caption above the first face line takes ownership of source order so the statement is assembled from the wrong anchor.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "note_captions_do_not_disturb_source_order",
+          "kind": "presentation_topology",
+          "statement": "Caption rows typed as headers interleave among the face rows with zero topology errors, and the section conclusion owner is unchanged."
+        },
+        {
+          "expectation_id": "a_numeric_caption_prefix_is_refused",
+          "kind": "presentation_topology",
+          "statement": "MUTATION: a caption row that carries numeric history and precedes the first face line is refused with ORPHAN_NUMERIC_PREFIX — a note number can never become a silent statement value."
+        },
+        {
+          "expectation_id": "note_caption_receives_no_economic_role",
+          "kind": "authority_selection",
+          "statement": "The caption label \"Notes\" is UNMAPPED and receives no economic role."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "duplicate_label_in_income_statement_and_cash_flow",
+      "case_path": "test-fixtures/archetypes/presentation/duplicate-label-in-income-statement-and-cash-flow.json",
+      "accounting_shape": "The identical caption \"Profit after taxation\" printed on BOTH the income-statement face and as the opening line of the indirect cash-flow reconciliation.",
+      "why_it_breaks_models": "A naive implementation keys rows by label, so the two occurrences collide: one overwrites the other, the cash-flow reconciliation loses its anchor, or the income statement acquires a second bottom line.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "same_label_in_the_income_statement_takes_net_income",
+          "kind": "authority_selection",
+          "statement": "In the income statement the shared label is accepted as net_income."
+        },
+        {
+          "expectation_id": "same_label_in_the_cash_flow_takes_the_cash_flow_role",
+          "kind": "authority_selection",
+          "statement": "In the cash-flow statement the SAME label is accepted as cash_flow_net_income — the section, not the label, decides the role."
+        },
+        {
+          "expectation_id": "duplicate_label_income_statement_topology_clean",
+          "kind": "presentation_topology",
+          "statement": "The income-statement section compiles with zero topology errors and net_income as sole conclusion owner."
+        },
+        {
+          "expectation_id": "duplicate_label_cash_flow_topology_clean",
+          "kind": "presentation_topology",
+          "statement": "The cash-flow section carrying the same label compiles with zero topology errors and ending_cash as sole conclusion owner."
+        },
+        {
+          "expectation_id": "two_rows_claiming_one_visible_authority_are_refused",
+          "kind": "presentation_topology",
+          "statement": "MUTATION: two rows in ONE section claiming net_income are refused with DUPLICATE_VISIBLE_AUTHORITY and MULTIPLE_SECTION_CONCLUSION_OWNERS — cross-section reuse is lawful, within-section duplication is not."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "label_synonym_drift_across_periods",
+      "case_path": "test-fixtures/archetypes/presentation/label-synonym-drift-across-periods.json",
+      "accounting_shape": "The top line renamed between filings — \"Turnover\" in the comparative filing, \"Revenue\" in the current one — with the modern IFRS 15 caption \"Revenue from contracts with customers\" as the third variant.",
+      "why_it_breaks_models": "A naive implementation keys history on the printed caption, so a rename splits one economic series into two half-populated rows, and the growth rate is computed against a blank prior period.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "turnover_synonym_maps_to_revenue",
+          "kind": "authority_selection",
+          "statement": "\"Turnover\" is accepted as revenue at confidence 0.90."
+        },
+        {
+          "expectation_id": "revenue_label_maps_to_revenue",
+          "kind": "authority_selection",
+          "statement": "\"Revenue\" is accepted as revenue at confidence 0.90 — the rename does not change the awarded role."
+        },
+        {
+          "expectation_id": "ifrs15_revenue_caption_is_unmapped_and_tied_against_cost_of_sales",
+          "kind": "authority_selection",
+          "statement": "DEFECT: \"Revenue from contracts with customers\", the standard IFRS 15 face caption, is UNMAPPED with a ZERO separation margin and its top candidates tied at cost_of_sales and revenue — no amount of structural evidence can separate a tie, so the most common modern revenue caption always requires a clarification stop."
+        },
+        {
+          "expectation_id": "group_revenue_caption_is_unmapped_and_tied_against_cost_of_sales",
+          "kind": "authority_selection",
+          "statement": "DEFECT: \"Group revenue\" fails the same way — UNMAPPED, zero margin, tied against cost_of_sales."
+        },
+        {
+          "expectation_id": "net_revenues_caption_leads_with_net_income",
+          "kind": "authority_selection",
+          "statement": "DEFECT: \"Net revenues\" is UNMAPPED with net_income as its single leading candidate — the \"net\" token pulls the top line toward the bottom line."
+        },
+        {
+          "expectation_id": "one_revenue_authority_survives_the_label_change",
+          "kind": "presentation_topology",
+          "statement": "One revenue row carrying BOTH filings' source lines compiles with zero topology errors and no duplicate visible authority — the rename produces one series, not two."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "subtotal_only_no_members_printed",
+      "case_path": "test-fixtures/archetypes/presentation/subtotal-only-no-members-printed.json",
+      "accounting_shape": "A face subtotal printed with NO member rows disclosed anywhere — the filing publishes \"Other operating expenses\" as one number and never breaks it down.",
+      "why_it_breaks_models": "A naive implementation either invents plausible members to make the subtotal look decomposed, or treats the undecomposed total as a footed family and reports a verification it never performed.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "subtotal_without_members_is_recorded_not_silently_skipped",
+          "kind": "identity_or_footing",
+          "statement": "A declared family total naming no members yields the typed finding STATEMENT_FAMILY_EMPTY_MEMBER_SET — nothing can foot it, and that fact is recorded rather than skipped."
+        },
+        {
+          "expectation_id": "no_member_rows_are_invented_beneath_a_reported_subtotal",
+          "kind": "presentation_topology",
+          "statement": "The reported subtotal compiles with zero topology errors and NO presentation parent or invented children: its presentation_parent_id is null and its depth is 0."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "members_printed_without_subtotal",
+      "case_path": "test-fixtures/archetypes/presentation/members-printed-without-subtotal.json",
+      "accounting_shape": "Member rows printed with NO subtotal on the face: the filing lists distribution, administrative and other operating costs individually and never prints a combined operating-expense line.",
+      "why_it_breaks_models": "A naive implementation mints the missing subtotal and then presents it as a filed figure, so a model-computed number acquires the filing's authority and any later footing check compares the mint against itself.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "a_minted_subtotal_asserts_no_filed_series_to_foot",
+          "kind": "identity_or_footing",
+          "statement": "A formula-owned (derived_formula) total over filed members asserts NO independent filed series, so the footing pass raises no family finding at all — the mint cannot manufacture a footing claim against itself."
+        },
+        {
+          "expectation_id": "unsubtotalled_members_stay_flat_with_no_invented_parent",
+          "kind": "presentation_topology",
+          "statement": "The three member rows compile with zero topology errors, each with a null presentation parent — no visual family is invented from arithmetic."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "rounded_members_do_not_foot_printed_total",
+      "case_path": "test-fixtures/archetypes/presentation/rounded-members-do-not-foot-printed-total.json",
+      "accounting_shape": "A printed total that does NOT foot to its printed members beyond any rounding allowance: three members of 33 under a printed total of 100.",
+      "why_it_breaks_models": "A naive implementation silently overwrites the printed total with the members' sum (losing the filing's own figure) or silently keeps the total and lets the discrepancy travel into the model as an unexplained plug.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "material_unfooted_family_total_blocks_with_provenance",
+          "kind": "identity_or_footing",
+          "statement": "A MATERIAL unfooted family total BLOCKS, once per historical period, and each refusal carries the filed total and the member sum so the discrepancy is auditable rather than plugged."
+        },
+        {
+          "expectation_id": "source_level_footing_oracle_also_rejects_the_printed_total",
+          "kind": "identity_or_footing",
+          "statement": "The source-level footing oracle independently rejects the same printed total at declared precision 0 (tolerance half a unit, discrepancy one whole unit)."
+        },
+        {
+          "expectation_id": "an_immaterial_unfooted_total_is_recorded_not_blocked",
+          "kind": "identity_or_footing",
+          "statement": "The SAME discrepancy on an immaterial total is RECORDED as a typed finding and does not block — materiality decides the severity, never whether the discrepancy is noticed."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "total_foots_only_within_rounding_tolerance",
+      "case_path": "test-fixtures/archetypes/presentation/total-foots-only-within-rounding-tolerance.json",
+      "accounting_shape": "A printed total that foots ONLY once the source's printed precision is honoured: members printed to one decimal place whose sum differs from the printed total by binary-float representation alone (12.3 + 45.6 = 57.900000000000006 against a printed 57.9).",
+      "why_it_breaks_models": "A naive implementation compares the sum to the printed total with exact equality, so every one-decimal statement in the filing reports a false unfooted total; widening to a single global epsilon then hides genuine discrepancies.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "declared_source_precision_makes_the_printed_total_foot",
+          "kind": "identity_or_footing",
+          "statement": "With the source's printed precision declared (one decimal place), the footing oracle accepts the printed total: tolerance is derived from the source, not from a global epsilon."
+        },
+        {
+          "expectation_id": "without_declared_precision_the_case_compiler_oracle_rejects_the_same_printed_total",
+          "kind": "identity_or_footing",
+          "statement": "DEFECT (half 1 of 2): with no declared precision the case-compiler footing oracle uses EXACT arithmetic (tolerance 0) and rejects the very same printed total on float representation alone."
+        },
+        {
+          "expectation_id": "the_model_ir_footing_oracle_accepts_what_the_case_compiler_oracle_rejects",
+          "kind": "identity_or_footing",
+          "statement": "DEFECT (half 2 of 2): the model-IR footing oracle, whose comment claims it MIRRORS the case-compiler tolerance, adds a 1e-9 relative float allowance and ACCEPTS the same undeclared-precision numbers. Two footing oracles, two verdicts, identical printed figures."
+        }
+      ],
+      "extraction_evidence_still_required": false
+    },
+    {
+      "archetype_id": "reporting_currency_change_between_periods",
+      "case_path": "test-fixtures/archetypes/presentation/reporting-currency-change-between-periods.json",
+      "accounting_shape": "The reporting currency CHANGES between periods: the comparative column is presented in sterling and the current column in euro, with no restated comparative.",
+      "why_it_breaks_models": "A naive implementation stores bare numbers, so a GBP comparative and a EUR current period are subtracted to produce a growth rate that is pure exchange-rate noise, and no receipt records that a currency boundary was crossed.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "adding_across_a_currency_change_is_refused",
+          "kind": "value_state",
+          "statement": "Adding a GBP reading to a EUR reading is REFUSED with a receipt demanding explicit conversion evidence — the currency boundary is a typed refusal, not a silent arithmetic."
+        },
+        {
+          "expectation_id": "translation_through_an_explicit_rate_operand_is_lawful",
+          "kind": "value_state",
+          "statement": "Multiplying the EUR reading by an explicit dimensionless rate operand IS lawful and yields a derived_number: conversion is permitted only when the rate is an operand of record."
+        },
+        {
+          "expectation_id": "multiplying_two_currency_bearing_readings_is_dimensionally_refused",
+          "kind": "value_state",
+          "statement": "Multiplying two currency-bearing readings is refused as dimensionally invalid — a currency figure can never be used as if it were a rate."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "reporting_currency_differs_from_functional_currency",
+      "case_path": "test-fixtures/archetypes/presentation/reporting-currency-differs-from-functional-currency.json",
+      "accounting_shape": "The PRESENTATION currency differs from the group's FUNCTIONAL currency: the accounts are presented in euro while the functional currency of the operations is the US dollar.",
+      "why_it_breaks_models": "A naive implementation records one \"currency\" for the issuer and applies it to every figure, so translated presentation figures and functional-currency debt terms are combined without a conversion of record.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "a_functional_currency_declaration_is_refused_not_silently_ignored",
+          "kind": "authority_selection",
+          "statement": "Declaring issuer.functional_currency alongside issuer.reporting_currency is REFUSED by the case contract as a disallowed property — the second currency authority is rejected loudly, not accepted and ignored. DEFECT: the distinction therefore has no representation at all, so a presentation-currency filing is modelled as if presentation were functional."
+        },
+        {
+          "expectation_id": "single_reporting_currency_declaration_is_accepted",
+          "kind": "compiles_clean",
+          "statement": "CONTROL: a single three-letter reporting_currency raises no currency error."
+        },
+        {
+          "expectation_id": "presentation_and_functional_readings_cannot_be_added_without_conversion_evidence",
+          "kind": "value_state",
+          "statement": "A euro presentation reading and a US dollar functional reading cannot be added: the arithmetic service refuses and demands explicit conversion evidence."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "unit_scale_change_thousands_to_millions",
+      "case_path": "test-fixtures/archetypes/presentation/unit-scale-change-thousands-to-millions.json",
+      "accounting_shape": "The printed unit scale CHANGES between statements: the income statement is headed \"£000\" and the cash-flow statement \"£m\".",
+      "why_it_breaks_models": "A naive implementation reads one unit for the filing, so a cash-flow figure is silently a thousand times a same-named income-statement figure and every cash-conversion ratio is out by three orders of magnitude.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "adding_across_a_unit_scale_change_is_refused",
+          "kind": "value_state",
+          "statement": "Adding a thousands-scaled reading to a millions-scaled reading is REFUSED with a receipt demanding explicit scale conversion."
+        },
+        {
+          "expectation_id": "a_per_statement_unit_declaration_is_refused",
+          "kind": "authority_selection",
+          "statement": "Declaring units per statement is refused: issuer.units admits only the single enumerated scalar. DEFECT: a filing that genuinely prints two scales therefore has no lawful representation, and the mismatch can only be caught later by footing."
+        },
+        {
+          "expectation_id": "a_single_case_wide_unit_declaration_is_accepted",
+          "kind": "compiles_clean",
+          "statement": "CONTROL: a single case-wide unit declaration raises no unit error."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "printed_unit_label_contradicts_declared_units",
+      "case_path": "test-fixtures/archetypes/presentation/printed-unit-label-contradicts-declared-units.json",
+      "accounting_shape": "The printed column header contradicts the figures beneath it: the statement is headed \"£m\" while the member rows were captured at their thousands magnitude.",
+      "why_it_breaks_models": "A naive implementation trusts either the header or the digits, never both, and has no independent check that they agree — so a whole statement can arrive a thousand times too large with no signal at all.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "a_thousand_fold_scale_error_fails_the_footing_oracle",
+          "kind": "identity_or_footing",
+          "statement": "Members captured at the thousands magnitude beneath a millions-scaled printed total fail the source footing oracle."
+        },
+        {
+          "expectation_id": "the_scale_error_blocks_as_an_unfooted_material_total",
+          "kind": "identity_or_footing",
+          "statement": "The same mis-scale BLOCKS through the model-IR footing pass as a material unfooted total, so a partial scale error cannot reach the workbook."
+        },
+        {
+          "expectation_id": "a_uniform_scale_error_foots_perfectly_and_is_invisible_to_footing",
+          "kind": "identity_or_footing",
+          "statement": "DEFECT: when the total AND its members are mis-scaled together, the footing oracle accepts them — footing is scale-invariant, so a uniform whole-statement scale error is invisible to every check exercised here. Reading the printed unit label is unowned, which is why this archetype still needs real extraction evidence."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "negative_in_parentheses_convention",
+      "case_path": "test-fixtures/archetypes/presentation/negative-in-parentheses-convention.json",
+      "accounting_shape": "Negative figures printed in PARENTHESES rather than with a minus sign: a cost of 1,234 printed as \"(1,234)\".",
+      "why_it_breaks_models": "A naive numeric parser strips punctuation and returns +1234, flipping the sign of every cost, tax and repayment line — and once the printed text is discarded there is no way to audit the flip after the fact.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "parenthesised_cost_reads_negative_and_keeps_its_printed_text",
+          "kind": "value_state",
+          "statement": "The parenthesised cost reads exactly -1234 and retains its printed text \"(1,234)\" on the typed value, so the convention that produced the sign stays auditable."
+        },
+        {
+          "expectation_id": "a_reading_without_its_printed_text_is_refused",
+          "kind": "value_state",
+          "statement": "Constructing a reported_number WITHOUT raw_text is REFUSED — the typed contract makes a number divorced from its printed form unrepresentable, which is what makes the parentheses convention checkable at all."
+        },
+        {
+          "expectation_id": "the_same_digits_without_parentheses_read_positive",
+          "kind": "value_state",
+          "statement": "CONTROL: the same digits printed without parentheses read +1234 — the sign comes from the presentation, and both readings are distinguishable."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "sign_convention_flip_on_a_cost_row",
+      "case_path": "test-fixtures/archetypes/presentation/sign-convention-flip-on-a-cost-row.json",
+      "accounting_shape": "A cost row whose sign convention FLIPS: expenses printed as positive magnitudes under a \"Costs\" caption, deducted by the statement's layout rather than by their sign.",
+      "why_it_breaks_models": "A naive implementation adds the printed magnitudes, so a 100 revenue less 40 costs subtotal of 60 is computed as 140 — and because the members and the total are both real filing figures, the error looks like an extraction fault rather than a convention fault.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "costs_printed_positive_break_the_printed_subtotal",
+          "kind": "identity_or_footing",
+          "statement": "Summing the printed magnitudes (100 and 40) against the printed subtotal of 60 FAILS the footing oracle — the convention error is caught, not absorbed."
+        },
+        {
+          "expectation_id": "the_declared_negation_restores_the_printed_subtotal",
+          "kind": "identity_or_footing",
+          "statement": "With the cost row's declared negation applied (-40) the same printed subtotal foots exactly."
+        },
+        {
+          "expectation_id": "the_sign_convention_is_an_explicit_recorded_operation",
+          "kind": "value_state",
+          "statement": "The negation is an explicit arithmetic operation of record: negating the printed 40 yields a derived_number of -40 with an operand receipt, never an implicit reinterpretation."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "zero_printed_as_a_dash",
+      "case_path": "test-fixtures/archetypes/presentation/zero-printed-as-a-dash.json",
+      "accounting_shape": "A GENUINE reported zero printed as an em dash: the filing prints \"—\" in a column where the amount really is nil.",
+      "why_it_breaks_models": "A naive implementation reads the dash as absent, so a reported nil silently becomes a gap; the mirror mistake reads every dash as zero, so a not-disclosed cell silently becomes a nil. Both destroy the distinction the filing actually drew.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "a_dash_that_means_zero_reads_exactly_zero_and_keeps_the_dash",
+          "kind": "value_state",
+          "statement": "A dash classified as a genuine reported zero is the state reported_zero: it reads exactly 0, is value-bearing, and retains the printed dash as its raw text."
+        },
+        {
+          "expectation_id": "a_reported_zero_state_cannot_carry_a_non_zero_value",
+          "kind": "value_state",
+          "statement": "Constructing reported_zero with a non-zero value is REFUSED — the state's value is a const 0, so a mislabelled zero cannot exist."
+        },
+        {
+          "expectation_id": "a_genuine_reported_zero_total_blocks_a_contradictory_member_sum",
+          "kind": "identity_or_footing",
+          "statement": "When the dash is classified as zero, a nil total under members summing to 30 BLOCKS as an unfooted material total — the classification makes the contradiction visible."
+        },
+        {
+          "expectation_id": "the_same_dash_encoded_as_absent_silently_disables_the_footing_check",
+          "kind": "identity_or_footing",
+          "statement": "DEFECT: encoding the same dash as ABSENT (what a naive dash reader emits) makes the footing pass skip the period entirely — proof status PASS with zero findings against members summing to 30. The never-zero invariant protects absence from becoming zero, but nothing forces a printed dash to be CLASSIFIED, so a genuine reported nil silently escapes footing."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "blank_versus_genuine_zero_in_the_same_row",
+      "case_path": "test-fixtures/archetypes/presentation/blank-versus-genuine-zero-in-the-same-row.json",
+      "accounting_shape": "ONE row containing both a genuine reported zero and a blank cell: the middle comparative was not disclosed, the outer two were reported (one of them as nil).",
+      "why_it_breaks_models": "A naive implementation coerces the blank to 0, so an undisclosed period becomes a confident nil; the row then foots, the total looks verified, and the fabricated zero propagates into every movement, growth rate and covenant test built on that period. This is the programme's central never-zero invariant.",
+      "proves_envelope_values": [],
+      "envelope_extension_candidate": true,
+      "shape_expectations": [
+        {
+          "expectation_id": "a_blank_cell_reads_null_and_is_never_zero",
+          "kind": "value_state",
+          "statement": "A blank cell is the state reported_blank: its only lawful numeric reading is null, it is NOT value-bearing, and the reading is not zero under strict identity."
+        },
+        {
+          "expectation_id": "a_blank_state_cannot_be_constructed_with_a_value_at_all",
+          "kind": "value_state",
+          "statement": "The reported_blank variant declares NO value field, so constructing a blank carrying 0 is REFUSED — the coercion is unrepresentable, not merely discouraged."
+        },
+        {
+          "expectation_id": "a_genuine_zero_in_the_same_row_reads_exactly_zero",
+          "kind": "value_state",
+          "statement": "The genuine zero in the same row is reported_zero: it reads exactly 0 and IS value-bearing. The two cells are distinguishable states, not two spellings of one number."
+        },
+        {
+          "expectation_id": "a_sum_containing_a_blank_is_unresolved_never_a_blank_treated_as_zero",
+          "kind": "value_state",
+          "statement": "A sum containing the blank is UNRESOLVED with a null value, and the receipt names the reported_blank operand as the reason — the blank is never added as zero."
+        },
+        {
+          "expectation_id": "partial_aggregation_over_a_blank_is_permitted_only_when_declared_and_recorded",
+          "kind": "value_state",
+          "statement": "Partial aggregation over the blank resolves ONLY when the policy explicitly permits it, and the receipt then records exactly how many operands were omitted."
+        },
+        {
+          "expectation_id": "a_sum_containing_a_genuine_zero_resolves_without_a_partial_record",
+          "kind": "value_state",
+          "statement": "CONTROL: the same sum with the genuine zero resolves to a derived_number with NO partial record — proving the unresolved verdict above is caused by absence, not by the value 0."
+        },
+        {
+          "expectation_id": "a_blank_member_makes_the_period_unverifiable_never_a_zero_footed_total",
+          "kind": "identity_or_footing",
+          "statement": "A blank member value makes that period UNVERIFIABLE (STATEMENT_FAMILY_UNFOOTABLE_PERIOD, reason missing_member_value) and raises NO unfooted-total refusal — the footing pass refuses to judge rather than summing the blank as zero."
+        },
+        {
+          "expectation_id": "a_genuine_zero_member_foots_the_family_total",
+          "kind": "identity_or_footing",
+          "statement": "CONTROL: a genuine zero member foots the family total with zero findings — the unverifiable verdict above is about absence, not about the number 0."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "prior_year_column_first_layout",
+      "case_path": "test-fixtures/archetypes/presentation/prior-year-column-first-layout.json",
+      "accounting_shape": "A multi-column face laid out NEWEST-FIRST: the current year occupies the left-most numeric column and the comparative sits to its right.",
+      "why_it_breaks_models": "A naive implementation assumes left-to-right is oldest-to-newest, so the whole history is reversed: growth rates invert, the \"latest\" period is the oldest, and the forecast is anchored on the wrong year.",
+      "proves_envelope_values": [
+        {
+          "dimension": "fiscal_calendar",
+          "value": "fixed_date"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "a_newest_first_comparative_column_order_is_refused",
+          "kind": "period_arithmetic",
+          "statement": "A newest-first period series is REFUSED by the case contract with \"Period dates must be strictly increasing.\" — column order cannot silently redefine the period sequence."
+        },
+        {
+          "expectation_id": "the_fiscal_period_validator_alone_does_not_catch_the_reversal",
+          "kind": "period_arithmetic",
+          "statement": "FINDING: the fiscal-period validator run on the SAME reversed case reports zero errors — it checks each period's month and day, not their order. The ordering guarantee lives only in the case-shape validator, so a caller that runs fiscal-period validation alone passes a reversed layout."
+        },
+        {
+          "expectation_id": "an_oldest_first_column_order_is_accepted",
+          "kind": "compiles_clean",
+          "statement": "CONTROL: the same periods in oldest-first order raise no period error."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    },
+    {
+      "archetype_id": "scanned_image_only_face_statement",
+      "case_path": "test-fixtures/archetypes/presentation/scanned-image-only-face-statement.json",
+      "accounting_shape": "An English filing whose face statements exist only as SCANNED IMAGES: there is no text layer, so every figure has to come through optical character recognition.",
+      "why_it_breaks_models": "A naive implementation treats OCR output as equal in authority to a text layer, so a mis-read digit or a lost minus sign enters the model with the same provenance as a machine-readable filing and no disclosure that the reading was inferred from pixels.",
+      "proves_envelope_values": [
+        {
+          "dimension": "filing_language_format",
+          "value": "english_scanned_ocr"
+        }
+      ],
+      "shape_expectations": [
+        {
+          "expectation_id": "scanned_ocr_filing_is_experimental_not_stopped",
+          "kind": "authority_selection",
+          "statement": "An English scanned/OCR filing classifies EXPERIMENTAL, is NOT early-stopped, and its legal terminal set excludes DELIVERED_VERIFIED — the reduced reading authority is disclosed by the class, not hidden."
+        },
+        {
+          "expectation_id": "an_unadapted_non_english_scan_is_stopped_instead",
+          "kind": "unsupported_profile_early_stop",
+          "expected_terminal_reason": "PROFILE.unadapted_language",
+          "statement": "CONTRAST: the same scan in a non-English filing with no declared language adapter is STOPPED with the registered unadapted_language reason — the two neighbouring shapes take different, declared paths."
+        }
+      ],
+      "extraction_evidence_still_required": true
+    }
+  ]
+}

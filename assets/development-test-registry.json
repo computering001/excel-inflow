@@ -1598,6 +1598,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "archetype-presentation",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_archetype_presentation_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "period-scoring",
       "phase": "forecast",
       "runtime": "node",
