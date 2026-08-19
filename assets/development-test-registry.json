@@ -1634,6 +1634,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "economic-authority-seal",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_economic_authority_seal_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "package-ab",
       "phase": "proof",
       "runtime": "node",

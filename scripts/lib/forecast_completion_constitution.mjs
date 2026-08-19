@@ -1,5 +1,4 @@
 import { hashValue } from "./run_store.mjs";
-import { isTaxRatePolicyOperator } from "./tax_rate_policy.mjs";
 import { methodAt, ownershipClass, sourceOwnedMateriality } from "./capture_transition.mjs";
 import { economicRegionDefinitions } from "./ownership_census.mjs";
 import {
@@ -7,6 +6,13 @@ import {
   scheduleProducerForRole,
   scheduleRegionProducerWitness,
 } from "./forecast_producer_contract.mjs";
+import {
+  BOUND_ECONOMIC_ARTIFACTS,
+  sealEconomicAuthority,
+  verifyEconomicAuthoritySeal,
+  verifyEconomicAuthoritySealIntegrity,
+} from "./economic_authority_seal.mjs";
+import { isTaxRatePolicyOperator } from "./tax_rate_policy.mjs";
 
 /**
  * The Forecast Completion Constitution (Phase 2) and the economic
@@ -42,6 +48,15 @@ import {
  *     read again. `verifyEconomicStageParityAfterBuild` re-verifies it
  *     against the case Build actually consumed.
  *
+ * P3.8 closes the fifth: AUTHORITY. Those four hashes were all inputs, or
+ * censuses of inputs. Nothing in the receipt named the compiled economic state,
+ * so the Economic IR, the semantic manifest, the instrument period state, the
+ * equation graph and the solution could every one of them be rewritten with the
+ * receipt still reading PASS — and the transformation receipt, which records the
+ * Economic IR's seal, was written and never read again. The receipt now carries
+ * an `economic_authority` seal over all five artifacts plus that receipt, and
+ * the post-Build verifier RE-DERIVES all of them (see economic_authority_seal.mjs).
+ *
  * The parity seal binds the census, the authority ledger, the ownership
  * receipts and the case identity into one receipt minted BEFORE Build.
  * Build consumes the sealed graph; it may not select evidence, invent a
@@ -54,7 +69,12 @@ import {
  */
 
 export const FORECAST_COMPLETION_SCHEMA = "forecast-completion-census/1.1";
-export const ECONOMIC_STAGE_PARITY_SCHEMA = "economic-stage-parity/1.1";
+// 1.1 -> 1.2: the receipt now carries the P3.8 economic authority seal over the
+// five compiled economic artifacts. A 1.1 receipt binds four input hashes and
+// nothing about the economic state, so it is not comparable with a 1.2 one and
+// `verifyEconomicStageParity` refuses it by schema version rather than reading
+// its silence as agreement.
+export const ECONOMIC_STAGE_PARITY_SCHEMA = "economic-stage-parity/1.2";
 
 export const LAWFUL_DISPOSITIONS = Object.freeze([
   "schedule_owned",
@@ -496,6 +516,14 @@ export function verifyForecastCompletionCoverage(modelCase, census) {
  * PASS or a waterfall transition is still pending — those states mean the
  * deterministic pre-Build steps have not finished, which is a controller
  * sequencing defect, not a workbook problem.
+ *
+ * P3.8: the receipt also carries the ECONOMIC AUTHORITY SEAL. Its four original
+ * hashes named the case and three censuses OF the case — all inputs. The
+ * authority seal names the compiled economic state itself: the Economic IR, the
+ * semantic manifest, the instrument period state, the equation graph and the
+ * solution, plus the transformation receipt the projection mints. Any one of
+ * them changing invalidates the seal, which is what makes the post-Build
+ * re-verification below a proof rather than a re-read.
  */
 export function sealEconomicStageParity(modelCase) {
   const census = compileForecastCompletionCensus(modelCase);
@@ -515,10 +543,19 @@ export function sealEconomicStageParity(modelCase) {
     };
     throw error;
   }
+  // The whole economic state, derived from this case and sealed under one
+  // hash. `sealEconomicAuthority` never throws: an artifact that cannot compile
+  // is recorded as uncompilable with its failure signature, so the economic
+  // authority lane cannot invent a new way to fail a delivery — it can only
+  // notice, at the post-Build boundary, that the state stopped reproducing.
+  const authority = sealEconomicAuthority(modelCase);
   const body = {
     schema_version: ECONOMIC_STAGE_PARITY_SCHEMA,
     case_id: modelCase?.case_id ?? null,
     model_case_sha256: hashValue(modelCase),
+    economic_authority_sha256: authority.authority_sha256,
+    economic_authority_bound_artifacts: [...BOUND_ECONOMIC_ARTIFACTS],
+    economic_authority: authority,
     completion_census_sha256: census.census_sha256,
     completion_cell_count: census.cell_count,
     completion_period_count: census.period_scope.count,
@@ -531,13 +568,28 @@ export function sealEconomicStageParity(modelCase) {
   return { ...body, receipt_sha256: hashValue(body) };
 }
 
-/** Verify a previously minted parity receipt against the case about to Build. */
+/**
+ * Verify a previously minted parity receipt against the case about to Build.
+ *
+ * This is the CHEAP check: identity and self-consistency, no recompilation. It
+ * also proves the receipt carries a complete, self-consistent economic
+ * authority seal — a receipt that binds no economic state, or names four
+ * artifacts where five are owed, is refused here rather than passed on for
+ * someone downstream to trust. Whether the sealed state still REPRODUCES is a
+ * different question, and `verifyEconomicStageParityAfterBuild` answers it.
+ */
 export function verifyEconomicStageParity(modelCase, receipt) {
   const errors = [];
   if (receipt?.schema_version !== ECONOMIC_STAGE_PARITY_SCHEMA) errors.push("schema_version");
   const { receipt_sha256: declared, ...bodyOnly } = receipt ?? {};
   if (declared !== hashValue(bodyOnly)) errors.push("receipt_sha256");
   if (receipt?.model_case_sha256 !== hashValue(modelCase)) errors.push("model_case_sha256");
+  if (receipt?.economic_authority_sha256 !== (receipt?.economic_authority?.authority_sha256 ?? null)) {
+    errors.push("economic_authority_sha256");
+  }
+  for (const finding of verifyEconomicAuthoritySealIntegrity(receipt?.economic_authority ?? null)) {
+    errors.push(`authority:${finding}`);
+  }
   return errors;
 }
 
@@ -579,12 +631,26 @@ export function verifyEconomicStageParityAfterBuild(modelCase, receipt) {
   if (ledger !== (receipt?.forecast_ledger_sha256 ?? null)) errors.push("rebind:forecast_ledger_sha256");
   const ownership = modelCase?.forecast_ownership_preflights?.selected?.receipt_sha256 ?? null;
   if (ownership !== (receipt?.ownership_receipt_sha256 ?? null)) errors.push("rebind:ownership_receipt_sha256");
+  // P3.8: RE-DERIVE the whole economic state and compare it, artifact by
+  // artifact, with what the seal recorded — including a re-derivation of the
+  // transformation receipt, so a post-hoc rewrite of the emitted receipt (or of
+  // any artifact it describes) is named rather than inherited.
+  const authority = verifyEconomicAuthoritySeal(modelCase, receipt?.economic_authority ?? null);
+  for (const finding of authority.findings) errors.push(`authority:${finding}`);
   return {
     schema_version: ECONOMIC_STAGE_PARITY_SCHEMA,
     verified_at_stage: "post_build",
     case_id: modelCase?.case_id ?? null,
     receipt_sha256: receipt?.receipt_sha256 ?? null,
     completion_census_sha256: census.census_sha256,
+    // The hash of the seal AS PRESENTED, not the hash it declares about itself:
+    // a seal edited after minting keeps its old declaration, and a verdict that
+    // showed that stale claim agreeing with the re-derived hash would read as
+    // agreement over a list of errors. Both are reported, so they can disagree.
+    economic_authority_sha256: authority.authority_sha256,
+    declared_economic_authority_sha256: authority.declared_authority_sha256,
+    rederived_economic_authority_sha256: authority.rederived_authority_sha256,
+    economic_authority_status: authority.status,
     errors,
     status: errors.length === 0 ? "PASS" : "PARITY_BROKEN",
   };

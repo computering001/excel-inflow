@@ -135,7 +135,6 @@
     "policy-registry-v1.json",
     "policy-registry-v1.schema.json",
     "protected-identity-roles-v1.json",
-    "runtime-doctor-report-v1.schema.json",
     "economic-ir-v1.schema.json",
     "required-role-closure-v1.schema.json",
     "opening-debt-bridge-v1.schema.json",
@@ -243,7 +242,6 @@
     "product-delivery-constitution-v2.json": "Canonical v3.6 product/delivery owner retained as an inspectable policy artifact while compatibility runtime views remain generated for the current controller."
   },
   "script_entry_points": [
-    "run_runtime_doctor.mjs",
     "build_dynamic_model.mjs",
     "compile_evidence_run.mjs",
     "compile_declared_evidence_run.mjs",
@@ -314,6 +312,7 @@
     "lib/design_contract.mjs",
     "lib/economic_solve_policy.mjs",
     "lib/economic_ir.mjs",
+    "lib/economic_authority_seal.mjs",
     "lib/formula_ast.mjs",
     "lib/opening_instrument_provenance.mjs",
     "lib/required_role_closure.mjs",
@@ -369,8 +368,6 @@
     "lib/process_tree.mjs",
     "lib/progress_heartbeat.mjs",
     "lib/runtime_budget_policy.mjs",
-    "lib/runtime_doctor.mjs",
-    "run_runtime_doctor.mjs",
     "lib/public_test_run.mjs",
     "lib/raw_canary_fixture.mjs",
     "lib/rcf_policy.mjs",
