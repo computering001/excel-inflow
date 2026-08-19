@@ -58,9 +58,10 @@
       "commit": "f617ce7",
       "invariant": "typed contracts proven against the corpus; legacy readable via explicit adapters"
     },
-    "P2.8-wire": {
-      "commit": "(this commit)",
-      "invariant": "unsupported cases stop typed at the controller preflight before any model stage"
+    "P2.8": {
+      "commit": "687424d",
+      "invariant": "unsupported cases stop typed at the controller preflight before any model stage",
+      "note": "wire slice only; remaining P2.8 shapes (direct-method, discontinued detection, restatement detection, 53-week normalisation) stay on the work order"
     }
   },
   "evidence_baseline": {
