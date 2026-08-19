@@ -164,6 +164,29 @@ function validateNode(value, schema, rootSchema, path, errors) {
   for (const branch of schema.allOf ?? []) {
     validateNode(value, branch, rootSchema, path, errors);
   }
+  // P1.4: oneOf/anyOf were silently unenforced here while 10+ shipped
+  // schemas declare them — an invalid object could pass its producer and
+  // surface much later in Build. Enforcement matches JSON Schema semantics:
+  // anyOf requires at least one matching branch; oneOf exactly one.
+  if (Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
+    const matched = schema.anyOf.some((branch) => {
+      const branchErrors = [];
+      validateNode(value, branch, rootSchema, path, branchErrors);
+      return branchErrors.length === 0;
+    });
+    if (!matched) errors.push(`${path} matches none of the anyOf branches.`);
+  }
+  if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
+    let matches = 0;
+    for (const branch of schema.oneOf) {
+      const branchErrors = [];
+      validateNode(value, branch, rootSchema, path, branchErrors);
+      if (branchErrors.length === 0) matches += 1;
+    }
+    if (matches !== 1) {
+      errors.push(`${path} must match exactly one oneOf branch; matched ${matches}.`);
+    }
+  }
   if (schema.if) {
     const conditionErrors = [];
     validateNode(value, schema.if, rootSchema, path, conditionErrors);

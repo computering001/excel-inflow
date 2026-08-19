@@ -1873,6 +1873,7 @@
             "minLength": 1
           }
         },
+        "temporal_edge": { "type": "boolean" },
         "forecast_index": {
           "type": "integer",
           "minimum": 0,
