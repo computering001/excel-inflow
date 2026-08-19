@@ -20,7 +20,7 @@ import {
 } from "./lib/run_constitution_graph.mjs";
 import { executeOptionalBrokerCircuitBreaker } from "./lib/optional_broker_circuit_breaker.mjs";
 import { createExperienceTrace, writeExperienceTrace } from "./lib/experience_trace.mjs";
-import { compilePerformanceReceipt } from "./lib/performance_receipt.mjs";
+import { compilePerformanceReceipt, validatePerformanceReceipt } from "./lib/performance_receipt.mjs";
 import { cancelProcessTreePids, resolvePythonExecutable, runProcessTree } from "./lib/process_tree.mjs";
 import {
   boundedStageTimeout,
@@ -900,10 +900,62 @@ async function main() {
     buildResultSha256: await sha256File(buildResultPath),
     attachmentPerformance: attachmentState?.summary?.performance ?? {},
     checkpointTimings: buildResult?.checkpointing?.timings_ms ?? {},
+    // P6.6: a REUSED stage-4 checkpoint records timings_ms[id] = 0. Without the
+    // reuse sets a warm run emitted MISSING spans by construction, so the
+    // receipt lied about a lawful resume. Reuse is declared, never inferred.
+    reusedCheckpoints: buildResult?.checkpointing?.reused ?? [],
+    executedCheckpoints: buildResult?.checkpointing?.executed ?? [],
     totalDurationMs: Date.now() - ACTIVE_PERFORMANCE.started_epoch_ms,
   });
   await writeJson(performanceReceiptPath, performanceReceipt);
   artifacts.performance_receipt = performanceReceiptPath;
+  // P6.6: the receipt is VALIDATED here, in the delivered path, instead of
+  // being shipped INCOMPLETE with no caller. A receipt defect is a typed,
+  // visible FINDING with its own artifact and a line in the run summary --
+  // never a reason to discard a workbook that stage 4 already built,
+  // recalculated and independently validated. Deleting proven work because its
+  // stopwatch is unlabelled would trade a real deliverable for a bookkeeping
+  // defect; the runtime-budget and progress receipts above still fail closed
+  // because those measure whether the run stayed inside its declared
+  // envelope, which is a correctness claim about the run itself.
+  const performanceReceiptErrors = validatePerformanceReceipt(performanceReceipt);
+  const performanceReceiptValidationPath = path.join(out, "performance-receipt-validation.json");
+  await writeJson(performanceReceiptValidationPath, {
+    schema_version: "excel-inflow-performance-receipt-validation/1.0",
+    run_id: runId,
+    validator: "validatePerformanceReceipt",
+    validation_status: performanceReceiptErrors.length === 0 ? "PASS" : "FINDING",
+    finding_class: performanceReceiptErrors.length === 0 ? null : "PERFORMANCE_RECEIPT_NOT_HONEST",
+    errors: performanceReceiptErrors,
+    receipt: performanceReceiptPath,
+    receipt_sha256: performanceReceipt.receipt_sha256,
+    receipt_status: performanceReceipt.status,
+    reconciliation: performanceReceipt.reconciliation,
+    threshold_source: {
+      policy_ref: performanceReceipt.input_bindings.performance_policy_ref,
+      policy_sha256: performanceReceipt.input_bindings.performance_policy_sha256,
+    },
+    delivery_impact:
+      "none: a delivered workbook is never discarded for a receipt defect; the finding is recorded and surfaced in the run summary.",
+  });
+  artifacts.performance_receipt_validation = performanceReceiptValidationPath;
+  // ACTIVE_PERFORMANCE is merged into the delivered summary by finish(), so the
+  // finding travels with the run state without touching any finish() site.
+  ACTIVE_PERFORMANCE.receipt = {
+    path: performanceReceiptPath,
+    sha256: performanceReceipt.receipt_sha256,
+    status: performanceReceipt.status,
+    validation_status: performanceReceiptErrors.length === 0 ? "PASS" : "FINDING",
+    finding_class: performanceReceiptErrors.length === 0 ? null : "PERFORMANCE_RECEIPT_NOT_HONEST",
+    errors: performanceReceiptErrors,
+    unattributed_ms: performanceReceipt.reconciliation.unattributed_ms,
+    attribution_band: performanceReceipt.reconciliation.band,
+    attribution_ratio: performanceReceipt.reconciliation.attribution_ratio,
+    reused_span_names: performanceReceipt.summary.reused_span_names,
+    missing_span_names: performanceReceipt.summary.missing_span_names,
+    threshold_source: performanceReceipt.input_bindings.performance_policy_ref,
+    validation_artifact: performanceReceiptValidationPath,
+  };
   artifacts.build_result = buildResultPath;
   return finish({
     out,
