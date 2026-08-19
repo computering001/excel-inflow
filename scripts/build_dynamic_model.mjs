@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-import { applyFundedAcquisitionPlan, applyFundedAcquisitionWorkbook } from "./lib/funded_acquisition_plan.mjs";
+import {
+  applyFundedAcquisitionPlanOperations,
+  applyFundedAcquisitionWorkbook,
+  verifyFundedAcquisitionPlanPurity,
+} from "./lib/funded_acquisition_plan.mjs";
 
 import fs from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
@@ -12459,6 +12463,10 @@ async function main(packaging = null) {
             .join("\n- "),
       );
     }
+    // The shipped plan's funded-acquisition content must be exactly the
+    // recorded plan operations — the purity contract that outlaws every
+    // post-serialisation injection route.
+    verifyFundedAcquisitionPlanPurity(synthesis.plan, rowPlan, modelCase);
     const planCounts = gatePlan(
       synthesis.plan,
       rowPlan,
@@ -12583,7 +12591,13 @@ async function main(packaging = null) {
   // workbook that does not exist.
   const planPath = `${outputPath}.plan.json`;
   const plan = await extractPlan(outputPath, { caseId: modelCase.case_id });
-applyFundedAcquisitionPlan(plan, modelCase);
+  // The funded transaction enters the captured plan through the SAME recorded
+  // plan operations the portable route applies — address-keyed, derived from
+  // (rowPlan, modelCase) alone — and the purity contract then proves the plan
+  // holds exactly those operations. The retired alternative, matching labels
+  // over the serialised plan, was a second writer nothing could audit.
+  applyFundedAcquisitionPlanOperations(plan, rowPlan, modelCase);
+  verifyFundedAcquisitionPlanPurity(plan, rowPlan, modelCase);
   // Deterministic on purpose: a wall clock here would make two builds of the
   // same case differ, and the renderer stamps docProps from this very field.
   plan.generator = {
@@ -12645,6 +12659,10 @@ applyFundedAcquisitionPlan(plan, modelCase);
           .join("\n- "),
     );
   }
+  // The synthesised plan is held to the SAME purity contract as the captured
+  // one: its funded-acquisition content must be exactly the recorded plan
+  // operations, with nothing injected after serialisation.
+  verifyFundedAcquisitionPlanPurity(synthesis.plan, rowPlan, modelCase);
   // The synthesised plan is held to the SAME gate as the captured one, so the
   // evidence for the plan that can ship is not merely that it agrees with a
   // plan that was checked.
