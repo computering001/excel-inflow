@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import {
   CONVERGENCE_CONTRACT,
@@ -116,6 +117,23 @@ function depthFor(node, byId) {
 function finding(code, message, extra = {}) {
   return { code, message, ...extra };
 }
+
+/**
+ * The protected-identity role set is a declared asset, not a literal buried in
+ * the contract compiler: every rendered statement row carrying one of these
+ * semantic roles must have its formula identity bound and proven in the
+ * emitted workbook. Membership is pinned by
+ * scripts/run_statement_family_residual_tests.mjs — roles may be added, never
+ * removed, so the check can only strengthen.
+ */
+export const PROTECTED_IDENTITY_ROLES = Object.freeze(
+  JSON.parse(
+    readFileSync(
+      new URL("../../assets/protected-identity-roles-v1.json", import.meta.url),
+      "utf8",
+    ),
+  ).protected_identity_roles,
+);
 
 /**
  * Compile the proof-carrying, workbook-independent model representation.
@@ -452,6 +470,160 @@ export function compileModelIrV3({
       );
     }
   }
+  // ---- Statement-family footing (P2.5) -----------------------------------
+  // A statement-family total that carries an independently filed series —
+  // source_input on the face, or the retained reported series behind a
+  // reconciled total — must foot against its members. This is a validator:
+  // it refuses (material) or records (immaterial / unverifiable), it never
+  // repairs a number, and a missing member value is never coerced to zero.
+  const planStatementRows = ["income_statement", "cash_flow"].flatMap(
+    (section) => rowPlan?.statement_rows?.[section] ?? [],
+  );
+  const planRowById = new Map(planStatementRows.map((row) => [row.row_id, row]));
+  const familyMemberIds = new Map();
+  for (const row of planStatementRows) {
+    if (!row.parent_row_id) continue;
+    const members = familyMemberIds.get(row.parent_row_id) ?? [];
+    members.push(row.row_id);
+    familyMemberIds.set(row.parent_row_id, members);
+  }
+  const materialDisplayIds = new Set(
+    authority
+      .filter((item) => item.material === true)
+      .map((item) => item.display_id),
+  );
+  const filedNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    if (typeof value === "boolean") return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  };
+  // Mirrors the case compiler's sourceTolerance: half a unit in the filed
+  // precision when the source declared one, exact-plus-float-epsilon when it
+  // did not (JSON floats do not preserve printed decimal places).
+  const footingTolerance = (row, period, target) => {
+    const precisions =
+      row.reported_historical_value_precisions ??
+      row.historical_value_precisions;
+    const precision = Array.isArray(precisions) ? precisions[period] : null;
+    const rounding =
+      Number.isInteger(precision) && precision >= 0 && precision <= 12
+        ? 0.5 * 10 ** -precision
+        : 0;
+    return rounding + 1e-9 * Math.max(1, Math.abs(target)) + 1e-12;
+  };
+  for (const row of planStatementRows) {
+    const declaredFamilyTotal =
+      ["reported_parent", "derived_from_children"].includes(
+        row.aggregation_authority,
+      ) ||
+      row.historical_authority === "reported_total_reconciled" ||
+      familyMemberIds.has(row.row_id);
+    if (!declaredFamilyTotal) continue;
+    const memberIds =
+      familyMemberIds.get(row.row_id) ??
+      (row.calculation?.operator === "sum"
+        ? (row.calculation.refs ?? []).filter((id) => id !== row.row_id)
+        : []);
+    if (memberIds.length === 0) {
+      warnings.push(
+        finding(
+          "STATEMENT_FAMILY_EMPTY_MEMBER_SET",
+          `${row.row_id} declares a statement family but names no members; nothing can foot it.`,
+          { display_ids: [row.row_id] },
+        ),
+      );
+      continue;
+    }
+    const filedTarget =
+      row.historical_authority === "reported_total_reconciled"
+        ? row.reported_historical_values
+        : row.historical_authority === "source_input" ||
+            ["input", "uncalculated"].includes(row.row_type)
+          ? row.values
+          : null;
+    // Formula-owned totals (derived_formula) assert no independent filed
+    // series — the minted sum IS the total, so there is nothing to foot.
+    if (!Array.isArray(filedTarget)) continue;
+    const material = materialDisplayIds.has(row.row_id);
+    for (let period = 0; period < 3; period += 1) {
+      const target = filedNumber(filedTarget[period]);
+      if (target === null) continue; // a filed dash asserts nothing.
+      const memberValues = memberIds.map((memberId) => {
+        const member = planRowById.get(memberId);
+        return filedNumber(
+          member?.values?.[period] ??
+            member?.reported_historical_values?.[period],
+        );
+      });
+      if (memberValues.some((value) => value === null)) {
+        if (material) {
+          warnings.push(
+            finding(
+              "STATEMENT_FAMILY_UNFOOTABLE_PERIOD",
+              `${row.row_id} asserts a material filed total in historical period ${period + 1}, but a member value is missing; the footing cannot be verified (missing values are never treated as zero).`,
+              { display_ids: [row.row_id, ...memberIds], period },
+            ),
+          );
+        }
+        continue;
+      }
+      const membersSum = memberValues.reduce((sum, value) => sum + value, 0);
+      if (Math.abs(membersSum - target) > footingTolerance(row, period, target)) {
+        const unfooted = finding(
+          "STATEMENT_FAMILY_UNFOOTED_TOTAL",
+          `${row.row_id} prints ${target} in historical period ${period + 1}, but its ${memberIds.length} members sum to ${Number(membersSum.toFixed(6))}; a ${material ? "material" : "immaterial"} family total must foot against its members.`,
+          {
+            display_ids: [row.row_id, ...memberIds],
+            period,
+            filed: target,
+            members_sum: membersSum,
+          },
+        );
+        (material ? blockers : warnings).push(unfooted);
+      }
+    }
+  }
+  // A rendered row carrying a protected identity role with an EMPTY member
+  // set would silently receive no workbook identity protection; record it.
+  const protectedRoles = new Set(PROTECTED_IDENTITY_ROLES);
+  const statementMemberEdges = new Map();
+  for (const edge of calculationEdges) {
+    let consumerNodeId;
+    let dependencyNodeId;
+    if (edge.edge_type === "depends_on") {
+      consumerNodeId = edge.from;
+      dependencyNodeId = edge.to;
+    } else if (edge.edge_type === "contributes_to") {
+      consumerNodeId = edge.to;
+      dependencyNodeId = edge.from;
+    } else {
+      continue;
+    }
+    if (
+      !consumerNodeId.startsWith("statement.") ||
+      !dependencyNodeId.startsWith("statement.") ||
+      consumerNodeId === dependencyNodeId
+    ) continue;
+    const consumer = consumerNodeId.slice("statement.".length);
+    statementMemberEdges.set(
+      consumer,
+      (statementMemberEdges.get(consumer) ?? 0) + 1,
+    );
+  }
+  for (const node of statementNodes) {
+    if (node.projection_status !== "rendered") continue;
+    if (!protectedRoles.has(node.semantic_role)) continue;
+    if ((statementMemberEdges.get(node.row_id) ?? 0) > 0) continue;
+    warnings.push(
+      finding(
+        "PROTECTED_IDENTITY_EMPTY_MEMBER_SET",
+        `${node.row_id} carries protected identity role ${node.semantic_role} but its member set is empty; the workbook identity check cannot bind it.`,
+        { display_ids: [node.row_id] },
+      ),
+    );
+  }
+
   const evidenceEpoch = {
     epoch_sha256: sha256(evidence),
     sealed: blockers.every((item) => !item.code.startsWith("EVIDENCE_")),
@@ -844,14 +1016,7 @@ export function workbookSemanticProofContract(
   const graphNodeById = new Map(
     graphNodes.map((node) => [node.display_id, node]),
   );
-  const protectedIdentityRoles = new Set([
-    "cash_from_operations",
-    "cash_from_investing",
-    "cash_before_financing",
-    "cash_from_financing",
-    "net_change_in_cash",
-    "ending_cash",
-  ]);
+  const protectedIdentityRoles = new Set(PROTECTED_IDENTITY_ROLES);
   const roleProtectedFormulaIdentities = graphNodes.flatMap((node) => {
     if (!protectedIdentityRoles.has(node.semantic_role)) return [];
     const memberRows = authorisedDependencyEdges

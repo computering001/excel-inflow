@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "protected_identity_roles",
+  "description": "Semantic roles whose workbook formula identity is protected: the workbook semantic proof contract binds each rendered row carrying one of these roles to its authorised member rows, and the independent OOXML oracle proves the physical formula. Membership is pinned by scripts/run_statement_family_residual_tests.mjs — roles may be added, never removed, so the check can only strengthen.",
+  "protected_identity_roles": [
+    "cash_from_operations",
+    "cash_from_investing",
+    "cash_before_financing",
+    "cash_from_financing",
+    "net_change_in_cash",
+    "ending_cash"
+  ]
+}
