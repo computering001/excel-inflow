@@ -38,7 +38,8 @@ import {
   compileStructuralOwnershipPreflight,
   resolveSelectedForecastOwnership,
 } from "./forecast_ownership_resolver.mjs";
-import { isRankedTotalIdentity } from "./row_plan.mjs";
+import { isRankedTotalIdentity, normaliseStatementRows } from "./row_plan.mjs";
+import { sealRequiredRoleClosure } from "./required_role_closure.mjs";
 import {
   applyTier1AnchorOwnership,
   brokerMetricDefinitionSignature,
@@ -3836,6 +3837,82 @@ export function compileCase(caseSource, evidence = {}) {
     );
   }
 
+  // Phase F.9 — the required-role CLOSURE, sealed BEFORE the forecast lane
+  // opens.  Coverage's requiredRoleChecks still runs in Phase H, but it ran
+  // AFTER compileForecastPlan: a case missing a required role used to mint 36
+  // rows of forecast authorities, seal the authority ledger and the ownership
+  // census, and only then collect one late coverage block.  The closure
+  // enumerates every role the declared taxonomy carries, promotes what
+  // assets/production-contract-v2.json requires, records present / aliased /
+  // compiler-supplied / waived / absent with row-level provenance, and
+  // enforces uniqueness over the FULL required set (25 roles) instead of the
+  // 14-entry UNIQUE_VISIBLE_ROLES literal in statement_topology.mjs — which
+  // honoured neither role_aliases nor the canonical alias table.
+  //
+  // The refusal is typed and RECORDED here, before Phase G; the compiler still
+  // completes the landscape afterwards because a case-compile report is owed
+  // whole rather than serially (the same contract compileStructuralOwnership-
+  // Preflight above obeys).  A refused closure can never be delivered: its
+  // codes are BLOCK findings.
+  let requiredRoleClosure = null;
+  {
+    const projectedRows = {};
+    const projectionErrors = [];
+    for (const section of FACE_STATEMENT_SECTIONS) {
+      try {
+        projectedRows[section] = normaliseStatementRows(modelCase, section);
+      } catch (error) {
+        // An unavailable projection is NAMED, never silently treated as "this
+        // section supplies no compiler roles".
+        projectedRows[section] = null;
+        projectionErrors.push(`${section}: ${error.message}`);
+      }
+    }
+    try {
+      requiredRoleClosure = sealRequiredRoleClosure(modelCase, {
+        case_id: modelCase.case_id ?? null,
+        projected_rows: projectedRows,
+        projection_error: projectionErrors.length > 0 ? projectionErrors.join("; ") : null,
+      });
+    } catch (error) {
+      report.add(
+        "required_role_closure.crash",
+        "BLOCK",
+        `sealRequiredRoleClosure failed: ${error.message}`,
+        "Report this as a compiler defect; the closure compiler must not throw.",
+      );
+    }
+    for (const refusal of requiredRoleClosure?.refusals ?? []) {
+      report.add(
+        `required_role_closure.${refusal.code.toLowerCase()}`,
+        "BLOCK",
+        refusal.message,
+        refusal.code === "REQUIRED_ROLE_DUPLICATE_AUTHORITY"
+          ? "Give the required role exactly one owning row; remove the competing semantic_role or role_alias claim."
+          : "Map the filed line that carries this role, or declare the documented policy that waives it. A missing role is never a zero.",
+        {
+          code: refusal.code,
+          role: refusal.role,
+          section: refusal.section,
+          group: refusal.group,
+          row_ids: refusal.row_ids,
+        },
+      );
+    }
+    // vocabulary_notes are a PROGRAMME defect (a role the production contract
+    // requires that the semantic taxonomy does not declare), identical on every
+    // case.  They stay on the sealed artifact — the audit surface — rather than
+    // becoming a per-case finding that says nothing about this case.
+    for (const violation of requiredRoleClosure?.violations ?? []) {
+      report.add(
+        "required_role_closure.integrity",
+        "BLOCK",
+        violation,
+        "Report this as a compiler defect; the closure artifact must satisfy assets/required-role-closure-v1.schema.json.",
+      );
+    }
+  }
+
   // Phase G — the forecast lane is MINTED, never authored.  One call creates
   // authorities and their rules together, which is what makes FR-9 (an
   // authority without its formula) structurally impossible.
@@ -4188,6 +4265,7 @@ export function compileCase(caseSource, evidence = {}) {
     },
     findings: report.findings,
     classification_resolution_ledger: classificationResolutionLedger,
+    required_role_closure: requiredRoleClosure,
   };
   return { model_case: finalCase, report: compileReport };
 }

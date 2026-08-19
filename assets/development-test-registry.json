@@ -1625,6 +1625,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "required-role-closure",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_required_role_closure_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "archetype-economics",
       "phase": "evidence",
       "runtime": "node",

@@ -13,6 +13,7 @@ import {
   isLegacyDebtClass,
 } from "./debt_class.mjs";
 import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
+import { sealRequiredRoleClosure } from "./required_role_closure.mjs";
 
 const PRODUCTION_CONTRACT = JSON.parse(
   fs.readFileSync(
@@ -376,6 +377,70 @@ function requiredRoleChecks(modelCase) {
         );
       }
     }
+  }
+  return checks;
+}
+
+/**
+ * P2.4 — the required-role CLOSURE, re-compiled as a validator.  requiredRole-
+ * Checks above proves PRESENCE of the contract's required roles; it never
+ * proved UNIQUENESS.  Uniqueness lived in statement_topology.mjs over a
+ * 14-entry literal that honoured neither `role_aliases` nor the canonical
+ * alias table, so eleven contract-required roles (capex, dividends,
+ * debt_issuance, debt_repayment, change_in_working_capital,
+ * cash_flow_net_income, depreciation_and_amortisation, fx_effect_on_cash,
+ * reported_ebitda, net_interest_expense, other_non_operating) could carry two
+ * competing authorities unnoticed.
+ *
+ * These checks are strictly ADDITIVE: every check above still runs and still
+ * BLOCKs exactly as before.  This validator only validates — the closure
+ * compiler is pure and repairs nothing.
+ */
+function requiredRoleClosureChecks(modelCase) {
+  const checks = [];
+  let closure;
+  try {
+    const projected = {};
+    for (const section of ["income_statement", "cash_flow"]) {
+      try {
+        projected[section] = normaliseStatementRows(modelCase, section);
+      } catch {
+        projected[section] = null;
+      }
+    }
+    closure = sealRequiredRoleClosure(modelCase, {
+      case_id: modelCase.case_id ?? null,
+      projected_rows: projected,
+    });
+  } catch (error) {
+    return [
+      result(
+        "required_role_closure.crash",
+        "BLOCK",
+        `The required-role closure could not be compiled: ${error.message}`,
+        null,
+      ),
+    ];
+  }
+  checks.push(
+    result(
+      "required_role_closure",
+      closure.status === "PASS" ? "PASS" : "BLOCK",
+      closure.status === "PASS"
+        ? `Every one of the ${closure.required_role_count} contract-required semantic roles has exactly one owner.`
+        : `The required-role closure refuses: ${closure.refusals.length} typed refusal(s) over ${closure.required_role_count} required roles.`,
+      closure,
+    ),
+  );
+  for (const duplicate of closure.duplicates) {
+    checks.push(
+      result(
+        `required_role_closure.duplicate.${duplicate.section}.${duplicate.role}`,
+        "BLOCK",
+        `${duplicate.section} gives required semantic role ${duplicate.role} more than one authority (${duplicate.row_ids.join(", ")}).`,
+        duplicate,
+      ),
+    );
   }
   return checks;
 }
@@ -2298,6 +2363,7 @@ export function assessCoverage(modelCase) {
   }
   checks.push(...statementCoverageChecks(modelCase));
   checks.push(...requiredRoleChecks(modelCase));
+  checks.push(...requiredRoleClosureChecks(modelCase));
   checks.push(...dependencyChecks(modelCase));
   checks.push(...statementAuthorityChecks(modelCase));
   checks.push(...statementHierarchyChecks(modelCase));
