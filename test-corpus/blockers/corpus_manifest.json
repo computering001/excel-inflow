@@ -55,7 +55,7 @@
           "sha256": "0403f05ec21e672ce83d610636a76b900e5a046f41f3c02393e6a2b40c20d731"
         }
       ],
-      "replay_command": "node scripts/run_raw_input_black_box_canary.mjs <regenerated-donor-evidence> <python> <soffice> --real-filings-request <custody>/real-filings/public-form-10k-2025-request.json --real-filings-expectations <custody>/real-filings/public-form-10k-2025-expectations.json",
+      "replay_command": "node scripts/run_raw_input_black_box_canary.mjs <donor: run_evidence_run_tests.mjs test-fixtures/cases --emit-clean> <python> <soffice> --real-filings-request <custody>/real-filings/public-form-10k-2025-request.json --real-filings-expectations <custody>/real-filings/public-form-10k-2025-expectations.json",
       "replay_assertion": "raw PDF bytes deliver a workbook: build PASS_PENDING_MANUAL, workbook-semantic-oracle PASS with zero findings, portable validator zero violations"
     },
     {

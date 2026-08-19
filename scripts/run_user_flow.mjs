@@ -1882,9 +1882,16 @@ async function main() {
       path.join(runDir, "stages", "build_checks", "economic-stage-parity.json"),
       stageParityReceipt,
     );
+    // An EXPLICIT operator budget is a hard promise: the no-block stage
+    // floor may lift derived budgets so checkpoints can close, but it must
+    // never silently extend a budget the caller stated (P6.1: a deadline
+    // cannot be extended). The kill/resume proof depends on this.
     const stage4AllowanceMs = await boundedOuterTimeoutMs(runDeadline, {
       stage: "workbook_build_outer",
       requestedMs: stage4OuterTimeout(answeredCase, options.timeout),
+      ...(options.timeout !== undefined && options.timeout !== null
+        ? { floorMs: Math.min(60_000, Number(options.timeout)) }
+        : {}),
     });
     const stage4StartedMs = Date.now();
     const executed = await runCommand(process.execPath, args, {

@@ -36,6 +36,7 @@ import { ebitdaBasis, selectedEbitdaRow } from "./lib/semantic_roles.mjs";
 import { solveCase } from "./lib/solver.mjs";
 import { classifyStatementLine } from "./lib/statement_classifier.mjs";
 import { hashValue } from "./lib/run_store.mjs";
+import { sealBrokerConsensusMembership } from "./lib/broker_consensus.mjs";
 
 const casesDirectory = path.resolve(
   process.argv[2] ?? "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases",
@@ -59,6 +60,66 @@ export function adaptLegacyCertifiedCase(modelCase) {
   // This in-memory projection has already performed the migration. A legacy
   // migration receipt is not part of the current canonical case projection.
   delete modelCase.debt_class_migrations;
+
+  // Frozen pre-contract packs carry provider_consensus values without the
+  // provider_consensus_source custody the later contract demands. The values
+  // were sealed WITH the case; the adapter declares their custody explicitly
+  // (Phase 1: legacy objects stay readable through explicit adapters) — it
+  // never re-sources or invents figures.
+  for (const [metricId, metric] of Object.entries(modelCase.broker_pack?.metrics ?? {})) {
+    if (
+      Array.isArray(metric?.provider_consensus) &&
+      metric.provider_consensus_source === undefined
+    ) {
+      metric.provider_consensus_source = {
+        source_note:
+          "Frozen v2-certification fixture (sealed 2026-07-24, pre-provider-lineage contract). " +
+          "Provider consensus values are part of the sealed case custody; " +
+          `lineage declared by the legacy adapter for ${metricId}, not re-sourced.`,
+        period_lineage: (modelCase.broker_pack.forecast_periods ?? []).map(
+          (period) => `Frozen fixture custody | ${period}`,
+        ),
+      };
+      if (!migrations.includes("provider_consensus_source")) {
+        migrations.push("provider_consensus_source");
+      }
+    }
+    // Legacy packs likewise predate sealed consensus membership. The sealed
+    // brokers ON the metric are the membership the case certified with; the
+    // adapter declares exactly that — every sealed house included for every
+    // period, no re-scoring, no exclusion invented.
+    if (
+      Object.keys(metric?.brokers ?? {}).length > 0 &&
+      metric.consensus_membership === undefined
+    ) {
+      const identity = modelCase.issuer ?? {};
+      metric.consensus_membership = sealBrokerConsensusMembership({
+        schema_version: "broker-consensus-membership/1.0",
+        metric_id: metricId,
+        contributors: Object.keys(metric.brokers).sort().map((houseName) => ({
+          house_name: houseName,
+          status: "included",
+          reasons: [],
+          definition_signature: {
+            metric_id: metricId,
+            accounting_basis: null,
+            operation_scope: "continuing",
+            adjustment_basis: "statutory",
+            currency: identity.reporting_currency ?? null,
+            units: identity.units ?? null,
+            fiscal_calendar: identity.fiscal_calendar ?? "fixed_date",
+            cash_flow_basis: null,
+            lease_basis: null,
+          },
+          period_status: ["included", "included", "included"],
+          period_reasons: [[], [], []],
+        })),
+      });
+      if (!migrations.includes("consensus_membership")) {
+        migrations.push("consensus_membership");
+      }
+    }
+  }
 
   for (const section of ["income_statement", "cash_flow"]) {
     const rows = new Map(

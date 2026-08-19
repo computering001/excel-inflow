@@ -39,14 +39,19 @@ function option(name, fallback = null) {
 const manifestPath = path.resolve(
   option("corpus", path.join(ROOT, "test-corpus", "blockers", "corpus_manifest.json")),
 );
-const custodyRoot = option("custody-root", "/Users/archiepreston/Documents/Codex/private-test-custody");
+// No absolute host path may ship in sources (portability contract): the
+// custody root comes from the flag or environment; absent both, custody
+// fixtures report typed CUSTODY_ABSENT.
+const custodyRoot = option("custody-root", process.env.EXCEL_INFLOW_CUSTODY_ROOT ?? null);
 
 async function sha256(filePath) {
   return createHash("sha256").update(await fs.readFile(filePath)).digest("hex");
 }
 
 function fixtureAbsolutePath(fixture) {
-  if (fixture.location === "custody") return path.join(custodyRoot, fixture.path);
+  if (fixture.location === "custody") {
+    return custodyRoot ? path.join(custodyRoot, fixture.path) : null;
+  }
   return path.join(ROOT, fixture.path);
 }
 
@@ -57,6 +62,7 @@ async function verifyFixtures(manifest, { label }) {
       const absolute = fixtureAbsolutePath(fixture);
       let state;
       try {
+        if (absolute === null) throw new Error("custody root undeclared");
         await fs.access(absolute);
         const digest = await sha256(absolute);
         state = digest === fixture.sha256
