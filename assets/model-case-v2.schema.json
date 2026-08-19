@@ -1264,6 +1264,24 @@
         "commitment_fee_value": {
           "type": "number",
           "minimum": 0
+        },
+        "policy_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "version"
+          ],
+          "properties": {
+            "policy_id": {
+              "const": "rcf_policy"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+$"
+            }
+          },
+          "description": "P2.7 versioned policy binding stamped from assets/policy-registry-v1.json at the compilePolicies attach seam. Optional for legacy sealed cases; newly compiled cases always carry it, and a registry version bump is receipt-visible through this field."
         }
       },
       "oneOf": [
@@ -1397,6 +1415,24 @@
             "$ref": "#/$defs/cashBucket"
           },
           "description": "Optional explicit cash-bucket authority. Exactly one bucket is balancing. When supplied, legacy opening_cash, historical_year_end_cash, eligible_cash_percentage and cash_yield are omitted rather than restated."
+        },
+        "policy_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "version"
+          ],
+          "properties": {
+            "policy_id": {
+              "const": "cash_policy"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+$"
+            }
+          },
+          "description": "P2.7 versioned policy binding stamped from assets/policy-registry-v1.json at the compilePolicies attach seam. Optional for legacy sealed cases; newly compiled cases always carry it, and a registry version bump is receipt-visible through this field."
         }
       }
     },
@@ -1487,6 +1523,24 @@
         },
         "include_in_leverage": {
           "type": "boolean"
+        },
+        "policy_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "version"
+          ],
+          "properties": {
+            "policy_id": {
+              "const": "lease_policy"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+$"
+            }
+          },
+          "description": "P2.7 versioned policy binding stamped from assets/policy-registry-v1.json at the compilePolicies attach seam. Optional for legacy sealed cases; newly compiled cases always carry it, and a registry version bump is receipt-visible through this field."
         }
       }
     },

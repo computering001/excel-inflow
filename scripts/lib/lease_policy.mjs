@@ -1,3 +1,8 @@
+/** P2.7: this module's family in assets/policy-registry-v1.json. The suite
+ * (run_policy_registry_tests.mjs) holds these equal to the registry entry. */
+export const LEASE_POLICY_ID = "lease_policy";
+export const LEASE_POLICY_VERSION = "1.0";
+
 function series3(value, label, fallback = null) {
   if (value === undefined && fallback !== null) return [...fallback];
   if (

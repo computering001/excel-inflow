@@ -896,6 +896,12 @@ const JUSTIFIED = [
   // Newly compiled cases state the balancing-facility mode explicitly. Legacy
   // certified fixtures already imply balancing_rcf through instrument_id.
   /^rcf_policy\.mode$/,
+  // P2.7: compiled policy objects carry the versioned registry binding
+  // {policy_id, version} stamped from assets/policy-registry-v1.json. The
+  // legacy certified cohort predates the registry, so the binding is
+  // additive there (certifiedAbsent only — a VALUE disagreement on a
+  // binding still counts as a real divergence).
+  /^(?:rcf_policy|cash_policy|lease_policy)\.policy_binding\b/,
 ];
 
 function isJustified(diff) {

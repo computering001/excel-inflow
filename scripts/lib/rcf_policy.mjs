@@ -1,3 +1,8 @@
+/** P2.7: this module's family in assets/policy-registry-v1.json. The suite
+ * (run_policy_registry_tests.mjs) holds these equal to the registry entry. */
+export const RCF_POLICY_ID = "rcf_policy";
+export const RCF_POLICY_VERSION = "1.0";
+
 export function balancingRcfMode(modelCase) {
   const policy = modelCase?.rcf_policy;
   if (policy?.mode === "none") return "none";

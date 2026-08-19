@@ -1,0 +1,261 @@
+{
+  "schema_version": "excel-inflow-policy-registry/1.0",
+  "work_package": "P2.7",
+  "invariant": "Every model-owned assumption family binds to a versioned registry entry {policy_id, version, owned_assumption, evidence_hierarchy}; case-level policy objects carry the binding and a version change is receipt-visible on the sealed case.",
+  "entries": {
+    "rcf_policy": {
+      "policy_id": "rcf_policy",
+      "version": "1.0",
+      "binding_status": "bound",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "cash_rcf",
+        "schedule_roles": ["rcf_draw", "rcf_repayment", "ending_rcf", "commitment_fee", "liquidity", "liquidity_shortfall"],
+        "description": "Which facility (if any) balances liquidity, its committed capacity, opening draw and commitment-fee convention."
+      },
+      "evidence_hierarchy": ["contractual_commitment", "user_assumption", "explicit_zero"],
+      "owner_module": "scripts/lib/rcf_policy.mjs",
+      "case_binding": "rcf_policy",
+      "system_owned": false,
+      "notes": "Stamped at the compilePolicies attach seam (scripts/lib/case_compiler.mjs). mode:none carries explicit zero capacity/draw/fee authority — never a silent default."
+    },
+    "cash_policy": {
+      "policy_id": "cash_policy",
+      "version": "1.0",
+      "binding_status": "bound",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "cash_rcf",
+        "schedule_roles": ["non_balancing_cash_bucket_movement", "interest_income", "cash_interest_received"],
+        "description": "Opening/historical cash authority, minimum-cash floor, eligible-cash percentage, cash yield and interest-income cash-flow classification (or explicit bucket authority)."
+      },
+      "evidence_hierarchy": ["actual_plus_remainder", "user_assumption", "carry_forward"],
+      "owner_module": "scripts/lib/case_compiler.mjs (compilePolicies) + scripts/lib/flow_questions.mjs answer-time writers",
+      "case_binding": "cash_policy",
+      "system_owned": false,
+      "notes": "Question-round answers (flow_questions.mjs) mutate cash_policy fields after compile; they add fields and never remove the stamped binding."
+    },
+    "lease_policy": {
+      "policy_id": "lease_policy",
+      "version": "1.0",
+      "binding_status": "bound",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "leases",
+        "schedule_roles": ["lease_principal", "lease_interest", "lease_liability"],
+        "description": "Lease modelling mode, historical/opening liability authority, roll-forward drivers, interest basis and gross/net-debt/leverage inclusion."
+      },
+      "evidence_hierarchy": ["actual_plus_remainder", "user_assumption", "roll_forward"],
+      "owner_module": "scripts/lib/lease_policy.mjs",
+      "case_binding": "lease_policy",
+      "system_owned": false,
+      "notes": "interest_basis defaulting to total_liability for IFRS issuers (lease_policy.mjs:13-23) is part of this family; declared-vs-defaulted receipt parity is proof C follow-on."
+    },
+    "tax_rate_policy": {
+      "policy_id": "tax_rate_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "tax_and_working_capital",
+        "schedule_roles": [],
+        "description": "Effective-tax-rate completion below guidance/broker/user authorities: median or latest usable normalized historical ETR, explicit loss-case treatment."
+      },
+      "evidence_hierarchy": ["company_guidance", "broker_consensus", "user_assumption", "historical_average"],
+      "owner_module": "scripts/lib/tax_rate_policy.mjs",
+      "case_binding": null,
+      "system_owned": false,
+      "external_version_identity": "excel-inflow-tax-rate-policy/1.0",
+      "notes": "The generalisation prototype: already carries schema_version and a sealed case receipt. Registry binding of that receipt is follow-on."
+    },
+    "acquisition_policy": {
+      "policy_id": "acquisition_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "acquisition_overlay",
+        "schedule_roles": [],
+        "description": "Acquisition overlay: consideration, funding mix, close-period conventions and post-close roll-in treatment."
+      },
+      "evidence_hierarchy": ["contractual_commitment", "user_assumption"],
+      "owner_module": "scripts/lib/acquisition_policy.mjs",
+      "case_binding": null,
+      "system_owned": false,
+      "notes": "Case `acquisition` object is versionless and has FOUR post-compile in-place writers (build_dynamic_model.mjs:12335, release_nodes.mjs:136, public_test_run.mjs:242, evidence_run.mjs:692) — binding requires forbidden files; follow-on."
+    },
+    "forecast_assumptions": {
+      "policy_id": "forecast_assumptions",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "operating_forecast",
+        "schedule_roles": [],
+        "description": "The open bag of ~10 driver policies (revenue growth, margins, capex, working capital, dividends, FX drivers) read by the solver without a declared vocabulary."
+      },
+      "evidence_hierarchy": ["company_guidance", "broker_consensus", "user_assumption", "historical_average"],
+      "owner_module": "assets/model-case-v2.schema.json:366-376 (read via scripts/lib/solver.mjs:735-737)",
+      "case_binding": null,
+      "system_owned": false,
+      "notes": "Binding requires solver.mjs (forbidden) and a driver vocabulary; each driver family may split into its own entry when bound."
+    },
+    "coverage_policy": {
+      "policy_id": "coverage_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "historical_statements",
+        "schedule_roles": [],
+        "description": "Disclosure-coverage treatment: which filed lines must be individually represented versus lawfully aggregated."
+      },
+      "evidence_hierarchy": ["user_assumption", "explicit_zero"],
+      "owner_module": "assets/model-case-v2.schema.json:340-351 + scripts/lib/coverage.mjs",
+      "case_binding": null,
+      "system_owned": false,
+      "notes": "coverage.mjs is forbidden this package; binding is follow-on."
+    },
+    "historical_interest_basis": {
+      "policy_id": "historical_interest_basis",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "interest",
+        "schedule_roles": ["interest_expense", "cash_interest_paid"],
+        "description": "Which reported interest basis anchors the historical interest reconciliation."
+      },
+      "evidence_hierarchy": ["actual_plus_remainder", "carry_forward"],
+      "owner_module": "scripts/lib/historical_interest_authority.mjs:9,53",
+      "case_binding": null,
+      "system_owned": false,
+      "notes": "reported_interest_basis silently defaults to LEGACY_BASIS (filed_total_including_leases); versioning that default is the point of binding this family."
+    },
+    "debt_reconciliation_residual_tolerance": {
+      "policy_id": "debt_reconciliation_residual_tolerance",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "debt_instruments",
+        "schedule_roles": ["opening_debt"],
+        "description": "The residual tolerance under which an opening-debt reconciliation is accepted."
+      },
+      "evidence_hierarchy": [],
+      "owner_module": "scripts/lib/coverage.mjs:1792 + scripts/lib/release_nodes.mjs:101 + scripts/lib/case_source_proposer.mjs:897",
+      "case_binding": null,
+      "system_owned": true,
+      "notes": "The literal 0.05 is hardcoded in THREE places; binding must first centralise it (all three owners are outside this package's allowed files)."
+    },
+    "fx_translation": {
+      "policy_id": "fx_translation",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "historical_statements",
+        "schedule_roles": [],
+        "description": "The convention translating native-currency instrument balances and flows into the reporting currency."
+      },
+      "evidence_hierarchy": ["actual_plus_remainder", "carry_forward"],
+      "owner_module": "scripts/lib/case_compiler.mjs:3258-3269 (convention minted at compile)",
+      "case_binding": null,
+      "system_owned": false,
+      "notes": "Minted inside case_compiler outside the compilePolicies allowed region; binding is follow-on."
+    },
+    "residual_interest_authority": {
+      "policy_id": "residual_interest_authority",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "interest",
+        "schedule_roles": ["interest_expense"],
+        "description": "How unexplained residual interest between filed totals and instrument-level interest is attributed."
+      },
+      "evidence_hierarchy": ["actual_plus_remainder", "historical_average"],
+      "owner_module": "scripts/lib/residual_interest_authority.mjs",
+      "case_binding": null,
+      "system_owned": false
+    },
+    "materiality_policy": {
+      "policy_id": "materiality_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "outputs_and_ratios",
+        "schedule_roles": [],
+        "description": "Per-metric materiality thresholds gating flow-impact findings."
+      },
+      "evidence_hierarchy": [],
+      "owner_module": "scripts/lib/flow_impact.mjs:75-110 (MATERIALITY_POLICY literal)",
+      "case_binding": null,
+      "system_owned": true
+    },
+    "broker_headline_policy": {
+      "policy_id": "broker_headline_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "operating_forecast",
+        "schedule_roles": [],
+        "description": "Which broker headline metrics anchor consensus selection and how conflicts resolve."
+      },
+      "evidence_hierarchy": ["broker_consensus", "user_assumption"],
+      "owner_module": "scripts/lib/broker_headline_policy.mjs",
+      "case_binding": null,
+      "system_owned": false
+    },
+    "debt_class_ontology": {
+      "policy_id": "debt_class_ontology",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "debt_instruments",
+        "schedule_roles": [],
+        "description": "The canonical debt-class vocabulary and legacy-alias migration rules for instrument classification."
+      },
+      "evidence_hierarchy": ["contractual_commitment", "user_assumption"],
+      "owner_module": "scripts/lib/debt_class.mjs",
+      "case_binding": null,
+      "system_owned": false,
+      "external_version_identity": "debt-class-ontology/1.0"
+    },
+    "economic_solve_policy": {
+      "policy_id": "economic_solve_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "model",
+        "module": "interest",
+        "schedule_roles": [],
+        "description": "Circularity controls, solver tolerances and workbook iterative-calculation numerics."
+      },
+      "evidence_hierarchy": [],
+      "owner_module": "scripts/lib/economic_solve_policy.mjs + assets/economic-solve-policy.v1.json",
+      "case_binding": null,
+      "system_owned": true,
+      "external_version_identity": "economic-solve-policy/1.0 (sha-bound via model_ir_v3.mjs:996; production-contract-v2.json:265-273)"
+    },
+    "runtime_budget_policy": {
+      "policy_id": "runtime_budget_policy",
+      "version": "1.0",
+      "binding_status": "declared_only",
+      "owned_assumption": {
+        "scope": "runtime",
+        "module": null,
+        "schedule_roles": [],
+        "description": "Stage runtime budgets and cancellation treatment; owns no model-graph assumption."
+      },
+      "evidence_hierarchy": [],
+      "owner_module": "scripts/lib/runtime_budget_policy.mjs",
+      "case_binding": null,
+      "system_owned": true,
+      "external_version_identity": "excel-inflow-runtime-budget-policy/1.0"
+    }
+  }
+}

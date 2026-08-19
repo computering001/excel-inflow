@@ -62,6 +62,7 @@ import {
   selectedEbitdaRow,
 } from "./semantic_roles.mjs";
 import { migrateLegacyDebtClasses } from "./debt_class.mjs";
+import { stampPolicyBindings } from "./policy_registry.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CASE_SOURCE_SCHEMA = JSON.parse(
@@ -3583,7 +3584,11 @@ function compilePolicies(caseSource, lanes, report) {
       if (leaseBasis[key] !== undefined) lease[key] = clone(leaseBasis[key]);
     }
   }
-  return { rcf_policy: rcf, cash_policy: cash, lease_policy: lease };
+  // P2.7: seal each policy object with its versioned registry binding
+  // {policy_id, version} from assets/policy-registry-v1.json — a registry
+  // version bump is receipt-visible on the compiled case. Throws (never
+  // defaults) when a family has no bound registry entry.
+  return stampPolicyBindings({ rcf_policy: rcf, cash_policy: cash, lease_policy: lease });
 }
 
 /**
