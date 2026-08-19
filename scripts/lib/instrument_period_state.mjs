@@ -1,5 +1,13 @@
 import { assertCanonicalDebtClass } from "./debt_class.mjs";
 import { leaseForecast } from "./lease_policy.mjs";
+import {
+  OPENING_INSTRUMENT_PROVENANCE_SCHEMA_VERSION,
+  classifyOpeningRejection,
+  openingInstrumentCandidateRecord,
+  openingInstrumentSourceLane,
+  openingRejection,
+  sealOpeningInstrumentSourceInventory,
+} from "./opening_instrument_provenance.mjs";
 
 const DAY_MS = 86_400_000;
 const EPSILON = 1e-9;
@@ -201,6 +209,28 @@ function openingTranslationFor(modelCase, instrument, bounds) {
   };
 }
 
+/**
+ * P4.1 — name the translation authority for the opening balance.
+ *
+ * The opening rate is recorded on the provenance; this names WHERE that rate
+ * came from so the translation is reproducible from the record. Deliberately
+ * separate from `openingTranslationFor` so the instrument-period-state
+ * `translation` object — which is hash-pinned by its own validator — does not
+ * grow a field.
+ */
+function openingTranslationSourceRef(modelCase, instrument, bounds, translation) {
+  const reporting = modelCase.issuer.reporting_currency;
+  if (instrument.balance_basis === "reporting_currency_carrying_value") {
+    return `instruments[${instrument.instrument_id ?? "?"}].balance_basis=reporting_currency_carrying_value (already ${reporting}; no translation)`;
+  }
+  if (translation.basis_currency === reporting) {
+    return `issuer.reporting_currency=${reporting} (no translation)`;
+  }
+  const openingAbsoluteIndex = Math.max(0, bounds.absoluteIndex - 1);
+  const quote = modelCase.fx?.[translation.basis_currency]?.quote ?? "(absent)";
+  return `fx.${translation.basis_currency}.period_end_rates[${openingAbsoluteIndex}] quote=${quote}`;
+}
+
 function translationFor(modelCase, instrument, bounds) {
   const opening = openingTranslationFor(modelCase, instrument, bounds);
   const flowRate = fxRate(
@@ -231,6 +261,15 @@ function translationFor(modelCase, instrument, bounds) {
  * reporting-currency carrying value remains at 1.0 even when the instrument's
  * legal denomination is foreign.  Release and coverage gates consume this
  * artifact instead of independently summing mixed-currency case fields.
+ *
+ * P4.1 — SOURCE INVENTORY.  Every row now records WHERE it came from: a
+ * candidate id at its register position, the source rows considered (the
+ * register position plus the DCS source cells behind the selected
+ * opening-balance authority), the selected basis and translation authority,
+ * and — for every candidate that produced NO opening row — a typed entry in
+ * the not-selected register.  The selection replays from that record alone
+ * (`replayOpeningInstrumentSelection`).  The inventory is additive: the
+ * status, rows, amounts, reporting total and error strings are unchanged.
  */
 export function compileOpeningInstrumentState(modelCase) {
   if (!modelCase || typeof modelCase !== "object") {
@@ -243,10 +282,62 @@ export function compileOpeningInstrumentState(modelCase) {
   if (!reportingCurrency) {
     throw new Error("issuer.reporting_currency is required.");
   }
+  const lane = openingInstrumentSourceLane(modelCase);
+  const termAuthorities = Array.isArray(modelCase.instrument_term_authorities)
+    ? modelCase.instrument_term_authorities
+    : [];
+  // The candidate universe is EVERY declared register row, at its own register
+  // position, minted before anything is decided about it. A candidate cannot
+  // fall out of the universe: it is selected, or it is registered.
+  const candidates = modelCase.instruments.map((instrument, ordinal) =>
+    openingInstrumentCandidateRecord({
+      ordinal,
+      instrument,
+      sourceLane: lane.source_lane,
+      termAuthorities,
+    }),
+  );
+  const register = [];
+  const selectedCandidateIds = [];
+  const reject = (candidate, reason, detail) => {
+    candidate.outcome = "not_selected";
+    candidate.selection = null;
+    candidate.not_selected = { reason, detail };
+    register.push({
+      candidate_id: candidate.candidate_id,
+      ordinal: candidate.ordinal,
+      instrument_id: candidate.instrument_id,
+      reason,
+      detail,
+    });
+  };
+  const inventory = (asOf) =>
+    sealOpeningInstrumentSourceInventory({
+      schema_version: OPENING_INSTRUMENT_PROVENANCE_SCHEMA_VERSION,
+      as_of: asOf,
+      reporting_currency: reportingCurrency,
+      source_lane: lane.source_lane,
+      term_authority_crosswalk_sha256: lane.term_authority_crosswalk_sha256,
+      candidate_universe_count: candidates.length,
+      candidates,
+      selected_candidate_ids: selectedCandidateIds,
+      not_selected: register,
+    });
+
   let firstForecastBounds;
   try {
     firstForecastBounds = periodBounds(modelCase.periods ?? [], 0);
   } catch (error) {
+    // No first-forecast boundary means no opening balance sheet date exists.
+    // Every candidate is rejected for that one typed reason — the register
+    // still names each of them rather than returning a silent empty state.
+    for (const candidate of candidates) {
+      reject(
+        candidate,
+        "forecast_boundary_absent",
+        `No first forecast period boundary exists, so no opening state can be minted: ${error.message}`,
+      );
+    }
     return {
       schema_version: "opening-instrument-state/1.0",
       reporting_currency: reportingCurrency,
@@ -255,16 +346,20 @@ export function compileOpeningInstrumentState(modelCase) {
       rows: [],
       reporting_total: null,
       errors: [error.message],
+      source_inventory: inventory(null),
     };
   }
   const asOf = modelCase.periods[firstForecastBounds.absoluteIndex - 1]?.date ?? null;
   const rows = [];
   const errors = [];
   const ids = new Set();
-  for (const instrument of modelCase.instruments) {
+  for (const [ordinal, instrument] of modelCase.instruments.entries()) {
+    const candidate = candidates[ordinal];
     const id = instrument?.instrument_id ?? "unknown";
     if (ids.has(id)) {
-      errors.push(`Instrument IDs must be unique; duplicate ${id}.`);
+      const message = `Instrument IDs must be unique; duplicate ${id}.`;
+      errors.push(message);
+      reject(candidate, "duplicate_instrument_id", message);
       continue;
     }
     ids.add(id);
@@ -281,8 +376,42 @@ export function compileOpeningInstrumentState(modelCase) {
         resolvedInstrument,
         firstForecastBounds,
       );
+      // NEVER-ZERO. `Number(null)`, `Number("")` and `Number(false)` are all
+      // 0, so a nil or blank declared balance used to enter the register as a
+      // real zero opening row. The schema already requires a number here, so
+      // this refusal is unreachable for a shape-valid case — but the opening
+      // state is also compiled by coverage and release gates on cases that have
+      // not been through shape validation, and there a blank must be a typed
+      // rejection, not a zero.
+      const declaredAmount = candidate.declared.opening_balance;
+      if (["nil", "reported_blank"].includes(declaredAmount.state)) {
+        throw openingRejection(
+          "opening_balance_unresolved",
+          `${id}.opening_balance is ${declaredAmount.state}; a nil or blank opening balance is never zero.`,
+        );
+      }
       const basisAmount = number(instrument.opening_balance, `${id}.opening_balance`);
       if (basisAmount < 0) throw new Error(`${id}.opening_balance must be non-negative.`);
+      const selection = {
+        method: "declared_register_row",
+        basis_field_ref: `instruments[${ordinal}].opening_balance`,
+        basis_amount: basisAmount,
+        basis_currency: translation.basis_currency,
+        balance_basis: balanceBasis,
+        balance_basis_authority: instrument.balance_basis
+          ? "declared"
+          : "defaulted_native_principal",
+        translation_method: translation.method,
+        translation_rate: translation.opening_rate,
+        translation_source_ref: openingTranslationSourceRef(
+          modelCase,
+          resolvedInstrument,
+          firstForecastBounds,
+          translation,
+        ),
+        reporting_amount: basisAmount * translation.opening_rate,
+        include_in_gross_debt: instrument.include_in_gross_debt !== false,
+      };
       rows.push({
         instrument_id: id,
         class: instrument.class ?? null,
@@ -296,9 +425,24 @@ export function compileOpeningInstrumentState(modelCase) {
         translation_method: translation.method,
         include_in_gross_debt: instrument.include_in_gross_debt !== false,
         is_residual_pool: instrument.is_residual_pool === true,
+        provenance: {
+          candidate_id: candidate.candidate_id,
+          ordinal,
+          source_lane: candidate.source_lane,
+          source_row_refs: [...candidate.source_row_refs],
+          source_line_ids: [...candidate.source_line_ids],
+          opening_balance_authority: candidate.opening_balance_authority,
+          selection,
+        },
       });
+      candidate.outcome = "selected";
+      candidate.selection = selection;
+      candidate.not_selected = null;
+      selectedCandidateIds.push(candidate.candidate_id);
     } catch (error) {
-      errors.push(`${id}: ${error.message}`);
+      const message = `${id}: ${error.message}`;
+      errors.push(message);
+      reject(candidate, classifyOpeningRejection(error), message);
     }
   }
   return {
@@ -314,6 +458,7 @@ export function compileOpeningInstrumentState(modelCase) {
             .reduce((total, row) => total + row.reporting_amount, 0)
         : null,
     errors,
+    source_inventory: inventory(asOf),
   };
 }
 
