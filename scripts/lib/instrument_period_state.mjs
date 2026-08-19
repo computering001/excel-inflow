@@ -8,6 +8,7 @@ import {
   openingRejection,
   sealOpeningInstrumentSourceInventory,
 } from "./opening_instrument_provenance.mjs";
+import { numericValueOf } from "./typed_financial_value.mjs";
 
 const DAY_MS = 86_400_000;
 const EPSILON = 1e-9;
@@ -376,21 +377,35 @@ export function compileOpeningInstrumentState(modelCase) {
         resolvedInstrument,
         firstForecastBounds,
       );
-      // NEVER-ZERO. `Number(null)`, `Number("")` and `Number(false)` are all
-      // 0, so a nil or blank declared balance used to enter the register as a
-      // real zero opening row. The schema already requires a number here, so
-      // this refusal is unreachable for a shape-valid case — but the opening
-      // state is also compiled by coverage and release gates on cases that have
-      // not been through shape validation, and there a blank must be a typed
+      // NEVER-ZERO. `Number(null)`, `Number("")`, `Number(" ")`, `Number(false)`
+      // and `Number([])` are ALL 0, and `Number(true)` is 1, so any declared
+      // value that is not a number used to enter the register as a real opening
+      // balance. The schema already requires a number here, so this refusal is
+      // unreachable for a shape-valid case — but the opening state is also
+      // compiled by coverage and release gates on cases that have not been
+      // through shape validation, and there an absence must be a typed
       // rejection, not a zero.
+      //
+      // The gate is the SEALED P1.2 vocabulary, not an allow-list of absence
+      // states. The previous form tested `["nil", "reported_blank"]`, which is
+      // why D11's whitespace / boolean / array coercions walked straight past a
+      // guard whose own comment named `Number(false)`: an allow-list readmits
+      // every state it has not yet heard of. `numericValueOf` returns a number
+      // for the four value-bearing states and null for all eight never-zero
+      // states, so the predicate cannot fall behind the vocabulary.
       const declaredAmount = candidate.declared.opening_balance;
-      if (["nil", "reported_blank"].includes(declaredAmount.state)) {
+      const declaredNumber = numericValueOf(declaredAmount);
+      if (declaredNumber === null) {
         throw openingRejection(
           "opening_balance_unresolved",
-          `${id}.opening_balance is ${declaredAmount.state}; a nil or blank opening balance is never zero.`,
+          `${id}.opening_balance is ${declaredAmount.state}; a declared value that carries no ` +
+            "number is never zero and never a balance.",
         );
       }
-      const basisAmount = number(instrument.opening_balance, `${id}.opening_balance`);
+      // ONE reading of the declared amount: the typed value's own number. A
+      // second `Number(instrument.opening_balance)` here would be a second
+      // authority, and the two could drift apart exactly as D11 did.
+      const basisAmount = declaredNumber;
       if (basisAmount < 0) throw new Error(`${id}.opening_balance must be non-negative.`);
       const selection = {
         method: "declared_register_row",
@@ -575,7 +590,44 @@ function instrumentStates(modelCase, instrument, forecastPeriods) {
     !FAMILY_BY_CLASS[debtClass] ||
     ["lease_liability", "unclassified"].includes(debtClass)
   ) {
-    throw new Error(`Unsupported debt class ${debtClass} for ${instrument.instrument_id}.`);
+    // D12. The refusal itself is CORRECT and stays: `lease_liability` is not
+    // unsupported — it is compiled by its OWN lane (`lease_policy` ->
+    // `leaseStates`, which reserves the `lease_liability` identity below), and
+    // rolling a lease forward as an ordinary amortising instrument would
+    // double-count it against that family under the wrong interest convention.
+    // `unclassified` is the review sentinel and has no economics to roll.
+    //
+    // What was defective is that the refusal was a BARE Error: no code, no
+    // typed_internal_outcome, no registered reason — so a case that
+    // `validateCaseShape` accepts with zero errors (the class is in the
+    // model-case schema enum AND the envelope's declared debt matrix) died on
+    // an untyped throw that could not reach a lawful terminal. Typed here on
+    // the P3.7 pattern; the message is unchanged.
+    const error = new Error(`Unsupported debt class ${debtClass} for ${instrument.instrument_id}.`);
+    error.code = "UNSUPPORTED_INSTRUMENT_CLASS";
+    error.declared_instrument_class = debtClass;
+    error.instrument_id = instrument.instrument_id ?? null;
+    // The contract claims the class and the compiler cannot deliver it on this
+    // lane, so while that claim stands the disagreement is ENGINEERING's, not
+    // the user's: an internal defect, never SOURCE_REQUIRED or ACTION_REQUIRED.
+    // (The narrower code this deserves — a lane-routing refusal owned by the
+    // case contract — is not in the sealed registry, and the registry is not
+    // this package's to extend.)
+    error.typed_internal_outcome = {
+      reason_code: "INTERNAL.compiler_or_graph_defect",
+      earliest_responsible_layer: "instrument_period_state",
+      downstream_invalidation_scope: "solve_and_below",
+      declared_instrument_class: debtClass,
+      instrument_id: instrument.instrument_id ?? null,
+      contract_claim_mismatch:
+        debtClass === "lease_liability"
+          ? "instruments[].class admits lease_liability in the model-case schema enum and the " +
+            "support envelope's declared debt matrix, but the debt register has no lease lane: " +
+            "leases are compiled from lease_policy as the separately identified lease state family"
+          : "unclassified is the debt-class review sentinel: it names an instrument whose class " +
+            "was never resolved, and an unresolved class has no forecast economics to roll",
+    };
+    throw error;
   }
   const balanceBasis = instrument.balance_basis ?? "native_principal";
   if (!["native_principal", "reporting_currency_carrying_value"].includes(balanceBasis)) {

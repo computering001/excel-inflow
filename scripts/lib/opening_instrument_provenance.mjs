@@ -28,8 +28,13 @@
  *    silent drop;
  *  - the selection REPLAYS from the recorded provenance alone
  *    (`replayOpeningInstrumentSelection` reads the inventory and nothing else);
- *  - a missing, blank or unparseable declared amount is a TYPED never-zero
- *    state from the sealed P1.2 vocabulary — never a zero row;
+ *  - a declared amount that carries no number — missing, nil, blank,
+ *    whitespace-only, boolean, array, object or unparseable text — is a TYPED
+ *    never-zero state from the sealed P1.2 vocabulary, never a zero row and
+ *    never any other number (P4.1a / D11);
+ *  - a candidate may be SELECTED only on a VALUE-BEARING declared amount, so a
+ *    register row can never stand on an absence, whatever number its selection
+ *    records;
  *  - this module VALIDATES; it never repairs and never substitutes a number.
  */
 
@@ -90,14 +95,63 @@ export function mintOpeningCandidateId(ordinal, instrumentId) {
   return `oi.${position}.${id}`;
 }
 
+/** The kind name of a declared raw that cannot carry a number. */
+function declaredRawKind(raw) {
+  if (Array.isArray(raw)) return "array";
+  if (typeof raw === "object") return "object";
+  return typeof raw;
+}
+
+/**
+ * A stable, non-empty rendering of a declared raw that cannot carry a number.
+ * `String([])` is the EMPTY STRING, which would make a parse failure look like
+ * a blank cell — a false claim about what the source said — so the JSON form is
+ * used and the kind name is the fallback for anything unserialisable.
+ */
+function declaredRawText(raw) {
+  if (typeof raw === "boolean" || typeof raw === "bigint" || typeof raw === "symbol") {
+    return String(raw);
+  }
+  try {
+    const json = JSON.stringify(raw);
+    if (typeof json === "string" && json.length > 0) return json;
+  } catch {
+    /* circular or otherwise unserialisable — fall through to the kind name */
+  }
+  return `(${declaredRawKind(raw)})`;
+}
+
 /**
  * The typed reading of a declared opening balance. Missing, nil, blank and
  * unparseable are DISTINCT never-zero states — none of them is zero.
+ *
+ * D11 (found by the P7.3 generated cohort against this freshly sealed module):
+ * `Number(" ")`, `Number(false)` and `Number([])` are ALL 0, and `Number(true)`
+ * is 1, so a whitespace-only cell, a boolean and an array were typed
+ * `reported_zero` / `reported_number` — a numeric provenance claim about a
+ * source that stated no number. The coercion is therefore refused BEFORE
+ * `Number()` ever sees the value:
+ *   - a whitespace-only string is a blank cell in every spreadsheet sense, so
+ *     it joins the empty string as `reported_blank`;
+ *   - anything that is neither a string nor a number cannot carry a declared
+ *     amount at all, so it is a `parse_failure` that records what it saw.
+ * Only a string or a number reaches the coercion, and there `Number()` means
+ * what it says.
  */
 export function typedDeclaredAmount(raw) {
   if (raw === undefined) return typedValue("missing");
   if (raw === null) return typedValue("nil", { raw_text: "null" });
   if (raw === "") return typedValue("reported_blank");
+  if (typeof raw === "string" && raw.trim() === "") return typedValue("reported_blank");
+  if (typeof raw !== "string" && typeof raw !== "number") {
+    const kind = declaredRawKind(raw);
+    return typedValue("parse_failure", {
+      raw_text: declaredRawText(raw),
+      failure_reason:
+        `declared opening balance is a ${kind}, which carries no number; ` +
+        "a non-numeric declared value is never zero and never a number",
+    });
+  }
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
     return typedValue("parse_failure", {
@@ -382,9 +436,12 @@ export function validateOpeningInstrumentProvenance(state) {
     }
     // A declared amount is a typed value in the sealed vocabulary — reading it
     // must never coerce absence into zero.
+    let declaredNumber;
+    let declaredIsTyped = true;
     try {
-      numericValueOf(candidate.declared?.opening_balance);
+      declaredNumber = numericValueOf(candidate.declared?.opening_balance);
     } catch (error) {
+      declaredIsTyped = false;
       errors.push(`${id} declared.opening_balance is not a typed value: ${error.message}`);
     }
     const authorityFields = Array.isArray(candidate.opening_balance_authority_fields)
@@ -412,6 +469,18 @@ export function validateOpeningInstrumentProvenance(state) {
       }
     }
     if (candidate.outcome === "selected") {
+      // NEVER-ZERO, as a VALIDATION rule and not only a compiler rule (P4.1a).
+      // A selected candidate must stand on a value-bearing declared amount: a
+      // register row whose declared opening balance is nil, blank, missing or
+      // unparseable is a fabricated balance, whatever number its selection
+      // happens to record. Expressing it here means a future compiler cannot
+      // reintroduce the coercion without this validator refusing the state.
+      if (declaredIsTyped && declaredNumber === null) {
+        errors.push(
+          `${id} was selected on a declared opening balance in the non-value-bearing state ` +
+            `${candidate.declared?.opening_balance?.state}; an absence is never a balance.`,
+        );
+      }
       const refs = Array.isArray(candidate.source_row_refs) ? candidate.source_row_refs : [];
       if (refs.length === 0) {
         errors.push(`${id} was selected but names no source row.`);

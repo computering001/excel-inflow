@@ -707,14 +707,17 @@ const CHECKS = {
     },
   },
   lease_liability_instrument_class_refused: {
-    valid_case_dies_on_an_untyped_throw(context) {
+    valid_case_is_refused_typed_but_the_contract_over_claims(context) {
       const { modelCase, compiled } = context;
-      check(compiled.shapeErrors.length === 0, `DEFECT: validateCaseShape accepts the case, got ${JSON.stringify(compiled.shapeErrors)}`);
-      check(compiled.ok === false, "yet the case cannot be compiled");
+      check(compiled.shapeErrors.length === 0, `validateCaseShape accepts the case, got ${JSON.stringify(compiled.shapeErrors)}`);
+      check(compiled.ok === false, "yet the case cannot be compiled on the debt register lane");
       check(compiled.error instanceof Error, "compilation fails with an Error");
       check(/Unsupported debt class lease_liability/.test(compiled.error.message), `the message names the refused class, got ${compiled.error.message}`);
-      check(compiled.error.code === undefined, "DEFECT: the error carries no code");
-      check(compiled.error.typed_internal_outcome === undefined, "DEFECT: the error carries no typed_internal_outcome and so no registered reason code");
+      check(compiled.error.code === "UNSUPPORTED_INSTRUMENT_CLASS",
+        `the refusal is typed (P4.1a, defect D12), got ${JSON.stringify(compiled.error.code)}`);
+      check(compiled.error.typed_internal_outcome !== undefined
+        && typeof compiled.error.typed_internal_outcome.reason_code === "string",
+        "the refusal carries a typed_internal_outcome naming a registered reason code");
       const declaredClass = modelCase.instruments[0].class;
       check(MODEL_CASE_SCHEMA.$defs.instrument.properties.class.enum.includes(declaredClass),
         "the refused class is in the model-case schema enum");

@@ -449,9 +449,9 @@
       "proves_envelope_values": [],
       "shape_expectations": [
         {
-          "expectation_id": "valid_case_dies_on_an_untyped_throw",
+          "expectation_id": "valid_case_is_refused_typed_but_the_contract_over_claims",
           "kind": "schedule_behaviour",
-          "statement": "DEFECT: validateCaseShape returns ZERO errors for this case (the class is in the model-case schema enum and in the support envelope's declared debt matrix), yet compiling it throws a bare Error 'Unsupported debt class lease_liability' from the instrument-period-state compiler, with no error.code, no typed_internal_outcome and no registered reason code. A schema-valid, envelope-declared shape is refused by an untyped exception, so the validator and the compiler disagree and the refusal cannot reach a terminal state lawfully."
+          "statement": "The debt-register lane REFUSES this class TYPED (error.code UNSUPPORTED_INSTRUMENT_CLASS plus a typed_internal_outcome naming a registered reason code) — repaired by P4.1a, defect D12. The refusal is correct: leases are compiled by their own lease_policy lane, which reserves the lease_liability id, so rolling one as an ordinary amortising instrument would double-count it under the wrong interest convention. The REMAINING defect is the contract over-claim: the model-case schema instrument class enum and the envelope debt_instruments declared_matrix both admit lease_liability on the register lane, and validateCaseShape does not enforce the routing. This pin retires when those assets are corrected."
         }
       ],
       "extraction_evidence_still_required": true
