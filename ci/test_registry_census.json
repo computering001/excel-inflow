@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 315,
-  "source_commit": "e957b6282e5c220ab2eaa7ab8b388675721c0b9b",
-  "source_tree": "394fbef71d0b69efb1d4d8ade65a68a60a572be9",
+  "checks": 317,
+  "source_commit": "d40456ff913455724d4945369165de7059eaaacc",
+  "source_tree": "99137b4de9c66364804cbdb02b9a6585eba139a6",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 150
+    "test_count": 151
   },
   "scripts": [
     {
@@ -248,6 +248,10 @@
     {
       "script": "run_development_gate.mjs",
       "disposition": "CI_GATE_MACHINERY"
+    },
+    {
+      "script": "run_dual_read_migration_tests.mjs",
+      "disposition": "REGISTERED"
     },
     {
       "script": "run_ebitda_basis_contract_tests.mjs",
