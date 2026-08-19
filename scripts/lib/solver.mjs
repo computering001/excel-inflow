@@ -24,6 +24,10 @@ import {
   mandatoryRepaymentForPeriod,
 } from "./instrument_period_state.mjs";
 import { compileSolverEquationGraphEvidence } from "./equation_graph.mjs";
+import {
+  OPENING_DEBT_BRIDGE_REFUSAL_REASON_CODE,
+  compileOpeningDebtBridge,
+} from "./opening_debt_bridge.mjs";
 import { selectedEbitdaRow } from "./semantic_roles.mjs";
 import { validateResidualInterestAuthority } from "./residual_interest_authority.mjs";
 import {
@@ -1614,6 +1618,34 @@ export function solveCase(
   const instrumentPeriodStateIndex = compiledInstrumentPeriodState
     ? instrumentPeriodStateByKey(compiledInstrumentPeriodState)
     : null;
+  // P4.2: the opening-debt reconciliation is a STRUCTURED BRIDGE artifact,
+  // not a signed scalar absorbed into a pool row. Compile it before economics
+  // runs; when a bridge with a reported anchor leaves a residual no taxonomy
+  // line explains, refuse typed with the registered terminal reason code.
+  // NO_REPORTED_ANCHOR / NOT_EVALUABLE verdicts pass through — the coverage
+  // gate owns those BLOCKs — and a RECONCILED bridge leaves every solved
+  // number untouched (the artifact is attached, never substituted).
+  const openingDebtBridge = compileOpeningDebtBridge(modelCase);
+  if (openingDebtBridge.verdict === "REFUSE_UNEXPLAINED_RESIDUAL") {
+    const unexplained = openingDebtBridge.totals.unexplained_residual;
+    const error = new Error(
+      `OPENING_DEBT_UNRESOLVED: case ${modelCase.case_id} opening-debt bridge leaves ` +
+        `${unexplained} ${openingDebtBridge.reporting_currency} unexplained ` +
+        `(tolerance ${openingDebtBridge.tolerance}); a pool row cannot absorb an unexplained residual.`,
+    );
+    error.code = "OPENING_DEBT_UNRESOLVED";
+    error.opening_debt_bridge = openingDebtBridge;
+    // Transport read by the terminal catch; the reason code is the registered
+    // SOURCE code (owner: debt_reconciliation), not an internal classification.
+    error.typed_internal_outcome = {
+      reason_code: OPENING_DEBT_BRIDGE_REFUSAL_REASON_CODE,
+      earliest_responsible_layer: "debt_reconciliation",
+      downstream_invalidation_scope: "solve_and_below",
+      unexplained_residual: unexplained,
+      tolerance: openingDebtBridge.tolerance,
+    };
+    throw error;
+  }
   // An acquisition overlay is an adjustment to the issuer's standalone graph,
   // not a second opportunity to reinterpret issuer-only forecast chains. Solve
   // the acquisition-off state once and use it as the explicit base for rows
@@ -3102,6 +3134,7 @@ export function solveCase(
       compiledInstrumentPeriodState?.schema_version ?? null,
     definition_basis_graph:
       compiledInstrumentPeriodState?.definition_basis_graph ?? null,
+    opening_debt_bridge: openingDebtBridge,
     forecast: results,
     converged: results.length === 3 && results.every((result) => result.converged === true),
     iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),
