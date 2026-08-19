@@ -68,6 +68,33 @@ const DISPOSITIONS = {
   // as orphans for the same Phase 9 disposition decision.
   "run_broker_tier1_demand_tests.py": "ORPHANED_BARE_RUNNABLE",
   "run_standardised_design_contract_mutations.mjs": "ORPHANED_BARE_RUNNABLE",
+  // P6.0a suite committed at e0618e2 with neither registration nor
+  // disposition; bare-runnable and green, no caller. Flagged by P7.6a as
+  // deserving real registration in the development test registry.
+  "run_terminal_crash_path_tests.mjs": "ORPHANED_BARE_RUNNABLE",
+  // Production library modules under scripts/lib whose filenames begin with
+  // run_ because they model the "run" domain object (store, carrier,
+  // deadline, constitution graph, scoped concepts); imported by the
+  // pipeline, never runnable harnesses.
+  "lib/run_carrier.mjs": "PRODUCTION_LIBRARY_MODULE",
+  "lib/run_constitution_graph.mjs": "PRODUCTION_LIBRARY_MODULE",
+  "lib/run_deadline.mjs": "PRODUCTION_LIBRARY_MODULE",
+  "lib/run_scoped_broker_concepts.mjs": "PRODUCTION_LIBRARY_MODULE",
+  "lib/run_store.mjs": "PRODUCTION_LIBRARY_MODULE",
+  // Oracle mutation harnesses in scripts/verify: argument-driven authoring/
+  // release harnesses that corrupt disposable artifact copies to prove their
+  // owning oracle rejects them; not bare CI suites.
+  "verify/run_finance_proof_mutations.py": "ORACLE_MUTATION_HARNESS",
+  "verify/run_workbook_semantic_oracle_mutations.py": "ORACLE_MUTATION_HARNESS",
+  "verify/run_layered_graph_python_tests.py": "ORACLE_MUTATION_HARNESS",
+  // Same-language (JS) positive+mutation proof over a debt-linked add-back;
+  // requires a caller-supplied case and imports lib/row_plan.mjs, so it is
+  // NOT an independent oracle — census-visible, never registry-credited.
+  "verify/run_linked_debt_addback_proof_test.mjs": "ORACLE_MUTATION_HARNESS",
+  // Subordinate determinism oracle: consumes caller-built A/B workbooks;
+  // invoked by run_frozen_cohort.mjs and the deployment-profile smoke
+  // contract, never bare in CI.
+  "verify/run_deterministic_tests.py": "SUBORDINATE_ORACLE",
 };
 
 // The playbook's named critical suites: each MUST resolve to at least one
@@ -123,10 +150,22 @@ async function census(registry, scriptNames) {
 const registry = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "development-test-registry.json"), "utf8"),
 );
-const scriptNames = new Set(
-  (await fs.readdir(path.join(ROOT, "scripts")))
-    .filter((name) => name.startsWith("run_") && (name.endsWith(".mjs") || name.endsWith(".py"))),
-);
+// Recursive census: a runnable harness hiding in a subdirectory (verify/,
+// lib/, ...) is still a run_* script and MUST carry a classification. Keys
+// are scripts/-relative POSIX paths; top-level scripts keep their bare name.
+async function collectRunScripts(directory, prefix = "") {
+  const names = [];
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (entry.name === "node_modules") continue;
+      names.push(...(await collectRunScripts(path.join(directory, entry.name), `${prefix}${entry.name}/`)));
+    } else if (entry.name.startsWith("run_") && (entry.name.endsWith(".mjs") || entry.name.endsWith(".py"))) {
+      names.push(`${prefix}${entry.name}`);
+    }
+  }
+  return names;
+}
+const scriptNames = new Set(await collectRunScripts(path.join(ROOT, "scripts")));
 
 const rows = await census(registry, scriptNames);
 

@@ -2,7 +2,7 @@
   "schema_version": "critical-invariant-oracle-matrix/2.0",
   "bindings": {
     "oracle_path": "scripts/run_critical_invariant_oracle_matrix_tests.py",
-    "oracle_sha256": "11f573bfecb26e504238dd3892ede847efe62c34346d2a7ca3fa7f25fa5aa9f2",
+    "oracle_sha256": "08048030c6bb74233504ca1a3f6a7c3cd12044b9c332c8504462373d8d6ff04a",
     "registry_path": "assets/development-test-registry.json",
     "registry_sha256": "636620ed84ff6a15346b8a48287ef2ca33aa9c8b099a31efadb7ffb26c90e28b"
   },
@@ -37,7 +37,8 @@
           "mutation_id": "swap_instrument_rows"
         }
       ],
-      "evidence_scope": "synthetic_unit_only"
+      "evidence_scope": "synthetic_unit_only",
+      "independence": "NOT_INDEPENDENTLY_PROVEN"
     },
     {
       "domain": "interest_lineage",
@@ -64,7 +65,8 @@
           "mutation_id": "include_impairment_in_ebitda"
         }
       ],
-      "evidence_scope": "synthetic_unit_only"
+      "evidence_scope": "synthetic_unit_only",
+      "independence": "NOT_INDEPENDENTLY_PROVEN"
     },
     {
       "domain": "forecast_ownership",
@@ -105,7 +107,8 @@
           "mutation_id": "change_broker_period"
         }
       ],
-      "evidence_scope": "synthetic_unit_only"
+      "evidence_scope": "synthetic_unit_only",
+      "independence": "NOT_INDEPENDENTLY_PROVEN"
     },
     {
       "domain": "broker_consensus_membership",
@@ -135,7 +138,8 @@
           "mutation_id": "unresolved_to_zero"
         }
       ],
-      "evidence_scope": "synthetic_unit_only"
+      "evidence_scope": "synthetic_unit_only",
+      "independence": "NOT_INDEPENDENTLY_PROVEN"
     },
     {
       "domain": "debt_classification",
@@ -162,7 +166,8 @@
           "mutation_id": "remote_value_error"
         }
       ],
-      "evidence_scope": "synthetic_unit_only"
+      "evidence_scope": "synthetic_unit_only",
+      "independence": "NOT_INDEPENDENTLY_PROVEN"
     },
     {
       "domain": "acquisition_cash_debt_interest",

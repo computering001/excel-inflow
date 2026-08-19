@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import copy
 import hashlib
 import json
@@ -17,6 +16,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from verify.emitted_candidate_artifact_oracle import (
+    FORBIDDEN_PRODUCTION_IMPORTS,
     inspect_acquisition_and_lease,
     inspect_consensus,
     inspect_debt_and_interest,
@@ -24,6 +24,16 @@ from verify.emitted_candidate_artifact_oracle import (
     inspect_forecast_ownership,
     inspect_protected_cash_and_rcf,
     inspect_source_arithmetic,
+)
+from verify.oracle_independence import production_imports as scan_production_imports
+from verify.oracle_independence import scan_directory
+
+# Same-language (JavaScript) checkers in scripts/verify share the production
+# language and module graph; they are honestly NOT_INDEPENDENT and are never
+# scanned as if the Python independence scan could clear them.
+NOT_INDEPENDENT_SAME_LANGUAGE_CHECKERS = (
+    "verify/recalc_second_opinion.mjs",
+    "verify/run_linked_debt_addback_proof_test.mjs",
 )
 
 
@@ -122,15 +132,22 @@ def main() -> int:
     assert baseline["status"] == "PASS", json.dumps(baseline, indent=2)
 
     oracle_path = HERE / "verify" / "emitted_candidate_artifact_oracle.py"
-    tree = ast.parse(oracle_path.read_text(encoding="utf-8"))
-    imports = sorted({
-        node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
-    } | {
-        alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
-    })
-    forbidden = ("case_compiler", "forecast_candidate_compiler", "row_plan", "solver", "emit", "build_dynamic_model")
-    production_imports = [name for name in imports if any(token in name for token in forbidden)]
+    assert FORBIDDEN_PRODUCTION_IMPORTS, "forbidden production-import list must be non-empty"
+    independence_scan = scan_directory(HERE / "verify", FORBIDDEN_PRODUCTION_IMPORTS)
+    assert oracle_path.name in independence_scan
+    contaminated = {name: hits for name, hits in independence_scan.items() if hits}
+    assert contaminated == {}, json.dumps(contaminated, indent=2)
+    production_imports = independence_scan[oracle_path.name]
     assert production_imports == []
+    # Negative self-test: an injected forbidden import MUST be caught, or the
+    # scan is decorative.
+    injected_copy = output / "injected-forbidden-import-oracle.py"
+    injected_copy.write_text(
+        oracle_path.read_text(encoding="utf-8") + "\nimport emit  # injected forbidden import\n",
+        encoding="utf-8",
+    )
+    assert scan_production_imports(injected_copy, FORBIDDEN_PRODUCTION_IMPORTS) == ["emit"]
+    injected_copy.unlink()
 
     mutations: list[dict] = []
 
@@ -280,6 +297,11 @@ def main() -> int:
             "operating_model_delta": expected_delta,
         },
         "production_imports": production_imports,
+        "independence_scan": {
+            "forbidden_production_imports": list(FORBIDDEN_PRODUCTION_IMPORTS),
+            "python_files_scanned": sorted(independence_scan),
+            "not_independent_same_language_checkers": list(NOT_INDEPENDENT_SAME_LANGUAGE_CHECKERS),
+        },
         "artifact_origin": "real_candidate_emission_with_sealed_source_arithmetic",
         "native_excel": "NOT_RUN_PORTABLE_OOXML_AND_LIBREOFFICE",
         "total_violations": 0,

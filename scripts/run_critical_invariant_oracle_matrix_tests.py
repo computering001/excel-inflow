@@ -78,6 +78,14 @@ def validate_matrix(candidate: dict) -> list[dict]:
         assert entry.get("evidence_scope") in {
             "emitted_candidate_artifact", "synthetic_unit_only"
         }
+        # Honest scoping: synthetic-unit domains are checked by this same
+        # script's hand-written unit facts and therefore carry no independent
+        # proof; the matrix must say so explicitly.
+        if entry["evidence_scope"] == "synthetic_unit_only":
+            assert entry.get("independence") == "NOT_INDEPENDENTLY_PROVEN", (
+                f"synthetic_unit_only domain {entry['domain']} must be marked "
+                "independence=NOT_INDEPENDENTLY_PROVEN"
+            )
         oracle_ids = entry["independent_oracle_test_ids"]
         assert oracle_ids and len(oracle_ids) == len(set(oracle_ids))
         for oracle_id in oracle_ids:
@@ -123,6 +131,8 @@ artifact_mutations = {
 }
 
 results = []
+total_detected = 0
+total_mutations = 0
 for entry in domains:
     domain_results = []
     for mutation in entry["mutations"]:
@@ -134,11 +144,24 @@ for entry in domains:
             caught = detected(mutation["mutation_id"])
         assert caught, f"{mutation['mutation_id']} escaped {entry['domain']}"
         domain_results.append({"mutation_id": mutation["mutation_id"], "detected": caught})
+    detected_count = sum(item["detected"] for item in domain_results)
+    domain_rate = detected_count / len(domain_results)
+    if entry["evidence_scope"] == "emitted_candidate_artifact":
+        # Never weaken: the artifact-scope claim stays a full kill rate; a
+        # computed rate below the claimed 1.0 is a FAILURE, not a report line.
+        assert domain_rate >= 1.0, (
+            f"artifact-scope domain {entry['domain']} computed detection rate "
+            f"{domain_rate} fell below the claimed 1.0"
+        )
+    total_detected += detected_count
+    total_mutations += len(domain_results)
     results.append({
         "domain": entry["domain"],
-        "detected": sum(item["detected"] for item in domain_results),
+        "detected": detected_count,
         "total": len(domain_results),
-        "detection_rate": 1.0,
+        "detection_rate": domain_rate,
+        "evidence_scope": entry["evidence_scope"],
+        "independence": entry.get("independence", "emitted_candidate_artifact_oracle"),
         "mutations": domain_results,
     })
 
@@ -157,6 +180,10 @@ governance_candidates["missing_artifact_domain"]["domains"] = [
     entry for entry in governance_candidates["missing_artifact_domain"]["domains"]
     if entry["domain"] != "lease_roll_forward"
 ]
+governance_candidates["synthetic_claims_independence"] = json.loads(json.dumps(matrix))
+for entry in governance_candidates["synthetic_claims_independence"]["domains"]:
+    if entry["evidence_scope"] == "synthetic_unit_only":
+        entry.pop("independence", None)
 governance_mutations = {}
 for mutation_id, candidate in governance_candidates.items():
     try:
@@ -173,7 +200,13 @@ print(json.dumps({
     "oracle_sha256": sha256(Path(__file__)),
     "registry_sha256": sha256(REGISTRY_PATH),
     "domains": results,
-    "mutation_detection_rate": 1.0,
+    "mutation_detection_rate": total_detected / total_mutations,
+    "mutations_detected": total_detected,
+    "mutations_total": total_mutations,
+    "not_independently_proven_domains": sorted(
+        entry["domain"] for entry in domains
+        if entry.get("independence") == "NOT_INDEPENDENTLY_PROVEN"
+    ),
     "governance_mutations_caught": len(governance_mutations),
     "production_imports": [],
     "artifact_oracle_production_imports": artifact_report["production_imports"],

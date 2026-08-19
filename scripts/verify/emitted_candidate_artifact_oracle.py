@@ -18,6 +18,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from .oracle_independence import production_imports
+
 
 FORECAST_COLUMNS = ("J", "K", "L")
 ADJUSTMENT_COLUMNS = ("N", "O", "P")
@@ -25,7 +27,19 @@ BROKER_COLUMNS = ("D", "E", "F")
 BLUE = "0000FF"
 BLACK = "000000"
 GREEN = "008000"
-FORBIDDEN_PRODUCTION_IMPORTS: list[str] = []
+# Production-side module tokens this oracle (and every scripts/verify oracle)
+# must never import; the classification rule lives in oracle_independence.
+FORBIDDEN_PRODUCTION_IMPORTS: list[str] = [
+    "build_dynamic_model",
+    "case_compiler",
+    "emit",
+    "forecast_candidate_compiler",
+    "generated",
+    "render",
+    "row_plan",
+    "scripts.lib",
+    "solver",
+]
 
 
 def _finite(value: Any) -> bool:
@@ -380,7 +394,7 @@ def inspect_emitted_candidate(
         "coverage": coverage,
         "findings": findings,
         "total_violations": len(findings),
-        "production_imports": FORBIDDEN_PRODUCTION_IMPORTS,
+        "production_imports": production_imports(Path(__file__), FORBIDDEN_PRODUCTION_IMPORTS),
         "artifacts_consumed": [
             "emitted_workbook", "public_model_case", "forecast_receipt",
             "workbook_proof_contract", "source_arithmetic_artifact",
