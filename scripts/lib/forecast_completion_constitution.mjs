@@ -1,4 +1,5 @@
 import { hashValue } from "./run_store.mjs";
+import { isTaxRatePolicyOperator } from "./tax_rate_policy.mjs";
 import { methodAt, ownershipClass, sourceOwnedMateriality } from "./capture_transition.mjs";
 import { economicRegionDefinitions } from "./ownership_census.mjs";
 import {
@@ -137,7 +138,11 @@ function dispositionFor(row, forecastIndex) {
   if (
     authority?.tax_rate_normalization ||
     authority?.tax_rate_normalization_ref ||
-    authority?.formula_spec?.operator?.startsWith?.("tax_rate_policy")
+    // P3.3: MEMBERSHIP of the tax policy's declared operator vocabulary, not
+    // `startsWith("tax_rate_policy")`. A prefix test admitted any undeclared
+    // string that happened to share the prefix, so a typo or an invented
+    // operator could claim role-policy ownership of a cell.
+    isTaxRatePolicyOperator(authority?.formula_spec?.operator)
   ) {
     return "role_policy_owned";
   }
