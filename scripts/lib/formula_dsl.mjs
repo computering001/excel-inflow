@@ -6,7 +6,45 @@
  * strings cannot enter the statement compiler.  Schedule mechanics keep their
  * own declared emitters, but their output is inspected independently after
  * emission.
+ *
+ * The Excel text is no longer assembled here. Each operator builds a typed
+ * expression tree from `formula_ast.mjs` and `renderExpression` is the single
+ * place a formula becomes characters. That buys three things the string
+ * concatenation could not give:
+ *
+ *   - `ast_depth` is COMPUTED from the tree instead of declared, so the
+ *     complexity budget describes the formula that was actually emitted.
+ *   - The tree is available beside the text, so a caller can verify that the
+ *     text it is about to ship is what the tree renders (`verifyFormulaAst`).
+ *   - Every declared operator is now either backed by a tree builder or listed
+ *     in `UNSUPPORTED_FORMULA_OPERATORS` with a typed refusal. The union is
+ *     checked against `FORMULA_OPERATORS` at import, so an operator can never
+ *     again be declared and then silently reach a fall-through default.
  */
+
+import {
+  astDepth,
+  binary,
+  call,
+  conditional,
+  group,
+  literal,
+  opaqueRef,
+  range,
+  ref,
+  renderExpression,
+  renderFormula,
+} from "./formula_ast.mjs";
+
+export {
+  FORMULA_AST_NODE_KINDS,
+  FormulaAstError,
+  astDepth,
+  astReferences,
+  renderExpression,
+  renderFormula,
+  verifyFormulaAst,
+} from "./formula_ast.mjs";
 
 export const FORMULA_OPERATORS = Object.freeze([
   "link",
@@ -54,8 +92,113 @@ const ARITY = Object.freeze({
   toggle_gate: [2, 3],
 });
 
+/**
+ * Operators this module renders from a tree. Every other declared operator
+ * must appear in `UNSUPPORTED_FORMULA_OPERATORS`.
+ */
+export const SUPPORTED_FORMULA_OPERATORS = Object.freeze([
+  "link",
+  "schedule_link",
+  "sum",
+  "subtract",
+  "multiply",
+  "ratio",
+  "negated_ratio",
+  "growth",
+  "average",
+  "historical_average",
+  "historical_trend",
+  "negate",
+  "negate_sum",
+  "tax",
+  "prior_period",
+  "prior_period_scaled_by",
+]);
+
+/**
+ * Declared operators with no statement-level emitter. Their mechanics live in
+ * the schedule builders, which mint their own cells; asked for one here, this
+ * module REFUSES with a typed payload rather than approximating the semantics.
+ * A wrong interest accrual or a silently dropped toggle is worse than a stop.
+ */
+export const UNSUPPORTED_FORMULA_OPERATORS = Object.freeze({
+  average_balance_interest: Object.freeze({
+    operator: "average_balance_interest",
+    reason_code: "formula_operator_requires_schedule_emitter",
+    declared_arity: Object.freeze([3, 4]),
+    emitter: "interest schedule (opening/closing balance pair, rate, optional day count)",
+    repair:
+      "Emit the accrual from the interest schedule builder, then link the statement row with `link` or `schedule_link`.",
+  }),
+  roll_forward: Object.freeze({
+    operator: "roll_forward",
+    reason_code: "formula_operator_requires_schedule_emitter",
+    declared_arity: Object.freeze([2, Number.POSITIVE_INFINITY]),
+    emitter: "balance roll-forward schedule (opening balance plus signed movements)",
+    repair:
+      "Build the roll-forward in its schedule, where the opening balance's prior-period column is known, then link the statement row.",
+  }),
+  scenario_overlay: Object.freeze({
+    operator: "scenario_overlay",
+    reason_code: "formula_operator_requires_schedule_emitter",
+    declared_arity: Object.freeze([2, 3]),
+    emitter: "scenario overlay block (base case, overlay delta, optional selector)",
+    repair:
+      "Resolve the overlay in the scenario block and link its result; the statement layer must not choose a scenario.",
+  }),
+  toggle_gate: Object.freeze({
+    operator: "toggle_gate",
+    reason_code: "formula_operator_requires_schedule_emitter",
+    declared_arity: Object.freeze([2, 3]),
+    emitter: "control-gated schedule block (control cell, gated value, optional fallback)",
+    repair:
+      "Gate the value where the control cell lives, then link the statement row; a gate minted here would not be audited against the control registry.",
+  }),
+});
+
+/** Typed refusal for a declared operator this module deliberately will not render. */
+export class UnsupportedFormulaOperatorError extends Error {
+  constructor(detail) {
+    super(`${detail.operator} is a declared DSL operator but requires a schedule-specific emitter.`);
+    this.name = "UnsupportedFormulaOperatorError";
+    this.typed_refusal = detail;
+  }
+}
+
+// A declared operator that is neither rendered nor refused would fall through
+// to an untyped default. Fail at import rather than at the cell that needs it.
+{
+  const classified = [
+    ...SUPPORTED_FORMULA_OPERATORS,
+    ...Object.keys(UNSUPPORTED_FORMULA_OPERATORS),
+  ].sort();
+  const declared = [...FORMULA_OPERATORS].sort();
+  if (
+    classified.length !== declared.length ||
+    classified.some((operator, index) => operator !== declared[index])
+  ) {
+    throw new Error(
+      "Formula operator classification is incomplete: every declared operator must be " +
+        "listed in SUPPORTED_FORMULA_OPERATORS or UNSUPPORTED_FORMULA_OPERATORS. " +
+        `Declared ${declared.join(",")}; classified ${classified.join(",")}.`,
+    );
+  }
+}
+
+/** "supported" | "refused" | "unknown" — a total classification, no defaults. */
+export function formulaOperatorSupport(operator) {
+  if (SUPPORTED_FORMULA_OPERATORS.includes(operator)) return "supported";
+  if (Object.hasOwn(UNSUPPORTED_FORMULA_OPERATORS, operator)) return "refused";
+  return "unknown";
+}
+
 export const FORMULA_COMPLEXITY_BUDGET = Object.freeze({
-  max_ast_depth: 4,
+  // The deepest tree any declared operator builds is the historical trend at 7
+  // levels (`=F11+((E11-D11)+(F11-E11))/2*3`). Chained associative operators
+  // stay at one level whatever their operand count, so this bound no longer
+  // moves with the reference count and is now ENFORCED in `within_budget`
+  // rather than reported and ignored.
+  max_ast_depth: 8,
   max_semantic_references: 256,
   max_repeated_references: 0,
   max_excel_characters: 8192,
@@ -73,12 +216,18 @@ function parseCell(reference) {
   };
 }
 
-export function compactA1References(references) {
+/**
+ * Collapse a reference list into term NODES: a run of vertically contiguous
+ * cells sharing both absolute markers becomes one `range`, anything else stays
+ * a `ref`. A term the caller handed over already formed and unparseable
+ * survives as an opaque ref, exactly as the pre-AST emitter passed it through.
+ */
+export function compactA1ReferenceAsts(references) {
   const terms = [];
   for (let index = 0; index < references.length; ) {
     const first = parseCell(references[index]);
     if (!first) {
-      terms.push(String(references[index]));
+      terms.push(opaqueRef(String(references[index])));
       index += 1;
       continue;
     }
@@ -98,17 +247,32 @@ export function compactA1References(references) {
       last = candidate;
       next += 1;
     }
-    terms.push(last === first ? first.text : `${first.text}:${last.text}`);
+    terms.push(
+      last === first ? ref(first.text) : range(ref(first.text), ref(last.text)),
+    );
     index = next;
   }
   return terms;
 }
 
-export function canonicalSumExpression(references) {
-  const terms = compactA1References(references);
-  if (terms.length === 0) return "0";
+export function compactA1References(references) {
+  return compactA1ReferenceAsts(references).map((term) => renderExpression(term));
+}
+
+/**
+ * The canonical additive expression for a reference list, as a tree. An empty
+ * list is the zero literal; a single reference is itself, unwrapped; anything
+ * else is `SUM` over the compacted terms.
+ */
+export function sumExpressionAst(references) {
+  const terms = compactA1ReferenceAsts(references);
+  if (terms.length === 0) return literal(0);
   if (terms.length === 1 && references.length === 1) return terms[0];
-  return `SUM(${terms.join(",")})`;
+  return call("SUM", terms);
+}
+
+export function canonicalSumExpression(references) {
+  return renderExpression(sumExpressionAst(references));
 }
 
 export function validateFormulaRule(rule) {
@@ -154,17 +318,24 @@ export function validateFormulaRule(rule) {
   return errors;
 }
 
-export function formulaRuleComplexity(rule, formula = null) {
+/**
+ * Complexity of one compiled rule. `ast_depth` is measured on the tree the
+ * operator actually built — a rule that emitted no expression at all reports
+ * depth 0, not the flattering 1 this function used to declare for everything.
+ */
+export function formulaRuleComplexity(rule, formula = null, ast = null) {
   const repeated = (rule?.refs ?? []).filter(
     (reference, index, all) => all.indexOf(reference) !== index,
   );
+  const depth = ast === null || ast === undefined ? 0 : astDepth(ast);
   return {
-    ast_depth: 1,
+    ast_depth: depth,
     semantic_references: rule?.refs?.length ?? 0,
     unique_semantic_references: new Set(rule?.refs ?? []).size,
     repeated_references: new Set(repeated).size,
     excel_characters: formula?.length ?? null,
     within_budget:
+      depth <= FORMULA_COMPLEXITY_BUDGET.max_ast_depth &&
       (rule?.refs?.length ?? 0) <=
         FORMULA_COMPLEXITY_BUDGET.max_semantic_references &&
       new Set(repeated).size <=
@@ -174,7 +345,17 @@ export function formulaRuleComplexity(rule, formula = null) {
   };
 }
 
-export function compileStatementFormula({
+const ZERO = () => literal(0);
+
+/**
+ * Build the expression TREE for one statement formula. Returns
+ * `{ ast, formula, complexity }`; `ast` is null only where the rule emits no
+ * formula at all (a prior-period reference in the first column).
+ *
+ * `formula` is always exactly `renderFormula(ast)` — that is the property
+ * `verifyFormulaAst` exists to re-check at any later point in the pipeline.
+ */
+export function compileStatementFormulaAst({
   rule,
   definition,
   column,
@@ -185,77 +366,118 @@ export function compileStatementFormula({
 }) {
   const errors = validateFormulaRule(rule);
   if (errors.length > 0) throw new Error(errors.join(" "));
-  const refs = rule.refs.map((id) => {
+  const cells = rule.refs.map((id) => {
     const row = rowForId(id);
     if (!row) throw new Error(`Formula reference ${id} does not resolve.`);
     return `${column}${row}`;
   });
-  let formula;
+  const cell = (index) => ref(cells[index]);
+  let ast;
   switch (rule.operator) {
     case "sum": {
-      const expression = canonicalSumExpression(refs);
-      formula = roundSumDigits === null
-        ? `=${expression}`
-        : `=ROUND(${expression},${roundSumDigits})`;
+      const expression = sumExpressionAst(cells);
+      ast =
+        roundSumDigits === null
+          ? expression
+          : call("ROUND", [expression, literal(roundSumDigits)]);
       break;
     }
     case "link":
     case "schedule_link":
-      formula = `=${refs[0]}`;
+      ast = cell(0);
       break;
     case "subtract":
-      formula = `=${refs.slice(1).reduce((value, ref) => `${value}-${ref}`, refs[0])}`;
+      ast = binary("-", cells.map((text) => ref(text)));
       break;
     case "multiply":
-      formula = `=${refs.join("*")}`;
+      ast = binary("*", cells.map((text) => ref(text)));
       break;
     case "negate":
-      formula = `=-${refs[0]}`;
+      ast = { kind: "unary", operator: "-", operand: cell(0) };
       break;
     case "negate_sum":
-      formula = `=-${canonicalSumExpression(refs)}`;
+      ast = { kind: "unary", operator: "-", operand: sumExpressionAst(cells) };
       break;
     case "ratio":
-      formula = `=IFERROR(${refs[0]}/${refs[1]},0)`;
+      ast = call("IFERROR", [binary("/", [cell(0), cell(1)]), ZERO()]);
       break;
     case "negated_ratio":
-      formula = `=IFERROR(-${refs[0]}/${refs[1]},0)`;
+      ast = call("IFERROR", [
+        binary("/", [
+          { kind: "unary", operator: "-", operand: cell(0) },
+          cell(1),
+        ]),
+        ZERO(),
+      ]);
       break;
     case "growth": {
       const prior = previousColumn(column);
-      if (!prior) return { formula: '=""', complexity: formulaRuleComplexity(rule, '=""') };
+      if (!prior) {
+        const blank = literal("");
+        return {
+          ast: blank,
+          formula: renderFormula(blank),
+          complexity: formulaRuleComplexity(rule, renderFormula(blank), blank),
+        };
+      }
       const sourceRow = rowForId(rule.refs[0]);
-      formula = `=IFERROR(${column}${sourceRow}/${prior}${sourceRow}-1,0)`;
+      ast = call("IFERROR", [
+        binary("-", [
+          binary("/", [ref(`${column}${sourceRow}`), ref(`${prior}${sourceRow}`)]),
+          literal(1),
+        ]),
+        ZERO(),
+      ]);
       break;
     }
     case "tax":
-      formula = `=IF(${refs[0]}>0,-${refs[0]}*${refs[1]},0)`;
+      ast = conditional(
+        binary(">", [cell(0), ZERO()]),
+        binary("*", [{ kind: "unary", operator: "-", operand: cell(0) }, cell(1)]),
+        ZERO(),
+      );
       break;
     case "prior_period": {
       const prior = previousColumn(column);
-      if (!prior) return { formula: null, complexity: formulaRuleComplexity(rule) };
-      formula = `=${prior}${rowForId(rule.refs[0])}`;
+      if (!prior) {
+        return { ast: null, formula: null, complexity: formulaRuleComplexity(rule) };
+      }
+      ast = ref(`${prior}${rowForId(rule.refs[0])}`);
       break;
     }
     case "prior_period_scaled_by": {
       const prior = previousColumn(column);
-      if (!prior) return { formula: null, complexity: formulaRuleComplexity(rule) };
+      if (!prior) {
+        return { ast: null, formula: null, complexity: formulaRuleComplexity(rule) };
+      }
       const sourceRow = rowForId(rule.refs[0]);
       const driverRow = rowForId(rule.refs[1]);
-      formula =
-        `=IFERROR(${prior}${sourceRow}*${column}${driverRow}/` +
-        `${prior}${driverRow},0)`;
+      ast = call("IFERROR", [
+        binary("/", [
+          binary("*", [
+            ref(`${prior}${sourceRow}`),
+            ref(`${column}${driverRow}`),
+          ]),
+          ref(`${prior}${driverRow}`),
+        ]),
+        ZERO(),
+      ]);
       break;
     }
     case "average":
-      formula = `=AVERAGE(${refs.join(",")})`;
+      ast = call("AVERAGE", cells.map((text) => ref(text)));
       break;
     case "historical_average": {
       if (historicalColumns.length !== 3) {
         throw new Error("historical_average requires exactly three historical columns.");
       }
       const sourceRow = rowForId(rule.refs[0]);
-      formula = `=AVERAGE(${historicalColumns[0]}${sourceRow}:${historicalColumns[2]}${sourceRow})`;
+      ast = call("AVERAGE", [
+        range(
+          ref(`${historicalColumns[0]}${sourceRow}`),
+          ref(`${historicalColumns[2]}${sourceRow}`),
+        ),
+      ]);
       break;
     }
     case "historical_trend": {
@@ -268,19 +490,55 @@ export function compileStatementFormula({
         throw new Error("historical_trend forecast_index must be 0, 1 or 2.");
       }
       const [h1, h2, h3] = historicalColumns.map((item) => `${item}${sourceRow}`);
-      formula = `=${h3}+((${h2}-${h1})+(${h3}-${h2}))/2*${forecastIndex + 1}`;
+      // The two paired deltas are GROUPED deliberately: the expression means
+      // "the last actual plus the mean of the two period-over-period deltas",
+      // and precedence alone would flatten that reading away.
+      ast = binary("+", [
+        ref(h3),
+        binary("*", [
+          binary("/", [
+            binary("+", [
+              group(binary("-", [ref(h2), ref(h1)])),
+              group(binary("-", [ref(h3), ref(h2)])),
+            ]),
+            literal(2),
+          ]),
+          literal(forecastIndex + 1),
+        ]),
+      ]);
       break;
     }
     default:
-      throw new Error(
-        `${rule.operator} is a declared DSL operator but requires a schedule-specific emitter.`,
+      // Reached only for a declared operator with no statement emitter. The
+      // import-time classification check guarantees this is one of the four
+      // registered refusals and never an unclassified fall-through.
+      throw new UnsupportedFormulaOperatorError(
+        UNSUPPORTED_FORMULA_OPERATORS[rule.operator] ??
+          Object.freeze({
+            operator: rule.operator,
+            reason_code: "formula_operator_unclassified",
+            declared_arity: ARITY[rule.operator] ?? null,
+            emitter: null,
+            repair:
+              "Classify this operator in SUPPORTED_FORMULA_OPERATORS or UNSUPPORTED_FORMULA_OPERATORS.",
+          }),
       );
   }
-  const complexity = formulaRuleComplexity(rule, formula);
+  const formula = renderFormula(ast);
+  const complexity = formulaRuleComplexity(rule, formula, ast);
   if (!complexity.within_budget) {
     throw new Error(
       `${definition?.row_id ?? "formula"} exceeds the formula complexity budget.`,
     );
   }
+  return { ast, formula, complexity };
+}
+
+/**
+ * Text-only entry point, unchanged in shape for its existing caller. The
+ * formula it returns is rendered from the tree above, never concatenated.
+ */
+export function compileStatementFormula(options) {
+  const { formula, complexity } = compileStatementFormulaAst(options);
   return { formula, complexity };
 }
