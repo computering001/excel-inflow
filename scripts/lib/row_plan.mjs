@@ -3702,6 +3702,40 @@ function allocateRows(rows, startRow, rowsById, section) {
   return { rows: allocated, nextRow: row };
 }
 
+// Every rows_by_id identity must have exactly ONE writer. One collision family
+// is currently LAWFUL and deliberately masked: the interest schedule re-mints
+// the canonical statement semantic ids for the cash interest pair, so when a
+// case declares a statement row under either id the schedule row wins the
+// global registry while the sole consumer resolves statement identities
+// statement-first — see the admitting fallback at
+// build_dynamic_model.mjs:1251-1258 (cash_interest_paid is the id that comment
+// names; cash_interest_received is its same-block sibling resolved by the same
+// fallback). 2026-08-19 census: no shipped corpus case collides today — the
+// gate suites and the full custody-cohort equivalence run mint zero duplicates
+// — so this list is the complete lawful family, kept only because the masked
+// shape is reachable by any canonical case that names a statement row after
+// either id. It exists so P3.6 proper can retire the mask; it is not an
+// invitation to add entries. Any duplicate mint outside it is a plan-compile
+// defect and throws.
+export const KNOWN_ROW_ID_COLLISIONS = Object.freeze([
+  "cash_interest_paid",
+  "cash_interest_received",
+]);
+
+function mintPlanRowId(rowsById, rowId, row) {
+  if (
+    Object.hasOwn(rowsById, rowId) &&
+    !KNOWN_ROW_ID_COLLISIONS.includes(rowId)
+  ) {
+    throw new Error(
+      `ROW_PLAN_DUPLICATE_ROW_ID: rows_by_id["${rowId}"] minted twice ` +
+        `(existing row ${rowsById[rowId]}, duplicate row ${row}); only ` +
+        `KNOWN_ROW_ID_COLLISIONS may collide.`,
+    );
+  }
+  rowsById[rowId] = row;
+}
+
 function semanticSlug(value) {
   return String(value)
     .trim()
@@ -4086,7 +4120,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
   ].sort()) {
     if (!forecastFxRateMoves(modelCase, currency)) continue;
     debtFxRows[currency] = cursor;
-    rowsById[`debt_fx.${currency}`] = cursor;
+    mintPlanRowId(rowsById, `debt_fx.${currency}`, cursor);
     cursor += 1;
   }
   const groupedDebtPresentation = sorted.length > 0;
@@ -4128,12 +4162,19 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     const group = displayGroup ? groupByLabel.get(displayGroup) : null;
     if (group && group.header_row === null) {
       group.header_row = cursor;
-      rowsById[`debt_group.${group.group_id}.header`] = cursor;
+      mintPlanRowId(rowsById, `debt_group.${group.group_id}.header`, cursor);
       cursor += 1;
     }
     const plan = {
       instrument_id: instrument.instrument_id,
       display_group: displayGroup,
+      // The GROUP KEY travels with the human label. Downstream joins (the
+      // semantic graph's instrument→group-subtotal edges) must bind on this
+      // key: normalising the label re-derives a DIFFERENT token for the
+      // unclassified-review group ("Unclassified — review required" →
+      // unclassified_review_required ≠ unclassified_review) and silently
+      // orphaned every instrument in that group.
+      display_group_key: group ? group.group_id : null,
       // The validator needs the same semantic distinction as the emitter:
       // a contractual term maturity is governed by the roll switch, whereas a
       // documented non-maturing/evergreen balance is deliberately not. Carry
@@ -4152,7 +4193,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       interest_row: null,
       pik_interest_row: null,
     };
-    rowsById[`debt.${instrument.instrument_id}`] = cursor;
+    mintPlanRowId(rowsById, `debt.${instrument.instrument_id}`, cursor);
     cursor += 1;
     // A committed facility gets ONE line in the debt schedule: the drawn
     // balance. The undrawn memo row that used to sit beneath it is gone — it
@@ -4162,7 +4203,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     // straight off capacity less drawn.
     if ((instrument.new_issuance ?? []).some((value) => Math.abs(Number(value || 0)) > 0)) {
       plan.issuance_row = cursor;
-      rowsById[`debt.${instrument.instrument_id}.issuance`] = cursor;
+      mintPlanRowId(rowsById, `debt.${instrument.instrument_id}.issuance`, cursor);
       cursor += 1;
     }
     if (
@@ -4171,7 +4212,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       )
     ) {
       plan.amortisation_row = cursor;
-      rowsById[`debt.${instrument.instrument_id}.amortisation`] = cursor;
+      mintPlanRowId(rowsById, `debt.${instrument.instrument_id}.amortisation`, cursor);
       cursor += 1;
     }
     const compiledStates = [0, 1, 2].map((index) =>
@@ -4225,7 +4266,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       )
     ) {
       plan.pik_row = cursor;
-      rowsById[`debt.${instrument.instrument_id}.pik`] = cursor;
+      mintPlanRowId(rowsById, `debt.${instrument.instrument_id}.pik`, cursor);
       cursor += 1;
     }
     if (
@@ -4234,7 +4275,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       )
     ) {
       plan.fair_value_row = cursor;
-      rowsById[`debt.${instrument.instrument_id}.fair_value`] = cursor;
+      mintPlanRowId(rowsById, `debt.${instrument.instrument_id}.fair_value`, cursor);
       cursor += 1;
     }
     if (
@@ -4247,7 +4288,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       )
     ) {
       plan.other_non_cash_row = cursor;
-      rowsById[`debt.${instrument.instrument_id}.other_non_cash`] = cursor;
+      mintPlanRowId(rowsById, `debt.${instrument.instrument_id}.other_non_cash`, cursor);
       cursor += 1;
     }
     instrumentPlans.push(plan);
@@ -4256,7 +4297,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       group.instrument_ids.at(-1) === instrument.instrument_id
     ) {
       group.subtotal_row = cursor;
-      rowsById[`debt_group.${group.group_id}.subtotal`] = cursor;
+      mintPlanRowId(rowsById, `debt_group.${group.group_id}.subtotal`, cursor);
       cursor += 1;
     }
   }
@@ -4388,7 +4429,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       continue;
     }
     debtSummaryRows[id] = cursor;
-    rowsById[id] = cursor;
+    mintPlanRowId(rowsById, id, cursor);
     cursor += 1;
   }
   cursor += 1;
@@ -4453,7 +4494,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     "liquidity_shortfall",
   ]) {
     waterfallRows[id] = cursor;
-    rowsById[id] = cursor;
+    mintPlanRowId(rowsById, id, cursor);
     cursor += 1;
   }
   cursor += 1;
@@ -4469,7 +4510,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     benchmarkCurvePlan(modelCase);
   for (const curve of benchmarkCurves) {
     benchmarkRows[curve.key] = cursor;
-    rowsById[`benchmark.${curve.key}`] = cursor;
+    mintPlanRowId(rowsById, `benchmark.${curve.key}`, cursor);
     cursor += 1;
   }
   const benchmarkFloorRows = {};
@@ -4490,7 +4531,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       rates: instrument.benchmark_floor.map(Number),
       row: cursor,
     });
-    rowsById[`benchmark_floor.${instrument.instrument_id}`] = cursor;
+    mintPlanRowId(rowsById, `benchmark_floor.${instrument.instrument_id}`, cursor);
     cursor += 1;
   }
   for (const instrument of orderedInstruments) {
@@ -4502,12 +4543,12 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
       rates: instrument.pik_rate.map(Number),
       row: cursor,
     });
-    rowsById[`pik_rate.${instrument.instrument_id}`] = cursor;
+    mintPlanRowId(rowsById, `pik_rate.${instrument.instrument_id}`, cursor);
     cursor += 1;
   }
   for (const bucket of cashBucketPlans) {
     bucket.rate_row = cursor;
-    rowsById[`cash_yield.${bucket.bucket_id}`] = cursor;
+    mintPlanRowId(rowsById, `cash_yield.${bucket.bucket_id}`, cursor);
     cursor += 1;
   }
   const interestTermHeaderRow = cursor;
@@ -4527,7 +4568,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
   if (groupedDebtPresentation) {
     for (const group of debtGroups) {
       group.interest_header_row = cursor;
-      rowsById[`interest_group.${group.group_id}.header`] = cursor;
+      mintPlanRowId(rowsById, `interest_group.${group.group_id}.header`, cursor);
       cursor += 1;
       for (const instrumentId of group.instrument_ids) {
         if (!carriesInterestRow(instrumentId)) continue;
@@ -4535,7 +4576,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
           (plan) => plan.instrument_id === instrumentId,
         );
         instrumentPlan.interest_row = cursor;
-        rowsById[`interest.${instrumentPlan.instrument_id}`] = cursor;
+        mintPlanRowId(rowsById, `interest.${instrumentPlan.instrument_id}`, cursor);
         cursor += 1;
         const instrument = instrumentById.get(instrumentId);
         if (
@@ -4544,19 +4585,19 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
           )
         ) {
           instrumentPlan.pik_interest_row = cursor;
-          rowsById[`interest.${instrumentPlan.instrument_id}.pik`] = cursor;
+          mintPlanRowId(rowsById, `interest.${instrumentPlan.instrument_id}.pik`, cursor);
           cursor += 1;
         }
       }
       group.interest_subtotal_row = cursor;
-      rowsById[`interest_group.${group.group_id}.subtotal`] = cursor;
+      mintPlanRowId(rowsById, `interest_group.${group.group_id}.subtotal`, cursor);
       cursor += 1;
     }
   } else {
     for (const instrumentPlan of instrumentPlans) {
       if (!carriesInterestRow(instrumentPlan.instrument_id)) continue;
       instrumentPlan.interest_row = cursor;
-      rowsById[`interest.${instrumentPlan.instrument_id}`] = cursor;
+      mintPlanRowId(rowsById, `interest.${instrumentPlan.instrument_id}`, cursor);
       cursor += 1;
       const instrument = instrumentById.get(instrumentPlan.instrument_id);
       if (
@@ -4565,7 +4606,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
         )
       ) {
         instrumentPlan.pik_interest_row = cursor;
-        rowsById[`interest.${instrumentPlan.instrument_id}.pik`] = cursor;
+        mintPlanRowId(rowsById, `interest.${instrumentPlan.instrument_id}.pik`, cursor);
         cursor += 1;
       }
     }
@@ -4575,7 +4616,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     cursor += 1;
     for (const bucket of cashBucketPlans) {
       bucket.interest_row = cursor;
-      rowsById[`cash_interest.${bucket.bucket_id}`] = cursor;
+      mintPlanRowId(rowsById, `cash_interest.${bucket.bucket_id}`, cursor);
       cursor += 1;
     }
   }
@@ -4612,7 +4653,7 @@ export function compileRowPlan(modelCase, { instrumentPeriodState = null } = {})
     "net_interest_expense",
   ]) {
     interestSummaryRows[id] = cursor;
-    rowsById[id] = cursor;
+    mintPlanRowId(rowsById, id, cursor);
     cursor += 1;
   }
 

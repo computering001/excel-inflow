@@ -190,12 +190,9 @@ function uniqueSorted(values) {
   );
 }
 
-function normaliseGroupKey(label) {
-  return String(label)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
+// (The label-normalising group-key helper that used to live here is gone on
+// purpose: group joins bind on the minted display_group_key, never on a
+// re-derivation of the human label.)
 
 function dependencies(definition) {
   return canonicalForecastStatementDependencies(definition);
@@ -532,6 +529,10 @@ function instrumentNodes(modelCase, rowPlan, instrumentPeriodState = null) {
       label: instrument.name ?? plan.instrument_id,
       instrument_class: instrument.class ?? null,
       display_group: plan.display_group ?? null,
+      // The group KEY is the join identity; the label above is presentation
+      // only. Joining on a normalised label silently orphaned the
+      // unclassified-review group (label normalises to a different token).
+      display_group_key: plan.display_group_key ?? null,
       maturity_treatment: instrument.maturity_treatment ?? "contractual",
       repayment_state_by_period: [
         ...(plan.repayment_state_by_period ?? ["zero", "zero", "zero"]),
@@ -848,6 +849,12 @@ function graphEdges(nodes, rowPlan) {
   );
   const statement = (role) => statementByRole.get(role) ?? null;
   const explicitCashBuckets = (rowPlan.cash_buckets ?? []).length > 0;
+  // Instruments join their presentation-group subtotals on the GROUP KEY the
+  // row plan minted, never on a normalisation of the human label: the
+  // unclassified-review label normalises to a different token than its key,
+  // which silently orphaned every instrument in that group. A declared group
+  // whose subtotal node is missing is a manifest defect and must surface as a
+  // typed violation, not a silently dropped edge.
   const groupByInstrument = new Map(
     nodes
       .filter(
@@ -856,22 +863,37 @@ function graphEdges(nodes, rowPlan) {
       )
       .map((node) => [
         node.instrument_id,
-        normaliseGroupKey(node.display_group ?? ""),
+        node.display_group_key ?? null,
       ]),
   );
+  const requireGroupNode = (nodeId, plan, groupKey) => {
+    if (present.has(nodeId)) return nodeId;
+    const error = new Error(
+      `ECONOMIC_GRAPH_GROUP_NODE_ABSENT: instrument ${plan.instrument_id} ` +
+        `declares presentation group ${groupKey} but node ${nodeId} is ` +
+        `absent from the manifest.`,
+    );
+    error.violation_code = "ECONOMIC_GRAPH_GROUP_NODE_ABSENT";
+    throw error;
+  };
   for (const plan of rowPlan.instruments ?? []) {
-    const groupKey = groupByInstrument.get(plan.instrument_id);
+    const groupKey = groupByInstrument.get(plan.instrument_id) ?? null;
+    if (!groupKey) continue;
     link(
-      groupKey ? `debt_group.${groupKey}.subtotal` : null,
+      requireGroupNode(`debt_group.${groupKey}.subtotal`, plan, groupKey),
       `instrument.${plan.instrument_id}.balance`,
     );
     link(
-      groupKey ? `interest_group.${groupKey}.subtotal` : null,
+      requireGroupNode(`interest_group.${groupKey}.subtotal`, plan, groupKey),
       `instrument.${plan.instrument_id}.interest`,
     );
     if (plan.pik_interest_row) {
       link(
-        groupKey ? `interest_group.${groupKey}.subtotal` : null,
+        requireGroupNode(
+          `interest_group.${groupKey}.subtotal`,
+          plan,
+          groupKey,
+        ),
         `instrument.${plan.instrument_id}.pik_interest`,
       );
     }
