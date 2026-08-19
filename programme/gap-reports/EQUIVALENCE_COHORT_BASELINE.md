@@ -2,9 +2,11 @@
 
 ## Finding
 `node scripts/run_case_compiler_equivalence.mjs` (full run, custody root present) exits 1 with
-stable totals: **55 economic path diffs / 90 compile blocks / 1 failed compiled solve / 0 hard plan
-diffs / 0 failed plan compiles**, concentrated in the frozen custody packs (astrazeneca-v2,
-kerry-v2 variants). Verified in PRISTINE worktrees:
+stable totals. **CURRENT PIN (from P2.10, defect D5): 55 economic path diffs / 98 compile blocks /
+1 failed compiled solve / 0 hard plan diffs / 0 failed plan compiles.** The compile-block count was
+90 before P2.10 unified the footing tolerance; see "Baseline movement" below for the traced cause.
+The divergence is concentrated in the frozen custody packs (astrazeneca-v2, kerry-v2 variants,
+kingspan-v2). Verified in PRISTINE worktrees:
 
 - at `30a6d50` (committed head, no working changes): exit 1, totals above;
 - with the P2.3+P2.5+P4.2 working tree applied: exit 1, IDENTICAL totals — the three packages
@@ -33,3 +35,33 @@ named migration owners) or a recorded refusal treatment per pack. Until then thi
 custody run is a KNOWN RED with the totals pinned above; a change to these totals in either
 direction requires investigation. Never "fix" this by weakening compile blocks or regenerating
 frozen packs.
+
+## Baseline movement — 90 -> 98 compile blocks (P2.10 / defect D5, 2026-08-19)
+Investigated end to end as this document requires, and independently re-verified by the
+coordinator (55/98/1/0/0; kingspan-v2 33 -> 41 blocks, every other pack unchanged).
+
+Cause: P2.10 replaced two disagreeing footing tolerances with one IEEE754-derived bound
+(rounding tolerance for the declared precision + a recursive-summation float-noise bound).
+Both prior forms were wrong in opposite directions: case_compiler's exact-0 REJECTED
+arithmetic that is correct to the printed precision, while model_ir_v3's `1e-9 * max(1,|target|)`
+ACCEPTED a genuine one-printed-unit break at a 500,000,000 total (tolerance 1.0). The footing
+pass was the LOOSER oracle, not merely the more permissive one.
+
+kingspan-v2's own filed values are float-contaminated (cf.ending = 584.6999999999997,
+is.gross_profit = 2339.7000000000007). The movement decomposes exactly:
+- MINUS 1: a FALSE face_additivity block on cf.ending disappears — a 3.4e-13 residue on 584.7
+  had been reported as a mis-footed subtotal.
+- PLUS 9: operating_profit (filed 835.2 / 862.1 / 903.5) now reconstructs as
+  trading_profit + intangible_amortisation (residues 7.9e-13 / 4.5e-13 / 1.1e-13, all of which
+  exact-0 rejected). Recovering that real identity makes trading_profit a source-visible
+  aggregate, so the frozen pack's missing children-owned forecast authority is refused across
+  3 channels x 3 periods.
+
+Direction: STRICTER. One false refusal removed; nine real refusals gained. The newly refused
+thing is precisely the pre-contract migration debt this document already names as the cohort's
+disposition (P1.2/P1.3 remainder). Nothing was weakened to reach it, and no golden or frozen
+pack was regenerated.
+
+Side effect, recorded: bridge_operating_profit / reported_ebitda history shifts by ~7e-13
+(835.2 -> 835.2000000000007) because a recovered filed subtotal trades filed values for the
+minted formula.

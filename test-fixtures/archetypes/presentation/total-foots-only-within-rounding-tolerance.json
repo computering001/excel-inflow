@@ -111,8 +111,8 @@
         }
       ],
       "asserts": {
-        "without_declared_precision_the_case_compiler_oracle_rejects_the_same_printed_total": {
-          "matches": false
+        "without_declared_precision_both_oracles_accept_on_a_float_noise_bound": {
+          "matches": true
         }
       }
     },
@@ -147,7 +147,7 @@
         }
       ],
       "asserts": {
-        "the_model_ir_footing_oracle_accepts_what_the_case_compiler_oracle_rejects": {
+        "both_footing_oracles_return_one_verdict_from_one_tolerance": {
           "proof_status": "PASS",
           "family_codes": {
             "__length": 0

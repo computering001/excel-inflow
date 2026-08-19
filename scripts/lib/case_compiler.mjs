@@ -25,6 +25,10 @@ import {
   faceStatementManifestDigest,
 } from "./face_statement_manifest.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
+import {
+  declaredPrecisions,
+  rowSourceTolerance,
+} from "./source_tolerance.mjs";
 import { validateCaseShape } from "./solver.mjs";
 import { applyCaptureMark, clearCaptureMark } from "./capture_transition.mjs";
 import { assessCoverage } from "./coverage.mjs";
@@ -154,28 +158,35 @@ function typedHistoricalStates(line) {
   });
 }
 
+// JSON numbers do not preserve the source's printed decimal places. In
+// particular, deriving precision from String(binaryFloat) can mint 14–17
+// fictitious decimal places. Legacy manifests without explicit precision
+// therefore receive exact-only arithmetic and no invented custody stamp.
+// The reader itself lives in source_tolerance.mjs (P2.10) so this file's
+// footing oracle and model_ir_v3's cannot read different precision keys off
+// the same row.
 function typedHistoricalPrecisions(line) {
-  const declared = line?.value_precisions ??
-    line?.historical_value_precisions ??
-    line?.reported_historical_value_precisions;
-  if (Array.isArray(declared) && declared.length === 3) {
-    return declared.map((precision) =>
-      Number.isInteger(precision) && precision >= 0 && precision <= 12
-        ? precision
-        : null,
-    );
-  }
-  // JSON numbers do not preserve the source's printed decimal places. In
-  // particular, deriving precision from String(binaryFloat) can mint 14–17
-  // fictitious decimal places. Legacy manifests without explicit precision
-  // therefore receive exact-only arithmetic and no invented custody stamp.
-  return [null, null, null];
+  return declaredPrecisions(line);
 }
 
-function sourceTolerance(line, period) {
-  const precision = typedHistoricalPrecisions(line)[period];
-  if (!Number.isInteger(precision) || precision < 0) return 0;
-  return 0.5 * (10 ** -precision) + 1e-12;
+/**
+ * The source-arithmetic tolerance. ONE home, in source_tolerance.mjs: half a
+ * printed unit where the source declared a precision, plus the IEEE754 noise
+ * floor of the specific comparison being made.
+ *
+ * `comparison` describes the arithmetic, not the row. A caller comparing a sum
+ * against a printed target passes `{ target, terms }` and receives the noise
+ * floor of THAT sum; a caller testing a single magnitude passes nothing and
+ * receives the rounding tolerance alone.
+ *
+ * Before P2.10 this returned EXACTLY 0 with no declared precision, so
+ * 12.3 + 45.6 (which is 57.900000000000006 in doubles) was reported as failing
+ * to foot against a printed 57.9 — the check rejected arithmetic that is
+ * correct to every printed digit, while model_ir_v3's copy of the same
+ * tolerance passed it. Defect register D5.
+ */
+function sourceTolerance(line, period, comparison = {}) {
+  return rowSourceTolerance(line, period, comparison);
 }
 
 function typedNumericSeries(line) {
@@ -210,11 +221,13 @@ function sourceHistoricalSumMatchPeriods(parent, members) {
   if (!target || series.length === 0 || series.some((values) => values === null)) {
     return null;
   }
-  return target.map((value, period) =>
-    Math.abs(
-      series.reduce((sum, values) => sum + values[period], 0) - value,
-    ) <= sourceTolerance(parent, period),
-  );
+  return target.map((value, period) => {
+    const terms = series.map((values) => values[period]);
+    return (
+      Math.abs(terms.reduce((sum, item) => sum + item, 0) - value) <=
+      sourceTolerance(parent, period, { target: value, terms })
+    );
+  });
 }
 
 export function sourceHistoricalSumMatches(parent, members) {
@@ -457,11 +470,13 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
       const candidates = candidateEntries.map((entry) => entry.row);
       const series = candidates.map((candidate) => numericSeries(candidate));
       if (series.some((values) => values === null)) break;
-      const matches = target.every((value, period) =>
-        Math.abs(
-          series.reduce((sum, values) => sum + values[period], 0) - value,
-        ) <= sourceTolerance(parentLine, period),
-      );
+      const matches = target.every((value, period) => {
+        const terms = series.map((values) => values[period]);
+        return (
+          Math.abs(terms.reduce((sum, item) => sum + item, 0) - value) <=
+          sourceTolerance(parentLine, period, { target: value, terms })
+        );
+      });
       if (!matches) continue;
       const parentRowId = candidateParentRow?.row_id;
       const wouldReverseExistingIdentity = Boolean(
@@ -550,11 +565,9 @@ function compileStatementSection({ section, manifests, mapEntries, report, expan
           (child) => child?.values?.[period] === null || child?.values?.[period] === undefined,
         )
       ) continue;
-      const total = childLines.reduce(
-        (sum, child) => sum + Number(child.values[period]),
-        0,
-      );
-      const tolerance = sourceTolerance(parentLine, period);
+      const terms = childLines.map((child) => Number(child.values[period]));
+      const total = terms.reduce((sum, item) => sum + item, 0);
+      const tolerance = sourceTolerance(parentLine, period, { target, terms });
       if (Math.abs(total - target) > tolerance) {
         report.add(
           "statement_map.face_additivity",

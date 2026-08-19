@@ -521,14 +521,14 @@
           "statement": "With the source's printed precision declared (one decimal place), the footing oracle accepts the printed total: tolerance is derived from the source, not from a global epsilon."
         },
         {
-          "expectation_id": "without_declared_precision_the_case_compiler_oracle_rejects_the_same_printed_total",
+          "expectation_id": "without_declared_precision_both_oracles_accept_on_a_float_noise_bound",
           "kind": "identity_or_footing",
-          "statement": "DEFECT (half 1 of 2): with no declared precision the case-compiler footing oracle uses EXACT arithmetic (tolerance 0) and rejects the very same printed total on float representation alone."
+          "statement": "With no declared precision BOTH footing oracles accept the same printed total, because the unified tolerance carries an IEEE754 recursive-summation noise bound (P2.10, defect D5). Exact-0 arithmetic previously rejected the total on float representation alone, which is arithmetic that is correct to the printed precision being called a mis-footing."
         },
         {
-          "expectation_id": "the_model_ir_footing_oracle_accepts_what_the_case_compiler_oracle_rejects",
+          "expectation_id": "both_footing_oracles_return_one_verdict_from_one_tolerance",
           "kind": "identity_or_footing",
-          "statement": "DEFECT (half 2 of 2): the model-IR footing oracle, whose comment claims it MIRRORS the case-compiler tolerance, adds a 1e-9 relative float allowance and ACCEPTS the same undeclared-precision numbers. Two footing oracles, two verdicts, identical printed figures."
+          "statement": "The model-IR and case-compiler footing oracles now agree on identical printed figures because they consume ONE shared tolerance (lib/source_tolerance.mjs). Previously the model-IR oracle added a 1e-9 relative allowance that ACCEPTED a genuine one-printed-unit break at a 500,000,000 total, so it was the looser oracle; the unified bound is float-noise-only and materially tighter."
         }
       ],
       "extraction_evidence_still_required": false
@@ -713,9 +713,9 @@
           "statement": "When the dash is classified as zero, a nil total under members summing to 30 BLOCKS as an unfooted material total — the classification makes the contradiction visible."
         },
         {
-          "expectation_id": "the_same_dash_encoded_as_absent_silently_disables_the_footing_check",
+          "expectation_id": "the_same_dash_encoded_as_absent_is_refused_as_unclassified",
           "kind": "identity_or_footing",
-          "statement": "DEFECT: encoding the same dash as ABSENT (what a naive dash reader emits) makes the footing pass skip the period entirely — proof status PASS with zero findings against members summing to 30. The never-zero invariant protects absence from becoming zero, but nothing forces a printed dash to be CLASSIFIED, so a genuine reported nil silently escapes footing."
+          "statement": "Encoding the same dash as an unclassified printed glyph now BLOCKS with three STATEMENT_FAMILY_UNCLASSIFIED_FILED_CELL findings (reason printed_glyph_unclassified) rather than silently skipping the period (P2.10, defect D6). The finding asserts nothing about the value, so no zero is minted; a genuinely absent cell must be DECLARED absent (reported_blank / not_applicable), which stays silent as before."
         }
       ],
       "extraction_evidence_still_required": true

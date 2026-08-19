@@ -11,6 +11,13 @@ import {
   attachShadowEconomicIr,
   economicIrReceiptBinding,
 } from "./economic_ir.mjs";
+import {
+  declaredUnitMagnitude,
+  filedCellAssertion,
+  filedNumber,
+  printedUnitMagnitude,
+  rowSourceTolerance,
+} from "./source_tolerance.mjs";
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
@@ -496,26 +503,17 @@ export function compileModelIrV3({
       .filter((item) => item.material === true)
       .map((item) => item.display_id),
   );
-  const filedNumber = (value) => {
-    if (value === null || value === undefined || value === "") return null;
-    if (typeof value === "boolean") return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-  };
-  // Mirrors the case compiler's sourceTolerance: half a unit in the filed
-  // precision when the source declared one, exact-plus-float-epsilon when it
-  // did not (JSON floats do not preserve printed decimal places).
-  const footingTolerance = (row, period, target) => {
-    const precisions =
-      row.reported_historical_value_precisions ??
-      row.historical_value_precisions;
-    const precision = Array.isArray(precisions) ? precisions[period] : null;
-    const rounding =
-      Number.isInteger(precision) && precision >= 0 && precision <= 12
-        ? 0.5 * 10 ** -precision
-        : 0;
-    return rounding + 1e-9 * Math.max(1, Math.abs(target)) + 1e-12;
-  };
+  // `filedNumber`, `filedCellAssertion` and the footing tolerance all come
+  // from source_tolerance.mjs (P2.10). This comment used to CLAIM the tolerance
+  // mirrored the case compiler's `sourceTolerance` while in fact adding
+  // `1e-9 * max(1, |target|)` the compiler did not have: on 12.3 + 45.6 against
+  // a printed 57.9 the compiler reported a mis-footing and this pass reported
+  // none, and at a printed total of 500,000,000 with precision 0 the same
+  // epsilon doubled the half-unit allowance so a genuine ONE-UNIT break passed
+  // here. There is now one tolerance, in one home, and both oracles consume it
+  // — see defect register D5.
+  const footingTolerance = (row, period, target, terms) =>
+    rowSourceTolerance(row, period, { target, terms });
   for (const row of planStatementRows) {
     const declaredFamilyTotal =
       ["reported_parent", "derived_from_children"].includes(
@@ -575,9 +573,47 @@ export function compileModelIrV3({
       const value = filedNumber(member.values?.[period]);
       return value === null ? { state: "missing" } : { state: "filed", value };
     };
+    // Which of the row's two filed series the target came from decides which
+    // classification the cell must carry.
+    const targetRow =
+      row.historical_authority === "reported_total_reconciled"
+        ? { value_states: row.reported_historical_value_states }
+        : { value_states: row.historical_value_states ?? row.value_states };
     for (let period = 0; period < 3; period += 1) {
       const target = filedNumber(filedTarget[period]);
-      if (target === null) continue; // a filed dash asserts nothing.
+      if (target === null) {
+        // A DECLARED absence asserts nothing and stays silent — that is the
+        // never-zero invariant working, and it must not become a failure.
+        // An UNCLASSIFIED cell is a different thing: nothing forced the case to
+        // say whether the glyph was a reported nil or a blank, so a genuine
+        // reported nil used to escape the footing pass entirely (a total filed
+        // as three dashes against members summing to 30 compiled PASS with
+        // zero findings). The absence of a classification is itself the defect
+        // — typed here, never resolved to zero and never guessed. Defect
+        // register D6.
+        const assertion = filedCellAssertion(
+          targetRow,
+          period,
+          filedTarget[period],
+        );
+        if (assertion.kind === "declared_absent") continue;
+        const unclassified = finding(
+          "STATEMENT_FAMILY_UNCLASSIFIED_FILED_CELL",
+          assertion.reason === "printed_glyph_unclassified"
+            ? `${row.row_id} carries a printed cell in historical period ${period + 1} whose state ${assertion.state} declares no numeric reading; a printed glyph must be classified as a reported nil or a declared absence before its family can be footed.`
+            : assertion.reason === "value_bearing_state_over_empty_cell"
+              ? `${row.row_id} classifies historical period ${period + 1} as ${assertion.state}, but the cell carries no number; the classification contradicts the filed series.`
+              : `${row.row_id} files no value in historical period ${period + 1} and declares no classification for it; an unclassified cell is neither a reported nil nor a declared absence, so its family cannot be footed (it is never read as zero).`,
+          {
+            display_ids: [row.row_id, ...memberIds],
+            period,
+            declared_state: assertion.state,
+            reason: assertion.reason,
+          },
+        );
+        (material ? blockers : warnings).push(unclassified);
+        continue;
+      }
       const memberStates = memberIds.map((memberId) =>
         memberFiledState(memberId, period),
       );
@@ -602,8 +638,12 @@ export function compileModelIrV3({
         }
         continue;
       }
-      const membersSum = memberStates.reduce((sum, item) => sum + item.value, 0);
-      if (Math.abs(membersSum - target) > footingTolerance(row, period, target)) {
+      const memberTerms = memberStates.map((item) => item.value);
+      const membersSum = memberTerms.reduce((sum, value) => sum + value, 0);
+      if (
+        Math.abs(membersSum - target) >
+        footingTolerance(row, period, target, memberTerms)
+      ) {
         const unfooted = finding(
           "STATEMENT_FAMILY_UNFOOTED_TOTAL",
           `${row.row_id} prints ${target} in historical period ${period + 1}, but its ${memberIds.length} members sum to ${Number(membersSum.toFixed(6))}; a ${material ? "material" : "immaterial"} family total must foot against its members.`,
@@ -617,6 +657,101 @@ export function compileModelIrV3({
         (material ? blockers : warnings).push(unfooted);
       }
     }
+  }
+  // ---- Declared-vs-printed unit scale (P2.10 / D9) -----------------------
+  // A PARTIAL unit mis-scale mis-foots, so the pass above refuses it. A UNIFORM
+  // one is invisible to footing BY CONSTRUCTION: every member and its total are
+  // in the same wrong scale, so every identity holds exactly and the whole
+  // model is out by 1000x. Rewriting standard-maximal-v2's printed unit
+  // witnesses from "USD millions" to "USD thousands" changed not one finding.
+  //
+  // P2.1 landed the reconciliation on the extraction side
+  // (scripts/extract_filing_statements.py reconcile_unit_labels ->
+  // UNIT_LABEL_MISMATCH / UNIT_LABEL_UNPARSED), but that pass only sees a
+  // filing it extracted itself; a case that reached the compiler by any other
+  // route has never been reconciled. The compile boundary therefore reconciles
+  // the witness the CASE carries — provenance[row][].units, which the contract
+  // requires on every provenance entry — against the single declared basis
+  // issuer.units, reading a label with the same vocabulary the Python side uses.
+  //
+  // This is a validator: it keeps the declaration and refuses. It never rescales
+  // a number, never rewrites issuer.units, and never invents a witness a case
+  // does not carry.
+  const declaredUnits = declaredUnitMagnitude(modelCase?.issuer?.units);
+  const printedUnitWitnesses = new Map();
+  const unparsedUnitWitnesses = new Map();
+  for (const [rowId, entries] of Object.entries(modelCase?.provenance ?? {})) {
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      const label = entry?.units;
+      if (typeof label !== "string" || label.trim() === "") continue;
+      const printed = printedUnitMagnitude(label);
+      const bucket = printed === null ? unparsedUnitWitnesses : printedUnitWitnesses;
+      const key = printed ?? label;
+      if (!bucket.has(key)) bucket.set(key, { labels: new Set(), rows: new Set() });
+      bucket.get(key).labels.add(label);
+      bucket.get(key).rows.add(rowId);
+    }
+  }
+  const printedMagnitudes = [...printedUnitWitnesses.keys()];
+  if (printedMagnitudes.length > 1) {
+    // The honest refusal: `issuer.units` is ONE enumerated scalar, so a filing
+    // printing two magnitudes has no lawful representation in the case contract
+    // (defect register D7c). Naming the limitation is the correct treatment —
+    // inventing a per-statement unit field here, or silently electing one of
+    // the printed magnitudes as the winner, would both be worse.
+    blockers.push(
+      finding(
+        "UNIT_SCALE_PER_STATEMENT_UNREPRESENTABLE",
+        `The case's printed unit witnesses assert ${printedMagnitudes.length} different magnitudes (${printedMagnitudes.join(", ")}), but issuer.units is a single scalar for the whole case; a per-statement unit scale is UNREPRESENTABLE in the case contract, so no scale can be elected here.`,
+        {
+          printed_magnitudes: printedMagnitudes,
+          declared_units: declaredUnits,
+          contract_limitation: "issuer.units_is_a_single_scalar",
+          display_ids: [
+            ...new Set(
+              printedMagnitudes.flatMap((magnitude) => [
+                ...printedUnitWitnesses.get(magnitude).rows,
+              ]),
+            ),
+          ].sort(portableCompare),
+        },
+      ),
+    );
+  }
+  if (declaredUnits !== null) {
+    for (const magnitude of printedMagnitudes) {
+      if (magnitude === declaredUnits) continue;
+      const witness = printedUnitWitnesses.get(magnitude);
+      const rows = [...witness.rows].sort(portableCompare);
+      blockers.push(
+        finding(
+          "DECLARED_UNIT_SCALE_CONTRADICTED",
+          `${rows.length} row(s) carry a printed unit witness in ${magnitude} (${[...witness.labels].sort(portableCompare).join(", ")}) while the case declares issuer.units ${declaredUnits}; a uniform scale contradiction foots perfectly and can never be caught by footing. The declaration is kept, not repaired.`,
+          {
+            printed_units: magnitude,
+            declared_units: declaredUnits,
+            display_ids: rows,
+          },
+        ),
+      );
+    }
+  }
+  for (const [label, witness] of unparsedUnitWitnesses) {
+    // Inability to verify RECORDS; only a proven contradiction refuses. A
+    // provenance unit witness is free text, so an unreadable label proves
+    // nothing about the scale — the fail-closed reading of a printed unit
+    // HEADER belongs to extraction, which can see the page.
+    warnings.push(
+      finding(
+        "PRINTED_UNIT_WITNESS_UNPARSED",
+        `The printed unit witness "${label}" does not parse to a magnitude, so it cannot be reconciled against the declared basis ${declaredUnits ?? "(undeclared)"}; the scale is unverified, never assumed.`,
+        {
+          label,
+          declared_units: declaredUnits,
+          display_ids: [...witness.rows].sort(portableCompare),
+        },
+      ),
+    );
   }
   // A rendered row carrying a protected identity role with an EMPTY member
   // set would silently receive no workbook identity protection; record it.

@@ -140,10 +140,16 @@
         }
       ],
       "asserts": {
-        "the_same_dash_encoded_as_absent_silently_disables_the_footing_check": {
-          "proof_status": "PASS",
+        "the_same_dash_encoded_as_absent_is_refused_as_unclassified": {
+          "proof_status": "BLOCK",
           "family_codes": {
-            "__length": 0
+            "__length": 3,
+            "__contains": [
+              "STATEMENT_FAMILY_UNCLASSIFIED_FILED_CELL"
+            ],
+            "__excludes": [
+              "STATEMENT_FAMILY_UNFOOTED_TOTAL"
+            ]
           }
         }
       }
