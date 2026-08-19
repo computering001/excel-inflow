@@ -36,6 +36,7 @@ import {
   validateProgressEvidence,
 } from "./lib/progress_heartbeat.mjs";
 import { resolveActiveSourceIdentity } from "./lib/source_identity.mjs";
+import { classifySupport } from "./lib/support_envelope.mjs";
 
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -57,12 +58,16 @@ const STATE_SCHEMA = JSON.parse(
 );
 // The support-envelope contract governing this runtime (P0.4): identity is
 // bound by digest so every run receipt names the exact envelope version.
-const SUPPORT_ENVELOPE_IDENTITY = await (async () => {
+const { SUPPORT_ENVELOPE_IDENTITY, SUPPORT_ENVELOPE_CONTRACT } = await (async () => {
   const contractPath = path.join(ROOT, "assets", "support-envelope-v377.json");
   const bytes = await fs.readFile(contractPath);
+  const contract = JSON.parse(bytes.toString("utf8"));
   return {
-    version: JSON.parse(bytes.toString("utf8")).envelope_version,
-    sha256: createHash("sha256").update(bytes).digest("hex"),
+    SUPPORT_ENVELOPE_CONTRACT: contract,
+    SUPPORT_ENVELOPE_IDENTITY: {
+      version: contract.envelope_version,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    },
   };
 })();
 const PRE_BROKER_DEMAND_SCHEMA = JSON.parse(
@@ -518,6 +523,52 @@ async function main() {
   const evidenceRun = await readJson(evidencePath, "evidence run");
   const runId = String(evidenceRun.run_id ?? "vnext-run");
   artifacts.evidence_run = evidencePath;
+  // P2.8 wiring of the P0.4 support envelope: classify from evidence-lane
+  // facts BEFORE any model stage runs. Facts the evidence run cannot state
+  // stay undeclared and classify to their contract-declared unknown classes;
+  // an early-stop predicate ends the run as UNSUPPORTED_PROFILE with its
+  // typed reason, before model compilation spends anything.
+  const supportVerdict = (() => {
+    const filings = evidenceRun.filings ?? {};
+    const framework = String(filings.accounting_framework ?? "").toLowerCase();
+    const historicalCount = (filings.historical_periods ?? []).length;
+    const sections = evidenceRun.case_evidence?.face_statement_manifests ?? {};
+    const descriptor = {
+      ...(framework === "ifrs" ? { accounting_framework: "ifrs" } : {}),
+      ...(framework === "us_gaap" ? { accounting_framework: "us_gaap" } : {}),
+      ...(filings.fiscal_calendar_kind === "fixed_date" ? { fiscal_calendar: "fixed_date" } : {}),
+      ...(filings.fiscal_calendar_kind === "52_53_week" ? { fiscal_calendar: "week_52_53" } : {}),
+      ...(historicalCount >= 3
+        ? { historical_periods: "three_or_more" }
+        : historicalCount === 2
+          ? { historical_periods: "two_with_prior_filing_support" }
+          : historicalCount > 0
+            ? { historical_periods: "fewer_than_two" }
+            : {}),
+      ...((sections.cash_flow ?? []).length === 0 && (sections.income_statement ?? []).length > 0
+        ? { statement_topology: "cash_flow_absent" }
+        : {}),
+    };
+    return classifySupport(SUPPORT_ENVELOPE_CONTRACT, descriptor);
+  })();
+  if (supportVerdict.early_stop.stopped) {
+    checkpoints.push(await checkpoint("support_envelope_preflight", "BLOCKED", evidencePath));
+    return finish({
+      out,
+      runId,
+      status: "BLOCKED",
+      qualityMode: "FATAL",
+      blockerClass: "FATAL_SOURCE",
+      checkpoints,
+      artifacts,
+      summary: {
+        message: `The case is outside the versioned support envelope: ${supportVerdict.early_stop.reason_code}.`,
+        support_envelope_verdict: supportVerdict.support_class,
+        support_envelope_reason: supportVerdict.early_stop.reason_code,
+      },
+    });
+  }
+  checkpoints.push(await checkpoint("support_envelope_preflight", "PASS", evidencePath));
   const userFlowOut = path.join(out, "model");
   const workspaceToken = String(options["workspace-token"] ?? `vnext:${digestBytes(out).slice(0, 24)}`);
   const firstArgs = [

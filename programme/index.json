@@ -1,8 +1,8 @@
 {
   "schema_version": "excel-inflow-programme-index/1.0",
   "programme": "v3.7.7 behavioural closure -> v3.8.0 structural simplification",
-  "current_phase": "Phase 0 - Freeze, evidence custody and programme control",
-  "active_package": "P0.8 (pending green receipt) / P1.5-P1.7 (subagent fleet) / P1.2-P1.3 cores staged",
+  "current_phase": "Phase 1 sealed (2 core-only packages declared); Phase 2 opened",
+  "active_package": "P0.8 (pending green run) / Phase 2-5 per gap-report work orders",
   "sealed_packages": {
     "P0.1": {
       "commit": "6a64f74",
@@ -41,6 +41,26 @@
     "P1.4": {
       "commit": "c3b620a",
       "invariant": "invalid objects fail immediately at the producer that created them"
+    },
+    "P1.5": {
+      "commit": "e957b62",
+      "invariant": "tax-rate normalisation emits one compact auditable receipt referenced by authorities"
+    },
+    "P1.6": {
+      "commit": "e957b62",
+      "invariant": "entity identity uses identifier strength and perimeter relationships"
+    },
+    "P1.7": {
+      "commit": "d40456f",
+      "invariant": "no new nullable-to-number coercion; every existing one inventoried"
+    },
+    "P1.8": {
+      "commit": "f617ce7",
+      "invariant": "typed contracts proven against the corpus; legacy readable via explicit adapters"
+    },
+    "P2.8-wire": {
+      "commit": "(this commit)",
+      "invariant": "unsupported cases stop typed at the controller preflight before any model stage"
     }
   },
   "evidence_baseline": {
