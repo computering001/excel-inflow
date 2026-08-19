@@ -113,6 +113,42 @@
       "test_class": "unit"
     },
     {
+      "id": "tax-rate-policy",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_tax_rate_policy_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "run-deadline",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_run_deadline_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "forecast-completion",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_forecast_completion_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
+      "id": "ci-census",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_ci_census_tests.mjs",
+      "timeout_seconds": 120,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "multipage-filing-extraction",
       "phase": "evidence",
       "runtime": "python",

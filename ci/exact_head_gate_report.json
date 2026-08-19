@@ -1,0 +1,46 @@
+{
+  "schema_version": "excel-inflow-exact-head-gate-report/1.0",
+  "role": "exact_head (working tree = source head; no synthetic merge)",
+  "head_commit_at_generation": "431ef3ec3e9cfc69e8bd49e0cb8b48590ce34799",
+  "head_tree_at_generation": "fb0a312b72a44ec4f09ed671a2c3e6cce9671715",
+  "note": "generated pre-commit; the sealing commit binds this report, its inputs and the census in one tree",
+  "toolchain": {
+    "node": "v22.23.2",
+    "python": "Python 3.9.6",
+    "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
+  },
+  "gates": [
+    {
+      "gate": "identity-governance",
+      "command": "node scripts/run_release_identity_governance_tests.mjs",
+      "exit": 0
+    },
+    {
+      "gate": "registry-contract",
+      "command": "node scripts/run_test_registry_contract_tests.mjs",
+      "exit": 0,
+      "checks": 715,
+      "registry_tests": 139
+    },
+    {
+      "gate": "blocker-corpus",
+      "command": "node scripts/run_blocker_corpus_tests.mjs",
+      "exit": 0,
+      "checks": 79
+    },
+    {
+      "gate": "ci-census",
+      "command": "node scripts/run_ci_census_tests.mjs",
+      "exit": 0,
+      "checks": 293,
+      "scripts_classified": 154
+    },
+    {
+      "gate": "oracle-matrix",
+      "command": "python scripts/run_critical_invariant_oracle_matrix_tests.py <representative> --soffice <soffice>",
+      "exit": 0,
+      "mutation_detection_rate": 1.0
+    }
+  ],
+  "status": "PASS"
+}

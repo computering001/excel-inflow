@@ -26,13 +26,19 @@ const options = {
 
 assert.deepEqual(validateIdentityConvergence(identity, options), []);
 assert.deepEqual(validatePerformanceEvidence(performance, options), []);
-assert.equal(runtime.skill_version, "3.7.5");
+// DELIBERATE TRIPWIRE, not derivation: the literal names the version this
+// suite was consciously reviewed against, so a skill_version bump fails here
+// until the bump owner re-reads the identity-governance expectations. The
+// 3.7.6 bump missed this line and the registered gate ran red at exact head
+// for a full release cycle (P0.3 of the finalisation programme). Update the
+// literal IN THE SAME COMMIT as any future runtime-manifest version bump.
+assert.equal(runtime.skill_version, "3.7.6");
 assert.equal(runtime.status, "v2_development");
 assert.equal(runtime.deployment_status, "not_installed");
 assert(
   validateIdentityConvergence(identity, { ...options, expectedVersion: runtime.skill_version })
     .some((error) => error.includes("version")),
-  "Historical v3.7.3 identity masqueraded as the active v3.7.5 candidate.",
+  "Historical v3.7.3 identity masqueraded as the active runtime-manifest candidate.",
 );
 
 const staleVersion = structuredClone(identity);

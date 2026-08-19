@@ -167,22 +167,12 @@ const replays = [];
   replays.push({ case_id: "runtime-deadline-overrun", status: "PASS" });
 }
 {
-  // Documented CURRENT signature at the frozen baseline: the identity
-  // governance suite carries a stale 3.7.5 version pin and MUST fail with
-  // exactly that assertion. When P0.3 repairs the pin, this replay's
-  // expectation flips to PASS alongside the manifest entry.
-  let signature = null;
-  try {
-    await run(process.execPath, ["run_release_identity_governance_tests.mjs"]);
-  } catch (error) {
-    signature = `${error.stderr ?? ""}${error.stdout ?? ""}${error.message ?? ""}`;
-  }
-  check(
-    signature !== null && signature.includes("'3.7.6' !== '3.7.5'"),
-    "package-identity-discrepancy: the documented stale-version-pin failure signature did not reproduce " +
-      "(either the defect was repaired — update the corpus expectation per P0.3 — or a different failure appeared)",
-  );
-  replays.push({ case_id: "package-identity-discrepancy", status: "KNOWN_FAILING_SIGNATURE_REPRODUCED" });
+  // P0.3 repaired the stale 3.7.5 tripwire literal; the suite must now pass
+  // at exact head. The historical failing signature ("'3.7.6' !== '3.7.5'")
+  // stays documented in the manifest as the regression direction: a future
+  // skill_version bump that misses the tripwire fails this replay again.
+  await run(process.execPath, ["run_release_identity_governance_tests.mjs"]);
+  replays.push({ case_id: "package-identity-discrepancy", status: "PASS" });
 }
 const heavy = manifest.cases
   .map((testCase) => testCase.case_id)

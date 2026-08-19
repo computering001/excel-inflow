@@ -110,7 +110,7 @@
       "entity": "n/a (release package)",
       "accounting_basis": "n/a",
       "expected_support_class": "n/a",
-      "expected_terminal_result": "KNOWN_FAILING at baseline 433bd237: run_release_identity_governance_tests.mjs pins skill_version '3.7.5' and fails ERR_ASSERTION \"'3.7.6' !== '3.7.5'\" at line 29 against the 3.7.6 runtime manifest; the registered CI gate is therefore untruthful at exact head. Repair is owned by P0.3, after which this case's expectation flips to PASS.",
+      "expected_terminal_result": "PASS at exact head (P0.3 repaired the stale 3.7.5 tripwire literal to 3.7.6 with the bump discipline documented in-line; the historical failing signature ERR_ASSERTION \"'3.7.6' !== '3.7.5'\" is recorded in known_reason_code)",
       "observed_failure_stage": "release packaging: v3.7.6 dependency scanning defect repaired at 433bd237 (the baseline commit itself); the identity-governance suite carries a stale version literal missed by the 3.7.6 bump; install discrepancies between local and Rogo package identity",
       "known_reason_code": "stale test version pin (ERR_ASSERTION '3.7.6' !== '3.7.5'); release dependency scanning missed shipped-script command dependencies; typed refusal 'Package/source identity check requires a clean worktree.'",
       "privacy_classification": "internal",
@@ -118,7 +118,7 @@
       "evidence_gap": null,
       "fixtures": [],
       "replay_command": "node scripts/run_release_identity_governance_tests.mjs",
-      "replay_assertion": "CURRENT signature: exit non-zero with ERR_ASSERTION \"'3.7.6' !== '3.7.5'\" (documented open defect, P0.3 repairs it and flips this assertion to PASS)"
+      "replay_assertion": "exit 0 (suite PASS); regression direction: a future skill_version bump that misses the tripwire literal must fail this suite at exact head again"
     },
     {
       "case_id": "runtime-deadline-overrun",

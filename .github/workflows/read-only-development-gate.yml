@@ -39,6 +39,8 @@ jobs:
         run: |
           node scripts/generate_canonical_instructions.mjs --check
           node scripts/run_governance_evidence_tests.mjs
+      - name: CI census — every critical suite registered, every script classified
+        run: node scripts/run_ci_census_tests.mjs --python "$(command -v python3)" --soffice "$(command -v soffice)" --out "${{ runner.temp }}/test_registry_census.json"
       - name: Run portable phase lane
         continue-on-error: true
         env:
@@ -58,6 +60,14 @@ jobs:
           path: ${{ runner.temp }}/phase-${{ matrix.lane }}/**/*.json
           if-no-files-found: error
           retention-days: 30
+      # continue-on-error above exists ONLY so artifact custody survives a
+      # failing lane; this verdict step restores job truthfulness — a failed
+      # lane must present as a failed job, never as green (P0.3).
+      - name: Lane verdict is authoritative
+        env:
+          GATE_OUT: ${{ runner.temp }}/phase-${{ matrix.lane }}
+        run: |
+          node -e "const r=require(process.env.GATE_OUT+'/development-gate-report.json'); if(r.status!=='PASS'){console.error('Lane report status:',r.status);process.exit(1);} console.log('lane PASS');"
 
   portable-serial:
     name: Merge compatibility complete portable registry (serial)
@@ -92,6 +102,12 @@ jobs:
           path: ${{ runner.temp }}/portable-serial/**/*.json
           if-no-files-found: error
           retention-days: 30
+      # See phase-gates: artifact custody first, then a truthful job verdict.
+      - name: Serial lane verdict is authoritative
+        env:
+          GATE_OUT: ${{ runner.temp }}/portable-serial
+        run: |
+          node -e "const r=require(process.env.GATE_OUT+'/development-gate-report.json'); if(r.status!=='PASS'){console.error('Serial report status:',r.status);process.exit(1);} console.log('serial PASS');"
 
   custody-inventory:
     name: Enumerate custody tests (explicit BLOCKED allowed)
@@ -114,6 +130,14 @@ jobs:
           path: ${{ runner.temp }}/custody-inventory/**/*.json
           if-no-files-found: error
           retention-days: 30
+      # Custody policy mirrors compile_ci_gate_matrix.mjs: every enumerated
+      # test must be PASS or an EXPLICIT typed BLOCKED (missing custody named);
+      # anything else fails the job here, not only in the aggregate.
+      - name: Custody verdict is authoritative
+        env:
+          GATE_OUT: ${{ runner.temp }}/custody-inventory
+        run: |
+          node -e "const r=require(process.env.GATE_OUT+'/development-gate-report.json'); const bad=(r.results??[]).filter(x=>!['PASS','BLOCKED'].includes(x.status)); if(bad.length){console.error('Invalid custody statuses:',bad.map(x=>x.id+':'+x.status).join(', '));process.exit(1);} console.log('custody inventory PASS_OR_EXPLICIT_BLOCKED');"
 
   merge-compatibility-identity:
     name: Distinguish merge compatibility from package source

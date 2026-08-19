@@ -1,0 +1,645 @@
+{
+  "schema_version": "excel-inflow-ci-census/1.0",
+  "status": "PASS",
+  "checks": 293,
+  "source_commit": "431ef3ec3e9cfc69e8bd49e0cb8b48590ce34799",
+  "source_tree": "fb0a312b72a44ec4f09ed671a2c3e6cce9671715",
+  "toolchain": {
+    "node": "v22.23.2",
+    "python": "Python 3.9.6",
+    "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
+  },
+  "registry": {
+    "test_count": 139
+  },
+  "scripts": [
+    {
+      "script": "run_acquisition_funding_integration_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_acquisition_portable_workbook_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_acquisition_solver_case_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_acquisition_valuation_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_acquisition_workbook_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_architecture_ownership_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_attachment_evidence_pipeline.py",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_authority_projection_mutations.mjs",
+      "disposition": "ARGUMENT_REQUIRED_HARNESS"
+    },
+    {
+      "script": "run_blocker_corpus_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_consensus_membership_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_consensus_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_consensus_workbook_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_core_demand_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_degraded_close_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_demand_selection_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_dynamic_concept_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_exit_fault_injection_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_freshness_policy_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_house_exclusion_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_intake.mjs",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_broker_intake_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_migration_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_native_eligibility_tests.py",
+      "disposition": "ORPHANED_VIA_LEGACY_GATE"
+    },
+    {
+      "script": "run_broker_native_preflight_reuse_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_page_evidence_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_pdf_timeout_policy_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_period_header_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_period_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_physical_reconciliation_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_pipeline.py",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_broker_preview_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_public_layout_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_real_pack_completion_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_selected_cell_recovery_tests.py",
+      "disposition": "ORPHANED_VIA_LEGACY_GATE"
+    },
+    {
+      "script": "run_broker_table_engine_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_broker_tier1_demand_tests.py",
+      "disposition": "ORPHANED_BARE_RUNNABLE"
+    },
+    {
+      "script": "run_broker_work_graph_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_carrier_product_identity_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_case_authorship_boundary_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_case_compiler_equivalence.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_case_compiler_mutation_tests.mjs",
+      "disposition": "ARGUMENT_REQUIRED_HARNESS"
+    },
+    {
+      "script": "run_case_source_proposer_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_cash_fx_identity_workbook_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_ci_census_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_ci_governance_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_controller_exit_inventory_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_critical_invariant_oracle_matrix_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_current_package_source_identity_check.mjs",
+      "disposition": "CI_WORKFLOW_STEP"
+    },
+    {
+      "script": "run_dcs_evidence_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_dcs_pipeline.py",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_dcs_pipeline_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_debt_class_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_decision_round_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_degraded_broker_delivery_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_delivery_constitution_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_delivery_inventory_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_development_gate.mjs",
+      "disposition": "CI_GATE_MACHINERY"
+    },
+    {
+      "script": "run_ebitda_basis_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_emitted_candidate_independent_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_entity_identity_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_equation_graph_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_evidence_orchestration_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_evidence_pipeline_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_evidence_resolution_v2_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_evidence_run_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_excel_inflow_vnext.mjs",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_excel_number_format_compatibility_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_excel_value_semantics_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_experience_trace_leaf_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_experience_trace_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_filings_pipeline.mjs",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_filings_pipeline_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_filings_source_mode_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_fixed_point_constitution_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_authority_ledger_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_authority_ranking_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_behavior_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_completion_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_observation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_ownership_preflight_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_forecast_topology_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_frozen_cohort.mjs",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_funded_acquisition_transaction_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_governance_evidence_tests.mjs",
+      "disposition": "CI_WORKFLOW_STEP"
+    },
+    {
+      "script": "run_historical_normalisation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_host_experience_trace_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_identity_vocabulary_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_independent_forecast_ownership_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_independent_physical_workbook_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_inline_xbrl_extraction_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_installed_host_broker_receipt_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_instrument_period_state_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_interest_economics_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_interest_lineage_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_internal_fixed_point_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_large_broker_pack_stress_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_layered_graph_constitution_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_lease_roll_forward_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_local_workbook_review_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_merge_compatibility_identity_check.mjs",
+      "disposition": "CI_WORKFLOW_STEP"
+    },
+    {
+      "script": "run_model_owned_broker_demand_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_multipage_filing_extraction_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_native_excel_error_scan_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_nonrecurring_forecast_policy_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_opening_debt_reconciliation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_performance_receipt_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_period_support_stitch_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_phase15_fault_injection_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_phase5_operational_runtime_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_phase9_broker_e2e_scenarios.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_portability_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_portable_finance_workbook_mutation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_prebroker_ownership_controller_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_product_constitution_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_progress_heartbeat_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_public_state_ownership_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_raw_canary_fixture_custody_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_raw_input_black_box_canary.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_real_filing_corpus_extraction_outcomes.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_real_filing_custody_inventory_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_real_statement_outcome_regression.mjs",
+      "disposition": "ARGUMENT_REQUIRED_HARNESS"
+    },
+    {
+      "script": "run_reconciled_parent_portable_workbook_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_release_certification_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_release_identity_governance_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_release_package_attestation_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_reviewed_portable_gate.py",
+      "disposition": "ORPHANED_LEGACY_GATE"
+    },
+    {
+      "script": "run_reviewed_repair_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_run_constitution_graph_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_run_deadline_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_runtime_budget_policy_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_runtime_custody_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_runtime_version_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_semantic_role_closure_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_solver_hardening_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_source_arithmetic_authority_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_source_arithmetic_oracle_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_source_arithmetic_precision_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_source_arithmetic_tests.py",
+      "disposition": "ORPHANED_VIA_LEGACY_GATE"
+    },
+    {
+      "script": "run_source_arithmetic_topology_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_source_identity_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_source_ingress_security_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_stage4_checkpoint_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_standardised_design_contract_mutations.mjs",
+      "disposition": "ORPHANED_BARE_RUNNABLE"
+    },
+    {
+      "script": "run_statement_classifier_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_structural_ownership_preflight.mjs",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_tax_rate_policy_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_test_registry_contract_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_typed_filing_value_tests.py",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_universal_broker_delivery_matrix.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_user_flow.mjs",
+      "disposition": "PIPELINE_ENTRYPOINT"
+    },
+    {
+      "script": "run_user_flow_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_workbook_quality_panel_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_workbook_semantic_inventory_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_workflow_state_tests.mjs",
+      "disposition": "REGISTERED"
+    }
+  ],
+  "critical_requirements": [
+    "tax_etr",
+    "runtime_deadline",
+    "forecast_completion",
+    "period_stitching",
+    "inline_xbrl_typed_values",
+    "entity_identity",
+    "package_closure",
+    "installed_host_receipts",
+    "blocker_replay_corpus"
+  ],
+  "generated_at_source_identity_only": true
+}
