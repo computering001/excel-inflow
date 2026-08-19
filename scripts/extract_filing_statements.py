@@ -73,10 +73,30 @@ UNIT_HEADER_RE = re.compile(
     r"^\s*(?:amounts?\s+)?(?:expressed\s+)?(?:in\s+)?"
     r"(?:(?:USD|GBP|EUR|CAD|AUD|NZD|JPY|CHF|SEK|NOK|DKK|ZAR|INR|CNY|RMB|HKD|SGD|"
     r"[$€£¥])\s*(?:in\s+)?)?"
-    r"(?:units?|thousands?|millions?|billions?|000s?|m|mm|bn)"
+    r"(?P<magnitude>units?|thousands?|millions?|billions?|000s?|m|mm|bn)"
     r"(?:\s+unless otherwise stated)?\s*$",
     re.I,
 )
+UNIT_LABEL_MAGNITUDES = {
+    "unit": "units", "units": "units",
+    "thousand": "thousands", "thousands": "thousands", "000": "thousands", "000s": "thousands",
+    "million": "millions", "millions": "millions", "m": "millions", "mm": "millions",
+    "billion": "billions", "billions": "billions", "bn": "billions",
+}
+OUT_OF_SCOPE_STATEMENT_HEADINGS = {
+    "balance_sheet": re.compile(
+        r"^\s*(?:consolidated\s+)?(?:balance sheets?|statements? of financial position)\s*"
+        r"(?:\(unaudited\))?\s*(?:\(continued\)|continued)?\s*$",
+        re.I,
+    ),
+    "statement_of_changes_in_equity": re.compile(
+        r"^\s*(?:consolidated\s+)?statements? of\s+"
+        r"(?:changes in\s+(?:shareholders.?\s+|stockholders.?\s+)?equity|"
+        r"(?:shareholders|stockholders).?\s+equity)\s*"
+        r"(?:\(unaudited\))?\s*(?:\(continued\)|continued)?\s*$",
+        re.I,
+    ),
+}
 CONTINUED_RE = re.compile(r"\bcontinued\b", re.I)
 
 ACCOUNTING_FRAMEWORK_PATTERNS = {
@@ -119,7 +139,23 @@ def detect_accounting_framework(lines: list[dict[str, Any]]) -> str | None:
     return next(iter(matches)) if len(matches) == 1 else None
 
 
-def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict[str, Any]]:
+def _supplement_reason(normalised: str) -> str | None:
+    """Classify a per-share/share-count/dividend supplement caption."""
+    if re.match(r"^dividends? declared\b", normalised):
+        return "dividend_declaration_row"
+    if re.match(
+        r"^earnings per share\b|^shares used in computing earnings per share\b|"
+        r"^(?:basic|diluted) earnings per\b|^weighted average number of\b|"
+        r"^diluted weighted average number of\b",
+        normalised,
+    ):
+        return "per_share_supplement_row"
+    return None
+
+
+def model_statement_scope(
+    rows: list[dict[str, Any]], section: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Project a face-statement capture onto the operating-model surface.
 
     The raw PDF remains the immutable archive.  A combined statement of
@@ -131,11 +167,25 @@ def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict
 
     Cash-flow statements need no economic pruning; only a valueless Notes
     column caption is decoration rather than a filed cash-flow row.
+
+    Nothing is silently deleted: every dropped row is returned in a typed
+    out-of-scope inventory (statement kind, label, reason code, provenance)
+    alongside the retained rows.
     """
     scoped: list[dict[str, Any]] = []
+    out_of_scope: list[dict[str, Any]] = []
     in_profit_attribution = False
     past_profit_attribution = False
     in_oci = False
+
+    def record(row: dict[str, Any], reason_code: str) -> None:
+        out_of_scope.append({
+            "statement": section,
+            "source_line_id": row.get("source_line_id"),
+            "raw_label": str(row.get("raw_label") or "").strip(),
+            "reason_code": reason_code,
+            "page_or_note": row.get("page_or_note"),
+        })
 
     for row in rows:
         label = str(row.get("raw_label") or "").strip()
@@ -143,6 +193,7 @@ def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict
         has_values = any(value is not None for value in row.get("values", []))
 
         if normalised in {"note", "notes"} and not has_values:
+            record(row, "notes_column_caption")
             continue
         if section != "income_statement":
             scoped.append(row)
@@ -151,27 +202,35 @@ def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict
         if normalised.startswith("other comprehensive income"):
             in_oci = True
             in_profit_attribution = False
+            record(row, "oci_section_heading")
             continue
         if normalised == "profit attributable to":
             in_oci = False
             in_profit_attribution = True
+            record(row, "profit_attribution_heading")
             continue
         if normalised.startswith("total comprehensive income attributable to"):
             in_profit_attribution = False
             past_profit_attribution = True
+            record(row, "comprehensive_income_attribution")
             continue
 
         if in_oci or past_profit_attribution:
+            if in_oci:
+                record(row, "oci_row")
+            else:
+                record(
+                    row,
+                    _supplement_reason(normalised) or "beyond_operating_statement_row",
+                )
             continue
-        if re.match(
-            r"^earnings per share\b|^shares used in computing earnings per share\b|"
-            r"^(?:basic|diluted) earnings per\b|^weighted average number of\b|"
-            r"^diluted weighted average number of\b|^dividends? declared\b",
-            normalised,
-        ):
+        supplement_reason = _supplement_reason(normalised)
+        if supplement_reason:
             past_profit_attribution = True
+            record(row, supplement_reason)
             continue
         if re.match(r"^all activities were in respect of continuing operations", normalised):
+            record(row, "continuing_operations_note")
             continue
         # In a combined statement, the two numeric children immediately below
         # “Profit attributable to” are part of the P&L.  A later comprehensive
@@ -181,7 +240,126 @@ def model_statement_scope(rows: list[dict[str, Any]], section: str) -> list[dict
 
     for ordinal, row in enumerate(scoped, start=1):
         row["ordinal"] = ordinal
-    return scoped
+    return scoped, out_of_scope
+
+
+def statement_scope_inventory_errors(
+    pre_scope_rows: list[dict[str, Any]],
+    scoped_rows: list[dict[str, Any]],
+    inventory: list[dict[str, Any]],
+) -> list[str]:
+    """Validate scope-projection conservation; validators validate, never repair.
+
+    Every pre-scope row must survive either as a retained row or as a typed
+    out-of-scope record — a row in neither place was silently deleted.
+    """
+    errors: list[str] = []
+    pre_ids = [str(row.get("source_line_id") or "") for row in pre_scope_rows]
+    scoped_ids = {str(row.get("source_line_id") or "") for row in scoped_rows}
+    inventory_ids = {str(record.get("source_line_id") or "") for record in inventory}
+    for shared in sorted(scoped_ids & inventory_ids):
+        errors.append(f"row {shared} is both retained and recorded out of scope")
+    for row_id in pre_ids:
+        if row_id not in scoped_ids and row_id not in inventory_ids:
+            errors.append(f"row {row_id} was scope-dropped without an out-of-scope record")
+    for orphan in sorted((scoped_ids | inventory_ids) - set(pre_ids)):
+        errors.append(f"row {orphan} appeared without a source row")
+    for record in inventory:
+        if not all(
+            str(record.get(field) or "").strip()
+            for field in ("statement", "source_line_id", "raw_label", "reason_code", "page_or_note")
+        ):
+            errors.append(
+                f"out-of-scope record {record.get('source_line_id')!r} omits statement, "
+                "label, reason code, or provenance"
+            )
+    return errors
+
+
+def parse_unit_label_magnitude(label: str) -> str | None:
+    """Read the printed magnitude out of a source-visible unit label."""
+    normalised = re.sub(r"[()]", " ", str(label or ""))
+    normalised = re.sub(r"\s+", " ", normalised).strip(" :;,.–—-")
+    match = UNIT_HEADER_RE.fullmatch(normalised)
+    if not match:
+        return None
+    return UNIT_LABEL_MAGNITUDES.get(match.group("magnitude").lower())
+
+
+def reconcile_unit_labels(
+    source_unit_labels: list[str], declared_units: str | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Reconcile printed unit labels against the declared unit basis.
+
+    Every printed label is recorded.  A printed magnitude that contradicts the
+    declared basis is a material, fail-closed finding — the declaration is
+    kept (never repaired), and the receipt cannot PASS.  A missing declaration
+    is typed, never invented.
+    """
+    declared_magnitude = (
+        UNIT_LABEL_MAGNITUDES.get(str(declared_units).lower()) if declared_units else None
+    )
+    records: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = []
+    for label in source_unit_labels:
+        printed = parse_unit_label_magnitude(label)
+        if printed is None:
+            status = "unparsed"
+        elif declared_magnitude is None:
+            status = "no_declared_units"
+        elif printed == declared_magnitude:
+            status = "match"
+        else:
+            status = "mismatch"
+        records.append({
+            "raw_label": label,
+            "printed_units": printed,
+            "declared_units": declared_magnitude,
+            "status": status,
+        })
+        if status == "mismatch":
+            findings.append({
+                "code": "UNIT_LABEL_MISMATCH",
+                "label": label,
+                "printed_units": printed,
+                "declared_units": declared_magnitude,
+                "material": True,
+            })
+        elif status == "unparsed":
+            findings.append({"code": "UNIT_LABEL_UNPARSED", "label": label, "material": True})
+    return records, findings
+
+
+def out_of_scope_statement_inventory(lines: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Record whole statements the model surface admits no manifest for.
+
+    Balance-sheet and equity statements are out of model scope by contract
+    (the response admits only income-statement and cash-flow manifests); their
+    presence in the filing is recorded, never silently ignored.  Only strict
+    full-line headings count — a prose mention is not a statement.
+    """
+    pages_by_kind: dict[str, list[int]] = {}
+    label_by_kind: dict[str, str] = {}
+    for line in lines:
+        text = str(line.get("text") or "").strip()
+        if not text:
+            continue
+        for kind, pattern in OUT_OF_SCOPE_STATEMENT_HEADINGS.items():
+            if pattern.fullmatch(text):
+                page = int(line.get("page") or 0) or 1
+                pages = pages_by_kind.setdefault(kind, [])
+                if page not in pages:
+                    pages.append(page)
+                label_by_kind.setdefault(kind, text)
+    return [
+        {
+            "statement_kind": kind,
+            "raw_label": label_by_kind[kind],
+            "reason_code": "statement_out_of_model_scope",
+            "pages": sorted(pages),
+        }
+        for kind, pages in pages_by_kind.items()
+    ]
 
 
 def canonical(value: Any) -> bytes:
@@ -1597,9 +1775,20 @@ def extract_statement(
             cell["normalized_value"] = row["values"][index]
             if cell["typed_state"] == "reported_blank":
                 cell["confidence"] = 1.0
-    rows = model_statement_scope(rows, section)
+    pre_scope_rows = list(rows)
+    rows, out_of_scope_inventory = model_statement_scope(rows, section)
+    scope_errors = statement_scope_inventory_errors(pre_scope_rows, rows, out_of_scope_inventory)
+    if scope_errors:
+        # Fail closed: a scope drop without a typed record is a silent deletion.
+        return None, findings + [{
+            "code": "SCOPE_INVENTORY_INCOMPLETE",
+            "section": section,
+            "errors": scope_errors,
+        }]
     if not rows:
         return None, findings + [{"code": "NO_STATEMENT_ROWS", "section": section}]
+    unit_label_reconciliation, unit_findings = reconcile_unit_labels(source_unit_labels, units)
+    findings.extend({"section": section, **item} for item in unit_findings)
     infer_parent_links(rows)
     manifest = {
         "schema_version": "face-statement-manifest/1.3",
@@ -1618,6 +1807,8 @@ def extract_statement(
         **({"reporting_currency": reporting_currency} if reporting_currency else {}),
         **({"units": units} if units else {}),
         "source_unit_labels": source_unit_labels,
+        "unit_label_reconciliation": unit_label_reconciliation,
+        "out_of_scope_inventory": out_of_scope_inventory,
         "row_count": len(rows),
         "rows_sha256": "0" * 64,
         "rows": rows,
@@ -1676,8 +1867,10 @@ def main() -> int:
         raw_sha256 = digest(target.read_bytes())
         document_manifests = {section: [] for section in HEADINGS}
         disposition = "reviewed_supplemental"
+        out_of_scope_statements: list[dict[str, Any]] = []
         if target.suffix.lower() == ".pdf":
             lines = pdf_lines(target)
+            out_of_scope_statements = out_of_scope_statement_inventory(lines)
             detected_framework = detect_accounting_framework(lines)
             if detected_framework:
                 detected_frameworks.add(detected_framework)
@@ -1712,6 +1905,7 @@ def main() -> int:
                 if disposition == "selected_face_statement_authority"
                 else "Reviewed by native extraction; no selected face statement was found in this document."
             ),
+            "out_of_scope_statements": out_of_scope_statements,
             "face_statement_manifests": document_manifests,
         })
     for section, found in selected.items():

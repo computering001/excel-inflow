@@ -21,6 +21,7 @@
           "raw_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "disposition": { "enum": ["selected_face_statement_authority", "selected_period_authority_support", "reviewed_supplemental"] },
           "review_reason": { "type": "string", "minLength": 1 },
+          "out_of_scope_statements": { "type": "array", "items": { "$ref": "#/$defs/outOfScopeStatement" } },
           "face_statement_manifests": {
             "type": "object",
             "additionalProperties": false,
@@ -114,6 +115,8 @@
         "reporting_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
         "units": { "enum": ["units", "thousands", "millions"] },
         "source_unit_labels": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "unit_label_reconciliation": { "type": "array", "items": { "$ref": "#/$defs/unitLabelReconciliation" } },
+        "out_of_scope_inventory": { "type": "array", "items": { "$ref": "#/$defs/outOfScopeRow" } },
         "period_support_required": {
           "type": "array",
           "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
@@ -195,6 +198,40 @@
         "leverage_basis": { "enum": ["includes_leases", "excludes_leases", null] },
         "minimum_operating_cash": { "type": ["number", "null"], "minimum": 0 },
         "announced_acquisition": { "type": ["object", "null"] }
+      }
+    },
+    "outOfScopeRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "source_line_id", "raw_label", "reason_code", "page_or_note"],
+      "properties": {
+        "statement": { "enum": ["income_statement", "cash_flow"] },
+        "source_line_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]*$" },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "reason_code": { "enum": ["notes_column_caption", "oci_section_heading", "oci_row", "profit_attribution_heading", "comprehensive_income_attribution", "beyond_operating_statement_row", "per_share_supplement_row", "dividend_declaration_row", "continuing_operations_note"] },
+        "page_or_note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outOfScopeStatement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement_kind", "raw_label", "reason_code", "pages"],
+      "properties": {
+        "statement_kind": { "enum": ["balance_sheet", "statement_of_changes_in_equity"] },
+        "raw_label": { "type": "string", "minLength": 1 },
+        "reason_code": { "const": "statement_out_of_model_scope" },
+        "pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true }
+      }
+    },
+    "unitLabelReconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_label", "printed_units", "declared_units", "status"],
+      "properties": {
+        "raw_label": { "type": "string", "minLength": 1 },
+        "printed_units": { "enum": ["units", "thousands", "millions", "billions", null] },
+        "declared_units": { "enum": ["units", "thousands", "millions", "billions", null] },
+        "status": { "enum": ["match", "mismatch", "no_declared_units", "unparsed"] }
       }
     },
     "entityIdentifiers": {
