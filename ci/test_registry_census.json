@@ -2,8 +2,8 @@
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
   "checks": 293,
-  "source_commit": "431ef3ec3e9cfc69e8bd49e0cb8b48590ce34799",
-  "source_tree": "fb0a312b72a44ec4f09ed671a2c3e6cce9671715",
+  "source_commit": "9b8b646200a62fcef98b088072fb126c8738aea7",
+  "source_tree": "65c3746bf508d8e5bd612a93b55f0da547bc6848",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",

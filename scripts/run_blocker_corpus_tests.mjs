@@ -68,10 +68,13 @@ async function verifyFixtures(manifest, { label }) {
                 `expected ${fixture.sha256}, found ${digest}. The fixture is refused; no replay may run.`,
             };
       } catch {
-        state = fixture.location === "custody"
+        // repo_external_symlink fixtures live in external custody by design
+        // (the repo tracks only the link); on a custody-less host they are
+        // typed absence, exactly like a custody fixture — never a hard MISSING.
+        state = ["custody", "repo_external_symlink"].includes(fixture.location)
           ? {
               status: "CUSTODY_ABSENT",
-              message: `Custody fixture ${fixture.path} is not present under ${custodyRoot}; hash verification deferred to a custody-bearing host.`,
+              message: `Custody fixture ${fixture.path} is not present on this host; hash verification deferred to a custody-bearing host.`,
             }
           : {
               status: "MISSING",

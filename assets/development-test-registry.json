@@ -108,6 +108,10 @@
       "phase": "evidence",
       "runtime": "node",
       "script": "run_blocker_corpus_tests.mjs",
+      "requires": [
+        "REAL_FILINGS_REQUEST",
+        "REAL_FILINGS_EXPECTATIONS"
+      ],
       "timeout_seconds": 900,
       "mutates_product_tree": false,
       "test_class": "unit"
