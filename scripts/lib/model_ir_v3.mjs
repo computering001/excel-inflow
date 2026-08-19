@@ -546,29 +546,59 @@ export function compileModelIrV3({
     // series — the minted sum IS the total, so there is nothing to foot.
     if (!Array.isArray(filedTarget)) continue;
     const material = materialDisplayIds.has(row.row_id);
+    // A member contributes to face footing only through its FILED series:
+    // source_input rows carry it in values, reconciled totals in
+    // reported_historical_values. Schedule-owned (schedule_link) and
+    // formula-owned (derived_formula & friends) member caches are model
+    // projections — the waterfall lane restates interest history to the
+    // reconciled reported-interest basis, and derived rows cache evaluated
+    // identities — so they are never summed as if filed; their footing is
+    // delegated to the owning schedule/derivation contract and RECORDED.
+    const memberFiledState = (memberId, period) => {
+      const member = planRowById.get(memberId);
+      if (!member) return { state: "missing" };
+      const memberAuthority = member.historical_authority ?? null;
+      if (memberAuthority === "reported_total_reconciled") {
+        const value = filedNumber(member.reported_historical_values?.[period]);
+        return value === null ? { state: "missing" } : { state: "filed", value };
+      }
+      const faceOwned =
+        memberAuthority === "source_input" ||
+        (memberAuthority === null &&
+          !member.calculation &&
+          ["input", "uncalculated"].includes(member.row_type));
+      if (!faceOwned) return { state: "non_face" };
+      const value = filedNumber(member.values?.[period]);
+      return value === null ? { state: "missing" } : { state: "filed", value };
+    };
     for (let period = 0; period < 3; period += 1) {
       const target = filedNumber(filedTarget[period]);
       if (target === null) continue; // a filed dash asserts nothing.
-      const memberValues = memberIds.map((memberId) => {
-        const member = planRowById.get(memberId);
-        return filedNumber(
-          member?.values?.[period] ??
-            member?.reported_historical_values?.[period],
-        );
-      });
-      if (memberValues.some((value) => value === null)) {
+      const memberStates = memberIds.map((memberId) =>
+        memberFiledState(memberId, period),
+      );
+      if (memberStates.some((item) => item.state !== "filed")) {
         if (material) {
+          const nonFace = memberStates.some((item) => item.state === "non_face");
           warnings.push(
             finding(
               "STATEMENT_FAMILY_UNFOOTABLE_PERIOD",
-              `${row.row_id} asserts a material filed total in historical period ${period + 1}, but a member value is missing; the footing cannot be verified (missing values are never treated as zero).`,
-              { display_ids: [row.row_id, ...memberIds], period },
+              nonFace
+                ? `${row.row_id} asserts a material filed total in historical period ${period + 1}, but member history is schedule- or formula-owned; face footing is delegated to the owning schedule/derivation contract (compiled caches are never treated as the filed series).`
+                : `${row.row_id} asserts a material filed total in historical period ${period + 1}, but a member value is missing; the footing cannot be verified (missing values are never treated as zero).`,
+              {
+                display_ids: [row.row_id, ...memberIds],
+                period,
+                reason: nonFace
+                  ? "non_face_member_history"
+                  : "missing_member_value",
+              },
             ),
           );
         }
         continue;
       }
-      const membersSum = memberValues.reduce((sum, value) => sum + value, 0);
+      const membersSum = memberStates.reduce((sum, item) => sum + item.value, 0);
       if (Math.abs(membersSum - target) > footingTolerance(row, period, target)) {
         const unfooted = finding(
           "STATEMENT_FAMILY_UNFOOTED_TOTAL",

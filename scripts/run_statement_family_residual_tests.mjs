@@ -85,7 +85,11 @@ function compileFamily({ totalValues, memberValues, options = {} }) {
         : {}),
     },
   ];
-  memberValues.forEach((values, index) => {
+  memberValues.forEach((member, index) => {
+    // A plain array is a filed (source_input) member; an object may override
+    // the member's historical authority/calculation to model schedule- or
+    // formula-owned members whose caches are NOT filed history.
+    const spec = Array.isArray(member) ? { values: member } : member;
     const id = `member_${index}`;
     nodes.push(
       statementNode(id, {
@@ -98,12 +102,13 @@ function compileFamily({ totalValues, memberValues, options = {} }) {
     planRows.push({
       row_id: id,
       row: 11 + index,
-      row_type: "input",
-      historical_authority: "source_input",
+      row_type: spec.row_type ?? "input",
+      historical_authority: spec.historical_authority ?? "source_input",
+      ...(spec.calculation ? { calculation: spec.calculation } : {}),
       ...(options.totalAuthority === "reported_total_reconciled"
         ? {}
         : { parent_row_id: "family_total", aggregation_role: "working_child" }),
-      values,
+      values: spec.values,
     });
   });
   const semanticManifest = {
@@ -202,7 +207,9 @@ const codesOf = (findings, code) => findings.filter((item) => item.code === code
   );
   const unfootable = codesOf(ir.proof.warnings, "STATEMENT_FAMILY_UNFOOTABLE_PERIOD");
   check(
-    unfootable.length === 1 && unfootable[0].period === 1,
+    unfootable.length === 1 &&
+      unfootable[0].period === 1 &&
+      unfootable[0].reason === "missing_member_value",
     "the unverifiable period on a material total is recorded as a typed finding",
   );
   check(ir.proof.status === "PASS", "unfootable period records, it does not block");
@@ -263,6 +270,98 @@ const codesOf = (findings, code) => findings.filter((item) => item.code === code
   check(
     outOfTolerance.proof.status === "BLOCK",
     "difference beyond the filed rounding tolerance is refused",
+  );
+}
+
+// (8) REGRESSION (evidence-derived donor shape, P2.5 follow-up): a member
+// whose history is SCHEDULE-owned carries a model-restated cache (the
+// waterfall lane stamps interest_expense to -|reported_interest|), not the
+// filed series the reported total was printed against. Face footing must be
+// recorded as delegated — never refused off compiled caches, and the caches
+// must never be summed as if filed. Donor shape: pre_tax_income reported 150
+// over [operating_profit 150 filed, interest_income schedule 0,
+// interest_expense schedule -5].
+{
+  const ir = compileFamily({
+    totalValues: [150, 150, 150],
+    memberValues: [
+      [150, 150, 150],
+      {
+        values: [0, 0, 0],
+        historical_authority: "schedule_link",
+        row_type: "calculation",
+        calculation: { operator: "sum", refs: [] },
+      },
+      {
+        values: [-5, -5, -5],
+        historical_authority: "schedule_link",
+        row_type: "calculation",
+        calculation: { operator: "sum", refs: [] },
+      },
+    ],
+    options: { totalAuthority: "reported_total_reconciled" },
+  });
+  check(
+    ir.proof.status === "PASS" &&
+      codesOf(ir.proof.blocking_findings, "STATEMENT_FAMILY_UNFOOTED_TOTAL").length === 0,
+    "schedule-owned member caches are never refused as an unfooted face total",
+  );
+  const delegated = codesOf(ir.proof.warnings, "STATEMENT_FAMILY_UNFOOTABLE_PERIOD");
+  check(
+    delegated.length === 3 &&
+      delegated.every((item) => item.reason === "non_face_member_history"),
+    "schedule-owned member history is recorded as a typed non-face delegation",
+  );
+}
+
+// (9) REGRESSION (evidence-derived donor shape, CF side): a formula-owned
+// member (derived_formula link) carries an evaluated cache, not filed
+// history. Donor shape: cash_flow_profit_before_tax reported 150 over
+// [cash_flow_net_income link-cache 114, cash_flow_tax_addback 31 filed].
+{
+  const ir = compileFamily({
+    totalValues: [150, 150, 150],
+    memberValues: [
+      {
+        values: [114, 114, 114],
+        historical_authority: "derived_formula",
+        row_type: "calculation",
+        calculation: { operator: "link", refs: ["net_income"] },
+      },
+      [31, 31, 31],
+    ],
+    options: { totalAuthority: "reported_total_reconciled" },
+  });
+  check(
+    ir.proof.status === "PASS" &&
+      codesOf(ir.proof.blocking_findings, "STATEMENT_FAMILY_UNFOOTED_TOTAL").length === 0,
+    "formula-owned member caches are never refused as an unfooted face total",
+  );
+  check(
+    codesOf(ir.proof.warnings, "STATEMENT_FAMILY_UNFOOTABLE_PERIOD").every(
+      (item) => item.reason === "non_face_member_history",
+    ) &&
+      codesOf(ir.proof.warnings, "STATEMENT_FAMILY_UNFOOTABLE_PERIOD").length === 3,
+    "formula-owned member history is recorded as a typed non-face delegation",
+  );
+}
+
+// (10) The check does NOT weaken: a reconciled-member family still foots in
+// the filed domain (member contributes via its own reported series), and a
+// filed-domain mismatch still refuses.
+{
+  const refused = compileFamily({
+    totalValues: [150, 150, 150],
+    memberValues: [
+      [114, 114, 114],
+      [31, 31, 31],
+    ],
+    options: { totalAuthority: "reported_total_reconciled" },
+  });
+  check(
+    refused.proof.status === "BLOCK" &&
+      codesOf(refused.proof.blocking_findings, "STATEMENT_FAMILY_UNFOOTED_TOTAL").length === 3,
+    "filed source_input members that genuinely mis-foot still refuse",
   );
 }
 
