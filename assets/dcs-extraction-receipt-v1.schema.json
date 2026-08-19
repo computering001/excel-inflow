@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/dcs-extraction-receipt-v1.schema.json",
+  "title": "Lossless DCS extraction receipt",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "status", "source_sha256", "source_tables_sha256", "candidate_manifest_sha256", "counts", "violations"],
+  "properties": {
+    "schema_version": {"const": "dcs-extraction-receipt/1.0"},
+    "status": {"enum": ["PASS", "BLOCKED"]},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_tables_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidate_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "counts": {"type": "object", "required": ["sheets", "rows", "nonblank_cells"]},
+    "violations": {"type": "array"}
+  }
+}

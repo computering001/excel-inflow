@@ -1,0 +1,1037 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/broker-crosswalk.schema.json",
+  "title": "Cell-addressed broker evidence to model metric crosswalk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "as_of",
+    "reporting_currency",
+    "units",
+    "forecast_periods",
+    "metrics",
+    "mappings",
+    "table_reviews",
+    "coverage_ledger"
+  ],
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "broker-crosswalk/1.1",
+        "broker-crosswalk/1.2"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "source_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reporting_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "units": {
+      "enum": [
+        "units",
+        "thousands",
+        "millions"
+      ]
+    },
+    "forecast_periods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "format": "date"
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "unit_kind",
+          "definition_id"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit_kind": {
+            "enum": [
+              "currency",
+              "ratio",
+              "percent_decimal"
+            ]
+          },
+          "definition_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "semantic_role": {
+            "$ref": "#/$defs/semanticRole"
+          },
+          "economic_domain": {
+            "$ref": "#/$defs/economicDomain"
+          },
+          "concept_id": {
+            "$ref": "#/$defs/conceptId"
+          },
+          "evidence_kind": {
+            "$ref": "#/$defs/evidenceKind"
+          },
+          "model_use": {
+            "$ref": "#/$defs/modelUse"
+          },
+          "consensus_family": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "definition_signature": {
+            "$ref": "#/$defs/definitionSignature"
+          },
+          "definition_fingerprint": {
+            "$ref": "#/$defs/definitionFingerprint"
+          },
+          "sign_convention": {
+            "enum": [
+              "as_reported",
+              "outflow_negative",
+              "outflow_positive"
+            ]
+          },
+          "model_disposition": {
+            "enum": [
+              "reference_only",
+              "rejected",
+              "not_applicable"
+            ]
+          },
+          "model_disposition_reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "run_scoped_concepts": {
+      "type": "array",
+      "maxItems": 10,
+      "description": "Reviewed, hash-bound insertion contracts for company-specific concepts in the run.* namespace. Runtime code validates the complete contract against run-scoped-broker-concept-v1.schema.json; omission is the ordinary closed-vocabulary path.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "mappings": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mapping_id",
+          "house_id",
+          "metric_id",
+          "definition_id",
+          "period_index",
+          "sources",
+          "rationale"
+        ],
+        "properties": {
+          "mapping_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "house_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definition_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          },
+          "period_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "table_id",
+                "row",
+                "column",
+                "coefficient"
+              ],
+              "properties": {
+                "table_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "row": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "column": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "coefficient": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "constant": {
+            "type": "number"
+          },
+          "multiplier": {
+            "type": "number"
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "review_status": {
+            "enum": [
+              "auto_exact",
+              "reviewed"
+            ]
+          }
+        }
+      },
+      "description": "An empty mappings list is a lawful zero-consumption crosswalk (FORECAST_WATERFALL or a fully quarantined/evidence-only pack); coverage completeness is enforced by the coverage ledger and the independent semantic verifier, not by forcing a mapping to exist."
+    },
+    "table_reviews": {
+      "type": "array",
+      "minItems": 0,
+      "description": "One review per preserved structured table. Empty is lawful only when every broker surface is independently model-prohibited and therefore no structured table survived as model-eligible evidence.",
+      "items": {
+        "$ref": "#/$defs/tableReview"
+      }
+    },
+    "coverage_ledger": {
+      "type": "array",
+      "minItems": 0,
+      "description": "One disposition per immutable candidate. Empty is lawful only when the extraction-owned candidate manifest is empty because every preserved broker surface is independently model-prohibited; compiler, semantic verifier and ingress re-prove that condition.",
+      "items": {
+        "$ref": "#/$defs/coverageEntry"
+      }
+    },
+    "terminal_recovery": {
+      "$ref": "#/$defs/terminalRecovery"
+    },
+    "derived_mappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/derivedMapping"
+      }
+    },
+    "provider_consensus": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "provider_consensus_source": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_note", "period_lineage"],
+        "properties": {
+          "source_note": {"type": "string", "minLength": 1},
+          "period_lineage": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "flex_elections": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "concept",
+          "rationale"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string"
+          },
+          "concept": {
+            "enum": [
+              "lease_payments",
+              "committed_restructuring",
+              "impairment_addback",
+              "pension_contributions",
+              "disposal_proceeds",
+              "other_committed_flow"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis": {
+            "enum": [
+              "consensus",
+              "attributed"
+            ],
+            "description": "consensus: three or more houses under one definition, consumed as a pooled series. attributed: one or two houses; consumed as the named house's own series, rendered wearing the house's name so a single voice is never laundered into consensus clothing."
+          },
+          "source_house_id": {
+            "type": "string",
+            "description": "Required when basis is attributed: the house whose series the line consumes. That house must supply all three forecast periods - an attributed row has no pool to substitute from."
+          },
+          "confirmed_by_user": {
+            "type": "boolean",
+            "description": "Required true when basis is attributed: the inclusion is the user's call, recorded from the single consolidated Stage-2 question, never improvised by the run."
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "broker-crosswalk/1.1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": {
+              "required": [
+                "semantic_role"
+              ]
+            }
+          },
+          "coverage_ledger": {
+            "items": {
+              "required": [
+                "semantic_role"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "broker-crosswalk/1.2"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": {
+              "required": [
+                "economic_domain",
+                "concept_id",
+                "evidence_kind",
+                "model_use",
+                "definition_fingerprint"
+              ]
+            }
+          },
+          "coverage_ledger": {
+            "items": {
+              "required": [
+                "economic_domain",
+                "concept_id",
+                "model_use",
+                "definition_fingerprint",
+                "definition_evidence"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"required": ["provider_consensus"]},
+      "then": {"required": ["provider_consensus_source"]}
+    }
+  ],
+  "$defs": {
+    "terminalRecovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "run_id",
+        "bundle_sha256",
+        "candidate_manifest_sha256",
+        "source_crosswalk_sha256",
+        "semantic_report_sha256",
+        "producer_id",
+        "reviewed_at",
+        "bounded_review_status",
+        "quarantined_candidates"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "broker-terminal-recovery/1.0"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bundle_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "candidate_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_crosswalk_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "semantic_report_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "producer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bounded_review_status": {
+          "const": "exhausted"
+        },
+        "quarantined_candidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "candidate_id",
+              "document_id",
+              "house_id",
+              "table_id",
+              "row",
+              "source_cells",
+              "source_authority_status",
+              "disposition",
+              "model_consumption",
+              "finding_codes",
+              "rationale",
+              "review_status"
+            ],
+            "properties": {
+              "candidate_id": {
+                "type": "string",
+                "pattern": "^bc-[a-f0-9]{24}$"
+              },
+              "document_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "house_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "table_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "source_cells": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/sourceCell"
+                }
+              },
+              "source_authority_status": {
+                "enum": [
+                  "verified",
+                  "quarantined_conflict"
+                ]
+              },
+              "disposition": {
+                "const": "preserve_unconsumed_quarantine"
+              },
+              "model_consumption": {
+                "const": "prohibited"
+              },
+              "finding_codes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 12
+              },
+              "review_status": {
+                "const": "reviewed"
+              }
+            }
+          }
+        }
+      }
+    },
+    "economicDomain": {
+      "enum": [
+        "operating",
+        "cash_flow",
+        "debt_liquidity",
+        "leverage_coverage",
+        "interest_finance",
+        "lease",
+        "tax",
+        "guidance",
+        "valuation",
+        "presentation_metadata",
+        "other"
+      ]
+    },
+    "conceptId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+    },
+    "modelUse": {
+      "enum": [
+        "active_input",
+        "reference_only",
+        "exact_duplicate",
+        "derived_input",
+        "unresolved"
+      ]
+    },
+    "semanticRole": {
+      "enum": [
+        "operating_forecast",
+        "cash_flow_forecast",
+        "debt_or_liquidity",
+        "leverage_or_coverage",
+        "interest_or_finance",
+        "lease",
+        "tax",
+        "management_guidance",
+        "broker_derived_estimate",
+        "valuation_market_data",
+        "presentation_only",
+        "metadata",
+        "other_model_check"
+      ]
+    },
+    "evidenceKind": {
+      "enum": [
+        "broker_estimate",
+        "company_guidance",
+        "broker_derived_estimate",
+        "partial_period",
+        "calculated_check",
+        "market_data",
+        "historical_observation",
+        "non_numeric"
+      ]
+    },
+    "definitionSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "accounting_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "adjustment_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fiscal_calendar": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cash_flow_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lease_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "definitionFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concept_id",
+        "measurement_basis",
+        "restatement_basis",
+        "cash_flow_basis",
+        "lease_basis",
+        "units",
+        "currency",
+        "period_basis",
+        "sign_convention",
+        "accounting_basis",
+        "operating_scope"
+      ],
+      "properties": {
+        "concept_id": {
+          "$ref": "#/$defs/conceptId"
+        },
+        "measurement_basis": {
+          "enum": [
+            "reported",
+            "adjusted",
+            "core",
+            "underlying",
+            "statutory",
+            "mixed",
+            "unspecified"
+          ]
+        },
+        "restatement_basis": {
+          "enum": [
+            "restated",
+            "originally_reported",
+            "not_applicable",
+            "unspecified"
+          ]
+        },
+        "cash_flow_basis": {
+          "enum": [
+            "cfo",
+            "fcf",
+            "fcfe",
+            "not_applicable",
+            "unspecified"
+          ]
+        },
+        "lease_basis": {
+          "enum": [
+            "including_leases",
+            "excluding_leases",
+            "not_applicable",
+            "unspecified"
+          ]
+        },
+        "units": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "currency": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "period_basis": {
+          "enum": [
+            "annual_forecast",
+            "partial_period",
+            "guidance",
+            "non_periodic",
+            "historical"
+          ]
+        },
+        "sign_convention": {
+          "enum": [
+            "as_reported",
+            "outflow_negative",
+            "outflow_positive"
+          ]
+        },
+        "accounting_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_scope": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sourceCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row",
+        "column"
+      ],
+      "properties": {
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "periodColumn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "period_basis"
+      ],
+      "properties": {
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "period_basis": {
+          "enum": [
+            "annual_forecast",
+            "partial_period"
+          ]
+        },
+        "period_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "period_label": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tableReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "house_id",
+        "table_id",
+        "classification",
+        "header_rows",
+        "period_columns",
+        "rationale",
+        "review_status"
+      ],
+      "properties": {
+        "house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "table_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classification": {
+          "enum": [
+            "annual_forecast",
+            "partial_period",
+            "guidance",
+            "mixed",
+            "historical_only",
+            "ratings_or_valuation",
+            "non_forecast"
+          ]
+        },
+        "header_rows": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "period_columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/periodColumn"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "const": "reviewed"
+        }
+      }
+    },
+    "coverageEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "house_id",
+        "table_id",
+        "row",
+        "period_basis",
+        "source_cells",
+        "evidence_kind",
+        "definition_id",
+        "disposition",
+        "rationale",
+        "review_status"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "table_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "period_basis": {
+          "enum": [
+            "annual_forecast",
+            "partial_period",
+            "guidance",
+            "non_periodic",
+            "historical"
+          ]
+        },
+        "period_indexes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          }
+        },
+        "source_cells": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceCell"
+          }
+        },
+        "semantic_role": {
+          "$ref": "#/$defs/semanticRole"
+        },
+        "economic_domain": {
+          "$ref": "#/$defs/economicDomain"
+        },
+        "concept_id": {
+          "$ref": "#/$defs/conceptId"
+        },
+        "evidence_kind": {
+          "$ref": "#/$defs/evidenceKind"
+        },
+        "model_use": {
+          "$ref": "#/$defs/modelUse"
+        },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "definition_fingerprint": {
+          "$ref": "#/$defs/definitionFingerprint"
+        },
+        "definition_evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "mapped_metric",
+            "mapped_guidance",
+            "broker_derived_estimate",
+            "partial_period_evidence",
+            "supplemental_check",
+            "duplicate",
+            "not_model_relevant",
+            "unusable",
+            "quarantined_conflict"
+          ]
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mapping_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        },
+        "duplicate_of": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "parent_candidate_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "const": "reviewed"
+        }
+      }
+    },
+    "derivedMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derivation_id",
+        "mapping_id",
+        "house_id",
+        "metric_id",
+        "definition_id",
+        "period_index",
+        "input_candidate_ids",
+        "expression",
+        "rationale",
+        "review_status"
+      ],
+      "properties": {
+        "derivation_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "mapping_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "house_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definition_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "period_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "input_candidate_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+          }
+        },
+        "expression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "const": "reviewed"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "External immutable release-package attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "release_gate_status",
+    "issued_at",
+    "package",
+    "certification_evidence",
+    "attestation_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "release-package-attestation/2.0" },
+    "status": { "const": "PASS" },
+    "release_gate_status": {
+      "enum": [
+        "DEVELOPMENT_PACKAGE_NOT_CERTIFIED_OR_INSTALLED",
+        "CERTIFIED_PACKAGE_NOT_INSTALLED"
+      ]
+    },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "release_name",
+        "skill_version",
+        "product_identity",
+        "complete_package_inventory",
+        "archive",
+        "release_manifest_sha256"
+      ],
+      "properties": {
+        "release_name": { "type": "string" },
+        "skill_version": { "type": "string" },
+        "product_identity": {
+          "type": "object",
+          "required": ["schema_version", "source", "package", "deployment"],
+          "properties": {
+            "schema_version": { "const": "product-identity/2.0" },
+            "package": {
+              "type": "object",
+              "properties": { "mode": { "enum": ["development", "certified"] } }
+            },
+            "deployment": {
+              "type": "object",
+              "properties": { "status": { "const": "not_installed" } }
+            }
+          }
+        },
+        "complete_package_inventory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "identity_kind", "file_count", "files", "sha256"],
+          "properties": {
+            "schema_version": { "const": "complete-package-inventory/1.0" },
+            "identity_kind": { "const": "complete_package_inventory" },
+            "file_count": { "type": "integer", "minimum": 1 },
+            "files": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "archive": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity_kind", "format", "sha256", "bytes"],
+          "properties": {
+            "identity_kind": { "const": "archive" },
+            "format": { "const": "ustar" },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "bytes": { "type": "integer", "minimum": 1024 }
+          }
+        },
+        "release_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "certification_evidence": { "type": ["object", "null"] },
+    "attestation_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "package": {
+            "properties": {
+              "product_identity": {
+                "properties": {
+                  "package": { "properties": { "mode": { "const": "development" } } }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "release_gate_status": { "const": "DEVELOPMENT_PACKAGE_NOT_CERTIFIED_OR_INSTALLED" },
+          "certification_evidence": { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "release_gate_status": { "const": "CERTIFIED_PACKAGE_NOT_INSTALLED" },
+          "certification_evidence": { "type": "object" }
+        }
+      }
+    }
+  ]
+}

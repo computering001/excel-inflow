@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/evidence-resolution-v2.schema.json",
+  "title": "Excel Inflow evidence resolution v2",
+  "description": "One model-first, source-bound observation ledger, authority graph, blocker classification and quality receipt. Raw evidence is referenced, never duplicated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "input_bindings",
+    "source_snapshot_sha256",
+    "status",
+    "quality_mode",
+    "blocker_class",
+    "user_blocking",
+    "source_store",
+    "observations",
+    "authority_graph",
+    "quarantines",
+    "findings",
+    "receipt"
+  ],
+  "properties": {
+    "schema_version": { "const": "evidence-resolution/2.0" },
+    "run_id": { "$ref": "#/$defs/id" },
+    "input_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_run_sha256",
+        "forecast_plan_sha256",
+        "case_compile_report_sha256",
+        "lane_states_sha256"
+      ],
+      "properties": {
+        "evidence_run_sha256": { "$ref": "#/$defs/sha256" },
+        "forecast_plan_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "case_compile_report_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "lane_states_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "source_snapshot_sha256": { "$ref": "#/$defs/sha256" },
+    "status": {
+      "enum": ["PASS", "PASS_DEGRADED", "ACTION_REQUIRED", "NEEDS_INTERNAL_WORK", "BLOCKED"]
+    },
+    "quality_mode": {
+      "enum": ["VERIFIED", "DEGRADED", "INPUT_REQUIRED", "INTERNAL_WORK", "FATAL"]
+    },
+    "blocker_class": {
+      "enum": [null, "INTERNAL_WORK", "USER_DECISION", "FATAL_SOURCE"]
+    },
+    "user_blocking": { "type": "boolean" },
+    "source_store": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "authority_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges", "unresolved_material_count"],
+      "properties": {
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/authorityNode" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/authorityEdge" } },
+        "unresolved_material_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "quarantines": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/quarantine" }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "resolution_sha256",
+        "source_count",
+        "observation_count",
+        "authority_node_count",
+        "selected_authority_count",
+        "quarantine_count",
+        "fallback_count",
+        "finding_count",
+        "quality_mode"
+      ],
+      "properties": {
+        "schema_version": { "const": "evidence-resolution-receipt/2.0" },
+        "resolution_sha256": { "$ref": "#/$defs/sha256" },
+        "source_count": { "type": "integer", "minimum": 0 },
+        "observation_count": { "type": "integer", "minimum": 0 },
+        "authority_node_count": { "type": "integer", "minimum": 0 },
+        "selected_authority_count": { "type": "integer", "minimum": 0 },
+        "quarantine_count": { "type": "integer", "minimum": 0 },
+        "fallback_count": { "type": "integer", "minimum": 0 },
+        "finding_count": { "type": "integer", "minimum": 0 },
+        "quality_mode": {
+          "enum": ["VERIFIED", "DEGRADED", "INPUT_REQUIRED", "INTERNAL_WORK", "FATAL"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]*$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "lane", "kind", "status", "sha256", "path"],
+      "properties": {
+        "source_id": { "$ref": "#/$defs/id" },
+        "lane": { "enum": ["filings", "broker", "dcs", "user", "runtime"] },
+        "kind": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["used", "supplemental", "quarantined", "unavailable"] },
+        "sha256": { "$ref": "#/$defs/nullableSha256" },
+        "path": { "type": ["string", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "page", "table", "row", "column", "cell", "crop_sha256"],
+      "properties": {
+        "document": { "type": ["string", "null"] },
+        "page": { "type": ["string", "integer", "null"] },
+        "table": { "type": ["string", "null"] },
+        "row": { "type": ["string", "integer", "null"] },
+        "column": { "type": ["string", "integer", "null"] },
+        "cell": { "type": ["string", "null"] },
+        "crop_sha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "lane",
+        "concept_id",
+        "definition_id",
+        "period_basis",
+        "period_start",
+        "period_end",
+        "value",
+        "units",
+        "sign_convention",
+        "source_id",
+        "source_sha256",
+        "confidence",
+        "status",
+        "model_driving",
+        "provenance",
+        "mapping_components"
+      ],
+      "properties": {
+        "observation_id": { "$ref": "#/$defs/id" },
+        "lane": { "enum": ["filings", "broker", "dcs", "user"] },
+        "concept_id": { "$ref": "#/$defs/id" },
+        "definition_id": { "$ref": "#/$defs/id" },
+        "period_basis": {
+          "enum": ["instant", "annual", "h1_ytd", "q3_ytd", "quarterly", "contractual", "non_periodic"]
+        },
+        "period_start": { "type": ["string", "null"], "format": "date" },
+        "period_end": { "type": ["string", "null"], "format": "date" },
+        "value": { "type": ["number", "string", "boolean", "null"] },
+        "units": { "type": "string", "minLength": 1 },
+        "sign_convention": { "type": "string", "minLength": 1 },
+        "source_id": { "$ref": "#/$defs/id" },
+        "source_sha256": { "$ref": "#/$defs/nullableSha256" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "status": { "enum": ["verified", "supplemental", "quarantined", "unavailable"] },
+        "model_driving": { "type": "boolean" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "mapping_components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/mappingComponent" }
+        }
+      }
+    },
+    "mappingComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "page",
+        "row",
+        "column",
+        "cell",
+        "source_ref",
+        "raw_value",
+        "coefficient",
+        "contribution",
+        "crop_sha256"
+      ],
+      "properties": {
+        "table": { "type": ["string", "null"] },
+        "page": { "type": ["string", "integer", "null"] },
+        "row": { "type": ["string", "integer", "null"] },
+        "column": { "type": ["string", "integer", "null"] },
+        "cell": { "type": ["string", "null"] },
+        "source_ref": { "type": ["string", "null"] },
+        "raw_value": { "type": ["number", "string", "boolean", "null"] },
+        "coefficient": { "type": ["number", "null"] },
+        "contribution": { "type": ["number", "null"] },
+        "crop_sha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "authorityNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id",
+        "section",
+        "concept_id",
+        "period_end",
+        "material",
+        "state",
+        "method",
+        "selected_candidate_id",
+        "candidate_ids",
+        "fallback_trace",
+        "source_bindings"
+      ],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/id" },
+        "section": { "type": "string", "minLength": 1 },
+        "concept_id": { "$ref": "#/$defs/id" },
+        "period_end": { "type": ["string", "null"], "format": "date" },
+        "material": { "type": "boolean" },
+        "state": { "enum": ["RESOLVED", "FALLBACK", "INPUT_REQUIRED", "NOT_APPLICABLE"] },
+        "method": { "type": "string", "minLength": 1 },
+        "selected_candidate_id": { "type": ["string", "null"] },
+        "candidate_ids": { "type": "array", "items": { "type": "string" } },
+        "fallback_trace": { "type": "array", "items": { "type": "string" } },
+        "source_bindings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "authorityEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "kind"],
+      "properties": {
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["candidate_for", "selected_for", "fallback_from", "source_for"] }
+      }
+    },
+    "quarantine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["quarantine_id", "lane", "scope", "reason", "model_use", "source_bindings"],
+      "properties": {
+        "quarantine_id": { "$ref": "#/$defs/id" },
+        "lane": { "enum": ["filings", "broker", "dcs", "user"] },
+        "scope": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "model_use": { "const": "prohibited" },
+        "source_bindings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "owner", "severity", "message", "affected_nodes"],
+      "properties": {
+        "finding_id": { "$ref": "#/$defs/id" },
+        "owner": { "enum": ["INTERNAL_WORK", "USER_DECISION", "FATAL_SOURCE", "QUALITY"] },
+        "severity": { "enum": ["INFO", "WARN", "BLOCK"] },
+        "message": { "type": "string", "minLength": 1 },
+        "affected_nodes": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/run-constitution-graph-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "product_constitution_sha256", "case_id", "model_demand_graph_sha256", "selected_authority_contract_sha256", "nodes", "edges", "counts", "graph_sha256"],
+  "properties": {
+    "schema_version": { "const": "run-constitution-graph/1.0" },
+    "product_constitution_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "model_demand_graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "selected_authority_contract_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["node_id", "node_type", "status"],
+        "properties": {
+          "node_id": { "type": "string", "minLength": 1 },
+          "node_type": { "enum": ["source", "observation", "candidate", "model_state", "economic_state", "physical_state", "obligation", "receipt"] },
+          "status": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "kind"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1 },
+          "to": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["supports", "candidate_for", "selected_for", "depends_on", "projects_to", "requires", "discharges", "quarantines"] }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodes", "edges", "selected_paths", "orphan_selected_authorities", "missing_material_producers"],
+      "properties": {
+        "nodes": { "type": "integer", "minimum": 0 },
+        "edges": { "type": "integer", "minimum": 0 },
+        "selected_paths": { "type": "integer", "minimum": 0 },
+        "orphan_selected_authorities": { "type": "integer", "minimum": 0 }
+        ,"missing_material_producers": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "graph_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
