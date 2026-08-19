@@ -1,0 +1,87 @@
+{
+  "schema_version": "excel-inflow-golden-difference-taxonomy/1.0",
+  "frozen_release": "v3.7.7",
+  "work_package": "P7.2",
+  "declared_by": "scripts/lib/behavioural_golden.mjs::GOLDEN_DIFFERENCE_CLASS_CONTRACT",
+  "authority": "The class set and each class's acceptability are owned by CODE, not by this asset. validateGoldenDifferenceTaxonomy refuses an asset that drops a class, invents one, flips an acceptability, or paraphrases what a class detects. Editing this file cannot make a never-acceptable difference approvable.",
+  "primary_economic_truth": "The canonical Economic IR (economic-ir/1.0), compiled in shadow beside the proof projection. NOT the emitted workbook.",
+  "regeneration_command": "node scripts/regenerate_behavioural_goldens.mjs",
+  "regeneration_prohibited_inside_any_gate": true,
+  "regeneration_gate": "Regeneration requires an approval record in goldens/approval-ledger.jsonl naming a human actor, a reason of at least 40 characters, the fixtures, the difference classes, and the commit the approval was granted against. The approval is single-use. Regeneration is refused outright when any observed difference is never-acceptable, regardless of approval.",
+  "never_acceptable_classes": [
+    "golden_coverage_gap",
+    "golden_record_corruption",
+    "never_zero_collapse",
+    "shadow_boundary_violation",
+    "uncertified_golden_present",
+    "unclassified_difference"
+  ],
+  "never_acceptable_meaning": "A never-acceptable difference is a regression, not a change. It is fixed in the code that produced it and never by moving the golden. No actor, reason, commit or approval can authorise regenerating past one.",
+  "classes": {
+    "contract_version_bump": {
+      "acceptability": "requires_approval",
+      "detects": "a declared contract version moved (economic-ir, typed_financial_value, schedule_typed_states or the proof projection schema).",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "coverage_census_drift": {
+      "acceptability": "requires_approval",
+      "detects": "the twelve-state census moved in a direction that is not a never-zero collapse.",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "economic_drift": {
+      "acceptability": "requires_approval",
+      "detects": "the Economic IR seal content hash moved: economic truth changed.",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "fixture_identity_drift": {
+      "acceptability": "requires_approval",
+      "detects": "case_id, case_sha256 or evidence_epoch_sha256 moved: the fixture itself was re-cut.",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "golden_coverage_gap": {
+      "acceptability": "never_acceptable",
+      "detects": "a certified fixture has no golden record, or a golden record names a fixture that no longer exists. Deleting a golden is not a way to pass.",
+      "approvable_by_any_actor_or_reason": false
+    },
+    "golden_record_corruption": {
+      "acceptability": "never_acceptable",
+      "detects": "the golden record on disk does not satisfy its schema or its own record_sha256; it was edited after sealing.",
+      "approvable_by_any_actor_or_reason": false
+    },
+    "historical_basis_drift": {
+      "acceptability": "requires_approval",
+      "detects": "the historical_basis histogram or the economic node count moved.",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "never_zero_collapse": {
+      "acceptability": "never_acceptable",
+      "detects": "a never-zero state became a number: bare_number_slots moved off 0, or never-zero slots collapsed into value-bearing readings, or a schedule family's not_applicable slots became numbers. This is the regression the freeze exists to catch.",
+      "approvable_by_any_actor_or_reason": false
+    },
+    "schedule_shape_drift": {
+      "acceptability": "requires_approval",
+      "detects": "the forecast schedule period count, period ids, or a family's slot count or non-collapse state mix moved.",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "shadow_boundary_violation": {
+      "acceptability": "never_acceptable",
+      "detects": "the Economic IR stopped being shadow: mode, gates_delivery, shadow status, or the non-enumerable attachment changed. Promoting the IR is a new schema version, never a golden update.",
+      "approvable_by_any_actor_or_reason": false
+    },
+    "slot_shape_drift": {
+      "acceptability": "requires_approval",
+      "detects": "a typed-slot shape count moved (total, historical, forecast, schedule, value-bearing or never-zero).",
+      "approvable_by_any_actor_or_reason": true
+    },
+    "uncertified_golden_present": {
+      "acceptability": "never_acceptable",
+      "detects": "golden records exist but there is no approval ledger, so nothing certifies them. Shedding the certification history while keeping the records is not a route back to PRE_FREEZE.",
+      "approvable_by_any_actor_or_reason": false
+    },
+    "unclassified_difference": {
+      "acceptability": "never_acceptable",
+      "detects": "a pinned fact differs and no declared class named it. A new pinned fact must get a class before it can ever be approved.",
+      "approvable_by_any_actor_or_reason": false
+    }
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://excel-inflow.invalid/assets/behavioural-golden-v1.schema.json",
+  "title": "Behavioural golden record (P7.2)",
+  "description": "One frozen behavioural record per certified fixture. The PRIMARY ECONOMIC TRUTH is the canonical Economic IR (economic-ir/1.0), never the emitted workbook: no workbook bytes, no manifest, no cell address and no formula string appears in this schema, deliberately. Every count in a record is derived by walking the IR's own typed slots; nothing here may be hand-transcribed. Provenance lives in `certification` and is NOT compared by the comparator — behaviour is everything else.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "golden_kind",
+    "frozen_release",
+    "fixture_id",
+    "fixture_path",
+    "primary_economic_truth",
+    "certification",
+    "identity",
+    "contracts",
+    "seal",
+    "slot_shape",
+    "twelve_state_census",
+    "node_count",
+    "historical_basis_histogram",
+    "schedules",
+    "shadow_boundary",
+    "record_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-behavioural-golden/1.0" },
+    "golden_kind": {
+      "description": "economic_ir is the only kind. A workbook-shaped golden is not a permitted kind: the register warns against whole-workbook goldens and the Economic IR exists so the freeze can name economic truth instead.",
+      "const": "economic_ir"
+    },
+    "frozen_release": { "const": "v3.7.7" },
+    "fixture_id": { "type": "string", "minLength": 1 },
+    "fixture_path": { "type": "string", "pattern": "^test-fixtures/cases/.+\\.json$" },
+    "primary_economic_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "is_workbook", "note"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "is_workbook": {
+          "description": "Structurally false. A golden whose economic truth is the workbook is the brittle artifact this package exists NOT to produce.",
+          "const": false
+        },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "certification": {
+      "description": "Provenance: who froze this record, when, against which commit, under which approval. Not compared by the comparator.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "release",
+        "work_package",
+        "freeze_event",
+        "frozen_at",
+        "frozen_by",
+        "frozen_at_commit",
+        "working_tree_state",
+        "approval_record_hash"
+      ],
+      "properties": {
+        "release": { "const": "v3.7.7" },
+        "work_package": { "type": "string", "minLength": 2 },
+        "freeze_event": {
+          "description": "genesis_freeze is the one-time initial freeze, which has no approval to consume because there was no prior expectation to overwrite. Every later record must be an approved_regeneration.",
+          "enum": ["genesis_freeze", "approved_regeneration"]
+        },
+        "frozen_at": { "type": "string", "minLength": 10 },
+        "frozen_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": {
+              "description": "Only a human freezes or approves a golden. Automation records; it does not authorise.",
+              "const": "human"
+            },
+            "id": { "type": "string", "minLength": 1 },
+            "role": { "type": ["string", "null"] }
+          }
+        },
+        "frozen_at_commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+        "working_tree_state": { "enum": ["clean", "dirty"] },
+        "approval_record_hash": {
+          "description": "The approve record this regeneration consumed. Null only for the genesis freeze.",
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "approval_reason": { "type": "string", "minLength": 40 },
+        "approved_difference_classes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "case_sha256", "evidence_epoch_sha256"],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "case_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "evidence_epoch_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "economic_ir",
+        "typed_financial_value",
+        "schedule_typed_states",
+        "proof_projection_schema_version"
+      ],
+      "properties": {
+        "economic_ir": { "type": "string", "minLength": 1 },
+        "typed_financial_value": { "type": "string", "minLength": 1 },
+        "schedule_typed_states": { "type": "string", "minLength": 1 },
+        "proof_projection_schema_version": { "type": ["string", "number"] }
+      }
+    },
+    "seal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_sha256", "sealed_slots"],
+      "properties": {
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sealed_slots": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "slot_shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "typed_slots",
+        "historical_slots",
+        "forecast_slots",
+        "schedule_slots",
+        "value_bearing_slots",
+        "never_zero_slots",
+        "bare_number_slots"
+      ],
+      "properties": {
+        "typed_slots": { "type": "integer", "minimum": 1 },
+        "historical_slots": { "type": "integer", "minimum": 0 },
+        "forecast_slots": { "type": "integer", "minimum": 0 },
+        "schedule_slots": { "type": "integer", "minimum": 0 },
+        "value_bearing_slots": { "type": "integer", "minimum": 0 },
+        "never_zero_slots": { "type": "integer", "minimum": 0 },
+        "bare_number_slots": {
+          "description": "Structurally 0. Every economic slot is a typed financial value; a bare number is the untyped-value regression Phase 1 removed and Phase 7 freezes out.",
+          "const": 0
+        }
+      }
+    },
+    "twelve_state_census": {
+      "description": "All twelve typed states, INCLUDING the zeros. The zeros are the load-bearing half: a state moving off 0 is what the freeze catches.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_number",
+        "reported_zero",
+        "prior_filing_support",
+        "derived_number",
+        "reported_blank",
+        "nil",
+        "missing",
+        "parse_failure",
+        "period_support_required",
+        "captured",
+        "not_applicable",
+        "unresolved"
+      ],
+      "properties": {
+        "reported_number": { "type": "integer", "minimum": 0 },
+        "reported_zero": { "type": "integer", "minimum": 0 },
+        "prior_filing_support": { "type": "integer", "minimum": 0 },
+        "derived_number": { "type": "integer", "minimum": 0 },
+        "reported_blank": { "type": "integer", "minimum": 0 },
+        "nil": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "parse_failure": { "type": "integer", "minimum": 0 },
+        "period_support_required": { "type": "integer", "minimum": 0 },
+        "captured": { "type": "integer", "minimum": 0 },
+        "not_applicable": { "type": "integer", "minimum": 0 },
+        "unresolved": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "node_count": { "type": "integer", "minimum": 1 },
+    "historical_basis_histogram": {
+      "description": "How many economic nodes carry each historical basis. Open key set by design: a NEW basis appearing is itself a difference the comparator must classify.",
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "schedules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "period_count",
+        "historical_period_count",
+        "forecast_period_count",
+        "period_ids",
+        "families"
+      ],
+      "properties": {
+        "period_count": { "type": "integer", "minimum": 0 },
+        "historical_period_count": { "type": "integer", "minimum": 0 },
+        "forecast_period_count": { "type": "integer", "minimum": 0 },
+        "period_ids": { "type": "array", "items": { "type": "string" } },
+        "families": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "slot_count",
+              "slots_per_period",
+              "by_state",
+              "not_applicable_slots",
+              "value_bearing_slots",
+              "bare_number_slots",
+              "not_applicable_pattern"
+            ],
+            "properties": {
+              "slot_count": { "type": "integer", "minimum": 0 },
+              "slots_per_period": { "type": "number", "minimum": 0 },
+              "by_state": {
+                "type": "object",
+                "additionalProperties": { "type": "integer", "minimum": 0 }
+              },
+              "not_applicable_slots": { "type": "integer", "minimum": 0 },
+              "value_bearing_slots": { "type": "integer", "minimum": 0 },
+              "bare_number_slots": { "const": 0 },
+              "not_applicable_pattern": {
+                "description": "The RCF / acquisition pattern in one comparable token. A case with no acquisition must read not_applicable_in_every_period; that pattern turning into numbers is a never_zero_collapse.",
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "shadow_boundary": {
+      "description": "The shadow-boundary invariant pinned as a fact, not assumed. The IR is computed, sealed and hashed beside the proof projection and gates nothing; promoting it is a new schema version, never a golden update.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ir_mode",
+        "ir_gates_delivery",
+        "shadow_status",
+        "shadow_mode",
+        "shadow_gates_delivery",
+        "attachment_property",
+        "attached_enumerably",
+        "present_in_serialised_projection"
+      ],
+      "properties": {
+        "ir_mode": { "const": "shadow" },
+        "ir_gates_delivery": { "const": false },
+        "shadow_status": { "const": "sealed" },
+        "shadow_mode": { "const": "shadow" },
+        "shadow_gates_delivery": { "const": false },
+        "attachment_property": { "type": "string", "minLength": 1 },
+        "attached_enumerably": { "const": false },
+        "present_in_serialised_projection": { "const": false }
+      }
+    },
+    "record_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
