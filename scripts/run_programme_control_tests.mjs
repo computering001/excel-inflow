@@ -66,7 +66,7 @@ function lintCard(body, name) {
   return null;
 }
 for (const entry of await fs.readdir(PROGRAMME)) {
-  if (!/^P\d+\.\d+_issue_card\.md$/.test(entry)) continue;
+  if (!/^P\d+\.\d+[a-z]?_issue_card\.md$/.test(entry)) continue;
   const body = await fs.readFile(path.join(PROGRAMME, entry), "utf8");
   const problem = lintCard(body, entry);
   check(problem === null, problem ?? "");

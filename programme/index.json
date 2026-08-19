@@ -137,6 +137,21 @@
       "commit": "3f529eb",
       "invariant": "every verify oracle is census-visible and AST-proven production-import-free; detection rates are computed, not claimed",
       "note": "five synthetic domains now honestly marked NOT_INDEPENDENTLY_PROVEN"
+    },
+    "P4.1": {
+      "commit": "d627849",
+      "invariant": "every opening instrument records its candidate universe, selected source and typed not-selected register",
+      "note": "bridge citation of candidate ids and coverage-side validation follow on"
+    },
+    "P3.1": {
+      "commit": "dab1952",
+      "invariant": "a canonical Economic IR is compiled in shadow with typed values throughout and a deterministic seal in the receipts",
+      "note": "forecast/schedule numbers type unresolved until a later phase feeds solved values; delivery ungated"
+    },
+    "P8.6a": {
+      "commit": "7289482",
+      "invariant": "a release rollback is a declared, authorised, evidence-preserving procedure recorded in an append-only hash-chained journal",
+      "note": "installed-host legs declared EXCLUDED_INSTALLED_HOST per standing directive"
     }
   },
   "evidence_baseline": {

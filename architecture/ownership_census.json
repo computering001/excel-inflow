@@ -109,6 +109,15 @@
       "concern": "coverage checks (must not mutate)",
       "target_owner": "validators stay validators"
     },
+    "lib/economic_ir.mjs": {
+      "count": 1,
+      "families": {
+        "row_topology": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "P3.1 canonical Economic IR (shadow; typed values, never gates delivery)",
+      "target_owner": "Economic IR (Phase 3)"
+    },
     "lib/evidence_resolution_v2.mjs": {
       "count": 6,
       "families": {
@@ -351,6 +360,15 @@
       "classification": "validator",
       "concern": "release identity governance checks",
       "target_owner": "validators stay validators"
+    },
+    "lib/release_journal.mjs": {
+      "count": 2,
+      "families": {
+        "terminal_status": 2
+      },
+      "classification": "canonical_writer",
+      "concern": "P8.6a append-only hash-chained release journal + rollback policy validator",
+      "target_owner": "Release/package compiler (Phase 8)"
     },
     "lib/release_nodes.mjs": {
       "count": 3,

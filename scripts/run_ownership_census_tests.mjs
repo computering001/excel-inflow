@@ -106,6 +106,9 @@ const FILE_OWNERSHIP = {
   "lib/policy_registry.mjs": { role: "canonical_writer", concern: "P2.7 versioned policy-binding stamps (throws on unregistered family; never defaults)", target_owner: "Policy registry (Phase 2)" },
   "lib/required_role_closure.mjs": { role: "canonical_writer", concern: "P2.4 required-role closure artifact minted before forecast compilation", target_owner: "Statement Authority compiler (Phase 2)" },
   "lib/formula_ast.mjs": { role: "canonical_writer", concern: "P4.5 typed formula expression tree + deterministic A1 renderer", target_owner: "Workbook planner (Phase 5)" },
+  "lib/economic_ir.mjs": { role: "canonical_writer", concern: "P3.1 canonical Economic IR (shadow; typed values, never gates delivery)", target_owner: "Economic IR (Phase 3)" },
+  "lib/opening_instrument_provenance.mjs": { role: "canonical_writer", concern: "P4.1 opening-instrument candidate inventory + not-selected register", target_owner: "Schedule/solver layer (Phase 4)" },
+  "lib/release_journal.mjs": { role: "canonical_writer", concern: "P8.6a append-only hash-chained release journal + rollback policy validator", target_owner: "Release/package compiler (Phase 8)" },
 };
 
 const SCAN_DIRS = ["scripts/lib", "scripts"];

@@ -1580,6 +1580,33 @@
       "test_class": "mutation"
     },
     {
+      "id": "economic-ir",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_economic_ir_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "opening-instrument-provenance",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_instrument_provenance_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "release-rollback-policy",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_release_rollback_policy_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "runtime-closure",
       "phase": "proof",
       "runtime": "node",
