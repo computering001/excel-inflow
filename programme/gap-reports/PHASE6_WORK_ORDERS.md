@@ -76,3 +76,36 @@ P3.7 forecast recipes).
   trust stage4-content-addressed-resume only on a quiescent tree.
 - raw_canary_fixture/optional_broker_circuit_breaker/run_constitution_graph are census-pinned:
   census update in the same commit or programme-control goes red.
+
+# Phase 6 carry-in — terminal outcome compiler (second scout, same commit)
+- **TOC.A** 27 finish sites, ZERO registry-bound statuses (vnext 9 literals :456-911; delegate 18);
+  six further unbound vocabularies (flow outcomes ×11, question statuses, stage_receipt statuses,
+  carrier states, lane pipeline_status, quality_mode ×5). Only code naming the 7 declared terminal
+  states: generated support_envelope_contract.mjs:13 TerminalState — no consumers.
+- **TOC.B** public schema admits ONLY the 4 legacy tokens (excel-inflow-vnext-run.schema.json) —
+  DELIVERED_*/SOURCE_REQUIRED/UNSUPPORTED_PROFILE/INTERNAL_FAILURE/CANCELLED unmintable; no
+  terminal_reason property; assertPublicStateOwnership has ZERO production callers and is weaker
+  than the registry; dead NEEDS_USER_INPUT branch at vnext:282.
+- **TOC.C** 17 codes, 5 emitters; UNSUPPORTED_PROFILE.* vs PROFILE.* spelling crosswalked only
+  inside a test; 618 untyped throws across 70 lib files (3 files typed);
+  internal-failure.json read by NOTHING (parent maps delegate exit≠0 to NEEDS_INTERNAL_WORK and
+  discards the typed code, vnext:612-632,834-858); untyped path payload: 3 of 5 fields placeholders.
+- **TOC.D** category firewall enforced NOWHERE; three live crossings:
+  (1) run_user_flow.mjs:1140-1168 decision_replay/graph_blocked → ACTION_REQUIRED +
+  blocker INTERNAL_WORK → workflow contract admits only USER_DECISION → GUARANTEED UNCAUGHT THROW
+  (highest-value cheap fix in the phase, per scout);
+  (2) SOURCE.opening_debt_unresolved surfaces publicly as NEEDS_INTERNAL_WORK;
+  (3) support-envelope early stop discards early_stop.terminal_state/legal_terminals and mints
+  BLOCKED/FATAL_SOURCE (vnext:554-569). P3.7's "no-internal-ACTION_REQUIRED scan" does not exist.
+- **TOC.E** two unlinked reason vocabularies: delivery-constitution fatal_reasons are registry codes
+  with the category prefix STRIPPED; nothing asserts alignment. The BLOCKED-outcome binding
+  (workflow_state.mjs:160-195) is the strong pattern to generalise. No ACTION_REQUIRED outcome
+  carries a reason code.
+- **TOC.F** confidentiality live: vnext :623-630/:849-856 slice 4000 chars of delegate
+  stdout+stderr into public summary; :928-931 full stack; delegate :2199 full stack; :2021/:2039
+  raw error.message on the user screen; :1918-1922 stage-4 stderr into build-result.json.
+
+Sequencing: TOC.A/TOC.B (one compiled status+reason writer) PRECEDES P6.2/P6.7 (journal needs one
+vocabulary). Cross-phase: TOC.C ← P3.7; TOC.B/D ← P0.5; P6.3/6.4/6.7-resume ← P3.6 identity;
+P6.8 cohort ← P7.1 corpus. Overlaps: P2.7 findings shape ↔ blocked_outcomes map; P4.3 must attach
+typed_internal_outcome at new refusals; P2.1 owns the envelope descriptor — P6 binds legal_terminals.
