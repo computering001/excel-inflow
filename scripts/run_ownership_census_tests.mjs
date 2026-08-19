@@ -99,6 +99,7 @@ const FILE_OWNERSHIP = {
   "lib/run_constitution_graph.mjs": { role: "canonical_writer", concern: "run constitution graph", target_owner: "Canonical graph compiler (Phase 3)" },
   "lib/source_identity.mjs": { role: "canonical_writer", concern: "active source identity", target_owner: "Release/package compiler (Phase 8)" },
   "lib/statement_topology.mjs": { role: "canonical_writer", concern: "statement topology records", target_owner: "Statement Authority compiler (Phase 2)" },
+  "lib/typed_value_dual_read.mjs": { role: "derived_reader", concern: "P1.8 legacy-to-typed projection (reads legacy state, mints typed views; never mutates the case)", target_owner: "Typed value parser (Phase 1, migration adapter)" },
 };
 
 const SCAN_DIRS = ["scripts/lib", "scripts"];
@@ -143,7 +144,7 @@ const census = {
   ),
   duplicate_writer_findings: [
     "forecast_authority and forecast_formula have MULTIPLE writers: forecast_candidate_compiler (waterfall selection), row_plan (legacy waterfall, consolidation rewires, capture-parent restore) and capture_transition (capture rewrites). The same economic fact can be selected in the candidate compiler and re-mutated in row planning - the v3.8 deletion target.",
-    "capture_ownership has three writers (capture_transition as the declared single legal writer, plus row_plan markForecastCapturedBy and case_compiler markCompilerCapture) - convergence to capture_transition is the Phase 3 seam.",
+    "capture_ownership CONVERGED (P3.5): every write to the forecast_capture_* fields routes through capture_transition's field-custody primitives (applyCaptureMark / clearCaptureMark / reassignCaptureParent / migrateCaptureMode); callers keep orchestration only. The single-writer gate below enforces this.",
     "workbook formula text is written at plan time (plan_builder) AND rewritten post-emission (build_dynamic_model patch passes) - the Phase 5 passivity seam.",
   ],
   unknown_writer_gate: {
@@ -192,5 +193,28 @@ check(census.files["lib/row_plan.mjs"].classification === "mixed_legacy_writer",
 check(census.files["build_dynamic_model.mjs"].classification === "late_repair_candidate",
   "build_dynamic_model must be classified late_repair_candidate");
 check(sites.length > 100, "the scan must find a substantial mutation surface (sanity floor)");
+// P3.5 single-writer gate: a RAW assignment to any forecast_capture_* field
+// outside lib/capture_transition.mjs is a defect — callers must use the
+// custody primitives.
+{
+  const rawWrite = /\.forecast_capture_(parent_id|mode|note|certificates)\s*(=[^=]|\?\?=)/;
+  const offenders = [];
+  for (const dir of SCAN_DIRS) {
+    for (const entry of await fs.readdir(path.join(ROOT, dir))) {
+      if (!entry.endsWith(".mjs")) continue;
+      const relative = dir === "scripts/lib" ? `lib/${entry}` : entry;
+      if (relative === "lib/capture_transition.mjs") continue;
+      if (dir === "scripts" && !/^(run_user_flow|run_excel_inflow_vnext|build_dynamic_model|compile_skill_release|orchestrate_release)\.mjs$/.test(entry)) continue;
+      const body = await fs.readFile(path.join(ROOT, dir, entry), "utf8");
+      body.split("\n").forEach((line, index) => {
+        if (rawWrite.test(line) && !/^\s*(\/\/|\*)/.test(line)) {
+          offenders.push(`${relative}:${index + 1}`);
+        }
+      });
+    }
+  }
+  check(offenders.length === 0,
+    `raw forecast_capture_* writes outside capture_transition: ${offenders.join(", ")}`);
+}
 
 console.log(JSON.stringify({ status: "PASS", checks, mutation_sites: sites.length, files: Object.keys(byFile).length }));

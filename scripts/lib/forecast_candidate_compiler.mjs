@@ -1,4 +1,5 @@
 import { brokerHeadlineEligibility } from "./broker_headline_policy.mjs";
+import { applyCaptureMark } from "./capture_transition.mjs";
 import crypto from "node:crypto";
 
 import {
@@ -1127,10 +1128,11 @@ export function compileForecastPlan(
       delete row.forecast_calculation;
       delete row.forecast_period_calculations;
       row.values = [...(row.values ?? []).slice(0, 3), null, null, null];
-      row.forecast_capture_parent_id = derivedHeadline.row_id;
-      row.forecast_capture_mode = "formula_membership";
-      row.forecast_capture_note =
-        "The inverse bridge residual is represented by the authoritative headline and is not forecast as an independent plug.";
+      applyCaptureMark(row, {
+        parent_row_id: derivedHeadline.row_id,
+        mode: "formula_membership",
+        note: "The inverse bridge residual is represented by the authoritative headline and is not forecast as an independent plug.",
+      });
     }
   }
   // TIER 1 — THE ANCHOR IS ALWAYS CONSUMED, AND IT OUTRANKS ITS OWN IDENTITY.
@@ -1756,13 +1758,16 @@ export function materializeForecastPlan(modelCase, plan) {
         );
       }
       if (state.producer_type === "captured") {
-        row.forecast_capture_parent_id = candidate.capture_certificate.parent_row_id;
-        row.forecast_capture_mode = candidate.capture_certificate.mode;
-        row.forecast_capture_note =
-          candidate.note ?? `Captured by ${candidate.capture_certificate.parent_row_id}.`;
-        row.forecast_capture_certificates ??= [null, null, null];
-        row.forecast_capture_certificates[state.forecast_index] =
-          structuredClone(candidate.capture_certificate);
+        applyCaptureMark(row, {
+          parent_row_id: candidate.capture_certificate.parent_row_id,
+          mode: candidate.capture_certificate.mode,
+          note: candidate.note ?? `Captured by ${candidate.capture_certificate.parent_row_id}.`,
+          certificates: (() => {
+            const certificates = row.forecast_capture_certificates ?? [null, null, null];
+            certificates[state.forecast_index] = structuredClone(candidate.capture_certificate);
+            return certificates;
+          })(),
+        });
       }
     }
   }

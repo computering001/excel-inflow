@@ -26,6 +26,7 @@ import {
 } from "./face_statement_manifest.mjs";
 import { classifyStatementLine } from "./statement_classifier.mjs";
 import { validateCaseShape } from "./solver.mjs";
+import { applyCaptureMark, clearCaptureMark } from "./capture_transition.mjs";
 import { assessCoverage } from "./coverage.mjs";
 import { validateForecastAuthorities } from "./forecast_authority.mjs";
 import { sealForecastAuthorityLedger } from "./forecast_authority_ledger.mjs";
@@ -2342,10 +2343,7 @@ function restoreDerivedDisplayIdentity(row) {
   ) {
     return false;
   }
-  delete row.forecast_capture_parent_id;
-  delete row.forecast_capture_mode;
-  delete row.forecast_capture_note;
-  delete row.forecast_capture_certificates;
+  clearCaptureMark(row);
   if (row.formula_authority === "intentionally_blank") {
     delete row.formula_authority;
   }
@@ -2524,18 +2522,20 @@ function captureCertificates(row, targetId, mode, path, modelCase) {
 function markCompilerCapture(modelCase, row, targetId, mode, path) {
   row.forecast_treatment = "uncalculated";
   row.formula_authority = "intentionally_blank";
-  row.forecast_capture_parent_id = targetId;
-  row.forecast_capture_mode = mode;
-  row.forecast_capture_note =
-    `Forecast detail is captured by ${targetId} through the certified ` +
-    `${path.length - 1}-edge section-local membership path.`;
-  row.forecast_capture_certificates = captureCertificates(
-    row,
-    targetId,
+  applyCaptureMark(row, {
+    parent_row_id: targetId,
     mode,
-    path,
-    modelCase,
-  );
+    note:
+      `Forecast detail is captured by ${targetId} through the certified ` +
+      `${path.length - 1}-edge section-local membership path.`,
+    certificates: captureCertificates(
+      row,
+      targetId,
+      mode,
+      path,
+      modelCase,
+    ),
+  });
 }
 
 function formulaMembershipIndex(sectionRows) {

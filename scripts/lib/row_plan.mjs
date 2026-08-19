@@ -1,4 +1,10 @@
 import {
+  applyCaptureMark,
+  clearCaptureMark,
+  migrateCaptureMode,
+  reassignCaptureParent,
+} from "./capture_transition.mjs";
+import {
   describeStatementRow,
   inferMovementType,
 } from "./semantic_graph.mjs";
@@ -1143,13 +1149,14 @@ function markForecastCapturedBy(
   const material = modelCase ? forecastRowMateriality(modelCase, row) : null;
   row.forecast_treatment = "uncalculated";
   row.formula_authority = "intentionally_blank";
-  row.forecast_capture_parent_id = parentRowId;
-  row.forecast_capture_mode = mode;
-  row.forecast_capture_note = note;
   // Remove only stale absence declarations. Genuine direct authorities have
   // already returned above and are never deleted.
   delete row.forecast_period_authorities;
-  row.forecast_capture_certificates = [0, 1, 2].map((forecastIndex) => ({
+  applyCaptureMark(row, {
+    parent_row_id: parentRowId,
+    mode,
+    note,
+    certificates: [0, 1, 2].map((forecastIndex) => ({
     forecast_index: forecastIndex,
     parent_row_id: parentRowId,
     mode,
@@ -1159,7 +1166,8 @@ function markForecastCapturedBy(
       mode === "formula_membership"
         ? "Parent formula contains this row exactly once."
         : "The row's forecast scope is represented by the declared parent authority while this child remains intentionally blank.",
-  }));
+    })),
+  });
   return true;
 }
 
@@ -1169,10 +1177,7 @@ function clearCompiledForecastOverride(row) {
 }
 
 function clearForecastCaptureMetadata(row) {
-  delete row.forecast_capture_parent_id;
-  delete row.forecast_capture_mode;
-  delete row.forecast_capture_note;
-  delete row.forecast_capture_certificates;
+  clearCaptureMark(row);
   if (row.formula_authority === "intentionally_blank") {
     delete row.formula_authority;
   }
@@ -1322,14 +1327,13 @@ function migrateMultiHopCaptureCertificates(rows) {
     // path remains useful lineage, but it is not a physical forecast path and
     // may contain cancelling or parallel bridge routes.  Migrate old compiled
     // artifacts to the current proof mode without discarding that lineage.
-    row.forecast_capture_mode = "semantic_scope";
-    row.forecast_capture_certificates = certificates.map((certificate) => ({
+    migrateCaptureMode(row, "semantic_scope", certificates.map((certificate) => ({
       ...certificate,
       mode: "semantic_scope",
       proof:
         `Section-local semantic scope retained with historical membership path: ` +
         certificate.membership_path.join(" -> ") + ".",
-    }));
+    })));
   }
 }
 
@@ -2112,9 +2116,7 @@ function collapseRedundantStatementAliases(modelCase, section, rows) {
         rule.refs = rule.refs.map((ref) => (ref === fromId ? toId : ref));
       }
       if (row.parent_row_id === fromId) row.parent_row_id = toId;
-      if (row.forecast_capture_parent_id === fromId) {
-        row.forecast_capture_parent_id = toId;
-      }
+      reassignCaptureParent(row, fromId, toId);
     }
   };
 
@@ -2214,9 +2216,7 @@ function collapseEquivalentEbitOperatingProfit(rows) {
     if (row.parent_row_id === ebit.row_id) {
       row.parent_row_id = operatingProfit.row_id;
     }
-    if (row.forecast_capture_parent_id === ebit.row_id) {
-      row.forecast_capture_parent_id = operatingProfit.row_id;
-    }
+    reassignCaptureParent(row, ebit.row_id, operatingProfit.row_id);
   }
   // Retargeting can turn the survivor's own link-to-EBIT into a link to
   // itself; where that happens the survivor adopts the collapsed row's rule

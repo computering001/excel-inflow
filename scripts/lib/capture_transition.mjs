@@ -156,3 +156,49 @@ export function clearFullyCapturedDirectMarkers(row) {
   delete row.forecast_period_calculations;
   row.forecast_treatment = "uncalculated";
 }
+
+// ---------------------------------------------------------------------------
+// P3.5 — SINGLE-WRITER FIELD CUSTODY.
+//
+// Every write to forecast_capture_parent_id / _mode / _note / _certificates
+// anywhere in the compiler goes through the four primitives below. Callers
+// keep their own orchestration (eligibility rules, treatment markers), but
+// the capture FIELDS have one writing module. The ownership census verifies
+// this: a raw assignment outside this file is a defect.
+// ---------------------------------------------------------------------------
+
+/** Apply a capture mark. `certificates` is optional (formula-membership
+ * marks without sealed certificates keep that shape). */
+export function applyCaptureMark(row, { parent_row_id, mode, note, certificates }) {
+  row.forecast_capture_parent_id = parent_row_id;
+  row.forecast_capture_mode = mode;
+  row.forecast_capture_note = note;
+  if (certificates !== undefined) {
+    row.forecast_capture_certificates = certificates;
+  }
+  return row;
+}
+
+/** Remove every capture field from a row. */
+export function clearCaptureMark(row) {
+  delete row.forecast_capture_parent_id;
+  delete row.forecast_capture_mode;
+  delete row.forecast_capture_note;
+  delete row.forecast_capture_certificates;
+  return row;
+}
+
+/** Re-point a capture at a surviving parent (consolidation retargeting). */
+export function reassignCaptureParent(row, fromId, toId) {
+  if (row.forecast_capture_parent_id === fromId) {
+    row.forecast_capture_parent_id = toId;
+  }
+  return row;
+}
+
+/** Migrate a legacy capture's proof mode, preserving lineage. */
+export function migrateCaptureMode(row, mode, certificates) {
+  row.forecast_capture_mode = mode;
+  row.forecast_capture_certificates = certificates;
+  return row;
+}
