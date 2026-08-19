@@ -485,7 +485,15 @@ export function resolveSelectedForecastOwnership(modelCase) {
   const receipt = seal(body);
   modelCase.forecast_ownership_preflights.selected = receipt;
   if (receipt.status !== "PASS") {
-    throw new Error(`forecast ownership preflight B blocked: ${violations.join("; ")}`);
+    const error = new Error(`forecast ownership preflight B blocked: ${violations.join("; ")}`);
+    error.typed_internal_outcome = {
+      reason_code: "INTERNAL.forecast_ownership_blocked",
+      earliest_responsible_layer: "forecast_ownership_resolver",
+      downstream_invalidation_scope: "forecast_ownership_and_below",
+      violation_count: violations.length,
+      first_violation: violations[0] ?? null,
+    };
+    throw error;
   }
   return receipt;
 }

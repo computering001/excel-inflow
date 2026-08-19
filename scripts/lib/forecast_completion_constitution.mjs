@@ -149,10 +149,20 @@ export function compileForecastCompletionCensus(modelCase) {
 export function sealEconomicStageParity(modelCase) {
   const census = compileForecastCompletionCensus(modelCase);
   if (census.status !== "PASS") {
-    throw new Error(
+    const error = new Error(
       `economic stage parity refused: ${census.escalations.length} model-owned ` +
         `forecast cells lack a lawful disposition (first: ${JSON.stringify(census.escalations[0])})`,
     );
+    // P3.7: an internal forecast failure is a typed, resumable outcome —
+    // never a bare stack. The terminal catch serialises this payload.
+    error.typed_internal_outcome = {
+      reason_code: "INTERNAL.forecast_completion_escalated",
+      earliest_responsible_layer: "forecast_completion_constitution",
+      downstream_invalidation_scope: "forecast_compilation_and_below",
+      escalation_count: census.escalations.length,
+      first_escalation: census.escalations[0] ?? null,
+    };
+    throw error;
   }
   const body = {
     schema_version: ECONOMIC_STAGE_PARITY_SCHEMA,

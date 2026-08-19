@@ -2195,7 +2195,35 @@ guardedMain()
       ? 0
       : 1;
   })
-  .catch((error) => {
+  .catch(async (error) => {
     process.stderr.write(`${error.stack ?? String(error)}\n`);
+    // P3.7: an internal failure carrying a typed outcome is serialised with
+    // the registry's payload fields so the run is diagnosable and resumable —
+    // a bare stack print is not a terminal state.
+    try {
+      const outDir = process.argv.includes("--out")
+        ? process.argv[process.argv.indexOf("--out") + 1]
+        : null;
+      if (outDir) {
+        const payload = {
+          schema_version: "excel-inflow-internal-failure/1.0",
+          reason_code: error.typed_internal_outcome?.reason_code ?? "INTERNAL.compiler_or_graph_defect",
+          earliest_responsible_layer:
+            error.typed_internal_outcome?.earliest_responsible_layer ?? "unattributed (repair: type this throw)",
+          downstream_invalidation_scope:
+            error.typed_internal_outcome?.downstream_invalidation_scope ?? "unknown_full_rerun",
+          resumable_checkpoint_path: path.join(outDir, "stages"),
+          preserved_source_hashes: "evidence and stage artifacts under the run directory remain immutable",
+          detail: error.typed_internal_outcome ?? null,
+          message: String(error.message ?? error),
+        };
+        await fs.mkdir(outDir, { recursive: true });
+        await fs.writeFile(
+          path.join(outDir, "internal-failure.json"),
+          `${JSON.stringify(payload, null, 2)}\n`,
+          "utf8",
+        );
+      }
+    } catch {}
     process.exitCode = 1;
   });

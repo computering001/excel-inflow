@@ -2921,6 +2921,14 @@ export function solveCase(
       error.residual = residual;
       error.two_cycle_detections = cycleDetectionCount;
       error.damping_attempts = dampingIndex;
+      // P3.7: maps onto the sealed terminal-reason registry.
+      error.typed_internal_outcome = {
+        reason_code: "INTERNAL.equation_system_unsolved",
+        earliest_responsible_layer: "solver",
+        downstream_invalidation_scope: "solve_and_below",
+        iterations: iterationLimit,
+        residual,
+      };
       throw error;
     }
 

@@ -201,6 +201,30 @@
       "evidence_preserved": true,
       "allowed_terminal_states": ["INTERNAL_FAILURE", "CANCELLED"]
     },
+    "INTERNAL.forecast_completion_escalated": {
+      "owner_layer": "forecast_completion_constitution",
+      "category": "internal",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_repair",
+      "user_action": "none - engineering owns this",
+      "source_action": "none",
+      "checkpoint_required": true,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+    },
+    "INTERNAL.forecast_ownership_blocked": {
+      "owner_layer": "forecast_ownership_resolver",
+      "category": "internal",
+      "severity": "fatal",
+      "materiality": "material",
+      "recoverability": "resumable_after_repair",
+      "user_action": "none - engineering owns this",
+      "source_action": "none",
+      "checkpoint_required": true,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["INTERNAL_FAILURE"]
+    },
     "INTERNAL.compiler_or_graph_defect": {
       "owner_layer": "case_compiler_or_graph",
       "category": "internal",

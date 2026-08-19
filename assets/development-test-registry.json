@@ -270,6 +270,15 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "internal-outcomes",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_internal_outcome_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "synthetic_integration"
+    },
+    {
       "id": "multipage-filing-extraction",
       "phase": "evidence",
       "runtime": "python",
