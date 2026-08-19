@@ -3,7 +3,7 @@
   "invariant": "blank/nil/missing/parse-failure never become zero",
   "generated_by": "node scripts/run_coercion_ban_tests.mjs --write",
   "classification_legend": {
-    "lawful_counter_or_length": "counter, length, index, layout, or duration default — safe",
+    "lawful_counter_or_length": "counter, length, index, layout geometry, duration, id, or boolean-flag default — safe",
     "suspect_value_coercion": "financial/value context — migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
@@ -107,7 +107,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -207,7 +207,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -237,7 +237,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -247,7 +247,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -277,7 +277,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -287,7 +287,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -297,7 +297,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -307,7 +307,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 2,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -337,7 +337,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -357,7 +357,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -387,7 +387,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -397,7 +397,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -447,7 +447,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -477,7 +477,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -697,7 +697,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -727,7 +727,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -837,7 +837,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/build_dynamic_model.mjs",
@@ -1007,7 +1007,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/compile_broker_candidate_manifest.py",
@@ -1087,7 +1087,7 @@
         "py_or_zero"
       ],
       "occurrences": 2,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/extract_filing_statements.py",
@@ -1137,7 +1137,7 @@
         "py_or_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/extract_filing_statements.py",
@@ -1167,7 +1167,7 @@
         "py_or_zero"
       ],
       "occurrences": 2,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/acquisition_policy.mjs",
@@ -1177,7 +1177,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/attachment_ingress.mjs",
@@ -1187,7 +1187,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/attachment_ingress.mjs",
@@ -1497,7 +1497,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/fixed_point_constitution.mjs",
@@ -1797,7 +1797,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/flow_questions.mjs",
@@ -1847,7 +1847,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/flow_read.mjs",
@@ -2367,7 +2367,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 2,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/plan_builder.mjs",
@@ -2577,7 +2577,7 @@
         "js_logical_or_zero"
       ],
       "occurrences": 6,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/row_plan.mjs",
@@ -2587,7 +2587,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/row_plan.mjs",
@@ -2627,7 +2627,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/row_plan.mjs",
@@ -2657,7 +2657,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 2,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/row_plan.mjs",
@@ -3097,7 +3097,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/solver.mjs",
@@ -3147,7 +3147,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/lib/solver.mjs",
@@ -3297,7 +3297,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/solver.mjs",
@@ -3307,7 +3307,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/lib/solver.mjs",
@@ -3767,7 +3767,7 @@
         "py_or_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/run_excel_inflow_vnext.mjs",
@@ -3777,7 +3777,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/run_excel_inflow_vnext.mjs",
@@ -3787,7 +3787,7 @@
         "js_nullish_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "lawful_counter_or_length"
     },
     {
       "file": "scripts/run_excel_inflow_vnext.mjs",
@@ -3907,7 +3907,7 @@
         "py_or_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/verify/source_topology_oracle.py",
@@ -3957,7 +3957,7 @@
         "py_or_zero"
       ],
       "occurrences": 1,
-      "classification": "unreviewed"
+      "classification": "suspect_value_coercion"
     },
     {
       "file": "scripts/verify/validate_dynamic_model.py",

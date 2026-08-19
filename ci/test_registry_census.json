@@ -1,16 +1,16 @@
 {
   "schema_version": "excel-inflow-ci-census/1.0",
   "status": "PASS",
-  "checks": 309,
-  "source_commit": "c5f2ac68f06fc758efe4695f32f38e8c0e0cbcb7",
-  "source_tree": "4c01d9da470d3634ec153c467e8b17ab7940f984",
+  "checks": 315,
+  "source_commit": "e957b6282e5c220ab2eaa7ab8b388675721c0b9b",
+  "source_tree": "394fbef71d0b69efb1d4d8ade65a68a60a572be9",
   "toolchain": {
     "node": "v22.23.2",
     "python": "Python 3.9.6",
     "soffice": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb"
   },
   "registry": {
-    "test_count": 147
+    "test_count": 150
   },
   "scripts": [
     {
@@ -198,6 +198,10 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_coercion_ban_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_controller_exit_inventory_tests.mjs",
       "disposition": "REGISTERED"
     },
@@ -254,11 +258,19 @@
       "disposition": "REGISTERED"
     },
     {
+      "script": "run_entity_identifier_strength_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
       "script": "run_entity_identity_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
       "script": "run_equation_graph_tests.mjs",
+      "disposition": "REGISTERED"
+    },
+    {
+      "script": "run_etr_receipt_boundary_tests.mjs",
       "disposition": "REGISTERED"
     },
     {
