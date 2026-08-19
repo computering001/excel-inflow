@@ -1598,6 +1598,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "support-coverage-grid",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_support_coverage_grid_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "completion-census-scope",
       "phase": "forecast",
       "runtime": "node",

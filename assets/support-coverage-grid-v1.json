@@ -1,0 +1,1629 @@
+{
+  "schema_version": "excel-inflow-support-coverage-grid/1.0",
+  "work_package": "P7.1a",
+  "invariant": "Every value the support envelope CLAIMS is joined to the evidence proving it, tier-labelled; a claimed value with no proving evidence is reported as a typed coverage gap.",
+  "mode": "REPORT_ONLY",
+  "envelope_version": "3.7.7",
+  "envelope_sha256": "e2681666c6a693f07814e18e29f4eb991630900af9b5c29eb342830984f5ac0a",
+  "tier_definitions": {
+    "extraction_evidence": "A real filing is required: the claim concerns reading messy source documents (scanned PDFs, inline XBRL, unit labels, layout, caption vocabulary). This evidence lives in CUSTODY and is referenced by hash/id only — never copied into the repository.",
+    "model_shape_evidence": "A synthetic in-repo case suffices: the claim concerns economics, period arithmetic, or a pre-extraction refusal decided from intake facts alone. No document is opened to decide it."
+  },
+  "gap_reason_vocabulary": {
+    "no_real_filing_available": "The extraction tier is unmet: the custody register carries a classification axis for this dimension but no attested candidate exhibits this value. Closing it needs a new real filing classified into the existing axis.",
+    "custody_register_lacks_dimension_axis": "The extraction tier is unmet because the custody register has NO classification axis for this envelope dimension at all. No candidate can be joined until the register is extended — a classification-work gap, not merely a filing-supply gap.",
+    "no_synthetic_case_authored": "The model-shape tier is unmet: no in-repo synthetic case exhibits this value, though one could be authored without any new filing.",
+    "archetype_absent_from_corpus": "Both required tiers are unmet: the archetype is absent from every available source. Closing it needs a new real filing AND a new synthetic recipe."
+  },
+  "evidence_sources": [
+    {
+      "source": "repo_fixture",
+      "manifest": "test-fixtures/cases",
+      "tier": "model_shape_evidence",
+      "case_count": 2,
+      "note": "Synthetic standardised cases held in the repository. They carry no issuer, filing or licensed research, so they can only ever prove model shape."
+    },
+    {
+      "source": "blocker_corpus",
+      "manifest": "test-corpus/blockers/corpus_manifest.json",
+      "tier": "mixed",
+      "case_count": 6,
+      "note": "Known-blocker reproducers. A case carries extraction evidence only where raw filing bytes are held in custody; a sealed derived case or synthetic reproducer is model shape."
+    },
+    {
+      "source": "custody_family",
+      "manifest": "test-fixtures/real-filings-custody-v1",
+      "tier": "extraction_evidence",
+      "case_count": 14,
+      "note": "Real filings, enumerated by the in-repo redacted hash-bound register and referenced by candidate id only. No byte, path, host or issuer name is copied into this artifact or the repository."
+    }
+  ],
+  "custody_absence_typing": {
+    "contract": "Custody families are enumerated BY MANIFEST ONLY, so this grid is byte-identical with and without a custody root. A declared-but-unresolvable root is reported by the runtime probe as CUSTODY_ROOT_ABSENT_NOT_A_FAILURE and changes no row.",
+    "typed_reason": "CUSTODY_ROOT_ABSENT_NOT_A_FAILURE",
+    "grid_effect": "none"
+  },
+  "excluded_claim_kinds": [
+    {
+      "claim_kind": "unknown_value_class",
+      "reason": "A per-dimension fallback class for an UNSTATED value, not an enumerated value a case can exhibit. Pinned by the classifier suite (scripts/run_support_envelope_tests.mjs), not joinable to corpus evidence."
+    },
+    {
+      "claim_kind": "early_stop_predicates",
+      "reason": "Rule text over intake facts, with its own positive and negative examples inside the envelope. Its verdicts are pinned by the classifier and preflight suites; the refusal VALUES it consumes are carried as rows here."
+    }
+  ],
+  "custody_joins": [
+    {
+      "join_id": "custody_category_accounting_framework_ifrs",
+      "join_kind": "attested_category",
+      "register_reference": "accounting_framework.ifrs",
+      "dimension": "accounting_framework",
+      "value": "ifrs",
+      "justification": "The register's own accounting_framework axis attests an IFRS candidate; the envelope's ifrs value is the same claim about the same framework."
+    },
+    {
+      "join_id": "custody_category_accounting_framework_us_gaap",
+      "join_kind": "attested_category",
+      "register_reference": "accounting_framework.us_gaap",
+      "dimension": "accounting_framework",
+      "value": "us_gaap",
+      "justification": "The register's accounting_framework axis attests a US GAAP candidate; the envelope's us_gaap value is the same claim."
+    },
+    {
+      "join_id": "custody_category_native_pdf",
+      "join_kind": "attested_category",
+      "register_reference": "document_format.native_pdf",
+      "dimension": "filing_language_format",
+      "value": "english_text_pdf",
+      "justification": "A native-text PDF in the register is exactly the envelope's english_text_pdf format; the register's eligibility contract admits English-language local or official public filings only."
+    },
+    {
+      "join_id": "custody_category_scanned_pdf",
+      "join_kind": "attested_category",
+      "register_reference": "document_format.scanned_pdf",
+      "dimension": "filing_language_format",
+      "value": "english_scanned_ocr",
+      "justification": "A scanned PDF can only be read through OCR, which is precisely the envelope's english_scanned_ocr format."
+    },
+    {
+      "join_id": "custody_category_interim_reporting_period",
+      "join_kind": "attested_category",
+      "register_reference": "reporting_period.interim",
+      "dimension": "statement_topology",
+      "value": "condensed_or_interim",
+      "justification": "An interim report in the register carries the condensed interim statement topology the envelope names; the join is from reporting period to the topology that period implies."
+    },
+    {
+      "join_id": "custody_category_multi_page_cash_flow",
+      "join_kind": "attested_category",
+      "register_reference": "statement_structure.multi_page_cash_flow",
+      "dimension": "statement_topology",
+      "value": "standard_three_statement",
+      "justification": "A multi-page cash-flow statement located in a real annual filing evidences the full three-statement topology: the cash-flow face statement is present and was found across pages."
+    },
+    {
+      "join_id": "custody_qualification_three_period_face_statements",
+      "join_kind": "attested_qualification",
+      "register_reference": "three_period_face_statements_selected",
+      "dimension": "historical_periods",
+      "value": "three_or_more",
+      "justification": "The candidate's own attested qualification records that three periods of face statements were selected from the real document — the envelope's three_or_more claim, read off a real filing."
+    },
+    {
+      "join_id": "custody_document_inline_xbrl_markers",
+      "join_kind": "structural_media_metric",
+      "register_reference": "corpus-classification-receipt.documents[].media_metrics",
+      "dimension": "filing_language_format",
+      "value": "structured_inline_xbrl",
+      "justification": "Inline-XBRL markers counted in the document's own media metrics are direct structural evidence of the envelope's structured_inline_xbrl format."
+    },
+    {
+      "join_id": "custody_document_fully_rasterised_pages",
+      "join_kind": "structural_media_metric",
+      "register_reference": "corpus-classification-receipt.documents[].media_metrics",
+      "dimension": "filing_language_format",
+      "value": "english_scanned_ocr",
+      "justification": "A full-page raster fraction at or above 0.9 means the pages carry no native text layer, so the document can only be read by OCR."
+    },
+    {
+      "join_id": "custody_document_native_text_pdf",
+      "join_kind": "structural_media_metric",
+      "register_reference": "corpus-classification-receipt.documents[].media_metrics",
+      "dimension": "filing_language_format",
+      "value": "english_text_pdf",
+      "justification": "A PDF with a low raster fraction and a substantial median native-text character count per page is a text PDF read without OCR."
+    }
+  ],
+  "curated_mappings": [
+    {
+      "mapping_id": "curated.blocker_entity_is_non_financial_corporate",
+      "source": "blocker_corpus",
+      "source_ref": "apple-us-gaap-raw-canary",
+      "dimension": "entity_type",
+      "value": "non_financial_corporate",
+      "tier": "extraction_evidence",
+      "verified_token": "public filing",
+      "justification": "This case's declared entity (corpus_manifest.json entity field) is a listed non-financial manufacturer and its custody-held annual report on Form 10-K is the extraction evidence; the manifest's privacy_classification confirms a public filing, not a derived case."
+    },
+    {
+      "mapping_id": "curated.blocker_indirect_cash_flow_method",
+      "source": "blocker_corpus",
+      "source_ref": "working-capital-capture-blocker",
+      "dimension": "cash_flow_method",
+      "value": "indirect",
+      "tier": "extraction_evidence",
+      "verified_token": "change_in_working_capital",
+      "justification": "The case's replay assertion is over change_in_working_capital addbacks read out of the custody-held filing's cash-flow statement — an indirect-method presentation, verified by the cited token being present in the manifest field."
+    }
+  ],
+  "rows": [
+    {
+      "dimension": "accounting_framework",
+      "value": "ifrs",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence"
+      ],
+      "tier_justification": "IFRS identity is read off a real filing's captions and note structure; no synthetic case in this repository declares a framework at all.",
+      "proving_cases": [
+        {
+          "case_id": "921c3225f6960acd",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_category_accounting_framework_ifrs",
+          "probe_kind": "attested_category",
+          "attestation": "accounting_framework.ifrs"
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "accounting_framework",
+      "value": "us_gaap",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence"
+      ],
+      "tier_justification": "US GAAP identity is read off a real 10-K's caption vocabulary and layout; a synthetic case asserts no framework.",
+      "proving_cases": [
+        {
+          "case_id": "apple-us-gaap-raw-canary",
+          "tier": "extraction_evidence",
+          "source": "blocker_corpus",
+          "probe": "blocker_accounting_basis_us_gaap",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "working-capital-capture-blocker",
+          "tier": "extraction_evidence",
+          "source": "blocker_corpus",
+          "probe": "blocker_accounting_basis_us_gaap",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "26982d474427eed2",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_category_accounting_framework_us_gaap",
+          "probe_kind": "attested_category",
+          "attestation": "accounting_framework.us_gaap"
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "accounting_framework",
+      "value": "local_gaap_english",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence"
+      ],
+      "tier_justification": "Local-GAAP caption vocabulary exists only inside a real local filing; it cannot be synthesised faithfully.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_real_filing_available",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "no_real_filing_available"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "accounting_framework",
+      "value": "other_or_unknown",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A declared refusal decided from the intake framework fact alone, before any document byte is read; a synthetic intake case proves it.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "entity_type",
+      "value": "non_financial_corporate",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "The archetype must be recognised from a real filing's own statements (extraction) and compiled by the standard three-statement economics (model shape).",
+      "proving_cases": [
+        {
+          "case_id": "apple-us-gaap-raw-canary",
+          "tier": "extraction_evidence",
+          "source": "blocker_corpus",
+          "probe": "curated.blocker_entity_is_non_financial_corporate",
+          "probe_kind": "curated_manifest_field",
+          "attestation": "privacy_classification"
+        },
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "corporate_three_statement_shape",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "corporate_three_statement_shape",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "entity_type",
+      "value": "utility",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Regulated-utility captions (rate base, regulatory assets and liabilities) only appear in a real utility filing, and the regulated economics must also compile.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "entity_type",
+      "value": "reit",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "REIT presentation (FFO reconciliations, investment-property revaluation) is a real-filing reading problem, and the property economics are a distinct model shape.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "entity_type",
+      "value": "holding_company",
+      "declared_class": "SUPPORTED_DEGRADED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A holdco perimeter and its minority interests must be read from a real filing, and the disclosed lower authority behind the SUPPORTED_DEGRADED promise must be modelled.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "entity_type",
+      "value": "mixed_group_predominantly_non_financial",
+      "declared_class": "SUPPORTED_DEGRADED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A captive-finance segment must be recognised in a real filing, and its consolidation into an industrial group is separate period arithmetic.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "entity_type",
+      "value": "bank",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A declared early stop decided from the intake entity_type alone; the envelope promises the run stops before any byte is read, so no filing is needed to prove it.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "entity_type",
+      "value": "insurer",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake entity_type alone; no document is opened.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "entity_type",
+      "value": "fund",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake entity_type alone; no document is opened.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "entity_type",
+      "value": "financial_spv",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake entity_type alone; no document is opened.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "entity_type",
+      "value": "investment_company",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake entity_type alone; no document is opened.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "filing_language_format",
+      "value": "english_text_pdf",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence"
+      ],
+      "tier_justification": "Column layout, unit labels and page furniture are properties of real PDF bytes; a synthetic case has no document.",
+      "proving_cases": [
+        {
+          "case_id": "apple-us-gaap-raw-canary",
+          "tier": "extraction_evidence",
+          "source": "blocker_corpus",
+          "probe": "blocker_custody_pdf_fixture",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "working-capital-capture-blocker",
+          "tier": "extraction_evidence",
+          "source": "blocker_corpus",
+          "probe": "blocker_custody_pdf_fixture",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "26982d474427eed2",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_native_text_pdf",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "680a5c0c098b8432",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_native_text_pdf",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "921c3225f6960acd",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_category_native_pdf",
+          "probe_kind": "attested_category",
+          "attestation": "document_format.native_pdf"
+        },
+        {
+          "case_id": "921c3225f6960acd",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_native_text_pdf",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "b6eed0750605a2b1",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_native_text_pdf",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "filing_language_format",
+      "value": "structured_inline_xbrl",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence"
+      ],
+      "tier_justification": "Inline-XBRL fact and context structure exists only in real filing markup; it cannot be synthesised as a case.",
+      "proving_cases": [
+        {
+          "case_id": "07d5c35e0bb05342",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_inline_xbrl_markers",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "a022b1655565975b",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_inline_xbrl_markers",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "filing_language_format",
+      "value": "english_scanned_ocr",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence"
+      ],
+      "tier_justification": "OCR noise, rasterisation and recovered-text error modes only occur on real scanned bytes.",
+      "proving_cases": [
+        {
+          "case_id": "bdab86e13e84bd31",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_category_scanned_pdf",
+          "probe_kind": "attested_category",
+          "attestation": "document_format.scanned_pdf"
+        },
+        {
+          "case_id": "bdab86e13e84bd31",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_fully_rasterised_pages",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "f62a779dd3299b56",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_document_fully_rasterised_pages",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "filing_language_format",
+      "value": "non_english",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake language fact plus the absence of a declared adapter; decided before extraction.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "historical_periods",
+      "value": "three_or_more",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Three comparative columns must be read off real face statements (extraction) and they drive the model's period arithmetic (model shape).",
+      "proving_cases": [
+        {
+          "case_id": "b776178ad7088076",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_qualification_three_period_face_statements",
+          "probe_kind": "attested_qualification",
+          "attestation": "three_period_face_statements_selected"
+        },
+        {
+          "case_id": "bcdd76091c073f7a",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_qualification_three_period_face_statements",
+          "probe_kind": "attested_qualification",
+          "attestation": "three_period_face_statements_selected"
+        },
+        {
+          "case_id": "ff6bb04a0be2b5d6",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_qualification_three_period_face_statements",
+          "probe_kind": "attested_qualification",
+          "attestation": "three_period_face_statements_selected"
+        },
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "three_or_more_historical_periods",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "three_or_more_historical_periods",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "historical_periods",
+      "value": "two_with_prior_filing_support",
+      "declared_class": "SUPPORTED_DEGRADED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Stitching a prior filing needs two real documents and their overlap reconciled (extraction), and the degraded two-period arithmetic must compile (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "no_real_filing_available",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "historical_periods",
+      "value": "fewer_than_two",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake period count alone; a synthetic intake case proves the refusal.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "statement_topology",
+      "value": "standard_three_statement",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "The three face statements must be located in a real filing (extraction) and the linked three-statement model must compile (model shape).",
+      "proving_cases": [
+        {
+          "case_id": "f62a779dd3299b56",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_category_multi_page_cash_flow",
+          "probe_kind": "attested_category",
+          "attestation": "statement_structure.multi_page_cash_flow"
+        },
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "income_statement_and_cash_flow_present",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "income_statement_and_cash_flow_present",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "statement_topology",
+      "value": "condensed_or_interim",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Condensed interim layouts differ only in the source document (extraction), and interim-to-annual period stitching is distinct arithmetic (model shape).",
+      "proving_cases": [
+        {
+          "case_id": "b6eed0750605a2b1",
+          "tier": "extraction_evidence",
+          "source": "custody_family",
+          "probe": "custody_category_interim_reporting_period",
+          "probe_kind": "attested_category",
+          "attestation": "reporting_period.interim"
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence"
+      ],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "partially_proven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "statement_topology",
+      "value": "cash_flow_absent",
+      "declared_class": "UNSUPPORTED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Declared early stop from the intake topology fact alone; the run must stop before extraction, so no filing proves it.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": "The classifier verdict for this value is pinned by scripts/run_support_envelope_tests.mjs, but no corpus case exercises the refusal end to end; a unit assertion is not a case and never counts as proof here."
+    },
+    {
+      "dimension": "cash_flow_method",
+      "value": "indirect",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "An indirect-method statement must be recognised in a real filing (extraction), and the addback and working-capital roll is economics (model shape).",
+      "proving_cases": [
+        {
+          "case_id": "working-capital-capture-blocker",
+          "tier": "extraction_evidence",
+          "source": "blocker_corpus",
+          "probe": "curated.blocker_indirect_cash_flow_method",
+          "probe_kind": "curated_manifest_field",
+          "attestation": "replay_assertion"
+        },
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "indirect_cash_flow_starts_from_profit",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "indirect_cash_flow_starts_from_profit",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "cash_flow_method",
+      "value": "direct",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A direct-method receipts-and-payments layout only exists in a real filing (extraction), and its conversion into the model's indirect roll is arithmetic (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "fiscal_calendar",
+      "value": "fixed_date",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A fixed year-end is pure period arithmetic; the date carries no document-reading risk beyond the date itself.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "fixed_date_fiscal_year_end",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "fixed_date_fiscal_year_end",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "fiscal_calendar",
+      "value": "week_52_53",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "52/53-week period labels and their shifting year-ends must be read off a real retailer filing (extraction), and the 53-week period arithmetic must compile (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments",
+      "value": "within_declared_matrix",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Instrument mechanics are economics; the declared matrix is exercised end to end by synthetic instrument recipes.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "all_instruments_within_declared_matrix",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "all_instruments_within_declared_matrix",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments",
+      "value": "convertible_or_hybrid",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Hybrid and convertible terms live in real note disclosures (extraction), and the conversion, PIK and split-accounting arithmetic is economics (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments",
+      "value": "exotic_or_structured",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A structure outside the declared matrix is discovered by reading real notes (extraction) before any bespoke arithmetic can be modelled (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments",
+      "value": "none_disclosed",
+      "declared_class": "SUPPORTED_DEGRADED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "A no-debt balance sheet is a synthetic shape; the SUPPORTED_DEGRADED promise concerns the model's behaviour, not a document.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "broker_availability",
+      "value": "broker_pack_present",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "The broker overlay is economics over supplied consensus figures; licensed research is never held in the repository, so a synthetic pack is the correct and only lawful proof.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "broker_pack_with_metrics_present",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "broker_pack_with_metrics_present",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "broker_availability",
+      "value": "broker_pack_absent",
+      "declared_class": "SUPPORTED_DEGRADED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "The absent-pack path is a synthetic shape: the model must degrade to filing-only authorities with the degradation disclosed.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "acquisition_overlay",
+      "value": "none",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "The no-overlay path is a synthetic shape; nothing is read to establish it.",
+      "proving_cases": [
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "acquisition_overlay_disabled",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "acquisition_overlay",
+      "value": "single_declared_acquisition",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Deal terms arrive as declared intake facts, not extracted text; the overlay is funding and consolidation arithmetic.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "single_declared_acquisition_enabled",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "acquisition_overlay",
+      "value": "multi_step_or_contingent",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Multi-step and contingent consideration remain user-declared terms; the risk is the staged arithmetic, not the reading.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "restructuring_complexity",
+      "value": "none",
+      "declared_class": "CERTIFIED",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "The no-restructuring path is a synthetic shape.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "no_restructuring_markers",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "no_restructuring_markers",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "restructuring_complexity",
+      "value": "discontinued_operations_disclosed",
+      "declared_class": "SUPPORTED_DEGRADED",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Discontinued-operations re-presentation of comparatives only exists in a real filing (extraction), and the continuing/discontinued split is distinct arithmetic (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "restructuring_complexity",
+      "value": "major_perimeter_change",
+      "declared_class": "EXPERIMENTAL",
+      "required_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "tier_justification": "Restated comparatives after a perimeter change exist only in real filings (extraction), and the perimeter arithmetic must compile (model shape).",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "extraction_evidence",
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "archetype_absent_from_corpus",
+      "gap_reasons_by_tier": {
+        "extraction_evidence": "custody_register_lacks_dimension_axis",
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "bond_fixed",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.bond_fixed",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.bond_fixed",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "bond_floating",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "term_loan_fixed",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "term_loan_floating",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.term_loan_floating",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "commercial_paper",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.commercial_paper",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "securitisation",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.securitisation",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "rcf",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.rcf",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.rcf",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "lease_liability",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.lease_liability",
+          "probe_kind": "structural",
+          "attestation": null
+        },
+        {
+          "case_id": "standard_net_cash",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.lease_liability",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "overdraft",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [],
+      "satisfied_tiers": [],
+      "missing_tiers": [
+        "model_shape_evidence"
+      ],
+      "status": "unproven",
+      "gap_reason": "no_synthetic_case_authored",
+      "gap_reasons_by_tier": {
+        "model_shape_evidence": "no_synthetic_case_authored"
+      },
+      "adjacent_non_case_evidence": null
+    },
+    {
+      "dimension": "debt_instruments.declared_matrix",
+      "value": "other_explicit",
+      "declared_class": "DECLARED_MATRIX_MEMBER",
+      "required_tiers": [
+        "model_shape_evidence"
+      ],
+      "tier_justification": "One member of the envelope's declared instrument matrix: its roll-forward, interest and inclusion mechanics are economics, proven by a synthetic instrument recipe rather than by any document.",
+      "proving_cases": [
+        {
+          "case_id": "standard_maximal",
+          "tier": "model_shape_evidence",
+          "source": "repo_fixture",
+          "probe": "instrument_class_present.other_explicit",
+          "probe_kind": "structural",
+          "attestation": null
+        }
+      ],
+      "satisfied_tiers": [
+        "model_shape_evidence"
+      ],
+      "missing_tiers": [],
+      "status": "proven",
+      "gap_reason": null,
+      "gap_reasons_by_tier": {},
+      "adjacent_non_case_evidence": null
+    }
+  ],
+  "totals": {
+    "dimensions_declared": 11,
+    "values_declared": 50,
+    "proven": 22,
+    "partially_proven": 1,
+    "unproven": 27,
+    "proven_by_real_filing": 10,
+    "proven_by_synthetic_case": 17,
+    "required_extraction_only": 6,
+    "required_model_shape_only": 28,
+    "required_both_tiers": 16,
+    "unproven_by_gap_reason": {
+      "no_real_filing_available": 1,
+      "no_synthetic_case_authored": 15,
+      "archetype_absent_from_corpus": 11
+    },
+    "gapped_rows_by_gap_reason": {
+      "no_real_filing_available": 1,
+      "no_synthetic_case_authored": 16,
+      "archetype_absent_from_corpus": 11
+    },
+    "extraction_tier_gaps_by_reason": {
+      "no_real_filing_available": 2,
+      "custody_register_lacks_dimension_axis": 10
+    },
+    "model_shape_tier_gaps": 27,
+    "dimensions_without_custody_axis": [
+      "acquisition_overlay",
+      "broker_availability",
+      "cash_flow_method",
+      "debt_instruments",
+      "entity_type",
+      "fiscal_calendar",
+      "restructuring_complexity"
+    ]
+  }
+}
