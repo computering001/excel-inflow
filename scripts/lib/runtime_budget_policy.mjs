@@ -21,6 +21,53 @@ export const DEFAULT_RUNTIME_BUDGETS_MS = Object.freeze({
 
 const REQUIRED_KEYS = Object.freeze(Object.keys(DEFAULT_RUNTIME_BUDGETS_MS));
 
+/**
+ * The stage budget each USER stage draws from. Declared here (not in the
+ * controller) so every stage of the user flow consults the same policy and the
+ * mandatory sequential path below can be reconciled against the ceiling.
+ */
+export const USER_FLOW_STAGE_BUDGET_KEYS = Object.freeze({
+  inputs: "source_acquisition",
+  evidence_review: "filing_extraction",
+  decisions: "case_compilation_and_ownership",
+  build_checks: "workbook_build",
+  delivery: "validation",
+});
+
+/**
+ * The budgets that MUST run in sequence for one delivered workbook. The other
+ * keys are per-document, per-frontier, optional-lane or watchdog budgets that
+ * are not additive on the mandatory path. P6.1: this sum is reconciled against
+ * end_to_end_hard_ceiling, so stage-local budgets can no longer be declared in
+ * a combination the run is not allowed to spend.
+ */
+export const MANDATORY_SEQUENTIAL_BUDGET_KEYS = Object.freeze([
+  "source_acquisition",
+  "filing_extraction",
+  "case_compilation_and_ownership",
+  "solver",
+  "workbook_build",
+  "recalculation",
+  "validation",
+]);
+
+export function mandatorySequentialBudgetMs(budgets) {
+  return MANDATORY_SEQUENTIAL_BUDGET_KEYS.reduce((total, key) => total + Number(budgets?.[key] ?? 0), 0);
+}
+
+/**
+ * A stage budget DERIVED from the one remaining deadline: a stage may never be
+ * offered more than the run has left, whatever its stage-local number says.
+ */
+export function deriveStageBudgetMs({ budgets = DEFAULT_RUNTIME_BUDGETS_MS, stage = null, remainingMs = null }) {
+  const declared = stage && Object.hasOwn(budgets, stage)
+    ? positiveInteger(budgets[stage], stage)
+    : positiveInteger(budgets.end_to_end_hard_ceiling, "end_to_end_hard_ceiling");
+  const remaining = Number(remainingMs);
+  if (!Number.isFinite(remaining) || remaining <= 0) return declared;
+  return Math.max(1, Math.min(declared, Math.floor(remaining)));
+}
+
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -31,6 +78,23 @@ function canonical(value) {
 
 function digest(value) {
   return createHash("sha256").update(`${JSON.stringify(canonical(value))}\n`).digest("hex");
+}
+
+/**
+ * A budget that cannot be computed is a typed controller defect, not a number.
+ * The reason code is the registered internal class; the payload carries the
+ * registry's custody fields so the outer catch can serialise it directly.
+ */
+function runtimeBudgetInputError(message) {
+  const error = new Error(message);
+  error.typed_internal_outcome = {
+    reason_code: "INTERNAL.compiler_or_graph_defect",
+    earliest_responsible_layer: "runtime_governance",
+    downstream_invalidation_scope: "runtime_budget_computation",
+    checkpoint_required: true,
+    evidence_preserved: true,
+  };
+  return error;
 }
 
 function positiveInteger(value, label) {
@@ -60,6 +124,15 @@ export function resolveRuntimeBudgetPolicy(overrides = {}) {
   if (budgets.ownership_resolution_after_evidence > 120_000) {
     throw new Error("Ownership resolution after relevant evidence cannot exceed two minutes.");
   }
+  // P6.1: stage-local budgets may not be declared in a combination the run is
+  // not allowed to spend. A deadline can never be extended, so the mandatory
+  // sequential path must fit inside the hard ceiling by construction.
+  const mandatory = mandatorySequentialBudgetMs(budgets);
+  if (mandatory > budgets.end_to_end_hard_ceiling) {
+    throw new Error(
+      `Mandatory sequential stage budgets total ${mandatory} ms, which exceeds the ${budgets.end_to_end_hard_ceiling} ms end-to-end hard ceiling.`,
+    );
+  }
   const body = {
     schema_version: RUNTIME_BUDGET_POLICY_SCHEMA,
     budgets_ms: budgets,
@@ -88,18 +161,47 @@ export function validateRuntimeBudgetPolicy(policy) {
   }
 }
 
-export function remainingRuntimeMs({ policy, controllerStartedEpochMs, nowEpochMs = Date.now() }) {
+/**
+ * Remaining runtime against the hard ceiling.
+ *
+ * P6.1: `consumedComputeMs` is the PERSISTED reading of the one run-scoped
+ * compute clock and takes precedence. The `controllerStartedEpochMs` form
+ * measures from a PROCESS start, so every new invocation restored the whole
+ * ceiling; it survives only for callers that genuinely mean "since this
+ * process began" and must never be used to bound a run.
+ */
+export function remainingRuntimeMs({ policy, consumedComputeMs = null, controllerStartedEpochMs, nowEpochMs = Date.now() }) {
   const ceiling = positiveInteger(policy?.budgets_ms?.end_to_end_hard_ceiling, "end_to_end_hard_ceiling");
-  const elapsed = Math.max(0, Number(nowEpochMs) - Number(controllerStartedEpochMs));
-  return Math.max(0, Math.floor(ceiling - elapsed));
+  const consumed = consumedComputeMs === null || consumedComputeMs === undefined
+    ? Number.NaN
+    : Number(consumedComputeMs);
+  if (Number.isFinite(consumed) && consumed >= 0) {
+    return Math.max(0, Math.floor(ceiling - consumed));
+  }
+  const elapsed = Number(nowEpochMs) - Number(controllerStartedEpochMs);
+  // A budget computation must REFUSE rather than return a non-finite number.
+  // An unusable input used to propagate as NaN all the way into a subprocess
+  // spawn, where "no budget" is indistinguishable from "no timeout" — exactly
+  // the unbounded compute this layer exists to prevent.
+  if (!Number.isFinite(elapsed)) {
+    throw runtimeBudgetInputError(
+      "Remaining runtime cannot be computed: neither the persisted compute reading (consumedComputeMs) nor a usable elapsed window (controllerStartedEpochMs, nowEpochMs) was supplied.",
+    );
+  }
+  return Math.max(0, Math.floor(ceiling - Math.max(0, elapsed)));
 }
 
-export function boundedStageTimeout({ policy, stage, requestedMs, controllerStartedEpochMs, nowEpochMs = Date.now() }) {
+export function boundedStageTimeout({ policy, stage, requestedMs, consumedComputeMs = null, controllerStartedEpochMs, nowEpochMs = Date.now() }) {
   const stageBudget = positiveInteger(policy?.budgets_ms?.[stage], stage);
   const requested = requestedMs === undefined ? stageBudget : positiveInteger(requestedMs, `${stage}:requested`);
-  const remaining = remainingRuntimeMs({ policy, controllerStartedEpochMs, nowEpochMs });
+  const remaining = remainingRuntimeMs({ policy, consumedComputeMs, controllerStartedEpochMs, nowEpochMs });
   if (remaining <= 0) return 0;
-  return Math.min(stageBudget, requested, remaining);
+  const bounded = Math.min(stageBudget, requested, remaining);
+  // Belt and braces: no non-finite timeout may ever leave this layer.
+  if (!Number.isFinite(bounded)) {
+    throw runtimeBudgetInputError(`The ${stage} stage timeout could not be bounded to a finite number of milliseconds.`);
+  }
+  return bounded;
 }
 
 export function compileRuntimeBudgetReceipt({ policy, startedAt, endedAt, stageExecutions = [] }) {

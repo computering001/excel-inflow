@@ -7,11 +7,21 @@ import { fileURLToPath } from "node:url";
 
 import { validateEvidenceRun } from "./lib/evidence_run.mjs";
 import {
+  RUN_DEADLINE_ENV,
+  beginComputeSpan,
+  bindRunDeadlineIdentity,
   boundedOuterTimeoutMs,
+  closeRunDeadline,
+  consultStageBudget,
+  endComputeSpan,
   openRunDeadline,
   recordComputeSegment,
 } from "./lib/run_deadline.mjs";
-import { DEFAULT_RUNTIME_BUDGETS_MS } from "./lib/runtime_budget_policy.mjs";
+import {
+  DEFAULT_RUNTIME_BUDGETS_MS,
+  resolveRuntimeBudgetPolicy,
+  validateRuntimeBudgetPolicy,
+} from "./lib/runtime_budget_policy.mjs";
 import { assertEconomicStageParityAfterBuild, sealEconomicStageParity } from "./lib/forecast_completion_constitution.mjs";
 import {
   applyAnswers,
@@ -113,8 +123,12 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 let ACTIVE_RUN_GUARD = null;
 let ACTIVE_RUN_DEADLINE = null;
-let ACTIVE_INVOCATION_STARTED_MS = null;
-let ACTIVE_INVOCATION_ATTRIBUTED_MS = 0;
+// The whole invocation measured as ONE span against the persisted clock.
+// Compute charged by stages and by the stage-4 subprocess is credited out of
+// it automatically, so nothing is billed twice and nothing is unattributed.
+let ACTIVE_INVOCATION_SPAN = null;
+// The stage currently holding an allowance from the single clock.
+let ACTIVE_STAGE_CLOCK = null;
 
 const PRESENTATION_SCREENS = Object.freeze({
   evidence_review: Object.freeze({
@@ -417,19 +431,57 @@ function blockerForStoppedOutcome(outcome) {
     : "USER_EVIDENCE";
 }
 
+/**
+ * Enter one user stage against THE clock. Every stage consults the same
+ * remaining budget before it runs — that consult is recorded in the ledger, so
+ * a stage that skipped it is detectable — and the previous stage's consumption
+ * is closed out first.
+ */
+async function enterFlowStage(stage) {
+  if (!ACTIVE_RUN_DEADLINE) return null;
+  await closeFlowStage();
+  const allowanceMs = await consultStageBudget(ACTIVE_RUN_DEADLINE, { stage });
+  ACTIVE_STAGE_CLOCK = {
+    stage,
+    allowanceMs,
+    span: beginComputeSpan(ACTIVE_RUN_DEADLINE, `stage:${stage}`),
+  };
+  return allowanceMs;
+}
+
+/** Close the open stage and charge what it consumed to the single clock. */
+async function closeFlowStage() {
+  if (!ACTIVE_RUN_DEADLINE || !ACTIVE_STAGE_CLOCK) return;
+  const clock = ACTIVE_STAGE_CLOCK;
+  ACTIVE_STAGE_CLOCK = null;
+  await endComputeSpan(ACTIVE_RUN_DEADLINE, clock.span, {
+    stage: clock.stage,
+    allowanceMs: clock.allowanceMs,
+  });
+}
+
+/**
+ * Charge every millisecond this invocation consumed, whatever ends it. Called
+ * from finish() AND from the terminal catch, so a thrown run is as visible to
+ * the ceiling as a delivered one. (A killed run is charged by the ledger's own
+ * abandoned-invocation sweep on the next open.)
+ */
+async function chargeInvocationToRunDeadline() {
+  if (!ACTIVE_RUN_DEADLINE) return;
+  await closeFlowStage();
+  if (ACTIVE_INVOCATION_SPAN) {
+    const span = ACTIVE_INVOCATION_SPAN;
+    ACTIVE_INVOCATION_SPAN = null;
+    await endComputeSpan(ACTIVE_RUN_DEADLINE, span);
+  }
+  await closeRunDeadline(ACTIVE_RUN_DEADLINE);
+}
+
 async function finish({ runDir, result, screen = null, machine = false }) {
   // Attribute this invocation's remaining compute (everything outside the
-  // separately measured stage-4 spawn) so no interval stays unattributed.
-  if (ACTIVE_RUN_DEADLINE && Number.isFinite(ACTIVE_INVOCATION_STARTED_MS)) {
-    await recordComputeSegment(ACTIVE_RUN_DEADLINE, {
-      label: "controller_invocation_overhead",
-      durationMs: Math.max(
-        0,
-        Date.now() - ACTIVE_INVOCATION_STARTED_MS - ACTIVE_INVOCATION_ATTRIBUTED_MS,
-      ),
-    });
-    ACTIVE_INVOCATION_STARTED_MS = null;
-  }
+  // separately measured stage and stage-4 spans) so no interval stays
+  // unattributed and no interval is counted twice.
+  await chargeInvocationToRunDeadline();
   if (ACTIVE_RUN_GUARD) {
     const closing = await assertRuntimeIntegrityUnchanged(ACTIVE_RUN_GUARD.integrity, ROOT);
     await writeIsolationJson(path.join(runDir, "skill-integrity.json"), {
@@ -479,12 +531,44 @@ async function main() {
   }
   const isolated = await assertRunRootOutsideSkill({ skillRoot: ROOT, runRoot: options.out });
   const runDir = isolated.run_root;
-  // One persisted compute clock for the WHOLE user run: it survives chat
-  // turns, resume and host transition, so no stage ever restarts the budget.
-  const runDeadline = await openRunDeadline({ runDir });
+  // ONE persisted compute clock for the WHOLE user run: it survives chat
+  // turns, resume, retry and host transition, so no stage and no new
+  // invocation ever restarts the budget. When an outer controller is already
+  // holding the clock it hands its ledger path down, so parent and child
+  // charge the SAME file rather than keeping two clocks.
+  const inheritedDeadlinePath = typeof options["run-deadline"] === "string"
+    ? String(options["run-deadline"])
+    : (process.env[RUN_DEADLINE_ENV] ?? null);
+  // One budget policy, one ceiling: if the caller states a policy, the clock is
+  // opened against THAT policy rather than a second copy of the defaults.
+  let runBudgets = DEFAULT_RUNTIME_BUDGETS_MS;
+  let runBudgetPolicy = null;
+  if (options["runtime-budget-policy"]) {
+    const declaredPolicy = await readJson(
+      path.resolve(String(options["runtime-budget-policy"])),
+      "runtime budget policy",
+    );
+    const policyErrors = validateRuntimeBudgetPolicy(declaredPolicy);
+    if (policyErrors.length > 0) {
+      throw new Error(`The stated runtime budget policy is invalid: ${policyErrors.join(", ")}.`);
+    }
+    runBudgetPolicy = declaredPolicy;
+    runBudgets = declaredPolicy.budgets_ms;
+  } else {
+    runBudgetPolicy = resolveRuntimeBudgetPolicy();
+  }
+  const runDeadline = await openRunDeadline({
+    runDir,
+    ledgerPath: inheritedDeadlinePath,
+    budgets: runBudgets,
+    identity: {
+      controllerVersion: FLOW_CONTROLLER_VERSION,
+      policyDigest: runBudgetPolicy?.policy_sha256 ?? null,
+      invocationLabel: "run_user_flow",
+    },
+  });
   ACTIVE_RUN_DEADLINE = runDeadline;
-  ACTIVE_INVOCATION_STARTED_MS = Date.now();
-  ACTIVE_INVOCATION_ATTRIBUTED_MS = 0;
+  ACTIVE_INVOCATION_SPAN = beginComputeSpan(runDeadline, "controller_invocation_overhead");
   if (options.carrier && positional[0]) {
     throw new Error("Provide either a positional evidence run or --carrier, not both.");
   }
@@ -598,6 +682,16 @@ async function main() {
   });
   const integrity = await captureRuntimeIntegrity(ROOT);
   ACTIVE_RUN_GUARD = { runDir, identity, lease, integrity };
+  // The clock now learns WHICH RUN it is measuring. A ledger left in this
+  // directory by another run is caught here: it is not adopted, and the compute
+  // it recorded is carried forward as spent rather than returned.
+  await bindRunDeadlineIdentity(runDeadline, { runId, sourceDigest: integrity.digest });
+  // Re-baseline the invocation span against the (possibly carried-forward)
+  // reading so the credit arithmetic cannot swallow this invocation's own time.
+  ACTIVE_INVOCATION_SPAN = {
+    ...ACTIVE_INVOCATION_SPAN,
+    elapsed_at_start_ms: runDeadline.ledger.compute_elapsed_ms,
+  };
   const reusedStages = [];
   const runtimeDigests = stageRuntimeDigests(integrity);
   const carrierMigrationInput = (stageId) =>
@@ -618,6 +712,8 @@ async function main() {
   }
 
   // Stage 1 — validate the complete evidence envelope.
+  // Every stage consults the SAME remaining budget before it runs.
+  await enterFlowStage("inputs");
   const stage1Dir = path.join(runDir, "stages", "inputs");
   const stage1Validation = path.join(stage1Dir, "evidence-validation.json");
   const stage1Evidence = path.join(stage1Dir, "evidence-run.json");
@@ -755,6 +851,7 @@ async function main() {
   // Stage 2 — reconcile evidence. The receipt is bound to Stage 1 and to the
   // complete result file, so an interrupted run can resume without silently
   // changing its question set or its reconciled case.
+  await enterFlowStage("evidence_review");
   const stage2Dir = path.join(runDir, "stages", "evidence_review");
   const stage2Result = path.join(stage2Dir, "intake-result.json");
   const brokerPreviewPath = path.join(stage2Dir, "broker-preview.json");
@@ -1272,6 +1369,7 @@ async function main() {
 
   // Stage 3 — zero questions skips; otherwise one supplied answer file settles
   // the complete question set. No default may answer a question that was shown.
+  await enterFlowStage("decisions");
   const stage3Dir = path.join(runDir, "stages", "decisions");
   const answeredCasePath = path.join(stage3Dir, "model-case.json");
   const answeredCaseSourcePath = path.join(stage3Dir, "case-source.json");
@@ -1745,6 +1843,7 @@ async function main() {
 
   // Stage 4 — invoke the real portable workbook controller. The build folder
   // is content-addressed so a changed case never overwrites prior evidence.
+  await enterFlowStage("build_checks");
   const stage4Dir = path.join(runDir, "stages", "build_checks");
   const caseHash = await hashFile(answeredCasePath);
 
@@ -1936,7 +2035,8 @@ async function main() {
         EXCEL_INFLOW_WORKSPACE_TOKEN: workspaceToken,
       },
     });
-    ACTIVE_INVOCATION_ATTRIBUTED_MS += Date.now() - stage4StartedMs;
+    // Charged to the SAME clock. The stage span and the invocation span both
+    // credit this growth, so it is billed exactly once.
     await recordComputeSegment(runDeadline, {
       label: "stage4_build_execution",
       durationMs: Date.now() - stage4StartedMs,
@@ -2081,6 +2181,7 @@ async function main() {
   // Stage 5 — deliver the workbook and concise read, while keeping the manual
   // native-Excel gate explicit. Delivery succeeds; production certification is
   // still PASS_PENDING_MANUAL until that external evidence is attached.
+  await enterFlowStage("delivery");
   const stage5Dir = path.join(runDir, "stages", "delivery");
   const deliveryResultPath = path.join(stage5Dir, "delivery-result.json");
   const deliveryScreenPath = path.join(stage5Dir, "delivery-screen.txt");
@@ -2232,6 +2333,12 @@ guardedMain()
   })
   .catch(async (error) => {
     process.stderr.write(`${error.stack ?? String(error)}\n`);
+    // P6.1: a thrown run still records what it consumed. Without this a
+    // kill/retry loop was invisible to the ceiling: every attempt burned real
+    // compute and none of it was ever charged.
+    try {
+      await chargeInvocationToRunDeadline();
+    } catch {}
     // P3.7: an internal failure carrying a typed outcome is serialised with
     // the registry's payload fields so the run is diagnosable and resumable —
     // a bare stack print is not a terminal state.

@@ -31,6 +31,15 @@ import {
   validateRuntimeBudgetReceipt,
 } from "./lib/runtime_budget_policy.mjs";
 import {
+  RUN_DEADLINE_ENV,
+  beginComputeSpan,
+  closeRunDeadline,
+  endComputeSpan,
+  openRunDeadline,
+  remainingComputeMs,
+  resolveRunDeadlinePath,
+} from "./lib/run_deadline.mjs";
+import {
   compileProgressEvidence,
   createProgressHeartbeat,
   validateProgressEvidence,
@@ -53,6 +62,17 @@ let ACTIVE_PROGRESS_EVENTS = [];
 let ACTIVE_PROGRESS_HEARTBEAT = null;
 let ACTIVE_RUNTIME_BUDGET = null;
 let ACTIVE_RUNTIME_BUDGET_EXECUTIONS = [];
+// P6.1: THE run clock. Persisted in the run directory and shared with every
+// delegate, so a new invocation, a new turn or a retry cannot restore budget
+// that was already spent. It replaces the process-start origin that silently
+// handed each invocation a fresh 25-minute ceiling.
+let ACTIVE_RUN_DEADLINE = null;
+let ACTIVE_CONTROLLER_SPAN = null;
+
+/** Compute already spent by this RUN, or null before the clock is open. */
+function consumedRunComputeMs() {
+  return ACTIVE_RUN_DEADLINE ? ACTIVE_RUN_DEADLINE.ledger.compute_elapsed_ms : null;
+}
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
@@ -151,22 +171,36 @@ async function run(command, args, {
   budgetStage = null,
 } = {}) {
   const started = Date.now();
-  const remaining = ACTIVE_RUNTIME_BUDGET
+  // The remaining budget comes from the PERSISTED run clock, not from this
+  // process's start: a resumed or retried invocation inherits what earlier
+  // invocations already spent instead of restoring the whole ceiling.
+  // Before the clock is open (only the screen renderer runs that early) the
+  // caller's own explicit timeout is the bound. There is deliberately no
+  // process-start fallback: that fallback WAS the reset.
+  const consumedComputeMs = consumedRunComputeMs();
+  const clockOpen = ACTIVE_RUNTIME_BUDGET !== null && consumedComputeMs !== null;
+  const remaining = clockOpen
     ? remainingRuntimeMs({
       policy: ACTIVE_RUNTIME_BUDGET,
-      controllerStartedEpochMs: ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+      consumedComputeMs,
       nowEpochMs: started,
     })
     : Number(timeout);
-  const effectiveTimeout = ACTIVE_RUNTIME_BUDGET && budgetStage
+  const effectiveTimeout = clockOpen && budgetStage
     ? boundedStageTimeout({
       policy: ACTIVE_RUNTIME_BUDGET,
       stage: budgetStage,
       requestedMs: timeout,
-      controllerStartedEpochMs: ACTIVE_PROGRESS_STARTED_EPOCH_MS,
+      consumedComputeMs,
       nowEpochMs: started,
     })
     : Math.min(Number(timeout), remaining);
+  // Every subprocess is measured against the one clock. A delegate that shares
+  // the ledger charges itself; the credit inside endComputeSpan means this
+  // parent span only ever adds the part nobody else billed.
+  const clockSpan = ACTIVE_RUN_DEADLINE
+    ? beginComputeSpan(ACTIVE_RUN_DEADLINE, `subprocess:${path.basename(command)}`)
+    : null;
   if (progress) ACTIVE_PROGRESS_HEARTBEAT?.update({ ...progress, actionRequired: false });
   const spanId = ACTIVE_EXPERIENCE_TRACE?.start(
     `subprocess:${path.basename(command)}`,
@@ -210,6 +244,12 @@ async function run(command, args, {
     if (spanId) ACTIVE_EXPERIENCE_TRACE.end(spanId, "FAIL", { error: error.message });
     throw error;
   } finally {
+    if (clockSpan && ACTIVE_RUN_DEADLINE) {
+      await endComputeSpan(ACTIVE_RUN_DEADLINE, clockSpan, {
+        stage: budgetStage,
+        allowanceMs: budgetStage ? effectiveTimeout : null,
+      });
+    }
     if (progress) ACTIVE_PROGRESS_HEARTBEAT?.update({
       stage: progress.stage,
       documentsComplete: progress.documentsTotal ?? 0,
@@ -363,6 +403,20 @@ async function main() {
     throw new Error("vNext run output must be outside the immutable skill tree.");
   }
   await fs.mkdir(out, { recursive: true });
+  // Open THE clock before any work is spawned. It lives in the run directory,
+  // so a second invocation of this controller against the same run inherits
+  // what the first one spent instead of starting the ceiling again.
+  ACTIVE_RUN_DEADLINE = await openRunDeadline({
+    runDir: out,
+    ledgerPath: process.env[RUN_DEADLINE_ENV] ?? null,
+    budgets: ACTIVE_RUNTIME_BUDGET.budgets_ms,
+    identity: {
+      controllerVersion: CONTROLLER_VERSION,
+      policyDigest: ACTIVE_RUNTIME_BUDGET.policy_sha256,
+      invocationLabel: "run_excel_inflow_vnext",
+    },
+  });
+  ACTIVE_CONTROLLER_SPAN = beginComputeSpan(ACTIVE_RUN_DEADLINE, "vnext_controller_overhead");
   ACTIVE_PROGRESS_HEARTBEAT = createProgressHeartbeat({
     stage: "controller preflight",
     documentsTotal: 1,
@@ -395,12 +449,17 @@ async function main() {
     ...process.env,
     PYTHON: pythonCommand,
     EXCEL_INFLOW_PYTHON: pythonCommand,
+    // Every delegate charges the SAME ledger file. This is what makes the
+    // delegate's stage clock and this controller's clock one clock rather than
+    // two, and it is why a paused-then-resumed run cannot double its ceiling.
+    [RUN_DEADLINE_ENV]: ACTIVE_RUN_DEADLINE.path,
     ...(pythonSite
       ? { PYTHONPATH: [pythonSite, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) }
       : {}),
   };
   const checkpoints = [];
   const artifacts = {};
+  artifacts.run_deadline = ACTIVE_RUN_DEADLINE.path;
   const runtimeBudgetPolicyPath = path.join(out, "runtime-budget-policy.json");
   await writeJson(runtimeBudgetPolicyPath, ACTIVE_RUNTIME_BUDGET);
   artifacts.runtime_budget_policy = runtimeBudgetPolicyPath;
@@ -818,11 +877,13 @@ async function main() {
   const pausedResultSha256 = await sha256File(userFlowResultPath);
   const resumeExecution = await run(process.execPath, resumeArgs, {
     // This is only the controller watchdog. Stage-4 enforces solver, build,
-    // recalc and validation independently and cumulatively.
-    timeout: remainingRuntimeMs({
+    // recalc and validation independently and cumulatively. The watchdog is
+    // sized by the PERSISTED clock, so a resume gets what the run has left —
+    // not a fresh ceiling because this process started a moment ago.
+    timeout: Math.max(1, remainingRuntimeMs({
       policy: ACTIVE_RUNTIME_BUDGET,
-      controllerStartedEpochMs: ACTIVE_PROGRESS_STARTED_EPOCH_MS,
-    }),
+      consumedComputeMs: consumedRunComputeMs(),
+    })),
     env: runtimeEnv,
     progress: {
       stage: "workbook build and checks",
@@ -986,6 +1047,23 @@ async function main() {
   });
 }
 
+/**
+ * Charge this controller invocation to the one clock and release its claim on
+ * it. Called on the delivered path AND on the terminal catch, so a thrown
+ * outer controller run is as visible to the ceiling as a delivered one.
+ */
+async function closeControllerRunDeadline() {
+  if (!ACTIVE_RUN_DEADLINE) return;
+  try {
+    if (ACTIVE_CONTROLLER_SPAN) {
+      const span = ACTIVE_CONTROLLER_SPAN;
+      ACTIVE_CONTROLLER_SPAN = null;
+      await endComputeSpan(ACTIVE_RUN_DEADLINE, span);
+    }
+    await closeRunDeadline(ACTIVE_RUN_DEADLINE);
+  } catch {}
+}
+
 main().catch(async (error) => {
   // P3.7 pattern at the OUTER boundary (P6.0a): an uncaught controller
   // failure is serialised as a typed internal-failure artifact with the
@@ -1029,4 +1107,9 @@ main().catch(async (error) => {
   );
   try { ACTIVE_PROGRESS_HEARTBEAT?.stop?.(); } catch {}
   process.exitCode = 1;
+}).finally(async () => {
+  // P6.1: whatever ended this invocation — delivery or a throw — the compute it
+  // consumed is charged to the one persisted clock and its claim is released,
+  // so a kill/retry loop cannot hide its compute from the ceiling.
+  await closeControllerRunDeadline();
 });
