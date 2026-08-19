@@ -172,6 +172,36 @@
       "commit": "33c8209",
       "invariant": "forecast ownership is scored and persisted per period with a family aggregate, and the recovery pass is a declared code path",
       "note": "implementing agent lost after implementation; card authored from the verified diff (see card provenance note)"
+    },
+    "P7.1c": {
+      "commit": "f412160",
+      "invariant": "29 presentation/structure archetypes carry typed checkable expectations, not compiles-clean",
+      "note": "found 9 defects (DEFECT_REGISTER D1-D9); non-vacuity proven over all 234 leaves"
+    },
+    "P6.6": {
+      "commit": "26a9ae5",
+      "invariant": "the performance receipt's spans measure what they are named, reconcile against the total, and checkpoint reuse is a lawful zero",
+      "note": "invalid receipt is a typed finding; delivery preserved by design"
+    },
+    "P7.3": {
+      "commit": "ef6c325",
+      "invariant": "generated cases are a stratified sample of a declared space, replayable by seed and shrinkable",
+      "note": "291bn-point space; found 15 defects incl. D11 in freshly-sealed P4.1 code"
+    },
+    "P4.5": {
+      "commit": "426bb44",
+      "invariant": "workbook formulas are built from a typed AST with computed depth and an enforced budget; unimplemented operators refuse typed",
+      "note": "byte-identical emission; 264 raw template literals inventoried for the follow-on"
+    },
+    "P7.1b": {
+      "commit": "24027a8",
+      "invariant": "33 economics/period/tax/schedule archetypes carry typed checkable expectations",
+      "note": "found 8 further defects (D10-D19)"
+    },
+    "P2.4": {
+      "commit": "02b2e0c",
+      "invariant": "a required-role closure is sealed before forecast compilation over the full contract-required set, alias-aware",
+      "note": "custody baseline unchanged; net_interest_expense contract/taxonomy split reported"
     }
   },
   "evidence_baseline": {
