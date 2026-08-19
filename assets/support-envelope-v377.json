@@ -5,6 +5,7 @@
   "invariant": "Every case is classified CERTIFIED, SUPPORTED_DEGRADED, EXPERIMENTAL or UNSUPPORTED before expensive source processing, from intake facts alone.",
   "class_order_worst_first": ["UNSUPPORTED", "EXPERIMENTAL", "SUPPORTED_DEGRADED", "CERTIFIED"],
   "aggregation_rule": "worst_of_dimension_verdicts",
+  "terminal_reachability_invariant": "Every class declared here must have at least one legal terminal that is actually REACHABLE from the class it governs (P2.11, D13/D14). UNSUPPORTED reaches UNSUPPORTED_PROFILE only if an early-stop predicate fires and emits a registered reason code, so every dimension verdict of UNSUPPORTED must be covered by a predicate - by a NAMED predicate for every value declared here, and by the residual backstop for anything a later version adds. A class the run CONTINUES in must admit every terminal a continuing run can produce, including the user-owned SOURCE_REQUIRED and ACTION_REQUIRED, because a case that passes preflight can still meet an unresolvable issuer, an unreconcilable opening debt or a genuine material economic choice.",
   "terminal_state_mapping": {
     "CERTIFIED": {
       "legal_terminals": ["DELIVERED_VERIFIED", "DELIVERED_DEGRADED", "ACTION_REQUIRED", "SOURCE_REQUIRED", "INTERNAL_FAILURE", "CANCELLED"],
@@ -17,9 +18,10 @@
       "release_promise": "same as CERTIFIED; delivery is lawful only with the degradation disclosed"
     },
     "EXPERIMENTAL": {
-      "legal_terminals": ["DELIVERED_DEGRADED", "INTERNAL_FAILURE", "CANCELLED"],
+      "legal_terminals": ["DELIVERED_DEGRADED", "ACTION_REQUIRED", "SOURCE_REQUIRED", "INTERNAL_FAILURE", "CANCELLED"],
       "disclosure": "run accepted only in a controlled testing ring; output carries an EXPERIMENTAL banner and is not a global release claim",
-      "release_promise": "none - experimental dimensions make no certification claim"
+      "release_promise": "none - experimental dimensions make no certification claim",
+      "user_owned_terminal_correction": "P2.11 (D14): ACTION_REQUIRED and SOURCE_REQUIRED were absent from this list, which left an experimental-ring case with unresolvable issuer identity, unreconcilable opening debt or a genuine material economic choice with NO lawful terminal at all. The experimental ring is a CERTIFICATION statement, not an evidence or ownership statement: an experimental case can still be missing mandatory evidence and can still face a choice that belongs to the user, and refusing to name that outcome does not make it stop happening. The omission was the error, so the declaration is corrected rather than the outcome suppressed; nothing about the certification claim changes, and DELIVERED_VERIFIED stays unlawful here."
     },
     "UNSUPPORTED": {
       "legal_terminals": ["UNSUPPORTED_PROFILE"],
@@ -59,7 +61,13 @@
         "english_scanned_ocr": "EXPERIMENTAL",
         "non_english": "UNSUPPORTED"
       },
-      "unknown_value_class": "EXPERIMENTAL"
+      "unknown_value_class": "EXPERIMENTAL",
+      "conditional_class_lift": {
+        "value": "non_english",
+        "when_declared_flag": "declared_language_adapter",
+        "lifted_class": "EXPERIMENTAL",
+        "rationale": "P2.11 (D13): a versioned language adapter is the declared mechanism that brings a non-English filing inside the envelope, and unadapted_language_stop already reads that fact. Before this lift the adapter suppressed the STOP but not the VERDICT, so an adapted filing classified UNSUPPORTED and ran on with no reachable terminal. The lifted class is EXPERIMENTAL, never CERTIFIED: an adapter makes no certification claim until it clears EXPERIMENTAL_to_CERTIFIED promotion evidence. Absent the flag the value stays UNSUPPORTED and the stop fires."
+      }
     },
     "historical_periods": {
       "values": {
@@ -150,8 +158,8 @@
     {
       "id": "insufficient_history_stop",
       "reason_code": "UNSUPPORTED_PROFILE.insufficient_history",
-      "rule": "historical_periods = fewer_than_two",
-      "positive_examples": ["a newly listed company with one reported period and no prior filing"],
+      "rule": "the historical_periods verdict is UNSUPPORTED: historical_periods = fewer_than_two, or the intake states no period count at all and takes the declared unknown_value_class of UNSUPPORTED (P2.11, D13 - the rule keyed on the literal value only, so an unstated count classified UNSUPPORTED with no stop)",
+      "positive_examples": ["a newly listed company with one reported period and no prior filing", "an intake that states no historical period count at all, so no supportable history is established"],
       "negative_examples": ["two comparatives with a prior filing available for period support (supported_degraded)"]
     },
     {
@@ -160,6 +168,21 @@
       "rule": "statement_topology = cash_flow_absent",
       "positive_examples": ["a filing supplying only income statement and balance sheet"],
       "negative_examples": ["a condensed interim set that still carries a cash-flow statement (experimental)"]
+    },
+    {
+      "id": "unsupported_accounting_framework_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.unsupported_accounting_framework",
+      "rule": "the accounting_framework verdict is UNSUPPORTED: accounting_framework = other_or_unknown, or the intake states no framework at all and takes the declared unknown_value_class of UNSUPPORTED (P2.11, D13 - no predicate covered this dimension, so the whole class was unreachable to any terminal)",
+      "positive_examples": ["a filing reported under a hyperinflationary or local framework outside IFRS and US GAAP", "an intake that cannot state which framework the filing reports under"],
+      "negative_examples": ["local GAAP reported in English, which is the experimental ring rather than a stop", "an IFRS filing with US GAAP reconciliation notes"]
+    },
+    {
+      "id": "unsupported_dimension_residual_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.unsupported_dimension_profile",
+      "residual": true,
+      "rule": "residual backstop: ANY dimension verdict is UNSUPPORTED and no named predicate above covered it. Fail-closed by construction so a value added to this contract in a later version cannot classify UNSUPPORTED and still run on untyped; every value declared TODAY is covered by a named predicate, which the P2.11 suite proves exhaustively, so this predicate is unreached on the current contract and is exercised under mutation.",
+      "positive_examples": ["a dimension value added in a later envelope version whose class is UNSUPPORTED before its own named predicate is written"],
+      "negative_examples": ["any UNSUPPORTED value declared in this version, each of which is covered by its own named predicate above", "a SUPPORTED_DEGRADED or EXPERIMENTAL verdict, which never stops"]
     }
   ],
   "promotion_evidence_requirements": {

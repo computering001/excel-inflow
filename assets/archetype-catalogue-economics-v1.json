@@ -659,7 +659,7 @@
         {
           "expectation_id": "unsupported_class_without_an_early_stop",
           "kind": "authority_selection",
-          "statement": "DEFECT: classifySupport on a descriptor whose accounting_framework is other_or_unknown returns support_class UNSUPPORTED, whose only legal terminal is UNSUPPORTED_PROFILE, yet early_stop.stopped is false and early_stop.reason_code is null — no predicate covers a dimension-level UNSUPPORTED verdict, so the run is classified unsupported without being stopped and without a registered reason code. The envelope also declares no IAS 29 / hyperinflation dimension at all."
+          "statement": "classifySupport on a descriptor whose accounting_framework is other_or_unknown returns support_class UNSUPPORTED and STOPS the run, naming the registered reason code UNSUPPORTED_PROFILE.unsupported_accounting_framework via the named predicate unsupported_accounting_framework_stop — so the class's only legal terminal (UNSUPPORTED_PROFILE) is reachable. Repaired by P2.11 (defect D13); the predicate keys on the dimension VERDICT rather than a literal value, so a silent framework is covered too. REMAINING and unrepaired: the envelope still declares no IAS 29 / hyperinflation dimension at all."
         },
         {
           "expectation_id": "no_restatement_plane_in_the_economics",

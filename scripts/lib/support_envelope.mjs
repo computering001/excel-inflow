@@ -35,6 +35,49 @@ export function loadSupportEnvelope(contractPath = CONTRACT_PATH) {
 
 const CLASS_RANK = { UNSUPPORTED: 0, EXPERIMENTAL: 1, SUPPORTED_DEGRADED: 2, CERTIFIED: 3 };
 
+const FINANCIAL_ENTITY_TYPES = ["bank", "insurer", "fund", "financial_spv", "investment_company"];
+
+/**
+ * P2.11 (D13) — the named early-stop predicates, in evaluation order. Each
+ * one names the predicate the CONTRACT declares and reads only the descriptor
+ * plus the dimension verdicts computed from it. The reason code is taken from
+ * the contract, never restated here: a predicate the contract does not declare
+ * does not fire, which is what makes the declaration testable by mutation.
+ *
+ * Predicates that key on "the dimension verdict is UNSUPPORTED" rather than on
+ * a literal value cover BOTH the declared unsupported values and the case the
+ * intake never states at all (which takes the declared unknown_value_class).
+ * Keying on the literal value alone is exactly how an unstated framework and
+ * an unstated period count reached UNSUPPORTED with no stop.
+ */
+const NAMED_STOP_PREDICATES = [
+  {
+    id: "financial_institution_stop",
+    fires: (descriptor) => FINANCIAL_ENTITY_TYPES.includes(descriptor.entity_type ?? "unknown"),
+  },
+  {
+    id: "irreconcilable_identity_stop",
+    fires: (descriptor) => descriptor.identity_verdict === "mismatch",
+  },
+  {
+    id: "unadapted_language_stop",
+    fires: (descriptor) =>
+      descriptor.filing_language_format === "non_english" && !descriptor.declared_language_adapter,
+  },
+  {
+    id: "insufficient_history_stop",
+    fires: (descriptor, verdicts) => verdicts.historical_periods?.class === "UNSUPPORTED",
+  },
+  {
+    id: "missing_cash_flow_stop",
+    fires: (descriptor) => descriptor.statement_topology === "cash_flow_absent",
+  },
+  {
+    id: "unsupported_accounting_framework_stop",
+    fires: (descriptor, verdicts) => verdicts.accounting_framework?.class === "UNSUPPORTED",
+  },
+];
+
 /**
  * Classify an intake descriptor. The descriptor carries dimension values by
  * name; a dimension the caller cannot yet state uses the contract's declared
@@ -47,35 +90,45 @@ export function classifySupport(contract, descriptor = {}) {
   const degraded = [];
   for (const [dimension, spec] of Object.entries(contract.dimensions)) {
     const raw = descriptor[dimension];
-    const supportClass =
-      raw !== undefined && raw !== null && Object.hasOwn(spec.values, raw)
-        ? spec.values[raw]
-        : spec.unknown_value_class;
-    verdicts[dimension] = {
-      value: raw ?? "unknown",
-      class: supportClass,
-      declared: raw !== undefined && raw !== null && Object.hasOwn(spec.values, raw),
-    };
+    const declared = raw !== undefined && raw !== null && Object.hasOwn(spec.values, raw);
+    let supportClass = declared ? spec.values[raw] : spec.unknown_value_class;
+    // A contract-DECLARED conditional lift: a value the envelope refuses only
+    // in the absence of a declared mechanism (today: a versioned language
+    // adapter) takes the lifted class when the intake declares that mechanism.
+    // Without this the adapter lifted the STOP but not the VERDICT, so an
+    // adapted filing classified UNSUPPORTED and ran on with no reachable
+    // terminal (P2.11, D13). The lift is read from the contract, so removing
+    // the declaration removes the behaviour.
+    const lift = spec.conditional_class_lift;
+    if (lift && declared && raw === lift.value && Boolean(descriptor[lift.when_declared_flag])) {
+      supportClass = lift.lifted_class;
+    }
+    verdicts[dimension] = { value: raw ?? "unknown", class: supportClass, declared };
     if (supportClass === "SUPPORTED_DEGRADED") degraded.push(dimension);
   }
   // Early-stop predicates are evaluated on the SAME descriptor — nothing
   // here may demand document bytes. Identity mismatch arrives as a typed
   // intake fact (identity_verdict), not as a re-resolution.
+  const declaredPredicates = new Map(
+    (contract.early_stop_predicates ?? []).map((predicate) => [predicate.id, predicate]),
+  );
   let earlyStop = null;
-  const entityType = descriptor.entity_type ?? "unknown";
-  if (["bank", "insurer", "fund", "financial_spv", "investment_company"].includes(entityType)) {
-    earlyStop = "UNSUPPORTED_PROFILE.financial_institution";
-  } else if (descriptor.identity_verdict === "mismatch") {
-    earlyStop = "UNSUPPORTED_PROFILE.irreconcilable_entity_perimeter";
-  } else if (
-    descriptor.filing_language_format === "non_english" &&
-    !descriptor.declared_language_adapter
-  ) {
-    earlyStop = "UNSUPPORTED_PROFILE.unadapted_language";
-  } else if (descriptor.historical_periods === "fewer_than_two") {
-    earlyStop = "UNSUPPORTED_PROFILE.insufficient_history";
-  } else if (descriptor.statement_topology === "cash_flow_absent") {
-    earlyStop = "UNSUPPORTED_PROFILE.cash_flow_absent";
+  for (const predicate of NAMED_STOP_PREDICATES) {
+    const declaredPredicate = declaredPredicates.get(predicate.id);
+    if (!declaredPredicate) continue;
+    if (!predicate.fires(descriptor, verdicts)) continue;
+    earlyStop = declaredPredicate.reason_code;
+    break;
+  }
+  // Residual backstop: an UNSUPPORTED dimension verdict that no named
+  // predicate covered still stops, typed. Every value declared today is
+  // covered by a name; this keeps the contract fail-closed for anything a
+  // later version adds, so the UNSUPPORTED class can never again be assigned
+  // to a run that continues (P2.11, D13).
+  if (!earlyStop) {
+    const residual = (contract.early_stop_predicates ?? []).find((item) => item.residual === true);
+    const uncovered = Object.values(verdicts).some((verdict) => verdict.class === "UNSUPPORTED");
+    if (residual && uncovered) earlyStop = residual.reason_code;
   }
   const worst = Object.values(verdicts).reduce(
     (current, verdict) =>

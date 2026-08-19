@@ -4,7 +4,7 @@
   "invariant": "Every value the support envelope CLAIMS is joined to the evidence proving it, tier-labelled; a claimed value with no proving evidence is reported as a typed coverage gap.",
   "mode": "REPORT_ONLY",
   "envelope_version": "3.7.7",
-  "envelope_sha256": "e2681666c6a693f07814e18e29f4eb991630900af9b5c29eb342830984f5ac0a",
+  "envelope_sha256": "dd13150f8d986187137932542b0d8046e2c58ee2a3d15835a47e3a5da0e78569",
   "tier_definitions": {
     "extraction_evidence": "A real filing is required: the claim concerns reading messy source documents (scanned PDFs, inline XBRL, unit labels, layout, caption vocabulary). This evidence lives in CUSTODY and is referenced by hash/id only — never copied into the repository.",
     "model_shape_evidence": "A synthetic in-repo case suffices: the claim concerns economics, period arithmetic, or a pre-extraction refusal decided from intake facts alone. No document is opened to decide it."

@@ -153,6 +153,30 @@
       "evidence_preserved": true,
       "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
     },
+    "PROFILE.unsupported_accounting_framework": {
+      "owner_layer": "support_envelope_preflight",
+      "category": "support_envelope",
+      "severity": "terminal",
+      "materiality": "material",
+      "recoverability": "recoverable_with_a_declared_supported_framework",
+      "user_action": "state the filing's reporting framework, or supply a filing reported under IFRS or US GAAP",
+      "source_action": "provide a filing reported under IFRS or US GAAP",
+      "checkpoint_required": false,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+    },
+    "PROFILE.unsupported_dimension_profile": {
+      "owner_layer": "support_envelope_preflight",
+      "category": "support_envelope",
+      "severity": "terminal",
+      "materiality": "material",
+      "recoverability": "not_recoverable_in_this_envelope",
+      "user_action": "none - a declared intake dimension falls outside the versioned support envelope; the preflight report names the failing dimension",
+      "source_action": "none",
+      "checkpoint_required": false,
+      "evidence_preserved": true,
+      "allowed_terminal_states": ["UNSUPPORTED_PROFILE"]
+    },
     "DEGRADED.broker_evidence_unavailable": {
       "owner_layer": "broker_pipeline",
       "category": "degradation",

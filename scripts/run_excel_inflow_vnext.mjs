@@ -530,7 +530,15 @@ async function main() {
   // typed reason, before model compilation spends anything.
   const supportVerdict = (() => {
     const filings = evidenceRun.filings ?? {};
-    const framework = String(filings.accounting_framework ?? "").toLowerCase();
+    // P2.11: the framework may be stated on the filings facts OR declared on the
+    // case source's identity. Reading only the former left every certified-fixture
+    // run classified UNSUPPORTED (framework silent) while the stop did not fire —
+    // an inert preflight. Both origins are authoritative declarations.
+    const framework = String(
+      filings.accounting_framework ??
+        evidenceRun.case_source?.identity?.accounting_framework ??
+        "",
+    ).toLowerCase();
     const historicalCount = (filings.historical_periods ?? []).length;
     const sections = evidenceRun.case_evidence?.face_statement_manifests ?? {};
     const descriptor = {

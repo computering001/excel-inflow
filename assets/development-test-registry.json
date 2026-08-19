@@ -1634,6 +1634,33 @@
       "test_class": "mutation"
     },
     {
+      "id": "envelope-terminal-legality",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_envelope_terminal_legality_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "footing-tolerance-defects",
+      "phase": "proof",
+      "runtime": "node",
+      "script": "run_footing_tolerance_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "opening-amount-typing",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_opening_amount_typing_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "classifier-caption-defects",
       "phase": "evidence",
       "runtime": "node",

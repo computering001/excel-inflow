@@ -947,11 +947,13 @@ const CHECKS = {
       check(verdict.support_class === "UNSUPPORTED", `class must be UNSUPPORTED, got ${verdict.support_class}`);
       check(verdict.dimension_verdicts.accounting_framework.class === "UNSUPPORTED", "the framework dimension carries the UNSUPPORTED verdict");
       check(verdict.legal_terminals.join(",") === "UNSUPPORTED_PROFILE", "its only legal terminal is UNSUPPORTED_PROFILE");
-      check(verdict.early_stop.stopped === false, "DEFECT: yet nothing stops the run");
-      check(verdict.early_stop.reason_code === null, "DEFECT: and no reason code is emitted, so the only legal terminal is unreachable");
+      check(verdict.early_stop.stopped === true,
+        "the run STOPS, so the class's only legal terminal is reachable (P2.11, defect D13)");
+      check(verdict.early_stop.reason_code === "UNSUPPORTED_PROFILE.unsupported_accounting_framework",
+        `the stop names its registered reason code, got ${JSON.stringify(verdict.early_stop.reason_code)}`);
       const predicates = ENVELOPE.contract.early_stop_predicates.map((item) => item.id);
-      check(!predicates.some((id) => /framework|accounting/.test(id)),
-        `no early-stop predicate covers an UNSUPPORTED accounting framework, got ${JSON.stringify(predicates)}`);
+      check(predicates.includes("unsupported_accounting_framework_stop"),
+        `a named early-stop predicate covers an UNSUPPORTED accounting framework, got ${JSON.stringify(predicates)}`);
       check(!Object.keys(ENVELOPE.contract.dimensions).some((name) => /inflation|price_index|restat/.test(name)),
         "and the envelope declares no hyperinflation dimension at all");
     },
