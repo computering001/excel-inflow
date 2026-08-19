@@ -708,12 +708,47 @@
       "runtime": "python",
       "script": "run_inline_xbrl_extraction_tests.py",
       "arguments": [
-        "--manifest",
-        "$REAL_FILING_CORPUS_MANIFEST"
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "real_filing_corpus_manifest",
+          "source": "REAL_FILING_CORPUS_MANIFEST",
+          "type": "file"
+        }
       ],
       "requires": [
         "REAL_FILING_CORPUS_MANIFEST"
-      ]
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
+    },
+    {
+      "id": "period-support-stitch",
+      "phase": "real_corpus",
+      "runtime": "python",
+      "script": "run_period_support_stitch_tests.py",
+      "arguments": [
+        {
+          "name": "arg_1",
+          "value": "--manifest",
+          "type": "literal"
+        },
+        {
+          "name": "real_filing_corpus_manifest",
+          "source": "REAL_FILING_CORPUS_MANIFEST",
+          "type": "file"
+        }
+      ],
+      "requires": [
+        "REAL_FILING_CORPUS_MANIFEST"
+      ],
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "real_corpus"
     },
     {
       "id": "broker-real-pack-completion",
