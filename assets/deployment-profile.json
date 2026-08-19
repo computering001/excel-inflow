@@ -19,6 +19,7 @@
     "validation.md"
   ],
   "asset_allowlist": [
+    "support-envelope-v377.json",
     "broker-metric-dictionary.json",
     "broker-metric-dictionary.schema.json",
     "broker-pack.schema.json",

@@ -1,0 +1,181 @@
+{
+  "schema_version": "excel-inflow-support-envelope/1.0",
+  "envelope_version": "3.7.7",
+  "work_package": "P0.4",
+  "invariant": "Every case is classified CERTIFIED, SUPPORTED_DEGRADED, EXPERIMENTAL or UNSUPPORTED before expensive source processing, from intake facts alone.",
+  "class_order_worst_first": ["UNSUPPORTED", "EXPERIMENTAL", "SUPPORTED_DEGRADED", "CERTIFIED"],
+  "aggregation_rule": "worst_of_dimension_verdicts",
+  "terminal_state_mapping": {
+    "CERTIFIED": {
+      "legal_terminals": ["DELIVERED_VERIFIED", "DELIVERED_DEGRADED", "ACTION_REQUIRED", "SOURCE_REQUIRED", "INTERNAL_FAILURE", "CANCELLED"],
+      "disclosure": "none beyond standard provenance",
+      "release_promise": "no internal compiler-owned condition may produce ACTION_REQUIRED, SOURCE_REQUIRED or UNSUPPORTED_PROFILE"
+    },
+    "SUPPORTED_DEGRADED": {
+      "legal_terminals": ["DELIVERED_DEGRADED", "ACTION_REQUIRED", "SOURCE_REQUIRED", "INTERNAL_FAILURE", "CANCELLED"],
+      "disclosure": "the degraded dimension and the disclosed lower authority or omitted optional evidence MUST appear in the workbook quality disclosure",
+      "release_promise": "same as CERTIFIED; delivery is lawful only with the degradation disclosed"
+    },
+    "EXPERIMENTAL": {
+      "legal_terminals": ["DELIVERED_DEGRADED", "INTERNAL_FAILURE", "CANCELLED"],
+      "disclosure": "run accepted only in a controlled testing ring; output carries an EXPERIMENTAL banner and is not a global release claim",
+      "release_promise": "none - experimental dimensions make no certification claim"
+    },
+    "UNSUPPORTED": {
+      "legal_terminals": ["UNSUPPORTED_PROFILE"],
+      "disclosure": "the failing dimension and its reason code are reported to the user at preflight",
+      "release_promise": "the run stops before document extraction, model compilation or any broker retrieval"
+    }
+  },
+  "dimensions": {
+    "accounting_framework": {
+      "values": {
+        "ifrs": "CERTIFIED",
+        "us_gaap": "CERTIFIED",
+        "local_gaap_english": "EXPERIMENTAL",
+        "other_or_unknown": "UNSUPPORTED"
+      },
+      "unknown_value_class": "UNSUPPORTED"
+    },
+    "entity_type": {
+      "values": {
+        "non_financial_corporate": "CERTIFIED",
+        "utility": "CERTIFIED",
+        "reit": "EXPERIMENTAL",
+        "holding_company": "SUPPORTED_DEGRADED",
+        "mixed_group_predominantly_non_financial": "SUPPORTED_DEGRADED",
+        "bank": "UNSUPPORTED",
+        "insurer": "UNSUPPORTED",
+        "fund": "UNSUPPORTED",
+        "financial_spv": "UNSUPPORTED",
+        "investment_company": "UNSUPPORTED"
+      },
+      "unknown_value_class": "EXPERIMENTAL"
+    },
+    "filing_language_format": {
+      "values": {
+        "english_text_pdf": "CERTIFIED",
+        "structured_inline_xbrl": "CERTIFIED",
+        "english_scanned_ocr": "EXPERIMENTAL",
+        "non_english": "UNSUPPORTED"
+      },
+      "unknown_value_class": "EXPERIMENTAL"
+    },
+    "historical_periods": {
+      "values": {
+        "three_or_more": "CERTIFIED",
+        "two_with_prior_filing_support": "SUPPORTED_DEGRADED",
+        "fewer_than_two": "UNSUPPORTED"
+      },
+      "unknown_value_class": "UNSUPPORTED"
+    },
+    "statement_topology": {
+      "values": {
+        "standard_three_statement": "CERTIFIED",
+        "condensed_or_interim": "EXPERIMENTAL",
+        "cash_flow_absent": "UNSUPPORTED"
+      },
+      "unknown_value_class": "EXPERIMENTAL"
+    },
+    "cash_flow_method": {
+      "values": {
+        "indirect": "CERTIFIED",
+        "direct": "EXPERIMENTAL"
+      },
+      "unknown_value_class": "EXPERIMENTAL"
+    },
+    "fiscal_calendar": {
+      "values": {
+        "fixed_date": "CERTIFIED",
+        "week_52_53": "CERTIFIED"
+      },
+      "unknown_value_class": "EXPERIMENTAL"
+    },
+    "debt_instruments": {
+      "values": {
+        "within_declared_matrix": "CERTIFIED",
+        "convertible_or_hybrid": "EXPERIMENTAL",
+        "exotic_or_structured": "EXPERIMENTAL",
+        "none_disclosed": "SUPPORTED_DEGRADED"
+      },
+      "unknown_value_class": "EXPERIMENTAL",
+      "declared_matrix": ["bond_fixed", "bond_floating", "term_loan_fixed", "term_loan_floating", "commercial_paper", "securitisation", "rcf", "lease_liability", "overdraft", "other_explicit"]
+    },
+    "broker_availability": {
+      "values": {
+        "broker_pack_present": "CERTIFIED",
+        "broker_pack_absent": "SUPPORTED_DEGRADED"
+      },
+      "unknown_value_class": "SUPPORTED_DEGRADED"
+    },
+    "acquisition_overlay": {
+      "values": {
+        "none": "CERTIFIED",
+        "single_declared_acquisition": "CERTIFIED",
+        "multi_step_or_contingent": "EXPERIMENTAL"
+      },
+      "unknown_value_class": "CERTIFIED"
+    },
+    "restructuring_complexity": {
+      "values": {
+        "none": "CERTIFIED",
+        "discontinued_operations_disclosed": "SUPPORTED_DEGRADED",
+        "major_perimeter_change": "EXPERIMENTAL"
+      },
+      "unknown_value_class": "CERTIFIED"
+    }
+  },
+  "early_stop_predicates": [
+    {
+      "id": "financial_institution_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.financial_institution",
+      "rule": "entity_type in {bank, insurer, fund, financial_spv, investment_company}",
+      "positive_examples": ["a retail bank", "a life insurer", "a closed-end fund", "a securitisation SPV", "a listed investment trust"],
+      "negative_examples": ["a manufacturer with a captive financing arm consolidated into a predominantly industrial group (mixed_group_predominantly_non_financial)", "a REIT (experimental, not stopped)", "a utility with regulated returns", "a holding company over industrial subsidiaries"]
+    },
+    {
+      "id": "irreconcilable_identity_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.irreconcilable_entity_perimeter",
+      "rule": "intake identity resolution reports a MISMATCH verdict between declared entity and sealed filing identity that no identifier tier reconciles",
+      "positive_examples": ["filings for a different legal entity than the declared issuer", "a subsidiary filing supplied for a group-level model with no consolidation path"],
+      "negative_examples": ["a market-suffixed ticker for the same issuer", "a renamed issuer with continuous identifiers"]
+    },
+    {
+      "id": "unadapted_language_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.unadapted_language",
+      "rule": "filing_language_format = non_english and no versioned language adapter is declared",
+      "positive_examples": ["a Japanese-only yuho filing"],
+      "negative_examples": ["an English filing with foreign-language appendices", "structured Inline XBRL regardless of label language"]
+    },
+    {
+      "id": "insufficient_history_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.insufficient_history",
+      "rule": "historical_periods = fewer_than_two",
+      "positive_examples": ["a newly listed company with one reported period and no prior filing"],
+      "negative_examples": ["two comparatives with a prior filing available for period support (supported_degraded)"]
+    },
+    {
+      "id": "missing_cash_flow_stop",
+      "reason_code": "UNSUPPORTED_PROFILE.cash_flow_absent",
+      "rule": "statement_topology = cash_flow_absent",
+      "positive_examples": ["a filing supplying only income statement and balance sheet"],
+      "negative_examples": ["a condensed interim set that still carries a cash-flow statement (experimental)"]
+    }
+  ],
+  "promotion_evidence_requirements": {
+    "EXPERIMENTAL_to_CERTIFIED": [
+      "at least three independent real filings of the dimension value pass the full raw black-box lane with DELIVERED_VERIFIED or lawfully disclosed DELIVERED_DEGRADED",
+      "a registered regression fixture per filing with frozen raw-input hashes",
+      "independent oracle and portable validation at zero violations for each",
+      "a signed phase-checkpoint entry recording the promotion and its evidence hashes"
+    ],
+    "SUPPORTED_DEGRADED_to_CERTIFIED": [
+      "the degraded dimension gains a first-class authority (not a fallback) proven on at least two real filings",
+      "the disclosure requirement is retired by contract version bump, never silently"
+    ]
+  },
+  "workbook_disclosure_specification": {
+    "quality_panel_fields": ["support_envelope_version", "support_envelope_sha256", "support_class", "degraded_dimensions"],
+    "wiring_status": "run receipts stamped from v3.7.7 (P0.4); the workbook quality-panel stamp lands with the Phase 5 workbook-projection package to avoid unaudited golden churn - tracked, not silent"
+  }
+}

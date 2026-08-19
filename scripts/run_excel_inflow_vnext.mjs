@@ -55,6 +55,16 @@ let ACTIVE_RUNTIME_BUDGET_EXECUTIONS = [];
 const STATE_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "excel-inflow-vnext-run.schema.json"), "utf8"),
 );
+// The support-envelope contract governing this runtime (P0.4): identity is
+// bound by digest so every run receipt names the exact envelope version.
+const SUPPORT_ENVELOPE_IDENTITY = await (async () => {
+  const contractPath = path.join(ROOT, "assets", "support-envelope-v377.json");
+  const bytes = await fs.readFile(contractPath);
+  return {
+    version: JSON.parse(bytes.toString("utf8")).envelope_version,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+})();
 const PRE_BROKER_DEMAND_SCHEMA = JSON.parse(
   await fs.readFile(path.join(ROOT, "assets", "pre-broker-model-demand-v1.schema.json"), "utf8"),
 );
@@ -286,6 +296,9 @@ async function finish({ out, runId, status, qualityMode, blockerClass, checkpoin
     schema_version: "excel-inflow-vnext-run/1.0",
     controller_version: CONTROLLER_VERSION,
     runtime_closure_sha256: ACTIVE_RUNTIME_CLOSURE,
+    // Which support-envelope contract governed this run (P0.4). Metadata
+    // only: classification wiring into intake preflight is Phase 2 work.
+    support_envelope: SUPPORT_ENVELOPE_IDENTITY,
     run_id: runId,
     status,
     quality_mode: qualityMode,

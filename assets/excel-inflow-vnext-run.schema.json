@@ -22,6 +22,15 @@
     "schema_version": { "const": "excel-inflow-vnext-run/1.0" },
     "controller_version": { "const": "excel-inflow-vnext/1.0" },
     "runtime_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "support_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sha256"],
+      "properties": {
+        "version": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
     "run_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
     "status": { "enum": ["NEEDS_INTERNAL_WORK", "ACTION_REQUIRED", "BLOCKED", "PASS_PENDING_MANUAL"] },
     "quality_mode": { "enum": ["VERIFIED", "DEGRADED", "INPUT_REQUIRED", "INTERNAL_WORK", "FATAL"] },
