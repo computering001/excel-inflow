@@ -135,6 +135,7 @@
     "policy-registry-v1.json",
     "policy-registry-v1.schema.json",
     "protected-identity-roles-v1.json",
+    "runtime-doctor-report-v1.schema.json",
     "opening-debt-bridge-v1.schema.json",
     "product-delivery-constitution-v2.json"
   ],
@@ -360,6 +361,7 @@
     "lib/process_tree.mjs",
     "lib/progress_heartbeat.mjs",
     "lib/runtime_budget_policy.mjs",
+    "lib/runtime_doctor.mjs",
     "lib/public_test_run.mjs",
     "lib/raw_canary_fixture.mjs",
     "lib/rcf_policy.mjs",

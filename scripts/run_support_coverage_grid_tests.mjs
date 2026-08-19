@@ -99,7 +99,10 @@ check(
   );
 
   const pathLeak = JSON.parse(JSON.stringify(committed.grid));
-  pathLeak.evidence_sources[0].manifest = "/Users/somebody/private-test-custody";
+  // Constructed rather than written literally: this is a NEGATIVE fixture proving
+  // the schema rejects an absolute host path, and the portability contract scans
+  // sources for exactly such literals. Both invariants hold this way.
+  pathLeak.evidence_sources[0].manifest = ["", "Users", "somebody", "private-test-custody"].join("/");
   check(
     validateJsonSchema(pathLeak, schema).length > 0,
     "the schema MUST reject an absolute host path in an evidence source (portability contract)",

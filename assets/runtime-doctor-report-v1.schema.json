@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/excel-inflow/runtime-doctor-report-v1.schema.json",
+  "title": "Runtime doctor host pre-flight report (P6.7)",
+  "description": "A typed, report-first statement of whether THIS host can complete a run, produced BEFORE any expensive work begins. Every declared precondition appears exactly once with a typed result; only \"satisfied\" is a pass. An unsatisfied or unknown mandatory precondition compiles a typed refusal naming a registered terminal reason code. A declared installed-host exclusion neither passes nor refuses and may never be reported as satisfied by any portable gate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "work_package",
+    "invariant",
+    "generated_at",
+    "report_only",
+    "performed_expensive_work",
+    "repaired_host",
+    "skill_root_present",
+    "run_root",
+    "requested_lanes",
+    "host",
+    "verdict",
+    "counts",
+    "advisory_preconditions",
+    "checks",
+    "refusal"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "excel-inflow-runtime-doctor-report/1.0"
+    },
+    "work_package": {
+      "const": "P6.7"
+    },
+    "invariant": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "report_only": {
+      "description": "The doctor reports and refuses. It never installs, never mutates PATH, never creates a missing working directory and never repairs the host.",
+      "const": true
+    },
+    "performed_expensive_work": {
+      "description": "The doctor must be cheap by construction: no render, recalculation, extraction, compilation or solve.",
+      "const": false
+    },
+    "repaired_host": {
+      "description": "Validators validate, never repair.",
+      "const": false
+    },
+    "skill_root_present": {
+      "type": "boolean"
+    },
+    "run_root": {
+      "description": "The run root the doctor was asked about, or null when none was supplied (in which case work_root_writable is typed unknown, never satisfied).",
+      "type": ["string", "null"]
+    },
+    "requested_lanes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["evidence", "workbook"]
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "architecture",
+        "node_version",
+        "cpu_count",
+        "total_memory_bytes",
+        "hostname_sha256"
+      ],
+      "properties": {
+        "platform": { "type": "string" },
+        "architecture": { "type": "string" },
+        "node_version": { "type": "string" },
+        "cpu_count": { "type": "integer", "minimum": 0 },
+        "total_memory_bytes": { "type": "integer", "minimum": 0 },
+        "hostname_sha256": {
+          "description": "The host is identified without disclosing its name.",
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "verdict": {
+      "description": "HOST_READY only when every mandatory precondition is satisfied (or legally not-applicable because its lane was not requested).",
+      "enum": ["HOST_READY", "REFUSED"]
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "satisfied",
+        "unsatisfied",
+        "not_applicable",
+        "unknown",
+        "excluded_installed_host",
+        "total"
+      ],
+      "properties": {
+        "satisfied": { "type": "integer", "minimum": 0 },
+        "unsatisfied": { "type": "integer", "minimum": 0 },
+        "not_applicable": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 },
+        "excluded_installed_host": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "advisory_preconditions": {
+      "description": "Optional preconditions that are unsatisfied or unknown. These degrade a corroboration; they never refuse.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/preconditionFinding" }
+    },
+    "checks": {
+      "description": "Every declared precondition, exactly once, in register order.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "refusal": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/refusal" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "description": "A REFUSED verdict must carry the typed refusal payload.",
+      "if": {
+        "properties": { "verdict": { "const": "REFUSED" } },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": { "refusal": { "$ref": "#/$defs/refusal" } },
+        "required": ["refusal"]
+      }
+    },
+    {
+      "description": "A HOST_READY verdict must carry no refusal.",
+      "if": {
+        "properties": { "verdict": { "const": "HOST_READY" } },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": { "refusal": { "type": "null" } }
+      }
+    }
+  ],
+  "$defs": {
+    "result": {
+      "description": "The five typed results. Only \"satisfied\" is a pass; \"unknown\" exists so an unreached answer is never rounded up into one.",
+      "enum": [
+        "satisfied",
+        "unsatisfied",
+        "not_applicable",
+        "unknown",
+        "excluded_installed_host"
+      ]
+    },
+    "obligation": {
+      "enum": ["mandatory", "optional", "excluded_installed_host"]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "precondition_id",
+        "title",
+        "obligation",
+        "lane",
+        "result",
+        "reason",
+        "detail",
+        "checked_by",
+        "exclusion_reason"
+      ],
+      "properties": {
+        "precondition_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "obligation": { "$ref": "#/$defs/obligation" },
+        "lane": {
+          "description": "\"always\" holds for any run; a lane name holds only when that lane is requested.",
+          "enum": ["always", "evidence", "workbook"]
+        },
+        "result": { "$ref": "#/$defs/result" },
+        "reason": {
+          "description": "Mandatory for every non-pass; forbidden on a pass — a pass that needs an excuse is not a pass.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "detail": {
+          "type": ["object", "null"]
+        },
+        "checked_by": {
+          "description": "How this precondition is established. Null only for a declared installed-host exclusion, which is never attempted.",
+          "type": ["string", "null"]
+        },
+        "exclusion_reason": {
+          "type": ["string", "null"]
+        }
+      },
+      "allOf": [
+        {
+          "description": "A pass carries no reason — a pass that needs an excuse is not a pass.",
+          "if": {
+            "properties": { "result": { "const": "satisfied" } },
+            "required": ["result"]
+          },
+          "then": {
+            "properties": { "reason": { "type": "null" } }
+          }
+        },
+        {
+          "description": "Every non-pass is typed WITH its reason.",
+          "if": {
+            "properties": {
+              "result": {
+                "enum": ["unsatisfied", "not_applicable", "unknown", "excluded_installed_host"]
+              }
+            },
+            "required": ["result"]
+          },
+          "then": {
+            "properties": { "reason": { "type": "string", "minLength": 1 } },
+            "required": ["reason"]
+          }
+        },
+        {
+          "description": "A declared installed-host exclusion may carry only the excluded result, and must carry its exclusion reason. It is never reported as satisfied.",
+          "if": {
+            "properties": { "obligation": { "const": "excluded_installed_host" } },
+            "required": ["obligation"]
+          },
+          "then": {
+            "properties": {
+              "result": { "const": "excluded_installed_host" },
+              "exclusion_reason": { "type": "string", "minLength": 1 },
+              "checked_by": { "type": "null" }
+            },
+            "required": ["result", "exclusion_reason"]
+          }
+        },
+        {
+          "description": "Conversely, the excluded result belongs only to a declared exclusion.",
+          "if": {
+            "properties": { "result": { "const": "excluded_installed_host" } },
+            "required": ["result"]
+          },
+          "then": {
+            "properties": { "obligation": { "const": "excluded_installed_host" } },
+            "required": ["obligation"]
+          }
+        }
+      ]
+    },
+    "preconditionFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["precondition_id", "result", "reason"],
+      "properties": {
+        "precondition_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "result": { "$ref": "#/$defs/result" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "refusal": {
+      "description": "The typed refusal. Carries the five fields assets/terminal-reason-registry-v1.json requires of an internal-failure payload, plus a DECLARED statement of reason-code fidelity because the sealed registry has no host/environment code.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason_code",
+        "earliest_responsible_layer",
+        "resumable_checkpoint_path",
+        "preserved_source_hashes",
+        "downstream_invalidation_scope",
+        "reason_code_fidelity",
+        "requested_reason_code",
+        "reason_code_fidelity_note",
+        "terminal_state",
+        "refusal_message",
+        "unsatisfied_preconditions"
+      ],
+      "properties": {
+        "reason_code": {
+          "description": "A code registered in assets/terminal-reason-registry-v1.json. The registry is sealed and is not edited by this work package.",
+          "type": "string",
+          "pattern": "^(SOURCE|INTERNAL|USER|PROFILE|DEGRADED|CANCELLED)\\.[a-z][a-z0-9_]*$"
+        },
+        "earliest_responsible_layer": {
+          "const": "runtime_host_preflight"
+        },
+        "resumable_checkpoint_path": {
+          "description": "Null by construction: the doctor refuses BEFORE any work starts, so there is no checkpoint to resume from and none is invented.",
+          "type": ["string", "null"]
+        },
+        "preserved_source_hashes": {
+          "type": "object"
+        },
+        "downstream_invalidation_scope": {
+          "description": "\"no_work_started\" is the honest scope for a pre-flight refusal.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reason_code_fidelity": {
+          "description": "\"exact\" when the registry declares a code for this condition; \"closest_available\" when it does not and the closest declared code is used instead, with the needed code named.",
+          "enum": ["exact", "closest_available"]
+        },
+        "requested_reason_code": {
+          "type": ["string", "null"]
+        },
+        "reason_code_fidelity_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "terminal_state": {
+          "enum": [
+            "DELIVERED_VERIFIED",
+            "DELIVERED_DEGRADED",
+            "ACTION_REQUIRED",
+            "SOURCE_REQUIRED",
+            "UNSUPPORTED_PROFILE",
+            "INTERNAL_FAILURE",
+            "CANCELLED"
+          ]
+        },
+        "refusal_message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unsatisfied_preconditions": {
+          "description": "The mandatory preconditions that caused the refusal. Never empty: a refusal names what is wrong.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/preconditionFinding" }
+        }
+      },
+      "allOf": [
+        {
+          "description": "closest_available fidelity must name the code that is actually needed.",
+          "if": {
+            "properties": { "reason_code_fidelity": { "const": "closest_available" } },
+            "required": ["reason_code_fidelity"]
+          },
+          "then": {
+            "properties": { "requested_reason_code": { "type": "string", "minLength": 1 } },
+            "required": ["requested_reason_code"]
+          }
+        }
+      ]
+    }
+  }
+}

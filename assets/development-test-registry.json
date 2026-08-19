@@ -1634,6 +1634,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "runtime-doctor",
+      "phase": "performance",
+      "runtime": "node",
+      "script": "run_runtime_doctor_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "portable-certification-tier",
       "phase": "proof",
       "runtime": "node",
