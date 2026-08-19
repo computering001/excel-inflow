@@ -7,6 +7,10 @@ import {
   canonicalJsonSha256,
 } from "./equation_graph.mjs";
 import { ECONOMIC_SOLVE_POLICY } from "./economic_solve_policy.mjs";
+import {
+  attachShadowEconomicIr,
+  economicIrReceiptBinding,
+} from "./economic_ir.mjs";
 
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
@@ -667,7 +671,7 @@ export function compileModelIrV3({
     presentation_nodes: presentation.length,
     source_crosswalk_rows: sourceCrosswalk.length,
   };
-  return {
+  const proofProjection = {
     schema_version: 3,
     case_id: semanticManifest.case_id,
     case_sha256: semanticManifest.case_sha256,
@@ -689,6 +693,21 @@ export function compileModelIrV3({
       metrics,
     },
   };
+  // ---- Economic IR, SHADOW (P3.1) ----------------------------------------
+  // The canonical economic object — one node per economic concept, every value
+  // slot a TYPED financial value, plus the typed schedule state this projection
+  // omits — is compiled, sealed and hashed here, beside the proof projection.
+  // It is attached NON-ENUMERABLY: JSON.stringify skips it, so the emitted
+  // .model-ir-v3.json sidecar, transformationReceipt().output_sha256 and the
+  // workbook proof contract's model_ir_sha256/closure_sha256 are byte-identical
+  // to the tree before P3.1. It changes no decision, no finding and no emitted
+  // number, and a shadow that cannot compile is recorded, never thrown.
+  attachShadowEconomicIr(proofProjection, {
+    modelCase,
+    rowPlan,
+    semanticManifest,
+  });
+  return proofProjection;
 }
 
 export function transformationReceipt(modelIr, outputKind = "model_ir_v3") {
@@ -698,6 +717,10 @@ export function transformationReceipt(modelIr, outputKind = "model_ir_v3") {
     output_hash: sha256(output),
     ...detail,
   });
+  // P3.1: the shadow Economic IR's seal is RECORDED here. output_sha256 above
+  // still hashes the proof projection alone (the shadow is non-enumerable), so
+  // the two hashes are independent statements about two different objects.
+  const economicIr = economicIrReceiptBinding(modelIr);
   return {
     receipt_version: 1,
     case_id: modelIr.case_id,
@@ -710,6 +733,8 @@ export function transformationReceipt(modelIr, outputKind = "model_ir_v3") {
       modelIr.proof.blocking_findings.map((item) => item.code),
     ).sort(),
     metrics: modelIr.proof.metrics,
+    economic_ir_sha256: economicIr.sha256,
+    economic_ir: economicIr,
     passes: [
       pass(
         "sealed_evidence",
