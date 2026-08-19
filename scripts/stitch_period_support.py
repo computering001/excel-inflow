@@ -90,6 +90,31 @@ def stitch_manifest(current: dict, prior: dict, prior_document_sha: str) -> dict
         "prior_document_sha256": prior_document_sha,
         "periods": [],
     }
+    # Fail-closed identity/dimension gate (the docstring's promise, enforced):
+    # a prior manifest in a different currency or unit basis, or from a
+    # different statement, can never fill an owed period. Refusals keep the
+    # declaration and are recorded per owed period.
+    dimension_refusal = None
+    for field in ("statement", "reporting_currency", "units"):
+        current_value = current.get(field)
+        prior_value = prior.get(field)
+        if current_value is not None and prior_value is not None and current_value != prior_value:
+            dimension_refusal = (
+                f"prior filing {field} {prior_value!r} does not match current {current_value!r}; "
+                "cross-dimension fills are refused"
+            )
+            break
+    if dimension_refusal:
+        for period in list(current.get("period_support_required") or []):
+            ledger["periods"].append({
+                "period": period,
+                "filled_row_count": 0,
+                "unmatched_row_ordinals": [],
+                "refusal": dimension_refusal,
+            })
+        current.setdefault("period_support_stitches", []).append(ledger)
+        reseal_rows_sha(current)
+        return ledger
     still_required: list[str] = []
     for period in list(current.get("period_support_required") or []):
         record = {
