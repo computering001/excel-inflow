@@ -169,7 +169,7 @@
       "note": "report mode only; 27 unproven values are the narrowing decision input"
     },
     "P3.4": {
-      "commit": "PENDING",
+      "commit": "33c8209",
       "invariant": "forecast ownership is scored and persisted per period with a family aggregate, and the recovery pass is a declared code path",
       "note": "implementing agent lost after implementation; card authored from the verified diff (see card provenance note)"
     }
