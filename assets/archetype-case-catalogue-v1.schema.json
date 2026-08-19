@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "excel-inflow-archetype-case-catalogue/1.0",
+  "title": "Archetype case catalogue",
+  "description": "P7.1 model-shape evidence tier. Each entry binds ONE synthetic archetype case to the accounting shape it exercises, the support-envelope dimension values it proves, and the TYPED EXPECTATIONS that make the case meaningful. A case that merely compiles proves nothing: every entry must declare at least one shape_expectation, and the runner must assert each one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalogue_group", "invariant", "entries"],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-archetype-case-catalogue/1.0" },
+    "catalogue_group": {
+      "type": "string",
+      "description": "Disjoint authoring group (e.g. economics, presentation). One catalogue file per group; groups never share case files.",
+      "minLength": 1
+    },
+    "invariant": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "archetype_id",
+          "case_path",
+          "accounting_shape",
+          "why_it_breaks_models",
+          "proves_envelope_values",
+          "shape_expectations"
+        ],
+        "properties": {
+          "archetype_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$",
+            "description": "Stable id, unique across ALL catalogue groups."
+          },
+          "case_path": {
+            "type": "string",
+            "pattern": "^test-fixtures/archetypes/[a-z0-9_]+/[a-z0-9_-]+\\.json$",
+            "description": "Repo-relative. NEVER test-fixtures/cases/ — that directory is globbed by other suites and its derived donor is hash-pinned."
+          },
+          "accounting_shape": { "type": "string", "minLength": 1 },
+          "why_it_breaks_models": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The specific failure a naive implementation would produce on this shape."
+          },
+          "proves_envelope_values": {
+            "type": "array",
+            "description": "Support-envelope {dimension, value} pairs this case is claimed to prove. May be empty for archetypes outside the declared envelope — those are recorded as envelope_extension_candidate.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dimension", "value"],
+              "properties": {
+                "dimension": { "type": "string", "minLength": 1 },
+                "value": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "envelope_extension_candidate": {
+            "type": "boolean",
+            "description": "True when the shape is real but the envelope declares no dimension value for it — a claim-set gap, recorded not silently dropped."
+          },
+          "shape_expectations": {
+            "type": "array",
+            "minItems": 1,
+            "description": "What the runner asserts. Each expectation must be checkable against a compiled artifact, not prose.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["expectation_id", "kind", "statement"],
+              "properties": {
+                "expectation_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$" },
+                "kind": {
+                  "enum": [
+                    "compiles_clean",
+                    "typed_refusal",
+                    "period_arithmetic",
+                    "authority_selection",
+                    "value_state",
+                    "identity_or_footing",
+                    "schedule_behaviour",
+                    "presentation_topology",
+                    "unsupported_profile_early_stop"
+                  ]
+                },
+                "statement": { "type": "string", "minLength": 1 },
+                "expected_terminal_reason": {
+                  "type": "string",
+                  "description": "Required when kind is typed_refusal or unsupported_profile_early_stop: the registered reason code the case must produce."
+                }
+              }
+            }
+          },
+          "extraction_evidence_still_required": {
+            "type": "boolean",
+            "description": "True when the synthetic case proves the ECONOMICS but a real filing is still needed to prove the product can READ this shape. Keeps the two evidence tiers honest."
+          }
+        }
+      }
+    }
+  }
+}

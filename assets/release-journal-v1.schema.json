@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "excel-inflow-release-journal-record/1.0",
+  "description": "P8.6a — one record of the append-only release journal. Every release-affecting event (compile, attest, tag, retain, promote, rollback, supersede) is one record. Records are stored one canonical JSON object per line in a .jsonl journal and are hash-chained in the same discipline as the user-flow stage receipts (scripts/lib/flow_runtime.mjs createStageReceipt): record_hash is the canonical digest of the record body with record_hash removed, and previous_record_hash is the preceding record's record_hash (null only at sequence 0). This file constrains SHAPE only; sequence contiguity, chain linkage, timestamp monotonicity, retention-precedes-rollback, no-re-promotion-after-rollback and every vocabulary membership are enforced by scripts/lib/release_journal.mjs. This is a RELEASE journal — it is not, and must never be conflated with, the per-run resumability receipts of scripts/lib/release_checkpoint_store.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sequence",
+    "event_type",
+    "recorded_at",
+    "actor",
+    "policy",
+    "release",
+    "rollback",
+    "detail",
+    "previous_record_hash",
+    "record_hash"
+  ],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-release-journal-record/1.0" },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based position in the journal. Contiguous by construction; a gap is a deletion and is refused."
+    },
+    "event_type": {
+      "enum": ["compile", "attest", "tag", "retain", "promote", "rollback", "supersede"],
+      "description": "compile: a package was written from a frozen source. attest: an external release-package attestation was issued. tag: an immutable release tag was created. retain: a package was retained as the previous-known-good rollback target. promote: a package became the production route. rollback: a promoted package was withdrawn in favour of a retained target. supersede: a retained target was replaced by a newer one."
+    },
+    "recorded_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{3})?Z$",
+      "description": "UTC instant. Non-decreasing across the journal; a backdated record is refused."
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "identity"],
+      "properties": {
+        "kind": {
+          "enum": ["human", "automation"],
+          "description": "A rollback event must be authorised by a human; automation may record, never authorise."
+        },
+        "identity": { "type": "string", "minLength": 1 }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_schema_version", "policy_version", "policy_sha256"],
+      "properties": {
+        "policy_schema_version": { "const": "excel-inflow-release-rollback-policy/1.0" },
+        "policy_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "Canonical digest of assets/release-rollback-policy-v1.json in force when the record was sealed."
+        }
+      }
+    },
+    "release": { "$ref": "#/$defs/release_identity" },
+    "rollback": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/rollback_payload" }],
+      "description": "Non-null exactly when event_type is \"rollback\"."
+    },
+    "detail": { "type": ["string", "null"] },
+    "previous_record_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "The preceding record's record_hash; null only at sequence 0."
+    },
+    "record_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Canonical digest of this record with record_hash removed."
+    }
+  },
+  "$defs": {
+    "release_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "source_commit",
+        "source_tree",
+        "skill_version",
+        "package_mode",
+        "deployment_status",
+        "runtime_code_closure_sha256",
+        "complete_package_inventory_sha256",
+        "archive_sha256",
+        "release_package_attestation_sha256"
+      ],
+      "description": "The package identity this event is ABOUT, in the same terms as product-identity/2.0 (scripts/lib/identity_vocabulary.mjs). On a rollback record this is the WITHDRAWN package; the target is in rollback.to.",
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "source_tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "skill_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "package_mode": {
+          "type": "string",
+          "description": "Must be a PACKAGE_MODES member; membership enforced in code."
+        },
+        "deployment_status": {
+          "type": "string",
+          "description": "Must be a DEPLOYMENT_STATUSES member; membership enforced in code. Exactly the rollback records carry \"rollback\"."
+        },
+        "runtime_code_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "complete_package_inventory_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "archive_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "release_package_attestation_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "rollback_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trigger_id",
+        "authorisation_reference",
+        "from",
+        "to",
+        "target_attestation_status",
+        "in_flight_runs",
+        "preserved_evidence"
+      ],
+      "properties": {
+        "trigger_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Must be a declared trigger in the rollback policy's trigger_conditions clause."
+        },
+        "authorisation_reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the human authorisation is recorded (issue card, checkpoint, approval receipt)."
+        },
+        "from": { "$ref": "#/$defs/rollback_endpoint" },
+        "to": { "$ref": "#/$defs/rollback_endpoint" },
+        "target_attestation_status": {
+          "const": "PASS",
+          "description": "A rollback target must be attestable: verifyReleasePackageAttestation over the retained package must PASS and bind the target closure. Anything else is refused before the record is written."
+        },
+        "in_flight_runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["run_id", "disposition", "terminal_reason_code"],
+            "properties": {
+              "run_id": { "type": "string", "minLength": 1 },
+              "disposition": {
+                "type": "string",
+                "description": "Must be an allowed disposition in the policy's in_flight_run_package_pinning clause. A run's package identity is pinned at run start and is never re-pointed by a rollback."
+              },
+              "terminal_reason_code": {
+                "type": ["string", "null"],
+                "description": "Null for a pinned continuation; for a stopped run, the ALREADY REGISTERED reason code the policy names. The journal never mints reason codes."
+              }
+            }
+          }
+        },
+        "preserved_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Paths of the evidence preserved by this rollback. Every class the policy marks never_delete must be represented."
+        }
+      }
+    },
+    "rollback_endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_commit", "source_tree", "runtime_code_closure_sha256"],
+      "properties": {
+        "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "source_tree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "runtime_code_closure_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "complete_package_inventory_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "archive_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "release_package_attestation_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

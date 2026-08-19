@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "excel-inflow-release-rollback-policy/1.0",
+  "description": "P8.6a — the versioned release-rollback policy. A release rollback is a DECLARED, executable, evidence-preserving procedure: this asset names the trigger conditions, the authorisation required, the target identity you roll back TO, what happens to in-flight runs (the package-pinning rule) and what evidence must be preserved. This file constrains SHAPE only. Cross-vocabulary membership is enforced by scripts/lib/release_journal.mjs at load and never repaired: deployment statuses must be DEPLOYMENT_STATUSES and package modes PACKAGE_MODES (scripts/lib/identity_vocabulary.mjs); the in-flight-run stop path must name an ALREADY REGISTERED reason code in assets/terminal-reason-registry-v1.json; and the clause set, together with which clauses are permanently EXCLUDED_INSTALLED_HOST, is declared in code (ROLLBACK_POLICY_CLAUSE_CONTRACT) so this asset can never quietly claim an installed-host clause is satisfiable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "work_package", "invariant", "policy_version", "clauses"],
+  "properties": {
+    "schema_version": { "const": "excel-inflow-release-rollback-policy/1.0" },
+    "work_package": { "const": "P8.6a" },
+    "invariant": { "type": "string", "minLength": 40 },
+    "policy_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Bumping this changes every journal record sealed under it — receipt-visible by construction, because each record carries the policy digest."
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["portable_tier", "installed_host_tier"],
+      "properties": {
+        "portable_tier": { "type": "string", "minLength": 1 },
+        "installed_host_tier": { "type": "string", "minLength": 1 }
+      },
+      "description": "What this policy can and cannot reach. The installed-host tier is permanently excluded, not deferred."
+    },
+    "clauses": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/clause" },
+      "description": "Keyed by clause_id. The key set must equal ROLLBACK_POLICY_CLAUSE_CONTRACT exactly — no missing clause, no extra clause."
+    }
+  },
+  "$defs": {
+    "clause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clause_id",
+        "title",
+        "satisfiability",
+        "statement",
+        "procedure_steps",
+        "evidence",
+        "exclusion_reason",
+        "excluded_from_portable_gate"
+      ],
+      "properties": {
+        "clause_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Stable clause identifier; must equal the entry's key in clauses."
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "satisfiability": {
+          "enum": ["portable", "EXCLUDED_INSTALLED_HOST"],
+          "description": "portable: satisfiable in this repository with no installed host. EXCLUDED_INSTALLED_HOST: satisfiable ONLY on an installed host, permanently excluded from this programme — declared here rather than pretended satisfiable. The value must equal the code-declared satisfiability for this clause_id."
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 20,
+          "description": "The rule, stated as a rule. Not a description of intent."
+        },
+        "procedure_steps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Ordered, executable steps. MUST be empty for an EXCLUDED_INSTALLED_HOST clause and non-empty for a portable one."
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The artefacts or identities this clause reads or produces. MUST be non-empty for a portable clause."
+        },
+        "exclusion_reason": {
+          "type": ["string", "null"],
+          "description": "Non-null exactly when satisfiability is EXCLUDED_INSTALLED_HOST; must say what host capability is missing."
+        },
+        "excluded_from_portable_gate": {
+          "type": "boolean",
+          "description": "Must equal (satisfiability === \"EXCLUDED_INSTALLED_HOST\"). An excluded clause is never counted as a portable-gate pass."
+        },
+        "binding": {
+          "type": ["object", "null"],
+          "description": "Machine-readable clause payload. Its required keys per clause_id, and every vocabulary membership inside it, are enforced by scripts/lib/release_journal.mjs — deliberately not duplicated here, following the assets/policy-registry-v1.schema.json precedent."
+        }
+      }
+    }
+  }
+}

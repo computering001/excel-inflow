@@ -1,0 +1,397 @@
+{
+  "schema_version": "excel-inflow-release-rollback-policy/1.0",
+  "work_package": "P8.6a",
+  "policy_version": "1.0",
+  "invariant": "A release rollback is a DECLARED, executable, evidence-preserving procedure: the trigger conditions, the human authorisation, the exact package identity rolled back TO, the in-flight-run package-pinning rule and the evidence that must survive are all declared here; every release-affecting event is an append-only hash-chained release-journal record; and a rollback target that is not attestable is refused rather than assumed.",
+  "scope": {
+    "portable_tier": "This repository and the artefacts it produces: a compiled package, its complete-package inventory, its deterministic archive, its external release-package attestation, the release journal and the preserved evidence. Everything in this policy marked portable is satisfiable here with no installed host.",
+    "installed_host_tier": "Anything that changes what a live Rogo install resolves to — the versioned install destination, the active pointer, the installed identity read-back and post-rollback installed behaviour parity. PERMANENTLY EXCLUDED from this programme, not deferred. The three EXCLUDED_INSTALLED_HOST clauses below are declared exclusions, never waivers: no portable gate may report them as passed, and no script in this repository may attempt them."
+  },
+  "clauses": {
+    "trigger_conditions": {
+      "clause_id": "trigger_conditions",
+      "title": "What may trigger a release rollback",
+      "satisfiability": "portable",
+      "statement": "A rollback may be opened only by one of the declared trigger conditions below, each of which names the mechanism that detects it. A condition not on this list is not a rollback trigger; it is either a new declared trigger (policy_version bump) or an ordinary defect to be fixed forward. No trigger executes a rollback by itself.",
+      "procedure_steps": [
+        "Name the trigger_id that fired and capture the detecting mechanism's own output as the trigger finding.",
+        "Write the trigger finding to the rollback evidence directory before anything else happens; it is the reason the rollback exists and is preserved forever.",
+        "If the observed condition matches no declared trigger_id, STOP: either fix forward, or add the trigger here and bump policy_version — never roll back on an undeclared trigger."
+      ],
+      "evidence": [
+        "rollback-evidence/trigger-finding.json",
+        "the detecting mechanism's own output (attestation verification findings, closure mismatch error, failing gate receipt)"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "triggers": [
+          {
+            "trigger_id": "certification_evidence_invalidated",
+            "detected_by": "scripts/lib/release_certification.mjs validateReleaseCertificationEvidence — a hash-bound evidence class no longer verifies against the promoted package.",
+            "severity": "critical",
+            "requires_authorisation": true
+          },
+          {
+            "trigger_id": "package_attestation_no_longer_verifies",
+            "detected_by": "scripts/lib/release_package_attestation.mjs verifyReleasePackageAttestation — the promoted package's inventory, archive or sealed product identity has diverged from its external attestation.",
+            "severity": "critical",
+            "requires_authorisation": true
+          },
+          {
+            "trigger_id": "post_tag_source_mutation_detected",
+            "detected_by": "the release tag's bound source commit and tree no longer match the package the tag names; the tag's certification is invalidated by construction.",
+            "severity": "critical",
+            "requires_authorisation": true
+          },
+          {
+            "trigger_id": "active_closure_mismatch_at_run_start",
+            "detected_by": "scripts/lib/source_identity.mjs checkActiveRuntimeCodeClosure — the live runtime-code closure is not the closure the promoted package identity declares, so runs refuse to start.",
+            "severity": "critical",
+            "requires_authorisation": true
+          },
+          {
+            "trigger_id": "delivery_regression_in_promoted_package",
+            "detected_by": "a registered delivery or validation gate that was green on the previous known-good package and is red on the promoted one, with both results bound to their package identities.",
+            "severity": "material",
+            "requires_authorisation": true
+          },
+          {
+            "trigger_id": "dependency_or_licence_withdrawal",
+            "detected_by": "a vendored runtime dependency in the promoted package's closure must be removed or replaced for licence or supply-chain reasons, so the promoted closure may no longer be distributed.",
+            "severity": "material",
+            "requires_authorisation": true
+          },
+          {
+            "trigger_id": "authorised_owner_request",
+            "detected_by": "an explicit written instruction from the release owner naming the package identity to withdraw and the retained target to return to.",
+            "severity": "declared",
+            "requires_authorisation": true
+          }
+        ]
+      }
+    },
+    "authorisation": {
+      "clause_id": "authorisation",
+      "title": "Who may authorise a rollback, and where it is recorded",
+      "satisfiability": "portable",
+      "statement": "Only the human release owner authorises a rollback. Automation may detect a trigger, assemble evidence and write the journal record, but it may never decide that a rollback happens. The authorisation must exist as a durable record before the rollback journal record is written, and the journal record must cite it.",
+      "procedure_steps": [
+        "The release owner records the decision: the trigger_id, the package identity being withdrawn and the retained target identity being returned to.",
+        "Open a work-package issue card for the rollback under programme/ and reference it from the journal record's rollback.authorisation_reference.",
+        "Only then run the rollback procedure; a rollback journal record whose actor.kind is \"automation\" is refused by the validator."
+      ],
+      "evidence": [
+        "programme/<package>_issue_card.md naming the rollback",
+        "the rollback journal record's actor and rollback.authorisation_reference fields"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "authoriser_role": "release owner (human)",
+        "automation_may_authorise": false,
+        "record_required": [
+          "programme issue card naming the trigger, the withdrawn identity and the target identity",
+          "release-journal rollback record with actor.kind = human and a non-empty authorisation_reference"
+        ]
+      }
+    },
+    "rollback_target_identity": {
+      "clause_id": "rollback_target_identity",
+      "title": "Which package identity you roll back TO",
+      "satisfiability": "portable",
+      "statement": "A rollback target is one exact package identity expressed in product-identity/2.0 terms, not a branch, a version string or a nickname. The target must be attestable: verifyReleasePackageAttestation over the retained package bytes must PASS and the attestation must bind exactly the runtime-code closure being returned to. A target that cannot be attested is not a rollback target and the rollback is refused.",
+      "procedure_steps": [
+        "Read the retained package's external release-package attestation (kept beside, never inside, the package bytes).",
+        "Run verifyRollbackTargetAttestation (scripts/lib/release_journal.mjs) over the retained package root, its attestation and its deterministic archive, passing the runtime-code closure digest you intend to return to.",
+        "Refuse the rollback outright if the verdict is not PASS: the retained bytes have moved, the archive does not match, or the attestation binds a different closure.",
+        "Carry the verified target identity into the journal record's rollback.to block in full: source commit, source tree, runtime-code closure, complete-package inventory, archive and attestation digests."
+      ],
+      "evidence": [
+        "the retained package's external release-package attestation",
+        "the retained package's deterministic ustar archive",
+        "the verifyRollbackTargetAttestation verdict",
+        "the rollback journal record's rollback.to identity block"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "identity_schema": "product-identity/2.0",
+        "required_identity_fields": [
+          "source_commit",
+          "source_tree",
+          "runtime_code_closure_sha256",
+          "complete_package_inventory_sha256",
+          "archive_sha256",
+          "release_package_attestation_sha256"
+        ],
+        "required_package_mode": "certified",
+        "attestation_required": true,
+        "attestation_verifier": "scripts/lib/release_package_attestation.mjs verifyReleasePackageAttestation, wrapped by scripts/lib/release_journal.mjs verifyRollbackTargetAttestation",
+        "note": "required_package_mode names the mode a PRODUCTION rollback target must carry. While v3.7.7 is portable-sealed development, a development-mode target is journalled honestly as such and the target-mode requirement is the standing rule the certified tier inherits — it is never silently relaxed to make a development package look production-eligible."
+      }
+    },
+    "retained_previous_known_good": {
+      "clause_id": "retained_previous_known_good",
+      "title": "The retained previous-known-good package",
+      "satisfiability": "portable",
+      "statement": "At least one previous known-good package is retained in full — archive, external attestation and release manifest — before any newer package is promoted. Retention is a precondition of promotion, not something arranged after a failure. Retention is journalled as a retain record, and the validator refuses a rollback whose target has no earlier retain record.",
+      "procedure_steps": [
+        "Before promoting a package, confirm the outgoing package's archive and external attestation are retained outside the package directory and are readable.",
+        "Append a retain journal record carrying the retained package's full identity block, including its inventory, archive and attestation digests.",
+        "Never delete a retained package while it is the newest retained known-good; retire it only with a supersede record naming the retained package that replaces it.",
+        "If nothing is retained, promotion does not proceed: an unretained release has no rollback."
+      ],
+      "evidence": [
+        "retained/<identity>/package.tar",
+        "retained/<identity>/package.attestation.json",
+        "retained/<identity>/release-manifest.json",
+        "the retain journal record"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "retained_previous_known_good_count": 1,
+        "retained_artefacts": [
+          "deterministic ustar package archive",
+          "external release-package attestation",
+          "release manifest",
+          "certification or portable-dossier verdict bound to that identity"
+        ],
+        "retention_precedes_promotion": true,
+        "retention_journal_event_type": "retain",
+        "retirement_journal_event_type": "supersede"
+      }
+    },
+    "in_flight_run_package_pinning": {
+      "clause_id": "in_flight_run_package_pinning",
+      "title": "In-flight runs: the package-pinning rule",
+      "satisfiability": "portable",
+      "statement": "A run's package identity is resolved once, at run start, and is immutable for the life of that run. A release rollback NEVER re-points an in-flight run onto a different package: a run either continues on the package it was pinned to, or it is stopped and terminated with the already-registered CANCELLED.user_or_system_stop reason, which preserves its evidence and leaves it resumable from its own checkpoints. A half-rolled-back run — one whose inputs came from one closure and whose outputs came from another — is the single outcome this clause exists to make impossible.",
+      "procedure_steps": [
+        "Enumerate the in-flight runs at the moment of rollback and record each one's pinned runtime-code closure.",
+        "Default: let each pinned run finish on its own package (pinned_continue). Its outputs stay attributable to the closure that produced them.",
+        "Stop a pinned run only when the trigger makes its output untrustworthy (a critical-severity trigger). Terminate it with CANCELLED.user_or_system_stop, which is checkpoint-required and evidence-preserving.",
+        "Record every in-flight run in the rollback journal record with its run_id, its disposition and, for a stopped run, that registered reason code. A run absent from the record is an undeclared run.",
+        "New runs started after the rollback record resolve to the rollback target; that resolution is portable here and route-level on an installed host (see active_pointer_repoint, which is excluded)."
+      ],
+      "evidence": [
+        "the rollback journal record's rollback.in_flight_runs array",
+        "each stopped run's terminal outcome artifact carrying CANCELLED.user_or_system_stop",
+        "each pinned run's run-start identity resolution recording its closure"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "pinning_seam": "scripts/lib/source_identity.mjs resolveActiveSourceIdentity — every run-start identity resolution flows through it and asserts the active closure against the declared package identity",
+        "default_disposition": "pinned_continue",
+        "allowed_dispositions": ["pinned_continue", "stopped_cancelled"],
+        "rollback_repoints_in_flight_run": false,
+        "stop_path": {
+          "terminal_reason_code": "CANCELLED.user_or_system_stop",
+          "registry": "assets/terminal-reason-registry-v1.json",
+          "new_reason_code_required": false,
+          "why": "The registered code is already owner_layer run_controller, checkpoint_required, evidence_preserved and resumable_from_checkpoint — exactly the semantics a rollback-stopped run needs. Minting a rollback-specific terminal reason would add a second vocabulary for a state that already has one."
+        }
+      }
+    },
+    "evidence_preservation": {
+      "clause_id": "evidence_preservation",
+      "title": "What must survive a rollback",
+      "satisfiability": "portable",
+      "statement": "A rollback preserves evidence or it is not a rollback. Every class below is never-delete: the withdrawn package's own bytes and attestation, the retained target's bytes and attestation, the trigger finding, the release journal itself and the artefacts of every in-flight run at the moment of rollback. Nothing is deleted to make a rollback tidy; a superseded artefact is retired by a journal record, never by removal.",
+      "procedure_steps": [
+        "Copy the withdrawn package's archive and external attestation into the rollback evidence directory before the withdrawal is recorded.",
+        "Confirm the retained target's archive and attestation are still readable and still verify; they are the other half of the record.",
+        "Leave every in-flight run directory in place, stopped or continuing; a stopped run keeps its checkpoints so it stays resumable.",
+        "Append the rollback journal record last, listing the preserved evidence paths. The journal is itself preserved evidence and is never rewritten or truncated."
+      ],
+      "evidence": [
+        "rollback-evidence/<rollback-sequence>/ containing the withdrawn package archive, its attestation and the trigger finding",
+        "the retained target's archive and attestation",
+        "the release journal file itself",
+        "the in-flight run directories named in the rollback record"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "preserved_classes": [
+          {
+            "evidence_class": "withdrawn_package",
+            "artefacts": [
+              "withdrawn package deterministic archive",
+              "withdrawn package external attestation",
+              "withdrawn package release manifest"
+            ],
+            "never_delete": true,
+            "reason": "The withdrawn package is the subject of the rollback; without its bytes the rollback record cannot be independently checked."
+          },
+          {
+            "evidence_class": "rollback_target",
+            "artefacts": [
+              "retained target deterministic archive",
+              "retained target external attestation"
+            ],
+            "never_delete": true,
+            "reason": "The target must remain independently attestable after the rollback, not only at the moment of it."
+          },
+          {
+            "evidence_class": "trigger_finding",
+            "artefacts": [
+              "the detecting mechanism's output that opened the rollback",
+              "the failing gate or verification receipt bound to the withdrawn identity"
+            ],
+            "never_delete": true,
+            "reason": "The reason for a rollback is part of the release record; a rollback without its cause is folklore."
+          },
+          {
+            "evidence_class": "release_journal",
+            "artefacts": ["release-journal.jsonl"],
+            "never_delete": true,
+            "reason": "Append-only and hash-chained: deleting or rewriting any record breaks the chain and is refused by the validator rather than repaired."
+          },
+          {
+            "evidence_class": "in_flight_run_artifacts",
+            "artefacts": [
+              "run directories of every run in flight at the rollback",
+              "the terminal outcome artifact of each stopped run",
+              "each run's per-run checkpoint receipts"
+            ],
+            "never_delete": true,
+            "reason": "A user's run is their evidence. A release decision may stop a run; it may never destroy what the run had already proven."
+          }
+        ]
+      }
+    },
+    "release_journal_record": {
+      "clause_id": "release_journal_record",
+      "title": "The append-only release journal",
+      "satisfiability": "portable",
+      "statement": "Every release-affecting event is one append-only record in the release journal: compile, attest, tag, retain, promote, rollback, supersede. Records are hash-chained — record_hash is the canonical digest of the record body with record_hash removed, previous_record_hash is the preceding record's record_hash, and the first record opens the chain with null. Sequences are contiguous from zero. The journal is only ever appended to; a record is never edited, reordered or removed, and a journal that does not validate cannot be appended to.",
+      "procedure_steps": [
+        "Append one record per release-affecting event, at the time of the event, under the journal lock.",
+        "Carry the digest of this policy in every record, so a policy edit is visible on every record sealed after it.",
+        "Validate the whole journal before every append; refuse to append onto a chain that does not verify.",
+        "Never repair a journal by rewriting it. A mistaken record is corrected by a later record that says so."
+      ],
+      "evidence": [
+        "release-journal.jsonl",
+        "assets/release-journal-v1.schema.json",
+        "scripts/lib/release_journal.mjs validateReleaseJournal verdict"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "journal_record_schema_version": "excel-inflow-release-journal-record/1.0",
+        "journal_filename": "release-journal.jsonl",
+        "required_event_types": [
+          "compile",
+          "attest",
+          "tag",
+          "retain",
+          "promote",
+          "rollback",
+          "supersede"
+        ],
+        "chaining": {
+          "record_hash": "canonical sha256 of the record body with record_hash removed",
+          "previous_record_hash": "the preceding record's record_hash",
+          "genesis_previous_record_hash": null,
+          "sequence": "contiguous integers from 0; a gap, a reorder or a fork is refused",
+          "mirrors": "scripts/lib/flow_runtime.mjs createStageReceipt stage-receipt chaining"
+        },
+        "append_only": true,
+        "append_only_proof": "Writes are O_APPEND + fsync under a directory lock, then byte-prefix-verified: if any earlier byte changed, the write is reported as a defect rather than accepted."
+      }
+    },
+    "deployment_status_transitions": {
+      "clause_id": "deployment_status_transitions",
+      "title": "What the rollback deployment status means",
+      "satisfiability": "portable",
+      "statement": "The \"rollback\" member of DEPLOYMENT_STATUSES is the status of the package being WITHDRAWN, and it is terminal for that package identity: a withdrawn identity is never promoted again, it is superseded by a new compile. The rollback target is not restamped by the rollback; it is recorded at the status it held when it was last known good. Making the target the live route again is a route change on an installed host and is excluded.",
+      "procedure_steps": [
+        "Record the withdrawn package with deployment_status \"rollback\" in its rollback journal record; the validator refuses any other status there.",
+        "Record the rollback target at the status it already held; do not invent a new status for it.",
+        "Never write a later promote record for a closure that a rollback record has withdrawn — the validator refuses it. Fix forward with a new compile instead."
+      ],
+      "evidence": [
+        "scripts/lib/identity_vocabulary.mjs DEPLOYMENT_STATUSES",
+        "the rollback journal record's release.deployment_status",
+        "the validator's refusal of a post-rollback re-promotion"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "withdrawn_package": {
+          "from": "production_promoted",
+          "to": "rollback",
+          "terminal": true,
+          "repromotion_allowed": false
+        },
+        "rollback_target": {
+          "recorded_status": "production_promoted",
+          "restamped_by_rollback": false,
+          "repoint_satisfiability": "EXCLUDED_INSTALLED_HOST"
+        },
+        "terminal_statuses": ["rollback"]
+      }
+    },
+    "rollback_is_not_run_resume": {
+      "clause_id": "rollback_is_not_run_resume",
+      "title": "Release rollback is not per-run resumability",
+      "satisfiability": "portable",
+      "statement": "Release rollback and per-run resumability are different mechanisms answering different questions. Per-run checkpoints answer \"can THIS run continue from where it stopped\". A release rollback answers \"which package is the release\". Resuming a run never changes which release is live, and rolling back a release never resumes a run. Neither may be presented as evidence for the other.",
+      "procedure_steps": [
+        "When asked whether the product can roll back a release, read this policy and the release journal — never the per-run checkpoint receipts.",
+        "Never resume a run across a package-identity change: the run is pinned, and a resume onto different bytes is a half-rolled-back run.",
+        "Keep the two vocabularies apart in reports: a checkpoint receipt is per-run evidence, a journal record is per-release evidence."
+      ],
+      "evidence": [
+        "scripts/lib/release_checkpoint_store.mjs (per-run resumability — NOT release rollback)",
+        "scripts/lib/release_journal.mjs (release rollback and the release journal)"
+      ],
+      "exclusion_reason": null,
+      "excluded_from_portable_gate": false,
+      "binding": {
+        "distinguished_from": [
+          "scripts/lib/release_checkpoint_store.mjs ReleaseCheckpointStore — per-RUN resumability from that run's own artefacts",
+          "scripts/lib/flow_runtime.mjs stage receipts — per-RUN stage progress"
+        ],
+        "reason": "Per-run checkpoints say nothing about which package is the release; they were repeatedly mistaken for rollback capability, which is why the distinction is a clause and not a comment."
+      }
+    },
+    "active_pointer_repoint": {
+      "clause_id": "active_pointer_repoint",
+      "title": "Re-pointing the active route to the rollback target",
+      "satisfiability": "EXCLUDED_INSTALLED_HOST",
+      "statement": "On an installed host, a rollback finishes by re-pointing the active route from the withdrawn package to the retained target and reading the pointer back from a fresh session. This programme has no installed host, so this leg is not performed and is not claimed.",
+      "procedure_steps": [],
+      "evidence": [],
+      "exclusion_reason": "Requires write access to a live Rogo install's versioned install destination and active pointer. The installed half of P8.6 is permanently excluded by standing directive; no script in this repository may mutate a live install, so this clause is unsatisfiable here by construction rather than merely unfinished.",
+      "excluded_from_portable_gate": true,
+      "binding": null
+    },
+    "installed_identity_readback": {
+      "clause_id": "installed_identity_readback",
+      "title": "Fresh-session installed identity read-back after a rollback",
+      "satisfiability": "EXCLUDED_INSTALLED_HOST",
+      "statement": "On an installed host, the rollback target's identity is read back from a fresh session — installed package digest, active pointer and runtime-code closure — before the rollback is considered complete. Not performed here.",
+      "procedure_steps": [],
+      "evidence": [],
+      "exclusion_reason": "Requires a fresh session on an installed host to read the installed package and active pointer. Portable verification stops at the retained package's own attestation, which is what verifyRollbackTargetAttestation proves; an installed read-back cannot be simulated and is not asserted.",
+      "excluded_from_portable_gate": true,
+      "binding": null
+    },
+    "post_rollback_installed_parity": {
+      "clause_id": "post_rollback_installed_parity",
+      "title": "Post-rollback installed behaviour parity",
+      "satisfiability": "EXCLUDED_INSTALLED_HOST",
+      "statement": "On an installed host, a rollback is followed by an explicitly authorised installed behaviour parity run proving the target still delivers. Not performed here.",
+      "procedure_steps": [],
+      "evidence": [],
+      "exclusion_reason": "Requires an authorised fresh-session installed run and, for the workbook leg, native Excel and visual review — the same two evidence classes this programme records as permanent declared exclusions. The portable substitute is the registered portable gate set run against the target's own bytes, which is a different claim and is reported as such.",
+      "excluded_from_portable_gate": true,
+      "binding": null
+    }
+  }
+}
