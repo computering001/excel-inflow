@@ -1625,6 +1625,24 @@
       "test_class": "synthetic_integration"
     },
     {
+      "id": "roll-forward-invariant",
+      "phase": "economics",
+      "runtime": "node",
+      "script": "run_roll_forward_invariant_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
+      "id": "classifier-caption-defects",
+      "phase": "evidence",
+      "runtime": "node",
+      "script": "run_classifier_caption_defect_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "required-role-closure",
       "phase": "evidence",
       "runtime": "node",

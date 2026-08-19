@@ -202,6 +202,16 @@
       "commit": "02b2e0c",
       "invariant": "a required-role closure is sealed before forecast compilation over the full contract-required set, alias-aware",
       "note": "custody baseline unchanged; net_interest_expense contract/taxonomy split reported"
+    },
+    "P4.4a": {
+      "commit": "c82772e",
+      "invariant": "the release roll-forward invariant accounts for every movement that lawfully changes an instrument balance (defect D10)",
+      "note": "seven-term identity; archetypes re-pinned to assert the repair"
+    },
+    "P2.9": {
+      "commit": "c633d6f",
+      "invariant": "a printed caption is read as a declared alias wrapped in qualifiers, resolving at most one role on evidence (defects D1-D3)",
+      "note": "an evidence-withholding alternative was proven to weaken the margin validator and reverted"
     }
   },
   "evidence_baseline": {
