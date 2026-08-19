@@ -4,7 +4,7 @@
   "graph_binding": {
     "schema_version": "equation-graph/1.0",
     "graph_id": "canonical_debt_overlay_forecast",
-    "canonical_sha256": "6ca6e0809c5927b0a2bf85ca7eed6de88a59f8c09035414e801029767e94828c",
+    "canonical_sha256": "c4505d067fd2e383ee226ef77260f2afc4ef86b2c25a0dea51684aac90076fd2",
     "hash_encoding": "sha256_canonical_json"
   },
   "policy_binding": {

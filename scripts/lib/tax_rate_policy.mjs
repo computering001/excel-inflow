@@ -35,6 +35,51 @@
 
 export const TAX_RATE_POLICY_SCHEMA = "excel-inflow-tax-rate-policy/1.0";
 
+/**
+ * The policy's OPERATOR VOCABULARY — declared here, once, and consumed by
+ * membership everywhere.
+ *
+ * P3.3: these three names used to be recognised downstream by
+ * `operator.startsWith("tax_rate_policy")`. A prefix test is not a
+ * declaration: it silently admits any future string that happens to start the
+ * same way, it cannot be enumerated, and no validator can prove the set is
+ * closed. Every consumer now asks this module whether an operator IS one of
+ * its operators, and `formula_dsl.mjs` registers exactly these three names in
+ * the declared formula operator vocabulary.
+ *
+ * The strings themselves are unchanged — the emitted `formula_spec.operator`
+ * values below are byte-identical to the ones the prefix test matched.
+ */
+export const TAX_RATE_POLICY_OPERATORS = Object.freeze({
+  median: "tax_rate_policy_median",
+  latest: "tax_rate_policy_latest",
+  loss_case: "tax_rate_policy_loss_case",
+});
+
+/** The closed, ordered list of the policy's operators. */
+export const TAX_RATE_POLICY_OPERATOR_LIST = Object.freeze([
+  TAX_RATE_POLICY_OPERATORS.median,
+  TAX_RATE_POLICY_OPERATORS.latest,
+  TAX_RATE_POLICY_OPERATORS.loss_case,
+]);
+
+/**
+ * The semantic role each operator forecasts. The rate row is the only role
+ * this policy owns; declaring it lets the equation-graph proof bind the
+ * operator vocabulary to the graph node that carries the rate.
+ */
+export const TAX_RATE_POLICY_OWNED_ROLE = "effective_tax_rate";
+
+/**
+ * Membership, not prefix. `false` for every non-string and for any string —
+ * including one that begins "tax_rate_policy" — that is not one of the three
+ * declared operators.
+ */
+export function isTaxRatePolicyOperator(operator) {
+  return typeof operator === "string"
+    && TAX_RATE_POLICY_OPERATOR_LIST.includes(operator);
+}
+
 /** |PBT| below this fraction of the largest observed |PBT| is "near zero":
  * the ratio is arithmetic noise, not an economic rate. */
 const NEAR_ZERO_PBT_FRACTION = 0.02;
@@ -252,7 +297,7 @@ export function taxRatePolicyCandidate(modelCase, row, forecastIndex) {
       source_kind: "historical_inference",
       value,
       formula_spec: {
-        operator: "tax_rate_policy_median",
+        operator: TAX_RATE_POLICY_OPERATORS.median,
         row_id: row.row_id,
         usable_period_count: usable.length,
         forecast_index: forecastIndex,
@@ -275,7 +320,7 @@ export function taxRatePolicyCandidate(modelCase, row, forecastIndex) {
       source_kind: "historical_inference",
       value: usable[0],
       formula_spec: {
-        operator: "tax_rate_policy_latest",
+        operator: TAX_RATE_POLICY_OPERATORS.latest,
         row_id: row.row_id,
         usable_period_count: 1,
         forecast_index: forecastIndex,
@@ -302,7 +347,7 @@ export function taxRatePolicyCandidate(modelCase, row, forecastIndex) {
       source_kind: "historical_inference",
       value: 0,
       formula_spec: {
-        operator: "tax_rate_policy_loss_case",
+        operator: TAX_RATE_POLICY_OPERATORS.loss_case,
         row_id: row.row_id,
         forecast_index: forecastIndex,
       },

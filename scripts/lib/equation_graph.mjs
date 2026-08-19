@@ -212,6 +212,390 @@ function validateContractSemantics(contract, graph, policy, errors) {
   }
 }
 
+/**
+ * THE EFFECTIVE-TAX-RATE PATH (P3.3).
+ *
+ * The effective tax rate is the one driver the candidate compiler refuses to
+ * forecast from its own historical identity, because `tax = PBT × rate` beside
+ * `rate = tax ÷ PBT` is a two-equation cycle. `tax_rate_policy.mjs` breaks it
+ * by making the rate an INPUT computed from filed history outside the equation
+ * system. That refusal is only sound if the resulting path is genuinely
+ * acyclic in the graph the solve is bound to — and until P3.3 the graph
+ * contained no tax node at all, so the claim was unprovable rather than true.
+ *
+ * These four nodes and six edges are that path. The rate enters as an input;
+ * pre-tax income consumes EBIT and (when circularity is on) net interest; tax
+ * expense consumes the pair; net income closes it. Nothing downstream feeds
+ * back, and `validateEffectiveTaxRatePathAcyclicity` proves it rather than
+ * asserting it — including the sink property, which is what a future edit
+ * wiring net income into the cash-flow bridge would violate. (That edit would
+ * be a real economic circularity: it would drag the tax path into the interest
+ * SCC. It must fail loudly here, not converge quietly.)
+ */
+export const EFFECTIVE_TAX_RATE_PATH = Object.freeze({
+  schema_version: "effective-tax-rate-path/1.0",
+  policy_module: "tax_rate_policy",
+  /** The rate the policy owns; the reason this path exists. */
+  rate_role: "effective_tax_rate",
+  /** The base the rate is applied to. */
+  base_role: "pre_tax_income",
+  /** The charge the rate and the base produce. */
+  charge_role: "tax_expense",
+  /** The path's terminal consumer. */
+  sink_role: "net_income",
+  roles: Object.freeze([
+    "pre_tax_income",
+    "effective_tax_rate",
+    "tax_expense",
+    "net_income",
+  ]),
+  required_edges: Object.freeze([
+    Object.freeze({
+      id: "edge.ebit_to_pre_tax_income",
+      from: "statement.ebit",
+      to: "statement.pre_tax_income",
+      type: "statement_dependency",
+      activation: "always",
+    }),
+    Object.freeze({
+      id: "edge.net_interest_to_pre_tax_income",
+      from: "interest.net_expense",
+      to: "statement.pre_tax_income",
+      type: "schedule_to_statement",
+      activation: "circularity_on",
+    }),
+    Object.freeze({
+      id: "edge.pre_tax_income_to_tax_expense",
+      from: "statement.pre_tax_income",
+      to: "statement.tax_expense",
+      type: "statement_dependency",
+      activation: "always",
+    }),
+    Object.freeze({
+      id: "edge.effective_tax_rate_to_tax_expense",
+      from: "statement.effective_tax_rate",
+      to: "statement.tax_expense",
+      type: "statement_dependency",
+      activation: "always",
+    }),
+    Object.freeze({
+      id: "edge.pre_tax_income_to_net_income",
+      from: "statement.pre_tax_income",
+      to: "statement.net_income",
+      type: "statement_dependency",
+      activation: "always",
+    }),
+    Object.freeze({
+      id: "edge.tax_expense_to_net_income",
+      from: "statement.tax_expense",
+      to: "statement.net_income",
+      type: "statement_dependency",
+      activation: "always",
+    }),
+  ]),
+});
+
+/**
+ * Resolve the declared ETR roles to nodes of `graph`. Roles, never id prefixes:
+ * a node id starting "tax" proves nothing and the validator already enforces
+ * role uniqueness, so a role is an identifier the graph guarantees is single.
+ */
+export function deriveEffectiveTaxRatePath(graph, declaration = EFFECTIVE_TAX_RATE_PATH) {
+  const errors = [];
+  const nodeByRole = new Map();
+  for (const role of declaration.roles) {
+    const matches = (graph?.nodes ?? []).filter((node) => node.role === role);
+    if (matches.length !== 1) {
+      errors.push(
+        `effective-tax-rate path role ${role} must bind to exactly one equation node; found ${matches.length}.`,
+      );
+      continue;
+    }
+    nodeByRole.set(role, matches[0]);
+  }
+  const nodeIds = declaration.roles
+    .map((role) => nodeByRole.get(role)?.id)
+    .filter((id) => id !== undefined)
+    .sort();
+  return { errors, nodeByRole, nodeIds };
+}
+
+/**
+ * Deterministic Kahn topological order over an induced subgraph. A returned
+ * order IS the acyclicity certificate: Kahn terminates with every node placed
+ * exactly when the subgraph has no directed cycle, so the caller does not have
+ * to trust a separate claim.
+ */
+function topologicalOrder(nodeIds, edges) {
+  const members = new Set(nodeIds);
+  const ordered = [...nodeIds].sort();
+  const outgoing = new Map(ordered.map((id) => [id, []]));
+  const indegree = new Map(ordered.map((id) => [id, 0]));
+  for (const edge of edges) {
+    if (!members.has(edge.from) || !members.has(edge.to)) continue;
+    outgoing.get(edge.from).push(edge.to);
+    indegree.set(edge.to, indegree.get(edge.to) + 1);
+  }
+  for (const targets of outgoing.values()) targets.sort();
+  const ready = ordered.filter((id) => indegree.get(id) === 0);
+  const order = [];
+  while (ready.length > 0) {
+    ready.sort();
+    const id = ready.shift();
+    order.push(id);
+    for (const target of outgoing.get(id)) {
+      indegree.set(target, indegree.get(target) - 1);
+      if (indegree.get(target) === 0) ready.push(target);
+    }
+  }
+  return {
+    order,
+    complete: order.length === ordered.length,
+    unplaced: ordered.filter((id) => !order.includes(id)),
+  };
+}
+
+/** Every node reachable from `startId` along `edges`, deterministically. */
+function reachableFrom(startId, edges) {
+  const outgoing = new Map();
+  for (const edge of edges) {
+    if (!outgoing.has(edge.from)) outgoing.set(edge.from, []);
+    outgoing.get(edge.from).push(edge.to);
+  }
+  for (const targets of outgoing.values()) targets.sort();
+  const seen = new Set();
+  const queue = [startId];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    for (const target of outgoing.get(id) ?? []) {
+      if (seen.has(target)) continue;
+      seen.add(target);
+      queue.push(target);
+    }
+  }
+  return seen;
+}
+
+/**
+ * PROVE the effective-tax-rate path is DAG-safe inside the graph the solve is
+ * bound to. Six independent obligations, none of which any other validator
+ * covered:
+ *
+ *   1. PRESENT — every declared role binds to exactly one node.
+ *   2. WIRED — every declared edge exists with exactly its declared direction,
+ *      type and activation (an absent edge would make 3-6 vacuously true).
+ *   3. CONNECTED — the rate and the base each reach the charge, and the charge
+ *      reaches the sink. This is what stops the proof passing on four isolated
+ *      nodes.
+ *   4. ACYCLIC INTERNALLY — a topological order exists over the induced
+ *      subgraph, in the structural graph and in both circularity states.
+ *   5. OUTSIDE EVERY SCC — no strongly connected component of the WHOLE graph
+ *      contains an ETR node, structurally or in either circularity state.
+ *      This is the DAG-safety statement itself: an ETR node inside an SCC
+ *      would be solved by iteration, which is exactly the circular
+ *      `tax`/`rate` pair the policy refuses to create.
+ *   6. SINK — no edge leaves the ETR node set. With 5 this makes the acyclicity
+ *      structural rather than incidental: the tax path can never become part of
+ *      a cycle without adding an outgoing edge, and adding one fails here.
+ */
+export function validateEffectiveTaxRatePathAcyclicity(
+  graph,
+  declaration = EFFECTIVE_TAX_RATE_PATH,
+) {
+  const { errors, nodeByRole, nodeIds } = deriveEffectiveTaxRatePath(graph, declaration);
+  if (errors.length > 0) return errors;
+
+  const edgesById = new Map((graph.edges ?? []).map((edge) => [edge.id, edge]));
+  for (const required of declaration.required_edges) {
+    const edge = edgesById.get(required.id);
+    if (!edge) {
+      errors.push(`effective-tax-rate path edge ${required.id} is missing.`);
+    } else if (!edgeMatches(edge, required)) {
+      errors.push(
+        `effective-tax-rate path edge ${required.id} does not match its declared direction, type and activation.`,
+      );
+    }
+  }
+  if (errors.length > 0) return errors;
+
+  const members = new Set(nodeIds);
+  const rateId = nodeByRole.get(declaration.rate_role).id;
+  const baseId = nodeByRole.get(declaration.base_role).id;
+  const chargeId = nodeByRole.get(declaration.charge_role).id;
+  const sinkId = nodeByRole.get(declaration.sink_role).id;
+
+  // 3. CONNECTED.
+  const allEdges = graph.edges ?? [];
+  for (const [fromId, toId, label] of [
+    [rateId, chargeId, "the rate must reach the tax charge"],
+    [baseId, chargeId, "the tax base must reach the tax charge"],
+    [chargeId, sinkId, "the tax charge must reach the path's terminal consumer"],
+  ]) {
+    if (!reachableFrom(fromId, allEdges).has(toId)) {
+      errors.push(
+        `effective-tax-rate path is not connected: ${label} (${fromId} does not reach ${toId}).`,
+      );
+    }
+  }
+
+  // 4. ACYCLIC INTERNALLY, in every activation state.
+  for (const [label, edges] of [
+    ["structural", allEdges],
+    ["circularity-off", activeEquationEdges(graph, 0)],
+    ["circularity-on", activeEquationEdges(graph, 1)],
+  ]) {
+    const { complete, unplaced } = topologicalOrder(nodeIds, edges);
+    if (!complete) {
+      errors.push(
+        `effective-tax-rate path has no ${label} topological order: ${unplaced.join(", ")} lie on a cycle.`,
+      );
+    }
+  }
+
+  // 5. OUTSIDE EVERY STRONGLY CONNECTED COMPONENT of the whole graph.
+  for (const [label, options] of [
+    ["structural", {}],
+    ["circularity-off", { circularity: 0 }],
+    ["circularity-on", { circularity: 1 }],
+  ]) {
+    for (const component of deriveStronglyConnectedComponents(graph, options)) {
+      const trapped = component.filter((id) => members.has(id));
+      if (trapped.length > 0) {
+        errors.push(
+          `effective-tax-rate node(s) ${trapped.join(", ")} lie inside a ${label} strongly connected ` +
+            `component [${component.join(", ")}]: the tax path would be solved by iteration.`,
+        );
+      }
+    }
+  }
+
+  // 6. SINK.
+  for (const edge of allEdges) {
+    if (!members.has(edge.from) || members.has(edge.to)) continue;
+    errors.push(
+      `effective-tax-rate node ${edge.from} feeds ${edge.to} through edge ${edge.id}: the tax ` +
+        "path must terminate, because any consumer of tax inside the equation system recreates " +
+        "the circular tax/rate pair the tax rate policy exists to break.",
+    );
+  }
+  return errors;
+}
+
+/**
+ * Hash-bound evidence that the ETR path is DAG-safe in THIS graph. Carries the
+ * topological order (the certificate), so a consumer can re-derive it rather
+ * than trust a boolean.
+ */
+export function compileEffectiveTaxRatePathProof(
+  graph = EQUATION_GRAPH,
+  declaration = EFFECTIVE_TAX_RATE_PATH,
+) {
+  const errors = validateEffectiveTaxRatePathAcyclicity(graph, declaration);
+  if (errors.length > 0) {
+    throw new Error(`Effective-tax-rate path is not DAG-safe:\n- ${errors.join("\n- ")}`);
+  }
+  const { nodeByRole, nodeIds } = deriveEffectiveTaxRatePath(graph, declaration);
+  const orders = Object.fromEntries(
+    [
+      ["structural", graph.edges ?? []],
+      ["circularity_off", activeEquationEdges(graph, 0)],
+      ["circularity_on", activeEquationEdges(graph, 1)],
+    ].map(([label, edges]) => [label, topologicalOrder(nodeIds, edges).order]),
+  );
+  return {
+    schema_version: declaration.schema_version,
+    policy_module: declaration.policy_module,
+    graph_id: graph.graph_id,
+    graph_sha256: canonicalJsonSha256(graph),
+    nodes_by_role: Object.fromEntries(
+      declaration.roles.map((role) => [role, nodeByRole.get(role).id]),
+    ),
+    edge_ids: declaration.required_edges.map((edge) => edge.id),
+    topological_order: orders,
+    acyclic: true,
+    outside_every_strongly_connected_component: true,
+    terminates: true,
+  };
+}
+
+/**
+ * Totality of the canonical node/row binding, checked at the graph's own seam.
+ *
+ * The binding register lives in `layered_graph_constitution.mjs` (which imports
+ * this module, so the register cannot be imported back without a cycle) and is
+ * passed in. The obligation is exact set equality plus per-node role agreement:
+ * a node added to the graph without a declared realisation, a node removed while
+ * a declaration still names it, and a renamed role are each errors here. Called
+ * at the register's own module load, this is what makes a silent divergence
+ * between the equation graph and the statement layer impossible rather than
+ * merely unlikely.
+ *
+ * This validates. It never repairs, and it never invents a default disposition
+ * for an undeclared node.
+ */
+export function validateEquationGraphRowBinding(binding, graph = EQUATION_GRAPH) {
+  const errors = [];
+  if (!binding || typeof binding !== "object") {
+    return ["equation graph row binding register is absent or not an object."];
+  }
+  const declaredIds = new Set(Object.keys(binding));
+  for (const node of graph.nodes ?? []) {
+    const declared = binding[node.id] ?? null;
+    if (!declared) {
+      errors.push(
+        `equation graph node ${node.id} (role ${node.role}) has no declared row binding.`,
+      );
+      continue;
+    }
+    declaredIds.delete(node.id);
+    if (declared.role !== node.role) {
+      errors.push(
+        `equation graph node ${node.id} declares role ${node.role} but its row binding declares ${declared.role}.`,
+      );
+    }
+    if (declared.disposition === "statement_row") {
+      if (!declared.section || !declared.semantic_role) {
+        errors.push(
+          `equation graph node ${node.id} declares a statement_row binding without a section and semantic role.`,
+        );
+      }
+      if (!["required", "case_optional"].includes(declared.presence)) {
+        errors.push(
+          `equation graph node ${node.id} declares a statement_row binding without a declared presence.`,
+        );
+      }
+    } else if (declared.disposition === "schedule_row") {
+      if (!declared.row_family || !declared.schedule_row) {
+        errors.push(
+          `equation graph node ${node.id} declares a schedule_row binding without a row family and schedule row.`,
+        );
+      }
+    } else if (declared.disposition !== "solver_control") {
+      errors.push(
+        `equation graph node ${node.id} declares unknown row binding disposition ${declared.disposition}.`,
+      );
+    }
+  }
+  for (const id of [...declaredIds].sort()) {
+    errors.push(
+      `equation graph row binding declares node ${id}, which the graph does not contain.`,
+    );
+  }
+  return errors;
+}
+
+export function assertValidEquationGraphRowBinding(
+  binding,
+  graph = EQUATION_GRAPH,
+) {
+  const errors = validateEquationGraphRowBinding(binding, graph);
+  if (errors.length > 0) {
+    throw new Error(
+      `Equation graph row binding is not total:\n- ${errors.join("\n- ")}`,
+    );
+  }
+}
+
 export function validateEquationGraph(
   graph,
   contract = CONVERGENCE_CONTRACT,
@@ -376,6 +760,10 @@ export function validateEquationGraph(
   if (contract.solver_iteration.non_convergence !== policy.solver.non_convergence) {
     errors.push("convergence non-convergence policy must match the economic solve policy.");
   }
+  // P3.3 — the effective-tax-rate path is proved DAG-safe here, at the same
+  // seam that proves the interest SCC, so no case can be solved against a
+  // graph in which the tax path is absent, disconnected or circular.
+  errors.push(...validateEffectiveTaxRatePathAcyclicity(graph));
   return errors;
 }
 

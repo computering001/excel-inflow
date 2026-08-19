@@ -14,6 +14,7 @@ import {
   canonicalStatementDependencies,
   canonicalForecastStatementDependencies,
   compileLayeredGraphConstitution,
+  economicStatementBindings,
 } from "./layered_graph_constitution.mjs";
 import { balancingRcfMode } from "./rcf_policy.mjs";
 
@@ -1092,6 +1093,31 @@ export function compileSemanticManifest(
     modelCase,
     rowPlan,
   );
+  // The manifest's statement rows and the layered constitution's economic layer
+  // used to be separately sealed graphs that could disagree about the same row in
+  // silence. Every equation node the constitution reports as BOUND names one
+  // (section, semantic_role) pair; the manifest must carry that row too, or the
+  // two graphs no longer describe the same model and the seal would certify a
+  // disagreement. Only bindings the constitution already resolved are asserted,
+  // so a case that legitimately omits a row is unaffected.
+  const manifestStatementRoles = new Set(
+    nodes
+      .filter((node) => node.node_kind === "statement_row" && node.semantic_role)
+      .map((node) => `${node.section} ${node.semantic_role}`),
+  );
+  for (const binding of economicStatementBindings(layeredGraphConstitution)) {
+    if (manifestStatementRoles.has(`${binding.section} ${binding.semantic_role}`)) {
+      continue;
+    }
+    const error = new Error(
+      `ECONOMIC_GRAPH_STATEMENT_BINDING_ABSENT: equation node ` +
+        `${binding.equation_node_id} is bound to ${binding.section}.` +
+        `${binding.semantic_role} in the layered graph constitution but the ` +
+        "semantic manifest carries no statement row with that semantic role.",
+    );
+    error.violation_code = "ECONOMIC_GRAPH_STATEMENT_BINDING_ABSENT";
+    throw error;
+  }
   return {
     schema_version: 1,
     contract_version: Number(modelCase.contract_version),

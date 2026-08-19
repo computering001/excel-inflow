@@ -35,6 +35,11 @@ import {
   renderExpression,
   renderFormula,
 } from "./formula_ast.mjs";
+import {
+  TAX_RATE_POLICY_OPERATORS,
+  TAX_RATE_POLICY_OPERATOR_LIST,
+  TAX_RATE_POLICY_OWNED_ROLE,
+} from "./tax_rate_policy.mjs";
 
 export {
   FORMULA_AST_NODE_KINDS,
@@ -185,10 +190,116 @@ export class UnsupportedFormulaOperatorError extends Error {
   }
 }
 
-/** "supported" | "refused" | "unknown" — a total classification, no defaults. */
+/**
+ * ROLE-POLICY OPERATORS (P3.3).
+ *
+ * `FORMULA_OPERATORS` above is the STATEMENT-EXPRESSION vocabulary: every
+ * member is either rendered to Excel here or registered as a schedule-emitter
+ * refusal. The tax-rate policy's three operators are neither. They name a
+ * completion AUTHORITY — the rate cell carries a value the policy computed
+ * from normalized filed history — so they must never render an expression, and
+ * they must never be admitted to the statement set where the import check
+ * above would demand an emitter for them.
+ *
+ * They are nevertheless part of the DECLARED formula operator vocabulary
+ * (`DECLARED_FORMULA_OPERATORS`), which is the point: before P3.3 they existed
+ * nowhere in this module and downstream consumers recognised them by testing
+ * `operator.startsWith("tax_rate_policy")`. A prefix test admits strings
+ * nobody declared. This registry is closed, enumerable, and checked at import
+ * against the policy module's own list.
+ */
+export const ROLE_POLICY_FORMULA_OPERATORS = Object.freeze({
+  [TAX_RATE_POLICY_OPERATORS.median]: Object.freeze({
+    operator: TAX_RATE_POLICY_OPERATORS.median,
+    reason_code: "formula_operator_owned_by_role_policy",
+    policy: "tax_rate_policy",
+    owned_role: TAX_RATE_POLICY_OWNED_ROLE,
+    declared_arity: Object.freeze([0, 0]),
+    emitter: "tax rate policy (median of the usable normalized historical effective tax rates)",
+    repair:
+      "Read the rate from the authority the tax rate policy produced; the statement DSL must not re-derive a rate, because `rate = tax ÷ PBT` beside `tax = PBT × rate` is the circular pair the policy exists to break.",
+  }),
+  [TAX_RATE_POLICY_OPERATORS.latest]: Object.freeze({
+    operator: TAX_RATE_POLICY_OPERATORS.latest,
+    reason_code: "formula_operator_owned_by_role_policy",
+    policy: "tax_rate_policy",
+    owned_role: TAX_RATE_POLICY_OWNED_ROLE,
+    declared_arity: Object.freeze([0, 0]),
+    emitter: "tax rate policy (the single usable normalized historical effective tax rate, carried forward)",
+    repair:
+      "Read the rate from the authority the tax rate policy produced; the statement DSL must not re-derive a rate from the rate row's own history.",
+  }),
+  [TAX_RATE_POLICY_OPERATORS.loss_case]: Object.freeze({
+    operator: TAX_RATE_POLICY_OPERATORS.loss_case,
+    reason_code: "formula_operator_owned_by_role_policy",
+    policy: "tax_rate_policy",
+    owned_role: TAX_RATE_POLICY_OWNED_ROLE,
+    declared_arity: Object.freeze([0, 0]),
+    emitter: "tax rate policy (declared loss-case treatment; the model's own loss rule owns the forecast)",
+    repair:
+      "Read the declared loss-case state from the authority; a rendered 0% here would be indistinguishable from an inferred zero rate.",
+  }),
+});
+
+/**
+ * Every operator this module knows by name: the statement-expression set plus
+ * the role-policy set. "Declared" means enumerable and closed — the property a
+ * string-prefix test cannot provide.
+ */
+export const DECLARED_FORMULA_OPERATORS = Object.freeze([
+  ...FORMULA_OPERATORS,
+  ...Object.keys(ROLE_POLICY_FORMULA_OPERATORS),
+]);
+
+// The role-policy registry must name EXACTLY the policy module's declared
+// operators, and must stay DISJOINT from the statement-expression set: an
+// operator in both would be simultaneously required to render an expression
+// and forbidden from rendering one. Fail at import, not at the cell.
+{
+  const registered = Object.keys(ROLE_POLICY_FORMULA_OPERATORS).sort();
+  const declared = [...TAX_RATE_POLICY_OPERATOR_LIST].sort();
+  if (
+    registered.length !== declared.length ||
+    registered.some((operator, index) => operator !== declared[index])
+  ) {
+    throw new Error(
+      "Role-policy formula operator registry drifted from the tax rate policy's declared " +
+        `operators: registered ${registered.join(",")}; declared ${declared.join(",")}.`,
+    );
+  }
+  const overlap = registered.filter((operator) => FORMULA_OPERATORS.includes(operator));
+  if (overlap.length > 0) {
+    throw new Error(
+      "A role-policy operator cannot also be a statement-expression operator: " +
+        `${overlap.join(",")} appears in both vocabularies.`,
+    );
+  }
+  for (const [key, entry] of Object.entries(ROLE_POLICY_FORMULA_OPERATORS)) {
+    if (entry.operator !== key) {
+      throw new Error(`Role-policy operator entry ${key} declares operator ${entry.operator}.`);
+    }
+  }
+}
+
+/**
+ * Membership in the role-policy vocabulary. This is the predicate that
+ * replaces `operator.startsWith("tax_rate_policy")` at every consumer.
+ */
+export function isRolePolicyFormulaOperator(operator) {
+  return typeof operator === "string"
+    && Object.hasOwn(ROLE_POLICY_FORMULA_OPERATORS, operator);
+}
+
+/**
+ * "supported" | "refused" | "role_policy" | "unknown" — a total classification,
+ * no defaults. Every answer this returned before P3.3 is unchanged; the three
+ * declared role-policy operators moved from "unknown" to "role_policy", which
+ * is the whole point: they are now DECLARED rather than unrecognised.
+ */
 export function formulaOperatorSupport(operator) {
   if (SUPPORTED_FORMULA_OPERATORS.includes(operator)) return "supported";
   if (Object.hasOwn(UNSUPPORTED_FORMULA_OPERATORS, operator)) return "refused";
+  if (isRolePolicyFormulaOperator(operator)) return "role_policy";
   return "unknown";
 }
 
@@ -281,6 +392,16 @@ export function validateFormulaRule(rule) {
     return ["Formula rule must be an object."];
   }
   if (!FORMULA_OPERATORS.includes(rule.operator)) {
+    // A DECLARED role-policy operator asked to render a statement expression
+    // is a different fault from an undeclared name, and says so.
+    if (isRolePolicyFormulaOperator(rule.operator)) {
+      const entry = ROLE_POLICY_FORMULA_OPERATORS[rule.operator];
+      errors.push(
+        `${rule.operator} is a declared ${entry.policy} operator for the ${entry.owned_role} ` +
+          "role and renders no statement expression.",
+      );
+      return errors;
+    }
     errors.push(`Unsupported formula operator ${rule.operator}.`);
     return errors;
   }

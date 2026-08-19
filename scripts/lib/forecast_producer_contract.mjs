@@ -1,3 +1,8 @@
+import {
+  TAX_RATE_POLICY_OPERATOR_LIST,
+  isTaxRatePolicyOperator,
+} from "./tax_rate_policy.mjs";
+
 const FORMULA_METHODS = new Set([
   "accounting_identity",
   "driver_formula",
@@ -58,9 +63,9 @@ function formulaWitness(state, candidate) {
     // Tax-rate role policy: the rate is computed from normalized tax/PBT
     // components and carried on the authority as a value; the spec names the
     // policy basis and source row rather than a self-referential average.
-    "tax_rate_policy_median",
-    "tax_rate_policy_latest",
-    "tax_rate_policy_loss_case",
+    // P3.3: spread from the policy's DECLARED operator list so this literal
+    // copy cannot drift away from the vocabulary the policy actually emits.
+    ...TAX_RATE_POLICY_OPERATOR_LIST,
   ].includes(spec?.operator) && Boolean(spec?.row_id ?? state?.row_id);
   const executable = Boolean(
     spec &&
@@ -263,10 +268,10 @@ export function scheduleRegionProducerWitness(input) {
 
 function rolePolicyClaim(authority) {
   const operator = authority?.formula_spec?.operator ?? null;
-  const declaredOperator =
-    typeof operator === "string" && operator.startsWith("tax_rate_policy")
-      ? operator
-      : null;
+  // P3.3: MEMBERSHIP of the tax policy's declared operator vocabulary, not
+  // `startsWith("tax_rate_policy")`. "declaredOperator" now means what it
+  // says — an operator the policy module actually declares.
+  const declaredOperator = isTaxRatePolicyOperator(operator) ? operator : null;
   const payload = authority?.tax_rate_normalization ?? null;
   const ref = authority?.tax_rate_normalization_ref ?? null;
   if (!payload && !ref && !declaredOperator) return null;

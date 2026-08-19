@@ -38,7 +38,11 @@
     { "id": "statement.ebit", "role": "ebit", "domain": "income_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "uncontrolled" },
     { "id": "statement.finance_expense", "role": "income_statement_finance_expense", "domain": "income_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "zero_when_off" },
     { "id": "statement.finance_income", "role": "income_statement_finance_income", "domain": "income_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "zero_when_off" },
-    { "id": "statement.cash_flow_start", "role": "cash_flow_start", "domain": "cash_flow_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "uncontrolled" }
+    { "id": "statement.cash_flow_start", "role": "cash_flow_start", "domain": "cash_flow_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "uncontrolled" },
+    { "id": "statement.pre_tax_income", "role": "pre_tax_income", "domain": "income_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "uncontrolled" },
+    { "id": "statement.effective_tax_rate", "role": "effective_tax_rate", "domain": "income_statement", "kind": "input", "tolerance_class": "ratio", "circularity_behavior": "uncontrolled" },
+    { "id": "statement.tax_expense", "role": "tax_expense", "domain": "income_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "uncontrolled" },
+    { "id": "statement.net_income", "role": "net_income", "domain": "income_statement", "kind": "statement_output", "tolerance_class": "currency", "circularity_behavior": "uncontrolled" }
   ],
   "edges": [
     { "id": "edge.control_to_acquisition_interest", "from": "control.circularity", "to": "interest.acquisition", "type": "control_gate", "activation": "always" },
@@ -105,6 +109,12 @@
     { "id": "edge.rcf_interest_to_gross", "from": "interest.rcf", "to": "interest.gross_expense", "type": "aggregation", "activation": "circularity_on" },
     { "id": "edge.rcf_repayment_to_cash", "from": "rcf.repayment", "to": "cash.ending_balance", "type": "cash_waterfall", "activation": "always" },
     { "id": "edge.rcf_repayment_to_ending_rcf", "from": "rcf.repayment", "to": "rcf.ending_balance", "type": "balance_rollforward", "activation": "always" },
-    { "id": "edge.scheduled_amortisation_to_mandatory", "from": "debt.scheduled_amortisation", "to": "debt.mandatory_repayment", "type": "aggregation", "activation": "always" }
+    { "id": "edge.scheduled_amortisation_to_mandatory", "from": "debt.scheduled_amortisation", "to": "debt.mandatory_repayment", "type": "aggregation", "activation": "always" },
+    { "id": "edge.ebit_to_pre_tax_income", "from": "statement.ebit", "to": "statement.pre_tax_income", "type": "statement_dependency", "activation": "always" },
+    { "id": "edge.net_interest_to_pre_tax_income", "from": "interest.net_expense", "to": "statement.pre_tax_income", "type": "schedule_to_statement", "activation": "circularity_on" },
+    { "id": "edge.pre_tax_income_to_tax_expense", "from": "statement.pre_tax_income", "to": "statement.tax_expense", "type": "statement_dependency", "activation": "always" },
+    { "id": "edge.effective_tax_rate_to_tax_expense", "from": "statement.effective_tax_rate", "to": "statement.tax_expense", "type": "statement_dependency", "activation": "always" },
+    { "id": "edge.pre_tax_income_to_net_income", "from": "statement.pre_tax_income", "to": "statement.net_income", "type": "statement_dependency", "activation": "always" },
+    { "id": "edge.tax_expense_to_net_income", "from": "statement.tax_expense", "to": "statement.net_income", "type": "statement_dependency", "activation": "always" }
   ]
 }

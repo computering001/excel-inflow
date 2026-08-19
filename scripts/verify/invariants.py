@@ -96,6 +96,278 @@ def _node_map(layer: Dict[str, Any]) -> Dict[Any, Dict[str, Any]]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Economic-layer statement binding (P4.6), re-derived independently.
+#
+# The economic layer used to be an isolated node set: every node carried five
+# identity fields and no edge left the layer, so this oracle could compare it
+# against the canonical equation graph alone.  The layer now also carries the
+# canonical equation-node -> statement-row relation, and an unchecked field is
+# exactly how the drift that binding closes would reappear.  So these are
+# declared here rather than imported: `scripts/verify` may not import
+# `scripts/lib` (see oracle_independence.py), and re-declaring the vocabulary is
+# what makes disagreement between the two sides detectable at all.
+#
+# What this oracle verifies INDEPENDENTLY, from the equation-graph asset and the
+# artifact's own statement layer:
+#   * the binding field set is exactly this, per node — no missing field and no
+#     unchecked extra field;
+#   * disposition and status are declared members, and the disposition
+#     constrains which statuses and which companion fields are legal;
+#   * the status is RE-DERIVED from the statement layer, so `bound`,
+#     `row_absent` and `row_ambiguous` each have to be earned: a node may not
+#     claim its row is missing while the layer contains it, nor claim a binding
+#     the layer cannot resolve to exactly one row;
+#   * the bound statement node genuinely carries the declared section and
+#     semantic role, and no statement row is claimed by two economic nodes;
+#   * the cross-layer edge set follows exactly from the RE-DERIVED bound set,
+#     not from the nodes' own claims.
+#
+# What it does NOT independently verify: WHICH (section, semantic_role) pair a
+# node declares.  That pair is a declaration with no second source, exactly as
+# the node's `role` is read from the equation-graph asset rather than derived.
+# Promoting the register to a declarative asset both sides read would close
+# that gap; it is recorded here rather than pretended away.
+_ECONOMIC_BINDING_FIELDS = (
+    "binding_disposition",
+    "binding_join_basis",
+    "binding_row_family",
+    "binding_status",
+    "bound_section",
+    "bound_semantic_role",
+    "bound_statement_node_id",
+)
+
+_ECONOMIC_BINDING_DISPOSITIONS = ("schedule_row", "solver_control", "statement_row")
+
+_ECONOMIC_BINDING_STATUSES = (
+    "bound",
+    "not_row_realised",
+    "row_absent",
+    "row_ambiguous",
+    # A second claimant on a row another node already realises. The claim is
+    # refused, so no realisation edge exists for it and the row derivation below
+    # does not apply.
+    "row_contested",
+    "schedule_row_uncovered",
+    "undeclared",
+)
+
+# One disposition admits exactly these statuses.  Without this the layer could
+# relabel an unbound node `schedule_row_uncovered` and escape the row checks.
+_ECONOMIC_STATUS_BY_DISPOSITION = {
+    "solver_control": ("not_row_realised",),
+    "schedule_row": ("schedule_row_uncovered",),
+    "statement_row": ("bound", "row_absent", "row_ambiguous", "row_contested"),
+}
+
+
+def _economic_statement_role_index(
+    statement_layer: Dict[str, Any],
+) -> Dict[Any, List[Dict[str, Any]]]:
+    index: Dict[Any, List[Dict[str, Any]]] = {}
+    for node in statement_layer.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        role = node.get("semantic_role")
+        if not role:
+            continue
+        index.setdefault((node.get("section"), role), []).append(node)
+    return index
+
+
+def _validate_economic_statement_binding(
+    errors: List[Dict[str, Any]],
+    *,
+    economic_layer: Dict[str, Any],
+    statement_layer: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Check every binding field and return the expected cross-layer edges."""
+
+    role_index = _economic_statement_role_index(statement_layer)
+    statement_by_id = _node_map(statement_layer)
+    expected_edges: List[Dict[str, Any]] = []
+    claimed_statement_nodes: Dict[Any, Any] = {}
+    for node in economic_layer.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get("id")
+        missing = [field for field in _ECONOMIC_BINDING_FIELDS if field not in node]
+        extra = _portable_sorted(
+            set(node)
+            - set(_ECONOMIC_BINDING_FIELDS)
+            - {"id", "equation_node_id", "role", "domain", "writer"}
+        )
+        if missing or extra:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_field_set",
+                stable_id=node_id,
+                missing=missing,
+                unchecked=extra,
+            )
+            continue
+        disposition = node.get("binding_disposition")
+        status = node.get("binding_status")
+        if disposition not in _ECONOMIC_BINDING_DISPOSITIONS:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_disposition",
+                stable_id=node_id,
+                disposition=disposition,
+            )
+            continue
+        if status not in _ECONOMIC_BINDING_STATUSES:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_status",
+                stable_id=node_id,
+                status=status,
+            )
+            continue
+        if status not in _ECONOMIC_STATUS_BY_DISPOSITION[disposition]:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_status_disposition",
+                stable_id=node_id,
+                disposition=disposition,
+                status=status,
+                allowed=list(_ECONOMIC_STATUS_BY_DISPOSITION[disposition]),
+            )
+            continue
+        if disposition == "schedule_row" and not node.get("binding_row_family"):
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_row_family",
+                stable_id=node_id,
+            )
+        if disposition != "schedule_row" and node.get("binding_row_family") is not None:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_row_family",
+                stable_id=node_id,
+                row_family=node.get("binding_row_family"),
+            )
+        if disposition != "statement_row":
+            for field in (
+                "bound_section",
+                "bound_semantic_role",
+                "bound_statement_node_id",
+            ):
+                if node.get(field) is not None:
+                    _error(
+                        errors,
+                        "manifest.layered_graph_constitution.economic_binding_unbound_claim",
+                        stable_id=node_id,
+                        field=field,
+                        value=node.get(field),
+                    )
+            continue
+        section = node.get("bound_section")
+        semantic_role = node.get("bound_semantic_role")
+        if not section or not semantic_role:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_incomplete_join",
+                stable_id=node_id,
+                section=section,
+                semantic_role=semantic_role,
+            )
+            continue
+        if status == "row_contested":
+            # The claim was refused, not resolved: the row exists and would
+            # derive `bound`, so the derivation does not apply. What must hold is
+            # that the refusal carries no target and no edge.
+            if node.get("bound_statement_node_id") is not None:
+                _error(
+                    errors,
+                    "manifest.layered_graph_constitution.economic_binding_unbound_claim",
+                    stable_id=node_id,
+                    field="bound_statement_node_id",
+                    value=node.get("bound_statement_node_id"),
+                )
+            continue
+        matches = role_index.get((section, semantic_role)) or []
+        derived_status = (
+            "bound"
+            if len(matches) == 1
+            else "row_absent"
+            if not matches
+            else "row_ambiguous"
+        )
+        if derived_status != status:
+            # The whole point: absence and ambiguity are re-derived from the
+            # statement layer, so neither can be asserted into existence.
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_status_derivation",
+                stable_id=node_id,
+                section=section,
+                semantic_role=semantic_role,
+                claimed=status,
+                derived=derived_status,
+                statement_matches=[item.get("id") for item in matches],
+            )
+            continue
+        if derived_status != "bound":
+            if node.get("bound_statement_node_id") is not None:
+                _error(
+                    errors,
+                    "manifest.layered_graph_constitution.economic_binding_unbound_claim",
+                    stable_id=node_id,
+                    field="bound_statement_node_id",
+                    value=node.get("bound_statement_node_id"),
+                )
+            continue
+        target = matches[0]
+        if node.get("bound_statement_node_id") != target.get("id"):
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_target",
+                stable_id=node_id,
+                expected=target.get("id"),
+                actual=node.get("bound_statement_node_id"),
+            )
+            continue
+        persisted = statement_by_id.get(target.get("id")) or {}
+        if (
+            persisted.get("section") != section
+            or persisted.get("semantic_role") != semantic_role
+        ):
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_target_role",
+                stable_id=node_id,
+                statement_id=target.get("id"),
+                expected=[section, semantic_role],
+                actual=[persisted.get("section"), persisted.get("semantic_role")],
+            )
+            continue
+        contender = claimed_statement_nodes.get(target.get("id"))
+        if contender is not None:
+            _error(
+                errors,
+                "manifest.layered_graph_constitution.economic_binding_row_contested",
+                statement_id=target.get("id"),
+                claimants=_portable_sorted([contender, node_id]),
+            )
+            continue
+        claimed_statement_nodes[target.get("id")] = node_id
+        expected_edges.append(
+            {
+                "id": _stable_layer_node_id(
+                    "edge", "economic_realises_row", node.get("equation_node_id")
+                ),
+                "type": "realises_statement_row",
+                "from": node_id,
+                "to": target.get("id"),
+                "activation": "always",
+                "cross_layer": True,
+            }
+        )
+    return expected_edges
+
+
 def _compare_exact_inventory(
     errors: List[Dict[str, Any]],
     *,
@@ -227,6 +499,11 @@ def validate_layered_graph_constitution(
             expected=expected_violation_sha256,
             actual=artifact.get("violation_sha256"),
         )
+    # The closure core seals the economic binding register and the coverage
+    # ledger alongside the layer hashes (P4.6).  This oracle must rebuild the
+    # SAME core: a stale core here would report a hash mismatch on every build
+    # while the artifact was in fact self-consistent, which is a disagreement
+    # between two views of one graph rather than a finding.
     closure_core = {
         "schema_version": artifact.get("schema_version"),
         "case_id": artifact.get("case_id"),
@@ -234,6 +511,9 @@ def validate_layered_graph_constitution(
         "row_plan_projection_scope": artifact.get("row_plan_projection_scope"),
         "row_plan_projection_sha256": artifact.get("row_plan_projection_sha256"),
         "layer_hashes": artifact.get("layer_hashes"),
+        "economic_binding_scope": artifact.get("economic_binding_scope"),
+        "economic_binding_sha256": artifact.get("economic_binding_sha256"),
+        "economic_coverage_sha256": artifact.get("economic_coverage_sha256"),
         "violation_sha256": artifact.get("violation_sha256"),
     }
     expected_closure_sha256 = _hash_value(closure_core)
@@ -572,6 +852,13 @@ def validate_layered_graph_constitution(
         )
 
     if equation_graph is not None:
+        _ECONOMIC_IDENTITY_FIELDS = (
+            "id",
+            "equation_node_id",
+            "role",
+            "domain",
+            "writer",
+        )
         expected_economic_nodes = [
             {
                 "id": _stable_layer_node_id("economic", node.get("id")),
@@ -582,6 +869,34 @@ def validate_layered_graph_constitution(
             }
             for node in equation_graph.get("nodes") or []
         ]
+        # The identity half of each node row stays an EXACT expectation derived
+        # from the canonical equation graph: an invented node, a missing node, a
+        # renamed role, a changed domain or a foreign writer are all still
+        # caught.  Only the fields the asset cannot predict are moved to
+        # `_validate_economic_statement_binding`, which checks every one of them
+        # and rejects any field neither half accounts for — so nothing became
+        # unchecked, and this comparison did not get weaker.
+        actual_economic_nodes = (layer_by_id.get("economic") or {}).get("nodes") or []
+        _compare_exact_inventory(
+            errors,
+            layer_id="economic",
+            item_kind="node",
+            expected=expected_economic_nodes,
+            actual=[
+                {
+                    field: node.get(field)
+                    for field in _ECONOMIC_IDENTITY_FIELDS
+                    if field in node
+                }
+                for node in actual_economic_nodes
+                if isinstance(node, dict)
+            ],
+        )
+        expected_cross_layer_edges = _validate_economic_statement_binding(
+            errors,
+            economic_layer=layer_by_id.get("economic") or {},
+            statement_layer=layer_by_id.get("statement") or {},
+        )
         expected_economic_edges = [
             {
                 "id": _stable_layer_node_id("edge", "economic", edge.get("id")),
@@ -591,14 +906,7 @@ def validate_layered_graph_constitution(
                 "activation": edge.get("activation"),
             }
             for edge in equation_graph.get("edges") or []
-        ]
-        _compare_exact_inventory(
-            errors,
-            layer_id="economic",
-            item_kind="node",
-            expected=expected_economic_nodes,
-            actual=(layer_by_id.get("economic") or {}).get("nodes") or [],
-        )
+        ] + expected_cross_layer_edges
         _compare_exact_inventory(
             errors,
             layer_id="economic",
