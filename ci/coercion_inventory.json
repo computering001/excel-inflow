@@ -7,7 +7,7 @@
     "suspect_value_coercion": "financial/value context — migration candidate",
     "unreviewed": "not yet read in context; treat as suspect until reviewed"
   },
-  "entry_count": 399,
+  "entry_count": 402,
   "entries": [
     {
       "file": "scripts/broker_terminal_recovery.py",
@@ -1143,6 +1143,16 @@
       "file": "scripts/extract_filing_statements.py",
       "content": "page = int(current.get(\"page\") or 0)",
       "fingerprint": "899f44d8f8da1350a852",
+      "patterns": [
+        "py_or_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/extract_filing_statements.py",
+      "content": "page = int(line.get(\"page\") or 0) or 1",
+      "fingerprint": "9c5059b39801fe1c46dd",
       "patterns": [
         "py_or_zero"
       ],
@@ -2350,6 +2360,16 @@
       "classification": "lawful_counter_or_length"
     },
     {
+      "file": "scripts/lib/model_ir_v3.mjs",
+      "content": "if ((statementMemberEdges.get(node.row_id) ?? 0) > 0) continue;",
+      "fingerprint": "794459f19d51f30903cc",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
       "file": "scripts/lib/performance_receipt.mjs",
       "content": "[\"validation\", [\"verify_dynamic\", \"verify_style\", \"verify_cache\", \"verify_finance\", \"verify_semantic\", \"verify_aggregate\", \"render\"].reduce((sum, key) => sum + Number(timings[key] ?? 0), 0), \"stage4_validation\"],",
       "fingerprint": "e1f86c0e271e92b1f1b8",
@@ -3071,6 +3091,16 @@
     },
     {
       "file": "scripts/lib/solver.mjs",
+      "content": "enabled: Number(modelCase.acquisition?.enabled ?? 0) === 1,",
+      "fingerprint": "35b212b7964d4afb7e1d",
+      "patterns": [
+        "js_nullish_zero"
+      ],
+      "occurrences": 1,
+      "classification": "lawful_counter_or_length"
+    },
+    {
+      "file": "scripts/lib/solver.mjs",
       "content": "iterations: Math.max(0, ...results.map((result) => Number(result.iterations ?? 0))),",
       "fingerprint": "3ee7f6d9d24f1779dbfe",
       "patterns": [
@@ -3291,8 +3321,8 @@
     },
     {
       "file": "scripts/lib/solver.mjs",
-      "content": "total + Number(component.values?.[forecastIndex + 3] ?? 0),",
-      "fingerprint": "0b7ddf6f4aea623df7ee",
+      "content": "total + Number(component.values?.[periodIndex] ?? 0),",
+      "fingerprint": "08b6336a279ede02e696",
       "patterns": [
         "js_nullish_zero"
       ],

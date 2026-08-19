@@ -60,7 +60,7 @@ try {
     process.execPath,
     [
       path.join(ROOT, "scripts", "run_case_compiler_equivalence.mjs"),
-      path.join(ROOT, "fixtures/external/Codex/2026-07-24/ok/work/v2-certification/cases"),
+      path.join(ROOT, "test-fixtures", "cases"),
       CASE_NAME,
     ],
     { env: { ...process.env, KEEL_WRITE_SOURCE: dumpDir }, stdio: "ignore" },
