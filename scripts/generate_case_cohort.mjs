@@ -14,7 +14,11 @@
  *
  * The seed registry is GENERATED, never hand-written: it records the seeds whose
  * cases violated a property, each with its failure signature, its shrunk minimal
- * reproduction and the case digest that makes it replayable by seed alone.
+ * reproduction and the case digest that makes it replayable by seed alone. Every
+ * entry declares a PROVENANCE: a real product-property violation, or the
+ * synthetic shrink-proof oracle that keeps the persist/replay/shrink mechanism
+ * proved on the day no real defect is left to prove it with (P7.3a). A synthetic
+ * entry is never a product claim and is never counted as a violation.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -33,6 +37,7 @@ import {
   generateCohort,
   loadArchetypeSeedShapes,
   loadDimensionSpace,
+  probeOracleSignature,
   reasonTerminalClosureTable,
   shrinkCase,
   spaceSize,
@@ -110,144 +115,156 @@ const TIERS = { ci_default: 300, pr: 2500, nightly: 10000, weekly: 25000 };
  * the property still fires, the seed is still persisted and replayed, and the
  * suite prints it every run. It is NOT accepted behaviour and it is NOT a
  * loosened property — it is a defect with an owner and a pointer.
+ *
+ * P7.3a: the set is EMPTY, and that is a result rather than a default. All
+ * fifteen signatures it carried were REPAIRED at their earliest responsible
+ * layer and then verified not to reproduce — none of the fifteen fires on its own
+ * pinned seed and none fires anywhere in a 25,000-seed sweep. The suite's own
+ * doctrine ("a pin that stops reproducing fails the suite so it must be retired
+ * rather than left standing") therefore required their retirement: a pin kept
+ * past its repair documents a defect that no longer exists, which is a false
+ * claim in the opposite direction. The retirement record below names each one and
+ * the commit that repaired it, so nothing is lost by the list being empty; the
+ * undeclared-signature path in bindDispositionSeeds() and the new-defect path in
+ * the suite are untouched, so the next real defect still fails the suite loudly.
  */
-const DISPOSITIONED_DEFECTS = [
+const DISPOSITIONED_DEFECTS = [];
+
+/**
+ * Signatures retired because the DEFECT WAS REPAIRED, never because the pin was
+ * inconvenient. Each row names the property, the layer that was repaired and the
+ * commit that repaired it. This is documentation carried in the generated space
+ * so a reader of the asset can see why the dispositioned set is empty; nothing
+ * reads it as a control input, and re-appearance of any signature below is a
+ * NEW_UNDISPOSITIONED defect that fails the suite exactly like any other.
+ */
+const RETIRED_DISPOSITIONS = [
   {
     signature: "declared_absence_never_becomes_number|whitespace_only_became_reported_zero",
     property_id: "declared_absence_never_becomes_number",
-    severity: "high",
-    owner: "opening_instrument_provenance",
-    statement:
-      "typedDeclaredAmount(' ') returns reported_zero with value 0. A whitespace-only cell is a blank cell in every spreadsheet sense; the empty string is correctly typed reported_blank but whitespace is coerced through Number(' ') === 0 and enters the register as a genuine reported zero.",
-    repair_pointer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — treat a whitespace-only string as reported_blank before the Number() coercion.",
+    repaired_layer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — a whitespace-only string classifies reported_blank before any Number() coercion",
+    retired_by: "P7.3a",
   },
   {
     signature: "declared_absence_never_becomes_number|boolean_false_became_reported_zero",
     property_id: "declared_absence_never_becomes_number",
-    severity: "high",
-    owner: "opening_instrument_provenance",
-    statement:
-      "typedDeclaredAmount(false) returns reported_zero with value 0. instrument_period_state.mjs's own NEVER-ZERO comment names Number(false) as one of the three coercions it defends against, but the guard only rejects the nil and reported_blank states, so a boolean false becomes a real zero opening balance.",
-    repair_pointer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — reject non-number, non-string raws before Number().",
+    repaired_layer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — a non-number, non-string raw classifies parse_failure with its real raw text",
+    retired_by: "P7.3a",
   },
   {
     signature: "declared_absence_never_becomes_number|boolean_true_became_reported_number",
     property_id: "declared_absence_never_becomes_number",
-    severity: "medium",
-    owner: "opening_instrument_provenance",
-    statement:
-      "typedDeclaredAmount(true) returns reported_number with value 1. A boolean becomes a real balance of 1 with raw_text 'true' — the same coercion class as boolean false, on the non-zero side.",
-    repair_pointer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — same repair as boolean_false.",
+    repaired_layer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — same repair as boolean_false, on the non-zero side",
+    retired_by: "P7.3a",
   },
   {
     signature: "declared_absence_never_becomes_number|empty_array_became_reported_zero",
     property_id: "declared_absence_never_becomes_number",
-    severity: "medium",
-    owner: "opening_instrument_provenance",
-    statement:
-      "typedDeclaredAmount([]) returns reported_zero with value 0 and raw_text ''. An empty array is not a reported zero; the typed state makes a false provenance claim about what the source said.",
-    repair_pointer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — same repair as boolean_false.",
+    repaired_layer: "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — an array raw classifies parse_failure, never reported_zero",
+    retired_by: "P7.3a",
   },
   {
     signature: "absent_declared_balance_never_selected|whitespace_only_selected",
     property_id: "absent_declared_balance_never_selected",
-    severity: "high",
-    owner: "instrument_period_state",
-    statement:
-      "An instrument whose declared opening balance is whitespace-only is SELECTED into the opening register with a zero basis amount, because the never-zero guard tests only the nil and reported_blank typed states. Downstream this is indistinguishable from a company that genuinely reported zero.",
-    repair_pointer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — gate on 'the typed state is not a number', not on an allow-list of two absence states.",
+    repaired_layer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — selection gates on 'the typed state is not a number' rather than an allow-list of two absence states",
+    retired_by: "P7.3a",
   },
   {
     signature: "absent_declared_balance_never_selected|boolean_false_selected",
     property_id: "absent_declared_balance_never_selected",
-    severity: "high",
-    owner: "instrument_period_state",
-    statement:
-      "An instrument whose declared opening balance is boolean false is SELECTED with a zero basis amount — exactly the Number(false) coercion the compiler's own comment claims to have closed.",
-    repair_pointer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only.",
+    repaired_layer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — same repair as whitespace_only",
+    retired_by: "P7.3a",
   },
   {
     signature: "absent_declared_balance_never_selected|boolean_true_selected",
     property_id: "absent_declared_balance_never_selected",
-    severity: "medium",
-    owner: "instrument_period_state",
-    statement:
-      "An instrument whose declared opening balance is boolean true is SELECTED with a basis amount of 1 and contributes to the reporting total.",
-    repair_pointer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only.",
+    repaired_layer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — same repair as whitespace_only",
+    retired_by: "P7.3a",
   },
   {
     signature: "absent_declared_balance_never_selected|empty_array_selected",
     property_id: "absent_declared_balance_never_selected",
-    severity: "medium",
-    owner: "instrument_period_state",
-    statement:
-      "An instrument whose declared opening balance is an empty array is SELECTED with a zero basis amount.",
-    repair_pointer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only.",
+    repaired_layer: "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+    repaired_by: "P4.1a (defects D11+D12) at 3cd9f97 — same repair as whitespace_only",
+    retired_by: "P7.3a",
   },
   {
     signature: "unsupported_early_stops_typed|accounting_framework=other_or_unknown",
     property_id: "unsupported_early_stops_typed",
-    severity: "high",
-    owner: "support_envelope_contract",
-    statement:
-      "accounting_framework=other_or_unknown classifies the case UNSUPPORTED, whose only legal terminal is UNSUPPORTED_PROFILE, but no early_stop_predicate covers it. The case therefore reaches an UNSUPPORTED verdict with early_stop.stopped=false and no typed reason code to report at preflight.",
-    repair_pointer: "assets/support-envelope-v377.json early_stop_predicates — add an unsupported_accounting_framework predicate with a registered PROFILE.* reason code (registry addition required too).",
+    repaired_layer: "assets/support-envelope-v377.json early_stop_predicates",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — unsupported_accounting_framework_stop fires on the dimension VERDICT, with a registered UNSUPPORTED_PROFILE reason code",
+    retired_by: "P7.3a",
   },
   {
     signature: "unsupported_early_stops_typed|accounting_framework=unknown",
     property_id: "unsupported_early_stops_typed",
-    severity: "high",
-    owner: "support_envelope_contract",
-    statement:
-      "An unstated accounting_framework takes unknown_value_class=UNSUPPORTED and hits the same gap: UNSUPPORTED with no covering early-stop predicate and therefore no typed reason code.",
-    repair_pointer: "assets/support-envelope-v377.json early_stop_predicates — the accounting-framework predicate must also fire on an unstated framework.",
+    repaired_layer: "assets/support-envelope-v377.json early_stop_predicates",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — the same predicate covers an unstated framework taking its declared unknown_value_class",
+    retired_by: "P7.3a",
   },
   {
     signature: "unsupported_early_stops_typed|historical_periods=unknown",
     property_id: "unsupported_early_stops_typed",
-    severity: "high",
-    owner: "support_envelope_contract",
-    statement:
-      "historical_periods unknown_value_class is UNSUPPORTED, but insufficient_history_stop keys on the literal value fewer_than_two, so an unstated period count classifies UNSUPPORTED with no typed stop.",
-    repair_pointer: "assets/support-envelope-v377.json insufficient_history_stop — the rule must cover the unknown value as well as fewer_than_two.",
+    repaired_layer: "assets/support-envelope-v377.json insufficient_history_stop",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — the rule keys on the UNSUPPORTED verdict, not the literal fewer_than_two value",
+    retired_by: "P7.3a",
   },
   {
     signature: "unsupported_early_stops_typed|filing_language_format=non_english",
     property_id: "unsupported_early_stops_typed",
-    severity: "medium",
-    owner: "support_envelope_contract",
-    statement:
-      "A declared language adapter suppresses unadapted_language_stop but does not change the filing_language_format dimension verdict, which stays UNSUPPORTED. The case is classified UNSUPPORTED and not stopped — the envelope has no mechanism for an adapter to lift a dimension class.",
-    repair_pointer: "assets/support-envelope-v377.json — either declare an adapter-conditional dimension value for non_english, or make the adapter a dimension of its own rather than a predicate suppressor.",
+    repaired_layer: "assets/support-envelope-v377.json filing_language_format.conditional_class_lift",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — a declared language adapter now lifts the VERDICT to EXPERIMENTAL, not only suppresses the stop; absent the adapter the value stays UNSUPPORTED and the stop fires",
+    retired_by: "P7.3a",
   },
   {
     signature: "refusal_terminal_legal_for_support_class|EXPERIMENTAL|SOURCE.issuer_or_reporting_period_unresolved",
     property_id: "refusal_terminal_legal_for_support_class",
-    severity: "medium",
-    owner: "support_envelope_contract",
-    statement:
-      "SOURCE.issuer_or_reporting_period_unresolved allows only SOURCE_REQUIRED, but the envelope's EXPERIMENTAL class declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED]. An experimental-ring case with unresolvable identity has no lawful terminal: the product cannot ask for a better source.",
-    repair_pointer: "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — decide whether the experimental ring inherits the user-owned terminals, and say so in the contract.",
+    repaired_layer: "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — EXPERIMENTAL admits SOURCE_REQUIRED and ACTION_REQUIRED, the user-owned terminals a continuing run can genuinely reach; DELIVERED_VERIFIED stays unlawful there",
+    retired_by: "P7.3a",
   },
   {
     signature: "refusal_terminal_legal_for_support_class|EXPERIMENTAL|SOURCE.opening_debt_unresolved",
     property_id: "refusal_terminal_legal_for_support_class",
-    severity: "medium",
-    owner: "support_envelope_contract",
-    statement:
-      "Same hole for opening debt: a REIT or condensed-interim case (both EXPERIMENTAL) whose opening debt cannot be reconciled has no lawful SOURCE_REQUIRED terminal to reach.",
-    repair_pointer: "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — as above.",
+    repaired_layer: "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — as above",
+    retired_by: "P7.3a",
   },
   {
     signature: "refusal_terminal_legal_for_support_class|EXPERIMENTAL|USER.material_economic_choice",
     property_id: "refusal_terminal_legal_for_support_class",
-    severity: "medium",
-    owner: "support_envelope_contract",
-    statement:
-      "USER.material_economic_choice allows only ACTION_REQUIRED, which EXPERIMENTAL does not admit. An experimental-ring case facing a genuine material economic choice cannot lawfully ask the user.",
-    repair_pointer: "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — as above.",
+    repaired_layer: "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL",
+    repaired_by: "P2.11 (defects D13+D14) at 5b6f31b — as above",
+    retired_by: "P7.3a",
   },
 ];
+
+/**
+ * The two provenances a persisted seed can carry.
+ *
+ * `product_property` — a real violation of a declared product property, found by
+ * the sweep. This is what the registry exists to persist.
+ *
+ * `synthetic_mechanism_proof` — the shrink-proof oracle (an instrument above a
+ * probe threshold), which is NOT a product claim and never has been. It is
+ * persisted so the registry keeps proving that a failing seed can be recorded,
+ * replayed byte-identically and shrunk EVEN WHEN THE PRODUCT SECTION IS EMPTY.
+ * Without it, the day every real defect is repaired is the day the persistence
+ * and replay machinery stops being exercised at all — and the only ways to keep a
+ * bare counter satisfied would be to invent a product defect (a lie) or delete
+ * the counter (losing the proof). The synthetic entry is drawn from the same
+ * sweep, replayed by the same seed-only path and shrunk by the same shrinker as a
+ * product entry, so the mechanism it proves is the identical mechanism.
+ */
+const PRODUCT_PROVENANCE = "product_property";
+const SYNTHETIC_PROVENANCE = "synthetic_mechanism_proof";
 
 const CERTIFIED_BASELINE = {
   accounting_framework: "ifrs",
@@ -399,12 +416,15 @@ function emitDimensionSpace() {
       model_shaping_axes: MODEL_SHAPING_AXES,
       conditional_model_shaping: CONDITIONAL_MODEL_SHAPING,
       statement:
-        "The shrinker is proved against a synthetic oracle (an instrument above a probe threshold) so the proof survives the repair of every real defect below.",
+        "The shrinker is proved against a synthetic oracle (an instrument above a probe threshold) so the proof survives the repair of every real defect below. That day has arrived: the dispositioned set is empty, and the same synthetic oracle is what keeps the shrinker proof and the seed-registry persistence/replay proof alive with nothing real left to fail on. It is never a product claim.",
     },
     properties: PROPERTIES.map((property) => ({ id: property.id, statement: property.statement })),
     dispositioned_defects: DISPOSITIONED_DEFECTS.map((entry) => ({ ...entry, seed: null, case_sha256: null })),
     disposition_doctrine:
       "A dispositioned signature is a KNOWN OPEN DEFECT, never accepted behaviour. The property still fires, the seed is still replayed, the suite prints it every run, and a pin that stops reproducing fails the suite so it must be retired rather than left standing. No property is ever loosened to make a case pass.",
+    retired_dispositions: RETIRED_DISPOSITIONS,
+    retirement_doctrine:
+      "dispositioned_defects is EMPTY as a RESULT, not as a default: every signature it once carried was repaired at its earliest responsible layer and then verified — none reproduces on its own pinned seed and none appears anywhere in the discovery sweep. Retirement is compulsory under the disposition doctrine above, because a pin kept past its repair asserts a defect that no longer exists. retired_dispositions records what was retired and which commit repaired it. Nothing reads that list as a control input: if any signature in it reappears it is reported as NEW_UNDISPOSITIONED and fails the suite exactly like any other new defect.",
   };
   return contract;
 }
@@ -497,6 +517,72 @@ function bindDispositionSeeds(context, draft, discoveryCount) {
   return draft;
 }
 
+/**
+ * The registry's PERSISTENCE-AND-REPLAY proof, which must survive an empty
+ * product section.
+ *
+ * The registry's reason to exist is that a failing seed can be recorded, replayed
+ * by seed alone to a byte-identical case, and shrunk to a minimal reproduction.
+ * With every dispositioned defect repaired the product sweep finds nothing, so
+ * with product entries alone that machinery would go unexercised — and the two
+ * ways to keep a bare "at least one entry" counter satisfied would both be
+ * dishonest: invent a product defect, or delete the counter and lose the proof.
+ *
+ * So the proof is carried by the SYNTHETIC shrink-proof oracle, the device the
+ * dimension space already declares for exactly this eventuality ("so the proof
+ * survives the repair of every real defect"). The entry is found in the same
+ * cohort, keyed by the same signature machinery, replayed by the same seed-only
+ * path and shrunk by the same shrinker as a product entry, so what it proves is
+ * the identical mechanism — while its provenance and its property id both say, in
+ * the artifact, that it asserts nothing about the product.
+ *
+ * The FIRST qualifying seed in cohort order is chosen, so the choice is
+ * deterministic and restatable rather than a lucky draw.
+ */
+function synthesiseMechanismProof(cohort, context) {
+  const signature = probeOracleSignature();
+  let subject = null;
+  let occurrences = 0;
+  for (const generated of cohort.cases) {
+    const fires = evaluateCase(generated, context, { probe: true }).violations.some(
+      (violation) => violation.signature === signature,
+    );
+    if (!fires) continue;
+    occurrences += 1;
+    if (subject === null) subject = generated;
+  }
+  if (subject === null) {
+    throw new Error(
+      `the synthetic mechanism-proof oracle (${signature}) found no subject in this cohort, so the registry ` +
+        "cannot prove persistence and replay. Widen the tier rather than persisting an entry the oracle does not fail on.",
+    );
+  }
+  const detail = evaluateCase(subject, context, { probe: true }).violations.find(
+    (violation) => violation.signature === signature,
+  ).detail;
+  const shrunk = shrinkCase(subject, signature, context, { probe: true });
+  return {
+    seed: subject.seed,
+    case_sha256: subject.sha256,
+    signature,
+    property_id: "shrink_proof_oracle",
+    provenance: SYNTHETIC_PROVENANCE,
+    failure_detail: detail,
+    occurrences_in_sweep: occurrences,
+    disposition: {
+      state: "SYNTHETIC_MECHANISM_PROOF",
+      severity: "not_a_defect",
+      owner: "generated_case_cohort_suite",
+      repair_pointer: null,
+    },
+    not_a_product_claim:
+      "The shrink-proof oracle fails on any instrument above a probe threshold. It is a self-test of the shrinker and of this registry's persist/replay path; it makes NO claim about the product and must never be read as an open defect. It is persisted so that persistence and replay stay proved on the day — now — when no real defect remains to prove them with.",
+    minimal_case: shrunk.summary,
+    shrink_steps: shrunk.steps.length,
+    shrink_operators: shrunk.steps.map((step) => step.operator),
+  };
+}
+
 if (options.updateSeedRegistry || options.out || options.report || options.tier || options.count) {
   const space = loadDimensionSpace();
   if (space.drift.length) {
@@ -538,7 +624,7 @@ if (options.updateSeedRegistry || options.out || options.report || options.tier 
   const dispositions = new Map(
     (space.contract.dispositioned_defects ?? []).map((entry) => [entry.signature, entry]),
   );
-  const interesting = [...bySignature.values()]
+  const productSeeds = [...bySignature.values()]
     .sort((left, right) => left.signature.localeCompare(right.signature))
     .map((entry) => {
       const disposition = dispositions.get(entry.signature);
@@ -549,6 +635,7 @@ if (options.updateSeedRegistry || options.out || options.report || options.tier 
         case_sha256: entry.case_sha256,
         signature: entry.signature,
         property_id: entry.property_id,
+        provenance: PRODUCT_PROVENANCE,
         failure_detail: entry.detail,
         occurrences_in_sweep: entry.occurrences,
         disposition: disposition
@@ -561,11 +648,18 @@ if (options.updateSeedRegistry || options.out || options.report || options.tier 
     });
 
   if (options.updateSeedRegistry) {
+    // Computed only when the registry is being written: the probe sweep and the
+    // synthetic shrink are real work, and a --tier/--out reporting run has no
+    // reason to pay for them.
+    const mechanismProof = synthesiseMechanismProof(cohort, context);
+    const interesting = [...productSeeds, mechanismProof];
     const registry = {
       schema_version: "excel-inflow-generated-case-seed-registry/1.0",
       work_package: "P7.3",
       invariant:
         "A failing seed is PERSISTED with its failure signature and its shrunk minimal reproduction, so a regression is replayable by seed alone.",
+      provenance_doctrine:
+        `Every entry declares a provenance. '${PRODUCT_PROVENANCE}' is a real violation of a declared product property found by the sweep — the thing this registry exists to persist. '${SYNTHETIC_PROVENANCE}' is the shrink-proof oracle, which is NOT a product claim and never was; it is persisted so the persist/replay/shrink mechanism stays PROVED when the product section is empty, rather than that proof lapsing silently or being faked with an invented defect. The suite asserts both: at least one synthetic entry must exist and must be the declared oracle signature, and every entry — product or synthetic — must replay byte-identically AND still raise the exact signature it was persisted with.`,
       generated_by: `scripts/generate_case_cohort.mjs --update-seed-registry (${CASE_GENERATOR_VERSION})`,
       generator_version: CASE_GENERATOR_VERSION,
       dimension_space_version: space.contract.space_version,
@@ -574,7 +668,17 @@ if (options.updateSeedRegistry || options.out || options.report || options.tier 
       envelope_sha256: space.envelope.sha256,
       declared_space_size: spaceSize(context).toString(),
       tiers: space.contract.tiers,
-      discovery_sweep: { root_seed: rootSeed, cases: count, tier, violations: violationCount },
+      // `violations` counts PRODUCT property violations only; the synthetic
+      // mechanism proof is deliberately excluded so the product count stays a
+      // truthful zero and cannot be inflated by the suite's own self-test.
+      discovery_sweep: {
+        root_seed: rootSeed,
+        cases: count,
+        tier,
+        violations: violationCount,
+        product_signatures: bySignature.size,
+        synthetic_mechanism_proofs: 1,
+      },
       seed_shape_mode: context.seedShapeMode,
       seed_shape_inventory_sha256: context.seedShapeInventorySha256,
       archetype_seed_shapes: {
@@ -604,7 +708,8 @@ if (options.updateSeedRegistry || options.out || options.report || options.tier 
     };
     fs.writeFileSync(SEED_REGISTRY_PATH, stableJson(registry));
     process.stderr.write(
-      `wrote ${path.relative(ROOT, SEED_REGISTRY_PATH)} (${interesting.length} interesting seeds from ${count} cases)\n`,
+      `wrote ${path.relative(ROOT, SEED_REGISTRY_PATH)} (${productSeeds.length} product seed(s) + 1 synthetic ` +
+        `mechanism proof at seed ${mechanismProof.seed}, from ${count} cases)\n`,
     );
   }
 

@@ -2,12 +2,13 @@
   "schema_version": "excel-inflow-generated-case-seed-registry/1.0",
   "work_package": "P7.3",
   "invariant": "A failing seed is PERSISTED with its failure signature and its shrunk minimal reproduction, so a regression is replayable by seed alone.",
+  "provenance_doctrine": "Every entry declares a provenance. 'product_property' is a real violation of a declared product property found by the sweep — the thing this registry exists to persist. 'synthetic_mechanism_proof' is the shrink-proof oracle, which is NOT a product claim and never was; it is persisted so the persist/replay/shrink mechanism stays PROVED when the product section is empty, rather than that proof lapsing silently or being faked with an invented defect. The suite asserts both: at least one synthetic entry must exist and must be the declared oracle signature, and every entry — product or synthetic — must replay byte-identically AND still raise the exact signature it was persisted with.",
   "generated_by": "scripts/generate_case_cohort.mjs --update-seed-registry (excel-inflow-generated-case-generator/1.0.0)",
   "generator_version": "excel-inflow-generated-case-generator/1.0.0",
   "dimension_space_version": "1.0.0",
-  "dimension_space_sha256": "942853412d446cc411d0d7097695e8e4aa91c011dbccf965f4593d52df2c015b",
+  "dimension_space_sha256": "01ce65c1f89b9684908b63375c09d7f2c3113bcf842416be3ce7bb32ea7ce1e3",
   "envelope_version": "3.7.7",
-  "envelope_sha256": "e2681666c6a693f07814e18e29f4eb991630900af9b5c29eb342830984f5ac0a",
+  "envelope_sha256": "dd13150f8d986187137932542b0d8046e2c58ee2a3d15835a47e3a5da0e78569",
   "declared_space_size": "291962880000",
   "tiers": {
     "ci_default": 300,
@@ -19,7 +20,9 @@
     "root_seed": 7730000,
     "cases": 2500,
     "tier": "pr",
-    "violations": 1732
+    "violations": 0,
+    "product_signatures": 0,
+    "synthetic_mechanism_proofs": 1
   },
   "seed_shape_mode": "off",
   "seed_shape_inventory_sha256": null,
@@ -100,141 +103,30 @@
   "replay_instruction": "node -e \"import('./scripts/lib/case_generator.mjs').then(async m => { const s = m.loadDimensionSpace(); const c = m.buildGeneratorContext(s); const g = m.generateCase({ seed: SEED, context: c }); console.log(g.sha256); })\"",
   "interesting_seeds": [
     {
-      "seed": 7730012,
-      "case_sha256": "98a8065451f82c6c522531a5ea2e4b392a273c7156417bb143632f42606f67cf",
-      "signature": "absent_declared_balance_never_selected|boolean_false_selected",
-      "property_id": "absent_declared_balance_never_selected",
-      "failure_detail": "gen_01_rcf declared boolean_false yet was selected with basis 0",
-      "occurrences_in_sweep": 115,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "instrument_period_state",
-        "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only."
-      },
-      "minimal_case": {
-        "seed": 7730012,
-        "sha256": "fd600b5996efbe58da95dba3eecfb23413de110c3c1400a82dee6b3844e4cb96",
-        "support_class": "SUPPORTED_DEGRADED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          false
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "none_disclosed",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "boolean_false",
-          "instrument_book": "single",
-          "historical_periods_declared": "two",
-          "currency_mix": "reporting_only",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 8,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "reset_axis_identity_verdict",
-        "reset_axis_declared_language_adapter",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_acquisition_overlay",
-        "reset_envelope_restructuring_complexity"
-      ]
-    },
-    {
-      "seed": 7730034,
-      "case_sha256": "22e18eab28499851ed2a1feeada473e827dfbe616ef0203df502a37749ece85a",
-      "signature": "absent_declared_balance_never_selected|boolean_true_selected",
-      "property_id": "absent_declared_balance_never_selected",
-      "failure_detail": "gen_01_bond_floating declared boolean_true yet was selected with basis 1",
-      "occurrences_in_sweep": 126,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "instrument_period_state",
-        "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only."
-      },
-      "minimal_case": {
-        "seed": 7730034,
-        "sha256": "fa54bc2a00dcea604b273596b42cb62a3f63c3b4bcf44c5ec489aed09eef6d05",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          true
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "exotic_or_structured",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "boolean_true",
-          "instrument_book": "single",
-          "historical_periods_declared": "one",
-          "currency_mix": "reporting_only",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 7,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "reset_envelope_accounting_framework",
-        "reset_envelope_entity_type",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_restructuring_complexity"
-      ]
-    },
-    {
       "seed": 7730000,
       "case_sha256": "df21f4c58c0f8d920e3dd4bc8b3792009b38e4a0679095f789a5496c8ac9fc1a",
-      "signature": "absent_declared_balance_never_selected|empty_array_selected",
-      "property_id": "absent_declared_balance_never_selected",
-      "failure_detail": "gen_01_bond_fixed declared empty_array yet was selected with basis 0",
-      "occurrences_in_sweep": 127,
+      "signature": "shrink_proof_oracle|instrument_above_probe_threshold",
+      "property_id": "shrink_proof_oracle",
+      "provenance": "synthetic_mechanism_proof",
+      "failure_detail": "1 instrument(s) above the probe threshold 1500",
+      "occurrences_in_sweep": 841,
       "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "instrument_period_state",
-        "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only."
+        "state": "SYNTHETIC_MECHANISM_PROOF",
+        "severity": "not_a_defect",
+        "owner": "generated_case_cohort_suite",
+        "repair_pointer": null
       },
+      "not_a_product_claim": "The shrink-proof oracle fails on any instrument above a probe threshold. It is a self-test of the shrinker and of this registry's persist/replay path; it makes NO claim about the product and must never be read as an open defect. It is persisted so that persistence and replay stay proved on the day — now — when no real defect remains to prove them with.",
       "minimal_case": {
         "seed": 7730000,
-        "sha256": "d60fa4c2e8e04b4c9cdf4e87b89c024a1e5892e62940a9c73d9b10a83c338a11",
+        "sha256": "26fcee3a50a5ecef55850f5b39fdd0427b96fcbc5c50cc221f19bbf814169361",
         "support_class": "CERTIFIED",
         "early_stop": null,
         "refusal_reason_code": null,
         "instruments": 1,
         "periods": 2,
         "declared_opening_balances": [
-          []
+          1500.1
         ],
         "axes": {
           "accounting_framework": "ifrs",
@@ -257,842 +149,42 @@
           "refusal_pressure": "none"
         }
       },
-      "shrink_steps": 16,
+      "shrink_steps": 34,
       "shrink_operators": [
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
+        "drop_instrument_0",
+        "drop_instrument_1",
+        "drop_instrument_2",
+        "drop_instrument_3",
+        "drop_instrument_5",
+        "drop_instrument_6",
+        "drop_instrument_7",
+        "drop_instrument_8",
         "drop_trailing_forecast_period",
         "drop_trailing_forecast_period",
         "drop_leading_historical_period",
         "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "reset_axis_declared_language_adapter",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_entity_type",
-        "reset_envelope_historical_periods",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay",
-        "reset_envelope_restructuring_complexity"
-      ]
-    },
-    {
-      "seed": 7730022,
-      "case_sha256": "bee7412d10d09c43c2ee90dd1b36041dd934df1f9ea75d7a2cec65ae51de97d5",
-      "signature": "absent_declared_balance_never_selected|whitespace_only_selected",
-      "property_id": "absent_declared_balance_never_selected",
-      "failure_detail": "gen_01_securitisation declared whitespace_only yet was selected with basis 0",
-      "occurrences_in_sweep": 134,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "instrument_period_state",
-        "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — gate on 'the typed state is not a number', not on an allow-list of two absence states."
-      },
-      "minimal_case": {
-        "seed": 7730022,
-        "sha256": "436e7c6d0903e4a09f69cce14928231523fe51f4fedb0c99a8931b145530f25d",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          " "
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "__unknown",
-          "debt_instruments": "exotic_or_structured",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "whitespace_only",
-          "instrument_book": "single",
-          "historical_periods_declared": "one",
-          "currency_mix": "reporting_only",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 11,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "reset_axis_identity_verdict",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_accounting_framework",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_historical_periods",
-        "reset_envelope_statement_topology",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay"
-      ]
-    },
-    {
-      "seed": 7730012,
-      "case_sha256": "98a8065451f82c6c522531a5ea2e4b392a273c7156417bb143632f42606f67cf",
-      "signature": "declared_absence_never_becomes_number|boolean_false_became_reported_zero",
-      "property_id": "declared_absence_never_becomes_number",
-      "failure_detail": "declared opening balance boolean_false is not a number but typed as reported_zero with value 0",
-      "occurrences_in_sweep": 177,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "opening_instrument_provenance",
-        "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — reject non-number, non-string raws before Number()."
-      },
-      "minimal_case": {
-        "seed": 7730012,
-        "sha256": "fd600b5996efbe58da95dba3eecfb23413de110c3c1400a82dee6b3844e4cb96",
-        "support_class": "SUPPORTED_DEGRADED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          false
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "none_disclosed",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "boolean_false",
-          "instrument_book": "single",
-          "historical_periods_declared": "two",
-          "currency_mix": "reporting_only",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 8,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "reset_axis_identity_verdict",
-        "reset_axis_declared_language_adapter",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_acquisition_overlay",
-        "reset_envelope_restructuring_complexity"
-      ]
-    },
-    {
-      "seed": 7730034,
-      "case_sha256": "22e18eab28499851ed2a1feeada473e827dfbe616ef0203df502a37749ece85a",
-      "signature": "declared_absence_never_becomes_number|boolean_true_became_reported_number",
-      "property_id": "declared_absence_never_becomes_number",
-      "failure_detail": "declared opening balance boolean_true is not a number but typed as reported_number with value 1",
-      "occurrences_in_sweep": 189,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "opening_instrument_provenance",
-        "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — same repair as boolean_false."
-      },
-      "minimal_case": {
-        "seed": 7730034,
-        "sha256": "fa54bc2a00dcea604b273596b42cb62a3f63c3b4bcf44c5ec489aed09eef6d05",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          true
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "exotic_or_structured",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "boolean_true",
-          "instrument_book": "single",
-          "historical_periods_declared": "one",
-          "currency_mix": "reporting_only",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 7,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "reset_envelope_accounting_framework",
-        "reset_envelope_entity_type",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_restructuring_complexity"
-      ]
-    },
-    {
-      "seed": 7730000,
-      "case_sha256": "df21f4c58c0f8d920e3dd4bc8b3792009b38e4a0679095f789a5496c8ac9fc1a",
-      "signature": "declared_absence_never_becomes_number|empty_array_became_reported_zero",
-      "property_id": "declared_absence_never_becomes_number",
-      "failure_detail": "declared opening balance empty_array is not a number but typed as reported_zero with value 0",
-      "occurrences_in_sweep": 191,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "opening_instrument_provenance",
-        "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — same repair as boolean_false."
-      },
-      "minimal_case": {
-        "seed": 7730000,
-        "sha256": "d60fa4c2e8e04b4c9cdf4e87b89c024a1e5892e62940a9c73d9b10a83c338a11",
-        "support_class": "CERTIFIED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          []
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "fixed_date",
-          "debt_instruments": "within_declared_matrix",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "empty_array",
-          "instrument_book": "large_book",
-          "historical_periods_declared": "five",
-          "currency_mix": "foreign_with_declared_fx",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 16,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "reset_axis_declared_language_adapter",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_entity_type",
-        "reset_envelope_historical_periods",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay",
-        "reset_envelope_restructuring_complexity"
-      ]
-    },
-    {
-      "seed": 7730022,
-      "case_sha256": "bee7412d10d09c43c2ee90dd1b36041dd934df1f9ea75d7a2cec65ae51de97d5",
-      "signature": "declared_absence_never_becomes_number|whitespace_only_became_reported_zero",
-      "property_id": "declared_absence_never_becomes_number",
-      "failure_detail": "declared opening balance whitespace_only is not a number but typed as reported_zero with value 0",
-      "occurrences_in_sweep": 186,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "opening_instrument_provenance",
-        "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — treat a whitespace-only string as reported_blank before the Number() coercion."
-      },
-      "minimal_case": {
-        "seed": 7730022,
-        "sha256": "436e7c6d0903e4a09f69cce14928231523fe51f4fedb0c99a8931b145530f25d",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          " "
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "__unknown",
-          "debt_instruments": "exotic_or_structured",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "whitespace_only",
-          "instrument_book": "single",
-          "historical_periods_declared": "one",
-          "currency_mix": "reporting_only",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 11,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "reset_axis_identity_verdict",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_accounting_framework",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_historical_periods",
-        "reset_envelope_statement_topology",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay"
-      ]
-    },
-    {
-      "seed": 7730010,
-      "case_sha256": "01004cd438aca5bdb32b119e07fcbf96b7972974bd001f23b4e91059894285d0",
-      "signature": "refusal_terminal_legal_for_support_class|EXPERIMENTAL|SOURCE.issuer_or_reporting_period_unresolved",
-      "property_id": "refusal_terminal_legal_for_support_class",
-      "failure_detail": "SOURCE.issuer_or_reporting_period_unresolved allows [SOURCE_REQUIRED] but EXPERIMENTAL declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED] — the case has no lawful terminal",
-      "occurrences_in_sweep": 104,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — decide whether the experimental ring inherits the user-owned terminals, and say so in the contract."
-      },
-      "minimal_case": {
-        "seed": 7730010,
-        "sha256": "75248cca36a5aea15639242d798e87c1fb5e292925a0cbaef0a9463f269caccc",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": "SOURCE.issuer_or_reporting_period_unresolved",
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          ""
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "__unknown",
-          "debt_instruments": "exotic_or_structured",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "reported_blank",
-          "instrument_book": "large_book",
-          "historical_periods_declared": "five",
-          "currency_mix": "foreign_with_absent_fx",
-          "refusal_pressure": "source_identity_unresolved"
-        }
-      },
-      "shrink_steps": 15,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "reset_axis_identity_verdict",
-        "reset_envelope_accounting_framework",
-        "reset_envelope_entity_type",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay"
-      ]
-    },
-    {
-      "seed": 7730043,
-      "case_sha256": "0d690acbbed3602802e8a56e368d9df31d172a836e534be988f8fdec8a3c339c",
-      "signature": "refusal_terminal_legal_for_support_class|EXPERIMENTAL|SOURCE.opening_debt_unresolved",
-      "property_id": "refusal_terminal_legal_for_support_class",
-      "failure_detail": "SOURCE.opening_debt_unresolved allows [SOURCE_REQUIRED] but EXPERIMENTAL declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED] — the case has no lawful terminal",
-      "occurrences_in_sweep": 103,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — as above."
-      },
-      "minimal_case": {
-        "seed": 7730043,
-        "sha256": "b28b9a4fcd55a2fdee2c869154c6a6901d00427383037d320a8c9cda39b7c1ac",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": "SOURCE.opening_debt_unresolved",
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          0
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "none_disclosed",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "major_perimeter_change",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "well_formed",
-          "instrument_book": "single",
-          "historical_periods_declared": "one",
-          "currency_mix": "foreign_with_declared_fx",
-          "refusal_pressure": "source_opening_debt_unresolved"
-        }
-      },
-      "shrink_steps": 11,
-      "shrink_operators": [
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "simplify_instrument_magnitudes",
-        "bisect_instrument_magnitude_0",
-        "reset_axis_identity_verdict",
-        "reset_axis_declared_language_adapter",
-        "reset_envelope_entity_type",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_historical_periods",
-        "reset_envelope_cash_flow_method",
-        "simplify_instrument_magnitudes"
-      ]
-    },
-    {
-      "seed": 7730072,
-      "case_sha256": "1056087a6c88ca1034443fb1eb14c0baf111a621b13aaefafd8c2f5fb621b41a",
-      "signature": "refusal_terminal_legal_for_support_class|EXPERIMENTAL|USER.material_economic_choice",
-      "property_id": "refusal_terminal_legal_for_support_class",
-      "failure_detail": "USER.material_economic_choice allows [ACTION_REQUIRED] but EXPERIMENTAL declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED] — the case has no lawful terminal",
-      "occurrences_in_sweep": 94,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — as above."
-      },
-      "minimal_case": {
-        "seed": 7730072,
-        "sha256": "ef5a0f0084f342833acf7b02bcf08c0683e4609bc8cf2ed8ddc09da35593d393",
-        "support_class": "EXPERIMENTAL",
-        "early_stop": null,
-        "refusal_reason_code": "USER.material_economic_choice",
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          ""
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "__unknown",
-          "debt_instruments": "exotic_or_structured",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "reported_blank",
-          "instrument_book": "small_book",
-          "historical_periods_declared": "two",
-          "currency_mix": "foreign_with_declared_fx",
-          "refusal_pressure": "user_material_economic_choice"
-        }
-      },
-      "shrink_steps": 10,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "reset_axis_identity_verdict",
-        "reset_envelope_entity_type",
-        "reset_envelope_historical_periods",
-        "reset_envelope_statement_topology",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_acquisition_overlay"
-      ]
-    },
-    {
-      "seed": 7730011,
-      "case_sha256": "f64aedb82281ab4bede8e24bc7b2c8e9a5a13da03d912bec26a92565010eef91",
-      "signature": "unsupported_early_stops_typed|accounting_framework=other_or_unknown",
-      "property_id": "unsupported_early_stops_typed",
-      "failure_detail": "accounting_framework=other_or_unknown classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE",
-      "occurrences_in_sweep": 42,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json early_stop_predicates — add an unsupported_accounting_framework predicate with a registered PROFILE.* reason code (registry addition required too)."
-      },
-      "minimal_case": {
-        "seed": 7730011,
-        "sha256": "707146309384e7d73cb7a7a95fb3832f48560298347be9de3906eb87f3571f22",
-        "support_class": "UNSUPPORTED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 0,
-        "periods": 2,
-        "declared_opening_balances": [],
-        "axes": {
-          "accounting_framework": "other_or_unknown",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "__unknown",
-          "debt_instruments": "convertible_or_hybrid",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "whitespace_only",
-          "instrument_book": "none",
-          "historical_periods_declared": "two",
-          "currency_mix": "foreign_with_declared_fx",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 96,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "reset_axis_identity_verdict",
-        "reset_axis_declared_language_adapter",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_entity_type",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_statement_topology",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_broker_availability",
-        "reset_envelope_restructuring_complexity",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4",
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "halve_instruments_4"
-      ]
-    },
-    {
-      "seed": 7730203,
-      "case_sha256": "68623620596f71b4be9e8f849f5053fefc18170150a1835359dbf98cf0afe7ca",
-      "signature": "unsupported_early_stops_typed|accounting_framework=unknown",
-      "property_id": "unsupported_early_stops_typed",
-      "failure_detail": "accounting_framework=unknown classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE",
-      "occurrences_in_sweep": 39,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json early_stop_predicates — the accounting-framework predicate must also fire on an unstated framework."
-      },
-      "minimal_case": {
-        "seed": 7730203,
-        "sha256": "3929d6ef5b07b3ba326c173cdd2199a2facb234b265fbb4f2c481a90bf1a8baf",
-        "support_class": "UNSUPPORTED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          0
-        ],
-        "axes": {
-          "accounting_framework": "__unknown",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "fixed_date",
-          "debt_instruments": "__unknown",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "well_formed",
-          "instrument_book": "small_book",
-          "historical_periods_declared": "three",
-          "currency_mix": "foreign_with_absent_fx",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 18,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
         "drop_leading_historical_period",
         "drop_leading_historical_period",
         "simplify_instrument_magnitudes",
         "bisect_instrument_magnitude_0",
-        "reset_axis_identity_verdict",
+        "bisect_instrument_magnitude_1",
+        "bisect_instrument_magnitude_2",
+        "bisect_instrument_magnitude_3",
+        "bisect_instrument_magnitude_4",
         "reset_axis_declared_language_adapter",
         "reset_axis_refusal_pressure",
         "reset_envelope_entity_type",
-        "reset_envelope_filing_language_format",
         "reset_envelope_historical_periods",
-        "reset_envelope_statement_topology",
         "reset_envelope_broker_availability",
         "reset_envelope_acquisition_overlay",
         "reset_envelope_restructuring_complexity",
-        "simplify_instrument_magnitudes"
-      ]
-    },
-    {
-      "seed": 7730028,
-      "case_sha256": "b6b8b9dc80a0cbf5bb43f83622b7eedff349b7454944796efeef2731202a51aa",
-      "signature": "unsupported_early_stops_typed|filing_language_format=non_english",
-      "property_id": "unsupported_early_stops_typed",
-      "failure_detail": "filing_language_format=non_english classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE",
-      "occurrences_in_sweep": 27,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "medium",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json — either declare an adapter-conditional dimension value for non_english, or make the adapter a dimension of its own rather than a predicate suppressor."
-      },
-      "minimal_case": {
-        "seed": 7730028,
-        "sha256": "d46401dacd19217f1834b8da0ac9e15cb8e9ff14af1f1a9d57475aa5d70c7d62",
-        "support_class": "UNSUPPORTED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          []
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "non_english",
-          "historical_periods": "three_or_more",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "none_disclosed",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "declared",
-          "declared_value_pathology": "empty_array",
-          "instrument_book": "small_book",
-          "historical_periods_declared": "five",
-          "currency_mix": "foreign_with_declared_fx",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 11,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "drop_leading_historical_period",
-        "reset_envelope_accounting_framework",
-        "reset_envelope_entity_type",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay"
-      ]
-    },
-    {
-      "seed": 7730027,
-      "case_sha256": "e524d3b4d6d89bca42c05608dd4c198630b15070a8d9c1647258ad9742b46f4f",
-      "signature": "unsupported_early_stops_typed|historical_periods=unknown",
-      "property_id": "unsupported_early_stops_typed",
-      "failure_detail": "historical_periods=unknown classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE",
-      "occurrences_in_sweep": 78,
-      "disposition": {
-        "state": "DISPOSITIONED_OPEN_DEFECT",
-        "severity": "high",
-        "owner": "support_envelope_contract",
-        "repair_pointer": "assets/support-envelope-v377.json insufficient_history_stop — the rule must cover the unknown value as well as fewer_than_two."
-      },
-      "minimal_case": {
-        "seed": 7730027,
-        "sha256": "afbe17e49e971f9ce4bf7aed98bc2318eea62dd4959b20e8f3c79bbe504b3cac",
-        "support_class": "UNSUPPORTED",
-        "early_stop": null,
-        "refusal_reason_code": null,
-        "instruments": 1,
-        "periods": 2,
-        "declared_opening_balances": [
-          0
-        ],
-        "axes": {
-          "accounting_framework": "ifrs",
-          "entity_type": "non_financial_corporate",
-          "filing_language_format": "english_text_pdf",
-          "historical_periods": "__unknown",
-          "statement_topology": "standard_three_statement",
-          "cash_flow_method": "indirect",
-          "fiscal_calendar": "week_52_53",
-          "debt_instruments": "within_declared_matrix",
-          "broker_availability": "broker_pack_present",
-          "acquisition_overlay": "none",
-          "restructuring_complexity": "none",
-          "identity_verdict": "unstated",
-          "declared_language_adapter": "absent",
-          "declared_value_pathology": "well_formed",
-          "instrument_book": "large_book",
-          "historical_periods_declared": "two",
-          "currency_mix": "foreign_with_declared_fx",
-          "refusal_pressure": "none"
-        }
-      },
-      "shrink_steps": 18,
-      "shrink_operators": [
-        "halve_instruments_1",
-        "halve_instruments_2",
-        "halve_instruments_3",
-        "drop_trailing_forecast_period",
-        "drop_trailing_forecast_period",
-        "drop_leading_historical_period",
-        "simplify_instrument_magnitudes",
-        "bisect_instrument_magnitude_0",
-        "reset_axis_identity_verdict",
-        "reset_axis_declared_language_adapter",
-        "reset_axis_refusal_pressure",
-        "reset_envelope_entity_type",
-        "reset_envelope_filing_language_format",
-        "reset_envelope_cash_flow_method",
-        "reset_envelope_broker_availability",
-        "reset_envelope_acquisition_overlay",
-        "reset_envelope_restructuring_complexity",
-        "simplify_instrument_magnitudes"
+        "drop_instrument_0",
+        "drop_instrument_1",
+        "drop_instrument_3",
+        "drop_instrument_4",
+        "drop_instrument_0",
+        "drop_instrument_2",
+        "drop_instrument_0"
       ]
     }
   ],
@@ -1105,10 +197,10 @@
       ],
       "legal_in_classes": [
         "CERTIFIED",
-        "SUPPORTED_DEGRADED"
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
       ],
       "unlawful_in_classes": [
-        "EXPERIMENTAL",
         "UNSUPPORTED"
       ]
     },
@@ -1120,10 +212,10 @@
       ],
       "legal_in_classes": [
         "CERTIFIED",
-        "SUPPORTED_DEGRADED"
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
       ],
       "unlawful_in_classes": [
-        "EXPERIMENTAL",
         "UNSUPPORTED"
       ]
     },
@@ -1165,10 +257,10 @@
       ],
       "legal_in_classes": [
         "CERTIFIED",
-        "SUPPORTED_DEGRADED"
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
       ],
       "unlawful_in_classes": [
-        "EXPERIMENTAL",
         "UNSUPPORTED"
       ]
     },
@@ -1234,6 +326,36 @@
     },
     {
       "reason_code": "PROFILE.cash_flow_absent",
+      "category": "support_envelope",
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ],
+      "legal_in_classes": [
+        "UNSUPPORTED"
+      ],
+      "unlawful_in_classes": [
+        "CERTIFIED",
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
+      ]
+    },
+    {
+      "reason_code": "PROFILE.unsupported_accounting_framework",
+      "category": "support_envelope",
+      "allowed_terminal_states": [
+        "UNSUPPORTED_PROFILE"
+      ],
+      "legal_in_classes": [
+        "UNSUPPORTED"
+      ],
+      "unlawful_in_classes": [
+        "CERTIFIED",
+        "SUPPORTED_DEGRADED",
+        "EXPERIMENTAL"
+      ]
+    },
+    {
+      "reason_code": "PROFILE.unsupported_dimension_profile",
       "category": "support_envelope",
       "allowed_terminal_states": [
         "UNSUPPORTED_PROFILE"
@@ -1365,27 +487,28 @@
       "unrestricted": 1027
     },
     "lane_coverage": {
-      "early_stop": 806,
-      "register_compiled": 1260,
+      "early_stop": 934,
+      "register_compiled": 1167,
       "empty_register": 642,
-      "refusal_lane": 1370,
+      "refusal_lane": 1378,
       "certified_release_promise": 375,
       "degraded_disclosure": 361,
-      "translation_authority_absent": 427,
+      "translation_authority_absent": 397,
       "archetype_register": 0
     },
     "under_sampled_lanes": [],
     "support_class_distribution": {
       "SUPPORTED_DEGRADED": 361,
       "CERTIFIED": 375,
-      "EXPERIMENTAL": 820,
-      "UNSUPPORTED": 944
+      "EXPERIMENTAL": 830,
+      "UNSUPPORTED": 934
     },
     "early_stop_distribution": {
       "UNSUPPORTED_PROFILE.financial_institution": 456,
       "UNSUPPORTED_PROFILE.irreconcilable_entity_perimeter": 136,
-      "UNSUPPORTED_PROFILE.insufficient_history": 93,
-      "UNSUPPORTED_PROFILE.cash_flow_absent": 76,
+      "UNSUPPORTED_PROFILE.unsupported_accounting_framework": 50,
+      "UNSUPPORTED_PROFILE.insufficient_history": 199,
+      "UNSUPPORTED_PROFILE.cash_flow_absent": 48,
       "UNSUPPORTED_PROFILE.unadapted_language": 45
     }
   }

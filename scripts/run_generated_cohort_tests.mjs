@@ -18,6 +18,14 @@
  * signature IS dispositioned is replayed from its persisted seed and must still
  * reproduce exactly — a pin that has stopped reproducing is itself a failure,
  * because the pin must then be retired rather than left standing.
+ *
+ * P7.3a: that retirement has now happened for all fifteen pins, every one of
+ * them because the defect was REPAIRED. The dispositioned set is empty and the
+ * product section of the seed registry is empty with it, which is the truthful
+ * state of the product — so the registry's persistence-and-replay proof is
+ * carried by the clearly-labelled SYNTHETIC shrink-proof oracle instead of by a
+ * kept defect. See section 4. Nothing about the new-defect path changed: the next
+ * real violation still fails this suite with a shrunk minimal reproduction.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -201,15 +209,93 @@ check(
   (seedRegistry.seed_shape_mode ?? "off") === seedShapeMode,
   `seed registry was generated in seed-shape mode ${seedRegistry.seed_shape_mode}, space declares ${seedShapeMode}`,
 );
+// The registry is the PERSISTENCE-AND-REPLAY proof, not a defect counter.
+//
+// P7.3a retired all fifteen dispositioned defects BECAUSE all fifteen were
+// repaired, so the product section of this registry is now legitimately empty —
+// that is the truthful state, not a gap. A bare "at least one entry" counter can
+// then only be satisfied two ways, and both are dishonest: invent or keep a
+// product defect, or delete the counter and lose the only proof that persistence
+// and replay work at all.
+//
+// So the entry that keeps the mechanism proved is the SYNTHETIC shrink-proof
+// oracle — the device the dimension space already declares for exactly this
+// eventuality ("so the proof survives the repair of every real defect"). It is
+// drawn from the same sweep, replayed by the same seed-only path and shrunk by
+// the same shrinker as a product entry, so the mechanism it proves is identical,
+// while its provenance says in the artifact that it asserts nothing about the
+// product.
+//
+// The assertions below are strictly STRONGER than the count they replace: the
+// array-and-non-empty check is kept verbatim, the byte-identical replay check
+// keeps its exact strength, and three checks are added — every entry must declare
+// a typed provenance, a synthetic mechanism proof must be present and must be the
+// declared oracle signature (so it can never be swapped for a fake product
+// defect), and every entry must still RAISE the signature it was persisted with,
+// which is the registry-level form of the retirement doctrine.
+const PRODUCT_PROVENANCE = "product_property";
+const SYNTHETIC_PROVENANCE = "synthetic_mechanism_proof";
 check(
   Array.isArray(seedRegistry.interesting_seeds) && seedRegistry.interesting_seeds.length > 0,
   "seed registry must persist at least one interesting seed",
+);
+const productEntries = [];
+const syntheticEntries = [];
+for (const entry of seedRegistry.interesting_seeds) {
+  check(
+    entry.provenance === PRODUCT_PROVENANCE || entry.provenance === SYNTHETIC_PROVENANCE,
+    `persisted seed ${entry.seed} must declare a typed provenance (${PRODUCT_PROVENANCE} or ` +
+      `${SYNTHETIC_PROVENANCE}); got ${JSON.stringify(entry.provenance)}`,
+  );
+  if (entry.provenance === SYNTHETIC_PROVENANCE) syntheticEntries.push(entry);
+  else productEntries.push(entry);
+}
+check(
+  syntheticEntries.length > 0,
+  "the seed registry must carry at least one synthetic mechanism-proof entry — without it, the day every " +
+    "product defect is repaired is the day this registry silently stops proving that a failing seed can be " +
+    "persisted, replayed byte-identically and shrunk",
+);
+for (const entry of syntheticEntries) {
+  check(
+    entry.signature === probeOracleSignature() && entry.property_id === "shrink_proof_oracle",
+    `a synthetic mechanism-proof entry must be the declared synthetic oracle, never a product signature ` +
+      `wearing a synthetic label; got ${entry.signature}`,
+  );
+}
+// An empty product section must be DECLARED and checked, never a silence: the
+// sweep's own product-violation count and the persisted product entries have to
+// agree, so a registry cannot claim zero violations while listing product
+// defects, nor claim violations it did not persist.
+check(
+  Number.isInteger(seedRegistry.discovery_sweep?.violations),
+  "the seed registry must declare how many PRODUCT property violations its sweep found",
+);
+check(
+  (seedRegistry.discovery_sweep.violations === 0) === (productEntries.length === 0),
+  `the registry claims ${seedRegistry.discovery_sweep.violations} product violation(s) but persists ` +
+    `${productEntries.length} product entr(ies) — one of the two is wrong`,
 );
 for (const entry of seedRegistry.interesting_seeds) {
   const replayed = generateCase({ seed: entry.seed, context });
   check(
     replayed.sha256 === entry.case_sha256,
     `persisted seed ${entry.seed} no longer replays to ${entry.case_sha256} (got ${replayed.sha256})`,
+  );
+  // Byte-identical replay is necessary but not sufficient. A persisted seed earns
+  // its place only while it still RAISES the signature it was persisted with: a
+  // recorded reproduction that stopped reproducing must be retired, exactly as a
+  // dispositioned pin must be. The synthetic oracle is off by default, so it is
+  // re-evaluated in probe mode — the product battery is never run in probe mode,
+  // so this cannot let a synthetic signature stand in for a product one.
+  const probe = entry.provenance === SYNTHETIC_PROVENANCE;
+  const reproduced = evaluateCase(replayed, context, { probe }).violations.some(
+    (violation) => violation.signature === entry.signature,
+  );
+  check(
+    reproduced,
+    `persisted seed ${entry.seed} replays byte-identically but no longer raises ${entry.signature} — ` +
+      "retire the entry instead of leaving it standing",
   );
   seedsReplayed += 1;
 }
@@ -339,6 +425,28 @@ for (const entry of dispositioned.values()) {
   check(
     typeof entry.owner === "string" && typeof entry.statement === "string" && entry.statement.length > 20,
     `dispositioned defect ${entry.signature} must name an owner and state the defect`,
+  );
+}
+// A retirement must be JUSTIFIED in the artifact, not merely performed: a pin may
+// only leave the dispositioned set because the defect was repaired, so every
+// retired signature has to name the layer and the commit that repaired it, and
+// may not still be standing in the dispositioned set.
+const retired = space.contract.retired_dispositions ?? [];
+check(Array.isArray(retired), "retired_dispositions must be an array when present");
+for (const entry of retired) {
+  check(
+    declaredPropertyIds.has(entry.property_id),
+    `retired disposition ${entry.signature} names unknown property ${entry.property_id}`,
+  );
+  check(
+    typeof entry.repaired_by === "string" && entry.repaired_by.length > 20 &&
+      typeof entry.repaired_layer === "string" && entry.repaired_layer.length > 0,
+    `retired disposition ${entry.signature} must name the layer and the commit that repaired it — a pin is ` +
+      "retired because the defect was repaired, never because the pin was inconvenient",
+  );
+  check(
+    !dispositioned.has(entry.signature),
+    `${entry.signature} is recorded as retired and is still standing in the dispositioned set`,
   );
 }
 

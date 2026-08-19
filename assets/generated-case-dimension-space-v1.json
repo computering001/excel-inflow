@@ -7,7 +7,7 @@
   "derived_from": {
     "envelope_path": "assets/support-envelope-v377.json",
     "envelope_version": "3.7.7",
-    "envelope_sha256": "e2681666c6a693f07814e18e29f4eb991630900af9b5c29eb342830984f5ac0a",
+    "envelope_sha256": "dd13150f8d986187137932542b0d8046e2c58ee2a3d15835a47e3a5da0e78569",
     "envelope_declared_value_count": 40,
     "derivation_rule": "Every envelope dimension is sampled over its declared values PLUS the __unknown value that exercises its unknown_value_class. No value is added to, removed from or renamed within an envelope dimension. loadDimensionSpace() re-derives this mirror at load time and returns typed DRIFT if it disagrees; the suite refuses on any drift."
   },
@@ -350,7 +350,7 @@
         "fewer_than_two"
       ]
     },
-    "statement": "The shrinker is proved against a synthetic oracle (an instrument above a probe threshold) so the proof survives the repair of every real defect below."
+    "statement": "The shrinker is proved against a synthetic oracle (an instrument above a probe threshold) so the proof survives the repair of every real defect below. That day has arrived: the dispositioned set is empty, and the same synthetic oracle is what keeps the shrinker proof and the seed-registry persistence/replay proof alive with nothing real left to fail on. It is never a product claim."
   },
   "properties": [
     {
@@ -418,178 +418,120 @@
       "statement": "Synthetic oracle used only to prove the shrinker reduces and preserves a failure signature; it is never a product claim."
     }
   ],
-  "dispositioned_defects": [
+  "dispositioned_defects": [],
+  "disposition_doctrine": "A dispositioned signature is a KNOWN OPEN DEFECT, never accepted behaviour. The property still fires, the seed is still replayed, the suite prints it every run, and a pin that stops reproducing fails the suite so it must be retired rather than left standing. No property is ever loosened to make a case pass.",
+  "retired_dispositions": [
     {
       "signature": "declared_absence_never_becomes_number|whitespace_only_became_reported_zero",
       "property_id": "declared_absence_never_becomes_number",
-      "severity": "high",
-      "owner": "opening_instrument_provenance",
-      "statement": "typedDeclaredAmount(' ') returns reported_zero with value 0. A whitespace-only cell is a blank cell in every spreadsheet sense; the empty string is correctly typed reported_blank but whitespace is coerced through Number(' ') === 0 and enters the register as a genuine reported zero.",
-      "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — treat a whitespace-only string as reported_blank before the Number() coercion.",
-      "seed": 7730022,
-      "case_sha256": "bee7412d10d09c43c2ee90dd1b36041dd934df1f9ea75d7a2cec65ae51de97d5",
-      "observed_detail": "declared opening balance whitespace_only is not a number but typed as reported_zero with value 0"
+      "repaired_layer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — a whitespace-only string classifies reported_blank before any Number() coercion",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "declared_absence_never_becomes_number|boolean_false_became_reported_zero",
       "property_id": "declared_absence_never_becomes_number",
-      "severity": "high",
-      "owner": "opening_instrument_provenance",
-      "statement": "typedDeclaredAmount(false) returns reported_zero with value 0. instrument_period_state.mjs's own NEVER-ZERO comment names Number(false) as one of the three coercions it defends against, but the guard only rejects the nil and reported_blank states, so a boolean false becomes a real zero opening balance.",
-      "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — reject non-number, non-string raws before Number().",
-      "seed": 7730012,
-      "case_sha256": "98a8065451f82c6c522531a5ea2e4b392a273c7156417bb143632f42606f67cf",
-      "observed_detail": "declared opening balance boolean_false is not a number but typed as reported_zero with value 0"
+      "repaired_layer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — a non-number, non-string raw classifies parse_failure with its real raw text",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "declared_absence_never_becomes_number|boolean_true_became_reported_number",
       "property_id": "declared_absence_never_becomes_number",
-      "severity": "medium",
-      "owner": "opening_instrument_provenance",
-      "statement": "typedDeclaredAmount(true) returns reported_number with value 1. A boolean becomes a real balance of 1 with raw_text 'true' — the same coercion class as boolean false, on the non-zero side.",
-      "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — same repair as boolean_false.",
-      "seed": 7730034,
-      "case_sha256": "22e18eab28499851ed2a1feeada473e827dfbe616ef0203df502a37749ece85a",
-      "observed_detail": "declared opening balance boolean_true is not a number but typed as reported_number with value 1"
+      "repaired_layer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — same repair as boolean_false, on the non-zero side",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "declared_absence_never_becomes_number|empty_array_became_reported_zero",
       "property_id": "declared_absence_never_becomes_number",
-      "severity": "medium",
-      "owner": "opening_instrument_provenance",
-      "statement": "typedDeclaredAmount([]) returns reported_zero with value 0 and raw_text ''. An empty array is not a reported zero; the typed state makes a false provenance claim about what the source said.",
-      "repair_pointer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount — same repair as boolean_false.",
-      "seed": 7730000,
-      "case_sha256": "df21f4c58c0f8d920e3dd4bc8b3792009b38e4a0679095f789a5496c8ac9fc1a",
-      "observed_detail": "declared opening balance empty_array is not a number but typed as reported_zero with value 0"
+      "repaired_layer": "scripts/lib/opening_instrument_provenance.mjs typedDeclaredAmount",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — an array raw classifies parse_failure, never reported_zero",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "absent_declared_balance_never_selected|whitespace_only_selected",
       "property_id": "absent_declared_balance_never_selected",
-      "severity": "high",
-      "owner": "instrument_period_state",
-      "statement": "An instrument whose declared opening balance is whitespace-only is SELECTED into the opening register with a zero basis amount, because the never-zero guard tests only the nil and reported_blank typed states. Downstream this is indistinguishable from a company that genuinely reported zero.",
-      "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — gate on 'the typed state is not a number', not on an allow-list of two absence states.",
-      "seed": 7730022,
-      "case_sha256": "bee7412d10d09c43c2ee90dd1b36041dd934df1f9ea75d7a2cec65ae51de97d5",
-      "observed_detail": "gen_01_securitisation declared whitespace_only yet was selected with basis 0"
+      "repaired_layer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — selection gates on 'the typed state is not a number' rather than an allow-list of two absence states",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "absent_declared_balance_never_selected|boolean_false_selected",
       "property_id": "absent_declared_balance_never_selected",
-      "severity": "high",
-      "owner": "instrument_period_state",
-      "statement": "An instrument whose declared opening balance is boolean false is SELECTED with a zero basis amount — exactly the Number(false) coercion the compiler's own comment claims to have closed.",
-      "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only.",
-      "seed": 7730012,
-      "case_sha256": "98a8065451f82c6c522531a5ea2e4b392a273c7156417bb143632f42606f67cf",
-      "observed_detail": "gen_01_rcf declared boolean_false yet was selected with basis 0"
+      "repaired_layer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — same repair as whitespace_only",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "absent_declared_balance_never_selected|boolean_true_selected",
       "property_id": "absent_declared_balance_never_selected",
-      "severity": "medium",
-      "owner": "instrument_period_state",
-      "statement": "An instrument whose declared opening balance is boolean true is SELECTED with a basis amount of 1 and contributes to the reporting total.",
-      "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only.",
-      "seed": 7730034,
-      "case_sha256": "22e18eab28499851ed2a1feeada473e827dfbe616ef0203df502a37749ece85a",
-      "observed_detail": "gen_01_bond_floating declared boolean_true yet was selected with basis 1"
+      "repaired_layer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — same repair as whitespace_only",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "absent_declared_balance_never_selected|empty_array_selected",
       "property_id": "absent_declared_balance_never_selected",
-      "severity": "medium",
-      "owner": "instrument_period_state",
-      "statement": "An instrument whose declared opening balance is an empty array is SELECTED with a zero basis amount.",
-      "repair_pointer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState — same repair as whitespace_only.",
-      "seed": 7730000,
-      "case_sha256": "df21f4c58c0f8d920e3dd4bc8b3792009b38e4a0679095f789a5496c8ac9fc1a",
-      "observed_detail": "gen_01_bond_fixed declared empty_array yet was selected with basis 0"
+      "repaired_layer": "scripts/lib/instrument_period_state.mjs compileOpeningInstrumentState",
+      "repaired_by": "P4.1a (defects D11+D12) at 3cd9f97 — same repair as whitespace_only",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "unsupported_early_stops_typed|accounting_framework=other_or_unknown",
       "property_id": "unsupported_early_stops_typed",
-      "severity": "high",
-      "owner": "support_envelope_contract",
-      "statement": "accounting_framework=other_or_unknown classifies the case UNSUPPORTED, whose only legal terminal is UNSUPPORTED_PROFILE, but no early_stop_predicate covers it. The case therefore reaches an UNSUPPORTED verdict with early_stop.stopped=false and no typed reason code to report at preflight.",
-      "repair_pointer": "assets/support-envelope-v377.json early_stop_predicates — add an unsupported_accounting_framework predicate with a registered PROFILE.* reason code (registry addition required too).",
-      "seed": 7730011,
-      "case_sha256": "f64aedb82281ab4bede8e24bc7b2c8e9a5a13da03d912bec26a92565010eef91",
-      "observed_detail": "accounting_framework=other_or_unknown classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE"
+      "repaired_layer": "assets/support-envelope-v377.json early_stop_predicates",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — unsupported_accounting_framework_stop fires on the dimension VERDICT, with a registered UNSUPPORTED_PROFILE reason code",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "unsupported_early_stops_typed|accounting_framework=unknown",
       "property_id": "unsupported_early_stops_typed",
-      "severity": "high",
-      "owner": "support_envelope_contract",
-      "statement": "An unstated accounting_framework takes unknown_value_class=UNSUPPORTED and hits the same gap: UNSUPPORTED with no covering early-stop predicate and therefore no typed reason code.",
-      "repair_pointer": "assets/support-envelope-v377.json early_stop_predicates — the accounting-framework predicate must also fire on an unstated framework.",
-      "seed": 7730203,
-      "case_sha256": "68623620596f71b4be9e8f849f5053fefc18170150a1835359dbf98cf0afe7ca",
-      "observed_detail": "accounting_framework=unknown classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE"
+      "repaired_layer": "assets/support-envelope-v377.json early_stop_predicates",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — the same predicate covers an unstated framework taking its declared unknown_value_class",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "unsupported_early_stops_typed|historical_periods=unknown",
       "property_id": "unsupported_early_stops_typed",
-      "severity": "high",
-      "owner": "support_envelope_contract",
-      "statement": "historical_periods unknown_value_class is UNSUPPORTED, but insufficient_history_stop keys on the literal value fewer_than_two, so an unstated period count classifies UNSUPPORTED with no typed stop.",
-      "repair_pointer": "assets/support-envelope-v377.json insufficient_history_stop — the rule must cover the unknown value as well as fewer_than_two.",
-      "seed": 7730027,
-      "case_sha256": "e524d3b4d6d89bca42c05608dd4c198630b15070a8d9c1647258ad9742b46f4f",
-      "observed_detail": "historical_periods=unknown classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE"
+      "repaired_layer": "assets/support-envelope-v377.json insufficient_history_stop",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — the rule keys on the UNSUPPORTED verdict, not the literal fewer_than_two value",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "unsupported_early_stops_typed|filing_language_format=non_english",
       "property_id": "unsupported_early_stops_typed",
-      "severity": "medium",
-      "owner": "support_envelope_contract",
-      "statement": "A declared language adapter suppresses unadapted_language_stop but does not change the filing_language_format dimension verdict, which stays UNSUPPORTED. The case is classified UNSUPPORTED and not stopped — the envelope has no mechanism for an adapter to lift a dimension class.",
-      "repair_pointer": "assets/support-envelope-v377.json — either declare an adapter-conditional dimension value for non_english, or make the adapter a dimension of its own rather than a predicate suppressor.",
-      "seed": 7730028,
-      "case_sha256": "b6b8b9dc80a0cbf5bb43f83622b7eedff349b7454944796efeef2731202a51aa",
-      "observed_detail": "filing_language_format=non_english classifies UNSUPPORTED but no early-stop predicate covers it, so the case carries no typed reason code for its only legal terminal UNSUPPORTED_PROFILE"
+      "repaired_layer": "assets/support-envelope-v377.json filing_language_format.conditional_class_lift",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — a declared language adapter now lifts the VERDICT to EXPERIMENTAL, not only suppresses the stop; absent the adapter the value stays UNSUPPORTED and the stop fires",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "refusal_terminal_legal_for_support_class|EXPERIMENTAL|SOURCE.issuer_or_reporting_period_unresolved",
       "property_id": "refusal_terminal_legal_for_support_class",
-      "severity": "medium",
-      "owner": "support_envelope_contract",
-      "statement": "SOURCE.issuer_or_reporting_period_unresolved allows only SOURCE_REQUIRED, but the envelope's EXPERIMENTAL class declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED]. An experimental-ring case with unresolvable identity has no lawful terminal: the product cannot ask for a better source.",
-      "repair_pointer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — decide whether the experimental ring inherits the user-owned terminals, and say so in the contract.",
-      "seed": 7730010,
-      "case_sha256": "01004cd438aca5bdb32b119e07fcbf96b7972974bd001f23b4e91059894285d0",
-      "observed_detail": "SOURCE.issuer_or_reporting_period_unresolved allows [SOURCE_REQUIRED] but EXPERIMENTAL declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED] — the case has no lawful terminal"
+      "repaired_layer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — EXPERIMENTAL admits SOURCE_REQUIRED and ACTION_REQUIRED, the user-owned terminals a continuing run can genuinely reach; DELIVERED_VERIFIED stays unlawful there",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "refusal_terminal_legal_for_support_class|EXPERIMENTAL|SOURCE.opening_debt_unresolved",
       "property_id": "refusal_terminal_legal_for_support_class",
-      "severity": "medium",
-      "owner": "support_envelope_contract",
-      "statement": "Same hole for opening debt: a REIT or condensed-interim case (both EXPERIMENTAL) whose opening debt cannot be reconciled has no lawful SOURCE_REQUIRED terminal to reach.",
-      "repair_pointer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — as above.",
-      "seed": 7730043,
-      "case_sha256": "0d690acbbed3602802e8a56e368d9df31d172a836e534be988f8fdec8a3c339c",
-      "observed_detail": "SOURCE.opening_debt_unresolved allows [SOURCE_REQUIRED] but EXPERIMENTAL declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED] — the case has no lawful terminal"
+      "repaired_layer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — as above",
+      "retired_by": "P7.3a"
     },
     {
       "signature": "refusal_terminal_legal_for_support_class|EXPERIMENTAL|USER.material_economic_choice",
       "property_id": "refusal_terminal_legal_for_support_class",
-      "severity": "medium",
-      "owner": "support_envelope_contract",
-      "statement": "USER.material_economic_choice allows only ACTION_REQUIRED, which EXPERIMENTAL does not admit. An experimental-ring case facing a genuine material economic choice cannot lawfully ask the user.",
-      "repair_pointer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL — as above.",
-      "seed": 7730072,
-      "case_sha256": "1056087a6c88ca1034443fb1eb14c0baf111a621b13aaefafd8c2f5fb621b41a",
-      "observed_detail": "USER.material_economic_choice allows [ACTION_REQUIRED] but EXPERIMENTAL declares legal terminals [DELIVERED_DEGRADED, INTERNAL_FAILURE, CANCELLED] — the case has no lawful terminal"
+      "repaired_layer": "assets/support-envelope-v377.json terminal_state_mapping.EXPERIMENTAL",
+      "repaired_by": "P2.11 (defects D13+D14) at 5b6f31b — as above",
+      "retired_by": "P7.3a"
     }
   ],
-  "disposition_doctrine": "A dispositioned signature is a KNOWN OPEN DEFECT, never accepted behaviour. The property still fires, the seed is still replayed, the suite prints it every run, and a pin that stops reproducing fails the suite so it must be retired rather than left standing. No property is ever loosened to make a case pass.",
+  "retirement_doctrine": "dispositioned_defects is EMPTY as a RESULT, not as a default: every signature it once carried was repaired at its earliest responsible layer and then verified — none reproduces on its own pinned seed and none appears anywhere in the discovery sweep. Retirement is compulsory under the disposition doctrine above, because a pin kept past its repair asserts a defect that no longer exists. retired_dispositions records what was retired and which commit repaired it. Nothing reads that list as a control input: if any signature in it reappears it is reported as NEW_UNDISPOSITIONED and fails the suite exactly like any other new defect.",
   "discovery_sweep": {
     "root_seed": 7730000,
-    "seeds_swept": 4000,
-    "signatures_found": 15,
+    "seeds_swept": 25000,
+    "signatures_found": 0,
     "unbound_dispositions": [],
     "undeclared_signatures": [],
     "seed_shape_inventory_sha256": null,
