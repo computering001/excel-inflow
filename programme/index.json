@@ -152,6 +152,26 @@
       "commit": "7289482",
       "invariant": "a release rollback is a declared, authorised, evidence-preserving procedure recorded in an append-only hash-chained journal",
       "note": "installed-host legs declared EXCLUDED_INSTALLED_HOST per standing directive"
+    },
+    "P5.4": {
+      "commit": "157e7c0",
+      "invariant": "a workbook's plan is reconstructible from the emitted file alone, without the build's forward expectation",
+      "note": "24 aspects reconstructed; declared gaps carried in every report"
+    },
+    "P3.2": {
+      "commit": "f203749",
+      "invariant": "the completion census covers every economically-owned cell with an executable producer witness; parity is re-verified after Build",
+      "note": "post-Build assertion wired in the controller by the coordinator"
+    },
+    "P7.1a": {
+      "commit": "86ca5ba",
+      "invariant": "every value the support envelope claims is joined to scanned evidence in a declared tier, or reported as a typed gap",
+      "note": "report mode only; 27 unproven values are the narrowing decision input"
+    },
+    "P3.4": {
+      "commit": "PENDING",
+      "invariant": "forecast ownership is scored and persisted per period with a family aggregate, and the recovery pass is a declared code path",
+      "note": "implementing agent lost after implementation; card authored from the verified diff (see card provenance note)"
     }
   },
   "evidence_baseline": {

@@ -90,6 +90,15 @@
       "concern": "statement topology + compile-time economics",
       "target_owner": "Statement Authority compiler (Phase 2)"
     },
+    "lib/case_generator.mjs": {
+      "count": 1,
+      "families": {
+        "economic_values": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "P7.3 development-only seeded synthetic case generator (writes generated TEST cases and their seed registry; never mutates product state on a real run)",
+      "target_owner": "Corpus and generated cohort (Phase 7)"
+    },
     "lib/case_source_proposer.mjs": {
       "count": 1,
       "families": {

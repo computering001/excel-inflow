@@ -1598,6 +1598,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "period-scoring",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_period_scoring_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "support-coverage-grid",
       "phase": "proof",
       "runtime": "node",

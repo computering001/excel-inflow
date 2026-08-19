@@ -139,6 +139,62 @@ export function forecastAuthorityDecidingDimension(winner, rejected) {
   return winnerRank.stable_id !== rejectedRank.stable_id ? "stable_id" : "exact_tie";
 }
 
+/**
+ * P3.4 additive rank-vector helpers. These operate on ALREADY-BUILT rank
+ * vectors (from forecastAuthorityRankVector or the family aggregate below)
+ * so period-scoped scoring can be compared and persisted without rebuilding
+ * candidates. Same dimension order and tie law as the candidate comparators.
+ */
+export function compareForecastRankVectors(left, right) {
+  for (const [dimension, direction] of FORECAST_RANK_DIMENSIONS) {
+    const difference =
+      Number(left?.[dimension] ?? 0) - Number(right?.[dimension] ?? 0);
+    if (difference !== 0) return difference * direction;
+  }
+  return String(left?.stable_id ?? "").localeCompare(String(right?.stable_id ?? ""));
+}
+
+export function forecastRankVectorDecidingDimension(winner, rejected) {
+  for (const [dimension] of FORECAST_RANK_DIMENSIONS) {
+    if (Number(winner?.[dimension] ?? 0) !== Number(rejected?.[dimension] ?? 0)) {
+      return dimension;
+    }
+  }
+  return String(winner?.stable_id ?? "") !== String(rejected?.stable_id ?? "")
+    ? "stable_id"
+    : "exact_tie";
+}
+
+/**
+ * Family-level aggregate rank vector over ALL independent child candidates,
+ * not just the strongest one. Each dimension takes the family's strongest
+ * evidence for that dimension (method_priority: lowest number wins; every
+ * other dimension: highest wins), so the family competes with the combined
+ * strength of its complete child set. The stable identifier is the
+ * lexicographically strongest member's, and the member roster is carried so
+ * the persisted score proves the aggregation spanned every child.
+ */
+export function aggregateForecastFamilyRankVector(candidates) {
+  const members = (candidates ?? []).filter(Boolean);
+  if (members.length === 0) return null;
+  const vectors = members.map(forecastAuthorityRankVector);
+  const strongest = [...vectors].sort(compareForecastRankVectors)[0];
+  const best = (dimension, reducer) =>
+    vectors.map((vector) => Number(vector[dimension] ?? 0)).reduce(reducer);
+  return {
+    method_priority: best("method_priority", (a, b) => Math.min(a, b)),
+    definition_score: best("definition_score", (a, b) => Math.max(a, b)),
+    period_score: best("period_score", (a, b) => Math.max(a, b)),
+    units_score: best("units_score", (a, b) => Math.max(a, b)),
+    freshness_timestamp: best("freshness_timestamp", (a, b) => Math.max(a, b)),
+    confidence_score: best("confidence_score", (a, b) => Math.max(a, b)),
+    completeness_score: best("completeness_score", (a, b) => Math.max(a, b)),
+    stable_id: strongest.stable_id,
+    aggregated_member_count: vectors.length,
+    aggregated_member_stable_ids: vectors.map((vector) => vector.stable_id).sort(),
+  };
+}
+
 const FORMULA_METHODS = new Set([
   "schedule_link",
   "accounting_identity",

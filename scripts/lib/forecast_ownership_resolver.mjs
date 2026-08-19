@@ -2,8 +2,12 @@ import { canonicalJson, hashValue } from "./run_store.mjs";
 import { verifyOwnershipCensus } from "./ownership_census.mjs";
 import { SCHEDULE_PRODUCER_BY_ROLE } from "./forecast_producer_contract.mjs";
 import {
+  aggregateForecastFamilyRankVector,
   compareForecastAuthorityCandidates,
+  compareForecastRankVectors,
   forecastAuthorityDecidingDimension,
+  forecastAuthorityRankVector,
+  forecastRankVectorDecidingDimension,
 } from "./forecast_authority.mjs";
 import {
   captureAuthority,
@@ -18,6 +22,93 @@ import {
 
 export const FORECAST_OWNERSHIP_PREFLIGHT_VERSION =
   "forecast-ownership-preflight/1.0";
+
+const OWNERSHIP_RECOVERY_MODES = Object.freeze(["historical_average"]);
+
+/**
+ * P3.4 — the bounded downstream-only recovery pass is a DECLARED code path.
+ * A case (or the controller, through its legacy environment gate, which is
+ * normalised here into the same typed declaration) must declare the recovery
+ * mode; the declaration and whether it was applied are sealed into the
+ * period-scoring ledger so a recovered run is receipt-visible, never an
+ * invisible environment side effect. An unregistered mode fails closed.
+ */
+export function declaredOwnershipRecovery(modelCase) {
+  const declared = modelCase?.forecast_ownership_recovery;
+  if (declared !== undefined && declared !== null) {
+    if (!OWNERSHIP_RECOVERY_MODES.includes(declared?.mode)) {
+      throw new Error(
+        `forecast ownership recovery declares unsupported mode ${JSON.stringify(declared?.mode ?? null)}; ` +
+          `declared recovery paths: ${OWNERSHIP_RECOVERY_MODES.join(", ")}`,
+      );
+    }
+    return {
+      mode: declared.mode,
+      origin: "case_declaration",
+      note: declared.note ?? "Bounded downstream-only recovery declared on the case.",
+    };
+  }
+  if (process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE === "historical_average") {
+    return {
+      mode: "historical_average",
+      origin: "controller_environment",
+      note: "Legacy controller environment gate normalised into the typed recovery declaration.",
+    };
+  }
+  return { mode: "none", origin: "undeclared", note: null };
+}
+
+/** The resolver's single period-authority writer (recovery fills and
+ * child-owned period pins both route through here). */
+function writePeriodAuthority(row, forecastIndex, authority) {
+  row.forecast_period_authorities ??= [null, null, null];
+  row.forecast_period_authorities[forecastIndex] = authority;
+}
+
+const PIN_SOURCE_KINDS = Object.freeze({
+  broker_consensus: "broker",
+  schedule_link: "schedule",
+  accounting_identity: "formula",
+  roll_forward: "formula",
+  driver_formula: "formula",
+  user_assumption: "user_supplied",
+  carry_forward: "historical_inference",
+  historical_average: "historical_inference",
+  historical_trend: "historical_inference",
+  seasonal_run_rate: "historical_inference",
+  explicit_zero: "none",
+});
+
+/**
+ * A capture mark is a row-level fact, but ownership is a per-period fact.
+ * When a family captures a child in SOME periods while other periods remain
+ * lawfully child-owned, any period whose ownership was only inferred (broker
+ * link, live calculation, supplied value) must be pinned as an explicit
+ * per-period authority — otherwise the row-level mark silently collapses the
+ * child-owned periods to "not separately forecast".
+ */
+function pinnedPeriodAuthority(modelCase, child, forecastIndex, state) {
+  const base = state.authority ?? {};
+  const pinned = {
+    method: state.method,
+    source_kind: base.source_kind ?? PIN_SOURCE_KINDS[state.method] ?? "none",
+    source_id:
+      base.source_id ??
+      base.stable_id ??
+      `ownership-period-pin:${child.row_id}:fy${forecastIndex + 1}`,
+    material:
+      typeof base.material === "boolean"
+        ? base.material
+        : sourceOwnedMateriality(modelCase, child),
+    note:
+      base.note ??
+      `FY${forecastIndex + 1} remains child-owned; the resolver pinned the row's ` +
+        `${state.method} authority explicitly so a sibling-period capture cannot collapse this period.`,
+  };
+  if (base.value !== undefined && base.value !== null) pinned.value = base.value;
+  if (base.as_of_date !== undefined) pinned.as_of_date = base.as_of_date;
+  return pinned;
+}
 
 
 function seal(body) {
@@ -97,10 +188,10 @@ function authorityAt(row, forecastIndex) {
   };
 }
 
-function strongestDirectChild(childStates, forecastIndex) {
+function strongestDirectChild(childStates) {
   return childStates
     .filter(({ owner_class }) => owner_class === "direct")
-    .map(({ row }) => ({ row, authority: authorityAt(row, forecastIndex) }))
+    .map(({ row, authority }) => ({ row, authority }))
     .sort((left, right) =>
       compareForecastAuthorityCandidates(left.authority, right.authority)
     )[0] ?? null;
@@ -239,6 +330,7 @@ export function resolveSelectedForecastOwnership(modelCase) {
   if (structural.status !== "PASS") {
     throw new Error(`forecast ownership preflight A blocked: ${structural.violations.join("; ")}`);
   }
+  const recovery = declaredOwnershipRecovery(modelCase);
   const resolutions = [];
   const degradedAuthorities = [];
   const rejectedAuthorities = [];
@@ -252,6 +344,26 @@ export function resolveSelectedForecastOwnership(modelCase) {
         shared_formula_child_ids,
       } of familyRows(rows)
     ) {
+      // PHASE 1 — decide every period from a PRE-TRANSITION snapshot. Each
+      // period's ownership classes and authorities are read before any of
+      // this family's captures apply, so a capture in one period can no
+      // longer reclassify a sibling period's lawful owner (the row-level
+      // forecast_capture_parent_id mark previously turned an inferred broker
+      // or calculation child into "absent" for EVERY period — the
+      // collapsed-period defect this package repairs). Mutations from
+      // earlier families stay visible: the snapshot is per family.
+      const snapshotStates = new Map(children.map((row) => [
+        row.row_id,
+        [0, 1, 2].map((snapshotIndex) => {
+          const method = methodAt(row, snapshotIndex);
+          return {
+            method,
+            owner_class: ownershipClass(method),
+            authority: authorityAt(row, snapshotIndex),
+          };
+        }),
+      ]));
+      const decisions = [];
       for (let forecastIndex = 0; forecastIndex < 3; forecastIndex += 1) {
         const parentMethod = methodAt(parent, forecastIndex);
         // A parent authority whose formula is spelled over this family's own
@@ -283,53 +395,53 @@ export function resolveSelectedForecastOwnership(modelCase) {
           parentFormulaIsFamilyIdentity
             ? "identity"
             : ownershipClass(parentMethod);
-        let childStates = children.map((row) => ({
+        const childStates = children.map((row) => ({
           row,
-          owner_class: ownershipClass(methodAt(row, forecastIndex)),
+          ...snapshotStates.get(row.row_id)[forecastIndex],
         }));
-        let materialChildStates = childStates.filter(({ row }) =>
+        const materialChildStates = childStates.filter(({ row }) =>
           sourceOwnedMateriality(modelCase, row)
         );
         let completeMaterialChildren = materialChildStates.every(
           ({ owner_class }) => owner_class !== "absent",
         );
-        const strongestChild = strongestDirectChild(
-          materialChildStates,
-          forecastIndex,
-        );
+        const strongestChild = strongestDirectChild(materialChildStates);
         const parentAuthority = authorityAt(parent, forecastIndex);
+        const parentRankVector = forecastAuthorityRankVector(parentAuthority);
         const parentHasCompilableIdentity =
           parent?.calculation?.operator === "sum" &&
           Array.isArray(parent.calculation.refs) &&
           parent.calculation.refs.length > 0;
-        const childRankDimension = strongestChild
-          ? forecastAuthorityDecidingDimension(
-            strongestChild.authority,
-            parentAuthority,
-          )
-          : null;
         // Family-level ownership: children may take the aggregate only when
         // the material family is COMPLETE (no absent member) — that is the
         // completeness half of the constitution, enforced above — and the
-        // strongest child substantively outranks the parent. The sealed
-        // contract tests deliberately let strong FY1 company evidence own a
-        // complete child set whose siblings carry weaker-but-present
-        // authorities; requiring every sibling to beat the parent would
-        // reject that lawful shape.
-        const strongerDirectChild = Boolean(
+        // FAMILY AGGREGATE over ALL direct material children substantively
+        // outranks the parent. The aggregate takes each rank dimension from
+        // the family's strongest evidence for that dimension, so a complete
+        // child set competes with its combined strength — never just its
+        // single strongest member — while weaker-but-present siblings still
+        // cannot drag a lawful family below its strongest child (the sealed
+        // contract shape where strong FY1 company evidence owns a complete
+        // child set whose siblings carry weaker-but-present authorities).
+        const familyAggregate = aggregateForecastFamilyRankVector(
+          materialChildStates
+            .filter(({ owner_class }) => owner_class === "direct")
+            .map(({ authority }) => authority),
+        );
+        const familyRankDimension = familyAggregate
+          ? forecastRankVectorDecidingDimension(familyAggregate, parentRankVector)
+          : null;
+        const strongerDirectChildren = Boolean(
           completeMaterialChildren &&
           parentHasCompilableIdentity &&
           strongestChild &&
-          !["stable_id", "exact_tie"].includes(childRankDimension) &&
-          compareForecastAuthorityCandidates(
-            strongestChild.authority,
-            parentAuthority,
-          ) < 0,
+          !["stable_id", "exact_tie"].includes(familyRankDimension) &&
+          compareForecastRankVectors(familyAggregate, parentRankVector) < 0,
         );
         let selectedMode = null;
         if (parentClass === "schedule") selectedMode = "schedule_owned";
         else if (parentClass === "direct") {
-          selectedMode = strongerDirectChild ? "children_owned" : "parent_owned";
+          selectedMode = strongerDirectChildren ? "children_owned" : "parent_owned";
         }
         else if (
           ["not_separately_forecast", "not_applicable"].includes(parentMethod) &&
@@ -343,118 +455,210 @@ export function resolveSelectedForecastOwnership(modelCase) {
           completeMaterialChildren
         ) selectedMode = "children_owned";
 
-        // The controller may make one bounded downstream-only recovery pass.
-        // It fills only genuinely missing material children with a deterministic
-        // historical-average authority when three historical observations exist;
-        // it never overwrites a selected source or turns unresolved evidence into zero.
+        // The DECLARED bounded downstream-only recovery pass (typed above,
+        // receipt-visible in the period-scoring ledger). It fills only
+        // genuinely missing material children with a deterministic
+        // historical-average authority when three historical observations
+        // exist; it never overwrites a selected source or turns unresolved
+        // evidence into zero.
         if (
           !selectedMode &&
-          process.env.EXCEL_INFLOW_OWNERSHIP_DEGRADE === "historical_average" &&
+          recovery.mode === "historical_average" &&
           parentHasCompilableIdentity
         ) {
-          for (const { row: child, owner_class: ownerClass } of materialChildStates) {
-            if (ownerClass !== "absent") continue;
-            const history = (child.values ?? []).slice(0, 3)
+          for (const state of materialChildStates) {
+            if (state.owner_class !== "absent") continue;
+            // A nil observation is MISSING, not zero: it must not enter the
+            // average (Number(null) would coerce to 0 and silently zero-bias
+            // the fill).
+            const history = (state.row.values ?? []).slice(0, 3)
+              .filter((value) => value !== null && value !== undefined)
               .map(Number)
               .filter(Number.isFinite);
             if (history.length !== 3) continue;
-            child.forecast_period_authorities ??= [];
-            child.forecast_period_authorities[forecastIndex] = {
+            writePeriodAuthority(state.row, forecastIndex, {
               method: "historical_average",
               source_kind: "historical_inference",
-              source_id: `ownership-degradation:${child.row_id}:fy${forecastIndex + 1}`,
+              source_id: `ownership-degradation:${state.row.row_id}:fy${forecastIndex + 1}`,
               value: history.reduce((sum, value) => sum + value, 0) / history.length,
-            };
+              note:
+                `Declared ownership recovery (${recovery.origin}) filled this ` +
+                `genuinely missing period from three historical observations.`,
+            });
+            Object.assign(state, {
+              method: "historical_average",
+              owner_class: "direct",
+              authority: authorityAt(state.row, forecastIndex),
+            });
             degradedAuthorities.push({
-              row_id: child.row_id,
+              row_id: state.row.row_id,
               forecast_index: forecastIndex,
               method: "historical_average",
             });
           }
-          childStates = children.map((row) => ({
-            row,
-            owner_class: ownershipClass(methodAt(row, forecastIndex)),
-          }));
-          materialChildStates = childStates.filter(({ row }) =>
-            sourceOwnedMateriality(modelCase, row)
-          );
           completeMaterialChildren = materialChildStates.every(
             ({ owner_class }) => owner_class !== "absent",
           );
           if (completeMaterialChildren) selectedMode = "children_owned";
         }
 
-        if (!selectedMode) {
-          violations.push(
-            `${section}:${parent.row_id}:fy${forecastIndex + 1} has unresolved material ownership ` +
-              `(parent=${parentMethod}; children=${childStates.map(({ row, owner_class }) => `${row.row_id}:${methodAt(row, forecastIndex)}:${owner_class}`).join(",")})`,
-          );
-          resolutions.push({
-            section,
-            parent_row_id: parent.row_id,
-            forecast_index: forecastIndex,
-            selected_mode: "unresolved",
-            child_row_ids: children.map((row) => row.row_id).sort(),
-          });
-          continue;
-        }
-
+        // The capture plan for THIS period is decided here against the
+        // snapshot and applied in phase 2.
+        const capturePlan = new Set();
         if (["parent_owned", "schedule_owned"].includes(selectedMode)) {
-          for (const { row: child, owner_class: childClass } of childStates) {
-            const permittedSchedule = childClass === "schedule" &&
-              child.forecast_schedule_coownership_permitted === true;
+          for (const state of childStates) {
+            const permittedSchedule = state.owner_class === "schedule" &&
+              state.row.forecast_schedule_coownership_permitted === true;
             // A calculation dependency is not automatically owned detail.
             // Shared statement building blocks (for example operating profit
             // and D&A) must remain live for their other accounting identities.
             // Only the declared structural children belong to this parent's
             // capture scope.
-            const formulaDependencyOnly = !structural_child_ids.has(child.row_id);
-            const childAuthority = authorityAt(child, forecastIndex);
+            const formulaDependencyOnly = !structural_child_ids.has(state.row.row_id);
             const parentRankDimension = forecastAuthorityDecidingDimension(
               parentAuthority,
-              childAuthority,
+              state.authority,
             );
             const parentSubstantivelyStronger =
               !["stable_id", "exact_tie"].includes(parentRankDimension) &&
               compareForecastAuthorityCandidates(
                 parentAuthority,
-                childAuthority,
+                state.authority,
               ) < 0;
             const reusableFormulaDependency = formulaDependencyOnly &&
               (
-                childClass !== "direct" ||
-                shared_formula_child_ids.has(child.row_id) ||
+                state.owner_class !== "direct" ||
+                shared_formula_child_ids.has(state.row.row_id) ||
                 !parentSubstantivelyStronger
               );
             if (!permittedSchedule && !reusableFormulaDependency) {
-              captureAuthority(modelCase, parent, child, forecastIndex, rejectedAuthorities);
+              capturePlan.add(state.row.row_id);
+            }
+          }
+        }
+
+        if (!selectedMode) {
+          violations.push(
+            `${section}:${parent.row_id}:fy${forecastIndex + 1} has unresolved material ownership ` +
+              `(parent=${parentMethod}; children=${childStates.map(({ row, method, owner_class }) => `${row.row_id}:${method}:${owner_class}`).join(",")})`,
+          );
+        }
+        decisions.push({
+          forecastIndex,
+          selectedMode,
+          parentMethod,
+          parentClass,
+          parentAuthority,
+          parentRankVector,
+          familyAggregate,
+          familyRankDimension,
+          childStates,
+          capturePlan,
+        });
+      }
+      const capturedChildIds = new Set(
+        decisions.flatMap(({ capturePlan }) => [...capturePlan]),
+      );
+      // PHASE 2 — THE PERIOD LOOP applies each period's decided transition,
+      // persists that period's rank vectors on the ledger, and SEALS
+      // CERTIFICATES INSIDE THE LOOP so the certificate state is re-proved
+      // against each period's final authorities as that period lands, not
+      // once after the whole family completes.
+      for (const decision of decisions) {
+        const {
+          forecastIndex,
+          selectedMode,
+          parentMethod,
+          parentClass,
+          parentRankVector,
+          familyAggregate,
+          familyRankDimension,
+          childStates,
+          capturePlan,
+        } = decision;
+        if (["parent_owned", "schedule_owned"].includes(selectedMode)) {
+          for (const state of childStates) {
+            if (capturePlan.has(state.row.row_id)) {
+              captureAuthority(modelCase, parent, state.row, forecastIndex, rejectedAuthorities);
             }
           }
         } else if (selectedMode === "children_owned") {
           if (parentClass === "direct") {
-            const decidingDimension = childRankDimension ??
+            const decidingDimension = familyRankDimension ??
               "complete_child_identity";
+            const rejectedParentAuthority =
+              structuredClone(parent.forecast_period_authorities?.[forecastIndex]);
+            // The rejected parent authority carries its own period rank proof
+            // into the sealed receipt (the authority object is the receipt's
+            // open surface for exactly this evidence).
+            if (rejectedParentAuthority && typeof rejectedParentAuthority === "object") {
+              rejectedParentAuthority.selection_rank ??= parentRankVector;
+            }
             rejectedAuthorities.push({
               row_id: parent.row_id,
               forecast_index: forecastIndex,
-              authority: structuredClone(parent.forecast_period_authorities?.[forecastIndex]),
+              authority: rejectedParentAuthority,
               rejection_reason:
                 `Complete compatible children own the aggregate identity; ` +
-                `the strongest child authority wins on ${decidingDimension}.`,
+                `the family aggregate authority over all ` +
+                `${familyAggregate?.aggregated_member_count ?? 0} children wins on ${decidingDimension}.`,
             });
           }
           setParentIdentity(modelCase, parent, forecastIndex);
+          // A child captured in a SIBLING period keeps this period's live
+          // ownership only through an explicit per-period authority: pin the
+          // snapshot's inferred authority so the row-level capture mark
+          // cannot collapse a lawfully child-owned period.
+          for (const state of childStates) {
+            if (!capturedChildIds.has(state.row.row_id)) continue;
+            if (state.owner_class === "absent") continue;
+            if (state.row.forecast_period_authorities?.[forecastIndex]?.method) continue;
+            writePeriodAuthority(
+              state.row,
+              forecastIndex,
+              pinnedPeriodAuthority(modelCase, state.row, forecastIndex, state),
+            );
+          }
         }
         resolutions.push({
           section,
           parent_row_id: parent.row_id,
           forecast_index: forecastIndex,
-          selected_mode: selectedMode,
+          selected_mode: selectedMode ?? "unresolved",
           child_row_ids: children.map((row) => row.row_id).sort(),
         });
+        // Persist THIS period's rank vectors on the rows (selection_rank is
+        // the schema's canonical per-period rank slot, and the sealed
+        // forecast-authority ledger republishes it per row per period). Only
+        // entries whose method still matches the adjudicated authority are
+        // stamped — a rewritten entry (capture, identity rebuild over a
+        // rejected direct parent) carries its rank through the certificate or
+        // the rejected-authority evidence instead — and a rank sealed by an
+        // earlier selector is never overwritten.
+        const parentEntry = parent.forecast_period_authorities?.[forecastIndex];
+        if (
+          parentEntry &&
+          typeof parentEntry === "object" &&
+          parentEntry.method === parentMethod
+        ) {
+          parentEntry.selection_rank ??= structuredClone(parentRankVector);
+        }
+        for (const state of childStates) {
+          if (capturePlan.has(state.row.row_id)) continue;
+          const childEntry = state.row.forecast_period_authorities?.[forecastIndex];
+          if (
+            childEntry &&
+            typeof childEntry === "object" &&
+            childEntry.method === state.method
+          ) {
+            childEntry.selection_rank ??= forecastAuthorityRankVector(state.authority);
+          }
+        }
+        for (const child of children) {
+          sealCaptureCertificates(modelCase, parent, child);
+        }
       }
       for (const child of children) {
-        sealCaptureCertificates(modelCase, parent, child);
         clearFullyCapturedDirectMarkers(child);
       }
     }
@@ -524,6 +728,61 @@ export function verifySelectedForecastOwnership(modelCase) {
     }
   }
   if (receipt.status !== "PASS") throw new Error("selected forecast ownership preflight is blocked");
+  return receipt;
+}
+
+/**
+ * Validate (never repair) the persisted per-period ownership scoring:
+ * against the sealed selected-ownership receipt, every family resolution is
+ * period-explicit on the rows — a children-owned period keeps every material
+ * child alive (a row-level capture mark may not collapse it), a
+ * resolver-authored authority (pin or declared recovery fill) carries its
+ * per-period selection_rank vector, and a rejected direct parent's period
+ * rank proof is sealed inside the receipt's rejected-authority evidence.
+ */
+export function verifyPeriodOwnershipScoring(modelCase) {
+  const receipt = verifySelectedForecastOwnership(modelCase);
+  const rowsBySectionName = new Map(
+    rowsBySection(modelCase).map(({ section, rows }) => [
+      section,
+      new Map(rows.filter((row) => row?.row_id).map((row) => [row.row_id, row])),
+    ]),
+  );
+  for (const resolution of receipt.resolutions ?? []) {
+    const localRows = rowsBySectionName.get(resolution.section);
+    for (const childId of resolution.child_row_ids ?? []) {
+      const child = localRows?.get(childId);
+      if (!child) continue;
+      const method = methodAt(child, resolution.forecast_index);
+      if (
+        resolution.selected_mode === "children_owned" &&
+        sourceOwnedMateriality(modelCase, child) &&
+        ownershipClass(method) === "absent" &&
+        !child.forecast_schedule_coownership_permitted
+      ) {
+        throw new Error(
+          `period ownership scoring violation: ${resolution.section}:${childId}:fy${resolution.forecast_index + 1} ` +
+            `is absent inside a children-owned period (a sibling-period capture collapsed it)`,
+        );
+      }
+    }
+  }
+  for (const { rows } of rowsBySection(modelCase)) {
+    for (const row of rows) {
+      (row?.forecast_period_authorities ?? []).forEach((authority, index) => {
+        const resolverAuthored =
+          typeof authority?.source_id === "string" &&
+          (authority.source_id.startsWith("ownership-period-pin:") ||
+            authority.source_id.startsWith("ownership-degradation:"));
+        if (resolverAuthored && !authority.selection_rank) {
+          throw new Error(
+            `period ownership scoring violation: ${row.row_id}:fy${index + 1} ` +
+              `resolver-authored authority lacks its persisted selection_rank vector`,
+          );
+        }
+      });
+    }
+  }
   return receipt;
 }
 
