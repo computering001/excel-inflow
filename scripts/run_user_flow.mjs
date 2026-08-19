@@ -12,7 +12,7 @@ import {
   recordComputeSegment,
 } from "./lib/run_deadline.mjs";
 import { DEFAULT_RUNTIME_BUDGETS_MS } from "./lib/runtime_budget_policy.mjs";
-import { sealEconomicStageParity } from "./lib/forecast_completion_constitution.mjs";
+import { assertEconomicStageParityAfterBuild, sealEconomicStageParity } from "./lib/forecast_completion_constitution.mjs";
 import {
   applyAnswers,
   deliver,
@@ -1988,6 +1988,10 @@ async function main() {
         },
       });
     }
+    // P3.2: the parity receipt sealed before Build is re-verified against the
+    // case that survived Build. Sealing alone proved only that the graph was
+    // coherent at the cheap boundary; this proves Build did not invalidate it.
+    assertEconomicStageParityAfterBuild(answeredCase, stageParityReceipt);
     receipt4 = await persistStage({
       runDir,
       runId,

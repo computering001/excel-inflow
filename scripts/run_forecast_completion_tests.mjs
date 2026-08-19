@@ -30,14 +30,18 @@ const completeCase = {
   case_id: "census-fixture",
   statement_structure: {
     income_statement: [
-      row("revenue", { forecast_period_authorities: [authority("broker_consensus"), authority("company_guidance"), authority("user_assumption")] }),
+      // P3.2: a direct-evidence authority must carry the value its producer
+      // selected — an evidence label with no number behind it is unwitnessed.
+      row("revenue", { forecast_period_authorities: [authority("broker_consensus", { value: 110 }), authority("company_guidance", { value: 120 }), authority("user_assumption", { value: 130 })] }),
       row("ebitda", { row_type: "calculation", calculation: { operator: "sum", refs: ["revenue"] }, forecast_period_authorities: [authority("accounting_identity"), authority("accounting_identity"), authority("accounting_identity")] }),
       row("effective_tax_rate", {
         semantic_role: "effective_tax_rate",
         forecast_period_authorities: [0, 1, 2].map(() =>
           authority("historical_average", { tax_rate_normalization: { schema_version: "excel-inflow-tax-rate-policy/1.0" } })),
       }),
-      row("interest", { forecast_period_authorities: [authority("schedule_link"), authority("schedule_link"), authority("schedule_link")] }),
+      // P3.2: a schedule claim must name the schedule producer that computes
+      // it (SCHEDULE_PRODUCER_BY_ROLE), not merely the method label.
+      row("interest", { semantic_role: "interest_expense", forecast_period_authorities: [authority("schedule_link"), authority("schedule_link"), authority("schedule_link")] }),
     ],
     cash_flow: [
       row("wc_detail", { forecast_period_authorities: [authority("not_separately_forecast"), authority("not_separately_forecast"), authority("not_separately_forecast")], forecast_capture_parent_id: "change_in_working_capital" }),
@@ -50,7 +54,14 @@ const completeCase = {
 {
   const census = compileForecastCompletionCensus(completeCase);
   check(census.status === "PASS", "a complete case must pass the census");
-  check(census.cell_count === 18, "every row x period is enumerated");
+  // P3.2 cardinality: 18 statement cells (6 rows x 3 periods) PLUS the 66
+  // economically-owned schedule cells (22 debt/interest/lease/RCF/acquisition/
+  // leverage definitions x 3 periods) the census previously never enumerated.
+  check(census.cell_count === 84, "every row x period is enumerated");
+  check(census.coverage.statement_cells === 18 && census.coverage.schedule_cells === 66,
+    "the census covers the statements AND the whole schedule surface");
+  check(census.producer_witness_counts.unwitnessed === 0,
+    "every cell's ownership rests on an executable producer witness");
   check(census.cells.every((cell) => LAWFUL_DISPOSITIONS.includes(cell.disposition)),
     "every cell carries a lawful disposition");
   check(census.disposition_counts.role_policy_owned === 3, "the tax policy periods are typed role_policy_owned");

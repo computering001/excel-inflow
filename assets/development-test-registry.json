@@ -1598,6 +1598,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "completion-census-scope",
+      "phase": "forecast",
+      "runtime": "node",
+      "script": "run_completion_census_scope_tests.mjs",
+      "timeout_seconds": 300,
+      "mutates_product_tree": false,
+      "test_class": "unit"
+    },
+    {
       "id": "plan-reconstruction",
       "phase": "proof",
       "runtime": "python",

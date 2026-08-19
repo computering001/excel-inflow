@@ -75,7 +75,14 @@ function sourceIds(value) {
   ])].sort();
 }
 
-function economicRegionDefinitions(modelCase) {
+/**
+ * The economically-owned SCHEDULE surface: one definition per debt, interest,
+ * lease, RCF, acquisition and leverage/liquidity cell the model owns outside
+ * the two statements. Exported (P3.2) so the forecast completion census
+ * enumerates the SAME surface this census does — one inventory, two views,
+ * no room for the schedule half to exist in one census and not the other.
+ */
+export function economicRegionDefinitions(modelCase) {
   const definitions = [];
   for (const instrument of modelCase?.instruments ?? []) {
     definitions.push({

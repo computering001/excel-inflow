@@ -172,8 +172,227 @@ export function attachForecastProducerWitness(state, candidate = null) {
   return { ...state, producer_witness: witness };
 }
 
+/**
+ * P3.2 — the operators the producer contract can execute from a row's OWN
+ * history, with no external reference: naming the operator and the row is
+ * enough to reproduce the number. `driver_formula` and `roll_forward` are
+ * deliberately absent — they reference other rows, so an unbound spec leaves
+ * them genuinely unwitnessed rather than intrinsically executable.
+ */
+export const INTRINSIC_ROW_HISTORY_OPERATORS = Object.freeze([
+  "historical_average",
+  "historical_trend",
+  "seasonal_run_rate",
+  "carry_forward",
+]);
+
+/**
+ * The DECLARED schedule regions that write economic cells. A region name is a
+ * producer only because it appears here; an unlisted region names no producer
+ * and its cells are reported unwitnessed rather than assumed owned.
+ */
+export const SCHEDULE_REGION_WRITERS = Object.freeze([
+  "debt_schedule",
+  "interest_schedule",
+  "lease_schedule",
+  "liquidity_schedule",
+  "rcf_waterfall",
+  "cash_bucket_schedule",
+  "leverage_liquidity",
+]);
+
+/** The registered schedule producer for a role, or null — never a guess. */
+export function scheduleProducerForRole(role) {
+  if (typeof role !== "string" || role.length === 0) return null;
+  return Object.hasOwn(SCHEDULE_PRODUCER_BY_ROLE, role)
+    ? SCHEDULE_PRODUCER_BY_ROLE[role]
+    : null;
+}
+
+/**
+ * The producer witness for one cell of an economic SCHEDULE region (debt,
+ * interest, lease, RCF, acquisition, leverage/liquidity). The producer is the
+ * registered role writer, else the instrument-scoped writer, else the declared
+ * region writer. `active: false` means the case declares the family absent —
+ * a typed not_applicable producer verdict, never a fabricated zero.
+ */
+export function scheduleRegionProducerWitness(input) {
+  const rowId = input?.row_id ?? null;
+  const region = input?.region ?? null;
+  const owner = input?.schedule_owner ?? null;
+  const nodeId = input?.model_node_id ?? null;
+  const active = input?.active !== false;
+  const registered = scheduleProducerForRole(input?.semantic_role ?? rowId);
+  const instrumentWriter =
+    typeof owner === "string" && owner.startsWith("instrument:")
+      ? nodeId ?? owner
+      : null;
+  const regionWriter =
+    typeof owner === "string" && SCHEDULE_REGION_WRITERS.includes(owner)
+      ? `${owner}.${rowId}`
+      : null;
+  const producerId = registered ?? instrumentWriter ?? regionWriter ?? null;
+  const bindingSource = registered
+    ? "schedule_role_registry"
+    : instrumentWriter
+      ? "instrument_schedule_writer"
+      : regionWriter
+        ? "declared_schedule_region_writer"
+        : null;
+  if (!active) {
+    return {
+      producer_kind: "not_applicable",
+      producer_id: producerId,
+      executable: true,
+      binding_source: bindingSource ?? "declared_absent_family",
+      family_active: false,
+      reason: null,
+    };
+  }
+  return {
+    producer_kind: "schedule",
+    producer_id: producerId,
+    executable: producerId !== null,
+    binding_source: bindingSource,
+    family_active: true,
+    reason: producerId === null
+      ? `Schedule region ${region ?? "(unnamed)"} names no executable producer for ${rowId ?? "(unnamed row)"}.`
+      : null,
+  };
+}
+
+function rolePolicyClaim(authority) {
+  const operator = authority?.formula_spec?.operator ?? null;
+  const declaredOperator =
+    typeof operator === "string" && operator.startsWith("tax_rate_policy")
+      ? operator
+      : null;
+  const payload = authority?.tax_rate_normalization ?? null;
+  const ref = authority?.tax_rate_normalization_ref ?? null;
+  if (!payload && !ref && !declaredOperator) return null;
+  return { payload, ref, declaredOperator };
+}
+
+function statementFormulaSpec(row, authority, forecastIndex) {
+  return (
+    authority?.formula_spec ??
+    row?.forecast_period_calculations?.[forecastIndex] ??
+    row?.forecast_calculation ??
+    row?.calculation ??
+    null
+  );
+}
+
+/**
+ * P3.2 — the ONE executable producer witness for one statement row × forecast
+ * period. Ownership is established by the producer that actually computes the
+ * cell (a registered schedule writer, a concrete formula, a named evidence
+ * selection, the tax-rate policy module), never by the method label alone.
+ *
+ * Nothing here is invented: the formula comes from the authority or the row's
+ * own calculation, the value from the authority or the row's own forecast
+ * column, the schedule producer from the registered role vocabulary, and the
+ * role policy from the normalisation receipt the authority carries. When no
+ * producer can be named the witness says so — `executable: false` with a
+ * reason — and never claims ownership on a label's word.
+ *
+ * `historical_count` is the case's historical column count; the forecast
+ * column is read at `historical_count + forecast_index`, never at a
+ * hard-wired offset.
+ */
+export function forecastCellProducerWitness(input) {
+  const row = input?.row ?? null;
+  const authority = input?.authority ?? null;
+  const section = input?.section ?? null;
+  const forecastIndex = Number.isInteger(input?.forecast_index) ? input.forecast_index : 0;
+  const historicalCount = Number.isInteger(input?.historical_count) ? input.historical_count : 0;
+  const method = input?.method ?? authority?.method ?? "unresolved";
+  const rowId = row?.row_id ?? null;
+
+  const policy = rolePolicyClaim(authority);
+  if (policy) {
+    const basis = policy.declaredOperator ??
+      policy.payload?.policy_id ?? policy.payload?.basis ?? "normalisation_receipt";
+    const witnessed = Boolean(policy.payload ?? policy.ref);
+    return {
+      producer_kind: "role_policy",
+      producer_id: witnessed ? `tax_rate_policy:${basis}` : null,
+      executable: witnessed,
+      binding_source: policy.payload
+        ? "tax_rate_normalization_payload"
+        : policy.ref
+          ? "tax_rate_normalization_ref"
+          : null,
+      reason: witnessed
+        ? null
+        : "Role-policy authority carries no tax-rate normalisation receipt or reference.",
+    };
+  }
+
+  if (FORMULA_METHODS.has(method)) {
+    const spec = statementFormulaSpec(row, authority, forecastIndex);
+    if (spec) {
+      const witness = formulaWitness({ method, section, row_id: rowId, formula_spec: spec });
+      if (witness.executable) return { ...witness, binding_source: "declared_row_formula" };
+    }
+    if (INTRINSIC_ROW_HISTORY_OPERATORS.includes(method) && rowId) {
+      return {
+        producer_kind: "formula",
+        producer_id: `formula:${section}.${rowId}:${method}`,
+        executable: true,
+        binding_source: "intrinsic_row_history",
+        formula_spec: { operator: method, row_id: rowId },
+        reason: null,
+      };
+    }
+    return {
+      producer_kind: spec?.operator === "prior_period" ? "temporal_roll_forward" : "formula",
+      producer_id: null,
+      executable: false,
+      binding_source: null,
+      formula_spec: spec ? structuredClone(spec) : null,
+      reason:
+        `Formula authority (${method}) names no executable producer: neither the authority nor ` +
+        `the row carries a referencing formula, and ${method} is not an intrinsic row-history operator.`,
+    };
+  }
+
+  const evidenceId = authority?.selected_candidate_id ??
+    (authority?.source_kind && authority?.source_id
+      ? `${authority.source_kind}:${authority.source_id}`
+      : null);
+  const state = {
+    method,
+    section,
+    row_id: rowId,
+    semantic_role: row?.semantic_role ?? null,
+    formula_spec: authority?.formula_spec ?? null,
+    value: authority?.value ?? row?.values?.[historicalCount + forecastIndex] ?? null,
+    selected_candidate_id: evidenceId,
+    source_bindings: authority?.source_bindings ??
+      (authority?.source_id ? [{ source_id: authority.source_id }] : []),
+    rationale: authority?.note ?? null,
+  };
+  const witness = forecastProducerWitness(state, null);
+  const bindingSource = !witness.executable
+    ? null
+    : method === "schedule_link"
+      ? (authority?.formula_spec?.producer_id ? "declared_schedule_producer" : "schedule_role_registry")
+      : ["not_separately_forecast", "not_applicable"].includes(method)
+        ? "declared_absence"
+        : authority?.value === undefined || authority?.value === null
+          ? "row_forecast_column"
+          : "authority_value";
+  return { ...witness, binding_source: bindingSource };
+}
+
 export default {
+  INTRINSIC_ROW_HISTORY_OPERATORS,
   SCHEDULE_PRODUCER_BY_ROLE,
+  SCHEDULE_REGION_WRITERS,
   attachForecastProducerWitness,
+  forecastCellProducerWitness,
   forecastProducerWitness,
+  scheduleProducerForRole,
+  scheduleRegionProducerWitness,
 };
