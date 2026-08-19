@@ -1141,21 +1141,47 @@ async function main() {
       const stage3Dir = path.join(runDir, "stages", "decisions");
       const stage3Result = path.join(stage3Dir, "decision-result.json");
       await writeJsonAtomic(stage3Result, serialisable(intakeResult));
+      // TOC.D crossing (1): a decision-graph failure is INTERNAL_WORK
+      // (blockerForStoppedOutcome), and the workflow-state contract admits
+      // ACTION_REQUIRED only with USER_DECISION. An internal decision-graph
+      // failure therefore surfaces as the internal-owned BLOCKED state the
+      // delivery-blocker constitution already binds (equation_system_unsolved,
+      // equation_graph) — never as a user-owned question. The registry lists
+      // "graph failure" as an explicitly illegal ACTION_REQUIRED cause.
+      const internalDecisionFailure =
+        blockerForStoppedOutcome(intakeResult.outcome) === "INTERNAL_WORK";
       const receipt3 = await persistStage({
         runDir,
         runId,
         stageId: "decisions",
-        status: "action_required",
+        status: internalDecisionFailure ? "blocked" : "action_required",
         inputHashes: { stage2_receipt: receipt2.receipt_hash },
         previousReceiptHash: receipt2.receipt_hash,
         outputs: { decision_result: stage3Result },
         detail: { outcome: intakeResult.outcome },
       });
-      return finish({
-        runDir,
-        screen: intakeResult.screen,
-        machine: options.json === true,
-        result: {
+      const decisionStopResult = internalDecisionFailure
+        ? {
+          schema_version: "user-flow-run/1.0",
+          controller_version: FLOW_CONTROLLER_VERSION,
+          run_id: runId,
+          status: "BLOCKED",
+          stage: "decisions",
+          outcome: intakeResult.outcome,
+          blocker_class: "INTERNAL_WORK",
+          typed_internal_outcome: {
+            reason_code: "INTERNAL.equation_system_unsolved",
+            earliest_responsible_layer: "decision_graph",
+            downstream_invalidation_scope: "decisions_stage_and_descendants",
+            outcome: intakeResult.outcome,
+            detail: serialisable(
+              intakeResult.replay?.invalid ?? intakeResult.plan?.blocked ?? null,
+            ),
+          },
+          receipt: receipt3,
+          reused_stages: reusedStages,
+        }
+        : {
           schema_version: "user-flow-run/1.0",
           controller_version: FLOW_CONTROLLER_VERSION,
           run_id: runId,
@@ -1165,7 +1191,12 @@ async function main() {
           blocker_class: blockerForStoppedOutcome(intakeResult.outcome),
           receipt: receipt3,
           reused_stages: reusedStages,
-        },
+        };
+      return finish({
+        runDir,
+        screen: intakeResult.screen,
+        machine: options.json === true,
+        result: decisionStopResult,
       });
     }
     return finish({

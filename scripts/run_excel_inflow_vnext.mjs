@@ -925,7 +925,47 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error.stack ?? error.message}\n`);
+main().catch(async (error) => {
+  // P3.7 pattern at the OUTER boundary (P6.0a): an uncaught controller
+  // failure is serialised as a typed internal-failure artifact with the
+  // registry's five payload fields; the public stderr carries one typed
+  // summary line, never a stack (TOC.F). The stack is preserved inside the
+  // artifact for engineering.
+  const reasonCode =
+    error?.typed_internal_outcome?.reason_code ?? "INTERNAL.compiler_or_graph_defect";
+  const summaryLine = String(error?.message ?? error).split("\n")[0];
+  let artifactNote = "no --out directory was resolvable; no artifact written";
+  try {
+    const outFlagIndex = process.argv.indexOf("--out");
+    const outDir = outFlagIndex >= 0 && process.argv[outFlagIndex + 1]
+      ? path.resolve(String(process.argv[outFlagIndex + 1]))
+      : null;
+    if (outDir) {
+      const payload = {
+        schema_version: "excel-inflow-internal-failure/1.0",
+        reason_code: reasonCode,
+        earliest_responsible_layer:
+          error?.typed_internal_outcome?.earliest_responsible_layer ??
+          "unattributed (repair: type this throw)",
+        downstream_invalidation_scope:
+          error?.typed_internal_outcome?.downstream_invalidation_scope ??
+          "unknown_full_rerun",
+        resumable_checkpoint_path: outDir,
+        preserved_source_hashes:
+          "evidence and run artifacts under the run directory remain immutable",
+        detail: error?.typed_internal_outcome ?? null,
+        message: String(error?.message ?? error),
+        stack: String(error?.stack ?? ""),
+      };
+      await fs.mkdir(outDir, { recursive: true });
+      const artifactPath = path.join(outDir, "internal-failure.json");
+      await fs.writeFile(artifactPath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+      artifactNote = artifactPath;
+    }
+  } catch {}
+  process.stderr.write(
+    `INTERNAL_FAILURE ${reasonCode}: ${summaryLine} (see ${artifactNote})\n`,
+  );
+  try { ACTIVE_PROGRESS_HEARTBEAT?.stop?.(); } catch {}
   process.exitCode = 1;
 });
