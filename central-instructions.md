@@ -401,10 +401,12 @@ status and next stage. Only a verified `success` receipt is resumable. A stale,
 foreign, failed, blocked or tampered receipt never skips work. State travels in
 the receipts and case files, never in chat history.
 
-The Build milestone has thirteen silent leaf checkpoints: semantic gates; plan; emit;
-LibreOffice recalculation; terminal patch; dynamic, style, cache, finance and
-semantic verification; verification aggregation; structural render; and
-publication. They do not create additional user messages. Each checkpoint
+The Build milestone has fourteen silent leaf checkpoints, plus one further
+render leaf per rendered sheet: semantic gates; plan; emit; LibreOffice
+recalculation; terminal patch; forecast-ownership physical verification;
+dynamic, style, cache, finance and semantic verification; verification
+aggregation; structural render; and publication. They do not create
+additional user messages. Each checkpoint
 stores a separate atomic success receipt and is reusable only when its recipe,
 named input hashes and exact output hashes still agree. A killed invocation
 therefore restarts at the first incomplete or invalid checkpoint in the same

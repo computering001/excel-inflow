@@ -313,6 +313,7 @@
     "lib/economic_solve_policy.mjs",
     "lib/economic_ir.mjs",
     "lib/economic_authority_seal.mjs",
+    "lib/evidence_work_graph.mjs",
     "lib/formula_ast.mjs",
     "lib/opening_instrument_provenance.mjs",
     "lib/required_role_closure.mjs",

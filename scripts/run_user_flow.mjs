@@ -63,6 +63,7 @@ import {
   hashFile,
   hashValue,
 } from "./lib/run_store.mjs";
+import { createEvidenceWorkGraph } from "./lib/evidence_work_graph.mjs";
 import { runProcessTree } from "./lib/process_tree.mjs";
 import {
   runCarrierMigrationStageInput,
@@ -632,6 +633,21 @@ async function main() {
     },
   });
   await writeJsonAtomic(path.join(runDir, "stage-runtime-closure.json"), runtimeClosure);
+  // P6.3 — the evidence half is a DECLARED work DAG. Every expensive
+  // compilation in stages 1-3 runs as a named node with declared inputs,
+  // declared outputs, a cache key and an invalidation rule, and every cache
+  // decision records its reason (hit, miss with the component that moved, or
+  // invalid with why) into stages/_work_graph/decisions.json. The graph reuses
+  // stage 4's proven checkpoint() call shape verbatim and does NOT enact reuse:
+  // hoisting this work behind its keys is P6.4's differential invalidation, and
+  // a DAG that changed what is computed would not be additive. See
+  // scripts/lib/evidence_work_graph.mjs.
+  const workGraph = createEvidenceWorkGraph({
+    runDir,
+    runId,
+    controllerVersion: FLOW_CONTROLLER_VERSION,
+    runtimeDigest: runtimeClosure.digest,
+  });
   const carrierMigrationInput = (stageId) =>
     runCarrierMigrationStageInput(verifiedCarrier, stageId);
   let brokerIntakeChoicePath = null;
@@ -707,8 +723,18 @@ async function main() {
     validation = await readJson(stage1Validation, "cached evidence validation");
     receipt1 = cached1.receipt;
     reusedStages.push("inputs");
+    await workGraph.reuseStage("inputs");
   } else {
-    validation = validateEvidenceRun(evidenceRun);
+    validation = (await workGraph.runNode({
+      id: "evidence_validation",
+      recipe: "evidence-validation/1.0",
+      inputs: { evidence_run: stage1Inputs.evidence_run },
+      outputs: {
+        evidence_validation: stage1Validation,
+        case_compile_report: stage1CompileReport,
+      },
+      action: () => validateEvidenceRun(evidenceRun),
+    })).value;
     await writeJsonAtomic(stage1Validation, serialisable(validation));
     await writeJsonAtomic(
       stage1CompileReport,
@@ -868,12 +894,22 @@ async function main() {
       }
     };
     try {
-      brokerPreview = compileBrokerPreview({
-        brokerPack: evidenceRun.broker_pack,
-        sourceTables: evidenceRun.broker_source_tables,
-        crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
-        bindingHashes: brokerBindingHashes,
-      });
+      brokerPreview = (await workGraph.runNode({
+        id: "broker_preview",
+        recipe: "broker-preview/1.0",
+        inputs: {
+          broker_pack: brokerBindingHashes.broker_pack_sha256,
+          broker_source_tables: brokerBindingHashes.broker_source_tables_sha256,
+          broker_crosswalk_receipt: brokerBindingHashes.broker_crosswalk_receipt_sha256,
+        },
+        outputs: { broker_preview: brokerPreviewPath },
+        action: () => compileBrokerPreview({
+          brokerPack: evidenceRun.broker_pack,
+          sourceTables: evidenceRun.broker_source_tables,
+          crosswalkReceipt: evidenceRun.broker_crosswalk_receipt,
+          bindingHashes: brokerBindingHashes,
+        }),
+      })).value;
     } catch (error) {
       brokerPreview = fallbackBrokerPreview([
         `Primary-house preview compilation failed internally: ${error.message}`,
@@ -949,10 +985,19 @@ async function main() {
         brokerConfirmation,
       );
       activeCaseEvidence = brokerProjection.case_evidence;
-      brokerSelectedCompilation = compileCase(
-        validation.handoff.case_source,
-        activeCaseEvidence,
-      );
+      brokerSelectedCompilation = (await workGraph.runNode({
+        id: "broker_selected_case_compile",
+        recipe: "broker-selected-case-compile/1.0",
+        inputs: {
+          case_source: hashValue(validation.handoff.case_source ?? null),
+          case_evidence: hashValue(activeCaseEvidence ?? null),
+        },
+        outputs: {
+          model_case: brokerSelectedCaseEvidencePath,
+          case_compile_report: brokerSelectedCompileReportPath,
+        },
+        action: () => compileCase(validation.handoff.case_source, activeCaseEvidence),
+      })).value;
       activeCaseCompileReport = brokerSelectedCompilation.report;
       activeModelCase = brokerSelectedCompilation.model_case;
       if (
@@ -1118,10 +1163,19 @@ async function main() {
     runtime: runtimeClosure.digest,
     ...carrierMigrationInput("decisions"),
   });
-  const freshIntakeResult = runIntake({
-    intake: validation.handoff.intake,
-    draftCase: activeModelCase,
-  });
+  const freshIntakeResult = (await workGraph.runNode({
+    id: "intake_plan",
+    recipe: "intake-decision-plan/1.0",
+    inputs: {
+      intake: hashValue(serialisable(validation.handoff.intake ?? null)),
+      draft_case: hashValue(serialisable(activeModelCase ?? null)),
+    },
+    outputs: { intake_result: stage2Result },
+    action: () => runIntake({
+      intake: validation.handoff.intake,
+      draftCase: activeModelCase,
+    }),
+  })).value;
   if (brokerConfirmationCheck?.valid && !stoppedOutcome(freshIntakeResult.outcome)) {
     applyBrokerPreviewSelection(
       freshIntakeResult.working_case,
@@ -1138,6 +1192,7 @@ async function main() {
       // decision plan is byte-equivalent to the persisted prior run.
       receipt2 = cached2.receipt;
       reusedStages.push("evidence_review");
+      await workGraph.reuseStage("evidence_review");
     } else {
       await writeJsonAtomic(stage2Result, serialisable(freshIntakeResult));
     }
@@ -1418,10 +1473,19 @@ async function main() {
       validation.handoff.case_source,
       applied.applied,
     );
-    const recompilation = compileCase(
-      answeredCaseSource,
-      activeCaseEvidence,
-    );
+    const recompilation = (await workGraph.runNode({
+      id: "answered_case_recompile",
+      recipe: "answered-case-compile/1.0",
+      inputs: {
+        answered_case_source: hashValue(answeredCaseSource ?? null),
+        case_evidence: hashValue(activeCaseEvidence ?? null),
+      },
+      outputs: {
+        model_case: answeredCaseSourcePath,
+        case_compile_report: answeredCompileReportPath,
+      },
+      action: () => compileCase(answeredCaseSource, activeCaseEvidence),
+    })).value;
     await writeJsonAtomic(answeredCaseSourcePath, answeredCaseSource);
     await writeJsonAtomic(answeredCompileReportPath, recompilation.report);
     if (recompilation.report.status !== "clean") {
@@ -1469,11 +1533,21 @@ async function main() {
         },
       });
     }
-    const replayedIntake = runIntake({
-      intake: validation.handoff.intake,
-      draftCase: recompilation.model_case,
-      priorAnswers: recordedDecisionMap(answeredCaseSource),
-    });
+    const replayedIntake = (await workGraph.runNode({
+      id: "intake_replay",
+      recipe: "intake-decision-replay/1.0",
+      inputs: {
+        intake: hashValue(serialisable(validation.handoff.intake ?? null)),
+        recompiled_case: hashValue(serialisable(recompilation.model_case ?? null)),
+        prior_answers: hashValue([...recordedDecisionMap(answeredCaseSource)]),
+      },
+      outputs: { intake_result: path.join(stage3Dir, "question-result.json") },
+      action: () => runIntake({
+        intake: validation.handoff.intake,
+        draftCase: recompilation.model_case,
+        priorAnswers: recordedDecisionMap(answeredCaseSource),
+      }),
+    })).value;
     if (brokerConfirmationCheck?.valid && !stoppedOutcome(replayedIntake.outcome)) {
       applyBrokerPreviewSelection(
         replayedIntake.working_case,
@@ -1583,56 +1657,93 @@ async function main() {
     answeredCase = await readJson(answeredCasePath, "cached answered case");
     receipt3 = cached3.receipt;
     reusedStages.push("decisions");
+    await workGraph.reuseStage("decisions");
   } else {
     const planningCase = structuredClone(answeredCase);
-    const normalizedStatements = {
-      income_statement: stripStatementPresentationMetadata(
-        normaliseStatementRows(
-          answeredCase,
-          "income_statement",
-          { forecastDecisionMode: "defer" },
-        ),
+    const normalisation = (await workGraph.runNode({
+      id: "statement_normalisation",
+      recipe: "statement-normalisation/1.0",
+      inputs: { answered_case: hashValue(serialisable(answeredCase ?? null)) },
+      outputs: { statement_structure: null, source_coverage: null },
+      action: () => {
+        const normalizedStatements = {
+          income_statement: stripStatementPresentationMetadata(
+            normaliseStatementRows(
+              answeredCase,
+              "income_statement",
+              { forecastDecisionMode: "defer" },
+            ),
+          ),
+          cash_flow: stripStatementPresentationMetadata(
+            normaliseStatementRows(
+              answeredCase,
+              "cash_flow",
+              { forecastDecisionMode: "defer" },
+            ),
+          ),
+        };
+        planningCase.statement_structure = normalizedStatements;
+        return {
+          statement_structure: normalizedStatements,
+          source_coverage: reconcileStatementProjectionCoverage(
+            planningCase,
+            normalizedStatements,
+          ),
+        };
+      },
+    })).value;
+    planningCase.source_coverage = normalisation.source_coverage;
+    const behaviorMap = (await workGraph.runNode({
+      id: "forecast_behavior_map",
+      recipe: "forecast-behavior-map/1.0",
+      inputs: { planning_case: hashValue(serialisable(planningCase)) },
+      outputs: { forecast_behavior_map: forecastBehaviorPath },
+      action: () => compileForecastBehaviorMap(
+        planningCase,
+        planningCase.statement_structure,
       ),
-      cash_flow: stripStatementPresentationMetadata(
-        normaliseStatementRows(
-          answeredCase,
-          "cash_flow",
-          { forecastDecisionMode: "defer" },
-        ),
-      ),
-    };
-    planningCase.statement_structure = normalizedStatements;
-    planningCase.source_coverage = reconcileStatementProjectionCoverage(
-      planningCase,
-      normalizedStatements,
-    );
-    const behaviorMap = compileForecastBehaviorMap(
-      planningCase,
-      planningCase.statement_structure,
-    );
+    })).value;
     const behaviorValidation = validateForecastBehaviorMap(behaviorMap);
     if (!behaviorValidation.valid) {
       throw new Error(
         `Forecast behavior artifact is invalid: ${behaviorValidation.violations[0]?.message ?? "unknown violation"}`,
       );
     }
-    const modelDemandGraph = compileModelDemandGraph(planningCase);
+    const modelDemandGraph = (await workGraph.runNode({
+      id: "model_demand_graph",
+      recipe: "model-demand-graph/1.0",
+      inputs: { planning_case: hashValue(serialisable(planningCase)) },
+      outputs: { model_demand_graph: modelDemandGraphPath },
+      action: () => compileModelDemandGraph(planningCase),
+    })).value;
     const demandValidation = validateModelDemandGraph(modelDemandGraph);
     if (!demandValidation.valid) {
       throw new Error(
         `Model-demand graph is invalid: ${demandValidation.errors[0] ?? "unknown violation"}`,
       );
     }
-    const forecastPlan = compileForecastPlan(
-      planningCase,
-      planningCase.statement_structure,
-      {
-        behaviorMap,
-        observationLedger:
-          validation.handoff?.forecast_observation_ledger ?? null,
-        sourceInventory: evidenceRun?.source_inventory ?? [],
+    const forecastPlan = (await workGraph.runNode({
+      id: "forecast_plan",
+      recipe: "forecast-plan/1.0",
+      inputs: {
+        planning_case: hashValue(serialisable(planningCase)),
+        observation_ledger: hashValue(
+          serialisable(validation.handoff?.forecast_observation_ledger ?? null),
+        ),
+        source_inventory: hashValue(serialisable(evidenceRun?.source_inventory ?? [])),
       },
-    );
+      outputs: { forecast_plan: forecastPlanJsonPath },
+      action: () => compileForecastPlan(
+        planningCase,
+        planningCase.statement_structure,
+        {
+          behaviorMap,
+          observationLedger:
+            validation.handoff?.forecast_observation_ledger ?? null,
+          sourceInventory: evidenceRun?.source_inventory ?? [],
+        },
+      ),
+    })).value;
     const forecastPlanErrors = validateForecastPlan(
       forecastPlan,
       planningCase.statement_structure,
@@ -1640,12 +1751,21 @@ async function main() {
     if (forecastPlanErrors.length > 0) {
       throw new Error(`Forecast plan artifact is invalid: ${forecastPlanErrors[0]}`);
     }
-    const selectedAuthorityContract = compileSelectedAuthorityContract({
-      modelCase: planningCase,
-      forecastPlan,
-      modelDemandGraph,
-      evidenceRun,
-    });
+    const selectedAuthorityContract = (await workGraph.runNode({
+      id: "selected_authority_contract",
+      recipe: "selected-authority-contract/1.0",
+      inputs: {
+        planning_case: hashValue(serialisable(planningCase)),
+        evidence_run: stage1Inputs.evidence_run,
+      },
+      outputs: { selected_authority_contract: selectedAuthorityContractPath },
+      action: () => compileSelectedAuthorityContract({
+        modelCase: planningCase,
+        forecastPlan,
+        modelDemandGraph,
+        evidenceRun,
+      }),
+    })).value;
     const authorityValidation = validateSelectedAuthorityContract(
       selectedAuthorityContract,
       { modelDemandGraph, forecastPlan },
@@ -1655,13 +1775,22 @@ async function main() {
         `Selected-authority contract is invalid: ${authorityValidation.errors[0] ?? "unknown violation"}`,
       );
     }
-    const runConstitutionGraph = compileRunConstitutionGraph({
-      evidenceRun,
-      modelCase: planningCase,
-      forecastPlan,
-      modelDemandGraph,
-      selectedAuthorityContract,
-    });
+    const runConstitutionGraph = (await workGraph.runNode({
+      id: "run_constitution_graph",
+      recipe: "run-constitution-graph/1.0",
+      inputs: {
+        planning_case: hashValue(serialisable(planningCase)),
+        evidence_run: stage1Inputs.evidence_run,
+      },
+      outputs: { run_constitution_graph: runConstitutionGraphPath },
+      action: () => compileRunConstitutionGraph({
+        evidenceRun,
+        modelCase: planningCase,
+        forecastPlan,
+        modelDemandGraph,
+        selectedAuthorityContract,
+      }),
+    })).value;
     const constitutionValidation = validateRunConstitutionGraph(runConstitutionGraph);
     if (!constitutionValidation.valid) {
       throw new Error(

@@ -95,6 +95,23 @@ import { assertPhysicalOwnershipPreflight } from "./lib/forecast_ownership_resol
 import { explicitPlausibilityAcknowledgements } from "./lib/plausibility_acknowledgements.mjs";
 import { compileStatementFormula } from "./lib/formula_dsl.mjs";
 import {
+  binary as astBinary,
+  call as astCall,
+  conditional as astConditional,
+  group as astGroup,
+  literal as astLiteral,
+  numericLiteral as astNumericLiteral,
+  opaqueRef as astOpaqueRef,
+  parseExpression as astParseExpression,
+  parseExpressionExactly as astParseExpressionExactly,
+  range as astRange,
+  ref as astRef,
+  renderExpression as astRender,
+  renderFormula as astRenderFormula,
+  sheetRef as astSheetRef,
+  unary as astUnary,
+} from "./lib/formula_ast.mjs";
+import {
   historicalInterestBasisLabel,
   resolveHistoricalInterestAuthority,
 } from "./lib/historical_interest_authority.mjs";
@@ -500,6 +517,8 @@ function columnNumber(name) {
 // references in the same column become one range, while gaps and expression
 // terms remain explicit. It therefore never pulls an intervening mechanics row
 // into a subtotal merely because that row sits between two selected balances.
+const A1_ADDRESS_PATTERN = /^\$?[A-Z]+\$?[0-9]+$/;
+
 function compactCellReferences(cells) {
   const parse = (value) => {
     const text = String(value);
@@ -544,15 +563,39 @@ function compactCellReferences(cells) {
   return terms;
 }
 
-function sumCellExpression(cells) {
+/**
+ * One compacted term as a NODE (P5.2).
+ *
+ * `compactCellReferences` yields three shapes and only three: an A1 address, a
+ * contiguous `from:to` run it just folded, and a term this file was handed
+ * already formed and could not parse. Each gets the node that says which it is,
+ * so the join below is a call with arguments rather than a string with commas.
+ */
+function cellTermAst(term) {
+  const text = String(term);
+  const colon = text.indexOf(":");
+  if (colon > 0) {
+    return astRange(
+      cellTermAst(text.slice(0, colon)),
+      cellTermAst(text.slice(colon + 1)),
+    );
+  }
+  return A1_ADDRESS_PATTERN.test(text) ? astRef(text) : astOpaqueRef(text);
+}
+
+function sumCellExpressionAst(cells) {
   const terms = compactCellReferences(cells);
-  if (terms.length === 0) return "0";
-  if (terms.length === 1 && cells.length === 1) return terms[0];
-  return `SUM(${terms.join(",")})`;
+  if (terms.length === 0) return astLiteral(0);
+  if (terms.length === 1 && cells.length === 1) return cellTermAst(terms[0]);
+  return astCall("SUM", terms.map((term) => cellTermAst(term)));
+}
+
+function sumCellExpression(cells) {
+  return astRender(sumCellExpressionAst(cells));
 }
 
 function sumCellFormula(cells) {
-  return `=${sumCellExpression(cells)}`;
+  return astRenderFormula(sumCellExpressionAst(cells));
 }
 
 // Expand an A1 range into its individual cell addresses. Used by the provenance
@@ -1097,9 +1140,18 @@ export function creditMetricEbitdaPresentation(
 function applyConditionalState(sheet, rowPlan, context) {
   const { maxRow, waterfallRows, uncalculatedRows } = context;
   const c = rowPlan.controls;
-  const circularityOff = `=$C$${c.circularity}=0`;
-  const maturityRollOff = `=$C$${c.debt_maturities_roll}=0`;
-  const adjustmentsOff = `=$P$${c.adjustments_enabled}=0`;
+  // A conditional-format rule is a FORMULA, and it is built like one: a tree
+  // over the same closed vocabulary the cells use, rendered by the same
+  // renderer. `=$C$5=0` spelled by hand is two `=` signs meaning two different
+  // things a character apart, and nothing checked that the second one had an
+  // expression on either side of it.
+  const controlIsOff = (row) =>
+    astRenderFormula(astBinary("=", [astRef(`$C$${row}`), astLiteral(0)]));
+  const circularityOff = controlIsOff(c.circularity);
+  const maturityRollOff = controlIsOff(c.debt_maturities_roll);
+  const adjustmentsOff = astRenderFormula(
+    astBinary("=", [astRef(`$P$${c.adjustments_enabled}`), astLiteral(0)]),
+  );
   const brokerCase = `$C$${c.broker_case}`;
 
   // "Suppressed", not "zero". Grey plus italic is the same vocabulary the
@@ -1203,7 +1255,9 @@ function applyConditionalState(sheet, rowPlan, context) {
       const [first, last] = pair.split(":");
       tint(
         `${first}${endingRcf}:${last}${endingRcf}`,
-        `=${first}$${endingRcf}>0`,
+        astRenderFormula(
+          astBinary(">", [astRef(`${first}$${endingRcf}`), astLiteral(0)]),
+        ),
         COLORS.stateAmber,
       );
     }
@@ -1214,7 +1268,9 @@ function applyConditionalState(sheet, rowPlan, context) {
       const [first, last] = pair.split(":");
       tint(
         `${first}${shortfall}:${last}${shortfall}`,
-        `=${first}$${shortfall}>0`,
+        astRenderFormula(
+          astBinary(">", [astRef(`${first}$${shortfall}`), astLiteral(0)]),
+        ),
         COLORS.stateRed,
       );
     }
@@ -1247,16 +1303,12 @@ function applyConditionalState(sheet, rowPlan, context) {
   // untouched in both states: the cell is a hardcoded input, its blue is its
   // provenance, and the rules below deliberately do not carry the toggles' font
   // colour even though a single-cell control rule would be permitted one.
-  tint(
-    `C${c.broker_case}`,
-    `=${brokerCase}="Consensus"`,
-    COLORS.toggleOff,
-  );
-  tint(
-    `C${c.broker_case}`,
-    `=${brokerCase}<>"Consensus"`,
-    COLORS.toggleOn,
-  );
+  const brokerCaseIs = (operator) =>
+    astRenderFormula(
+      astBinary(operator, [astRef(brokerCase), astLiteral("Consensus")]),
+    );
+  tint(`C${c.broker_case}`, brokerCaseIs("="), COLORS.toggleOff);
+  tint(`C${c.broker_case}`, brokerCaseIs("<>"), COLORS.toggleOn);
 }
 
 /**
@@ -2074,26 +2126,36 @@ function brokerEvidenceFormula(layout, houseName, metricId, periodIndex, expecte
   // In image-evidence mode the verified number is written once on Brokers as
   // a blue hardcode with sealed provenance; Bxx is deliberately visual-only.
   if (layout.mode === "page_images") return null;
+  // P5.2 — the evidence formula is a TREE. Every cross-sheet component is a
+  // `sheetRef` whose sheet name and address are each validated, rather than a
+  // quoted name spliced in front of an address with a `!`; the coefficient is a
+  // literal in a `*` node; and the multiplier's parentheses are a declared
+  // `group`, which is what they are — the multiplication would bind wrongly
+  // without them and the old code knew that only by having typed the brackets.
   const terms = (mapping.components ?? []).map((component) => {
     const physical = layout.cellMap.get(
       `${component.table_id}|${component.row}|${component.column}`,
     );
-    const reference = `'${physical.sheetName.replace(/'/g, "''")}'!${physical.address}`;
+    const reference = astSheetRef(physical.sheetName, physical.address);
     const coefficient = Number(component.coefficient);
     if (coefficient === 1) return reference;
-    if (coefficient === -1) return `-${reference}`;
-    return `${reference}*${coefficient}`;
+    if (coefficient === -1) return astUnary("-", reference);
+    return astBinary("*", [reference, astLiteral(coefficient)]);
   });
   let expression;
   const constant = Number(mapping.constant ?? 0);
   if (terms.length === 1 && constant === 0) expression = terms[0];
   else {
-    const argumentsList = [...terms, ...(constant === 0 ? [] : [String(constant)])];
-    expression = `SUM(${argumentsList.join(",")})`;
+    expression = astCall("SUM", [
+      ...terms,
+      ...(constant === 0 ? [] : [astLiteral(constant)]),
+    ]);
   }
   const multiplier = Number(mapping.multiplier ?? 1);
-  if (multiplier !== 1) expression = `(${expression})*${multiplier}`;
-  return `=${expression}`;
+  if (multiplier !== 1) {
+    expression = astBinary("*", [astGroup(expression), astLiteral(multiplier)]);
+  }
+  return astRenderFormula(expression);
 }
 
 function buildBrokerEvidenceDivider(workbook, layout) {
@@ -2335,7 +2397,9 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   applyFormula(
     sheet,
     `${ACTUAL_COLUMN}2`,
-    `='Operating Model'!$C$${rowPlan.controls.broker_case}`,
+    astRenderFormula(
+      astSheetRef("Operating Model", `$C$${rowPlan.controls.broker_case}`),
+    ),
   );
   sheet.getRange(`B2:${ACTUAL_COLUMN}2`).format.font = { bold: true };
 
@@ -2395,11 +2459,23 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
   // engaged, and it is used here for the same reason — this is the option that
   // is ON.
   const markLiveCase = (labelRow, span = `B${labelRow}`, aliases = []) => {
-    const labels = [`$B${labelRow}`, ...aliases.map((label) => `"${label}"`)]
-      .map((label) => `${liveCaseCell}=${label}`)
-      .join(",");
+    // The alias list used to be joined with commas into an `OR(...)` and the
+    // whole thing spliced into an `AND(...)`; a label containing a quote or a
+    // comma would have re-punctuated the rule. It is a call node with argument
+    // nodes now, and a label is a string LITERAL, escaped by the renderer.
+    const matches = [
+      astBinary("=", [astRef(liveCaseCell), astRef(`$B${labelRow}`)]),
+      ...aliases.map((label) =>
+        astBinary("=", [astRef(liveCaseCell), astLiteral(String(label))]),
+      ),
+    ];
     sheet.getRange(span).conditionalFormats.add("expression", {
-      formula: `=AND(${liveCaseCell}<>"",OR(${labels}))`,
+      formula: astRenderFormula(
+        astCall("AND", [
+          astBinary("<>", [astRef(liveCaseCell), astLiteral("")]),
+          astCall("OR", matches),
+        ]),
+      ),
       format: { fill: COLORS.toggleOn, font: { bold: true } },
     });
   };
@@ -2439,10 +2515,18 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     // pack quotes those as positive magnitudes and the cash-flow statement
     // carries them as negative movements, and a single unnegated copy would read
     // as a sign error against the nine forecasts beside it.
-    const actualFormula = definition
-      ? BROKER_MAGNITUDE_ROLES.has(definition.semantic_role)
-        ? `=-'Operating Model'!${HISTORICAL_COLUMNS.at(-1)}${definition.row}`
-        : `='Operating Model'!${HISTORICAL_COLUMNS.at(-1)}${definition.row}`
+    const actualLink = definition
+      ? astSheetRef(
+          "Operating Model",
+          `${HISTORICAL_COLUMNS.at(-1)}${definition.row}`,
+        )
+      : null;
+    const actualFormula = actualLink
+      ? astRenderFormula(
+          BROKER_MAGNITUDE_ROLES.has(definition.semantic_role)
+            ? astUnary("-", actualLink)
+            : actualLink,
+        )
       : null;
 
     // Production workbook emission is fail-closed on the hash-bound contributor
@@ -2581,7 +2665,15 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         applyFormula(
           sheet,
           `${column}${row}`,
-          `=IFERROR(${column}${providerConsensusRow}-${column}${modelConsensusRow},"")`,
+          astRenderFormula(
+            astCall("IFERROR", [
+              astBinary("-", [
+                astRef(`${column}${providerConsensusRow}`),
+                astRef(`${column}${modelConsensusRow}`),
+              ]),
+              astLiteral(""),
+            ]),
+          ),
         );
       }
       row += 1;
@@ -2596,10 +2688,23 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
         applyFormula(
           sheet,
           `${column}${row}`,
-          `=IFERROR(${column}${differenceRow}/ABS(${column}${modelConsensusRow}),"")`,
+          astRenderFormula(
+            astCall("IFERROR", [
+              astBinary("/", [
+                astRef(`${column}${differenceRow}`),
+                astCall("ABS", [astRef(`${column}${modelConsensusRow}`)]),
+              ]),
+              astLiteral(""),
+            ]),
+          ),
         );
         sheet.getRange(`${column}${row}`).conditionalFormats.add("expression", {
-          formula: `=ABS(${column}${row})>${compiledConsensus.review_threshold}`,
+          formula: astRenderFormula(
+            astBinary(">", [
+              astCall("ABS", [astRef(`${column}${row}`)]),
+              astLiteral(Number(compiledConsensus.review_threshold)),
+            ]),
+          ),
           format: { fill: COLORS.toggleOff, font: { bold: true } },
         });
       }
@@ -2616,7 +2721,11 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
       applyFormula(
         sheet,
         `${column}${row}`,
-        refs.length > 0 ? `=COUNT(${refs.join(",")})` : "=0",
+        astRenderFormula(
+          refs.length > 0
+            ? astCall("COUNT", refs.map((reference) => astRef(reference)))
+            : astLiteral(0),
+        ),
       );
     }
     row += 1;
@@ -2699,34 +2808,52 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
     // The Operating Model links only to this row.
     for (let index = 0; index < 3; index += 1) {
       const column = FORECAST_COLUMNS_BROKERS[index];
-      let expression =
-        `IF(OR(${liveCaseCell}="Consensus",${liveCaseCell}="Model Consensus",` +
-        `${liveCaseCell}="Forecast Waterfall"),${column}${modelConsensusRow},`;
-      if (providerConsensusRow) {
-        expression +=
-          `IF(${liveCaseCell}="Provider Consensus",${column}${providerConsensusRow},`;
-      }
-      expression +=
-        `IF(${liveCaseCell}="High",${column}${highRow},` +
-        `IF(${liveCaseCell}="Low",${column}${lowRow}`;
+      // THE SELECTOR IS A FOLD, SO IT IS WRITTEN AS ONE.
+      //
+      // This used to be assembled by appending `IF(...,` fragments and then
+      // closing them with `")".repeat(3 + names + provider)` — a bracket count
+      // maintained by hand, in a second place, against a chain built in a
+      // first. Get that arithmetic wrong by one and the workbook ships a
+      // formula Excel cannot parse; get it wrong by one in the other direction
+      // and an arm silently swallows the next. Built as a right fold over
+      // `conditional` nodes there is no count to keep: each arm nests inside
+      // the previous one's ELSE, and the renderer closes exactly what it opened.
       const selectableNames = compiledConsensus.periods[index].included.map(
         (entry) => entry.house_name,
       );
-      selectableNames.forEach((name) => {
-        const brokerRow = rowByHouse.get(name);
-        expression +=
-          `,IF(${liveCaseCell}="${name.replace(/"/g, '""')}",` +
-          `${column}${brokerRow}`;
-      });
+      const caseIs = (label) =>
+        astBinary("=", [astRef(liveCaseCell), astLiteral(String(label))]);
       // An unrecognised/degraded selection deliberately returns blank. The
       // statement row's sealed forecast authority then comes from company
       // evidence, formulas or history; this display selector may never invent
       // a consensus fallback for a missing named-house cell.
-      expression += `,""`;
-      expression += ")".repeat(
-        3 + selectableNames.length + (providerConsensusRow ? 1 : 0),
+      let selector = astLiteral("");
+      for (const name of [...selectableNames].reverse()) {
+        selector = astConditional(
+          caseIs(name),
+          astRef(`${column}${rowByHouse.get(name)}`),
+          selector,
+        );
+      }
+      selector = astConditional(caseIs("Low"), astRef(`${column}${lowRow}`), selector);
+      selector = astConditional(caseIs("High"), astRef(`${column}${highRow}`), selector);
+      if (providerConsensusRow) {
+        selector = astConditional(
+          caseIs("Provider Consensus"),
+          astRef(`${column}${providerConsensusRow}`),
+          selector,
+        );
+      }
+      selector = astConditional(
+        astCall("OR", [
+          caseIs("Consensus"),
+          caseIs("Model Consensus"),
+          caseIs("Forecast Waterfall"),
+        ]),
+        astRef(`${column}${modelConsensusRow}`),
+        selector,
       );
-      applyFormula(sheet, `${column}${metricRow}`, `=${expression}`);
+      applyFormula(sheet, `${column}${metricRow}`, astRenderFormula(selector));
     }
     if (actualFormula) {
       applyFormula(sheet, `${ACTUAL_COLUMN}${metricRow}`, actualFormula);
@@ -2898,7 +3025,7 @@ function buildBrokersSheet(workbook, modelCase, rowPlan, brokerEvidence = null) 
       applyFormula(
         sheet,
         `${ACTUAL_COLUMN}${row}`,
-        `='Operating Model'!I${definition.row}`,
+        astRenderFormula(astSheetRef("Operating Model", `I${definition.row}`)),
       );
       for (let index = 0; index < 3; index += 1) {
         const authority = authorities[index];
@@ -3116,25 +3243,36 @@ function rateFormula(
 // they used to; a literal ["C","D","E"] here would have gone on pointing at the
 // actual and the first two forecasts, silently, on every broker-driven row in
 // the model.
-function brokerLink(brokerRows, metricId, forecastIndex) {
+function brokerLinkAst(brokerRows, metricId, forecastIndex) {
   const row = brokerRows.selectedRows[metricId];
   if (!row) return null;
-  return `='Brokers'!${brokerRows.forecastColumns[forecastIndex]}${row}`;
+  return astSheetRef(
+    "Brokers",
+    `${brokerRows.forecastColumns[forecastIndex]}${row}`,
+  );
+}
+
+function brokerLink(brokerRows, metricId, forecastIndex) {
+  const node = brokerLinkAst(brokerRows, metricId, forecastIndex);
+  return node ? astRenderFormula(node) : null;
 }
 
 function signedBrokerLink(definition, brokerRows, forecastIndex) {
   const link = definition.broker_metric_id
-    ? brokerLink(brokerRows, definition.broker_metric_id, forecastIndex)
+    ? brokerLinkAst(brokerRows, definition.broker_metric_id, forecastIndex)
     : null;
   if (!link) return null;
+  // The sign flip is a node ABOVE the link, not `"=-ABS(" + link.slice(1) + ")"`
+  // — a construction whose correctness rested on the leading `=` being exactly
+  // one character wide.
   if (
     ["capex", "dividends", "share_buybacks"].includes(
       definition.semantic_role,
     )
   ) {
-    return `=-ABS(${link.slice(1)})`;
+    return astRenderFormula(astUnary("-", astCall("ABS", [link])));
   }
-  return link;
+  return astRenderFormula(link);
 }
 
 // REMOVED 2026-07-26: couponsPerYear() and the (1+coupon/n)^n-1 gross-up.
@@ -3328,7 +3466,9 @@ function acquisitionRatioDrivenAmount(drivers, column, kind) {
 // stating it here rather than as a control is why the acquisition block is
 // eight rows and not fourteen.
 function acquisitionRatioRowFormula(definition, column) {
-  return `=${standaloneColumnFor(column)}${definition.row}`;
+  return astRenderFormula(
+    astRef(`${standaloneColumnFor(column)}${definition.row}`),
+  );
 }
 
 function acquisitionRoleForDefinition(definition) {
@@ -3534,8 +3674,47 @@ function acquisitionFullEbitdaFormula(modelCase, column, rowPlan) {
     : acquisitionFullEbitdaInlineFormula(modelCase, column, rowPlan);
 }
 
+/**
+ * Negate an expression the way the TEXT `-<expr>` reads.
+ *
+ * Excel's unary minus binds tighter than `*` and `/`, so `-A*B` is `(-A)*B`,
+ * not `-(A*B)`. Splicing a minus sign onto the front of a fragment silently
+ * relied on that; saying it in the tree makes it a stated rule with one place
+ * to be wrong. Where the fragment is an additive chain the two readings differ
+ * arithmetically, so the negation goes around the whole thing — the correct
+ * answer, and one that shows up immediately as a byte difference if any caller
+ * was ever relying on the other.
+ */
+function negatedExpressionAst(node) {
+  if (
+    node.kind === "binary" &&
+    (node.operator === "*" || node.operator === "/")
+  ) {
+    return astBinary(node.operator, [
+      negatedExpressionAst(node.operands[0]),
+      ...node.operands.slice(1),
+    ]);
+  }
+  return astUnary("-", node);
+}
+
+/**
+ * P5.2 — the acquisition adjustment column, composed rather than concatenated.
+ *
+ * The seven arms below used to interpolate four expression FRAGMENTS (the
+ * operating fraction, the target's full-year EBITDA, its margin, its ratio-
+ * driven amounts) into template literals. The fragments still arrive as text —
+ * their producers are the neighbouring emitters and out of this package's
+ * scope — but they are now READ into trees by `parseExpressionExactly`, which
+ * refuses anything that is not an expression in the closed vocabulary and
+ * refuses any tree that does not re-render to the exact fragment it was given.
+ * The arms then COMPOSE nodes. Where a fragment lands inside an operator that
+ * would need parentheses around it, the renderer supplies them; the old
+ * concatenation could not have known.
+ */
 function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
   const c = rowPlan.controls;
+  const fragment = (text) => astParseExpressionExactly(String(text));
   const factor = acquisitionFactorFormula(column, rowPlan);
   const fullEbitda = acquisitionFullEbitdaFormula(modelCase, column, rowPlan);
   const drivers = acquisitionDerivedDrivers(modelCase, rowPlan);
@@ -3553,36 +3732,64 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
     // The margin is a DENOMINATOR here, so it is tested before it is used. A
     // margin at or below the floor means the target's revenue is not derivable
     // and the line reads zero — never 1e19.
-    return (
-      `=IF(${margin}>${ACQUISITION_NEAR_ZERO_TEXT},` +
-      `IFERROR(${fullEbitda}/${margin}*${factor},0),0)`
+    return astRenderFormula(
+      astConditional(
+        astBinary(">", [
+          fragment(margin),
+          astNumericLiteral(ACQUISITION_NEAR_ZERO_TEXT),
+        ]),
+        astCall("IFERROR", [
+          astBinary("*", [
+            astBinary("/", [fragment(fullEbitda), fragment(margin)]),
+            fragment(factor),
+          ]),
+          astLiteral(0),
+        ]),
+        astLiteral(0),
+      ),
     );
   }
   if (isEbitdaSemanticRole(role)) {
-    return `=${fullEbitda}*${factor}`;
+    return astRenderFormula(
+      astBinary("*", [fragment(fullEbitda), fragment(factor)]),
+    );
   }
   if (role === "depreciation_and_amortisation") {
     // D&A is a percentage of a driver, and the percentage is the target's own —
     // the line sitting against the D&A row when the company prints one, the
     // declared share of the target's EBITDA when it does not.
     const amount = acquisitionRatioDrivenAmount(drivers, column, "da");
-    return amount ? `=${amount}` : null;
+    return amount ? astRenderFormula(fragment(amount)) : null;
   }
   if (role === "ebit") {
     if (!drivers.ebitda || !drivers.da) return null;
-    return `=${column}${drivers.ebitda.row}-${column}${drivers.da.row}`;
+    return astRenderFormula(
+      astBinary("-", [
+        astRef(`${column}${drivers.ebitda.row}`),
+        astRef(`${column}${drivers.da.row}`),
+      ]),
+    );
   }
   if (role === "change_in_working_capital") {
     if (!drivers.revenue) return null;
-    return (
-      `=IFERROR(${column}${drivers.revenue.row}*` +
-      `${standaloneColumn}${definition.row}/` +
-      `${standaloneColumn}${drivers.revenue.row},0)`
+    return astRenderFormula(
+      astCall("IFERROR", [
+        astBinary("/", [
+          astBinary("*", [
+            astRef(`${column}${drivers.revenue.row}`),
+            astRef(`${standaloneColumn}${definition.row}`),
+          ]),
+          astRef(`${standaloneColumn}${drivers.revenue.row}`),
+        ]),
+        astLiteral(0),
+      ]),
     );
   }
   if (role === "capex") {
     const amount = acquisitionRatioDrivenAmount(drivers, column, "capex");
-    return amount ? `=-${amount}` : null;
+    return amount
+      ? astRenderFormula(negatedExpressionAst(fragment(amount)))
+      : null;
   }
   if (role === "tax_expense") {
     const statementRows = [
@@ -3605,9 +3812,13 @@ function acquisitionAdjustmentFormula(modelCase, definition, column, rowPlan) {
     // rather than independently recalculating its whole tax charge from the
     // standalone tax-rate cell. This is acyclic and lets every transaction
     // change above PBT flow through exactly once.
-    return (
-      `=-${column}${preTaxIncomeRow}*` +
-      `${standaloneColumn}${effectiveTaxRateRow}`
+    return astRenderFormula(
+      negatedExpressionAst(
+        astBinary("*", [
+          astRef(`${column}${preTaxIncomeRow}`),
+          astRef(`${standaloneColumn}${effectiveTaxRateRow}`),
+        ]),
+      ),
     );
   }
   return null;
@@ -10262,8 +10473,108 @@ function attachInputProvenance(sheet, rowPlan, modelCase, workbook) {
 
 const ADJUSTMENT_GATE_COLUMNS = ["N", "O", "P"];
 
+/**
+ * THE GATE, AS A TREE (P5.2).
+ *
+ * `IF($P$<control>=0,0,<inner>)` used to be applied as `prefix + formula + ")"`
+ * — string concatenation over formula text nobody had ever parsed — and
+ * detected as `formula.startsWith(prefix)`. Both halves were claims about a
+ * STRING. A prefix test says yes to `IF($P$4=0,0,A1)+1`, which is not a gated
+ * cell but a gated cell plus one; and a concatenation cannot tell an expression
+ * from a fragment, so a malformed inner formula would have been wrapped and
+ * shipped with the gate's own closing bracket lending it the look of balance.
+ *
+ * The gate is now a `conditional` NODE whose false arm is the tree the inner
+ * formula parses to, rendered by the one renderer. Three consequences, and they
+ * are the point of the package:
+ *
+ *   - Wrapping something that is not an expression in the closed vocabulary
+ *     throws, at the cell, naming the offset — it cannot be concatenated.
+ *   - The wrap is EXACT: `parseExpressionExactly` refuses a tree that does not
+ *     re-render to its own source, so the inner formula reaches the workbook
+ *     byte for byte and the gate is provably the only difference.
+ *   - `adjustmentGateInner` reads the gate back off a tree by SHAPE, so
+ *     "carries the gate" is a structural fact and the same function both
+ *     applies it and recognises it. There is no second definition to drift.
+ *
+ * `adjustmentGatePrefix` survives as the DECLARED text of the gate — the plan
+ * declaration quotes it and the derivability proof reads it — but nothing
+ * writes a formula with it any more.
+ */
+function adjustmentGateControlRef(rowPlan) {
+  return astRef(`$P$${rowPlan.controls.adjustments_enabled}`);
+}
+
+function adjustmentGateAst(rowPlan, inner) {
+  return astConditional(
+    astBinary("=", [adjustmentGateControlRef(rowPlan), astLiteral(0)]),
+    astLiteral(0),
+    inner,
+  );
+}
+
 function adjustmentGatePrefix(rowPlan) {
   return `IF($P$${rowPlan.controls.adjustments_enabled}=0,0,`;
+}
+
+/**
+ * The inner expression of a gated tree, or null when `node` is not this
+ * workbook's adjustment gate. Every field is checked: the conditional shape,
+ * the `=` test against THIS case's control cell, and both zero arms.
+ */
+function adjustmentGateInnerOf(controlCell, node) {
+  if (!node || node.kind !== "conditional") return null;
+  const test = node.test;
+  if (!test || test.kind !== "binary" || test.operator !== "=") return null;
+  if (!Array.isArray(test.operands) || test.operands.length !== 2) return null;
+  const [control, zero] = test.operands;
+  if (
+    control?.kind !== "ref" ||
+    control.sheet !== undefined ||
+    control.text !== controlCell
+  ) {
+    return null;
+  }
+  if (zero?.kind !== "literal" || zero.value !== 0) return null;
+  if (node.whenTrue?.kind !== "literal" || node.whenTrue.value !== 0) return null;
+  return node.whenFalse ?? null;
+}
+
+function adjustmentGateInner(rowPlan, node) {
+  return adjustmentGateInnerOf(adjustmentGateControlRef(rowPlan).text, node);
+}
+
+/** Gate one formula's TEXT by building the node and rendering it. */
+function gateAdjustmentFormula(rowPlan, formulaText) {
+  return astRender(
+    adjustmentGateAst(rowPlan, astParseExpressionExactly(String(formulaText))),
+  );
+}
+
+/**
+ * Does this formula text already carry the gate?
+ *
+ * Structural, not `startsWith`. Text outside the closed vocabulary answers NO
+ * rather than throwing: this is a question about a formula the caller is
+ * inspecting, not one it is about to rewrite, and a cell whose formula cannot
+ * be read as an expression certainly does not carry a gate node.
+ */
+function carriesAdjustmentGateOf(controlCell, formulaText) {
+  if (typeof formulaText !== "string") return false;
+  let node;
+  try {
+    node = astParseExpression(formulaText);
+  } catch {
+    return false;
+  }
+  return adjustmentGateInnerOf(controlCell, node) !== null;
+}
+
+function carriesAdjustmentGate(rowPlan, formulaText) {
+  return carriesAdjustmentGateOf(
+    adjustmentGateControlRef(rowPlan).text,
+    formulaText,
+  );
 }
 
 /**
@@ -10362,9 +10673,8 @@ async function patchWorkbookProperties(
         const formulaMatch = innerXml.match(formulaPattern);
         if (!formulaMatch) return fullMatch;
         const formula = formulaMatch[3];
-        const gate = adjustmentGatePrefix(rowPlan);
-        if (formula.startsWith(gate)) return fullMatch;
-        const gatedFormula = `${gate}${formula})`;
+        if (carriesAdjustmentGate(rowPlan, formula)) return fullMatch;
+        const gatedFormula = gateAdjustmentFormula(rowPlan, formula);
         const updatedInnerXml = innerXml.replace(
           formulaPattern,
           () =>
@@ -11881,6 +12191,9 @@ function declareShippedFacts(rowPlan, brokerRows) {
       label_indents: indents,
       centre_continuous: centreContinuous,
       gate_prefix: adjustmentGatePrefix(rowPlan),
+      // The gate's CONTROL CELL, so the shipped-plan check can recognise the
+      // gate by the shape of the tree instead of by a text prefix.
+      gate_control_cell: adjustmentGateControlRef(rowPlan).text,
       gate_excluded_rows: adjustmentGateExcludedRows(rowPlan),
       period_row: Number(rowPlan.period_row),
       visible_end_row: Number(rowPlan.visible_end_row),
@@ -11961,7 +12274,10 @@ function assertShippedPlan(plan, declared) {
     const [, column, rowText] = parsed;
     const row = Number(rowText);
     if (cell.f === undefined) continue;
-    const carries = cell.f.startsWith(spec.gate_prefix);
+    // STRUCTURAL, not `startsWith`. A prefix test also says yes to
+    // `IF($P$4=0,0,A1)+1`, which is a gated cell plus one — a formula this
+    // check exists to notice, and one no reader would call gated.
+    const carries = carriesAdjustmentGateOf(spec.gate_control_cell, cell.f);
     const shouldGate =
       ADJUSTMENT_GATE_COLUMNS.includes(column) &&
       row > spec.period_row &&
@@ -12138,7 +12454,6 @@ function assertShippedPlan(plan, declared) {
  */
 function applyPlanFormulaRewrites(sheet, rowPlan) {
   const excludedRows = adjustmentGateExcludedRows(rowPlan);
-  const gate = adjustmentGatePrefix(rowPlan);
   let adjustmentCells = 0;
   let proFormaHistoricalCells = 0;
   for (const address of [...sheet.cellAddresses()]) {
@@ -12151,14 +12466,17 @@ function applyPlanFormulaRewrites(sheet, rowPlan) {
     if (column === "N" || column === "O" || column === "P") {
       adjustmentCells += 1;
       if (!isRewritableFaceRow(rowPlan, row) || excludedRows.has(row)) continue;
-      if (cell.formula.startsWith(gate)) continue;
-      sheet.setFormulaText(address, `${gate}${cell.formula})`);
+      if (carriesAdjustmentGate(rowPlan, cell.formula)) continue;
+      sheet.setFormulaText(address, gateAdjustmentFormula(rowPlan, cell.formula));
       continue;
     }
     if (column === "R") {
       if (!isRewritableFaceRow(rowPlan, row)) continue;
       proFormaHistoricalCells += 1;
-      sheet.setFormulaText(address, `I${row}`);
+      // The pro-forma-historical rewrite states a LINK to the last actual, so
+      // it is written as the one-node tree a link is, not as an interpolated
+      // column letter and row number that happen to spell an address.
+      sheet.setFormulaText(address, astRender(astRef(`I${row}`)));
     }
   }
   return { adjustmentCells, proFormaHistoricalCells };

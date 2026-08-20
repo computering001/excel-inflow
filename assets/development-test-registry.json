@@ -1652,6 +1652,15 @@
       "test_class": "mutation"
     },
     {
+      "id": "evidence-work-graph",
+      "phase": "workflow",
+      "runtime": "node",
+      "script": "run_evidence_work_graph_tests.mjs",
+      "timeout_seconds": 600,
+      "mutates_product_tree": false,
+      "test_class": "mutation"
+    },
+    {
       "id": "canonical-model-modules",
       "phase": "graph",
       "runtime": "node",

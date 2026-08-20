@@ -154,6 +154,15 @@
       "concern": "evidence transaction",
       "target_owner": "Evidence IR (Phase 1)"
     },
+    "lib/evidence_work_graph.mjs": {
+      "count": 1,
+      "families": {
+        "release_identity": 1
+      },
+      "classification": "canonical_writer",
+      "concern": "P6.3 evidence-half work nodes + recorded cache decisions (declares and measures; deliberately does not skip work)",
+      "target_owner": "Runtime governance (Phase 6)"
+    },
     "lib/flow.mjs": {
       "count": 2,
       "families": {

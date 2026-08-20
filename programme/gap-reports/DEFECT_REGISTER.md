@@ -278,3 +278,16 @@ the correct trade — the alternative is shipping a workbook that misrepresents 
 came from, which is the single thing this programme's constitution refuses most explicitly.
 Unblocking delivery is a separate, properly-scoped repair on the emitter, NOT a relaxation of
 the check that found it.
+
+## D25 — compileBrokerPreview throws on the clean fixture and a catch installs a fallback
+Surfaced incidentally by P6.3's work graph, which now records `invalid.node_threw` on the
+`broker_preview` node. On the clean synthetic fixture `compileBrokerPreview` THROWS, and the
+surrounding catch installs the forecast-waterfall fallback. Behaviour is unchanged by P6.3 (the
+node rethrows and the fallback still applies), but what was previously visible only as the
+PRESENCE of a fallback artifact is now recorded as a thrown node with a reason.
+
+Why it matters: a silent degradation that reaches a lawful-looking outcome is the shape this
+programme repeatedly finds. The fallback may well be correct, but a throw on the CLEAN fixture
+means the preview path fails on input it should handle, and nothing named that until now.
+Open question for the owner: is the throw expected for a broker pack of this shape (then the
+catch should be a declared branch, not an exception), or is it a real preview defect?

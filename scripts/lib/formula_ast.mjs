@@ -52,6 +52,16 @@ export const FORMULA_FUNCTIONS = Object.freeze([
   "MIN",
   "MAX",
   "ABS",
+  // P5.2 — the rest of the vocabulary the shipped workbook actually uses.
+  // Every one of these was already being emitted as a raw template literal;
+  // admitting them here is what lets those formulas be READ as trees instead
+  // of trusted as text. `IF` is deliberately absent: it is the `conditional`
+  // node kind, not a call.
+  "AND",
+  "OR",
+  "COUNT",
+  "ISNUMBER",
+  "DATE",
 ]);
 
 /** Closed binary-operator vocabulary, with Excel's precedence levels. */
@@ -256,6 +266,12 @@ export function renderExpression(node) {
   switch (node.kind) {
     case "ref": {
       const text = String(node.text ?? "");
+      // A sheet-qualified address re-validates through its own constructor, so
+      // the sheet name and the cell address are each checked; the text is never
+      // taken on trust just because it carries a `!`.
+      if (node.sheet !== undefined) {
+        return sheetRef(node.sheet, node.address ?? "").text;
+      }
       if (node.strict === false) return opaqueRef(text).text;
       return ref(text).text;
     }
@@ -265,7 +281,20 @@ export function renderExpression(node) {
       )}`;
     case "literal": {
       const value = literal(node.value).value;
-      return typeof value === "number" ? String(value) : renderQuoted(value);
+      if (typeof value !== "number") return renderQuoted(value);
+      // A preserved lexeme is re-checked to denote exactly this value, so the
+      // spelling can differ from `String(value)` but the NUMBER cannot.
+      if (node.text !== undefined) {
+        const spelled = numericLiteral(node.text);
+        if (spelled.value !== value) {
+          throw new FormulaAstError(
+            `Numeric literal ${JSON.stringify(node.text)} does not denote ${value}.`,
+            { kind: "literal", value, text: node.text },
+          );
+        }
+        return spelled.text ?? String(value);
+      }
+      return String(value);
     }
     case "unary": {
       if (node.operator !== "-") {
@@ -401,4 +430,307 @@ export function verifyFormulaAst(node, formula) {
   return [
     `Formula AST renders ${rendered} but the accompanying formula text is ${expected}.`,
   ];
+}
+
+// ---------------------------------------------------------------------------
+// P5.2 — SHEET-QUALIFIED REFERENCES AND THE READER
+//
+// Everything above builds trees FORWARD, from a rule the compiler holds. This
+// section adds the inverse: `parseExpression` reads Excel text and returns a
+// tree over the SAME closed vocabulary, or throws. It exists for two callers:
+//
+//   1. The adjustment gate. Gating a cell used to be `prefix + formula + ")"`
+//      — string concatenation over text nobody had ever typed. It is now
+//      `conditional(binary("=", [...]), literal(0), parseExpression(formula))`
+//      rendered by `renderExpression`, so the gate is a NODE around a TREE and
+//      the wrap cannot land on something that is not an expression.
+//   2. The emitted-`<f>` derivability proof, which reads the formulas out of a
+//      built workbook and shows each one is an expression in this vocabulary
+//      that re-renders to the exact bytes that shipped.
+//
+// The parser is deliberately TOTAL AND CLOSED in the same sense the renderer
+// is: an unknown function, an undeclared operator, a name, a structured
+// reference, whitespace, or any character outside the grammar throws
+// `FormulaAstError` rather than being tolerated. And it is EXACT: every
+// parenthesis in the source becomes a `group` node and every numeric lexeme
+// keeps its source spelling, so `renderExpression(parseExpression(t)) === t`
+// for every text this parser accepts. That identity is what makes the reader
+// usable in a byte-identity-gated pipeline at all.
+// ---------------------------------------------------------------------------
+
+/** `'Sheet Name'!$A$1`, anchored — the whole text or nothing. */
+const SHEET_QUALIFIED_PATTERN = /^'((?:[^']|'')+)'!(\$?[A-Z]{1,3}\$?[0-9]+)/;
+const NUMERIC_LEXEME_PATTERN = /^[0-9]+(?:\.[0-9]+)?$/;
+
+/**
+ * A reference to a cell on ANOTHER sheet, `'Forward Curves'!F10`.
+ *
+ * The node kind stays `ref` — the eight-kind vocabulary is closed and a
+ * cross-sheet address is still an address — but it carries the sheet name as
+ * structure rather than as a prefix spliced into the text.
+ */
+export function sheetRef(sheet, address) {
+  const name = String(sheet);
+  const cell = String(address);
+  // A sheet name may contain an apostrophe; Excel doubles it inside the quotes.
+  // It may not contain the characters that would end the reference.
+  if (name.length === 0 || /[\[\]*?:\/\\!"]/.test(name)) {
+    throw new FormulaAstError(`${name} is not a usable sheet name.`, {
+      kind: "ref",
+      sheet: name,
+    });
+  }
+  if (!A1_PATTERN.test(cell)) {
+    throw new FormulaAstError(`${cell} is not an A1 cell address.`, {
+      kind: "ref",
+      text: cell,
+    });
+  }
+  return {
+    kind: "ref",
+    text: `'${name.replaceAll("'", "''")}'!${cell}`,
+    strict: true,
+    sheet: name,
+    address: cell,
+  };
+}
+
+/**
+ * A numeric literal that keeps the spelling it was read with.
+ *
+ * `String(1e-9)` is `1e-9`, but the workbook ships `0.000000001`; a reader that
+ * normalised it would re-render different bytes and the round trip would stop
+ * being an identity. The lexeme is checked to be a plain decimal AND to denote
+ * exactly the stored value, so this preserves spelling without admitting text.
+ */
+export function numericLiteral(text) {
+  const lexeme = String(text);
+  if (!NUMERIC_LEXEME_PATTERN.test(lexeme)) {
+    throw new FormulaAstError(`${lexeme} is not a numeric lexeme.`, {
+      kind: "literal",
+      text: lexeme,
+    });
+  }
+  const value = Number(lexeme);
+  if (!Number.isFinite(value)) {
+    throw new FormulaAstError(`${lexeme} is not a finite number.`, {
+      kind: "literal",
+      text: lexeme,
+    });
+  }
+  const node = literal(value);
+  return String(value) === lexeme ? node : { ...node, text: lexeme };
+}
+
+class FormulaParser {
+  constructor(text) {
+    this.text = String(text);
+    this.at = 0;
+  }
+
+  fail(message) {
+    throw new FormulaAstError(
+      `${message} at offset ${this.at} of ${JSON.stringify(this.text)}.`,
+      { parser: true, offset: this.at, text: this.text },
+    );
+  }
+
+  peek(length = 1) {
+    return this.text.slice(this.at, this.at + length);
+  }
+
+  eat(token) {
+    if (this.peek(token.length) !== token) return false;
+    this.at += token.length;
+    return true;
+  }
+
+  expect(token) {
+    if (!this.eat(token)) this.fail(`expected ${JSON.stringify(token)}`);
+  }
+
+  done() {
+    return this.at >= this.text.length;
+  }
+
+  parse() {
+    if (this.text.length === 0) this.fail("an empty formula is not an expression");
+    const node = this.expression();
+    if (!this.done()) this.fail("trailing input");
+    return node;
+  }
+
+  expression() {
+    return this.comparison();
+  }
+
+  comparison() {
+    let left = this.additive();
+    for (;;) {
+      const operator = ["<>", ">=", "<=", "=", ">", "<"].find((candidate) =>
+        this.peek(candidate.length) === candidate,
+      );
+      if (!operator) return left;
+      this.at += operator.length;
+      left = binary(operator, [left, this.additive()]);
+    }
+  }
+
+  additive() {
+    let left = this.multiplicative();
+    for (;;) {
+      const operator = this.peek();
+      if (operator !== "+" && operator !== "-") return left;
+      this.at += 1;
+      left = binary(operator, [left, this.multiplicative()]);
+    }
+  }
+
+  multiplicative() {
+    let left = this.unary();
+    for (;;) {
+      const operator = this.peek();
+      if (operator !== "*" && operator !== "/") return left;
+      this.at += 1;
+      left = binary(operator, [left, this.unary()]);
+    }
+  }
+
+  unary() {
+    if (this.eat("-")) return unary("-", this.unary());
+    return this.power();
+  }
+
+  power() {
+    let left = this.primary();
+    while (this.eat("^")) left = binary("^", [left, this.primary()]);
+    return left;
+  }
+
+  primary() {
+    if (this.eat("(")) {
+      const inner = this.expression();
+      this.expect(")");
+      return group(inner);
+    }
+    if (this.peek() === '"') return this.stringLiteral();
+    const digits = /^[0-9]/.test(this.peek());
+    if (digits) return this.number();
+    const reference = this.reference();
+    if (reference) return reference;
+    return this.callOrFail();
+  }
+
+  stringLiteral() {
+    this.expect('"');
+    let value = "";
+    for (;;) {
+      if (this.done()) this.fail("unterminated string literal");
+      if (this.eat('"')) {
+        if (this.eat('"')) {
+          value += '"';
+          continue;
+        }
+        return literal(value);
+      }
+      value += this.text[this.at];
+      this.at += 1;
+    }
+  }
+
+  number() {
+    const match = /^[0-9]+(?:\.[0-9]+)?/.exec(this.text.slice(this.at));
+    if (!match) this.fail("expected a number");
+    this.at += match[0].length;
+    return numericLiteral(match[0]);
+  }
+
+  /** A cell address, a sheet-qualified address, or a range of either. Null if the cursor is not on one. */
+  reference() {
+    const first = this.address();
+    if (!first) return null;
+    if (this.peek() !== ":") return first;
+    const save = this.at;
+    this.at += 1;
+    const second = this.address();
+    if (!second) {
+      this.at = save;
+      return first;
+    }
+    return range(first, second);
+  }
+
+  address() {
+    const rest = this.text.slice(this.at);
+    const qualified = SHEET_QUALIFIED_PATTERN.exec(rest);
+    if (qualified) {
+      this.at += qualified[0].length;
+      return sheetRef(qualified[1].replaceAll("''", "'"), qualified[2]);
+    }
+    // A bare `SUM(` must not be read as the address `SU` followed by `M(`, so
+    // the address may not be followed by an opening bracket.
+    const plain = /^\$?[A-Z]{1,3}\$?[0-9]+/.exec(rest);
+    if (!plain) return null;
+    this.at += plain[0].length;
+    return ref(plain[0]);
+  }
+
+  callOrFail() {
+    const match = /^([A-Z][A-Z0-9.]*)\(/.exec(this.text.slice(this.at));
+    if (!match) this.fail("expected a reference, a literal or a function call");
+    const name = match[1];
+    this.at += match[0].length;
+    const args = [];
+    if (!this.eat(")")) {
+      for (;;) {
+        args.push(this.expression());
+        if (this.eat(",")) continue;
+        this.expect(")");
+        break;
+      }
+    }
+    if (name === "IF") {
+      if (args.length !== 3) {
+        throw new FormulaAstError(
+          `IF takes exactly three arguments; this one has ${args.length}.`,
+          { kind: "conditional", args: args.length },
+        );
+      }
+      return conditional(args[0], args[1], args[2]);
+    }
+    return call(name, args);
+  }
+}
+
+/** Read Excel expression text (no leading `=`) into a tree over the closed vocabulary. */
+export function parseExpression(text) {
+  return new FormulaParser(text).parse();
+}
+
+/** Read a complete Excel formula (leading `=` required) into a tree. */
+export function parseFormula(text) {
+  const value = String(text);
+  if (!value.startsWith("=")) {
+    throw new FormulaAstError("A formula must begin with '='.", { text: value });
+  }
+  return parseExpression(value.slice(1));
+}
+
+/**
+ * Read `text` and prove the tree renders back to exactly those bytes.
+ *
+ * Callers that intend to REWRITE a formula (the adjustment gate) use this
+ * rather than `parseExpression` directly: a tree that does not re-render to its
+ * own source cannot safely stand in for the source.
+ */
+export function parseExpressionExactly(text) {
+  const node = parseExpression(text);
+  const rendered = renderExpression(node);
+  if (rendered !== String(text)) {
+    throw new FormulaAstError(
+      `Parsing ${JSON.stringify(String(text))} produced a tree that renders ${JSON.stringify(rendered)}.`,
+      { round_trip: false, source: String(text), rendered },
+    );
+  }
+  return node;
 }
